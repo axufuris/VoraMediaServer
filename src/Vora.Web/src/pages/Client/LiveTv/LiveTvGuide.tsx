@@ -356,7 +356,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
             const newSessions = await dvrService.getRecordingSessions(activeProfileId, serverId);
             setRecordingSessions(newSessions);
 
-            await dialog.alert("Recording scheduled successfully!", "Success");
+            await dialog.alert({ title: "Success", message: "Recording scheduled successfully!" });
             setProgramModal(null);
         } catch (error) {
             const err = error as { response?: { status: number } };

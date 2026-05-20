@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { ArtworkResult } from '../Media/libraryService';
+import type { ArtworkResult } from '../Media/artworkService';
 
 export interface UpdateCollectionRequest {
     title: string;

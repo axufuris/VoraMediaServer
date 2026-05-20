@@ -23,7 +23,7 @@ export default function CinematicBackdrop({ src, intensity = 'detail', parallax,
     const containerRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-        const key = transitionKey ?? src;
+        const key = transitionKey ?? src ?? undefined;
         if (key === lastKeyRef.current) return;
         lastKeyRef.current = key;
         setOpacity(0);

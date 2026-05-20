@@ -81,6 +81,7 @@ interface PlayerContextType {
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
+    const dialog = useDialog();
     const [currentMedia, setCurrentMedia] = useState<PlayableMedia | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);

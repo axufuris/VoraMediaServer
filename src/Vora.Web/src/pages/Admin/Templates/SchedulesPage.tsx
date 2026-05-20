@@ -401,9 +401,8 @@ export default function AdminTemplateSchedulesPage() {
                         <EmptyState
                             title="No schedules yet"
                             description="Schedule a template for a date range — e.g. Thanksgiving week. Profiles can opt out by picking a different template; their choice persists until the schedule ends, then reverts to their default."
-                            action={(
-                                <button type="button" onClick={openCreate} className="vora-button-primary cursor-pointer">Create the first schedule</button>
-                            )}
+                            actionLabel="Create the first schedule"
+                            onAction={openCreate}
                         />
                     ) : (
                         <div className="space-y-8">

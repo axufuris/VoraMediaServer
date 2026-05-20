@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams, Outlet } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, type ReactElement } from 'react';
 import { serverVault } from './utils/serverVault';
 import MainLayout from './layouts/MainLayout';
 import AdminShell from './components/Admin/Shell/AdminShell';
@@ -102,7 +102,7 @@ const ServerContextWrapper = () => {
     return <Outlet />;
 };
 
-const RequireAuth = ({ children }: { children: JSX.Element }) => {
+const RequireAuth = ({ children }: { children: ReactElement }) => {
     const servers = serverVault.getServers();
     let activeServer = serverVault.getActiveServer();
 

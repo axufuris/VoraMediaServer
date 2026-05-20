@@ -7,7 +7,6 @@ import { libraryAdminService } from '../../api/Media/libraryAdminService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import RecommendationRow from '../../components/Media/RecommendationRow';
 import { useDialog } from '../../dialogs';
-import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import Tabs from '../../components/Client/Primitives/Tabs';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
