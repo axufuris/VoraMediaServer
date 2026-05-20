@@ -188,7 +188,7 @@ export default function ProfileSelectionPage() {
         if (!userId || !newName.trim()) return;
 
         try {
-            await profileService.createProfile(userId, newName, undefined, newPin || undefined, [], true);
+            await profileService.createProfile(userId, newName, undefined, newPin || undefined, [], [], [], true);
             setIsCreateOpen(false);
             setNewName('');
             setNewPin('');

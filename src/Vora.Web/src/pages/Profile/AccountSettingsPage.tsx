@@ -10,7 +10,6 @@ import { userImageService } from '../../api/Users/userImageService';
 import { type UserVM, userService } from '../../api/Users/userService';
 import { musicService } from '../../api/Music/musicService';
 export default function AccountSettingsPage() {
-    const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const [user, setUser] = useState<UserVM | null>(null);
     const [libraries, setLibraries] = useState<LibrarySummary[]>([]);

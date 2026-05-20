@@ -350,7 +350,7 @@ export default function MediaDetailsPage() {
 
     return (
         <div className="relative min-h-full pb-20">
-            <EditMetadataModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSaved={reloadMedia} itemId={media.id} type="media" initialData={media} />
+            <EditMetadataModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSaved={reloadMedia} itemId={media.id} type="media" initialData={{ ...media, lockedFields: media.lockedFields ?? [] }} />
             <AddToCollectionModal isOpen={isCollectionModalOpen} onClose={() => setIsCollectionModalOpen(false)} mediaId={media.id} libraryId={media.libraryId} mediaType={media.type} initialCollectionIds={media.collectionIds || []} onSaved={reloadMedia} />
             <AddToPlaylistModal isOpen={isPlaylistModalOpen} onClose={() => setIsPlaylistModalOpen(false)} mediaId={media.id} />
 

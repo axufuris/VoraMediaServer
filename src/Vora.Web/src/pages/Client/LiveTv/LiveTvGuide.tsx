@@ -362,9 +362,9 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
             const err = error as { response?: { status: number } };
 
             if (err.response?.status === 403) {
-                await dialog.alert("You do not have permission to record Live TV.", "Permission Denied");
+                await dialog.alert({ title: "Permission Denied", message: "You do not have permission to record Live TV." });
             } else {
-                await dialog.alert("Failed to schedule recording. Tuner limits may be full or storage quota exceeded.", "Scheduling Failed");
+                await dialog.alert({ title: "Scheduling Failed", message: "Failed to schedule recording. Tuner limits may be full or storage quota exceeded." });
             }
         }
     };

@@ -9,7 +9,6 @@ import SmartPlaylistEditorModal from './SmartPlaylistEditorModal';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import Tabs from '../../../components/Client/Primitives/Tabs';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
-import { Modal } from '../../../components/Common/Modal';
 
 type TypeFilter = 'all' | 'music' | 'video';
 
@@ -44,10 +43,6 @@ export default function PlaylistsPage() {
         smartPlaylistService.list(serverId)
             .then(setSmartPlaylists)
             .catch(err => { console.error(err); setSmartPlaylists([]); });
-    };
-
-    const loadPlaylists = () => {
-        playlistService.getPlaylists(serverId).then(setPlaylists).catch(console.error);
     };
 
     useEffect(() => {
