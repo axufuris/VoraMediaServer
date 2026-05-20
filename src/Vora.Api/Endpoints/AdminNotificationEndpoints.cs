@@ -1,0 +1,44 @@
+using Microsoft.AspNetCore.Mvc;
+using Vora.Application.Notifications;
+using Vora.Application.Notifications.ViewModels;
+
+namespace Vora.Api.Endpoints;
+
+public static class AdminNotificationEndpoints
+{
+    public static RouteGroupBuilder MapAdminNotificationEndpoints(this IEndpointRouteBuilder routes)
+    {
+        var group = routes.MapGroup("/api/admin/notifications").WithTags("Admin Notifications").RequireAuthorization("AdminOnly");
+
+        group.MapGet("/", GetRecentAsync).Produces<List<AdminNotificationVM>>();
+        group.MapGet("/unread-count", GetUnreadCountAsync).Produces<int>();
+        group.MapPut("/{id:guid}/read", MarkReadAsync).Produces(StatusCodes.Status204NoContent);
+        group.MapPost("/mark-all-read", MarkAllReadAsync).Produces(StatusCodes.Status204NoContent);
+
+        return group;
+    }
+
+    private static async Task<IResult> GetRecentAsync([FromQuery] int? limit, [FromQuery] bool unreadOnly, IAdminNotificationManager manager)
+    {
+        var list = await manager.GetRecentAsync(Math.Clamp(limit ?? 50, 1, 200), unreadOnly);
+        return Results.Ok(list);
+    }
+
+    private static async Task<IResult> GetUnreadCountAsync(IAdminNotificationManager manager)
+    {
+        var count = await manager.GetUnreadCountAsync();
+        return Results.Ok(count);
+    }
+
+    private static async Task<IResult> MarkReadAsync(Guid id, IAdminNotificationManager manager)
+    {
+        var ok = await manager.MarkReadAsync(id);
+        return ok ? Results.NoContent() : Results.NotFound();
+    }
+
+    private static async Task<IResult> MarkAllReadAsync(IAdminNotificationManager manager)
+    {
+        await manager.MarkAllReadAsync();
+        return Results.NoContent();
+    }
+}

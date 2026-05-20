@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Vora — Home (mockup)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://rsms.me/" />
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+<style>
+  :root {
+    --bg-canvas: #08080b;
+    --bg-surface: #101015;
+    --bg-raised: #181820;
+    --bg-glass: rgba(20, 20, 28, 0.55);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --text-primary: #fafafa;
+    --text-secondary: #c4c4cc;
+    --text-muted: #9090a0;
+    --accent-500: #f59e0b;
+    --accent-soft: rgba(245, 158, 11, 0.18);
+    --accent-contrast: #1a1207;
+    --duration-med: 240ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+    font-family: 'Inter Tight', Inter, system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    overflow-x: hidden;
+  }
+  /* Topbar */
+  .topbar {
+    position: fixed; inset: 0 0 auto 0; height: 56px; z-index: 50;
+    display: flex; align-items: center; padding: 0 20px; gap: 20px;
+    background: var(--bg-glass);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .topbar .logo { font-weight: 600; letter-spacing: -0.01em; font-size: 18px; color: var(--text-primary); }
+  .topbar .lib-switch { font-size: 13px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .topbar .search {
+    flex: 1; max-width: 520px; margin: 0 auto;
+    background: rgba(255,255,255,0.06); border: 1px solid var(--border-subtle);
+    border-radius: 999px; height: 36px; display: flex; align-items: center; padding: 0 14px; gap: 10px;
+    color: var(--text-muted); font-size: 13px;
+  }
+  .topbar .profile { width: 32px; height: 32px; border-radius: 999px; background: linear-gradient(135deg, #f59e0b, #ef4444); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--accent-contrast); }
+  /* Rail nav */
+  .rail {
+    position: fixed; top: 56px; bottom: 0; left: 0; width: 72px; padding: 16px 0;
+    background: var(--bg-canvas);
+    border-right: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 40;
+  }
+  .rail .item { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; transition: background var(--duration-med) var(--ease-out), color var(--duration-med) var(--ease-out); }
+  .rail .item:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
+  .rail .item.active { background: var(--accent-soft); color: var(--accent-500); }
+  .rail .spacer { flex: 1; }
+  .rail .item svg { width: 22px; height: 22px; stroke-width: 1.5; }
+  /* Main */
+  .main { margin-left: 72px; padding-top: 56px; min-height: 100vh; }
+  /* Hero */
+  .hero { position: relative; height: 70vh; min-height: 540px; overflow: hidden; }
+  .hero .bg { position: absolute; inset: 0; background-size: cover; background-position: center; transition: opacity 0.56s var(--ease-out); }
+  .hero .bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0%, transparent 30%, var(--bg-canvas) 96%); }
+  .hero .vignette { position: absolute; inset: 0; background: radial-gradient(circle at 30% 50%, transparent 0%, transparent 40%, rgba(8,8,11,0.55) 100%); }
+  .hero .content { position: absolute; left: 64px; right: 64px; bottom: 80px; max-width: 640px; }
+  .hero .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-subtle); font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 18px; }
+  .hero h1 { font-size: 56px; line-height: 1.05; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 12px; }
+  .hero .meta { color: var(--text-secondary); font-size: 14px; display: flex; gap: 14px; margin-bottom: 16px; }
+  .hero .meta .chip { padding: 3px 9px; border: 1px solid var(--border-subtle); border-radius: 6px; font-size: 12px; }
+  .hero p { color: var(--text-secondary); font-size: 16px; line-height: 1.55; max-width: 560px; margin: 0 0 24px; }
+  .hero .ctas { display: flex; gap: 12px; }
+  .btn-primary { background: var(--accent-500); color: var(--accent-contrast); border: 0; padding: 14px 28px; border-radius: 10px; font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; transition: background var(--duration-med) var(--ease-out); }
+  .btn-primary:hover { background: #fbbf24; }
+  .btn-glass { background: rgba(255,255,255,0.08); color: var(--text-primary); border: 1px solid var(--border-subtle); padding: 14px 24px; border-radius: 10px; font-size: 15px; font-weight: 500; backdrop-filter: blur(10px); cursor: pointer; }
+  .hero .dots { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+  .hero .dot { width: 24px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.2); }
+  .hero .dot.active { background: var(--accent-500); width: 36px; }
+  /* Rails */
+  .rail-section { padding: 28px 64px; margin-top: -60px; position: relative; z-index: 2; }
+  .rail-section h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 16px; display: flex; align-items: center; gap: 12px; }
+  .rail-section h2 .more { font-size: 12px; color: var(--text-muted); font-weight: 400; cursor: pointer; }
+  .rail-row { display: grid; grid-auto-flow: column; grid-auto-columns: 192px; gap: 16px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+  .rail-row::-webkit-scrollbar { display: none; }
+  /* Poster card */
+  .poster { position: relative; transition: transform var(--duration-med) var(--ease-out); cursor: pointer; }
+  .poster:hover { transform: translateY(-4px) scale(1.03); }
+  .poster .art { aspect-ratio: 2/3; border-radius: 10px; background: var(--bg-surface); overflow: hidden; background-size: cover; background-position: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .poster .progress { position: absolute; left: 8px; right: 8px; bottom: 10px; height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; }
+  .poster .progress > div { height: 100%; background: var(--accent-500); }
+  .poster .title { margin-top: 10px; font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .poster .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  /* Still card */
+  .still .art { aspect-ratio: 16/9; }
+  /* Color placeholders for art */
+  .art-1 { background-image: linear-gradient(135deg, #2c1810 0%, #5c2818 50%, #1a0a0a 100%); }
+  .art-2 { background-image: linear-gradient(135deg, #0a2340 0%, #1a4d6f 50%, #062035 100%); }
+  .art-3 { background-image: linear-gradient(135deg, #2a1b40 0%, #5c3f7a 50%, #1a0e2a 100%); }
+  .art-4 { background-image: linear-gradient(135deg, #1a3a1f 0%, #3a6b40 50%, #0a1f10 100%); }
+  .art-5 { background-image: linear-gradient(135deg, #3a1f1a 0%, #6b4a3a 50%, #2a0f0a 100%); }
+  .art-6 { background-image: linear-gradient(135deg, #1a1f3a 0%, #4a5d8a 50%, #0a0f2a 100%); }
+  .art-7 { background-image: linear-gradient(135deg, #3a1a3a 0%, #6b3a6b 50%, #2a0a2a 100%); }
+  .art-8 { background-image: linear-gradient(135deg, #1a3a3a 0%, #3a6b6b 50%, #0a2a2a 100%); }
+  .hero-art { background-image: linear-gradient(120deg, #1a0a2e 0%, #3c1f5c 35%, #5d2e8c 65%, #1a0a2e 100%); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Vora</div>
+  <div class="lib-switch">
+    <span>Andy's Server</span>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+  <div class="search">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <span>Search movies, shows, music, or anyone</span>
+    <span style="margin-left:auto;font-size:11px;color:rgba(255,255,255,0.3);padding:2px 7px;border:1px solid var(--border-subtle);border-radius:5px">⌘K</span>
+  </div>
+  <div class="profile">AC</div>
+</div>
+
+<aside class="rail">
+  <div class="item active" title="Home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h4v-6h6v6h4V10"/></svg>
+  </div>
+  <div class="item" title="Discovery">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="m15 9-2 6-6 2 2-6 6-2z"/></svg>
+  </div>
+  <div class="item" title="Music">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+  </div>
+  <div class="item" title="Live TV">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="m8 22 4-3 4 3"/></svg>
+  </div>
+  <div class="item" title="Library">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m7 17 4-4 4 4 6-6"/></svg>
+  </div>
+  <div class="item" title="Watchlist">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+  </div>
+  <div class="spacer"></div>
+  <div class="item" title="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
+  </div>
+</aside>
+
+<main class="main">
+  <section class="hero">
+    <div class="bg hero-art"></div>
+    <div class="vignette"></div>
+    <div class="content">
+      <div class="eyebrow">
+        <span style="width:6px;height:6px;border-radius:50%;background:var(--accent-500)"></span>
+        Spotlight · New this week
+      </div>
+      <h1>Dune: Part Two</h1>
+      <div class="meta">
+        <span>2024</span>
+        <span class="chip">4K HDR</span>
+        <span class="chip">Atmos</span>
+        <span>166 min</span>
+        <span>PG-13</span>
+      </div>
+      <p>Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family.</p>
+      <div class="ctas">
+        <button class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Play
+        </button>
+        <button class="btn-glass">More info</button>
+      </div>
+    </div>
+    <div class="dots">
+      <div class="dot active"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+  </section>
+
+  <section class="rail-section">
+    <h2>Continue Watching <span class="more">View all →</span></h2>
+    <div class="rail-row">
+      <div class="poster still"><div class="art art-1"></div><div class="progress"><div style="width:67%"></div></div><div class="title">Severance · S2 E5</div><div class="sub">21 min left</div></div>
+      <div class="poster still"><div class="art art-2"></div><div class="progress"><div style="width:42%"></div></div><div class="title">The Bear · S3 E2</div><div class="sub">17 min left</div></div>
+      <div class="poster still"><div class="art art-3"></div><div class="progress"><div style="width:88%"></div></div><div class="title">Shōgun · S1 E9</div><div class="sub">8 min left</div></div>
+      <div class="poster still"><div class="art art-4"></div><div class="progress"><div style="width:23%"></div></div><div class="title">Andor · S2 E4</div><div class="sub">36 min left</div></div>
+      <div class="poster still"><div class="art art-5"></div><div class="progress"><div style="width:55%"></div></div><div class="title">Slow Horses · S4 E1</div><div class="sub">21 min left</div></div>
+    </div>
+  </section>
+
+  <section class="rail-section" style="margin-top:0">
+    <h2>Recently Added <span class="more">View all →</span></h2>
+    <div class="rail-row">
+      <div class="poster"><div class="art art-6"></div><div class="title">Oppenheimer</div><div class="sub">2023 · Drama</div></div>
+      <div class="poster"><div class="art art-7"></div><div class="title">Anatomy of a Fall</div><div class="sub">2023 · Mystery</div></div>
+      <div class="poster"><div class="art art-8"></div><div class="title">Past Lives</div><div class="sub">2023 · Romance</div></div>
+      <div class="poster"><div class="art art-1"></div><div class="title">The Holdovers</div><div class="sub">2023 · Comedy</div></div>
+      <div class="poster"><div class="art art-2"></div><div class="title">American Fiction</div><div class="sub">2023 · Drama</div></div>
+      <div class="poster"><div class="art art-3"></div><div class="title">Poor Things</div><div class="sub">2023 · Sci-fi</div></div>
+      <div class="poster"><div class="art art-4"></div><div class="title">The Zone of Interest</div><div class="sub">2023 · Drama</div></div>
+    </div>
+  </section>
+
+  <section class="rail-section" style="margin-top:0; padding-bottom: 80px">
+    <h2>Because you watched Severance <span class="more">View all →</span></h2>
+    <div class="rail-row">
+      <div class="poster"><div class="art art-2"></div><div class="title">Mr. Robot</div><div class="sub">2015 · Thriller</div></div>
+      <div class="poster"><div class="art art-3"></div><div class="title">Devs</div><div class="sub">2020 · Sci-fi</div></div>
+      <div class="poster"><div class="art art-6"></div><div class="title">Westworld</div><div class="sub">2016 · Sci-fi</div></div>
+      <div class="poster"><div class="art art-8"></div><div class="title">Black Mirror</div><div class="sub">2011 · Anthology</div></div>
+      <div class="poster"><div class="art art-1"></div><div class="title">Counterpart</div><div class="sub">2017 · Thriller</div></div>
+      <div class="poster"><div class="art art-5"></div><div class="title">Yellowjackets</div><div class="sub">2021 · Drama</div></div>
+      <div class="poster"><div class="art art-7"></div><div class="title">Tales from the Loop</div><div class="sub">2020 · Sci-fi</div></div>
+    </div>
+  </section>
+</main>
+
+</body>
+</html>

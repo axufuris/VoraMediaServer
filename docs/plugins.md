@@ -1,0 +1,73 @@
+# Plugin system
+
+Plugins extend Vora at runtime with new providers — metadata sources, artwork sources, IPTV providers, collection sync sources, chronology providers, etc.
+
+## Layout
+
+- **`/src/plugins/Vora.Plugins.Abstractions/`** — the contracts every plugin implements. Only depends on `Vora.Domain` (for entities passed across the boundary). Plugins reference **this and only this** from the plugin system.
+- **`/src/plugins/<PluginName>/`** — individual plugin assemblies. Each builds into the folder the loader scans.
+
+## Provider categories
+
+Vora plugins fall into these provider interfaces (defined in `Vora.Plugins.Abstractions`):
+
+- **Metadata provider** — looks up media metadata by external ID or title (e.g. TMDB, IMDB, TVDB)
+- **Artwork provider** — fetches posters/backdrops/banners
+- **IPTV provider** — supplies channels, EPG, stream URLs at the plugin contract level. Distinct from the user-facing `IptvPlaylist` / `IptvEpgSource` aggregates documented in `docs/iptv-and-dvr.md`; an IPTV provider plugin would typically feed data into those aggregates (e.g. HDHomeRun integration).
+- **Collection sync provider** — pulls list contents from external sources (Trakt lists, custom feeds)
+- **Chronology provider** — supplies a custom watch order for a collection (e.g. timeline-based MCU order)
+
+When adding a **new** provider interface:
+
+1. Add the interface to `Vora.Plugins.Abstractions`.
+2. Add it to the `PluginProviderInterfaces` array in `Vora.Api/Extensions/PluginLoaderExtensions.cs` so the loader discovers it.
+
+## Loader
+
+`Vora.Api/Extensions/PluginLoaderExtensions.cs` exposes `services.AddVoraPlugins(path)`. It:
+
+- Scans built-in and external assemblies under the given path.
+- Finds every concrete `IVoraPlugin` and every concrete implementation of one of the `PluginProviderInterfaces`.
+- Registers them with DI.
+
+`Vora.Api/Extensions/PluginSettingsAdapter.cs` adapts the application-layer `ISystemSettingsRepository` to the plugin-facing `IPluginSettingsProvider`, so plugins can read/write their own settings without knowing about EF Core.
+
+## Writing a plugin
+
+A plugin project:
+
+- References `Vora.Plugins.Abstractions` (and `Vora.Domain` only if entity shapes are required).
+- Implements one or more of the provider interfaces.
+- Builds to the folder the loader scans at runtime.
+
+Plugin settings (API keys, endpoints) come through `IPluginSettingsProvider`. The settings UI on the admin pages reads/writes via `pluginAdminService` on the frontend, which calls the corresponding backend endpoint. New settings fields are declared by the plugin and surfaced generically — you don't have to hand-build admin UI for them.
+
+## Where plugin settings render in the admin UI
+
+The `PluginSection` component in `components/Admin/Settings/PluginSettingsTab.tsx` renders one plugin's settings inline. It's exported so feature pages can mount it directly. The `FeaturePluginList` wrapper in `components/Admin/Features/FeaturePluginList.tsx` takes a list of plugin type names (matching the interface name without the `I` prefix and `Provider` suffix — e.g. `Discovery` for `IDiscoveryProvider`), fetches plugins, filters, and renders a `PluginSection` per match.
+
+Each plugin category has a canonical home:
+
+| Plugin type | Lives on |
+| --- | --- |
+| `Discovery`, `Theater` | Discover (`/admin/discovery`) |
+| `Recommendation` | For You (`/admin/for-you`) |
+| `Calendar` | Release Calendar (`/admin/release-calendar`) |
+| `PodcastDiscovery` | Podcasts (`/admin/podcasts`) |
+| `Artwork`, `Metadata`, `Ratings`, `FolderWatcher`, `LocalScanner`, `Chronology` | Libraries (TBD) |
+| `CollectionSync` | Collections (TBD) |
+| `OverlayEngine` | Poster Overlays (TBD) |
+| `Request` | Request Queue (TBD) |
+| `Lyrics`, `ListeningData` | Music (TBD) |
+
+Categories marked TBD don't have a dedicated admin page yet, so their plugin settings are still reachable via the System Settings → Plugins sub-sidebar. That sub-sidebar filters out the homed categories automatically — when every category has a home, the section disappears entirely.
+
+The **Plugin Management** page at `/admin/plugins` is a separate concern: it lists every installed plugin and lets admins upload, enable, disable, and uninstall whole plugin packages. It does not host per-plugin settings.
+
+## Admin theme bundles (separate from code plugins)
+
+Admin themes are NOT code plugins. They're folder bundles at `<install>/Themes/<theme-id>/` containing a `manifest.json` and an optional `assets/` directory. They have their own loader (`IThemeBundleLoader` in `Vora.Application.Themes`) and are deliberately kept outside `<install>/Plugins/` so the code-plugin loader's recursive `*.dll` scan never walks into theme assets.
+
+Author guide: `docs/admin-theme-bundles.md`. Surface in the admin UI: **Admin → Server → Appearance** (`/admin/appearance`).
+
+Theme authors don't need to write or compile C# — a bundle is just JSON + images. If you ever expand this to support compiled themes (with React-component slot overrides), that becomes a code plugin and lives in `<install>/Plugins/` like everything else; the contracts would go in `Vora.Plugins.Abstractions` next to the existing provider interfaces.

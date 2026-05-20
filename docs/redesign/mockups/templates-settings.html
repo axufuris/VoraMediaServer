@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Vora — Settings · Templates (mockup)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://rsms.me/" />
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+<style>
+  :root {
+    --bg-canvas: #08080b;
+    --bg-surface: #101015;
+    --bg-raised: #181820;
+    --bg-glass: rgba(20, 20, 28, 0.55);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --text-primary: #fafafa;
+    --text-secondary: #c4c4cc;
+    --text-muted: #9090a0;
+    --accent-500: #f59e0b;
+    --accent-hover: #fbbf24;
+    --accent-soft: rgba(245, 158, 11, 0.18);
+    --accent-contrast: #1a1207;
+    --success-soft: rgba(34, 197, 94, 0.18);
+    --success-text: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { background: var(--bg-canvas); color: var(--text-primary); font-family: 'Inter Tight', Inter, system-ui, sans-serif; }
+  .topbar { position: fixed; inset: 0 0 auto 0; height: 56px; z-index: 50; display: flex; align-items: center; padding: 0 20px; gap: 20px; background: var(--bg-glass); backdrop-filter: blur(18px) saturate(140%); border-bottom: 1px solid var(--border-subtle); }
+  .topbar .logo { font-weight: 600; font-size: 18px; }
+  .topbar .lib-switch { font-size: 13px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .topbar .search { flex: 1; max-width: 520px; margin: 0 auto; background: rgba(255,255,255,0.06); border: 1px solid var(--border-subtle); border-radius: 999px; height: 36px; display: flex; align-items: center; padding: 0 14px; gap: 10px; color: var(--text-muted); font-size: 13px; }
+  .topbar .profile { width: 32px; height: 32px; border-radius: 999px; background: linear-gradient(135deg, #f59e0b, #ef4444); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--accent-contrast); }
+  .rail { position: fixed; top: 56px; bottom: 0; left: 0; width: 72px; padding: 16px 0; background: var(--bg-canvas); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 40; }
+  .rail .item { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; }
+  .rail .item.active { background: var(--accent-soft); color: var(--accent-500); }
+  .rail .spacer { flex: 1; }
+  .rail .item svg { width: 22px; height: 22px; stroke-width: 1.5; }
+  .main { margin-left: 72px; padding: 88px 56px 80px; max-width: 1200px; }
+  .page-header { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 32px; }
+  .page-header h1 { margin: 0; font-size: 32px; font-weight: 600; letter-spacing: -0.01em; }
+  .page-header p { margin: 4px 0 0; color: var(--text-muted); font-size: 14px; }
+  /* Tabs */
+  .tabs { display: flex; gap: 28px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 28px; }
+  .tab { padding: 10px 0 14px; font-size: 14px; color: var(--text-muted); cursor: pointer; position: relative; }
+  .tab.active { color: var(--text-primary); }
+  .tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: var(--accent-500); }
+  /* Scheduled banner */
+  .schedule-banner {
+    position: relative; overflow: hidden; border-radius: 14px; margin-bottom: 28px;
+    background: linear-gradient(135deg, #4a1a1f 0%, #6b2a35 60%, #2a0a12 100%);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    padding: 22px 26px; display: flex; align-items: center; gap: 20px;
+  }
+  .schedule-banner::before { content: ''; position: absolute; right: -40px; top: -40px; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(245,158,11,0.4), transparent 70%); }
+  .schedule-banner .icon { width: 44px; height: 44px; border-radius: 12px; background: rgba(245,158,11,0.2); display: flex; align-items: center; justify-content: center; color: var(--accent-hover); flex-shrink: 0; }
+  .schedule-banner .text { flex: 1; }
+  .schedule-banner h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+  .schedule-banner p { margin: 0; font-size: 13px; color: var(--text-secondary); }
+  .schedule-banner .actions { display: flex; gap: 10px; align-items: center; }
+  .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-strong); padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  .btn-ghost:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+  /* Template grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+  .card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 14px; overflow: hidden; transition: transform 200ms ease, border-color 200ms ease; }
+  .card:hover { transform: translateY(-2px); border-color: var(--border-strong); }
+  .card.active { border: 2px solid var(--accent-500); }
+  .card .swatch { height: 100px; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; position: relative; }
+  .card .swatch::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 100%); pointer-events: none; }
+  .card .body { padding: 18px 20px 20px; }
+  .card .head { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+  .card h3 { margin: 0; font-size: 16px; font-weight: 600; }
+  .card .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 6px; }
+  .badge-built-in { background: rgba(255,255,255,0.08); color: var(--text-secondary); border: 1px solid var(--border-subtle); }
+  .badge-plugin { background: rgba(99, 102, 241, 0.18); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.35); }
+  .badge-active { background: var(--success-soft); color: var(--success-text); border: 1px solid rgba(34, 197, 94, 0.4); }
+  .badge-scheduled { background: rgba(239, 68, 68, 0.18); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+  .card .desc { color: var(--text-muted); font-size: 13px; line-height: 1.5; margin: 6px 0 12px; min-height: 36px; }
+  .card .author { color: var(--text-muted); font-size: 11px; }
+  .card .actions { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 8px; }
+  .btn-primary { background: var(--accent-500); color: var(--accent-contrast); border: 0; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .in-use { color: var(--text-muted); font-size: 12px; font-weight: 500; padding: 8px 0; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Vora</div>
+  <div class="lib-switch">Andy's Server <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+  <div class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Search</span></div>
+  <div class="profile">AC</div>
+</div>
+
+<aside class="rail">
+  <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h4v-6h6v6h4V10"/></svg></div>
+  <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="m15 9-2 6-6 2 2-6 6-2z"/></svg></div>
+  <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+  <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m7 17 4-4 4 4 6-6"/></svg></div>
+  <div class="spacer"></div>
+  <div class="item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3"/></svg></div>
+</aside>
+
+<main class="main">
+  <header class="page-header">
+    <div>
+      <h1>Settings</h1>
+      <p>Personalize Vora for this profile. Changes save automatically.</p>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <div class="tab active">Templates</div>
+    <div class="tab">Playback</div>
+    <div class="tab">Providers</div>
+    <div class="tab">Account</div>
+    <div class="tab">Devices</div>
+    <div class="tab">About</div>
+  </nav>
+
+  <div class="schedule-banner">
+    <div class="icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="6" width="18" height="15" rx="2"/><path d="M3 10h18"/></svg>
+    </div>
+    <div class="text">
+      <h3>Thanksgiving template is active</h3>
+      <p>Your server admin scheduled <strong>Vora Velvet</strong> until <strong>Nov 30, 11:59 PM</strong>. You can pick a different template — your choice will stay until the schedule ends, then revert to your default.</p>
+    </div>
+    <div class="actions">
+      <button class="btn-ghost">Revert to my default</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Vora Velvet (currently active, scheduled) -->
+    <div class="card active">
+      <div class="swatch">
+        <div style="background:#1a0a0e"></div>
+        <div style="background:#2a1218"></div>
+        <div style="background:#c2410c"></div>
+        <div style="background:#fef3c7"></div>
+        <div style="background:#92400e"></div>
+      </div>
+      <div class="body">
+        <div class="head">
+          <h3>Vora Velvet</h3>
+          <div class="badges">
+            <span class="badge badge-built-in">Built-in</span>
+            <span class="badge badge-scheduled">Scheduled</span>
+            <span class="badge badge-active">Active</span>
+          </div>
+        </div>
+        <div class="desc">Burgundy canvas with sepia-tinted artwork and gold accents. Holiday-warm without losing cinematic gravitas.</div>
+        <div class="author">by Vora · v1.0.0</div>
+        <div class="actions">
+          <span class="in-use">In use (scheduled)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vora Cinema (default) -->
+    <div class="card">
+      <div class="swatch">
+        <div style="background:#08080b"></div>
+        <div style="background:#101015"></div>
+        <div style="background:#f59e0b"></div>
+        <div style="background:#fafafa"></div>
+        <div style="background:#9090a0"></div>
+      </div>
+      <div class="body">
+        <div class="head">
+          <h3>Vora Cinema</h3>
+          <div class="badges">
+            <span class="badge badge-built-in">Built-in</span>
+          </div>
+        </div>
+        <div class="desc">The default. Deep canvas, amber accent, subtle vignette. Designed to disappear behind your library.</div>
+        <div class="author">by Vora · v1.0.0 · your default</div>
+        <div class="actions">
+          <button class="btn-primary">Override schedule with this</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vora Noir -->
+    <div class="card">
+      <div class="swatch">
+        <div style="background:#000000"></div>
+        <div style="background:#0a0a0a"></div>
+        <div style="background:#94a3b8"></div>
+        <div style="background:#f8fafc"></div>
+        <div style="background:#64748b"></div>
+      </div>
+      <div class="body">
+        <div class="head">
+          <h3>Vora Noir</h3>
+          <div class="badges">
+            <span class="badge badge-built-in">Built-in</span>
+          </div>
+        </div>
+        <div class="desc">Pure black canvas, cool steel accent, high contrast. For OLED screens and high-glare rooms.</div>
+        <div class="author">by Vora · v1.0.0</div>
+        <div class="actions">
+          <button class="btn-primary">Override schedule with this</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vora Aurora -->
+    <div class="card">
+      <div class="swatch">
+        <div style="background:#020617"></div>
+        <div style="background:#0c1726"></div>
+        <div style="background:#14b8a6"></div>
+        <div style="background:#e0f2fe"></div>
+        <div style="background:#475569"></div>
+      </div>
+      <div class="body">
+        <div class="head">
+          <h3>Vora Aurora</h3>
+          <div class="badges">
+            <span class="badge badge-built-in">Built-in</span>
+          </div>
+        </div>
+        <div class="desc">Deep navy with teal accent and an aurora gradient canvas. Cool, ambient, easy on late-night eyes.</div>
+        <div class="author">by Vora · v1.0.0</div>
+        <div class="actions">
+          <button class="btn-primary">Override schedule with this</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plugin: Halloween -->
+    <div class="card">
+      <div class="swatch">
+        <div style="background:#0a0410"></div>
+        <div style="background:#1a0a26"></div>
+        <div style="background:#f97316"></div>
+        <div style="background:#fef9c3"></div>
+        <div style="background:#86198f"></div>
+      </div>
+      <div class="body">
+        <div class="head">
+          <h3>Hallows Eve</h3>
+          <div class="badges">
+            <span class="badge badge-plugin">Plugin</span>
+          </div>
+        </div>
+        <div class="desc">Inky purple-black canvas with carved-pumpkin orange accents. Includes a faint cobweb canvas pattern.</div>
+        <div class="author">by Mona · v0.4.1</div>
+        <div class="actions">
+          <button class="btn-primary">Override schedule with this</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plugin: Cyberdrift -->
+    <div class="card">
+      <div class="swatch">
+        <div style="background:#020617"></div>
+        <div style="background:#0f172a"></div>
+        <div style="background:#22d3ee"></div>
+        <div style="background:#e0f2fe"></div>
+        <div style="background:#f472b6"></div>
+      </div>
+      <div class="body">
+        <div class="head">
+          <h3>Cyberdrift</h3>
+          <div class="badges">
+            <span class="badge badge-plugin">Plugin</span>
+          </div>
+        </div>
+        <div class="desc">Synthwave canvas with neon cyan and magenta accents. Includes a subtle grid background image.</div>
+        <div class="author">by Neon Studios · v2.1.0</div>
+        <div class="actions">
+          <button class="btn-primary">Override schedule with this</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+</body>
+</html>

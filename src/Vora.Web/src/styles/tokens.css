@@ -1,0 +1,432 @@
+/*
+ * Vora Admin Design Tokens — first-render fallback.
+ *
+ * These :root values are what the admin renders during the brief moment
+ * before <ThemeProvider> mounts and `applyTheme()` overrides them with the
+ * active theme's manifest. They match vora-default 1:1 so an unthemed page
+ * still looks identical to the default theme.
+ *
+ * To author or modify a theme, edit src/theme/themes/<id>.ts — NOT this file.
+ * The CSS variables and utility classes below consume those tokens; the
+ * runtime sets them on document.documentElement via applyTheme().
+ */
+
+:root {
+    /* === Surfaces === */
+    --vora-bg-canvas: #fafaf9;
+    --vora-bg-surface: #ffffff;
+    --vora-bg-raised: #ffffff;
+    --vora-bg-sunken: #f5f5f4;
+    --vora-bg-overlay: rgba(28, 25, 23, 0.6);
+
+    /* === Borders === */
+    --vora-border-subtle: #e7e5e4;
+    --vora-border-strong: #d6d3d1;
+    --vora-border-focus: #d97706;
+
+    /* === Text === */
+    --vora-text-primary: #1c1917;
+    --vora-text-secondary: #44403c;
+    --vora-text-muted: #78716c;
+    --vora-text-disabled: #a8a29e;
+    --vora-text-inverse: #fafaf9;
+
+    /* === Accent (Amber) === */
+    --vora-accent-500: #d97706;
+    --vora-accent-hover: #b45309;
+    --vora-accent-active: #92400e;
+    --vora-accent-soft: #fef3c7;
+    --vora-accent-soft-hover: #fde68a;
+    --vora-accent-text: #92400e;
+    --vora-accent-contrast: #ffffff;
+
+    /* === Semantic === */
+    --vora-success-500: #16a34a;
+    --vora-success-soft: #dcfce7;
+    --vora-success-text: #166534;
+
+    --vora-warning-500: #eab308;
+    --vora-warning-soft: #fef9c3;
+    --vora-warning-text: #854d0e;
+
+    --vora-danger-500: #dc2626;
+    --vora-danger-soft: #fee2e2;
+    --vora-danger-text: #991b1b;
+
+    --vora-info-500: #0284c7;
+    --vora-info-soft: #e0f2fe;
+    --vora-info-text: #075985;
+
+    /* === Typography === */
+    --vora-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --vora-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    /* === Radii === */
+    --vora-radius-sm: 4px;
+    --vora-radius-md: 6px;
+    --vora-radius-lg: 10px;
+    --vora-radius-xl: 14px;
+    --vora-radius-pill: 9999px;
+
+    /* === Shadows === */
+    --vora-shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.04), 0 1px 2px rgba(28, 25, 23, 0.06);
+    --vora-shadow-md: 0 4px 8px rgba(28, 25, 23, 0.05), 0 2px 4px rgba(28, 25, 23, 0.06);
+    --vora-shadow-lg: 0 12px 24px rgba(28, 25, 23, 0.08), 0 4px 8px rgba(28, 25, 23, 0.06);
+    --vora-shadow-overlay: 0 24px 48px rgba(28, 25, 23, 0.18);
+
+    /* === Motion === */
+    --vora-duration-fast: 150ms;
+    --vora-duration-med: 200ms;
+    --vora-ease-out: cubic-bezier(0.2, 0.0, 0.0, 1);
+
+    /* === Layout === */
+    --vora-shell-topbar-h: 56px;
+    --vora-shell-sidebar-w: 240px;
+    --vora-shell-sidebar-rail-w: 64px;
+
+    /* === Misc === */
+    --vora-skeleton-shimmer: #ebeae8;
+    --vora-accent-focus-ring: rgba(217, 119, 6, 0.15);
+
+    /* === Backgrounds (image slots) ===
+     * Themes set these to `url("…")` and a tint. The default theme has no
+     * images, so both slots are `none` here. The layered-background rule
+     * lower down still renders correctly when these are `none`. */
+    --vora-bg-canvas-image: none;
+    --vora-bg-canvas-image-tint: transparent;
+    --vora-bg-canvas-image-position: center;
+    --vora-bg-canvas-image-size: cover;
+    --vora-bg-canvas-image-blend: normal;
+
+    --vora-bg-page-header-image: none;
+    --vora-bg-page-header-image-tint: transparent;
+    --vora-bg-page-header-image-position: center;
+    --vora-bg-page-header-image-size: cover;
+    --vora-bg-page-header-image-blend: normal;
+
+    --vora-bg-player-scrim-image: none;
+    --vora-bg-player-scrim-image-tint: transparent;
+    --vora-bg-player-scrim-image-position: center;
+    --vora-bg-player-scrim-image-size: cover;
+    --vora-bg-player-scrim-image-blend: normal;
+
+    --vora-bg-login-canvas-image: none;
+    --vora-bg-login-canvas-image-tint: transparent;
+    --vora-bg-login-canvas-image-position: center;
+    --vora-bg-login-canvas-image-size: cover;
+    --vora-bg-login-canvas-image-blend: normal;
+
+    --vora-bg-glass: rgba(20, 20, 28, 0.55);
+    --vora-duration-slow: 560ms;
+}
+
+/*
+ * Admin-shell scope: any element under [data-vora-admin] inherits the typography
+ * baseline. Page bodies on the client side stay untouched until we templatize
+ * the client too.
+ */
+[data-vora-admin] {
+    font-family: var(--vora-font-sans);
+    color: var(--vora-text-primary);
+    background-color: var(--vora-bg-canvas);
+    /* Layered background: tint overlay on top of the image so text stays
+     * legible regardless of image contents. When no image is set the
+     * --vora-bg-canvas-image var is `none` and the tint var is `transparent`,
+     * so this rule renders identically to a solid color fill. */
+    background-image:
+        linear-gradient(var(--vora-bg-canvas-image-tint), var(--vora-bg-canvas-image-tint)),
+        var(--vora-bg-canvas-image);
+    background-size: var(--vora-bg-canvas-image-size);
+    background-position: var(--vora-bg-canvas-image-position);
+    background-repeat: no-repeat;
+    background-blend-mode: var(--vora-bg-canvas-image-blend);
+    font-feature-settings: "ss01" on, "cv11" on;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+[data-vora-admin] *:focus-visible {
+    outline: 2px solid var(--vora-accent-500);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* === Semantic utility classes for hand-authoring === */
+
+[data-vora-admin] .vora-card {
+    background-color: var(--vora-bg-surface);
+    border: 1px solid var(--vora-border-subtle);
+    border-radius: var(--vora-radius-lg);
+    box-shadow: var(--vora-shadow-sm);
+}
+
+[data-vora-admin] .vora-card-interactive {
+    transition: transform var(--vora-duration-fast) var(--vora-ease-out),
+                box-shadow var(--vora-duration-fast) var(--vora-ease-out),
+                border-color var(--vora-duration-fast) var(--vora-ease-out);
+}
+
+[data-vora-admin] .vora-card-interactive:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--vora-shadow-md);
+    border-color: var(--vora-border-strong);
+}
+
+[data-vora-client] {
+    font-family: var(--vora-font-sans);
+    color: var(--vora-text-primary);
+    background-color: var(--vora-bg-canvas);
+    background-image:
+        linear-gradient(var(--vora-bg-canvas-image-tint), var(--vora-bg-canvas-image-tint)),
+        var(--vora-bg-canvas-image);
+    background-size: var(--vora-bg-canvas-image-size);
+    background-position: var(--vora-bg-canvas-image-position);
+    background-repeat: no-repeat;
+    background-blend-mode: var(--vora-bg-canvas-image-blend);
+    font-feature-settings: "ss01" on, "cv11" on;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+[data-vora-client] *:focus-visible {
+    outline: 2px solid var(--vora-accent-500);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+.vora-glass {
+    background: var(--vora-bg-glass);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--vora-border-subtle);
+}
+
+[data-vora-client] .vora-card {
+    background-color: var(--vora-bg-surface);
+    border: 1px solid var(--vora-border-subtle);
+    border-radius: var(--vora-radius-lg);
+    box-shadow: var(--vora-shadow-sm);
+}
+
+[data-vora-client] .vora-card-interactive {
+    transition: transform var(--vora-duration-med) var(--vora-ease-out),
+                box-shadow var(--vora-duration-med) var(--vora-ease-out),
+                border-color var(--vora-duration-med) var(--vora-ease-out);
+}
+
+[data-vora-client] .vora-card-interactive:hover {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: var(--vora-shadow-md);
+    border-color: var(--vora-border-strong);
+}
+
+[data-vora-client] .vora-button-primary {
+    background: var(--vora-accent-500);
+    color: var(--vora-accent-contrast);
+    border: 0;
+    padding: 12px 24px;
+    border-radius: var(--vora-radius-md);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background var(--vora-duration-fast) var(--vora-ease-out);
+}
+
+[data-vora-client] .vora-button-primary:hover { background: var(--vora-accent-hover); }
+[data-vora-client] .vora-button-primary:active { background: var(--vora-accent-active); }
+
+[data-vora-client] .vora-button-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--vora-text-primary);
+    border: 1px solid var(--vora-border-subtle);
+    padding: 12px 22px;
+    border-radius: var(--vora-radius-md);
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+[data-vora-client] .vora-button-secondary:hover { border-color: var(--vora-border-strong); }
+
+[data-vora-client] .vora-input {
+    background: var(--vora-bg-surface);
+    border: 1px solid var(--vora-border-subtle);
+    border-radius: var(--vora-radius-md);
+    color: var(--vora-text-primary);
+    padding: 10px 12px;
+    font-size: 14px;
+}
+
+[data-vora-client] .vora-input:focus {
+    outline: none;
+    border-color: var(--vora-accent-500);
+    box-shadow: 0 0 0 3px var(--vora-accent-focus-ring);
+}
+
+[data-vora-client] .vora-skeleton {
+    background: var(--vora-skeleton-shimmer);
+    border-radius: var(--vora-radius-md);
+    animation: vora-skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes vora-skeleton-pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 0.85; }
+}
+
+[data-vora-client] *, [data-vora-admin] * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--vora-border-strong) transparent;
+}
+
+[data-vora-client] *::-webkit-scrollbar,
+[data-vora-admin] *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+[data-vora-client] *::-webkit-scrollbar-track,
+[data-vora-admin] *::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+[data-vora-client] *::-webkit-scrollbar-thumb,
+[data-vora-admin] *::-webkit-scrollbar-thumb {
+    background: var(--vora-border-subtle);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background var(--vora-duration-fast, 120ms) var(--vora-ease-out, ease-out);
+}
+
+[data-vora-client] *::-webkit-scrollbar-thumb:hover,
+[data-vora-admin] *::-webkit-scrollbar-thumb:hover {
+    background: var(--vora-border-strong);
+    background-clip: content-box;
+}
+
+[data-vora-client] *::-webkit-scrollbar-corner,
+[data-vora-admin] *::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+[data-vora-client] *::-webkit-scrollbar-button,
+[data-vora-admin] *::-webkit-scrollbar-button {
+    display: none;
+}
+
+[data-vora-client] .vora-guide-row:hover {
+    background: rgba(255, 255, 255, 0.025);
+}
+
+[data-vora-client] .vora-guide-row:hover .vora-guide-channel {
+    background: var(--vora-bg-raised);
+}
+
+[data-vora-client] .vora-guide-tile:hover {
+    border-color: var(--vora-accent-soft-hover) !important;
+    background: var(--vora-bg-raised) !important;
+    transform: translateY(-1px);
+    box-shadow: var(--vora-shadow-md);
+}
+
+[data-vora-admin] .vora-button-primary {
+    background-color: var(--vora-accent-500);
+    color: var(--vora-accent-contrast);
+    border: none;
+    border-radius: var(--vora-radius-md);
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color var(--vora-duration-fast) var(--vora-ease-out);
+}
+
+[data-vora-admin] .vora-button-primary:hover {
+    background-color: var(--vora-accent-hover);
+}
+
+[data-vora-admin] .vora-button-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+[data-vora-admin] .vora-button-secondary {
+    background-color: var(--vora-bg-surface);
+    color: var(--vora-text-primary);
+    border: 1px solid var(--vora-border-strong);
+    border-radius: var(--vora-radius-md);
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color var(--vora-duration-fast) var(--vora-ease-out);
+}
+
+[data-vora-admin] .vora-button-secondary:hover {
+    background-color: var(--vora-bg-sunken);
+}
+
+[data-vora-admin] .vora-input {
+    background-color: var(--vora-bg-surface);
+    color: var(--vora-text-primary);
+    border: 1px solid var(--vora-border-strong);
+    border-radius: var(--vora-radius-md);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    transition: border-color var(--vora-duration-fast) var(--vora-ease-out);
+    width: 100%;
+}
+
+[data-vora-admin] .vora-input:focus {
+    outline: none;
+    border-color: var(--vora-accent-500);
+    box-shadow: 0 0 0 3px var(--vora-accent-focus-ring);
+}
+
+@keyframes vora-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/*
+ * Every admin page opts into the new design system via `<div data-vora-page>`.
+ * The attribute is value-less — it's just a marker that this element is the
+ * page's primary surface. The actual surface color comes from the active theme's
+ * --vora-bg-canvas token, so themes can make it light or dark as they please.
+ */
+[data-vora-admin] main > [data-vora-page] {
+    background-color: var(--vora-bg-canvas);
+    color: var(--vora-text-primary);
+    min-height: 100%;
+}
+
+[data-vora-admin] .vora-skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--vora-bg-sunken) 0%,
+        var(--vora-skeleton-shimmer) 50%,
+        var(--vora-bg-sunken) 100%
+    );
+    background-size: 200% 100%;
+    animation: vora-shimmer 1.5s ease-in-out infinite;
+    border-radius: var(--vora-radius-md);
+}
+
+/*
+ * Page header surface — used by Admin/Primitives/PageHeader.tsx via the
+ * `.vora-page-header` class so themes can paint a banner per page.
+ */
+[data-vora-admin] .vora-page-header {
+    background-color: color-mix(in srgb, var(--vora-bg-canvas) 85%, transparent);
+    background-image:
+        linear-gradient(var(--vora-bg-page-header-image-tint), var(--vora-bg-page-header-image-tint)),
+        var(--vora-bg-page-header-image);
+    background-size: var(--vora-bg-page-header-image-size);
+    background-position: var(--vora-bg-page-header-image-position);
+    background-repeat: no-repeat;
+    background-blend-mode: var(--vora-bg-page-header-image-blend);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--vora-border-subtle);
+}

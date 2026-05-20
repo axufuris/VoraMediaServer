@@ -1,0 +1,285 @@
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Globalization;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using Vora.Application.Analysis;
+using Vora.Application.Analysis.Results;
+
+namespace Vora.Infrastructure.Analysis;
+
+public class FFmpegAnalyzerService : IMediaAnalyzerService
+{
+    private static readonly Regex SilenceStartRegex = new(@"silence_start:\s*(?<Time>\d+(\.\d+)?)", RegexOptions.Compiled);
+    private static readonly Regex SilenceEndRegex = new(@"silence_end:\s*(?<Time>\d+(\.\d+)?)", RegexOptions.Compiled);
+
+    private readonly ILogger<FFmpegAnalyzerService> _logger;
+
+    public FFmpegAnalyzerService(ILogger<FFmpegAnalyzerService> logger)
+    {
+        _logger = logger;
+    }
+
+    public async Task<MediaAnalysisResult> AnalyzeFileAsync(string filePath)
+    {
+        var result = new MediaAnalysisResult();
+        await RunFFprobeAsync(filePath, result);
+        return result;
+    }
+
+    public async Task<MediaAnalysisResult> AnalyzeSilenceDetectionsAsync(string filePath)
+    {
+        var result = new MediaAnalysisResult();
+        await RunFFmpegSilenceDetectionAsync(filePath, result);
+        return result;
+    }
+
+    private static string? GetTagValue(JsonElement tags, string keyToFind)
+    {
+        if (tags.ValueKind != JsonValueKind.Object) return null;
+
+        string? foundValue = null;
+
+        foreach (var tag in tags.EnumerateObject())
+        {
+            if (tag.Name.Equals(keyToFind, StringComparison.OrdinalIgnoreCase))
+            {
+                foundValue = tag.Value.GetString()?.Trim('"');
+                break;
+            }
+        }
+
+        if (foundValue == null)
+        {
+            foreach (var tag in tags.EnumerateObject())
+            {
+                if (tag.Name.StartsWith(keyToFind, StringComparison.OrdinalIgnoreCase))
+                {
+                    foundValue = tag.Value.GetString()?.Trim('"');
+                    break;
+                }
+            }
+        }
+
+        if (foundValue == "eng")
+            foundValue = "English";
+
+        if (!string.IsNullOrWhiteSpace(foundValue))
+        {
+            return char.ToUpper(foundValue[0]) + foundValue.Substring(1);
+        }
+
+        return foundValue;
+    }
+
+    private async Task RunFFprobeAsync(string filePath, MediaAnalysisResult result)
+    {
+        _logger.LogInformation("Extracting technical metadata via FFprobe for {FilePath}.", filePath);
+
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "ffprobe",
+            Arguments = $"-v quiet -print_format json -show_streams -show_format \"{filePath}\"",
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        try
+        {
+            using var process = Process.Start(processInfo);
+            if (process == null) throw new InvalidOperationException("Failed to start FFprobe process.");
+
+            string jsonOutput = await process.StandardOutput.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            if (string.IsNullOrWhiteSpace(jsonOutput)) return;
+
+            using var doc = JsonDocument.Parse(jsonOutput);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("format", out var formatBlock))
+            {
+                if (formatBlock.TryGetProperty("bit_rate", out var brProp) && long.TryParse(brProp.GetString(), out var br))
+                    result.OverallBitrate = br;
+
+                if (formatBlock.TryGetProperty("size", out var sizeProp) && long.TryParse(sizeProp.GetString(), out var size))
+                    result.FileSizeBytes = size;
+
+                if (formatBlock.TryGetProperty("duration", out var durProp) &&
+                    double.TryParse(durProp.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double durationSeconds))
+                {
+                    result.Duration = TimeSpan.FromSeconds(durationSeconds);
+                }
+            }
+
+            if (root.TryGetProperty("streams", out var streams) && streams.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var stream in streams.EnumerateArray())
+                {
+                    var codecType = stream.TryGetProperty("codec_type", out var ct) ? ct.GetString() : "";
+                    var index = stream.TryGetProperty("index", out var idx) ? idx.GetInt32() : 0;
+
+                    bool isDefault = false;
+                    bool isForced = false;
+                    if (stream.TryGetProperty("disposition", out var disp))
+                    {
+                        isDefault = disp.TryGetProperty("default", out var def) && def.GetInt32() == 1;
+                        isForced = disp.TryGetProperty("forced", out var f) && f.GetInt32() == 1;
+                    }
+
+                    if (codecType == "video")
+                    {
+                        var videoTrack = new VideoTrackInfo
+                        {
+                            StreamIndex = index,
+                            Codec = stream.TryGetProperty("codec_name", out var cn) ? cn.GetString() : null,
+                            Profile = stream.TryGetProperty("profile", out var p) ? p.GetString() : null,
+                            IsDefault = isDefault
+                        };
+
+                        if (stream.TryGetProperty("bits_per_raw_sample", out var bprs) && int.TryParse(bprs.GetString(), out var bd)) videoTrack.BitDepth = bd;
+                        else if (videoTrack.Profile != null && videoTrack.Profile.Contains("10")) videoTrack.BitDepth = 10;
+                        else if (stream.TryGetProperty("pix_fmt", out var pixFmtProp))
+                        {
+                            var pixFmt = pixFmtProp.GetString() ?? "";
+                            if (pixFmt.Contains("p10") || pixFmt.Contains("10le")) videoTrack.BitDepth = 10;
+                            else if (pixFmt.Contains("p12") || pixFmt.Contains("12le")) videoTrack.BitDepth = 12;
+                            else videoTrack.BitDepth = 8;
+                        }
+
+                        string? hdrType = null;
+                        if (stream.TryGetProperty("color_transfer", out var ctProp))
+                        {
+                            var colorTransfer = ctProp.GetString();
+                            if (colorTransfer == "smpte2084") hdrType = "HDR10";
+                            else if (colorTransfer == "arib-std-b67") hdrType = "HLG";
+                        }
+
+                        if (stream.TryGetProperty("side_data_list", out var sideDataList) && sideDataList.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var sideData in sideDataList.EnumerateArray())
+                            {
+                                if (sideData.TryGetProperty("side_data_type", out var sdt) && sdt.GetString() == "DOVI configuration record")
+                                {
+                                    hdrType = hdrType == "HDR10" ? "DoVi/HDR10" : "DoVi";
+                                    break;
+                                }
+                            }
+                        }
+                        videoTrack.HdrType = hdrType;
+
+                        if (stream.TryGetProperty("bit_rate", out var vbrProp) && long.TryParse(vbrProp.GetString(), out var vbr))
+                        {
+                            videoTrack.Bitrate = vbr;
+                        }
+                        else if (stream.TryGetProperty("tags", out var vTags))
+                        {
+                            var bpsString = GetTagValue(vTags, "BPS");
+                            if (!string.IsNullOrEmpty(bpsString) && long.TryParse(bpsString, out var bps))
+                            {
+                                videoTrack.Bitrate = bps;
+                            }
+                        }
+
+                        result.VideoTracks.Add(videoTrack);
+                    }
+                    else if (codecType == "audio")
+                    {
+                        var audioTrack = new AudioTrackInfo
+                        {
+                            StreamIndex = index,
+                            Codec = stream.TryGetProperty("codec_name", out var acn) ? acn.GetString()?.ToUpperInvariant() : null,
+                            Channels = stream.TryGetProperty("channels", out var ch) ? ch.GetInt32() : (int?)null,
+                            IsDefault = isDefault
+                        };
+
+                        if (stream.TryGetProperty("tags", out var tags))
+                        {
+                            audioTrack.Language = GetTagValue(tags, "language");
+                            audioTrack.Title = GetTagValue(tags, "title");
+                        }
+
+                        result.AudioTracks.Add(audioTrack);
+                    }
+                    else if (codecType == "subtitle")
+                    {
+                        var subTrack = new SubtitleTrackInfo
+                        {
+                            StreamIndex = index,
+                            Codec = stream.TryGetProperty("codec_name", out var scn) ? scn.GetString() : null,
+                            IsDefault = isDefault,
+                            IsForced = isForced
+                        };
+
+                        if (stream.TryGetProperty("tags", out var tags))
+                        {
+                            subTrack.Language = GetTagValue(tags, "language");
+                            subTrack.Title = GetTagValue(tags, "title");
+                        }
+
+                        result.SubtitleTracks.Add(subTrack);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "FFprobe analysis failed for {FilePath}.", filePath);
+            throw;
+        }
+    }
+
+    private async Task RunFFmpegSilenceDetectionAsync(string filePath, MediaAnalysisResult result)
+    {
+        _logger.LogInformation("Running FFmpeg silence detection on {FilePath}.", filePath);
+
+        var silenceStarts = new List<double>();
+        var silenceEnds = new List<double>();
+
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "ffmpeg",
+            Arguments = $"-i \"{filePath}\" -af silencedetect=noise=-40dB:d=2 -f null -",
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = new Process { StartInfo = processInfo };
+
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (string.IsNullOrEmpty(e.Data)) return;
+
+            var startMatch = SilenceStartRegex.Match(e.Data);
+            if (startMatch.Success && double.TryParse(startMatch.Groups["Time"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double startTime))
+            {
+                silenceStarts.Add(startTime);
+            }
+
+            var endMatch = SilenceEndRegex.Match(e.Data);
+            if (endMatch.Success && double.TryParse(endMatch.Groups["Time"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double endTime))
+            {
+                silenceEnds.Add(endTime);
+            }
+        };
+
+        process.Start();
+        process.BeginErrorReadLine();
+        await process.WaitForExitAsync();
+
+        if (silenceStarts.Count > 0 && silenceEnds.Count > 0)
+        {
+            result.IntroStart = TimeSpan.FromSeconds(silenceStarts[0]);
+            result.IntroEnd = TimeSpan.FromSeconds(silenceEnds[0]);
+
+            if (silenceStarts.Count > 1)
+            {
+                result.CreditsStart = TimeSpan.FromSeconds(silenceStarts[^1]);
+            }
+        }
+
+        _logger.LogInformation("Analysis complete. Intro: {IntroStart}-{IntroEnd}, Credits: {CreditsStart}", result.IntroStart, result.IntroEnd, result.CreditsStart);
+    }
+}

@@ -1,0 +1,47 @@
+﻿using System.Linq.Expressions;
+using Vora.Application.Libraries.ViewModels;
+using Vora.Application.Media.ViewModels;
+using Vora.Domain.Entities.Actors;
+using Vora.Domain.Entities.Media;
+
+namespace Vora.Application.Media;
+
+public interface IMediaRepository
+{
+    Task<List<Guid>> GetEpisodeIdsForSeasonAsync(Guid seasonId);
+    Task<List<Guid>> GetEpisodeIdsForShowAsync(Guid tvShowId);
+    Task<Guid?> GetMovieIdByTitleAndYearAsync(string title, int? year, Guid libraryId);
+    Task<Guid?> GetTvShowIdByTitleAsync(string title, Guid libraryId);
+    Task<Guid?> GetSeasonIdByNumberAsync(Guid tvShowId, int seasonNumber);
+    Task<Guid?> GetEpisodeIdByNumberAsync(Guid seasonId, int episodeNumber);
+    Task<List<Guid>> GetMediaIdsByExternalIdsAsync(List<string> tmdbIds, List<string> imdbIds);
+    Task<HashSet<string>> GetExistingLibraryPathsAsync(Guid libraryId);
+    Task<IEnumerable<Guid>> GetAllMediaItemIdsByLibraryAsync(Guid libraryId);
+    Task<List<string>> GetMediaFilePathsAsync(Guid mediaItemId);
+    Task<T?> GetProjectedAsync<T>(Guid id, Expression<Func<MediaItem, T>> projection, bool hasAllAccess = true, List<Guid>? allowedLibs = null, bool hasAllRatings = true, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false);
+    Task<IEnumerable<T>> GetAllProjectedAsync<T>(Expression<Func<MediaItem, T>> projection, Guid? libraryId = null, string? libraryType = null, bool hasAllAccess = true, List<Guid>? allowedLibs = null, bool hasAllRatings = true, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false);
+    Task<MediaItem?> GetForAnalysisAsync(Guid id);
+    Task<MediaItem?> GetForPosterOverlayAsync(Guid id);
+    Task<MediaItem?> GetForMetadataSyncAsync(Guid id);
+    Task<IEnumerable<Guid>> GetMediaIdsMissingMetadataAsync(Guid libraryId);
+    Task<MediaItem?> GetForBasicUpdateAsync(Guid id);
+    Task SyncMediaTracksAsync(Guid mediaPartId, List<MediaVideoTrack> incomingVideo, List<MediaAudioTrack> incomingAudio, List<MediaSubtitleTrack> incomingSubtitles);
+    Task UpdateSilenceDetectionsAsync(Guid mediaItemId, TimeSpan? introStart, TimeSpan? introEnd, TimeSpan? creditsStart, TimeSpan? duration);
+    Task UpdateMediaItemAsync(MediaItem item);
+    Task AddMediaItemAsync(MediaItem item);
+    Task AddMediaVideosAsync(IEnumerable<MediaVideo> videos);
+    Task RemoveMediaVideosAsync(IEnumerable<MediaVideo> videos);
+    Task DeleteMediaByFilePathAsync(string filePath);
+    Task DeleteMediaItemAsync(Guid id);
+    Task AddMediaPartAsync(MediaPart part);
+    Task AddMediaCastMembersAsync(IEnumerable<MediaCastMember> castMembers);
+    Task RemoveMediaCastMembersAsync(IEnumerable<MediaCastMember> castMembers);
+    Task SetMediaCompaniesAsync(Guid mediaItemId, IEnumerable<int> companyIds);
+    Task SetMediaCountriesAsync(Guid mediaItemId, IEnumerable<string> countryIsoCodes);
+    Task SetMediaGenresAsync(Guid mediaItemId, IEnumerable<int> genreIds);
+    Task SetTvNetworksAsync(Guid tvShowId, IEnumerable<int> networkIds);
+    Task<bool> MediaExistsByExternalIdAsync(string externalId, string type);
+    Task<Dictionary<string, Guid>> GetLibraryIdsByTmdbIdsAsync(IEnumerable<string> tmdbIds);
+    Task<List<MediaItem>> GetItemsPendingOverlayGenerationAsync(Guid libraryId, DateTime maxTemplateUpdatedDate);
+    Task<string?> GetParentContentRatingAsync(Guid mediaItemId);
+}

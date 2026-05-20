@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" type="image/x-icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vora</title>
+    <script>
+      // Pre-paint theme application — eliminates light-theme FOUC for users on
+      // dark themes. The full theme still applies after React mounts; this just
+      // gets the critical surface colors right for the first paint. Sync, fast.
+      (function () {
+        try {
+          var raw = localStorage.getItem('vora_admin_theme_prepaint');
+          if (!raw) return;
+          var cache = JSON.parse(raw);
+          if (!cache || typeof cache !== 'object') return;
+          var root = document.documentElement;
+          for (var key in cache) {
+            if (Object.prototype.hasOwnProperty.call(cache, key)) {
+              var value = cache[key];
+              if (typeof value === 'string' && value.length > 0) {
+                root.style.setProperty('--vora-' + key, value);
+              }
+            }
+          }
+        } catch (e) {
+          /* ignore — fall back to tokens.css defaults */
+        }
+      })();
+    </script>
+    <style>
+      /*
+       * Match the canvas color from the pre-paint cache (or the light default
+       * baked into tokens.css) so the browser's first paint before CSS loads
+       * doesn't show as plain white when the user is on a dark theme.
+       */
+      html, body { background: var(--vora-bg-canvas, #fafaf9); }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

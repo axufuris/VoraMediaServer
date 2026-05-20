@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Documentation.txt" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Vora.Api/Vora.Api.csproj" />
+    <Project Path="src/Vora.Application/Vora.Application.csproj" />
+    <Project Path="src/Vora.Domain/Vora.Domain.csproj" />
+    <Project Path="src/Vora.Infrastructure/Vora.Infrastructure.csproj" />
+    <Project Path="src/Vora.Plugins/Vora.Plugins.csproj" Id="1c1cd508-d289-403b-91c8-e110cc34d175" />
+    <Project Path="src/Vora.Web/Vora.Web.esproj" DisplayName="Vora.Web">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Project Path="docker-compose.dcproj" Id="12345678-abcd-1234-abcd-1234567890ab">
+    <Build />
+  </Project>
+</Solution>

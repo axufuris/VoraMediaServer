@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  Vora.api:
+    image: ${DOCKER_REGISTRY-}voraapi
+    build:
+      context: .
+      dockerfile: src/Vora.Api/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}
+      - StoragePaths__CustomArtwork=/app/data/custom_artwork
+      - StoragePaths__Overlays=/app/data/overlays
+      - StoragePaths__IptvTimeshift=/app/data/iptv/timeshift
+      - StoragePaths__IptvDvr=/app/data/iptv/dvr
+    ports:
+      - "${Vora_PORT:-8080}:8080"
+    volumes:
+      - D:\TestServer\Movies:/media/movies
+      - D:\TestServer\Shows:/media/shows
+      - D:\TestServer\Music:/media/music
+      - ./Vora-data:/app/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, video]
+
+# Must add this to the Extra Parameters in Unraid: --runtime=nvidia
+# Then you must add a new variable: Key - NVIDIA_VISIBLE_DEVICES, Value - all

@@ -1,0 +1,62 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using Vora.Api.Hubs;
+using Vora.Application.Analysis;
+using Vora.Application.Settings;
+using Vora.Application.Streaming;
+
+namespace Vora.Api.Endpoints;
+
+public record StreamCommandRequest(string Command, string? Message);
+
+public static class StreamingAdminEndpoints
+{
+    public static RouteGroupBuilder MapStreamingAdminEndpoints(this IEndpointRouteBuilder routes)
+    {
+        var group = routes.MapGroup("/api/streaming/admin").WithTags("Streaming (Admin)").RequireAuthorization("AdminOnly");
+
+        group.MapGet("/now-playing", GetNowPlayingAsync);
+        group.MapGet("/history", GetHistoryAsync)
+            .Produces(StatusCodes.Status200OK);
+        group.MapGet("/system-stats", GetSystemStatsAsync);
+        group.MapPost("/sessions/{sessionId:guid}/command", SendSessionCommandAsync);
+
+        return group;
+    }
+
+    private static async Task<IResult> GetNowPlayingAsync(IStreamManager streamManager)
+    {
+        var sessions = await streamManager.GetNowPlayingSessionsAsync();
+        return Results.Ok(sessions);
+    }
+
+    private static async Task<IResult> GetHistoryAsync(
+        [FromQuery] int page,
+        [FromQuery] int pageSize,
+        [FromQuery] string? search,
+        IStreamManager streamManager)
+    {
+        var result = await streamManager.GetGroupedHistoryAsync(page, pageSize, search ?? string.Empty);
+        return Results.Ok(new { result.Data, result.Total });
+    }
+
+    private static async Task<IResult> GetSystemStatsAsync(IStreamManager streamManager, ISystemMetricRepository metricRepo)
+    {
+        var stats = await streamManager.GetSystemStatsAsync(metricRepo);
+        return Results.Ok(stats);
+    }
+
+    private static async Task<IResult> SendSessionCommandAsync(
+        Guid sessionId,
+        IHubContext<VoraHub> hub,
+        [FromBody] StreamCommandRequest req)
+    {
+        await hub.Clients.All.SendAsync("StreamCommandReceived", new
+        {
+            SessionId = sessionId.ToString(),
+            req.Command,
+            req.Message
+        });
+        return Results.Ok();
+    }
+}
