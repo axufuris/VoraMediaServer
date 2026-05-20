@@ -28,13 +28,13 @@ export interface DiscoveryItem {
     title: string;
     type: string;
     year?: number;
-    releaseDate?: string; // <-- NEW
+    releaseDate?: string;
     posterUrl?: string;
     contentRating?: string;
 }
 
 export interface CastMember {
-    externalId: string; // <-- ADD THIS
+    externalId: string;
     name: string;
     role: string;
     profileImageUrl?: string;
@@ -119,7 +119,7 @@ export const discoveryService = {
     toggleWatchlist: async (profileId: string, externalId: string, providerId: string, type: string, title: string, posterUrl?: string, expectedReleaseDate?: string, serverId?: string): Promise<void> => {
         await apiClient.post(
             `/discovery/profiles/${profileId}/watchlist/toggle`,
-            { externalId, providerId, type, title, posterUrl, expectedReleaseDate }, // <-- Passed in payload
+            { externalId, providerId, type, title, posterUrl, expectedReleaseDate },
             { serverId }
         );
     },

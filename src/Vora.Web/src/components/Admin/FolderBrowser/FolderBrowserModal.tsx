@@ -66,8 +66,6 @@ export default function FolderBrowserModal({
         if (!isOpen) return;
         let cancelled = false;
         (async () => {
-            // Reset state every time the modal opens so we don't show stale data
-            // from a previous selection.
             setListing(null);
             setSelectedPath('');
 
@@ -76,9 +74,6 @@ export default function FolderBrowserModal({
 
             const startingPath = initialPath?.trim();
             if (startingPath) {
-                // Silent fallback: if the initial path is outside the allowed
-                // roots or otherwise unreachable, just show the roots picker
-                // instead of alarming the user with an error.
                 const ok = await loadListing(startingPath, { silent: true });
                 if (!ok && !cancelled && fetchedRoots.length === 1) {
                     await loadListing(fetchedRoots[0].path, { silent: true });

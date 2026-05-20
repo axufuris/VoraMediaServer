@@ -8,8 +8,8 @@ export interface CalendarEventVM {
     title: string;
     subTitle?: string;
     mediaType: string;
-    releaseDate: string; // ISO date string
-    airTime?: string; // "HH:mm:ss" format
+    releaseDate: string;
+    airTime?: string;
     releaseType: string;
     contentRating: string;
     posterUrl?: string;

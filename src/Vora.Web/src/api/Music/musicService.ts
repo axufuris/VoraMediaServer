@@ -264,6 +264,71 @@ export interface AlbumDetail {
     tracks: TrackVM[];
 }
 
+export interface AdminMusicHistoryQuery {
+    profileId?: string;
+    from?: string;
+    to?: string;
+    search?: string;
+    page?: number;
+    pageSize?: number;
+}
+
+export interface AdminMusicSummaryQuery {
+    from?: string;
+    to?: string;
+}
+
+export interface AdminMusicHistoryRowVM {
+    id: string;
+    profileId: string;
+    profileName: string;
+    trackId: string;
+    trackTitle: string;
+    artist?: string;
+    albumTitle?: string;
+    albumArtworkUrl?: string;
+    playedAt: string;
+    durationListenedSeconds: number;
+    completed: boolean;
+}
+
+export interface AdminMusicHistoryVM {
+    rows: AdminMusicHistoryRowVM[];
+    total: number;
+    page: number;
+    pageSize: number;
+}
+
+export interface AdminTopTrackVM {
+    trackId: string;
+    trackTitle: string;
+    artist?: string;
+    albumTitle?: string;
+    albumArtworkUrl?: string;
+    playCount: number;
+}
+
+export interface AdminTopArtistVM {
+    artistId: string;
+    artistName: string;
+    artworkUrl?: string;
+    playCount: number;
+}
+
+export interface AdminProfilePlayCountVM {
+    profileId: string;
+    profileName: string;
+    playCount: number;
+}
+
+export interface AdminMusicSummaryVM {
+    totalPlays: number;
+    distinctProfileCount: number;
+    topTracks: AdminTopTrackVM[];
+    topArtists: AdminTopArtistVM[];
+    playsPerProfile: AdminProfilePlayCountVM[];
+}
+
 export const musicService = {
     getArtists: async (libraryId?: string, serverId?: string, options?: { limit?: number }): Promise<ArtistVM[]> => {
         const params: Record<string, string | number> = {};
@@ -619,68 +684,3 @@ export const musicService = {
         return response.data;
     }
 };
-
-export interface AdminMusicHistoryQuery {
-    profileId?: string;
-    from?: string;
-    to?: string;
-    search?: string;
-    page?: number;
-    pageSize?: number;
-}
-
-export interface AdminMusicSummaryQuery {
-    from?: string;
-    to?: string;
-}
-
-export interface AdminMusicHistoryRowVM {
-    id: string;
-    profileId: string;
-    profileName: string;
-    trackId: string;
-    trackTitle: string;
-    artist?: string;
-    albumTitle?: string;
-    albumArtworkUrl?: string;
-    playedAt: string;
-    durationListenedSeconds: number;
-    completed: boolean;
-}
-
-export interface AdminMusicHistoryVM {
-    rows: AdminMusicHistoryRowVM[];
-    total: number;
-    page: number;
-    pageSize: number;
-}
-
-export interface AdminTopTrackVM {
-    trackId: string;
-    trackTitle: string;
-    artist?: string;
-    albumTitle?: string;
-    albumArtworkUrl?: string;
-    playCount: number;
-}
-
-export interface AdminTopArtistVM {
-    artistId: string;
-    artistName: string;
-    artworkUrl?: string;
-    playCount: number;
-}
-
-export interface AdminProfilePlayCountVM {
-    profileId: string;
-    profileName: string;
-    playCount: number;
-}
-
-export interface AdminMusicSummaryVM {
-    totalPlays: number;
-    distinctProfileCount: number;
-    topTracks: AdminTopTrackVM[];
-    topArtists: AdminTopArtistVM[];
-    playsPerProfile: AdminProfilePlayCountVM[];
-}
