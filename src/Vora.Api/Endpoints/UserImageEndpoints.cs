@@ -37,9 +37,9 @@ public static class UserImageEndpoints
         return Results.Ok(new { Url = url });
     }
 
-    private static IResult ServeCustomImage(string fileName)
+    private static IResult ServeCustomImage(string fileName, IUserProfileImageService imgService)
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "Users", fileName);
+        var path = imgService.ResolvePath(fileName);
         if (!File.Exists(path))
         {
             return Results.NotFound();

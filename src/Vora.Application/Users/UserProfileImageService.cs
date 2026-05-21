@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Vora.Application.Users;
@@ -7,6 +8,7 @@ public interface IUserProfileImageService
 {
     Task<string> UploadAsync(IFormFile file, string? oldImageUrl);
     void DeleteImage(string? imageUrl);
+    string ResolvePath(string fileName);
 }
 
 public class UserProfileImageService : IUserProfileImageService
@@ -16,15 +18,20 @@ public class UserProfileImageService : IUserProfileImageService
     private readonly ILogger<UserProfileImageService> _logger;
     private readonly string _basePath;
 
-    public UserProfileImageService(ILogger<UserProfileImageService> logger)
+    public UserProfileImageService(IConfiguration config, ILogger<UserProfileImageService> logger)
     {
         _logger = logger;
-        _basePath = Path.Combine(AppContext.BaseDirectory, "Users");
+        var configured = config["StoragePaths:UserImages"];
+        _basePath = !string.IsNullOrWhiteSpace(configured)
+            ? configured
+            : Path.Combine(AppContext.BaseDirectory, "Users");
         if (!Directory.Exists(_basePath))
         {
             Directory.CreateDirectory(_basePath);
         }
     }
+
+    public string ResolvePath(string fileName) => Path.Combine(_basePath, fileName);
 
     public async Task<string> UploadAsync(IFormFile file, string? oldImageUrl)
     {

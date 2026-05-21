@@ -71,7 +71,7 @@ public static class ServiceRegistrationExtensions
         builder.Services.AddVoraWorkers();
         builder.Services.AddVoraInfrastructure();
         builder.Services.AddVoraRealtime();
-        builder.Services.AddVoraPluginSystem();
+        builder.Services.AddVoraPluginSystem(builder.Configuration);
         builder.Services.AddVoraAuthenticationAndAuthorization(builder.Configuration);
         builder.Services.AddVoraCors();
         builder.Services.AddVoraJsonOptions();
@@ -289,9 +289,12 @@ public static class ServiceRegistrationExtensions
         return services;
     }
 
-    private static IServiceCollection AddVoraPluginSystem(this IServiceCollection services)
+    private static IServiceCollection AddVoraPluginSystem(this IServiceCollection services, IConfiguration configuration)
     {
-        var pluginsPath = Path.Combine(AppContext.BaseDirectory, "Plugins");
+        var configured = configuration["StoragePaths:Plugins"];
+        var pluginsPath = !string.IsNullOrWhiteSpace(configured)
+            ? configured
+            : Path.Combine(AppContext.BaseDirectory, "Plugins");
         services.AddVoraPlugins(pluginsPath);
         services.AddScoped<IPluginSettingsProvider, PluginSettingsAdapter>();
         return services;

@@ -131,7 +131,7 @@ export default function EditMetadataModal({
         }
     };
 
-    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         setSaving(true);
         try {

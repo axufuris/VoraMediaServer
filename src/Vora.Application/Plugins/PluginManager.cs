@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Plugins.ViewModels;
 using Vora.Application.Settings;
@@ -17,6 +18,7 @@ public interface IPluginManager
 public class PluginManager(
     IEnumerable<IVoraPlugin> plugins,
     ISystemSettingsRepository settingsRepo,
+    IConfiguration configuration,
     ILogger<PluginManager> logger) : IPluginManager
 {
     private const string EnabledSettingKey = "is_enabled";
@@ -92,7 +94,10 @@ public class PluginManager(
             throw new InvalidOperationException("Only .dll plugin files are supported.");
         }
 
-        var pluginsPath = Path.Combine(AppContext.BaseDirectory, "Plugins");
+        var configured = configuration["StoragePaths:Plugins"];
+        var pluginsPath = !string.IsNullOrWhiteSpace(configured)
+            ? configured
+            : Path.Combine(AppContext.BaseDirectory, "Plugins");
         if (!Directory.Exists(pluginsPath))
         {
             Directory.CreateDirectory(pluginsPath);

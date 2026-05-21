@@ -41,7 +41,10 @@ public class PosterOverlayManager : IPosterOverlayManager
         _overlayDirectory = !string.IsNullOrWhiteSpace(configPath) ? configPath : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
         if (!Directory.Exists(_overlayDirectory)) Directory.CreateDirectory(_overlayDirectory);
 
-        _originalArtworkCacheDir = Path.Combine(AppContext.BaseDirectory, "Storage", "OriginalArtworkCache");
+        var originalCachePath = config["StoragePaths:OriginalArtworkCache"];
+        _originalArtworkCacheDir = !string.IsNullOrWhiteSpace(originalCachePath)
+            ? originalCachePath
+            : Path.Combine(AppContext.BaseDirectory, "Storage", "OriginalArtworkCache");
         if (!Directory.Exists(_originalArtworkCacheDir)) Directory.CreateDirectory(_originalArtworkCacheDir);
     }
 

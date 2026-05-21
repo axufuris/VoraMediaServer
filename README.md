@@ -101,9 +101,11 @@ docker run -d \
   -e ConnectionStrings__DefaultConnection="Host=vora-postgres;Port=5432;Database=vora;Username=vora;Password=change-me-to-a-strong-password" \
   -e Jwt__SecretKey="$(openssl rand -base64 64)" \
   -e StoragePaths__CustomArtwork=/app/data/custom_artwork \
-  -e StoragePaths__Overlays=/app/data/overlays \
-  -e StoragePaths__IptvTimeshift=/app/data/iptv/timeshift \
+  -e StoragePaths__OriginalArtworkCache=/app/data/original_artwork_cache \
+  -e StoragePaths__EpgCache=/app/data/iptv/epg_cache \
   -e StoragePaths__IptvDvr=/app/data/iptv/dvr \
+  -e StoragePaths__UserImages=/app/data/users \
+  -e StoragePaths__Plugins=/app/data/plugins \
   -v /srv/vora/data:/app/data \
   -v /mnt/media/movies:/media/movies:ro \
   -v /mnt/media/shows:/media/shows:ro \
@@ -124,9 +126,12 @@ Key environment variables:
   account tokens. Generate once and keep it stable; rotating it
   invalidates every existing session.
 - `StoragePaths__*` — locations inside the container for
-  user-uploaded artwork, overlay assets, IPTV timeshift buffers, and
-  DVR recordings. Keep them all under one mounted volume so a single
-  backup covers everything.
+  user-uploaded artwork, the original-artwork download cache, the IPTV
+  EPG cache, DVR recordings, user profile images, and uploaded
+  plugins. Keep them all under one mounted volume so a single backup
+  covers everything. Transcoder scratch (HLS segments, IPTV timeshift)
+  lives under `/transcode` and is configured separately through the
+  admin UI — that path should be a fast local disk or tmpfs.
 
 Media mounts should be read-only (`:ro`) unless you want Vora to
 manage the files. Read-only is safer; the API only needs to read.
@@ -163,11 +168,14 @@ services:
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=vora;Username=vora;Password=change-me-to-a-strong-password"
       Jwt__SecretKey: "REPLACE_WITH_A_LONG_RANDOM_STRING"
       StoragePaths__CustomArtwork: /app/data/custom_artwork
-      StoragePaths__Overlays: /app/data/overlays
-      StoragePaths__IptvTimeshift: /app/data/iptv/timeshift
+      StoragePaths__OriginalArtworkCache: /app/data/original_artwork_cache
+      StoragePaths__EpgCache: /app/data/iptv/epg_cache
       StoragePaths__IptvDvr: /app/data/iptv/dvr
+      StoragePaths__UserImages: /app/data/users
+      StoragePaths__Plugins: /app/data/plugins
     volumes:
       - /srv/vora/data:/app/data
+      - /srv/vora/transcode:/transcode
       - /mnt/media/movies:/media/movies:ro
       - /mnt/media/shows:/media/shows:ro
       - /mnt/media/music:/media/music:ro
@@ -244,9 +252,12 @@ Apply, then wait for the container to go green in the Docker tab.
 | Variable: `ConnectionStrings__DefaultConnection` | `Host=vora-postgres;Port=5432;Database=vora;Username=vora;Password=<the password from above>` |
 | Variable: `Jwt__SecretKey` | a long random string (e.g. output of `openssl rand -base64 64` from any shell) |
 | Variable: `StoragePaths__CustomArtwork` | `/app/data/custom_artwork` |
-| Variable: `StoragePaths__Overlays` | `/app/data/overlays` |
-| Variable: `StoragePaths__IptvTimeshift` | `/app/data/iptv/timeshift` |
+| Variable: `StoragePaths__OriginalArtworkCache` | `/app/data/original_artwork_cache` |
+| Variable: `StoragePaths__EpgCache` | `/app/data/iptv/epg_cache` |
 | Variable: `StoragePaths__IptvDvr` | `/app/data/iptv/dvr` |
+| Variable: `StoragePaths__UserImages` | `/app/data/users` |
+| Variable: `StoragePaths__Plugins` | `/app/data/plugins` |
+| Path: `/transcode` | `/mnt/user/appdata/vora-transcode` (or a fast scratch disk) |
 
 Apply. Vora will auto-migrate the database on first launch (watch the
 container log if you want to confirm — you should see

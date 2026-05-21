@@ -11,9 +11,11 @@ services:
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}
       - StoragePaths__CustomArtwork=/app/data/custom_artwork
-      - StoragePaths__Overlays=/app/data/overlays
-      - StoragePaths__IptvTimeshift=/app/data/iptv/timeshift
+      - StoragePaths__OriginalArtworkCache=/app/data/original_artwork_cache
+      - StoragePaths__EpgCache=/app/data/iptv/epg_cache
       - StoragePaths__IptvDvr=/app/data/iptv/dvr
+      - StoragePaths__UserImages=/app/data/users
+      - StoragePaths__Plugins=/app/data/plugins
     ports:
       - "${Vora_PORT:-8080}:8080"
     volumes:
@@ -21,6 +23,7 @@ services:
       - D:\TestServer\Shows:/media/shows
       - D:\TestServer\Music:/media/music
       - ./Vora-data:/app/data
+      - ./Vora-transcode:/transcode
     deploy:
       resources:
         reservations:

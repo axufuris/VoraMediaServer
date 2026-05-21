@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -52,13 +53,16 @@ public class IptvEpgService : IIptvEpgService
     private readonly ILogger<IptvEpgService> _logger;
     private readonly string _cacheFilePath;
 
-    public IptvEpgService(IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory, ILogger<IptvEpgService> logger)
+    public IptvEpgService(IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory, IConfiguration config, ILogger<IptvEpgService> logger)
     {
         _scopeFactory = scopeFactory;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
 
-        var cacheDirectory = Path.Combine(AppContext.BaseDirectory, StorageRoot, CacheFolder);
+        var configured = config["StoragePaths:EpgCache"];
+        var cacheDirectory = !string.IsNullOrWhiteSpace(configured)
+            ? configured
+            : Path.Combine(AppContext.BaseDirectory, StorageRoot, CacheFolder);
         if (!Directory.Exists(cacheDirectory)) Directory.CreateDirectory(cacheDirectory);
         _cacheFilePath = Path.Combine(cacheDirectory, CacheFileName);
     }
