@@ -45,7 +45,7 @@ export default function LoginPage() {
         probe();
     }, [navigate, serverUrl]);
 
-    const handleLogin = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleLogin = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);

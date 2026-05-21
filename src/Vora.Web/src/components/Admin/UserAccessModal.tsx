@@ -68,7 +68,7 @@ export default function UserAccessModal({ user, libraries, iptvPlaylists, onSave
         );
     };
 
-    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         setIsSaving(true);
         try {

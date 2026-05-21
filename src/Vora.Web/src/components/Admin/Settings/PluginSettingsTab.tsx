@@ -54,7 +54,7 @@ export function PluginSection({ serverId, plugin, showModal }: { serverId?: stri
         }
     };
 
-    const handleSavePlugin = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleSavePlugin = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         setIsSaving(true);
         try {

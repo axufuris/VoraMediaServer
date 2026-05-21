@@ -109,7 +109,7 @@ export default function SmartListsPage() {
         setIsModalOpen(true);
     };
 
-    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
 
         const rules: SmartListRulesDto = {};

@@ -42,7 +42,7 @@ export default function RemoteAccessTab({ serverId, showModal }: RemoteAccessTab
         loadData();
     }, [loadData]);
 
-    const handleSaveRemote = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleSaveRemote = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!serverSettings || !remoteStatus) return;
         setIsSaving(true);

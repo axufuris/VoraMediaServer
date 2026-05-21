@@ -65,7 +65,7 @@ export default function AccountSettingsPage() {
         };
     }, [serverId, isProfileAdmin, activeProfileId, refreshTrigger]);
 
-    const handleAccountSave = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleAccountSave = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!user) return;
         try {
@@ -234,7 +234,7 @@ function ProfileEditor({ profile, user, libraries, iptvPlaylists, serverId, onCl
     const [editSchedules, setEditSchedules] = useState([...profile.accessSchedules]);
     const [uploadingImage, setUploadingImage] = useState(false);
 
-    const handleProfileSave = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleProfileSave = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         try {
             let finalPin: string | null = editPin;

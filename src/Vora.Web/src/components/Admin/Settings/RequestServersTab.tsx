@@ -148,7 +148,7 @@ export default function RequestServersTab({ serverId, showModal }: RequestServer
         }
     };
 
-    const handleSaveRequestServer = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleSaveRequestServer = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!editingRequestServer) return;
         setIsSaving(true);

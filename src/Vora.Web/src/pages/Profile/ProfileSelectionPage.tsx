@@ -176,13 +176,13 @@ export default function ProfileSelectionPage() {
         await authenticateProfile(profile.id, null);
     };
 
-    const handlePinSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handlePinSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!selectedProfile) return;
         await authenticateProfile(selectedProfile.id, pin);
     };
 
-    const handleCreateProfile = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleCreateProfile = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         const userId = sessionStorage.getItem('pending_user_id') || localStorage.getItem('user_id');
         if (!userId || !newName.trim()) return;

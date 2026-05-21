@@ -211,7 +211,7 @@ export default function PlaylistDetailsPage() {
         setIsEditModalOpen(true);
     };
 
-    const handleSaveEdit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleSaveEdit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!playlist || !editName.trim()) return;
 

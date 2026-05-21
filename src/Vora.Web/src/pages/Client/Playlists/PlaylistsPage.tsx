@@ -57,7 +57,7 @@ export default function PlaylistsPage() {
         }).finally(() => setLoading(false));
     }, [serverId]);
 
-    const handleManualCreate = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleManualCreate = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!newName.trim() || !manualCreatorType) return;
 

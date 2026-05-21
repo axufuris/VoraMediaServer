@@ -72,7 +72,7 @@ export default function AddToCollectionModal({
         }
     };
 
-    const handleCreateCollection = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleCreateCollection = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!newTitle.trim()) return;
 

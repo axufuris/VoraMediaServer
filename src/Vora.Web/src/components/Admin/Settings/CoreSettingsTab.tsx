@@ -60,7 +60,7 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
         loadServerSettings();
     }, [loadServerSettings]);
 
-    const handleSaveCore = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleSaveCore = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!serverSettings) return;
         setIsSaving(true);

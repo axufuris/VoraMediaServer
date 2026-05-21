@@ -36,7 +36,7 @@ export default function ForYouPage() {
         loadServerSettings();
     }, [loadServerSettings]);
 
-    const handleSave = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleSave = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!serverSettings) return;
         setIsSaving(true);

@@ -151,7 +151,7 @@ export default function EditCollectionModal({
         } catch { await dialog.alert("Failed to fetch artwork"); setLoadingArt(false); }
     };
 
-    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         setIsSaving(true);
         try {

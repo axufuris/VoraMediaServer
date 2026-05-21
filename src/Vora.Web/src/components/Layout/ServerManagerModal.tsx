@@ -103,7 +103,7 @@ export default function ServerManagerModal({
         }
     };
 
-    const handleConnect = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleConnect = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
@@ -150,7 +150,7 @@ export default function ServerManagerModal({
         await finalizeConnection(profile.id);
     };
 
-    const handlePinSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handlePinSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!selectedProfile || !tempAccountData) return;
         setIsLoading(true);

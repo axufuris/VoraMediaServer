@@ -30,7 +30,7 @@ export default function SetupPage() {
             });
     }, [navigate]);
 
-    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         setError('');
         try {
