@@ -77,10 +77,71 @@ public static class ServiceRegistrationExtensions
         builder.Services.AddVoraEmail(builder.Configuration);
         builder.Services.AddVoraRealtime();
         builder.Services.AddVoraPluginSystem(builder.Configuration);
+        builder.Services.AddVoraBackups(builder.Configuration);
         builder.Services.AddVoraAuthenticationAndAuthorization(builder.Configuration);
         builder.Services.AddVoraCors();
         builder.Services.AddVoraJsonOptions();
         return builder;
+    }
+
+    private static IServiceCollection AddVoraBackups(this IServiceCollection services, IConfiguration configuration)
+    {
+        var backupsDir = configuration["StoragePaths:Backups"];
+        if (string.IsNullOrWhiteSpace(backupsDir))
+        {
+            backupsDir = Path.Combine(AppContext.BaseDirectory, "backups");
+        }
+        Directory.CreateDirectory(backupsDir);
+
+        var dpDir = configuration["StoragePaths:DataProtection"];
+        if (string.IsNullOrWhiteSpace(dpDir))
+        {
+            dpDir = Path.Combine(AppContext.BaseDirectory, "DataProtectionKeys");
+        }
+
+        services.AddSingleton(new Vora.Application.Backups.BackupManagerOptions
+        {
+            DefaultDirectory = backupsDir,
+            SupportedSchemaVersion = 1
+        });
+        services.AddSingleton(new Vora.Infrastructure.Backups.Sections.DataProtectionKeysBackupOptions
+        {
+            Directory = dpDir
+        });
+
+        services.AddSingleton<Vora.Application.Backups.IBackupSettingsStore, Vora.Application.Backups.BackupSettingsStore>();
+        services.AddSingleton<Vora.Application.Backups.IBackupManager, Vora.Application.Backups.BackupManager>();
+        services.AddScoped<Vora.Application.Backups.IBackupTransactionFactory, Vora.Infrastructure.Backups.EfBackupTransactionFactory>();
+
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ServerSettingsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.PluginSettingsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection>(sp =>
+            new Vora.Infrastructure.Backups.Sections.DataProtectionKeysBackupSection(
+                sp.GetRequiredService<Vora.Infrastructure.Backups.Sections.DataProtectionKeysBackupOptions>()));
+
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ClientTemplateSchedulesBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.EmailTemplatesBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.OverlayTemplatesBackupSection>();
+
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.SmartListsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.DedupeRulesBackupSection>();
+
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.IptvPlaylistsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.IptvEpgSourcesBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.IptvTunerProfilesBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.IptvRecordingSchedulesBackupSection>();
+
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.DiscoveryRowsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.RequestServersBackupSection>();
+
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.UsersAndProfilesBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.DevicesBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.WatchHistoryBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.RatingsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ExternalConnectionsBackupSection>();
+
+        services.AddHostedService<Vora.Application.Backups.BackupScheduleWorker>();
+        return services;
     }
 
     private static WebApplicationBuilder AddVoraLogging(this WebApplicationBuilder builder)

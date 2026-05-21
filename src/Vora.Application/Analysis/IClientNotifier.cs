@@ -23,4 +23,6 @@ public interface IClientNotifier
     Task NotifyAdminAlertUnreadChangedAsync();
     Task NotifyAdminThemeChangedAsync(string themeId);
     Task NotifyClientTemplateConfigurationChangedAsync();
+    Task NotifyBackupCreatedAsync(string fileName);
+    Task NotifyBackupRestoredAsync(string fileName, IReadOnlyList<string> restoredSectionKeys);
 }

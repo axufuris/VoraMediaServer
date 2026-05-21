@@ -17,6 +17,8 @@ services:
       - StoragePaths__UserImages=/app/data/users
       - StoragePaths__Plugins=/app/data/plugins
       - StoragePaths__Logs=/app/data/logs
+      - StoragePaths__Backups=/app/data/backups
+      - StoragePaths__DataProtection=/app/data/dp-keys
     ports:
       - "${Vora_PORT:-8080}:8080"
     volumes:

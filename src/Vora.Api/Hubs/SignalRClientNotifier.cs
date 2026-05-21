@@ -62,4 +62,10 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
 
     public Task NotifyClientTemplateConfigurationChangedAsync() =>
         hubContext.Clients.All.SendAsync("ClientTemplateConfigurationChanged");
+
+    public Task NotifyBackupCreatedAsync(string fileName) =>
+        hubContext.Clients.Group("admins").SendAsync("BackupCreated", fileName);
+
+    public Task NotifyBackupRestoredAsync(string fileName, IReadOnlyList<string> restoredSectionKeys) =>
+        hubContext.Clients.Group("admins").SendAsync("BackupRestored", new { fileName, sectionKeys = restoredSectionKeys });
 }

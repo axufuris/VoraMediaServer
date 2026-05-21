@@ -12,7 +12,7 @@ export type IconName =
     | 'dashboard' | 'settings' | 'tasks' | 'plugins' | 'users' | 'devices'
     | 'history' | 'music-note' | 'chart' | 'folder' | 'layers' | 'image'
     | 'copy' | 'list' | 'inbox' | 'compass' | 'star' | 'calendar'
-    | 'tv' | 'record' | 'radio' | 'mic' | 'palette' | 'logs';
+    | 'tv' | 'record' | 'radio' | 'mic' | 'palette' | 'logs' | 'backup';
 
 export const Icons: Record<IconName, ReactNode> = {
     dashboard: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3v-7h6v7h3a1 1 0 001-1V10" />,
@@ -39,6 +39,7 @@ export const Icons: Record<IconName, ReactNode> = {
     mic: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zM5 10v2a7 7 0 0014 0v-2M12 19v4m-4 0h8" />,
     palette: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 21a9 9 0 110-18 9 9 0 015.66 16.06A2.4 2.4 0 0116 21h-2a2 2 0 01-2-2v0a2 2 0 00-2-2h-1.5a2.5 2.5 0 010-5H10a2 2 0 002-2v0M9 8h.01M15.5 9h.01M17.5 13h.01" />,
     logs: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 4h12l4 4v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm10 0v6h6M7 14h10M7 18h7M7 10h4" />,
+    backup: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 12a9 9 0 11-9-9 9 9 0 019 9zM12 7v5l3 2M5 5l-2-2M21 5l2-2" />,
 };
 
 export type NavSection = 'Server' | 'Library' | 'Features';
@@ -81,6 +82,7 @@ export const ADMIN_NAV: AdminNavEntry[] = [
     { label: 'Client Templates',     pathTemplate: '/admin/client-templates', section: 'Server',  icon: 'image',      keywords: ['client', 'template', 'schedule', 'thanksgiving', 'holiday', 'seasonal'] },
     { label: 'AI Usage & Stats',     pathTemplate: '/admin/ai-stats',         section: 'Server',  icon: 'chart',      keywords: ['tokens', 'openai', 'cost'], requires: 'ai' },
     { label: 'Server Logs',          pathTemplate: '/admin/logs',             section: 'Server',  icon: 'logs',       keywords: ['logs', 'errors', 'warnings', 'tail', 'trace', 'debug'] },
+    { label: 'Backup & Restore',     pathTemplate: '/admin/backups',          section: 'Server',  icon: 'backup',     keywords: ['backup', 'restore', 'export', 'import', 'snapshot', 'schedule'] },
 
     // === Library ===
     { label: 'Libraries',            pathTemplate: '/admin/libraries',        section: 'Library', icon: 'folder',     keywords: ['media', 'sources', 'folders'] },

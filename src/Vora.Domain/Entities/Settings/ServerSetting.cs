@@ -98,4 +98,6 @@ public class ServerSetting
     public string? SmtpFromAddress { get; set; }
     public string? SmtpFromDisplayName { get; set; }
     public string? EmailPublicBaseUrl { get; set; }
+
+    public string? BackupConfigurationJson { get; set; }
 }
