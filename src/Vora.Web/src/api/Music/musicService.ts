@@ -10,6 +10,8 @@ export interface ArtistVM {
     bannerUrl?: string;
     clearLogoUrl?: string;
     libraryId: string;
+    serverAdminRating?: number;
+    myRating?: number;
     lockedFields: string[];
 }
 
@@ -26,6 +28,8 @@ export interface AlbumVM {
     isCompilation: boolean;
     artistId: string;
     artistName: string;
+    serverAdminRating?: number;
+    myRating?: number;
     lockedFields: string[];
 }
 
@@ -40,6 +44,8 @@ export interface TrackVM {
     contentRating?: string;
     albumId?: string;
     isLiked: boolean;
+    serverAdminRating?: number;
+    myRating?: number;
     lockedFields: string[];
 }
 
@@ -55,6 +61,8 @@ export interface ArtistTrackVM {
     albumTitle?: string;
     albumArtworkUrl?: string;
     isLiked: boolean;
+    serverAdminRating?: number;
+    myRating?: number;
 }
 
 export interface LikedTracksVM {
@@ -493,6 +501,14 @@ export const musicService = {
 
     unlikeTrack: async (trackId: string, serverId?: string): Promise<void> => {
         await apiClient.delete(`/music/tracks/${trackId}/like`, { serverId });
+    },
+
+    setAlbumRating: async (albumId: string, rating: number | null, serverId?: string): Promise<void> => {
+        await apiClient.put(`/music/albums/${albumId}/rating`, { rating }, { serverId });
+    },
+
+    setArtistRating: async (artistId: string, rating: number | null, serverId?: string): Promise<void> => {
+        await apiClient.put(`/music/artists/${artistId}/rating`, { rating }, { serverId });
     },
 
     getLikedTracks: async (serverId?: string): Promise<LikedTracksVM> => {

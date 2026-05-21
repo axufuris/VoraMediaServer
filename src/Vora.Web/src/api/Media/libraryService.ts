@@ -49,6 +49,8 @@ export interface LibraryItem {
     timelineOrder?: number;
     isPlayed?: boolean;
     unplayedItemCount?: number;
+    serverAdminRating?: number;
+    myRating?: number;
 }
 
 export const libraryService = {

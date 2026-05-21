@@ -55,7 +55,9 @@ const FIELDS_BY_TYPE: Record<PlaylistMediaType, FieldDef[]> = {
         { value: 'ContentRating', label: 'Content Rating', kind: 'string' },
         { value: 'ReleaseYear', label: 'Year', kind: 'int' },
         { value: 'DurationSeconds', label: 'Duration (seconds)', kind: 'int' },
-        { value: 'Rating', label: 'Rating', kind: 'int' },
+        { value: 'ServerAdminRating', label: 'Server Admin Rating', kind: 'int' },
+        { value: 'MyRating', label: 'My Rating', kind: 'int' },
+        { value: 'AudienceRating', label: 'Audience Rating', kind: 'int' },
         { value: 'IsWatched', label: 'Is Watched', kind: 'bool' },
         { value: 'LastPlayedAt', label: 'Last Played', kind: 'date' },
         { value: 'DateAdded', label: 'Date Added', kind: 'date' }
@@ -69,6 +71,9 @@ const FIELDS_BY_TYPE: Record<PlaylistMediaType, FieldDef[]> = {
         { value: 'EpisodeNumber', label: 'Episode #', kind: 'int' },
         { value: 'ReleaseYear', label: 'Year', kind: 'int' },
         { value: 'DurationSeconds', label: 'Duration (seconds)', kind: 'int' },
+        { value: 'ServerAdminRating', label: 'Server Admin Rating', kind: 'int' },
+        { value: 'MyRating', label: 'My Rating', kind: 'int' },
+        { value: 'AudienceRating', label: 'Audience Rating', kind: 'int' },
         { value: 'IsWatched', label: 'Is Watched', kind: 'bool' },
         { value: 'LastPlayedAt', label: 'Last Played', kind: 'date' },
         { value: 'DateAdded', label: 'Date Added', kind: 'date' }

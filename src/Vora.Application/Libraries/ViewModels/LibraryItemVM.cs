@@ -19,6 +19,8 @@ public class LibraryItemVM
     public decimal? TimelineOrder { get; set; }
     public bool IsPlayed { get; set; }
     public int? UnplayedItemCount { get; set; }
+    public decimal? ServerAdminRating { get; set; }
+    public decimal? MyRating { get; set; }
 
     public static Expression<Func<MediaItem, LibraryItemVM>> Projection =>
         item => new LibraryItemVM
@@ -39,6 +41,7 @@ public class LibraryItemVM
             ReleaseDate = item.ReleaseDate,
             IsPlayed = false,
             UnplayedItemCount = null,
+            ServerAdminRating = item.ServerAdminRating,
             NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count : (int?)null
         };
 }

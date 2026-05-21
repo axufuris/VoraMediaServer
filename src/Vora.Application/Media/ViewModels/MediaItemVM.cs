@@ -21,6 +21,8 @@ public class MediaItemVM
 
     public string? Resolution { get; set; }
     public Guid LibraryId { get; set; }
+    public decimal? ServerAdminRating { get; set; }
+    public decimal? MyRating { get; set; }
     public List<Guid> CollectionIds { get; set; } = new();
 
     public List<SeasonVM> Seasons { get; set; } = new();
@@ -45,6 +47,7 @@ public class MediaItemVM
             Resolution = item.MediaParts.FirstOrDefault() != null ? item.MediaParts.FirstOrDefault()!.Resolution : null,
             LockedFields = item.LockedFields,
             LibraryId = item.LibraryId,
+            ServerAdminRating = item.ServerAdminRating,
             CollectionIds = item.Collections.Select(c => c.Id).ToList(),
 
             Cast = (item is Episode && !item.Cast.Any())

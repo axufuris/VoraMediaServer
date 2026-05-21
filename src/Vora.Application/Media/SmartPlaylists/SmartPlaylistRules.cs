@@ -26,7 +26,10 @@ public enum SmartPlaylistField
     SeasonNumber,
     EpisodeNumber,
     IsWatched,
-    Rating
+    Rating,
+    ServerAdminRating,
+    MyRating,
+    AudienceRating
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

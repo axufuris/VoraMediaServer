@@ -303,6 +303,13 @@ public class UserMediaStateRepository : IUserMediaStateRepository
 
     public async Task AttachUserMediaStateAsync(MediaDetailsVM vm, Guid profileId)
     {
+        var rating = await _context.Set<UserMediaRating>()
+            .AsNoTracking()
+            .Where(r => r.ProfileId == profileId && r.MediaItemId == vm.Id)
+            .Select(r => (decimal?)r.Rating)
+            .FirstOrDefaultAsync();
+        vm.MyRating = rating;
+
         if (vm.Type == "Movie" || vm.Type == "Episode")
         {
             var state = await _context.Set<UserMediaState>()
@@ -358,6 +365,19 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                 vm.UnplayedItemCount = totalUnplayed;
                 vm.IsPlayed = totalEpisodes > 0 && totalUnplayed == 0;
             }
+
+            var seasonIds = vm.Seasons.Select(s => s.Id).ToList();
+            if (seasonIds.Count > 0)
+            {
+                var seasonRatings = await _context.Set<UserMediaRating>()
+                    .AsNoTracking()
+                    .Where(r => r.ProfileId == profileId && seasonIds.Contains(r.MediaItemId))
+                    .ToDictionaryAsync(r => r.MediaItemId, r => r.Rating);
+                foreach (var s in vm.Seasons)
+                {
+                    if (seasonRatings.TryGetValue(s.Id, out var seasonRating)) s.MyRating = seasonRating;
+                }
+            }
         }
         else if (vm.Type == "Season")
         {
@@ -368,6 +388,11 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                 .Where(s => s.ProfileId == profileId && episodeIds.Contains(s.MediaItemId))
                 .ToDictionaryAsync(s => s.MediaItemId);
 
+            var episodeRatings = await _context.Set<UserMediaRating>()
+                .AsNoTracking()
+                .Where(r => r.ProfileId == profileId && episodeIds.Contains(r.MediaItemId))
+                .ToDictionaryAsync(r => r.MediaItemId, r => r.Rating);
+
             int unplayedTotal = 0;
 
             foreach (var ep in vm.Episodes)
@@ -376,6 +401,10 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                 {
                     ep.IsPlayed = state.IsPlayed;
                     ep.ResumePositionSeconds = state.ResumePositionSeconds;
+                }
+                if (episodeRatings.TryGetValue(ep.Id, out var episodeRating))
+                {
+                    ep.MyRating = episodeRating;
                 }
                 if (!ep.IsPlayed) unplayedTotal++;
             }
@@ -446,6 +475,11 @@ public class UserMediaStateRepository : IUserMediaStateRepository
             .Where(s => s.ProfileId == profileId && itemIds.Contains(s.MediaItemId))
             .ToDictionaryAsync(s => s.MediaItemId, s => s.IsPlayed);
 
+        var ratings = await _context.Set<UserMediaRating>()
+            .AsNoTracking()
+            .Where(r => r.ProfileId == profileId && itemIds.Contains(r.MediaItemId))
+            .ToDictionaryAsync(r => r.MediaItemId, r => r.Rating);
+
         var tvShowIds = itemList.Where(i => i.Type == "TvShow").Select(i => i.Id).ToList();
         var seasonIds = itemList.Where(i => i.Type == "Season").Select(i => i.Id).ToList();
 
@@ -492,6 +526,8 @@ public class UserMediaStateRepository : IUserMediaStateRepository
 
         foreach (var item in itemList)
         {
+            if (ratings.TryGetValue(item.Id, out var rating)) item.MyRating = rating;
+
             if (item.Type == "Movie" || item.Type == "Episode")
             {
                 if (directStates.TryGetValue(item.Id, out var played)) item.IsPlayed = played;
@@ -532,5 +568,57 @@ public class UserMediaStateRepository : IUserMediaStateRepository
             });
             await _context.SaveChangesAsync();
         }
+    }
+
+    public async Task<Dictionary<Guid, decimal>> GetMediaRatingsAsync(Guid profileId, IEnumerable<Guid> mediaItemIds)
+    {
+        var idList = mediaItemIds.ToList();
+        if (idList.Count == 0) return new Dictionary<Guid, decimal>();
+
+        return await _context.Set<UserMediaRating>()
+            .AsNoTracking()
+            .Where(r => r.ProfileId == profileId && idList.Contains(r.MediaItemId))
+            .ToDictionaryAsync(r => r.MediaItemId, r => r.Rating);
+    }
+
+    public async Task<SetMediaRatingResult> SetMediaRatingAsync(Guid profileId, Guid mediaItemId, decimal? rating, bool isAdmin)
+    {
+        var item = await _context.MediaItems.FirstOrDefaultAsync(m => m.Id == mediaItemId);
+        if (item == null) return new SetMediaRatingResult { Found = false, ServerAdminRatingChanged = false };
+
+        var existing = await _context.UserMediaRatings.FirstOrDefaultAsync(r => r.ProfileId == profileId && r.MediaItemId == mediaItemId);
+
+        if (rating.HasValue)
+        {
+            if (existing == null)
+            {
+                _context.UserMediaRatings.Add(new UserMediaRating
+                {
+                    ProfileId = profileId,
+                    MediaItemId = mediaItemId,
+                    Rating = rating.Value,
+                    RatedAt = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                existing.Rating = rating.Value;
+                existing.RatedAt = DateTime.UtcNow;
+            }
+        }
+        else if (existing != null)
+        {
+            _context.UserMediaRatings.Remove(existing);
+        }
+
+        bool serverAdminChanged = false;
+        if (isAdmin && item.ServerAdminRating != rating)
+        {
+            item.ServerAdminRating = rating;
+            serverAdminChanged = true;
+        }
+
+        await _context.SaveChangesAsync();
+        return new SetMediaRatingResult { Found = true, ServerAdminRatingChanged = serverAdminChanged };
     }
 }

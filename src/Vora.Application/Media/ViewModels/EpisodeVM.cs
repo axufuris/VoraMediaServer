@@ -11,4 +11,6 @@ public class EpisodeVM
     public double? DurationMinutes { get; set; }
     public bool IsPlayed { get; set; }
     public double? ResumePositionSeconds { get; set; }
+    public decimal? ServerAdminRating { get; set; }
+    public decimal? MyRating { get; set; }
 }

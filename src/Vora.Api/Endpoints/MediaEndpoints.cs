@@ -28,6 +28,10 @@ public static class MediaEndpoints
 
         readGroup.MapGet("/{id:guid}/up-next", GetUpNextAsync);
         readGroup.MapPost("/{id:guid}/played", SetPlayedAsync);
+        readGroup.MapPut("/{id:guid}/rating", SetRatingAsync)
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
 
         var adminGroup = routes.MapGroup("/api/media").WithTags("Media (Admin)").RequireAuthorization("AdminOnly");
 
@@ -115,6 +119,32 @@ public static class MediaEndpoints
 
         await manager.SetMediaPlayedStateAsync(id, profileId.Value, isPlayed);
         return Results.Ok();
+    }
+
+    public sealed class SetRatingRequest
+    {
+        public decimal? Rating { get; set; }
+    }
+
+    private static async Task<IResult> SetRatingAsync(
+        Guid id,
+        [FromBody] SetRatingRequest request,
+        ClaimsPrincipal user,
+        IUserMediaStateManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Unauthorized();
+
+        try
+        {
+            var result = await manager.SetMediaRatingAsync(id, profileId.Value, request.Rating, user.IsAdmin());
+            if (!result.Found) return Results.NotFound(new { Message = "Media item not found." });
+            return Results.NoContent();
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
     }
 
     private static IResult QueueScanAsync(Guid id, ITaskQueueManager taskQueue)

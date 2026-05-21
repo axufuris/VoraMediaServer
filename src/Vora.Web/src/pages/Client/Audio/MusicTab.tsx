@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type ArtistTrackVM, type MusicSearchResultVM, type GeneratedMixSummaryVM, type GeneratedMixDetailVM, type BecauseYouPlayedRowVM, type RadioSeed, type StationVM, type YearRecapVM, type GenreSummaryVM, type GenreContentVM, type ServerPlaybackSessionVM } from '../../../api/Music/musicService';
+import { mediaService } from '../../../api/Media/mediaService';
 import { usePlayer, type PlayableMedia } from '../../../contexts/usePlayer';
 import { serverVault } from '../../../utils/serverVault';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
@@ -9,6 +10,8 @@ import AddToPlaylistModal from '../../../components/Collections/AddToPlaylistMod
 import MusicServerSwitcher from '../../../components/Audio/MusicServerSwitcher';
 import { useDialog } from '../../../dialogs';
 import { audioQualityStore } from '../../../utils/audioQuality';
+import StarRating from '../../../components/Client/Primitives/StarRating';
+import RatedBadge from '../../../components/Client/Primitives/RatedBadge';
 
 type MusicView = 'artists' | 'artist' | 'album' | 'likes' | 'top' | 'mix' | 'recap' | 'genres' | 'genre';
 
@@ -267,6 +270,45 @@ export default function MusicTab() {
             console.error('Failed to toggle track like', err);
         }
     }, [serverId]);
+
+    const handleSetAlbumRating = useCallback(async (albumId: string, next: number | null) => {
+        setCurrentAlbum(prev => prev && prev.id === albumId ? {
+            ...prev,
+            myRating: next ?? undefined,
+            serverAdminRating: isServerAdmin ? (next ?? undefined) : prev.serverAdminRating,
+        } : prev);
+        try {
+            await musicService.setAlbumRating(albumId, next, serverId);
+        } catch (err) {
+            console.error('Failed to update album rating', err);
+        }
+    }, [serverId, isServerAdmin]);
+
+    const handleSetArtistRating = useCallback(async (artistId: string, next: number | null) => {
+        setCurrentArtist(prev => prev && prev.id === artistId ? {
+            ...prev,
+            myRating: next ?? undefined,
+            serverAdminRating: isServerAdmin ? (next ?? undefined) : prev.serverAdminRating,
+        } : prev);
+        try {
+            await musicService.setArtistRating(artistId, next, serverId);
+        } catch (err) {
+            console.error('Failed to update artist rating', err);
+        }
+    }, [serverId, isServerAdmin]);
+
+    const handleSetTrackRating = useCallback(async (trackId: string, next: number | null) => {
+        setTracks(prev => prev.map(t => t.id === trackId ? {
+            ...t,
+            myRating: next ?? undefined,
+            serverAdminRating: isServerAdmin ? (next ?? undefined) : t.serverAdminRating,
+        } : t));
+        try {
+            await mediaService.setRating(trackId, next, serverId);
+        } catch (err) {
+            console.error('Failed to update track rating', err);
+        }
+    }, [serverId, isServerAdmin]);
     useSignalREvent<string>("MusicArtistUpdated", bumpRefresh);
     useSignalREvent<string>("MusicAlbumUpdated", bumpRefresh);
     useSignalREvent<string>("MusicMixesUpdated", bumpRefresh);
@@ -1023,6 +1065,22 @@ export default function MusicTab() {
                                         <h2 className="text-3xl sm:text-4xl font-bold text-[var(--vora-text-primary)] drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] truncate">{currentArtist.name}</h2>
                                     )}
                                 </div>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-secondary)]">Your rating</span>
+                                        <StarRating
+                                            value={currentArtist.myRating ?? null}
+                                            onChange={(next) => handleSetArtistRating(currentArtist.id, next)}
+                                            showNumeric
+                                        />
+                                    </div>
+                                    {currentArtist.serverAdminRating != null && !isServerAdmin && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-secondary)]">Server admin</span>
+                                            <StarRating value={currentArtist.serverAdminRating} readOnly showNumeric color="var(--vora-accent-text)" />
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="flex flex-wrap items-center gap-2">
                                     {albums.length > 0 && (
                                         <>
@@ -1096,10 +1154,18 @@ export default function MusicTab() {
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                     </button>
                                 )}
-                                <div className="aspect-square rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden mb-3">
+                                <div className="relative aspect-square rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden mb-3">
                                     {album.artworkUrl
                                         ? <img src={album.artworkUrl} alt={album.title} className="max-w-full max-h-full object-cover" />
                                         : <svg className="w-10 h-10 text-[var(--vora-text-disabled)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>}
+                                    {(album.myRating ?? album.serverAdminRating) != null && (
+                                        <div className="absolute left-2 bottom-2">
+                                            <RatedBadge
+                                                value={(album.myRating ?? album.serverAdminRating)!}
+                                                title={album.myRating != null ? `Your rating: ${(album.myRating / 2).toFixed(1)} of 5 stars` : `Server admin rating: ${(album.serverAdminRating! / 2).toFixed(1)} of 5 stars`}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="font-bold text-sm text-[var(--vora-text-primary)] truncate" title={album.title}>{album.title}</div>
                                 <div className="text-xs text-[var(--vora-text-muted)]">{album.year || ''}</div>
@@ -1175,6 +1241,22 @@ export default function MusicTab() {
                                                     <h2 className="text-2xl sm:text-3xl font-bold text-[var(--vora-text-primary)] truncate">{currentAlbum.title}</h2>
                                                     <p className="text-base sm:text-lg text-[var(--vora-text-secondary)] truncate">{displayArtist}</p>
                                                     <p className="text-xs sm:text-sm text-[var(--vora-text-muted)] mt-1">{currentAlbum.year || ''}{currentAlbum.genre ? ` • ${currentAlbum.genre}` : ''}{tracks.length > 0 ? ` • ${tracks.length} tracks` : ''}</p>
+                                                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 justify-center sm:justify-start">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">Your rating</span>
+                                                            <StarRating
+                                                                value={currentAlbum.myRating ?? null}
+                                                                onChange={(next) => handleSetAlbumRating(currentAlbum.id, next)}
+                                                                showNumeric
+                                                            />
+                                                        </div>
+                                                        {currentAlbum.serverAdminRating != null && !isServerAdmin && (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">Server admin</span>
+                                                                <StarRating value={currentAlbum.serverAdminRating} readOnly showNumeric color="var(--vora-accent-text)" />
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <div className="flex flex-wrap items-center gap-2 sm:justify-end shrink-0">
                                                     {tracks.length > 0 && (
@@ -1253,6 +1335,17 @@ export default function MusicTab() {
                                                                     {showTrackArtist && track.artist && (
                                                                         <div className="text-xs text-[var(--vora-text-muted)] truncate">{track.artist}</div>
                                                                     )}
+                                                                </div>
+                                                                <div
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className={`shrink-0 hidden sm:inline-flex transition-opacity ${track.myRating != null ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                                                >
+                                                                    <StarRating
+                                                                        value={track.myRating ?? null}
+                                                                        onChange={(next) => handleSetTrackRating(track.id, next)}
+                                                                        size={13}
+                                                                        ariaLabel={`Rate ${track.title}`}
+                                                                    />
                                                                 </div>
                                                                 <button
                                                                     type="button"

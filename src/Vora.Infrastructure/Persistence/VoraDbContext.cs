@@ -68,6 +68,9 @@ public class VoraDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<UserProfile> UserProfiles { get; set; }
     public DbSet<UserMediaState> UserMediaStates { get; set; }
+    public DbSet<UserMediaRating> UserMediaRatings { get; set; }
+    public DbSet<UserAlbumRating> UserAlbumRatings { get; set; }
+    public DbSet<UserArtistRating> UserArtistRatings { get; set; }
     public DbSet<UserProviderConnection> UserProviderConnections { get; set; }
     public DbSet<ProfileAccessSchedule> ProfileAccessSchedules { get; set; }
     public DbSet<ProfileDeviceSetting> ProfileDeviceSettings { get; set; }
@@ -651,6 +654,42 @@ public class VoraDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.ProfileId, e.MediaItemId }).IsUnique();
+        });
+
+        modelBuilder.Entity<UserMediaRating>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.ProfileId, e.MediaItemId }).IsUnique();
+            entity.HasIndex(e => e.MediaItemId);
+
+            entity.HasOne(e => e.MediaItem)
+                  .WithMany()
+                  .HasForeignKey(e => e.MediaItemId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserAlbumRating>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.ProfileId, e.AlbumId }).IsUnique();
+            entity.HasIndex(e => e.AlbumId);
+
+            entity.HasOne(e => e.Album)
+                  .WithMany()
+                  .HasForeignKey(e => e.AlbumId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserArtistRating>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.ProfileId, e.ArtistId }).IsUnique();
+            entity.HasIndex(e => e.ArtistId);
+
+            entity.HasOne(e => e.Artist)
+                  .WithMany()
+                  .HasForeignKey(e => e.ArtistId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

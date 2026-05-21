@@ -64,6 +64,8 @@ export interface Season {
     episodeCount?: number;
     isPlayed?: boolean;
     unplayedItemCount?: number;
+    serverAdminRating?: number;
+    myRating?: number;
 }
 
 export interface Episode {
@@ -76,6 +78,8 @@ export interface Episode {
     durationMinutes?: number;
     isPlayed?: boolean;
     resumePositionSeconds?: number;
+    serverAdminRating?: number;
+    myRating?: number;
 }
 
 export interface SeasonDetails {
@@ -123,6 +127,8 @@ export interface MediaItem {
     thirdPartyRating1Name?: string;
     thirdPartyRating2?: number;
     thirdPartyRating2Name?: string;
+    serverAdminRating?: number;
+    myRating?: number;
     mediaParts?: MediaPart[];
 }
 
@@ -162,6 +168,10 @@ export const mediaService = {
 
     markAsPlayed: async (mediaItemId: string, isPlayed: boolean, serverId?: string): Promise<void> => {
         await apiClient.post(`/media/${mediaItemId}/played?isPlayed=${isPlayed}`, null, { serverId });
+    },
+
+    setRating: async (mediaItemId: string, rating: number | null, serverId?: string): Promise<void> => {
+        await apiClient.put(`/media/${mediaItemId}/rating`, { rating }, { serverId });
     },
 
     getUpNext: async (mediaId: string, contextType?: string, contextId?: string, serverId?: string): Promise<UpNextResultVM> => {

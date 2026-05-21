@@ -14,6 +14,8 @@ public class Artist : LockableEntity
     public string? BannerUrl { get; set; }
     public string? ClearLogoUrl { get; set; }
 
+    public decimal? ServerAdminRating { get; set; }
+
     public Guid LibraryId { get; set; }
     public virtual MediaLibrary Library { get; set; } = null!;
 

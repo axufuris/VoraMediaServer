@@ -18,6 +18,7 @@ import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
 import MediaRail from '../../../components/Client/Primitives/MediaRail';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import QualityPanel, { QualityPanelSection, type QualityOption } from '../../../components/Client/Primitives/QualityPanel';
+import StarRating from '../../../components/Client/Primitives/StarRating';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -248,6 +249,21 @@ export default function MediaDetailsPage() {
         }
     };
 
+    const handleSetRating = useCallback(async (next: number | null) => {
+        if (!media) return;
+        setMedia(prev => prev ? {
+            ...prev,
+            myRating: next ?? undefined,
+            serverAdminRating: isAdmin ? (next ?? undefined) : prev.serverAdminRating,
+        } : prev);
+        try {
+            await mediaService.setRating(media.id, next, serverId);
+        } catch {
+            await dialog.alert('Failed to update rating.');
+            reloadMedia();
+        }
+    }, [media, isAdmin, serverId, dialog, reloadMedia]);
+
     const handleVideoChange = (newVideoId: string) => {
         setSelectedVideoId(newVideoId);
         const newPart = media?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === newVideoId));
@@ -426,6 +442,36 @@ export default function MediaDetailsPage() {
                             {media.contentRating && <span className="rounded-md px-2.5 py-1 text-xs font-medium backdrop-blur-md" style={{ background: 'rgba(8, 8, 11, 0.6)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}>{media.contentRating}</span>}
                             {activePart?.resolution && <span className="rounded-md px-2.5 py-1 text-xs font-semibold backdrop-blur-md" style={{ background: 'var(--vora-accent-500)', border: '1px solid var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}>{activePart.resolution === '2160p' ? '4K' : activePart.resolution}</span>}
                             {sortedAudioTracks[0]?.codec && <span className="rounded-md px-2.5 py-1 text-xs font-medium backdrop-blur-md" style={{ background: 'rgba(8, 8, 11, 0.6)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}>{sortedAudioTracks[0].codec.toUpperCase()}{sortedAudioTracks[0].channels ? ` ${sortedAudioTracks[0].channels}ch` : ''}</span>}
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Your rating</span>
+                                <StarRating
+                                    value={media.myRating ?? null}
+                                    onChange={handleSetRating}
+                                    showNumeric
+                                    title={media.myRating != null ? 'Click a star to change, or click the same star to clear' : 'Rate this title'}
+                                />
+                            </div>
+                            {media.serverAdminRating != null && !isAdmin && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Server admin</span>
+                                    <StarRating value={media.serverAdminRating} readOnly showNumeric color="var(--vora-accent-text)" />
+                                </div>
+                            )}
+                            {media.thirdPartyRating1 != null && (
+                                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
+                                    <span className="font-semibold">{media.thirdPartyRating1Name ?? 'Rating'}</span>
+                                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{media.thirdPartyRating1.toFixed(1)}</span>
+                                </div>
+                            )}
+                            {media.thirdPartyRating2 != null && (
+                                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
+                                    <span className="font-semibold">{media.thirdPartyRating2Name ?? 'Rating'}</span>
+                                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{media.thirdPartyRating2.toFixed(1)}</span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="mt-6 flex flex-wrap items-center gap-3">

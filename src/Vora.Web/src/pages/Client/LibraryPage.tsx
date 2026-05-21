@@ -12,6 +12,7 @@ import Tabs from '../../components/Client/Primitives/Tabs';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
 import MediaStill from '../../components/Client/Primitives/MediaStill';
 import LetterRail from '../../components/Client/Primitives/LetterRail';
+import RatedBadge from '../../components/Client/Primitives/RatedBadge';
 
 type LibraryTabKey = 'library' | 'collections' | 'recommendations';
 
@@ -342,10 +343,15 @@ export default function LibraryPage() {
                                                 </span>
                                                 : undefined;
 
+                                        const ratingValue = item.myRating ?? item.serverAdminRating;
+                                        const ratingBadge = ratingValue != null
+                                            ? <RatedBadge value={ratingValue} title={item.myRating != null ? `Your rating: ${(item.myRating / 2).toFixed(1)} of 5 stars` : `Server admin rating: ${(item.serverAdminRating! / 2).toFixed(1)} of 5 stars`} />
+                                            : undefined;
+
                                         const card = isEpisode ? (
-                                            <MediaStill imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} badge={unplayedBadge} fill />
+                                            <MediaStill imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} badge={unplayedBadge} bottomLeftBadge={ratingBadge} fill />
                                         ) : (
-                                            <MediaPoster imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} badge={unplayedBadge} fill />
+                                            <MediaPoster imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} badge={unplayedBadge} bottomLeftBadge={ratingBadge} fill />
                                         );
 
                                         if (!isAdmin) return <div key={item.id}>{card}</div>;

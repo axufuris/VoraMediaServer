@@ -9,4 +9,6 @@ public class SeasonVM
     public int? EpisodeCount { get; set; }
     public bool IsPlayed { get; set; }
     public int? UnplayedItemCount { get; set; }
+    public decimal? ServerAdminRating { get; set; }
+    public decimal? MyRating { get; set; }
 }

@@ -7,6 +7,7 @@ interface MediaPosterProps {
     title: string;
     subtitle?: string;
     badge?: ReactNode;
+    bottomLeftBadge?: ReactNode;
     progressPercent?: number;
     onClick?: () => void;
     variant?: PosterVariant;
@@ -27,7 +28,7 @@ const DEFAULT_WIDTH_BY_VARIANT: Record<PosterVariant, number> = {
     actor: 96,
 };
 
-export default function MediaPoster({ imageUrl, title, subtitle, badge, progressPercent, onClick, variant = 'standard', width, fill, className }: MediaPosterProps) {
+export default function MediaPoster({ imageUrl, title, subtitle, badge, bottomLeftBadge, progressPercent, onClick, variant = 'standard', width, fill, className }: MediaPosterProps) {
     const aspect = ASPECT_BY_VARIANT[variant];
     const round = variant === 'actor';
     const widthStyle = fill ? '100%' : (width ?? DEFAULT_WIDTH_BY_VARIANT[variant]);
@@ -80,6 +81,11 @@ export default function MediaPoster({ imageUrl, title, subtitle, badge, progress
                 {badge && (
                     <div className="absolute right-2 top-2">
                         {badge}
+                    </div>
+                )}
+                {bottomLeftBadge && (
+                    <div className="absolute left-2 bottom-2">
+                        {bottomLeftBadge}
                     </div>
                 )}
                 {progressPercent != null && progressPercent > 0 && (

@@ -5,6 +5,7 @@ interface MediaStillProps {
     title: string;
     subtitle?: string;
     badge?: ReactNode;
+    bottomLeftBadge?: ReactNode;
     progressPercent?: number;
     onClick?: () => void;
     width?: number;
@@ -12,7 +13,7 @@ interface MediaStillProps {
     className?: string;
 }
 
-export default function MediaStill({ imageUrl, title, subtitle, badge, progressPercent, onClick, width = 280, fill, className }: MediaStillProps) {
+export default function MediaStill({ imageUrl, title, subtitle, badge, bottomLeftBadge, progressPercent, onClick, width = 280, fill, className }: MediaStillProps) {
     const widthStyle = fill ? '100%' : width;
     const handleKeyDown = onClick
         ? (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -53,6 +54,7 @@ export default function MediaStill({ imageUrl, title, subtitle, badge, progressP
                     </div>
                 )}
                 {badge && <div className="absolute right-2 top-2">{badge}</div>}
+                {bottomLeftBadge && <div className="absolute left-2 bottom-2">{bottomLeftBadge}</div>}
                 {progressPercent != null && progressPercent > 0 && (
                     <div className="absolute bottom-2 left-2 right-2 h-1 overflow-hidden rounded-full" style={{ background: 'rgba(255, 255, 255, 0.2)' }}>
                         <div className="h-full" style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%`, background: 'var(--vora-accent-500)' }} />

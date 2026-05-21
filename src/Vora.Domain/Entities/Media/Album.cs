@@ -17,6 +17,8 @@ public class Album : LockableEntity
     public string? AlbumArtist { get; set; }
     public bool IsCompilation { get; set; }
 
+    public decimal? ServerAdminRating { get; set; }
+
     public Guid ArtistId { get; set; }
     public virtual Artist Artist { get; set; } = null!;
 

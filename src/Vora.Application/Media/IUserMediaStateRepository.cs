@@ -12,4 +12,13 @@ public interface IUserMediaStateRepository
     Task AttachLibraryItemUserStatesAsync(IEnumerable<LibraryItemVM> items, Guid profileId);
     Task<List<ContinueWatchingVM>> GetContinueWatchingAsync(Guid profileId, int limit = 15);
     Task HideFromContinueWatchingAsync(Guid profileId, Guid mediaItemId);
+
+    Task<Dictionary<Guid, decimal>> GetMediaRatingsAsync(Guid profileId, IEnumerable<Guid> mediaItemIds);
+    Task<SetMediaRatingResult> SetMediaRatingAsync(Guid profileId, Guid mediaItemId, decimal? rating, bool isAdmin);
+}
+
+public sealed class SetMediaRatingResult
+{
+    public bool Found { get; init; }
+    public bool ServerAdminRatingChanged { get; init; }
 }

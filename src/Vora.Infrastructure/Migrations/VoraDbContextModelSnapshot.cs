@@ -829,6 +829,9 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<decimal?>("ServerAdminRating")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("SortTitle")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -891,6 +894,9 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<decimal?>("ServerAdminRating")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("SortName")
                         .HasMaxLength(500)
@@ -3261,6 +3267,90 @@ namespace Vora.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("Vora.Domain.Entities.Users.UserAlbumRating", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AlbumId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("RatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Rating")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AlbumId");
+
+                    b.HasIndex("ProfileId", "AlbumId")
+                        .IsUnique();
+
+                    b.ToTable("UserAlbumRatings");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.UserArtistRating", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ArtistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("RatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Rating")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArtistId");
+
+                    b.HasIndex("ProfileId", "ArtistId")
+                        .IsUnique();
+
+                    b.ToTable("UserArtistRatings");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.UserMediaRating", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MediaItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("RatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Rating")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaItemId");
+
+                    b.HasIndex("ProfileId", "MediaItemId")
+                        .IsUnique();
+
+                    b.ToTable("UserMediaRatings");
+                });
+
             modelBuilder.Entity("Vora.Domain.Entities.Users.UserMediaState", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4115,6 +4205,63 @@ namespace Vora.Infrastructure.Migrations
                         .HasForeignKey("ProfileId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.UserAlbumRating", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Media.Album", "Album")
+                        .WithMany()
+                        .HasForeignKey("AlbumId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vora.Domain.Entities.Users.UserProfile", "Profile")
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Album");
+
+                    b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.UserArtistRating", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Media.Artist", "Artist")
+                        .WithMany()
+                        .HasForeignKey("ArtistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vora.Domain.Entities.Users.UserProfile", "Profile")
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Artist");
+
+                    b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.UserMediaRating", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Media.MediaItem", "MediaItem")
+                        .WithMany()
+                        .HasForeignKey("MediaItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vora.Domain.Entities.Users.UserProfile", "Profile")
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MediaItem");
 
                     b.Navigation("Profile");
                 });

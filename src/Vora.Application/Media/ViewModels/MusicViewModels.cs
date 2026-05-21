@@ -11,6 +11,8 @@ public class ArtistVM
     public string? BannerUrl { get; set; }
     public string? ClearLogoUrl { get; set; }
     public Guid LibraryId { get; set; }
+    public decimal? ServerAdminRating { get; set; }
+    public decimal? MyRating { get; set; }
     public List<string> LockedFields { get; set; } = new();
 }
 
@@ -28,6 +30,8 @@ public class AlbumVM
     public bool IsCompilation { get; set; }
     public Guid ArtistId { get; set; }
     public string ArtistName { get; set; } = string.Empty;
+    public decimal? ServerAdminRating { get; set; }
+    public decimal? MyRating { get; set; }
     public List<string> LockedFields { get; set; } = new();
 }
 
@@ -43,6 +47,8 @@ public class TrackVM
     public string? ContentRating { get; set; }
     public Guid? AlbumId { get; set; }
     public bool IsLiked { get; set; }
+    public decimal? ServerAdminRating { get; set; }
+    public decimal? MyRating { get; set; }
     public List<string> LockedFields { get; set; } = new();
 }
 
@@ -133,4 +139,6 @@ public class ArtistTrackVM
     public string? AlbumTitle { get; set; }
     public string? AlbumArtworkUrl { get; set; }
     public bool IsLiked { get; set; }
+    public decimal? ServerAdminRating { get; set; }
+    public decimal? MyRating { get; set; }
 }

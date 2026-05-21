@@ -649,4 +649,108 @@ public class MusicRepository : IMusicRepository
 
         return query;
     }
+
+    public async Task<Dictionary<Guid, decimal>> GetAlbumRatingsAsync(Guid profileId, IEnumerable<Guid> albumIds)
+    {
+        var idList = albumIds.ToList();
+        if (idList.Count == 0) return new Dictionary<Guid, decimal>();
+
+        return await _context.UserAlbumRatings
+            .AsNoTracking()
+            .Where(r => r.ProfileId == profileId && idList.Contains(r.AlbumId))
+            .ToDictionaryAsync(r => r.AlbumId, r => r.Rating);
+    }
+
+    public async Task<Dictionary<Guid, decimal>> GetArtistRatingsAsync(Guid profileId, IEnumerable<Guid> artistIds)
+    {
+        var idList = artistIds.ToList();
+        if (idList.Count == 0) return new Dictionary<Guid, decimal>();
+
+        return await _context.UserArtistRatings
+            .AsNoTracking()
+            .Where(r => r.ProfileId == profileId && idList.Contains(r.ArtistId))
+            .ToDictionaryAsync(r => r.ArtistId, r => r.Rating);
+    }
+
+    public async Task<SetMusicRatingResult> SetAlbumRatingAsync(Guid profileId, Guid albumId, decimal? rating, bool isAdmin)
+    {
+        var album = await _context.Albums.FirstOrDefaultAsync(a => a.Id == albumId);
+        if (album == null) return new SetMusicRatingResult { Found = false, ServerAdminRatingChanged = false };
+
+        var existing = await _context.UserAlbumRatings.FirstOrDefaultAsync(r => r.ProfileId == profileId && r.AlbumId == albumId);
+
+        if (rating.HasValue)
+        {
+            if (existing == null)
+            {
+                _context.UserAlbumRatings.Add(new Vora.Domain.Entities.Users.UserAlbumRating
+                {
+                    ProfileId = profileId,
+                    AlbumId = albumId,
+                    Rating = rating.Value,
+                    RatedAt = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                existing.Rating = rating.Value;
+                existing.RatedAt = DateTime.UtcNow;
+            }
+        }
+        else if (existing != null)
+        {
+            _context.UserAlbumRatings.Remove(existing);
+        }
+
+        bool serverAdminChanged = false;
+        if (isAdmin && album.ServerAdminRating != rating)
+        {
+            album.ServerAdminRating = rating;
+            serverAdminChanged = true;
+        }
+
+        await _context.SaveChangesAsync();
+        return new SetMusicRatingResult { Found = true, ServerAdminRatingChanged = serverAdminChanged };
+    }
+
+    public async Task<SetMusicRatingResult> SetArtistRatingAsync(Guid profileId, Guid artistId, decimal? rating, bool isAdmin)
+    {
+        var artist = await _context.Artists.FirstOrDefaultAsync(a => a.Id == artistId);
+        if (artist == null) return new SetMusicRatingResult { Found = false, ServerAdminRatingChanged = false };
+
+        var existing = await _context.UserArtistRatings.FirstOrDefaultAsync(r => r.ProfileId == profileId && r.ArtistId == artistId);
+
+        if (rating.HasValue)
+        {
+            if (existing == null)
+            {
+                _context.UserArtistRatings.Add(new Vora.Domain.Entities.Users.UserArtistRating
+                {
+                    ProfileId = profileId,
+                    ArtistId = artistId,
+                    Rating = rating.Value,
+                    RatedAt = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                existing.Rating = rating.Value;
+                existing.RatedAt = DateTime.UtcNow;
+            }
+        }
+        else if (existing != null)
+        {
+            _context.UserArtistRatings.Remove(existing);
+        }
+
+        bool serverAdminChanged = false;
+        if (isAdmin && artist.ServerAdminRating != rating)
+        {
+            artist.ServerAdminRating = rating;
+            serverAdminChanged = true;
+        }
+
+        await _context.SaveChangesAsync();
+        return new SetMusicRatingResult { Found = true, ServerAdminRatingChanged = serverAdminChanged };
+    }
 }

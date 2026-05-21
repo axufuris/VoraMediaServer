@@ -25,6 +25,8 @@ public class MediaDetailsVM
     public string? ThirdPartyRating1Name { get; set; }
     public decimal? ThirdPartyRating2 { get; set; }
     public string? ThirdPartyRating2Name { get; set; }
+    public decimal? ServerAdminRating { get; set; }
+    public decimal? MyRating { get; set; }
 
     public bool IsPlayed { get; set; }
     public double? ResumePositionSeconds { get; set; }
@@ -65,6 +67,7 @@ public class MediaDetailsVM
             ThirdPartyRating1Name = item.ThirdPartyRating1Name,
             ThirdPartyRating2 = item.ThirdPartyRating2,
             ThirdPartyRating2Name = item.ThirdPartyRating2Name,
+            ServerAdminRating = item.ServerAdminRating,
             CollectionIds = item.Collections.Select(c => c.Id).ToList(),
             Genres = item.Genres.Select(g => g.Name).OrderBy(g => g).ToList(),
             Cast = (item is Episode && !item.Cast.Any())
@@ -110,7 +113,8 @@ public class MediaDetailsVM
                 SeasonNumber = s.SeasonNumber,
                 Title = s.Title,
                 PosterUrl = s.PosterUrl,
-                EpisodeCount = s.EpisodeCount
+                EpisodeCount = s.EpisodeCount,
+                ServerAdminRating = s.ServerAdminRating
             }).ToList() : new List<SeasonVM>(),
             TvShowId = item is Season ? ((Season)item).TvShowId :
                        item is Episode ? ((Episode)item).Season.TvShowId : null,
@@ -127,7 +131,8 @@ public class MediaDetailsVM
                 Overview = e.Overview,
                 PosterUrl = e.PosterUrl,
                 ReleaseDate = e.ReleaseDate,
-                DurationMinutes = e.Analysis.Duration.HasValue ? (int)e.Analysis.Duration.Value.TotalMinutes : (int?)null
+                DurationMinutes = e.Analysis.Duration.HasValue ? (int)e.Analysis.Duration.Value.TotalMinutes : (int?)null,
+                ServerAdminRating = e.ServerAdminRating
             }).OrderBy(e => e.EpisodeNumber).ToList() : new List<EpisodeVM>(),
             MediaParts = item.MediaParts.Select(p => new MediaDetailsPartVM
             {

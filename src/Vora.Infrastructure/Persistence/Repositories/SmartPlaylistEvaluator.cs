@@ -176,7 +176,12 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
             AddedAt = m.AddedAt,
             LibraryId = m.LibraryId,
             Genres = m.Genres.Select(g => g.Name.ToLower()),
-            Rating = (decimal?)(m.ServerAdminRating ?? m.ThirdPartyRating1),
+            ServerAdminRating = m.ServerAdminRating,
+            AudienceRating = m.ThirdPartyRating1,
+            MyRating = _context.UserMediaRatings
+                .Where(r => r.ProfileId == profileId && r.MediaItemId == m.Id)
+                .Select(r => (decimal?)r.Rating)
+                .FirstOrDefault(),
             IsWatched = _context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == m.Id && s.IsPlayed),
             LastPlayedAt = _context.UserMediaStates
                 .Where(s => s.ProfileId == profileId && s.MediaItemId == m.Id)
@@ -223,7 +228,12 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
             AddedAt = e.AddedAt,
             LibraryId = e.LibraryId,
             Genres = e.Season.TvShow.Genres.Select(g => g.Name.ToLower()),
-            Rating = (decimal?)(e.ServerAdminRating ?? e.ThirdPartyRating1),
+            ServerAdminRating = e.ServerAdminRating,
+            AudienceRating = e.ThirdPartyRating1,
+            MyRating = _context.UserMediaRatings
+                .Where(r => r.ProfileId == profileId && r.MediaItemId == e.Id)
+                .Select(r => (decimal?)r.Rating)
+                .FirstOrDefault(),
             IsWatched = _context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == e.Id && s.IsPlayed),
             LastPlayedAt = _context.UserMediaStates
                 .Where(s => s.ProfileId == profileId && s.MediaItemId == e.Id)
@@ -316,7 +326,10 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
         SmartPlaylistField.LastPlayedAt => new() { Member = Expression.Property(p, nameof(VideoRow.LastPlayedAt)), FieldKind = FieldAccess.Kind.Date },
         SmartPlaylistField.DateAdded => new() { Member = Expression.Property(p, nameof(VideoRow.AddedAt)), FieldKind = FieldAccess.Kind.Date },
         SmartPlaylistField.IsWatched => new() { Member = Expression.Property(p, nameof(VideoRow.IsWatched)), FieldKind = FieldAccess.Kind.Bool },
-        SmartPlaylistField.Rating => new() { Member = Expression.Property(p, nameof(VideoRow.Rating)), FieldKind = FieldAccess.Kind.Decimal },
+        SmartPlaylistField.Rating => new() { Member = Expression.Property(p, nameof(VideoRow.ServerAdminRating)), FieldKind = FieldAccess.Kind.Decimal },
+        SmartPlaylistField.ServerAdminRating => new() { Member = Expression.Property(p, nameof(VideoRow.ServerAdminRating)), FieldKind = FieldAccess.Kind.Decimal },
+        SmartPlaylistField.MyRating => new() { Member = Expression.Property(p, nameof(VideoRow.MyRating)), FieldKind = FieldAccess.Kind.Decimal },
+        SmartPlaylistField.AudienceRating => new() { Member = Expression.Property(p, nameof(VideoRow.AudienceRating)), FieldKind = FieldAccess.Kind.Decimal },
         SmartPlaylistField.LibraryId => new() { Member = Expression.Property(p, nameof(VideoRow.LibraryId)), FieldKind = FieldAccess.Kind.Guid },
         _ => null
     };
@@ -640,7 +653,9 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
         public DateTime AddedAt { get; set; }
         public Guid LibraryId { get; set; }
         public IEnumerable<string> Genres { get; set; } = Array.Empty<string>();
-        public decimal? Rating { get; set; }
+        public decimal? ServerAdminRating { get; set; }
+        public decimal? MyRating { get; set; }
+        public decimal? AudienceRating { get; set; }
         public bool IsWatched { get; set; }
         public DateTime? LastPlayedAt { get; set; }
     }

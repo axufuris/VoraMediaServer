@@ -15,7 +15,7 @@ namespace Vora.Application.Media;
 public interface IMusicManager
 {
     Task<List<ArtistVM>> GetArtistsAsync(Guid? libraryId, MusicAccessFilter access, int? limit = null);
-    Task<(ArtistVM? Artist, List<AlbumVM> Albums)> GetArtistDetailAsync(Guid artistId, MusicAccessFilter access);
+    Task<(ArtistVM? Artist, List<AlbumVM> Albums)> GetArtistDetailAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
     Task<(AlbumVM? Album, List<TrackVM> Tracks)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access);
     Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
     Task<string?> GetTrackFilePathAsync(Guid trackId, MusicAccessFilter access);
@@ -43,6 +43,9 @@ public interface IMusicManager
     Task<bool> SetTrackLikedAsync(Guid profileId, Guid trackId, bool liked);
     Task<List<ArtistTrackVM>> GetLikedTracksAsync(Guid profileId, MusicAccessFilter access);
     Task<int> GetLikedTrackCountAsync(Guid profileId);
+
+    Task<SetMusicRatingResult> SetAlbumRatingAsync(Guid profileId, Guid albumId, decimal? rating, bool isAdmin);
+    Task<SetMusicRatingResult> SetArtistRatingAsync(Guid profileId, Guid artistId, decimal? rating, bool isAdmin);
 
     Task<LyricsResult?> GetTrackLyricsAsync(Guid trackId, MusicAccessFilter access, CancellationToken cancellationToken);
 
@@ -76,6 +79,7 @@ public class MusicManager : IMusicManager
 
     private readonly IMusicRepository _repository;
     private readonly IUserRepository _userRepository;
+    private readonly IUserMediaStateRepository _userMediaStateRepository;
     private readonly IEnumerable<IMusicArtworkProvider> _artworkProviders;
     private readonly IEnumerable<ILyricsProvider> _lyricsProviders;
     private readonly IEnumerable<IListeningDataProvider> _listeningProviders;
@@ -83,10 +87,11 @@ public class MusicManager : IMusicManager
     private readonly ILogger<MusicManager> _logger;
     private readonly string _artworkBasePath;
 
-    public MusicManager(IMusicRepository repository, IUserRepository userRepository, IEnumerable<IMusicArtworkProvider> artworkProviders, IEnumerable<ILyricsProvider> lyricsProviders, IEnumerable<IListeningDataProvider> listeningProviders, IClientNotifier notifier, IConfiguration config, ILogger<MusicManager> logger)
+    public MusicManager(IMusicRepository repository, IUserRepository userRepository, IUserMediaStateRepository userMediaStateRepository, IEnumerable<IMusicArtworkProvider> artworkProviders, IEnumerable<ILyricsProvider> lyricsProviders, IEnumerable<IListeningDataProvider> listeningProviders, IClientNotifier notifier, IConfiguration config, ILogger<MusicManager> logger)
     {
         _repository = repository;
         _userRepository = userRepository;
+        _userMediaStateRepository = userMediaStateRepository;
         _artworkProviders = artworkProviders;
         _lyricsProviders = lyricsProviders;
         _listeningProviders = listeningProviders;
@@ -110,13 +115,53 @@ public class MusicManager : IMusicManager
         return artists.Select(MapArtist).ToList();
     }
 
-    public async Task<(ArtistVM? Artist, List<AlbumVM> Albums)> GetArtistDetailAsync(Guid artistId, MusicAccessFilter access)
+    public async Task<(ArtistVM? Artist, List<AlbumVM> Albums)> GetArtistDetailAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
     {
         var artist = await _repository.GetArtistByIdAsync(artistId, access);
         if (artist == null) return (null, new List<AlbumVM>());
 
         var albums = await _repository.GetAlbumsForArtistAsync(artistId, access);
-        return (MapArtist(artist), albums.Select(a => MapAlbum(a, artist.Name)).ToList());
+        var artistVm = MapArtist(artist);
+        var albumVms = albums.Select(a => MapAlbum(a, artist.Name)).ToList();
+
+        if (profileId.HasValue)
+        {
+            var artistRatings = await _repository.GetArtistRatingsAsync(profileId.Value, new[] { artistId });
+            if (artistRatings.TryGetValue(artistId, out var ar)) artistVm.MyRating = ar;
+
+            if (albumVms.Count > 0)
+            {
+                var albumRatings = await _repository.GetAlbumRatingsAsync(profileId.Value, albumVms.Select(a => a.Id));
+                foreach (var av in albumVms)
+                {
+                    if (albumRatings.TryGetValue(av.Id, out var rating)) av.MyRating = rating;
+                }
+            }
+        }
+
+        return (artistVm, albumVms);
+    }
+
+    public async Task<SetMusicRatingResult> SetAlbumRatingAsync(Guid profileId, Guid albumId, decimal? rating, bool isAdmin)
+    {
+        if (rating.HasValue && (rating.Value < 0m || rating.Value > 10m))
+        {
+            throw new ArgumentOutOfRangeException(nameof(rating), "Rating must be between 0 and 10.");
+        }
+        var result = await _repository.SetAlbumRatingAsync(profileId, albumId, rating, isAdmin);
+        if (result.Found) await _notifier.NotifyMusicAlbumUpdatedAsync(albumId);
+        return result;
+    }
+
+    public async Task<SetMusicRatingResult> SetArtistRatingAsync(Guid profileId, Guid artistId, decimal? rating, bool isAdmin)
+    {
+        if (rating.HasValue && (rating.Value < 0m || rating.Value > 10m))
+        {
+            throw new ArgumentOutOfRangeException(nameof(rating), "Rating must be between 0 and 10.");
+        }
+        var result = await _repository.SetArtistRatingAsync(profileId, artistId, rating, isAdmin);
+        if (result.Found) await _notifier.NotifyMusicArtistUpdatedAsync(artistId);
+        return result;
     }
 
     public async Task<(AlbumVM? Album, List<TrackVM> Tracks)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access)
@@ -129,14 +174,26 @@ public class MusicManager : IMusicManager
             ? await _repository.GetLikedTrackIdsAsync(profileId.Value, tracks.Select(t => t.Id))
             : new HashSet<Guid>();
 
+        var trackRatings = profileId.HasValue
+            ? await _userMediaStateRepository.GetMediaRatingsAsync(profileId.Value, tracks.Select(t => t.Id))
+            : new Dictionary<Guid, decimal>();
+
         var trackVms = tracks.Select(t =>
         {
             var vm = MapTrack(t);
             vm.IsLiked = likedIds.Contains(t.Id);
+            if (trackRatings.TryGetValue(t.Id, out var r)) vm.MyRating = r;
             return vm;
         }).ToList();
 
-        return (MapAlbum(album, album.Artist?.Name ?? string.Empty), trackVms);
+        var albumVm = MapAlbum(album, album.Artist?.Name ?? string.Empty);
+        if (profileId.HasValue)
+        {
+            var ratings = await _repository.GetAlbumRatingsAsync(profileId.Value, new[] { albumId });
+            if (ratings.TryGetValue(albumId, out var rating)) albumVm.MyRating = rating;
+        }
+
+        return (albumVm, trackVms);
     }
 
     public async Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
@@ -145,6 +202,9 @@ public class MusicManager : IMusicManager
         var likedIds = profileId.HasValue
             ? await _repository.GetLikedTrackIdsAsync(profileId.Value, tracks.Select(t => t.Id))
             : new HashSet<Guid>();
+        var ratings = profileId.HasValue
+            ? await _userMediaStateRepository.GetMediaRatingsAsync(profileId.Value, tracks.Select(t => t.Id))
+            : new Dictionary<Guid, decimal>();
 
         return tracks.Select(t => new ArtistTrackVM
         {
@@ -158,7 +218,9 @@ public class MusicManager : IMusicManager
             AlbumId = t.AlbumId,
             AlbumTitle = t.Album?.Title,
             AlbumArtworkUrl = t.Album?.ArtworkUrl,
-            IsLiked = likedIds.Contains(t.Id)
+            IsLiked = likedIds.Contains(t.Id),
+            ServerAdminRating = t.ServerAdminRating,
+            MyRating = ratings.TryGetValue(t.Id, out var r) ? r : (decimal?)null
         }).ToList();
     }
 
@@ -782,6 +844,7 @@ public class MusicManager : IMusicManager
         BannerUrl = a.BannerUrl,
         ClearLogoUrl = a.ClearLogoUrl,
         LibraryId = a.LibraryId,
+        ServerAdminRating = a.ServerAdminRating,
         LockedFields = a.LockedFields ?? new List<string>()
     };
 
@@ -799,6 +862,7 @@ public class MusicManager : IMusicManager
         IsCompilation = a.IsCompilation,
         ArtistId = a.ArtistId,
         ArtistName = artistName,
+        ServerAdminRating = a.ServerAdminRating,
         LockedFields = a.LockedFields ?? new List<string>()
     };
 
@@ -813,6 +877,7 @@ public class MusicManager : IMusicManager
         DurationSeconds = t.DurationSeconds,
         ContentRating = t.ContentRating,
         AlbumId = t.AlbumId,
+        ServerAdminRating = t.ServerAdminRating,
         LockedFields = t.LockedFields ?? new List<string>()
     };
 }

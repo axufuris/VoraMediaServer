@@ -45,6 +45,9 @@ public static class MusicEndpoints
         group.MapDelete("/tracks/{trackId:guid}/like", UnlikeTrackAsync).RequireAuthorization();
         group.MapGet("/likes", GetLikedTracksAsync).RequireAuthorization();
 
+        group.MapPut("/albums/{albumId:guid}/rating", SetAlbumRatingAsync).RequireAuthorization();
+        group.MapPut("/artists/{artistId:guid}/rating", SetArtistRatingAsync).RequireAuthorization();
+
         group.MapGet("/tracks/{trackId:guid}/lyrics", GetTrackLyricsAsync).RequireAuthorization();
 
         group.MapPost("/tracks/{trackId:guid}/played", RecordTrackPlayAsync).RequireAuthorization();
@@ -275,7 +278,7 @@ public static class MusicEndpoints
 
     private static async Task<IResult> GetArtistDetailAsync(Guid artistId, ClaimsPrincipal user, IMusicManager manager)
     {
-        var (artist, albums) = await manager.GetArtistDetailAsync(artistId, BuildFilter(user));
+        var (artist, albums) = await manager.GetArtistDetailAsync(artistId, user.GetProfileId(), BuildFilter(user));
         if (artist == null) return Results.NotFound();
         return Results.Ok(new { artist, albums });
     }
@@ -315,6 +318,43 @@ public static class MusicEndpoints
         if (profileId == null) return Results.Forbid();
         var tracks = await manager.GetLikedTracksAsync(profileId.Value, BuildFilter(user));
         return Results.Ok(new { count = tracks.Count, tracks });
+    }
+
+    public sealed class SetMusicRatingRequest
+    {
+        public decimal? Rating { get; set; }
+    }
+
+    private static async Task<IResult> SetAlbumRatingAsync(Guid albumId, [FromBody] SetMusicRatingRequest request, ClaimsPrincipal user, IMusicManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        try
+        {
+            var result = await manager.SetAlbumRatingAsync(profileId.Value, albumId, request.Rating, user.IsAdmin());
+            if (!result.Found) return Results.NotFound(new { Message = "Album not found." });
+            return Results.NoContent();
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+    }
+
+    private static async Task<IResult> SetArtistRatingAsync(Guid artistId, [FromBody] SetMusicRatingRequest request, ClaimsPrincipal user, IMusicManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        try
+        {
+            var result = await manager.SetArtistRatingAsync(profileId.Value, artistId, request.Rating, user.IsAdmin());
+            if (!result.Found) return Results.NotFound(new { Message = "Artist not found." });
+            return Results.NoContent();
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
     }
 
     private static async Task<IResult> GetTrackLyricsAsync(Guid trackId, ClaimsPrincipal user, IMusicManager manager, CancellationToken cancellationToken)

@@ -626,6 +626,7 @@ namespace Vora.Infrastructure.Migrations
                     BackgroundUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
                     BannerUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
                     ClearLogoUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    ServerAdminRating = table.Column<decimal>(type: "numeric", nullable: true),
                     LibraryId = table.Column<Guid>(type: "uuid", nullable: false),
                     AddedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     LockedFields = table.Column<string>(type: "text", nullable: false)
@@ -851,6 +852,7 @@ namespace Vora.Infrastructure.Migrations
                     DiscArtUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
                     AlbumArtist = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     IsCompilation = table.Column<bool>(type: "boolean", nullable: false),
+                    ServerAdminRating = table.Column<decimal>(type: "numeric", nullable: true),
                     ArtistId = table.Column<Guid>(type: "uuid", nullable: false),
                     LibraryId = table.Column<Guid>(type: "uuid", nullable: false),
                     AddedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -1164,6 +1166,33 @@ namespace Vora.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "UserArtistRatings",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Rating = table.Column<decimal>(type: "numeric", nullable: false),
+                    RatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ProfileId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ArtistId = table.Column<Guid>(type: "uuid", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserArtistRatings", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_UserArtistRatings_Artists_ArtistId",
+                        column: x => x.ArtistId,
+                        principalTable: "Artists",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_UserArtistRatings_UserProfiles_ProfileId",
+                        column: x => x.ProfileId,
+                        principalTable: "UserProfiles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "MediaItems",
                 columns: table => new
                 {
@@ -1255,6 +1284,33 @@ namespace Vora.Infrastructure.Migrations
                         name: "FK_MediaItems_MediaLibraries_LibraryId",
                         column: x => x.LibraryId,
                         principalTable: "MediaLibraries",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserAlbumRatings",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Rating = table.Column<decimal>(type: "numeric", nullable: false),
+                    RatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ProfileId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AlbumId = table.Column<Guid>(type: "uuid", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserAlbumRatings", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_UserAlbumRatings_Albums_AlbumId",
+                        column: x => x.AlbumId,
+                        principalTable: "Albums",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_UserAlbumRatings_UserProfiles_ProfileId",
+                        column: x => x.ProfileId,
+                        principalTable: "UserProfiles",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -1705,6 +1761,33 @@ namespace Vora.Infrastructure.Migrations
                         name: "FK_TvShowNetworks_Networks_NetworksId",
                         column: x => x.NetworksId,
                         principalTable: "Networks",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserMediaRatings",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Rating = table.Column<decimal>(type: "numeric", nullable: false),
+                    RatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ProfileId = table.Column<Guid>(type: "uuid", nullable: false),
+                    MediaItemId = table.Column<Guid>(type: "uuid", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserMediaRatings", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_UserMediaRatings_MediaItems_MediaItemId",
+                        column: x => x.MediaItemId,
+                        principalTable: "MediaItems",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_UserMediaRatings_UserProfiles_ProfileId",
+                        column: x => x.ProfileId,
+                        principalTable: "UserProfiles",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -2230,6 +2313,39 @@ namespace Vora.Infrastructure.Migrations
                 column: "TvShowsId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_UserAlbumRatings_AlbumId",
+                table: "UserAlbumRatings",
+                column: "AlbumId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserAlbumRatings_ProfileId_AlbumId",
+                table: "UserAlbumRatings",
+                columns: new[] { "ProfileId", "AlbumId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserArtistRatings_ArtistId",
+                table: "UserArtistRatings",
+                column: "ArtistId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserArtistRatings_ProfileId_ArtistId",
+                table: "UserArtistRatings",
+                columns: new[] { "ProfileId", "ArtistId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserMediaRatings_MediaItemId",
+                table: "UserMediaRatings",
+                column: "MediaItemId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserMediaRatings_ProfileId_MediaItemId",
+                table: "UserMediaRatings",
+                columns: new[] { "ProfileId", "MediaItemId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_UserMediaStates_MediaItemId",
                 table: "UserMediaStates",
                 column: "MediaItemId");
@@ -2399,6 +2515,15 @@ namespace Vora.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "TvShowNetworks");
+
+            migrationBuilder.DropTable(
+                name: "UserAlbumRatings");
+
+            migrationBuilder.DropTable(
+                name: "UserArtistRatings");
+
+            migrationBuilder.DropTable(
+                name: "UserMediaRatings");
 
             migrationBuilder.DropTable(
                 name: "UserMediaStates");

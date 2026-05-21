@@ -12,6 +12,11 @@ public interface IMusicRepository
     Task<List<Track>> GetLikedTracksAsync(Guid profileId, MusicAccessFilter access);
     Task<int> GetLikedTrackCountAsync(Guid profileId);
 
+    Task<Dictionary<Guid, decimal>> GetAlbumRatingsAsync(Guid profileId, IEnumerable<Guid> albumIds);
+    Task<Dictionary<Guid, decimal>> GetArtistRatingsAsync(Guid profileId, IEnumerable<Guid> artistIds);
+    Task<SetMusicRatingResult> SetAlbumRatingAsync(Guid profileId, Guid albumId, decimal? rating, bool isAdmin);
+    Task<SetMusicRatingResult> SetArtistRatingAsync(Guid profileId, Guid artistId, decimal? rating, bool isAdmin);
+
     Task RecordPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed);
     Task<List<Track>> GetRecentlyPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<Track>> GetTopPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit);
@@ -104,6 +109,12 @@ public sealed class GenreContent
     public List<Artist> Artists { get; set; } = new();
     public List<Album> Albums { get; set; } = new();
     public List<Track> Tracks { get; set; } = new();
+}
+
+public sealed class SetMusicRatingResult
+{
+    public bool Found { get; init; }
+    public bool ServerAdminRatingChanged { get; init; }
 }
 
 public class MusicAccessFilter
