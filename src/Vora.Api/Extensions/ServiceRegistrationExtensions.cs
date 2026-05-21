@@ -66,6 +66,7 @@ public static class ServiceRegistrationExtensions
 
     public static WebApplicationBuilder AddVoraServices(this WebApplicationBuilder builder)
     {
+        builder.AddVoraLogging();
         builder.Services.AddVoraSwagger();
         builder.Services.AddVoraDatabase(builder.Configuration);
         builder.Services.AddVoraRepositories();
@@ -79,6 +80,53 @@ public static class ServiceRegistrationExtensions
         builder.Services.AddVoraAuthenticationAndAuthorization(builder.Configuration);
         builder.Services.AddVoraCors();
         builder.Services.AddVoraJsonOptions();
+        return builder;
+    }
+
+    private static WebApplicationBuilder AddVoraLogging(this WebApplicationBuilder builder)
+    {
+        var configuredLogDir = builder.Configuration["StoragePaths:Logs"];
+        var logDir = !string.IsNullOrWhiteSpace(configuredLogDir)
+            ? configuredLogDir
+            : Path.Combine(AppContext.BaseDirectory, "logs");
+        Directory.CreateDirectory(logDir);
+
+        var bufferCapacity = builder.Configuration.GetValue<int?>("Logging:Vora:BufferCapacity") ?? 10_000;
+        var retentionDays = builder.Configuration.GetValue<int?>("Logging:Vora:RetentionDays") ?? 14;
+
+        var buffer = new Vora.Application.Logging.InMemoryLogBuffer(bufferCapacity);
+        var fileSink = new Vora.Application.Logging.LogFileSink(new Vora.Application.Logging.LogFileSinkOptions
+        {
+            Directory = logDir,
+            RetentionDays = retentionDays
+        });
+        var levels = new Vora.Application.Logging.LogLevelOverrideProvider();
+
+        var defaultLevelString = builder.Configuration["Logging:LogLevel:Default"];
+        if (!string.IsNullOrWhiteSpace(defaultLevelString)
+            && Enum.TryParse<Microsoft.Extensions.Logging.LogLevel>(defaultLevelString, true, out var mel))
+        {
+            levels.DefaultLevel = mel switch
+            {
+                Microsoft.Extensions.Logging.LogLevel.Trace => Vora.Application.Logging.VoraLogLevel.Trace,
+                Microsoft.Extensions.Logging.LogLevel.Debug => Vora.Application.Logging.VoraLogLevel.Debug,
+                Microsoft.Extensions.Logging.LogLevel.Information => Vora.Application.Logging.VoraLogLevel.Information,
+                Microsoft.Extensions.Logging.LogLevel.Warning => Vora.Application.Logging.VoraLogLevel.Warning,
+                Microsoft.Extensions.Logging.LogLevel.Error => Vora.Application.Logging.VoraLogLevel.Error,
+                Microsoft.Extensions.Logging.LogLevel.Critical => Vora.Application.Logging.VoraLogLevel.Critical,
+                _ => Vora.Application.Logging.VoraLogLevel.Information
+            };
+        }
+
+        builder.Services.AddSingleton<Vora.Application.Logging.ILogBuffer>(buffer);
+        builder.Services.AddSingleton(fileSink);
+        builder.Services.AddSingleton(levels);
+        builder.Services.AddSingleton<Vora.Application.Logging.ILogManager, Vora.Application.Logging.LogManager>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<Vora.Application.Logging.LogFileSink>());
+        builder.Services.AddHostedService<Vora.Application.Logging.LogBroadcastHostedService>();
+
+        builder.Logging.AddProvider(new Vora.Application.Logging.VoraLoggerProvider(buffer, fileSink, levels));
+        builder.Logging.AddFilter<Vora.Application.Logging.VoraLoggerProvider>(null, Microsoft.Extensions.Logging.LogLevel.Trace);
         return builder;
     }
 

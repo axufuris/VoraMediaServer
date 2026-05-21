@@ -12,7 +12,7 @@ export type IconName =
     | 'dashboard' | 'settings' | 'tasks' | 'plugins' | 'users' | 'devices'
     | 'history' | 'music-note' | 'chart' | 'folder' | 'layers' | 'image'
     | 'copy' | 'list' | 'inbox' | 'compass' | 'star' | 'calendar'
-    | 'tv' | 'record' | 'radio' | 'mic' | 'palette';
+    | 'tv' | 'record' | 'radio' | 'mic' | 'palette' | 'logs';
 
 export const Icons: Record<IconName, ReactNode> = {
     dashboard: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3v-7h6v7h3a1 1 0 001-1V10" />,
@@ -38,6 +38,7 @@ export const Icons: Record<IconName, ReactNode> = {
     radio: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3.5 12a8.5 8.5 0 0117 0m-3.5 0a5 5 0 00-10 0m6 0a1 1 0 11-2 0 1 1 0 012 0z" />,
     mic: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zM5 10v2a7 7 0 0014 0v-2M12 19v4m-4 0h8" />,
     palette: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 21a9 9 0 110-18 9 9 0 015.66 16.06A2.4 2.4 0 0116 21h-2a2 2 0 01-2-2v0a2 2 0 00-2-2h-1.5a2.5 2.5 0 010-5H10a2 2 0 002-2v0M9 8h.01M15.5 9h.01M17.5 13h.01" />,
+    logs: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 4h12l4 4v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm10 0v6h6M7 14h10M7 18h7M7 10h4" />,
 };
 
 export type NavSection = 'Server' | 'Library' | 'Features';
@@ -79,6 +80,7 @@ export const ADMIN_NAV: AdminNavEntry[] = [
     { label: 'Appearance',           pathTemplate: '/admin/appearance',       section: 'Server',  icon: 'palette',    keywords: ['theme', 'colors', 'look', 'admin appearance'] },
     { label: 'Client Templates',     pathTemplate: '/admin/client-templates', section: 'Server',  icon: 'image',      keywords: ['client', 'template', 'schedule', 'thanksgiving', 'holiday', 'seasonal'] },
     { label: 'AI Usage & Stats',     pathTemplate: '/admin/ai-stats',         section: 'Server',  icon: 'chart',      keywords: ['tokens', 'openai', 'cost'], requires: 'ai' },
+    { label: 'Server Logs',          pathTemplate: '/admin/logs',             section: 'Server',  icon: 'logs',       keywords: ['logs', 'errors', 'warnings', 'tail', 'trace', 'debug'] },
 
     // === Library ===
     { label: 'Libraries',            pathTemplate: '/admin/libraries',        section: 'Library', icon: 'folder',     keywords: ['media', 'sources', 'folders'] },

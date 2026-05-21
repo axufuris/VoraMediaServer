@@ -1,10 +1,14 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using Vora.Application.Analysis;
+using Vora.Application.Logging.ViewModels;
 
 namespace Vora.Api.Hubs;
 
 public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNotifier
 {
+    public Task NotifyLogEntriesAsync(IReadOnlyList<LogEntryVM> entries) =>
+        hubContext.Clients.Group("admins").SendAsync("LogEntryBatch", entries);
+
     public Task NotifyCollectionUpdatedAsync(Guid collectionId) =>
         hubContext.Clients.All.SendAsync("CollectionUpdated", collectionId);
 

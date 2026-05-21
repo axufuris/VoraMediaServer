@@ -1,7 +1,10 @@
-﻿namespace Vora.Application.Analysis;
+﻿using Vora.Application.Logging.ViewModels;
+
+namespace Vora.Application.Analysis;
 
 public interface IClientNotifier
 {
+    Task NotifyLogEntriesAsync(IReadOnlyList<LogEntryVM> entries);
     Task NotifyCollectionUpdatedAsync(Guid collectionId);
     Task NotifyLibraryUpdatedAsync(Guid libraryId);
     Task NotifyMediaItemUpdatedAsync(Guid mediaItemId);

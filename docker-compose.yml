@@ -16,6 +16,7 @@ services:
       - StoragePaths__IptvDvr=/app/data/iptv/dvr
       - StoragePaths__UserImages=/app/data/users
       - StoragePaths__Plugins=/app/data/plugins
+      - StoragePaths__Logs=/app/data/logs
     ports:
       - "${Vora_PORT:-8080}:8080"
     volumes:
