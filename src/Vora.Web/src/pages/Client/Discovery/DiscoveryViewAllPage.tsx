@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { discoveryService, type DiscoveryItem, type DiscoveryRowConfig } from '../../../api/Discovery/discoveryService';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import EmptyState from '../../../components/Client/Primitives/EmptyState';
 
 export default function DiscoveryViewAllPage() {
     const { serverId, providerId, rowId } = useParams<{ serverId?: string, providerId: string, rowId: string }>();
@@ -13,6 +14,7 @@ export default function DiscoveryViewAllPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [rowName, setRowName] = useState<string>('Loading…');
+    const [rowUnavailable, setRowUnavailable] = useState(false);
     const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
 
     const observerTarget = useRef<HTMLDivElement>(null);
@@ -26,7 +28,13 @@ export default function DiscoveryViewAllPage() {
             try {
                 const configs = await discoveryService.getAdminConfigs(serverId);
                 const matchingConfig = configs.find((c: DiscoveryRowConfig) => c.providerId === providerId && c.rowId === rowId);
-                if (matchingConfig) setRowName(matchingConfig.name);
+                if (!matchingConfig || !matchingConfig.isEnabled) {
+                    setRowUnavailable(true);
+                    setHasMore(false);
+                    setRowName('Row unavailable');
+                } else {
+                    setRowName(matchingConfig.name);
+                }
 
                 if (activeProfileId) {
                     const wItems = await discoveryService.getWatchlist(activeProfileId, serverId);
@@ -40,7 +48,7 @@ export default function DiscoveryViewAllPage() {
     }, [providerId, rowId, serverId, activeProfileId]);
 
     useEffect(() => {
-        if (!providerId || !rowId || !hasMore) return;
+        if (!providerId || !rowId || !hasMore || rowUnavailable) return;
         const loadPage = async () => {
             setIsLoading(true);
             try {
@@ -54,17 +62,23 @@ export default function DiscoveryViewAllPage() {
                         return [...prev, ...uniqueNew];
                     });
                 }
-            } catch (error) {
-                console.error('Failed to fetch discovery items', error);
+            } catch (error: unknown) {
+                const status = (error as { response?: { status?: number } })?.response?.status;
+                if (status === 404) {
+                    setRowUnavailable(true);
+                } else {
+                    console.error('Failed to fetch discovery items', error);
+                }
                 setHasMore(false);
             } finally {
                 setIsLoading(false);
             }
         };
         loadPage();
-    }, [providerId, rowId, page, serverId, hasMore]);
+    }, [providerId, rowId, page, serverId, hasMore, rowUnavailable]);
 
     useEffect(() => {
+        if (rowUnavailable) return;
         const observer = new IntersectionObserver(
             entries => {
                 if (entries[0].isIntersecting && !isLoading && hasMore) {
@@ -75,7 +89,7 @@ export default function DiscoveryViewAllPage() {
         );
         if (observerTarget.current) observer.observe(observerTarget.current);
         return () => observer.disconnect();
-    }, [isLoading, hasMore]);
+    }, [isLoading, hasMore, rowUnavailable]);
 
     const backAction = (
         <button
@@ -93,6 +107,28 @@ export default function DiscoveryViewAllPage() {
             <PageHeader title={rowName} subtitle="Browse everything in this discovery row." actions={backAction} />
 
             <div className="px-8 pt-2">
+                {rowUnavailable ? (
+                    <EmptyState
+                        title="This Discovery row is no longer available"
+                        description="The server admin has disabled this row, or the provider it relies on isn't installed. Head back to Discover for the rows that are still active."
+                        icon={(
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <circle cx="12" cy="12" r="9" />
+                                <line x1="8" y1="12" x2="16" y2="12" />
+                            </svg>
+                        )}
+                        action={(
+                            <button
+                                type="button"
+                                onClick={() => navigate(serverId ? `/server/${serverId}/discovery` : '/discovery')}
+                                className="vora-button-primary cursor-pointer"
+                            >
+                                Back to Discover
+                            </button>
+                        )}
+                    />
+                ) : (
+                <>
                 <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
                     {items.map(item => {
                         const inWatchlist = watchlistIds.has(item.externalId);
@@ -129,6 +165,8 @@ export default function DiscoveryViewAllPage() {
                         <div className="text-sm font-medium" style={{ color: 'var(--vora-text-muted)' }}>You've reached the end of the list.</div>
                     )}
                 </div>
+                </>
+                )}
             </div>
         </div>
     );

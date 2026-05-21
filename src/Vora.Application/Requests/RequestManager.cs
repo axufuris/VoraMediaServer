@@ -25,7 +25,7 @@ public interface IRequestManager
     Task<List<MediaRequestVM>> GetAllRequestsAsync();
     Task<IEnumerable<ProviderOptionDto>> GetProviderOptionsAsync(string providerId, string optionType, string host, int port, bool useSsl, string urlBase, string apiKey);
     Task DeleteRequestAsync(Guid id);
-    Task ResolveRequestAsync(string externalId, string type);
+    Task ResolveRequestAsync(string externalId, string type, Guid? mediaItemId = null);
     Task<int?> GetRequestStatusAsync(string externalId, string type);
 }
 
@@ -34,17 +34,20 @@ public class RequestManager : IRequestManager
     private readonly IRequestRepository _requestRepo;
     private readonly IMediaRepository _mediaRepo;
     private readonly IUserRepository _userRepo;
+    private readonly IRequestNotificationService _notificationService;
     private readonly IServiceProvider _serviceProvider;
 
     public RequestManager(
         IRequestRepository requestRepo,
         IMediaRepository mediaRepo,
         IUserRepository userRepo,
+        IRequestNotificationService notificationService,
         IServiceProvider serviceProvider)
     {
         _requestRepo = requestRepo;
         _mediaRepo = mediaRepo;
         _userRepo = userRepo;
+        _notificationService = notificationService;
         _serviceProvider = serviceProvider;
     }
 
@@ -225,7 +228,7 @@ public class RequestManager : IRequestManager
 
     public async Task DeleteRequestAsync(Guid id) => await _requestRepo.DeleteRequestAsync(id);
 
-    public async Task ResolveRequestAsync(string externalId, string type)
+    public async Task ResolveRequestAsync(string externalId, string type, Guid? mediaItemId = null)
     {
         if (string.IsNullOrWhiteSpace(externalId)) return;
 
@@ -236,6 +239,8 @@ public class RequestManager : IRequestManager
             request.Status = RequestStatus.Available;
             request.UpdatedAt = DateTime.UtcNow;
             await _requestRepo.UpdateRequestAsync(request);
+
+            await _notificationService.NotifyRequestAvailableAsync(request, mediaItemId);
         }
     }
 

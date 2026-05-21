@@ -60,6 +60,13 @@ public class UserRepository(VoraDbContext context) : IUserRepository
             .FirstOrDefaultAsync(u => u.Email.ToLower() == emailLower);
     }
 
+    public Task<User?> GetUserForProfileAsync(Guid profileId) =>
+        context.UserProfiles
+            .AsNoTracking()
+            .Where(p => p.Id == profileId)
+            .Select(p => p.User)
+            .FirstOrDefaultAsync();
+
     public Task<UserProfile?> GetProfileByIdAsync(Guid id) =>
         context.UserProfiles
             .Include(p => p.AccessSchedules)
@@ -133,6 +140,32 @@ public class UserRepository(VoraDbContext context) : IUserRepository
     public async Task DeleteRegistrationTicketAsync(RegistrationTicket ticket)
     {
         context.RegistrationTickets.Remove(ticket);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task CreatePasswordResetTicketAsync(PasswordResetTicket ticket)
+    {
+        await context.PasswordResetTickets.AddAsync(ticket);
+        await context.SaveChangesAsync();
+    }
+
+    public Task<PasswordResetTicket?> GetActivePasswordResetTicketByHashAsync(string tokenHash) =>
+        context.PasswordResetTickets
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && t.ExpiresAt > DateTime.UtcNow);
+
+    public async Task DeletePasswordResetTicketAsync(PasswordResetTicket ticket)
+    {
+        context.PasswordResetTickets.Remove(ticket);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task InvalidateOutstandingPasswordResetTicketsForUserAsync(Guid userId)
+    {
+        var outstanding = await context.PasswordResetTickets
+            .Where(t => t.UserId == userId)
+            .ToListAsync();
+        if (outstanding.Count == 0) return;
+        context.PasswordResetTickets.RemoveRange(outstanding);
         await context.SaveChangesAsync();
     }
 

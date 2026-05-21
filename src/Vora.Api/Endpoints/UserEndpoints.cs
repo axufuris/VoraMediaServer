@@ -9,6 +9,7 @@ public class UpdateUserDto
     public required string Email { get; set; }
     public required string DisplayName { get; set; }
     public string? NewPassword { get; set; }
+    public bool? EmailNotifyOnRequestAvailable { get; set; }
 }
 
 public class UpdateUserAccessDto
@@ -87,7 +88,7 @@ public static class UserEndpoints
 
     private static async Task<IResult> UpdateUserAsync(Guid userId, [FromBody] UpdateUserDto request, IUserManager manager)
     {
-        await manager.UpdateUserAccountAsync(userId, request.Email, request.DisplayName, request.NewPassword);
+        await manager.UpdateUserAccountAsync(userId, request.Email, request.DisplayName, request.NewPassword, request.EmailNotifyOnRequestAvailable);
         return Results.NoContent();
     }
 

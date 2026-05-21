@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { authService } from '../../api/Auth/authService';
 import AuthLayout from '../../layouts/AuthLayout';
@@ -15,10 +15,15 @@ function resolveServerUrl(): string {
 export default function RegisterPage() {
     const navigate = useNavigate();
     const serverUrl = resolveServerUrl();
+    const [searchParams] = useSearchParams();
+    const inviteToken = useMemo(() => searchParams.get('invite') ?? '', [searchParams]);
 
     const [registrationMode, setRegistrationMode] = useState<number | null>(null);
     const [isProbing, setIsProbing] = useState(true);
     const [probeError, setProbeError] = useState('');
+
+    const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
+    const [inviteError, setInviteError] = useState<string | null>(null);
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -32,6 +37,16 @@ export default function RegisterPage() {
                 const status = await authService.probeServer(serverUrl);
                 setRegistrationMode(status.registrationMode);
                 sessionStorage.setItem('pending_server_url', serverUrl);
+
+                if (inviteToken) {
+                    try {
+                        const invite = await authService.validateInvitation(serverUrl, inviteToken);
+                        setInvitedEmail(invite.email);
+                        setEmail(invite.email);
+                    } catch {
+                        setInviteError('This invitation is invalid or has expired. Ask the server admin to send a new one.');
+                    }
+                }
             } catch {
                 setProbeError("Could not reach the server. Make sure the Vora backend is running.");
             } finally {
@@ -39,13 +54,13 @@ export default function RegisterPage() {
             }
         };
         probe();
-    }, [serverUrl]);
+    }, [serverUrl, inviteToken]);
 
     const handleRegister = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         setError('');
         try {
-            const res = await authService.register(email, password, displayName, secretCode);
+            const res = await authService.register(email, password, displayName, secretCode || undefined, inviteToken || undefined);
 
             localStorage.setItem('account_token', res.accessToken);
             localStorage.setItem('user_id', res.userId);
@@ -88,7 +103,27 @@ export default function RegisterPage() {
         );
     }
 
-    if (registrationMode === 0) {
+    if (inviteToken && inviteError) {
+        return (
+            <AuthLayout title="Invitation expired" subtitle="This invite isn't usable anymore.">
+                <div
+                    className="text-sm font-medium p-3 rounded mb-4"
+                    style={{
+                        color: 'var(--vora-danger-text)',
+                        background: 'var(--vora-danger-soft)',
+                        border: '1px solid var(--vora-danger-500)',
+                    }}
+                >
+                    {inviteError}
+                </div>
+                <div className="text-center text-sm" style={{ color: 'var(--vora-text-muted)' }}>
+                    <Link to="/login" className="font-medium transition-colors hover:opacity-80" style={{ color: 'var(--vora-accent-text)' }}>Back to Sign In</Link>
+                </div>
+            </AuthLayout>
+        );
+    }
+
+    if (registrationMode === 0 && !invitedEmail) {
         return (
             <AuthLayout title="Registration Disabled" subtitle="The server administrator has closed new account registrations.">
                 <Link to="/login" className="vora-button-secondary block text-center cursor-pointer">Return to Login</Link>
@@ -96,8 +131,11 @@ export default function RegisterPage() {
         );
     }
 
+    const isInvited = invitedEmail !== null;
+    const showSecretCode = !isInvited && registrationMode === 2;
+
     return (
-        <AuthLayout title="Create Account" subtitle="Join the Vora server.">
+        <AuthLayout title="Create Account" subtitle={isInvited ? 'You were invited.' : 'Join the Vora server.'}>
             {error && (
                 <div
                     className="p-3 rounded mb-6 text-sm"
@@ -112,7 +150,24 @@ export default function RegisterPage() {
             )}
 
             <form onSubmit={handleRegister} className="space-y-5">
-                {registrationMode === 2 && (
+                {isInvited && (
+                    <div
+                        className="p-4 rounded-lg mb-2"
+                        style={{
+                            background: 'var(--vora-accent-soft)',
+                            border: '1px solid var(--vora-accent-500)',
+                        }}
+                    >
+                        <p className="text-sm" style={{ color: 'var(--vora-accent-text)' }}>
+                            <strong>Invited as</strong> <span className="font-mono">{invitedEmail}</span>
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--vora-text-muted)' }}>
+                            Pick a display name and a password to finish setting up your account.
+                        </p>
+                    </div>
+                )}
+
+                {showSecretCode && (
                     <div
                         className="p-4 rounded-lg mb-6"
                         style={{
@@ -132,11 +187,21 @@ export default function RegisterPage() {
                 </div>
                 <div>
                     <label className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Email</label>
-                    <input required type="email" value={email} onChange={e => setEmail(e.target.value)} className="vora-input w-full" />
+                    <input
+                        required
+                        type="email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        className="vora-input w-full disabled:opacity-70 disabled:cursor-not-allowed"
+                        disabled={isInvited}
+                    />
+                    {isInvited && (
+                        <p className="text-xs mt-1" style={{ color: 'var(--vora-text-muted)' }}>This must match the email your invitation was sent to.</p>
+                    )}
                 </div>
                 <div>
                     <label className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Password</label>
-                    <input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="vora-input w-full" />
+                    <input required type="password" minLength={6} value={password} onChange={e => setPassword(e.target.value)} className="vora-input w-full" />
                 </div>
                 <button type="submit" className="vora-button-primary w-full cursor-pointer mt-4">
                     Register

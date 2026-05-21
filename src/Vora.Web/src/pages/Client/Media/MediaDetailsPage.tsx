@@ -35,6 +35,24 @@ function formatRuntime(minutes?: number): string | null {
     return mins === 0 ? `${hours} hr` : `${hours} hr ${mins} min`;
 }
 
+function isPercentScaleRating(providerName?: string): boolean {
+    if (!providerName) return false;
+    const n = providerName.trim().toLowerCase();
+    return n === 'rotten tomatoes'
+        || n === 'rotten tomatoes audience'
+        || n === 'rotten tomatoes critic'
+        || n === 'rotten tomatoes certified'
+        || n === 'rt'
+        || n === 'rt audience'
+        || n === 'rt critic'
+        || n === 'rt certified';
+}
+
+function formatThirdPartyRating(value: number, providerName?: string): string {
+    if (isPercentScaleRating(providerName)) return `${Math.round(value)}%`;
+    return value.toFixed(1);
+}
+
 export default function MediaDetailsPage() {
     const dialog = useDialog();
     const { serverId, id } = useParams<{ serverId?: string, id: string }>();
@@ -463,13 +481,13 @@ export default function MediaDetailsPage() {
                             {media.thirdPartyRating1 != null && (
                                 <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
                                     <span className="font-semibold">{media.thirdPartyRating1Name ?? 'Rating'}</span>
-                                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{media.thirdPartyRating1.toFixed(1)}</span>
+                                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{formatThirdPartyRating(media.thirdPartyRating1, media.thirdPartyRating1Name)}</span>
                                 </div>
                             )}
                             {media.thirdPartyRating2 != null && (
                                 <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
                                     <span className="font-semibold">{media.thirdPartyRating2Name ?? 'Rating'}</span>
-                                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{media.thirdPartyRating2.toFixed(1)}</span>
+                                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{formatThirdPartyRating(media.thirdPartyRating2, media.thirdPartyRating2Name)}</span>
                                 </div>
                             )}
                         </div>

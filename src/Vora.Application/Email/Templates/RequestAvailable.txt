@@ -1,0 +1,9 @@
+{{serverName}} - Your request is ready
+
+Hi {{userName}},
+
+The {{mediaType}} you requested is now in the library:
+
+{{mediaTitle}}
+
+Watch it here: {{mediaLink}}

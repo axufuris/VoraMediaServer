@@ -11,6 +11,7 @@ export interface SetupStatus {
     isClaimed: boolean;
     registrationMode: number;
     serverName?: string;
+    emailEnabled?: boolean;
 }
 
 export const authService = {
@@ -19,8 +20,8 @@ export const authService = {
         return response.data;
     },
 
-    register: async (email: string, password: string, displayName: string, secretCode?: string, serverId?: string): Promise<AuthResponse> => {
-        const response = await apiClient.post<AuthResponse>('/auth/register', { email, password, displayName, secretCode }, { serverId });
+    register: async (email: string, password: string, displayName: string, secretCode?: string, inviteToken?: string, serverId?: string): Promise<AuthResponse> => {
+        const response = await apiClient.post<AuthResponse>('/auth/register', { email, password, displayName, secretCode, inviteToken }, { serverId });
         return response.data;
     },
 
@@ -68,10 +69,26 @@ export const authService = {
         return response.data.token;
     },
 
-    registerOnServer: async (baseUrl: string, email: string, password: string, displayName: string, secretCode?: string): Promise<AuthResponse> => {
+    registerOnServer: async (baseUrl: string, email: string, password: string, displayName: string, secretCode?: string, inviteToken?: string): Promise<AuthResponse> => {
         const client = createDirectClient(baseUrl);
-        const response = await client.post<AuthResponse>('/auth/register', { email, password, displayName, secretCode });
+        const response = await client.post<AuthResponse>('/auth/register', { email, password, displayName, secretCode, inviteToken });
         return response.data;
+    },
+
+    validateInvitation: async (baseUrl: string, token: string): Promise<{ email: string; expiresAt: string }> => {
+        const client = createDirectClient(baseUrl);
+        const response = await client.post<{ email: string; expiresAt: string }>('/auth/invitations/validate', { token });
+        return response.data;
+    },
+
+    requestPasswordReset: async (baseUrl: string, email: string): Promise<void> => {
+        const client = createDirectClient(baseUrl);
+        await client.post('/auth/forgot-password', { email });
+    },
+
+    confirmPasswordReset: async (baseUrl: string, token: string, newPassword: string): Promise<void> => {
+        const client = createDirectClient(baseUrl);
+        await client.post('/auth/reset-password', { token, newPassword });
     },
 
     logout: () => {

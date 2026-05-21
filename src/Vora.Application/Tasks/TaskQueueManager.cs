@@ -271,6 +271,9 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<IPosterOverlayManager>();
             await manager.GenerateOverlaysForMediaAsync(mediaItemId);
+
+            var notifier = sp.GetRequiredService<IClientNotifier>();
+            await notifier.NotifyMediaItemUpdatedAsync(mediaItemId);
         });
     }
 

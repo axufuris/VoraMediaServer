@@ -14,7 +14,8 @@ public enum FeatureGate
     LiveTv,
     Dvr,
     InternetRadio,
-    Podcasts
+    Podcasts,
+    Email
 }
 
 public class RequireFeatureFilter : IEndpointFilter
@@ -45,6 +46,7 @@ public class RequireFeatureFilter : IEndpointFilter
             FeatureGate.Dvr => settings.EnableLiveTv && settings.EnableDvr,
             FeatureGate.InternetRadio => settings.EnableInternetRadio,
             FeatureGate.Podcasts => settings.EnablePodcasts,
+            FeatureGate.Email => settings.EmailEnabled,
             _ => true
         };
 

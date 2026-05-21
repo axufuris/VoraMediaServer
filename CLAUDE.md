@@ -11,6 +11,7 @@ Vora is a self-hosted media server with a .NET backend (`Vora.Api`) and a React 
 - **Backend:** .NET 10, C#, minimal APIs (`Vora.Api`)
 - **Database:** PostgreSQL with the `vector` extension, EF Core
 - **Real-time:** SignalR hub at `/hubs/Vora`
+- **Email:** MailKit SMTP, ASP.NET Core DataProtection for SMTP password encryption
 - **Frontend:** React + TypeScript + Vite + Tailwind, axios, `react-router-dom`, `@microsoft/signalr`, `hls.js`, `react-rnd`
 - **Containerization:** API always runs in Docker; FFmpeg lives inside the container
 - **IDE:** Visual Studio 2026, single solution `Vora.slnx`
@@ -23,7 +24,8 @@ Read the doc that matches what you're doing. Each file is kept short (≤200 lin
 - [`docs/backend-conventions.md`](docs/backend-conventions.md) — `Vora.Api` structure, endpoints pattern, managers/services/repos, C# style, naming
 - [`docs/frontend-conventions.md`](docs/frontend-conventions.md) — `Vora.Web` structure, API service grouping, page layout, dialogs, shared primitives
 - [`docs/database.md`](docs/database.md) — DbContext layout, migrations workflow, PostgreSQL/vector, column constraints
-- [`docs/auth-and-devices.md`](docs/auth-and-devices.md) — auth flow, account/profile tokens, device tracking, claims, localStorage keys
+- [`docs/auth-and-devices.md`](docs/auth-and-devices.md) — auth flow, account/profile tokens, device tracking, claims, localStorage keys, forgot-password + invitation flows
+- [`docs/email.md`](docs/email.md) — SMTP transport, template renderer + admin overrides, dispatch worker, delivery log, DataProtection key storage, three use cases (password reset, admin invite, request fulfilled)
 - [`docs/realtime.md`](docs/realtime.md) — VoraHub, `IClientNotifier`, `useSignalREvent`
 - [`docs/plugins.md`](docs/plugins.md) — plugin contracts, loader, provider categories
 - [`docs/iptv-and-dvr.md`](docs/iptv-and-dvr.md) — IPTV playlists + EPG sources (split aggregates), EPG cache + matching strategy, DVR sessions, timeshift, recording schedules
@@ -74,3 +76,4 @@ These are project-wide. The deeper docs add their own rules; these never bend.
 - **localStorage keys**: see `docs/auth-and-devices.md` — the canonical admin flag is `is_server_admin`, NOT `is_admin` (that key is dead). Per-profile home prefs use the `vora_show_spotlight_${profileId}` key (broadcast a `vora:home-prefs-changed` event when changing).
 - **Header conventions**: device headers are all `X-Vora-*` (Device-Id, Client, Device, Device-Type, OS). The frontend interceptor in `src/api/client.ts` sends them; the backend `DeviceTrackingMiddleware` reads them.
 - **Brand assets**: `public/favicon.svg`, `public/vora-logo.svg`, `public/vora-mark.svg`. The chevron-V wordmark is gradient-driven (`--vora-accent-text` → `--vora-accent-500`), so the brand recolors per template. Don't replace these with raster art.
+- **DataProtection keys**: SMTP password is encrypted via ASP.NET Core DataProtection (`AddVoraEmail` in `ServiceRegistrationExtensions`). Keys persist to `StoragePaths:DataProtection` (default `<base>/DataProtectionKeys`). **Mount this directory as a Docker volume** — otherwise keys roll on every container rebuild and the saved SMTP password becomes undecryptable. See `docs/email.md`.

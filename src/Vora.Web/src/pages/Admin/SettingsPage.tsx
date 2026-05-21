@@ -6,17 +6,18 @@ import { apiClient } from '../../api/client';
 import RequestServersTab from '../../components/Admin/Settings/RequestServersTab';
 import CoreSettingsTab from '../../components/Admin/Settings/CoreSettingsTab';
 import RemoteAccessTab from '../../components/Admin/Settings/RemoteAccessTab';
+import EmailTab from '../../components/Admin/Settings/EmailTab';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import FeatureTabs from '../../components/Admin/Features/FeatureTabs';
 
-type SettingsTabKey = 'core' | 'remote' | 'requests';
+type SettingsTabKey = 'core' | 'remote' | 'email' | 'requests';
 
 export default function SettingsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const storageKey = `admin_settings_tab_${serverId || 'global'}`;
     const [activeTab, setActiveTab] = useState<SettingsTabKey>(() => {
         const saved = localStorage.getItem(storageKey);
-        return (saved === 'core' || saved === 'remote' || saved === 'requests') ? saved : 'core';
+        return (saved === 'core' || saved === 'remote' || saved === 'email' || saved === 'requests') ? saved : 'core';
     });
     const [scanners, setScanners] = useState<{ id: string, name: string }[]>([]);
     const [hardwareDevices, setHardwareDevices] = useState<string[]>([]);
@@ -53,6 +54,7 @@ export default function SettingsPage() {
                     tabs={[
                         { key: 'core', label: 'Core' },
                         { key: 'remote', label: 'Remote Access' },
+                        { key: 'email', label: 'Email' },
                         { key: 'requests', label: 'Request Servers' },
                     ]}
                     activeKey={activeTab}
@@ -64,6 +66,9 @@ export default function SettingsPage() {
                 )}
                 {activeTab === 'remote' && (
                     <RemoteAccessTab serverId={serverId} showModal={showModal} />
+                )}
+                {activeTab === 'email' && (
+                    <EmailTab serverId={serverId} />
                 )}
                 {activeTab === 'requests' && (
                     <RequestServersTab serverId={serverId} showModal={showModal} />

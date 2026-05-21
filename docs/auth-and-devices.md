@@ -20,12 +20,47 @@ The `profile_token` payload includes claims read by `Vora.Api/Extensions/AuthExt
 
 ## Auth pages
 
-- `pages/Auth/LoginPage.tsx` — Email + password only. Derives the server URL from `import.meta.env.VITE_API_BASE_URL` or falls back to `window.location.origin` and probes it on mount. **No** server URL input shown to the user.
-- `pages/Auth/RegisterPage.tsx` — Same approach: probe the current-origin server, then show the register form (or "registration disabled" / "needs invite code" depending on the server's `registrationMode`).
+- `pages/Auth/LoginPage.tsx` — Email + password only. Derives the server URL from `import.meta.env.VITE_API_BASE_URL` or falls back to `window.location.origin` and probes it on mount. **No** server URL input shown to the user. Renders a "Forgot password?" link only when `setup-status.emailEnabled` is true.
+- `pages/Auth/RegisterPage.tsx` — Probe the current-origin server, then show the register form. Reads `?invite=<token>` from the URL; if present, calls `/auth/invitations/validate` to pre-fill and lock the email field, hides the secret-code field, and registers even when `registrationMode === 0` (Disabled). Otherwise behaves per `registrationMode` (open / disabled / needs 3-word secret code).
+- `pages/Auth/ForgotPasswordPage.tsx` — Vague success state regardless of whether the email exists. Shows a "contact your administrator" fallback when the server reports email is disabled.
+- `pages/Auth/ResetPasswordPage.tsx` — Reads `?token=<token>` from the URL, accepts new password + confirm, POSTs to `/auth/reset-password`.
 - `pages/Auth/SetupPage.tsx` — First-run server-claim flow.
 - `pages/Profile/ProfileSelectionPage.tsx` — Picks a profile after account-token login, exchanges for a `profile_token`.
 
 When the user adds **additional** servers, that flow lives in `components/Layout/ServerManagerModal.tsx` — which **does** show a server URL field (because the additional server is by definition not the current origin).
+
+## Public auth endpoints
+
+All under `/api/auth/*`, anonymous unless noted. See `Vora.Api/Endpoints/AuthEndpoints.cs`.
+
+| Route | Notes |
+| --- | --- |
+| `GET /setup-status` | Returns `{ isClaimed, registrationMode, serverName, emailEnabled }`. The frontend uses `emailEnabled` to decide whether to render Forgot Password / Email Invitations UI. |
+| `POST /setup` | First-run server claim. |
+| `POST /login` | Email + password, returns `account_token`. |
+| `POST /register` | Body: `{ email, password, displayName, secretCode?, inviteToken? }`. If `inviteToken` is present, validates it via `InvitationManager`, forces the email to match the ticket, and bypasses `RegistrationMode.Disabled`. Otherwise enforces `RegistrationMode` (Simple / SecretWord / Disabled). |
+| `POST /exchange-profile-token` | Returns the narrower `profile_token`. |
+| `POST /forgot-password` | Body: `{ email }`. Always returns 204 (no enumeration leak). Throttled 3/hour/email via `IMemoryCache`. Silently no-ops if email is disabled. |
+| `POST /reset-password` | Body: `{ token, newPassword }`. Returns 204 on success, 400 with a generic "Invalid or expired" message otherwise. |
+| `POST /invitations/validate` | Body: `{ token }`. Returns `{ email, expiresAt }` for a valid invite, 404 otherwise. |
+
+Admin-only endpoints (`AdminOnly` policy):
+
+| Route | Notes |
+| --- | --- |
+| `POST /invite-code` | Legacy: creates a 3-word `RegistrationTicket` (shared, anyone can use). |
+| `GET /invitations` | Lists outstanding `InvitationTicket` rows (per-email, single-use, hashed token). |
+| `POST /invitations` | Creates a per-email invite, sends `AdminInvite` email. Returns 400 if email is disabled, 409 if the email already maps to an account. |
+| `DELETE /invitations/{id}` | Revokes an invite. |
+
+## Registration modes vs invitations
+
+There are two parallel invitation systems and they coexist:
+
+- **Legacy `RegistrationTicket`** (3-word shared codes). Used when `RegistrationMode == SecretWord`. Anyone with the code can register; codes are consumed on use. `AuthManager.GenerateInviteCodeAsync` creates them; surfaced on the **Users & Access** admin page.
+- **Per-email `InvitationTicket`** (Phase 4 email invitations). Independent of `RegistrationMode` — works regardless of the mode setting, including `Disabled`. Each invite is tied to one email address, requires the recipient's email to match at registration, and is consumed on use. Surfaced on the **Email Invitations** admin page. See `docs/email.md`.
+
+`AuthManager.RegisterAsync` checks `inviteToken` first; if present, it takes the invitation path. Otherwise it falls through to the legacy `RegistrationMode`-based flow.
 
 ## localStorage keys
 

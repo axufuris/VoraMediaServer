@@ -18,7 +18,7 @@ namespace Vora.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.7")
+                .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
@@ -357,6 +357,78 @@ namespace Vora.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("UserWatchlistItems");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Email.EmailDeliveryLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("TemplateKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ToAddress")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("TemplateKey", "CreatedAt");
+
+                    b.ToTable("EmailDeliveryLogs");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Email.EmailTemplate", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("HtmlBodyOverride")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SubjectOverride")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("TextBodyOverride")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("EmailTemplates");
                 });
 
             modelBuilder.Entity("Vora.Domain.Entities.Iptv.IptvChannel", b =>
@@ -2310,6 +2382,9 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<Guid>("ProfileId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("NotifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("RequestedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2481,6 +2556,13 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<int>("DvrStorageWarningPercent")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("EmailEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("EmailPublicBaseUrl")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<bool>("EnableDailyMixes")
                         .HasColumnType("boolean");
 
@@ -2579,6 +2661,34 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<string>("SmtpFromAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("SmtpFromDisplayName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("SmtpHost")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("SmtpPasswordCiphertext")
+                        .HasColumnType("text");
+
+                    b.Property<int>("SmtpPort")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("SmtpUseImplicitSsl")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("SmtpUseStartTls")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("SmtpUsername")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<int>("StreamingProfile")
                         .HasColumnType("integer");
 
@@ -2646,6 +2756,7 @@ namespace Vora.Infrastructure.Migrations
                             DvrPostRollSeconds = 300,
                             DvrPreRollSeconds = 120,
                             DvrStorageWarningPercent = 90,
+                            EmailEnabled = false,
                             EnableDailyMixes = true,
                             EnableDiscover = true,
                             EnableDvr = true,
@@ -2676,6 +2787,9 @@ namespace Vora.Infrastructure.Migrations
                             RegistrationMode = 2,
                             RunDetections = 0,
                             ServerName = "Vora Server",
+                            SmtpPort = 587,
+                            SmtpUseImplicitSsl = false,
+                            SmtpUseStartTls = true,
                             StreamingProfile = 0,
                             TmdbApiKey = "37627bd54505a2f5f83df81303bc1eaa",
                             TonemappingAlgorithm = "hable",
@@ -2758,7 +2872,7 @@ namespace Vora.Infrastructure.Migrations
                             Id = new Guid("73c33c2c-1fe6-4885-875e-481a1dac5462"),
                             DisplayOrder = 0,
                             FilterRulesJson = "{\"mediaTypes\":[\"Movie\",\"TvShow\",\"Season\"]}",
-                            IsSpotlight = false,
+                            IsSpotlight = true,
                             IsSystemList = true,
                             MaxItems = 20,
                             ShowOnHomepage = true,
@@ -3100,6 +3214,71 @@ namespace Vora.Infrastructure.Migrations
                     b.ToTable("ClientDevices");
                 });
 
+            modelBuilder.Entity("Vora.Domain.Entities.Users.InvitationTicket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("InvitedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("InvitationTickets");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.PasswordResetTicket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetTickets");
+                });
+
             modelBuilder.Entity("Vora.Domain.Entities.Users.ProfileAccessSchedule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3237,6 +3416,11 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("EmailNotifyOnRequestAvailable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<bool>("EnableAiRecommendations")
                         .HasColumnType("boolean");
@@ -4185,6 +4369,17 @@ namespace Vora.Infrastructure.Migrations
                     b.Navigation("User");
 
                     b.Navigation("UserProfile");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.PasswordResetTicket", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Users.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Vora.Domain.Entities.Users.ProfileAccessSchedule", b =>

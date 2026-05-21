@@ -42,6 +42,7 @@ public static class WebApplicationExtensions
         app.MapDiscoveryEndpoints();
         app.MapDvrEndpoints();
         app.MapDvrPlaybackEndpoints();
+        app.MapEmailEndpoints();
         app.MapFileSystemEndpoints();
         app.MapIptvAdminEndpoints();
         app.MapIptvClientEndpoints();

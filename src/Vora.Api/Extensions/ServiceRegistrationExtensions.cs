@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Vora.Api.Hubs;
@@ -13,6 +14,7 @@ using Vora.Application.Calendar;
 using Vora.Application.Collections;
 using Vora.Application.Devices;
 using Vora.Application.Discovery;
+using Vora.Application.Email;
 using Vora.Application.FileSystem;
 using Vora.Application.Iptv;
 using Vora.Application.Libraries;
@@ -39,6 +41,7 @@ using Vora.Application.Tracking;
 using Vora.Application.Users;
 using Vora.Application.Watchers;
 using Vora.Infrastructure.Analysis;
+using Vora.Infrastructure.Email;
 using Vora.Infrastructure.FileSystem;
 using Vora.Infrastructure.Notifications;
 using Vora.Infrastructure.Persistence;
@@ -70,6 +73,7 @@ public static class ServiceRegistrationExtensions
         builder.Services.AddVoraApplicationServices();
         builder.Services.AddVoraWorkers();
         builder.Services.AddVoraInfrastructure();
+        builder.Services.AddVoraEmail(builder.Configuration);
         builder.Services.AddVoraRealtime();
         builder.Services.AddVoraPluginSystem(builder.Configuration);
         builder.Services.AddVoraAuthenticationAndAuthorization(builder.Configuration);
@@ -102,6 +106,9 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ICollectionRepository, CollectionRepository>();
         services.AddScoped<IDeviceRepository, DeviceRepository>();
         services.AddScoped<IDiscoveryRepository, DiscoveryRepository>();
+        services.AddScoped<IEmailDeliveryLogRepository, EmailDeliveryLogRepository>();
+        services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
+        services.AddScoped<IInvitationRepository, InvitationRepository>();
         services.AddScoped<IIptvRepository, IptvRepository>();
         services.AddScoped<ILibraryRepository, LibraryRepository>();
         services.AddScoped<IMediaArtworkRepository, MediaArtworkRepository>();
@@ -142,6 +149,9 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IDeviceManager, DeviceManager>();
         services.AddScoped<IDiscoveryManager, DiscoveryManager>();
         services.AddScoped<IDvrManager, DvrManager>();
+        services.AddScoped<IEmailSettingsManager, EmailSettingsManager>();
+        services.AddScoped<IEmailTemplateManager, EmailTemplateManager>();
+        services.AddScoped<IInvitationManager, InvitationManager>();
         services.AddScoped<IIptvManager, IptvManager>();
         services.AddScoped<ILibraryManager, LibraryManager>();
         services.AddScoped<IMediaAnalyzerManager, MediaAnalyzerManager>();
@@ -193,6 +203,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMediaIngestionService, MediaIngestionService>();
         services.AddScoped<IMetadataFetchService, MetadataFetchService>();
         services.AddScoped<IMetadataMappingService, MetadataMappingService>();
+        services.AddScoped<IRequestNotificationService, RequestNotificationService>();
         services.AddScoped<IUserProfileImageService, UserProfileImageService>();
         services.AddScoped<CollectionOrderingService>();
         services.AddScoped<CollectionSyncService>();
@@ -211,6 +222,7 @@ public static class ServiceRegistrationExtensions
         services.AddHostedService<DvrPostProcessingWorker>();
         services.AddHostedService<DvrStorageMonitorWorker>();
         services.AddHostedService<DvrWorker>();
+        services.AddHostedService<EmailDispatchWorker>();
         services.AddHostedService<PodcastFeedRefreshWorker>();
         services.AddHostedService<RecommendationRefreshWorker>();
         services.AddHostedService<ScheduledJobWorker>();
@@ -279,6 +291,28 @@ public static class ServiceRegistrationExtensions
             client.DefaultRequestHeaders.Add("User-Agent", "Vora-Lyrics/1.0 (https://github.com/zenith/vora)");
         });
         services.AddMemoryCache();
+        return services;
+    }
+
+    private static IServiceCollection AddVoraEmail(this IServiceCollection services, IConfiguration configuration)
+    {
+        var configuredKeyPath = configuration["StoragePaths:DataProtection"];
+        var keyPath = !string.IsNullOrWhiteSpace(configuredKeyPath)
+            ? configuredKeyPath
+            : Path.Combine(AppContext.BaseDirectory, "DataProtectionKeys");
+
+        Directory.CreateDirectory(keyPath);
+
+        services.AddDataProtection()
+            .SetApplicationName("Vora")
+            .PersistKeysToFileSystem(new DirectoryInfo(keyPath));
+
+        services.AddSingleton<IEmailSecretProtector, DataProtectionEmailSecretProtector>();
+        services.AddSingleton<IEmailDispatchQueue, EmailDispatchQueue>();
+        services.AddScoped<IEmailTemplateRenderer, EmailTemplateRenderer>();
+        services.AddScoped<IEmailTransport, SmtpEmailTransport>();
+        services.AddScoped<IEmailService, EmailService>();
+
         return services;
     }
 

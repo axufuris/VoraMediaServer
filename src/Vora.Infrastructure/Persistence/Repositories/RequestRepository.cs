@@ -32,6 +32,8 @@ public class RequestRepository(VoraDbContext context) : IRequestRepository
             .Where(r => r.Id == id)
             .ExecuteDeleteAsync();
 
+    public Task SaveChangesAsync() => context.SaveChangesAsync();
+
     public Task<List<MediaRequestVM>> GetAllRequestsAsync() =>
         context.MediaRequests
             .AsNoTracking()

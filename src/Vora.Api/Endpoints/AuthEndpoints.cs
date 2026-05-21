@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Vora.Api.Extensions;
 using Vora.Application.Auth;
+using Vora.Application.Auth.ViewModels;
 using Vora.Application.Settings;
 
 namespace Vora.Api.Endpoints;
@@ -14,12 +16,24 @@ public class SetupRequestDto
 public class RegisterRequestDto : SetupRequestDto
 {
     public string? SecretCode { get; set; }
+    public string? InviteToken { get; set; }
 }
 
 public class LoginRequestDto
 {
     public required string Email { get; set; }
     public required string Password { get; set; }
+}
+
+public class ForgotPasswordRequestDto
+{
+    public required string Email { get; set; }
+}
+
+public class ResetPasswordRequestDto
+{
+    public required string Token { get; set; }
+    public required string NewPassword { get; set; }
 }
 
 public static class AuthEndpoints
@@ -33,22 +47,35 @@ public static class AuthEndpoints
         group.MapPost("/login", LoginAsync);
         group.MapPost("/register", RegisterAsync);
         group.MapPost("/exchange-profile-token", ExchangeProfileTokenAsync);
+        group.MapPost("/forgot-password", RequestPasswordResetAsync);
+        group.MapPost("/reset-password", ConfirmPasswordResetAsync);
+
+        group.MapPost("/invitations/validate", ValidateInvitationAsync);
 
         group.MapPost("/invite-code", GenerateInviteCodeAsync)
+            .RequireAuthorization("AdminOnly");
+
+        group.MapGet("/invitations", ListInvitationsAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPost("/invitations", CreateInvitationAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapDelete("/invitations/{id:guid}", RevokeInvitationAsync)
             .RequireAuthorization("AdminOnly");
 
         return group;
     }
 
-    private static async Task<IResult> GetSetupStatusAsync(IAuthManager authManager, ISystemSettingsManager settingsManager)
+    private static async Task<IResult> GetSetupStatusAsync(IAuthManager authManager, ISystemSettingsManager settingsManager, ISystemSettingsRepository settingsRepo)
     {
         var status = await authManager.GetSetupStatusAsync();
         var settings = await settingsManager.GetServerSettingsAsync();
+        var serverSettings = await settingsRepo.GetSettingsAsync();
         return Results.Ok(new
         {
             status.IsClaimed,
             RegistrationMode = (int)status.Mode,
-            settings.ServerName
+            settings.ServerName,
+            EmailEnabled = serverSettings.EmailEnabled
         });
     }
 
@@ -75,7 +102,7 @@ public static class AuthEndpoints
     {
         try
         {
-            var result = await manager.RegisterAsync(request.Email, request.Password, request.DisplayName, request.SecretCode);
+            var result = await manager.RegisterAsync(request.Email, request.Password, request.DisplayName, request.SecretCode, request.InviteToken);
             return Results.Ok(result);
         }
         catch (InvalidOperationException ex)
@@ -94,5 +121,68 @@ public static class AuthEndpoints
     {
         var code = await manager.GenerateInviteCodeAsync();
         return Results.Ok(new { Code = code });
+    }
+
+    private static async Task<IResult> RequestPasswordResetAsync([FromBody] ForgotPasswordRequestDto request, IAuthManager manager, HttpContext httpContext, CancellationToken cancellationToken)
+    {
+        var origin = $"{httpContext.Request.Scheme}://{httpContext.Request.Host.Value}";
+        await manager.RequestPasswordResetAsync(request.Email, origin, cancellationToken);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> ConfirmPasswordResetAsync([FromBody] ResetPasswordRequestDto request, IAuthManager manager, CancellationToken cancellationToken)
+    {
+        var result = await manager.ConfirmPasswordResetAsync(request.Token, request.NewPassword, cancellationToken);
+        return result switch
+        {
+            PasswordResetResult.Success => Results.NoContent(),
+            PasswordResetResult.PasswordRejected => Results.BadRequest(new { Message = "Password must be at least 6 characters." }),
+            _ => Results.BadRequest(new { Message = "Invalid or expired reset token." })
+        };
+    }
+
+    private static async Task<IResult> ListInvitationsAsync(IInvitationManager manager)
+    {
+        var invites = await manager.GetActiveInvitationsAsync();
+        return Results.Ok(invites);
+    }
+
+    private static async Task<IResult> CreateInvitationAsync([FromBody] CreateInvitationRequest request, HttpContext httpContext, IInvitationManager manager, CancellationToken cancellationToken)
+    {
+        var invitedBy = httpContext.User.GetAccountId();
+        var result = await manager.CreateInvitationAsync(request.Email, request.ExpiresInDays, invitedBy, cancellationToken);
+
+        return result.Outcome switch
+        {
+            InvitationCreateOutcome.Created => Results.Ok(new CreateInvitationResponse
+            {
+                Invitation = result.Invitation!,
+                EmailSent = result.EmailSent,
+                Message = result.EmailSent ? null : result.ErrorMessage
+            }),
+            InvitationCreateOutcome.EmailAlreadyRegistered => Results.Conflict(new { Message = result.ErrorMessage }),
+            _ => Results.BadRequest(new { Message = result.ErrorMessage })
+        };
+    }
+
+    private static async Task<IResult> RevokeInvitationAsync(Guid id, IInvitationManager manager)
+    {
+        var removed = await manager.RevokeAsync(id);
+        return removed ? Results.NoContent() : Results.NotFound();
+    }
+
+    private static async Task<IResult> ValidateInvitationAsync([FromBody] ValidateInvitationRequest request, IInvitationManager manager)
+    {
+        var ticket = await manager.ValidateTokenAsync(request.Token);
+        if (ticket is null)
+        {
+            return Results.NotFound(new { Message = "Invitation is invalid or has expired." });
+        }
+
+        return Results.Ok(new ValidateInvitationResponse
+        {
+            Email = ticket.Email,
+            ExpiresAt = ticket.ExpiresAt
+        });
     }
 }

@@ -1,11 +1,14 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Vora.Application.Auth.Dtos;
+using Vora.Application.Email;
 using Vora.Application.Settings;
 using Vora.Application.Users;
 using Vora.Domain.Entities.Users;
@@ -13,25 +16,41 @@ using Vora.Domain.Enums;
 
 namespace Vora.Application.Auth;
 
+public enum PasswordResetResult
+{
+    Success,
+    InvalidToken,
+    PasswordRejected
+}
+
 public interface IAuthManager
 {
     Task<(bool IsClaimed, RegistrationMode Mode)> GetSetupStatusAsync();
     Task<AuthResponseDto> ClaimServerAsync(string email, string password, string displayName);
     Task<AuthResponseDto?> LoginAsync(string email, string password);
     Task<string?> GenerateProfileTokenAsync(Guid accountId, Guid profileId);
-    Task<AuthResponseDto> RegisterAsync(string email, string password, string displayName, string? secretCode);
+    Task<AuthResponseDto> RegisterAsync(string email, string password, string displayName, string? secretCode, string? inviteToken = null);
     Task<string> GenerateInviteCodeAsync();
+    Task RequestPasswordResetAsync(string email, string requestOriginFallback, CancellationToken cancellationToken = default);
+    Task<PasswordResetResult> ConfirmPasswordResetAsync(string token, string newPassword, CancellationToken cancellationToken = default);
 }
 
 public class AuthManager(
     IUserRepository repository,
     ISystemSettingsRepository settingsRepo,
     IConfiguration configuration,
+    IEmailService emailService,
+    IInvitationManager invitationManager,
+    IMemoryCache memoryCache,
     ILogger<AuthManager> logger) : IAuthManager
 {
     private const int AccountTokenLifetimeHours = 2;
     private const int ProfileTokenLifetimeDays = 7;
     private const int InviteCodeLifetimeMinutes = 30;
+    private const int PasswordResetTicketLifetimeMinutes = 60;
+    private const int PasswordResetRequestsPerHour = 3;
+    private const int MinPasswordLength = 6;
+    private const string PasswordResetThrottlePrefix = "pwreset:throttle:";
 
     private static readonly string[] WordDictionary =
     {
@@ -72,8 +91,44 @@ public class AuthManager(
         }
     }
 
-    public async Task<AuthResponseDto> RegisterAsync(string email, string password, string displayName, string? secretCode)
+    public async Task<AuthResponseDto> RegisterAsync(string email, string password, string displayName, string? secretCode, string? inviteToken = null)
     {
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+
+        if (!string.IsNullOrWhiteSpace(inviteToken))
+        {
+            var invitation = await invitationManager.ValidateTokenAsync(inviteToken);
+            if (invitation is null)
+            {
+                throw new InvalidOperationException("Invitation is invalid or has expired.");
+            }
+
+            if (!string.Equals(invitation.Email, normalizedEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("The email address must match the address the invitation was sent to.");
+            }
+
+            var existingUserByInvite = await repository.GetUserWithProfilesByEmailAsync(normalizedEmail);
+            if (existingUserByInvite != null)
+            {
+                throw new InvalidOperationException("Email is already registered.");
+            }
+
+            var invitedUser = BuildUser(normalizedEmail, password, displayName, isAdmin: false);
+            try
+            {
+                await repository.AddUserAsync(invitedUser);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to register invited user {Email}", normalizedEmail);
+                throw;
+            }
+
+            await invitationManager.ConsumeAsync(invitation.TokenHash);
+            return BuildAuthResponse(invitedUser);
+        }
+
         var status = await GetSetupStatusAsync();
 
         if (status.Mode == RegistrationMode.Disabled)
@@ -97,20 +152,20 @@ public class AuthManager(
             await repository.DeleteRegistrationTicketAsync(ticket);
         }
 
-        var existingUser = await repository.GetUserWithProfilesByEmailAsync(email);
+        var existingUser = await repository.GetUserWithProfilesByEmailAsync(normalizedEmail);
         if (existingUser != null)
         {
             throw new InvalidOperationException("Email is already registered.");
         }
 
-        var user = BuildUser(email, password, displayName, isAdmin: false);
+        var user = BuildUser(normalizedEmail, password, displayName, isAdmin: false);
         try
         {
             await repository.AddUserAsync(user);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to register user {Email}", email);
+            logger.LogError(ex, "Failed to register user {Email}", normalizedEmail);
             throw;
         }
 
@@ -277,6 +332,149 @@ public class AuthManager(
         });
 
         return user;
+    }
+
+    public async Task RequestPasswordResetAsync(string email, string requestOriginFallback, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return;
+
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+
+        if (!TryRecordResetThrottle(normalizedEmail))
+        {
+            logger.LogInformation("Password reset request throttled for {Email}", normalizedEmail);
+            return;
+        }
+
+        var settings = await settingsRepo.GetSettingsAsync();
+        if (!settings.EmailEnabled)
+        {
+            logger.LogDebug("Password reset requested for {Email} but email is disabled; ignoring", normalizedEmail);
+            return;
+        }
+
+        var user = await repository.GetUserWithProfilesByEmailAsync(normalizedEmail);
+        if (user is null)
+        {
+            return;
+        }
+
+        await repository.InvalidateOutstandingPasswordResetTicketsForUserAsync(user.Id);
+
+        var token = GenerateResetToken();
+        var ticket = new PasswordResetTicket
+        {
+            UserId = user.Id,
+            TokenHash = HashToken(token),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(PasswordResetTicketLifetimeMinutes)
+        };
+
+        await repository.CreatePasswordResetTicketAsync(ticket);
+
+        var resetLink = BuildResetLink(settings.EmailPublicBaseUrl, requestOriginFallback, token);
+
+        try
+        {
+            await emailService.SendAsync(new EmailMessage
+            {
+                TemplateKey = EmailTemplateKey.PasswordReset,
+                ToAddress = user.Email,
+                ToDisplayName = user.DisplayName,
+                Variables = new Dictionary<string, string>
+                {
+                    [EmailTemplateVariables.ServerName] = string.IsNullOrWhiteSpace(settings.ServerName) ? "Vora" : settings.ServerName,
+                    [EmailTemplateVariables.UserName] = user.DisplayName,
+                    [EmailTemplateVariables.ResetLink] = resetLink
+                }
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to enqueue password reset email for {Email}", normalizedEmail);
+        }
+    }
+
+    public async Task<PasswordResetResult> ConfirmPasswordResetAsync(string token, string newPassword, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return PasswordResetResult.InvalidToken;
+        }
+
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < MinPasswordLength)
+        {
+            return PasswordResetResult.PasswordRejected;
+        }
+
+        var hash = HashToken(token);
+        var ticket = await repository.GetActivePasswordResetTicketByHashAsync(hash);
+        if (ticket is null)
+        {
+            return PasswordResetResult.InvalidToken;
+        }
+
+        var user = await repository.GetUserByIdAsync(ticket.UserId);
+        if (user is null)
+        {
+            await repository.DeletePasswordResetTicketAsync(ticket);
+            return PasswordResetResult.InvalidToken;
+        }
+
+        user.PasswordHash = HashPassword(newPassword);
+        await repository.UpdateUserAsync(user);
+
+        await repository.InvalidateOutstandingPasswordResetTicketsForUserAsync(user.Id);
+
+        return PasswordResetResult.Success;
+    }
+
+    private bool TryRecordResetThrottle(string normalizedEmail)
+    {
+        var key = PasswordResetThrottlePrefix + normalizedEmail;
+        if (memoryCache.TryGetValue<ResetThrottleEntry>(key, out var existing) && existing is not null)
+        {
+            if (existing.Count >= PasswordResetRequestsPerHour) return false;
+            existing.Count++;
+            return true;
+        }
+
+        memoryCache.Set(
+            key,
+            new ResetThrottleEntry { Count = 1 },
+            new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1) }
+        );
+        return true;
+    }
+
+    private static string GenerateResetToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        return Base64UrlEncode(bytes);
+    }
+
+    private static string HashToken(string token)
+    {
+        var bytes = Encoding.UTF8.GetBytes(token);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static string Base64UrlEncode(byte[] bytes)
+    {
+        var base64 = Convert.ToBase64String(bytes);
+        return base64.TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static string BuildResetLink(string? configuredBaseUrl, string fallbackOrigin, string token)
+    {
+        var baseUrl = string.IsNullOrWhiteSpace(configuredBaseUrl) ? fallbackOrigin : configuredBaseUrl;
+        baseUrl = baseUrl.TrimEnd('/');
+        return $"{baseUrl}/reset-password?token={Uri.EscapeDataString(token)}";
+    }
+
+    private sealed class ResetThrottleEntry
+    {
+        public int Count;
     }
 
     private static string RandomWord() => WordDictionary[Random.Shared.Next(WordDictionary.Length)];

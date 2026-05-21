@@ -30,7 +30,7 @@ API services are grouped by the backend resource they wrap:
 
 ```
 api/client.ts             axios wrapper - stays at root
-api/Auth/                 authService
+api/Auth/                 authService, invitationsAdminService
 api/Users/                userService, userImageService, profileService,
                           profileDeviceSettingsService, deviceService
 api/Media/                mediaService, libraryService, libraryAdminService,
@@ -43,10 +43,10 @@ api/Iptv/                 iptvClientService, iptvAdminService,
                           dvrPlaybackService, timeshiftService
 api/Discovery/            discoveryService, recommendationService, searchService,
                           requestAdminService, calendarService
-api/System/               systemSettingsAdminService, pluginAdminService,
-                          taskService, aiStatsService, adminService (dedupe),
-                          remoteAccessService, adminNotificationService,
-                          featureFlagsService, themeService
+api/System/               systemSettingsAdminService, emailAdminService,
+                          pluginAdminService, taskService, aiStatsService,
+                          adminService (dedupe), remoteAccessService,
+                          adminNotificationService, featureFlagsService, themeService
 ```
 
 Frontend services align 1:1 with backend `Vora.Api/Endpoints/*Endpoints.cs` groupings. When adding/splitting a service, mirror the backend grouping.

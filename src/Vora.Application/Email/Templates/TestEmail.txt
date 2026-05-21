@@ -1,0 +1,5 @@
+{{serverName}} - SMTP test successful
+
+If you're reading this, your SMTP configuration on {{serverName}} works.
+
+This message was sent from the admin email settings test button.

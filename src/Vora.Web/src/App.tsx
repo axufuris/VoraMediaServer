@@ -19,6 +19,7 @@ import CreateLibrary from './pages/Admin/Libraries/CreateLibrary';
 import RegisterPage from './pages/Auth/RegisterPage';
 import AccountSettingsPage from './pages/Profile/AccountSettingsPage';
 import AdminUserManagementPage from './pages/Admin/UserManagementPage';
+import AdminInvitationsPage from './pages/Admin/InvitationsPage';
 import AuthorizedDevicesPage from './pages/Admin/AuthorizedDevicesPage';
 import { PlayerProvider } from './contexts/PlayerContext';
 import { DialogProvider } from './dialogs';
@@ -31,6 +32,8 @@ import AdminHistoryPage from './pages/Admin/HistoryPage';
 import ProfileHistoryPage from './pages/Client/ProfileHistoryPage';
 import SetupPage from './pages/Auth/SetupPage';
 import LoginPage from './pages/Auth/LoginPage';
+import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/Auth/ResetPasswordPage';
 import ProfileSelectionPage from './pages/Profile/ProfileSelectionPage';
 import ClientPlaylistsPage from './pages/Client/Playlists/PlaylistsPage';
 import ClientPlaylistDetailsPage from './pages/Client/Playlists/PlaylistDetailsPage';
@@ -134,6 +137,8 @@ export default function App() {
                     <Route path="/setup" element={<SetupPage />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="/profiles" element={<ProfileSelectionPage />} />
 
                     {/* CLIENT ROUTES */}
@@ -195,6 +200,7 @@ export default function App() {
                         <Route path="dedupe" element={<AdminDedupePage />} />
                         <Route path="devices" element={<AuthorizedDevicesPage />} />
                         <Route path="users" element={<AdminUserManagementPage />} />
+                        <Route path="invitations" element={<AdminInvitationsPage />} />
                         <Route path="libraries/:id/manage" element={<ManageLibrary />} />
                         <Route path="libraries/new" element={<CreateLibrary />} />
                         <Route path="tasks" element={<TaskDashboard />} />
@@ -224,6 +230,7 @@ export default function App() {
                             <Route path="dedupe" element={<AdminDedupePage />} />
                             <Route path="devices" element={<AuthorizedDevicesPage />} />
                             <Route path="users" element={<AdminUserManagementPage />} />
+                            <Route path="invitations" element={<AdminInvitationsPage />} />
                             <Route path="libraries/:id/manage" element={<ManageLibrary />} />
                             <Route path="libraries/new" element={<CreateLibrary />} />
                             <Route path="tasks" element={<TaskDashboard />} />

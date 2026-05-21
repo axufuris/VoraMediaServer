@@ -14,6 +14,7 @@ public class UserVM
     public bool CanRequestMedia { get; set; }
     public bool AutoApproveRequests { get; set; }
     public bool EnableAiRecommendations { get; set; }
+    public bool EmailNotifyOnRequestAvailable { get; set; }
     public bool HasAllIptvAccess { get; set; }
     public List<Guid> AllowedIptvPlaylistIds { get; set; } = new();
     public bool CanRecordLiveTv { get; set; }
@@ -35,6 +36,7 @@ public class UserVM
             CanRequestMedia = u.CanRequestMedia,
             AutoApproveRequests = u.AutoApproveRequests,
             EnableAiRecommendations = u.EnableAiRecommendations,
+            EmailNotifyOnRequestAvailable = u.EmailNotifyOnRequestAvailable,
             HasAllIptvAccess = u.HasAllIptvAccess,
             AllowedIptvPlaylistIds = u.AllowedIptvPlaylistIds,
             CanRecordLiveTv = u.CanRecordLiveTv,

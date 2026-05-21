@@ -38,12 +38,14 @@ export default function DiscoveryPage() {
                 const serverNameStr = server?.name || 'Local Server';
                 const rawConfigs = await discoveryService.getAdminConfigs(serverId);
 
-                const mappedConfigs = rawConfigs.map(c => ({
-                    ...c,
-                    serverId,
-                    serverName: serverNameStr,
-                    uniqueId: `${serverId || 'global'}_${c.providerId}_${c.rowId}`,
-                }));
+                const mappedConfigs = rawConfigs
+                    .filter(c => c.isEnabled)
+                    .map(c => ({
+                        ...c,
+                        serverId,
+                        serverName: serverNameStr,
+                        uniqueId: `${serverId || 'global'}_${c.providerId}_${c.rowId}`,
+                    }));
                 setConfigs(mappedConfigs);
 
                 if (activeProfileId) {

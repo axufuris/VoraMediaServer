@@ -7,13 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Features" Version="5.0.17" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.7" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.7" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.7" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
     <PackageReference Include="Open.Nat.V2" Version="3.2.1" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
@@ -23,6 +23,21 @@
   <ItemGroup>
     <ProjectReference Include="..\Vora.Domain\Vora.Domain.csproj" />
     <ProjectReference Include="..\Vora.Plugins\Vora.Plugins.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Email\Templates\PasswordReset.subject.txt" />
+    <EmbeddedResource Include="Email\Templates\PasswordReset.html" />
+    <EmbeddedResource Include="Email\Templates\PasswordReset.txt" />
+    <EmbeddedResource Include="Email\Templates\AdminInvite.subject.txt" />
+    <EmbeddedResource Include="Email\Templates\AdminInvite.html" />
+    <EmbeddedResource Include="Email\Templates\AdminInvite.txt" />
+    <EmbeddedResource Include="Email\Templates\RequestAvailable.subject.txt" />
+    <EmbeddedResource Include="Email\Templates\RequestAvailable.html" />
+    <EmbeddedResource Include="Email\Templates\RequestAvailable.txt" />
+    <EmbeddedResource Include="Email\Templates\TestEmail.subject.txt" />
+    <EmbeddedResource Include="Email\Templates\TestEmail.html" />
+    <EmbeddedResource Include="Email\Templates\TestEmail.txt" />
   </ItemGroup>
 
   <ItemGroup>

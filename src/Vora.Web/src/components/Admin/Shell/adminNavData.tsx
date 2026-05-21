@@ -72,6 +72,7 @@ export const ADMIN_NAV: AdminNavEntry[] = [
     { label: 'Background Tasks',     pathTemplate: '/admin/tasks',            section: 'Server',  icon: 'tasks',      keywords: ['jobs', 'queue', 'worker'] },
     { label: 'Plugins',              pathTemplate: '/admin/plugins',          section: 'Server',  icon: 'plugins',    keywords: ['extensions'] },
     { label: 'Users & Access',       pathTemplate: '/admin/users',            section: 'Server',  icon: 'users',      keywords: ['accounts', 'profiles', 'invite'] },
+    { label: 'Email Invitations',    pathTemplate: '/admin/invitations',      section: 'Server',  icon: 'inbox',      keywords: ['invite', 'invites', 'invitation', 'email', 'register'] },
     { label: 'Authorized Devices',   pathTemplate: '/admin/devices',          section: 'Server',  icon: 'devices',    keywords: ['clients', 'block'] },
     { label: 'Watch History',        pathTemplate: '/admin/history',          section: 'Server',  icon: 'history',    keywords: ['playback', 'sessions'] },
     { label: 'Music History',        pathTemplate: '/admin/music-history',    section: 'Server',  icon: 'music-note', keywords: ['listening', 'plays'] },

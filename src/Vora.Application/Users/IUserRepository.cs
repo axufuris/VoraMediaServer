@@ -16,6 +16,7 @@ public interface IUserRepository
 
     Task<User?> GetUserByIdAsync(Guid id);
     Task<User?> GetUserWithProfilesByEmailAsync(string email);
+    Task<User?> GetUserForProfileAsync(Guid profileId);
     Task<UserProfile?> GetProfileByIdAsync(Guid id);
     Task<UserProfile?> GetProfileWithUserAsync(Guid accountId, Guid profileId);
 
@@ -29,6 +30,11 @@ public interface IUserRepository
     Task CreateRegistrationTicketAsync(RegistrationTicket ticket);
     Task<RegistrationTicket?> GetRegistrationTicketAsync(string secretCode);
     Task DeleteRegistrationTicketAsync(RegistrationTicket ticket);
+
+    Task CreatePasswordResetTicketAsync(PasswordResetTicket ticket);
+    Task<PasswordResetTicket?> GetActivePasswordResetTicketByHashAsync(string tokenHash);
+    Task DeletePasswordResetTicketAsync(PasswordResetTicket ticket);
+    Task InvalidateOutstandingPasswordResetTicketsForUserAsync(Guid userId);
 
     Task<(List<UserProfileHistoryDto> Data, int Total)> GetUserPlayHistoryAsync(Guid userId, Guid? profileId, int page, int pageSize, string search, string typeFilter);
 

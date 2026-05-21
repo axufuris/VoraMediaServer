@@ -20,6 +20,7 @@ public class User
     public bool CanRequestMedia { get; set; } = true;
     public bool AutoApproveRequests { get; set; }
     public bool EnableAiRecommendations { get; set; }
+    public bool EmailNotifyOnRequestAvailable { get; set; } = true;
 
     public bool CanRecordLiveTv { get; set; }
     public long DvrStorageQuotaBytes { get; set; }

@@ -24,6 +24,7 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [serverName, setServerName] = useState<string | null>(null);
     const [reachable, setReachable] = useState<boolean | null>(null);
+    const [emailEnabled, setEmailEnabled] = useState(false);
 
     useEffect(() => {
         const probe = async () => {
@@ -31,6 +32,7 @@ export default function LoginPage() {
                 const status = await authService.probeServer(serverUrl);
                 setReachable(true);
                 setServerName(status.serverName || 'Vora Server');
+                setEmailEnabled(status.emailEnabled ?? false);
 
                 if (!status.isClaimed) {
                     sessionStorage.setItem('pending_server_url', serverUrl);
@@ -114,7 +116,12 @@ export default function LoginPage() {
                     <input autoFocus type="email" required value={email} onChange={e => setEmail(e.target.value)} className="vora-input w-full" />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Password</label>
+                    <div className="flex items-baseline justify-between mb-1">
+                        <label className="block text-sm font-medium" style={{ color: 'var(--vora-text-muted)' }}>Password</label>
+                        {emailEnabled && (
+                            <Link to="/forgot-password" className="text-xs font-medium transition-colors hover:opacity-80" style={{ color: 'var(--vora-accent-text)' }}>Forgot password?</Link>
+                        )}
+                    </div>
                     <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="vora-input w-full" />
                 </div>
 

@@ -5,6 +5,7 @@ using System.Text.Json;
 using Vora.Domain.Entities.Actors;
 using Vora.Domain.Entities.Collections;
 using Vora.Domain.Entities.Discovery;
+using Vora.Domain.Entities.Email;
 using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Podcasts;
@@ -75,6 +76,8 @@ public class VoraDbContext : DbContext
     public DbSet<ProfileAccessSchedule> ProfileAccessSchedules { get; set; }
     public DbSet<ProfileDeviceSetting> ProfileDeviceSettings { get; set; }
     public DbSet<RegistrationTicket> RegistrationTickets { get; set; }
+    public DbSet<PasswordResetTicket> PasswordResetTickets { get; set; }
+    public DbSet<InvitationTicket> InvitationTickets { get; set; }
     public DbSet<ClientDevice> ClientDevices { get; set; }
 
     public DbSet<Playlist> Playlists { get; set; }
@@ -107,6 +110,9 @@ public class VoraDbContext : DbContext
 
     public DbSet<ServerSetting> ServerSettings { get; set; }
     public DbSet<PluginSettingValue> PluginSettings { get; set; }
+
+    public DbSet<EmailTemplate> EmailTemplates { get; set; }
+    public DbSet<EmailDeliveryLog> EmailDeliveryLogs { get; set; }
 
     public DbSet<ClientTemplateSchedule> ClientTemplateSchedules { get; set; }
 
@@ -150,6 +156,8 @@ public class VoraDbContext : DbContext
         ConfigureProfileSchedules(modelBuilder);
         ConfigureProfileDeviceSettings(modelBuilder);
         ConfigureRegistrationTickets(modelBuilder);
+        ConfigurePasswordResetTickets(modelBuilder);
+        ConfigureInvitationTickets(modelBuilder);
         ConfigureClientDevices(modelBuilder, converters);
 
         ConfigurePlaylists(modelBuilder);
@@ -166,6 +174,7 @@ public class VoraDbContext : DbContext
         ConfigurePosters(modelBuilder);
 
         ConfigureSettings(modelBuilder);
+        ConfigureEmail(modelBuilder);
         ConfigureMediaDedupe(modelBuilder);
         ConfigureClientTemplates(modelBuilder);
 
@@ -626,6 +635,7 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(128);
             entity.Property(e => e.Nickname).HasMaxLength(64);
             entity.Property(e => e.PasswordHash).HasMaxLength(256);
+            entity.Property(e => e.EmailNotifyOnRequestAvailable).HasDefaultValue(true);
 
             entity.HasIndex(u => u.Email).IsUnique();
 
@@ -761,6 +771,34 @@ public class VoraDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.SecretCode).IsRequired().HasMaxLength(128);
             entity.HasIndex(e => e.SecretCode).IsUnique();
+        });
+    }
+
+    private static void ConfigurePasswordResetTickets(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PasswordResetTicket>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureInvitationTickets(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<InvitationTicket>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Email).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.Email);
         });
     }
 
@@ -1067,6 +1105,12 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.TranscoderTempDirectory).HasMaxLength(1024);
             entity.Property(e => e.HardwareTranscodingDevice).HasMaxLength(32);
             entity.Property(e => e.TonemappingAlgorithm).HasMaxLength(32);
+            entity.Property(e => e.SmtpHost).HasMaxLength(256);
+            entity.Property(e => e.SmtpUsername).HasMaxLength(256);
+            entity.Property(e => e.SmtpPasswordCiphertext).HasColumnType("text");
+            entity.Property(e => e.SmtpFromAddress).HasMaxLength(256);
+            entity.Property(e => e.SmtpFromDisplayName).HasMaxLength(128);
+            entity.Property(e => e.EmailPublicBaseUrl).HasMaxLength(512);
         });
 
         modelBuilder.Entity<PluginSettingValue>(entity =>
@@ -1076,6 +1120,31 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.Key).IsRequired().HasMaxLength(64);
 
             entity.HasIndex(e => new { e.PluginId, e.Key }).IsUnique();
+        });
+    }
+
+    private static void ConfigureEmail(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EmailTemplate>(entity =>
+        {
+            entity.HasKey(e => e.Key);
+            entity.Property(e => e.Key).HasConversion<string>().HasMaxLength(64);
+            entity.Property(e => e.SubjectOverride).HasMaxLength(256);
+            entity.Property(e => e.HtmlBodyOverride).HasColumnType("text");
+            entity.Property(e => e.TextBodyOverride).HasColumnType("text");
+        });
+
+        modelBuilder.Entity<EmailDeliveryLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TemplateKey).HasConversion<string>().HasMaxLength(64);
+            entity.Property(e => e.ToAddress).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.Subject).HasMaxLength(256);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(16);
+            entity.Property(e => e.ErrorMessage).HasMaxLength(2048);
+
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => new { e.TemplateKey, e.CreatedAt });
         });
     }
 
@@ -1249,6 +1318,7 @@ public class VoraDbContext : DbContext
                 Id = Guid.Parse("73c33c2c-1fe6-4885-875e-481a1dac5462"),
                 Title = "Recently Released Movies & Shows",
                 IsSystemList = true,
+                IsSpotlight = true,
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.ReleaseDateDesc,

@@ -11,6 +11,7 @@ export interface UserVM {
     canRequestMedia: boolean;
     autoApproveRequests: boolean;
     enableAiRecommendations: boolean;
+    emailNotifyOnRequestAvailable: boolean;
     hasAllIptvAccess: boolean;
     allowedIptvPlaylistIds: string[];
     canRecordLiveTv: boolean;
@@ -50,8 +51,8 @@ export const userService = {
         return response.data;
     },
 
-    updateAccount: async (userId: string, email: string, displayName: string, newPassword?: string, serverId?: string): Promise<void> => {
-        await apiClient.put(`/users/${userId}`, { email, displayName, newPassword }, { serverId });
+    updateAccount: async (userId: string, email: string, displayName: string, newPassword?: string, emailNotifyOnRequestAvailable?: boolean, serverId?: string): Promise<void> => {
+        await apiClient.put(`/users/${userId}`, { email, displayName, newPassword, emailNotifyOnRequestAvailable }, { serverId });
     },
 
     updateUserAccess: async (userId: string, hasAllLibraryAccess: boolean, allowedLibraryIds: string[], canRequestMedia: boolean, autoApproveRequests: boolean, enableAiRecommendations: boolean, hasAllIptvAccess: boolean, allowedIptvPlaylistIds: string[], canRecordLiveTv: boolean, dvrStorageQuotaBytes: number, canTimeshiftIptv: boolean, canAddCustomPodcastFeeds: boolean, serverId?: string): Promise<void> => {

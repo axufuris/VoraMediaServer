@@ -8,6 +8,7 @@ import { useDialog } from '../../dialogs';
 import { profileService, type ProfileScheduleVM, type UserProfileVM } from '../../api/Users/profileService';
 import { userImageService } from '../../api/Users/userImageService';
 import { type UserVM, userService } from '../../api/Users/userService';
+import { authService } from '../../api/Auth/authService';
 import { musicService } from '../../api/Music/musicService';
 export default function AccountSettingsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -18,6 +19,8 @@ export default function AccountSettingsPage() {
     const [email, setEmail] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [newPassword, setNewPassword] = useState('');
+    const [emailNotifyOnRequestAvailable, setEmailNotifyOnRequestAvailable] = useState(true);
+    const [emailEnabled, setEmailEnabled] = useState(false);
     const [accountMsg, setAccountMsg] = useState('');
 
     const [editingProfile, setEditingProfile] = useState<UserProfileVM | null>(null);
@@ -35,10 +38,11 @@ export default function AccountSettingsPage() {
             if (!userId) return;
 
             try {
-                const [userData, libs, iptvData] = await Promise.all([
+                const [userData, libs, iptvData, setupStatus] = await Promise.all([
                     userService.getUserAccount(userId, serverId),
                     libraryService.getLibraries(serverId),
-                    iptvClientService.getPlaylists(userId, serverId)
+                    iptvClientService.getPlaylists(userId, serverId),
+                    authService.getSetupStatus(serverId).catch(() => null),
                 ]);
 
                 if (!isMounted) return;
@@ -46,6 +50,8 @@ export default function AccountSettingsPage() {
                 setUser(userData);
                 setEmail(userData.email);
                 setDisplayName(userData.displayName);
+                setEmailNotifyOnRequestAvailable(userData.emailNotifyOnRequestAvailable ?? true);
+                setEmailEnabled(setupStatus?.emailEnabled ?? false);
                 setLibraries(libs);
                 setIptvPlaylists(iptvData);
 
@@ -69,7 +75,7 @@ export default function AccountSettingsPage() {
         e.preventDefault();
         if (!user) return;
         try {
-            await userService.updateAccount(user.id, email, displayName, newPassword || undefined, serverId);
+            await userService.updateAccount(user.id, email, displayName, newPassword || undefined, emailNotifyOnRequestAvailable, serverId);
             setAccountMsg("Account updated successfully.");
             setNewPassword('');
             setRefreshTrigger(prev => prev + 1);
@@ -137,6 +143,22 @@ export default function AccountSettingsPage() {
                             <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded-md p-2.5 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)]" />
                         </div>
                     </div>
+                    {emailEnabled && (
+                        <div className="pt-4 mt-4 border-t border-[var(--vora-border-subtle)]">
+                            <label className="flex items-start gap-3 cursor-pointer group">
+                                <input
+                                    type="checkbox"
+                                    checked={emailNotifyOnRequestAvailable}
+                                    onChange={e => setEmailNotifyOnRequestAvailable(e.target.checked)}
+                                    className="w-5 h-5 mt-0.5 accent-[var(--vora-accent-500)] cursor-pointer"
+                                />
+                                <span className="flex flex-col">
+                                    <span className="text-sm text-[var(--vora-text-primary)]">Email me when a requested item becomes available</span>
+                                    <span className="text-xs text-[var(--vora-text-muted)] mt-1">When something you requested gets added to the library, the server will send you a one-time email at <span className="font-mono">{email}</span>.</span>
+                                </span>
+                            </label>
+                        </div>
+                    )}
                     <button type="submit" className="bg-[var(--vora-bg-raised)] hover:bg-[var(--vora-bg-raised)] px-6 py-2 rounded-md font-bold transition-colors">Save Account Changes</button>
                 </form>
             </div>

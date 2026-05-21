@@ -93,6 +93,14 @@ public class DiscoveryManager(
 
     public async Task<IEnumerable<DiscoveryItemDto>> GetRowItemsAsync(string providerId, string rowId, int page = 1)
     {
+        var dbConfigs = await repository.GetRowConfigsAsync();
+        var rowConfig = dbConfigs.FirstOrDefault(c => c.ProviderId == providerId && c.RowId == rowId);
+        if (rowConfig == null || !rowConfig.IsEnabled)
+        {
+            logger.LogInformation("Discovery row {ProviderId}/{RowId} requested but is disabled or no longer configured.", providerId, rowId);
+            throw new KeyNotFoundException($"Discovery row \"{rowId}\" is not available.");
+        }
+
         var plugin = plugins.FirstOrDefault(p => p.Id == providerId);
         if (plugin == null)
         {

@@ -89,7 +89,7 @@ public class MediaIngestionService : IMediaIngestionService
 
         if (!string.IsNullOrWhiteSpace(tmdbId))
         {
-            await _requestManager.ResolveRequestAsync(tmdbId, "Movie");
+            await _requestManager.ResolveRequestAsync(tmdbId, "Movie", movie.Id);
         }
 
         return movie.Id;
@@ -116,7 +116,7 @@ public class MediaIngestionService : IMediaIngestionService
 
         if (!string.IsNullOrWhiteSpace(tmdbId))
         {
-            await _requestManager.ResolveRequestAsync(tmdbId, "TvShow");
+            await _requestManager.ResolveRequestAsync(tmdbId, "TvShow", show.Id);
         }
 
         return show.Id;

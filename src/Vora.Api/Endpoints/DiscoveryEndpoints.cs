@@ -56,6 +56,10 @@ public static class DiscoveryEndpoints
         {
             return Results.Ok(await manager.GetRowItemsAsync(providerId, rowId, page > 0 ? page : 1));
         }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
         catch (InvalidOperationException ex)
         {
             return Results.BadRequest(new { error = ex.Message });
