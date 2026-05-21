@@ -15,15 +15,21 @@ export default function IptvEpgDiagnosticsModal({ isOpen, onClose, serverId }: P
 
     useEffect(() => {
         if (!isOpen) return;
-        setIsLoading(true);
-        setError(null);
+        let cancelled = false;
         iptvEpgAdminService.getDiagnostics(serverId)
-            .then(setData)
+            .then(result => {
+                if (cancelled) return;
+                setData(result);
+                setError(null);
+                setIsLoading(false);
+            })
             .catch(err => {
+                if (cancelled) return;
                 console.error('Failed to load diagnostics', err);
                 setError('Failed to load diagnostics.');
-            })
-            .finally(() => setIsLoading(false));
+                setIsLoading(false);
+            });
+        return () => { cancelled = true; };
     }, [isOpen, serverId]);
 
     return (

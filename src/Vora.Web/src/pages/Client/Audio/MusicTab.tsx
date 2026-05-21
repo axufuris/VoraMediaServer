@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type ArtistTrackVM, type MusicSearchResultVM, type GeneratedMixSummaryVM, type GeneratedMixDetailVM, type BecauseYouPlayedRowVM, type RadioSeed, type StationVM, type YearRecapVM, type GenreSummaryVM, type GenreContentVM, type ServerPlaybackSessionVM } from '../../../api/Music/musicService';
-import { usePlayer, type PlayableMedia } from '../../../contexts/PlayerContext';
+import { usePlayer, type PlayableMedia } from '../../../contexts/usePlayer';
 import { serverVault } from '../../../utils/serverVault';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import MusicMetadataEditModal, { type MusicEntityKind } from '../../../components/Media/MusicMetadataEditModal';
@@ -111,7 +111,7 @@ export default function MusicTab() {
     useEffect(() => {
         const mixParam = searchParams.get('mix');
         if (mixParam) {
-            updateNav({ view: 'mix', mixId: mixParam });
+            queueMicrotask(() => updateNav({ view: 'mix', mixId: mixParam }));
             searchParams.delete('mix');
             setSearchParams(searchParams, { replace: true });
         }
@@ -119,11 +119,13 @@ export default function MusicTab() {
 
     useEffect(() => {
         if (!searchActive) {
-            setSearchResults([]);
-            setIsSearching(false);
+            queueMicrotask(() => {
+                setSearchResults([]);
+                setIsSearching(false);
+            });
             return;
         }
-        setIsSearching(true);
+        queueMicrotask(() => setIsSearching(true));
         const handle = setTimeout(() => {
             musicService.search(searchQuery, 30, serverId)
                 .then(setSearchResults)
@@ -224,11 +226,11 @@ export default function MusicTab() {
     }, [serverId]);
 
     useEffect(() => {
-        loadLikedTracks();
+        queueMicrotask(() => { void loadLikedTracks(); });
     }, [loadLikedTracks, refreshSeq]);
 
     useEffect(() => {
-        loadHomeRows();
+        queueMicrotask(() => { void loadHomeRows(); });
     }, [loadHomeRows, refreshSeq]);
 
     useEffect(() => {
@@ -274,7 +276,7 @@ export default function MusicTab() {
         setServerPlayback(list);
     }, [serverId]);
 
-    useEffect(() => { loadServerPlayback(); }, [loadServerPlayback]);
+    useEffect(() => { queueMicrotask(() => { void loadServerPlayback(); }); }, [loadServerPlayback]);
     useSignalREvent<unknown>("ServerPlaybackUpdated", useCallback(() => { loadServerPlayback(); }, [loadServerPlayback]));
     useSignalREvent<string>("LibraryUpdated", useCallback(() => {
         sessionStorage.removeItem(NAV_STORAGE_KEY);
@@ -297,7 +299,7 @@ export default function MusicTab() {
 
     useEffect(() => {
         if (nav.view !== 'artists') return;
-        setIsLoading(true);
+        queueMicrotask(() => setIsLoading(true));
         musicService.getArtists(undefined, serverId)
             .then(setArtists)
             .catch(err => console.error('Failed to load artists', err))
@@ -306,8 +308,10 @@ export default function MusicTab() {
 
     useEffect(() => {
         if (nav.view !== 'artist' || !nav.artistId) return;
-        setIsLoading(true);
-        setSimilarArtists([]);
+        queueMicrotask(() => {
+            setIsLoading(true);
+            setSimilarArtists([]);
+        });
         musicService.getArtistDetail(nav.artistId, serverId)
             .then(detail => {
                 setCurrentArtist(detail.artist);
@@ -325,7 +329,7 @@ export default function MusicTab() {
 
     useEffect(() => {
         if (nav.view !== 'album' || !nav.albumId) return;
-        setIsLoading(true);
+        queueMicrotask(() => setIsLoading(true));
         musicService.getAlbumDetail(nav.albumId, serverId)
             .then(detail => {
                 setCurrentAlbum(detail.album);
@@ -340,7 +344,7 @@ export default function MusicTab() {
 
     useEffect(() => {
         if (nav.view !== 'mix' || !nav.mixId) return;
-        setIsLoading(true);
+        queueMicrotask(() => setIsLoading(true));
         musicService.getMixDetail(nav.mixId, serverId)
             .then(detail => {
                 if (!detail) {
@@ -359,7 +363,7 @@ export default function MusicTab() {
     useEffect(() => {
         if (nav.view !== 'recap') return;
         const targetYear = nav.year ?? new Date().getFullYear();
-        setIsLoading(true);
+        queueMicrotask(() => setIsLoading(true));
         musicService.getYearRecap(targetYear, serverId)
             .then(setCurrentRecap)
             .catch(err => {
@@ -371,7 +375,7 @@ export default function MusicTab() {
 
     useEffect(() => {
         if (nav.view !== 'genres') return;
-        setIsLoading(true);
+        queueMicrotask(() => setIsLoading(true));
         musicService.getGenres(serverId)
             .then(setGenres)
             .catch(err => console.error('Failed to load genres', err))
@@ -380,7 +384,7 @@ export default function MusicTab() {
 
     useEffect(() => {
         if (nav.view !== 'genre' || !nav.genre) return;
-        setIsLoading(true);
+        queueMicrotask(() => setIsLoading(true));
         musicService.getGenreContent(nav.genre, serverId)
             .then(content => {
                 if (!content) { resetToArtistsView(); return; }

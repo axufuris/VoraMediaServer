@@ -41,7 +41,7 @@ export default function RegisterPage() {
         probe();
     }, [serverUrl]);
 
-    const handleRegister = async (e: React.FormEvent) => {
+    const handleRegister = async (e: React.SyntheticEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError('');
         try {

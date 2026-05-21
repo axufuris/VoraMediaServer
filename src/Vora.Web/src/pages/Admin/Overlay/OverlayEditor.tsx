@@ -180,6 +180,8 @@ export default function OverlayEditor() {
 
     const canvasRef = useRef<HTMLDivElement>(null);
     const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+    const elementIdCounter = useRef(0);
+    const nextElementId = () => `el-${++elementIdCounter.current}`;
 
     useEffect(() => {
         const el = canvasRef.current;
@@ -216,7 +218,7 @@ export default function OverlayEditor() {
 
                     const restoredElements = parsedElements.map((el: OverlayElement) => {
                         const base = {
-                            id: Date.now().toString() + Math.random().toString(),
+                            id: nextElementId(),
                             type: el.type,
                             xPct: el.xPct,
                             yPct: el.yPct,
@@ -263,7 +265,7 @@ export default function OverlayEditor() {
 
         if (type === 'composite_ratings') {
             setElements([...elements, {
-                id: Date.now().toString(),
+                id: nextElementId(),
                 type,
                 previewImages: [
                     '/Overlays/Rating/Star.png',
@@ -278,7 +280,7 @@ export default function OverlayEditor() {
 
         const defaultImage = PREVIEW_OPTIONS[type][0].path;
         setElements([...elements, {
-            id: Date.now().toString(),
+            id: nextElementId(),
             type,
             previewImage: defaultImage,
             xPct: 0.05, yPct: 0.05,

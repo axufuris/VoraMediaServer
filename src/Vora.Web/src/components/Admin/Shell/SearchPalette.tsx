@@ -52,9 +52,11 @@ export default function SearchPalette({ isOpen, onClose }: SearchPaletteProps) {
     // Reset state on open; focus the input.
     useEffect(() => {
         if (isOpen) {
-            setQuery('');
-            setSelectedIndex(0);
-            queueMicrotask(() => inputRef.current?.focus());
+            queueMicrotask(() => {
+                setQuery('');
+                setSelectedIndex(0);
+                inputRef.current?.focus();
+            });
         }
     }, [isOpen]);
 
@@ -76,7 +78,7 @@ export default function SearchPalette({ isOpen, onClose }: SearchPaletteProps) {
 
     useEffect(() => {
         if (selectedIndex >= results.length) {
-            setSelectedIndex(Math.max(0, results.length - 1));
+            queueMicrotask(() => setSelectedIndex(Math.max(0, results.length - 1)));
         }
     }, [results.length, selectedIndex]);
 

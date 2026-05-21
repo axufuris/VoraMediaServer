@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { playlistService, type PlaylistDetailsVM, type PlaylistItemVM } from '../../../api/Collections/playlistService';
 import { mediaService } from '../../../api/Media/mediaService';
 import { musicService } from '../../../api/Music/musicService';
-import { usePlayer } from '../../../contexts/PlayerContext';
+import { usePlayer } from '../../../contexts/usePlayer';
 import { streamingService } from '../../../api/Streaming/streamingService';
 import { serverVault } from '../../../utils/serverVault';
 import { useDialog } from '../../../dialogs';
@@ -211,7 +211,7 @@ export default function PlaylistDetailsPage() {
         setIsEditModalOpen(true);
     };
 
-    const handleSaveEdit = async (e: React.FormEvent) => {
+    const handleSaveEdit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!playlist || !editName.trim()) return;
 

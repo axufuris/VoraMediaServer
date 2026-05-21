@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { dvrService, type IptvRecordingSessionVM } from '../../../api/Iptv/dvrService';
 import { dvrPlaybackService } from '../../../api/Iptv/dvrPlaybackService';
 import { serverVault } from '../../../utils/serverVault';
-import { usePlayer } from '../../../contexts/PlayerContext';
+import { usePlayer } from '../../../contexts/usePlayer';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import DvrSessionCard from '../../../components/Dvr/DvrSessionCard';
 import { useDialog } from '../../../dialogs';

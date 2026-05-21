@@ -1,4 +1,4 @@
-import { usePlayer } from '../../contexts/PlayerContext';
+import { usePlayer } from '../../contexts/usePlayer';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import Hls from 'hls.js';
 import { type IptvChannelVM } from '../../api/Iptv/iptvAdminService';

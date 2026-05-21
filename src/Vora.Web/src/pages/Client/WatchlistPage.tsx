@@ -16,7 +16,7 @@ export default function WatchlistPage() {
 
     useEffect(() => {
         if (!activeProfileId) {
-            setIsLoading(false);
+            queueMicrotask(() => setIsLoading(false));
             return;
         }
         discoveryService.getWatchlist(activeProfileId, serverId)

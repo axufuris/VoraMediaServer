@@ -1,84 +1,11 @@
-import { createContext, useContext, useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import { streamingService } from '../api/Streaming/streamingService';
 import { useSignalREvent } from '../hooks/useSignalREvent';
 import { musicService, type RadioSeed } from '../api/Music/musicService';
 import { serverVault } from '../utils/serverVault';
 import { audioQualityStore, crossfadeStore, eqPresetStore, EQ_PRESETS } from '../utils/audioQuality';
 import { useDialog } from '../dialogs';
-
-export interface PlayableMedia {
-    id: string;
-    title: string;
-    subtitle?: string;
-    posterUrl?: string;
-    backgroundUrl?: string;
-    streamUrl: string;
-    serverId?: string;
-    sessionId?: string;
-    startPosition?: number;
-    resolution?: string;
-    hdrType?: string;
-    audioChannels?: number;
-    videoTrackId?: string;
-    audioTrackId?: string;
-    subtitleTrackId?: string | null;
-    strategy?: string;
-    videoStrategy?: string;
-    audioStrategy?: string;
-    subtitleStrategy?: string | null;
-    videoCodec?: string;
-    audioCodec?: string;
-    targetAudioChannels?: number;
-    container?: string;
-    bandwidthKbps?: number;
-    playbackContextType?: string;
-    playbackContextId?: string;
-    commercialMarkers?: { start: number, end: number }[]; // <-- ADDED
-}
-
-export type RepeatMode = 'off' | 'all' | 'one';
-
-interface PlayerContextType {
-    currentMedia: PlayableMedia | null;
-    isPlaying: boolean;
-    isMinimized: boolean;
-    currentTime: number;
-    duration: number;
-    volume: number;
-    sessionId: string | null;
-    playMedia: (media: PlayableMedia) => void;
-    playQueue: (items: PlayableMedia[], startIndex?: number) => void;
-    addToQueue: (items: PlayableMedia[]) => void;
-    playNext: (items: PlayableMedia[]) => void;
-    nextTrack: () => void;
-    previousTrack: () => void;
-    jumpToQueueIndex: (idx: number) => void;
-    hasNext: boolean;
-    hasPrevious: boolean;
-    queue: PlayableMedia[];
-    queueIndex: number;
-    isShuffled: boolean;
-    toggleShuffle: () => void;
-    repeatMode: RepeatMode;
-    cycleRepeatMode: () => void;
-    togglePlayPause: () => void;
-    seek: (time: number) => void;
-    skipForward: (seconds: number) => void;
-    skipBackward: (seconds: number) => void;
-    setMinimized: (min: boolean) => void;
-    isFullscreen: boolean;
-    toggleFullscreen: () => void;
-    setFullscreen: (full: boolean) => void;
-    closePlayer: () => void;
-    setVolume: (vol: number) => void;
-    changeStreams: (videoTrackId: string, audioTrackId: string, subtitleTrackId: string) => Promise<void>;
-    videoRef: React.RefObject<HTMLVideoElement | null>;
-    radioSeed: RadioSeed | null;
-    radioLabel: string | null;
-    startRadio: (seed: RadioSeed, label: string, items: PlayableMedia[]) => void;
-}
-
-const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
+import { PlayerContext, type PlayableMedia, type RepeatMode } from './usePlayer';
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
     const dialog = useDialog();
@@ -102,11 +29,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const [isFullscreen, setIsFullscreen] = useState(false);
     useEffect(() => {
-        if (!currentMedia || currentMedia.playbackContextType !== 'Music') {
-            setIsFullscreen(false);
-        } else {
-            setIsMinimized(true);
-        }
+        queueMicrotask(() => {
+            if (!currentMedia || currentMedia.playbackContextType !== 'Music') {
+                setIsFullscreen(false);
+            } else {
+                setIsMinimized(true);
+            }
+        });
     }, [currentMedia]);
     const [isShuffled, setIsShuffled] = useState(false);
     const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
@@ -168,28 +97,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const audioEqNodesRef = useRef<BiquadFilterNode[]>([]);
     const fadingOutRef = useRef(false);
 
-    const ensureAudioGraph = useCallback(() => {
-        const video = videoRef.current;
-        if (!video) return;
-        if (audioContextRef.current) return;
-        try {
-            const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-            if (!Ctx) return;
-            const ctx = new Ctx();
-            const source = ctx.createMediaElementSource(video);
-            const gain = ctx.createGain();
-            gain.gain.value = 1;
-            source.connect(gain);
-            gain.connect(ctx.destination);
-            audioContextRef.current = ctx;
-            audioSourceRef.current = source;
-            audioGainRef.current = gain;
-            applyEqPreset(eqPresetStore.get());
-        } catch (err) {
-            console.warn('AudioContext setup failed', err);
-        }
-    }, []);
-
     const applyEqPreset = useCallback((preset: ReturnType<typeof eqPresetStore.get>) => {
         const ctx = audioContextRef.current;
         const source = audioSourceRef.current;
@@ -220,6 +127,28 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         prev.connect(gain);
         audioEqNodesRef.current = filters;
     }, []);
+
+    const ensureAudioGraph = useCallback(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        if (audioContextRef.current) return;
+        try {
+            const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+            if (!Ctx) return;
+            const ctx = new Ctx();
+            const source = ctx.createMediaElementSource(video);
+            const gain = ctx.createGain();
+            gain.gain.value = 1;
+            source.connect(gain);
+            gain.connect(ctx.destination);
+            audioContextRef.current = ctx;
+            audioSourceRef.current = source;
+            audioGainRef.current = gain;
+            applyEqPreset(eqPresetStore.get());
+        } catch (err) {
+            console.warn('AudioContext setup failed', err);
+        }
+    }, [applyEqPreset]);
 
     useEffect(() => {
         if (currentMedia?.playbackContextType !== 'Music') return;
@@ -346,9 +275,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             el.load();
             preloadedUrlRef.current = nextItem.streamUrl;
         } catch {
-            // best-effort
+            /* ignore */
         }
     }, [currentTime, duration, queue, queueIndex, currentMedia?.playbackContextType]);
+
+    const playMedia = useCallback((media: PlayableMedia) => {
+        setCurrentMedia(media);
+        if (media.sessionId) setSessionId(media.sessionId);
+        setIsMinimized(false);
+        setIsPlaying(true);
+    }, []);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -422,7 +358,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             video.removeEventListener('pause', onPause);
             video.removeEventListener('ended', onEnded);
         };
-    }, [currentMedia]);
+    }, [currentMedia, playMedia]);
 
     useEffect(() => {
         if (!sessionId) return;
@@ -469,7 +405,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         queueRef.current = [];
         queueIndexRef.current = 0;
         linearQueueRef.current = [];
-    }, [sessionId, currentMedia?.playbackContextType, currentMedia?.serverId]);
+    }, [sessionId, currentMedia]);
 
     useSignalREvent<{ sessionId: string, command: string, message?: string }>(
         "StreamCommandReceived",
@@ -484,13 +420,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             }
         }, [sessionId, closePlayer])
     );
-
-    const playMedia = (media: PlayableMedia) => {
-        setCurrentMedia(media);
-        if (media.sessionId) setSessionId(media.sessionId);
-        setIsMinimized(false);
-        setIsPlaying(true);
-    };
 
     const playQueue = (items: PlayableMedia[], startIndex = 0) => {
         if (items.length === 0) return;
@@ -614,7 +543,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (items.length === 0) return;
         const q = queueRef.current;
         if (q.length === 0) {
-            // empty queue: start playback
             const newQueue = [...items];
             setQueue(newQueue);
             setQueueIndex(0);
@@ -630,7 +558,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (linearQueueRef.current.length > 0) {
             linearQueueRef.current = [...linearQueueRef.current, ...items];
         }
-    }, []);
+    }, [playMedia]);
 
     const playNext = useCallback((items: PlayableMedia[]) => {
         if (items.length === 0) return;
@@ -657,7 +585,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 ...linearQueueRef.current.slice(linearIdx + 1)
             ];
         }
-    }, []);
+    }, [playMedia]);
 
     const jumpToQueueIndex = useCallback((idx: number) => {
         const q = queueRef.current;
@@ -665,7 +593,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setQueueIndex(idx);
         queueIndexRef.current = idx;
         playMedia(q[idx]);
-    }, []);
+    }, [playMedia]);
 
     const nextTrack = useCallback(() => {
         const q = queueRef.current;
@@ -681,7 +609,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             queueIndexRef.current = 0;
             playMedia(q[0]);
         } else {
-            // end of queue, no repeat
             setQueue([]);
             setQueueIndex(0);
             queueRef.current = [];
@@ -691,7 +618,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             }
             setIsPlaying(false);
         }
-    }, []);
+    }, [playMedia]);
 
     const previousTrack = useCallback(() => {
         const q = queueRef.current;
@@ -711,7 +638,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             video.currentTime = 0;
             setCurrentTime(0);
         }
-    }, []);
+    }, [playMedia]);
 
     const hasNext = queue.length > 0 && queueIndex < queue.length - 1;
     const hasPrevious = queue.length > 0 && queueIndex > 0;
@@ -807,7 +734,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                         <div className="w-16 h-16 bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-900/50 shadow-inner">
                             <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                            </svg>
+                                </svg>
                         </div>
                         <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Stream Terminated</h2>
                         <p className="text-gray-400 mb-8 text-sm leading-relaxed px-2">
@@ -825,9 +752,3 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         </PlayerContext.Provider>
     );
 }
-
-export const usePlayer = () => {
-    const context = useContext(PlayerContext);
-    if (!context) throw new Error("usePlayer must be used within a PlayerProvider");
-    return context;
-};

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import Hls from 'hls.js';
-import { usePlayer } from '../../contexts/PlayerContext';
+import { usePlayer } from '../../contexts/usePlayer';
 import { type IptvChannelVM } from '../../api/Iptv/iptvAdminService';
 import { iptvClientService } from '../../api/Iptv/iptvClientService';
 import { timeshiftService } from '../../api/Iptv/timeshiftService';
@@ -35,10 +35,11 @@ export default function LiveRadioPlayer() {
 
     useEffect(() => {
         if (currentMedia?.playbackContextType !== 'LiveRadio') {
-            setChannels([]);
+            queueMicrotask(() => setChannels([]));
             return;
         }
 
+        let cancelled = false;
         const loadRadioChannels = async () => {
             try {
                 const activeServer = serverVault.getActiveServer();
@@ -49,6 +50,7 @@ export default function LiveRadioPlayer() {
                 const userId = localStorage.getItem('user_id') || activeProfileId;
 
                 const allProviders = await iptvClientService.getPlaylists(userId, activeProfileId, activeServer.id);
+                if (cancelled) return;
                 const radioChannels = allProviders.flatMap(p => p.channels || []).filter(c => c.kind === 'Radio');
                 setChannels(radioChannels);
             } catch (error) {
@@ -56,6 +58,7 @@ export default function LiveRadioPlayer() {
             }
         };
         loadRadioChannels();
+        return () => { cancelled = true; };
     }, [currentMedia?.playbackContextType]);
 
     useEffect(() => {
@@ -64,7 +67,7 @@ export default function LiveRadioPlayer() {
 
         let hls: Hls | null = null;
         let isMounted = true;
-        setIsLoading(true);
+        queueMicrotask(() => { if (isMounted) setIsLoading(true); });
 
         if (isAudioOnDemand) {
             const startPosition = currentMedia.startPosition ?? 0;
@@ -194,7 +197,7 @@ export default function LiveRadioPlayer() {
                 timeshiftService.stopTimeshift(activeServer?.id).catch(() => { });
             }
         };
-    }, [currentMedia?.id, videoRef, canTimeshift, isAudioOnDemand, currentMedia?.streamUrl]);
+    }, [currentMedia?.id, videoRef, canTimeshift, isAudioOnDemand, currentMedia?.streamUrl, currentMedia?.startPosition]);
 
     useEffect(() => {
         if (!isPodcast || !currentMedia?.id) return;

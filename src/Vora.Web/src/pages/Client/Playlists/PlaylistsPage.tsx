@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { playlistService, type PlaylistSummaryVM } from '../../../api/Collections/playlistService';
 import { musicService, type GeneratedMixSummaryVM } from '../../../api/Music/musicService';
@@ -85,19 +85,19 @@ export default function PlaylistsPage() {
         }
     };
 
-    const matchesTab = (mediaType: PlaylistMediaType): boolean => {
+    const matchesTab = useCallback((mediaType: PlaylistMediaType): boolean => {
         if (activeTab === 'all') return true;
         if (activeTab === 'music') return mediaType === 'Music';
         if (activeTab === 'video') return mediaType === 'Movies' || mediaType === 'Shows';
         return true;
-    };
+    }, [activeTab]);
 
     const visiblePlaylists = useMemo(() => {
         if (activeTab === 'all') return playlists;
         return playlists.filter(p => matchesTab(p.mediaType));
-    }, [playlists, activeTab]);
+    }, [playlists, activeTab, matchesTab]);
 
-    const visibleSmart = useMemo(() => smartPlaylists.filter(sp => matchesTab(sp.mediaType)), [smartPlaylists, activeTab]);
+    const visibleSmart = useMemo(() => smartPlaylists.filter(sp => matchesTab(sp.mediaType)), [smartPlaylists, matchesTab]);
     const visibleMixes = useMemo(() => activeTab === 'all' || activeTab === 'music' ? dailyMixes : [], [dailyMixes, activeTab]);
 
     if (loading) {

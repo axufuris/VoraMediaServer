@@ -20,14 +20,21 @@ export default function AddToPlaylistModal({
 
     useEffect(() => {
         if (!isOpen) return;
-        setLoading(true);
+        let cancelled = false;
         Promise.all([
             playlistService.getPlaylists(serverId),
             playlistService.getPlaylistsContainingItem(mediaId, serverId)
         ]).then(([allPlaylists, containedIds]) => {
+            if (cancelled) return;
             setPlaylists(allPlaylists);
             setActivePlaylistIds(new Set(containedIds));
-        }).catch(console.error).finally(() => setLoading(false));
+            setLoading(false);
+        }).catch(err => {
+            if (cancelled) return;
+            console.error(err);
+            setLoading(false);
+        });
+        return () => { cancelled = true; };
     }, [isOpen, mediaId, serverId]);
 
     const togglePlaylist = async (playlistId: string) => {

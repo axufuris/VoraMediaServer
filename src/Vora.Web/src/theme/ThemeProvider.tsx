@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { ThemeManifest } from './types';
 import { applyTheme } from './applyTheme';
@@ -7,37 +7,12 @@ import { voraDark } from './themes/voraDark';
 import { voraOcean } from './themes/voraOcean';
 import { themeService } from '../api/System/themeService';
 import { useSignalREvent } from '../hooks/useSignalREvent';
+import { ThemeContext, type ThemeContextValue } from './useTheme';
 
-/**
- * Built-in themes bundled with the frontend. Plugin-shipped themes don't
- * appear here — they're fetched on demand from /api/admin/themes/{id}/manifest.
- */
 const BUILT_IN_THEMES: ThemeManifest[] = [voraDefault, voraDark, voraOcean];
 
 const STORAGE_KEY = 'vora_admin_theme_id';
 const URL_PARAM = 'theme';
-
-interface ThemeContextValue {
-    /** Built-in themes available without a network round-trip. The picker
-     *  may show additional plugin themes via themeService.getAll() — those
-     *  aren't included here until they're activated and fetched. */
-    builtInThemes: ThemeManifest[];
-    /** Currently active manifest. Always set; defaults to vora-default. */
-    active: ThemeManifest;
-    /** True while the initial backend reconcile is in flight. */
-    isLoading: boolean;
-    /** True while an asynchronous theme switch is being applied (relevant for
-     *  plugin themes where the manifest must be fetched first). */
-    isSwitching: boolean;
-    /**
-     * Switch themes by id. Built-in themes apply immediately. Plugin themes
-     * trigger a manifest fetch first, then apply. Persists to backend on
-     * success; reverts on failure. Returns true on success.
-     */
-    setActive: (id: string) => Promise<boolean>;
-}
-
-const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function readUrlOverrideThemeId(): string | null {
     if (typeof window === 'undefined') return null;
@@ -233,12 +208,4 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }), [activeManifest, isLoading, isSwitching, setActive]);
 
     return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
-}
-
-export function useTheme(): ThemeContextValue {
-    const ctx = useContext(ThemeContext);
-    if (!ctx) {
-        throw new Error('useTheme must be used inside <ThemeProvider>');
-    }
-    return ctx;
 }

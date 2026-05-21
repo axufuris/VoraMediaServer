@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { themeService, type ThemeMetaVM } from '../../api/System/themeService';
-import { useTheme } from '../../theme/ThemeProvider';
+import { useTheme } from '../../theme/useTheme';
 import { useDialog } from '../../dialogs';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { podcastService, type PodcastSubscriptionVM, type PodcastEpisodeVM, type DiscoveredPodcastVM, type PodcastFeedEpisodeVM, type AggregatedCatalogPodcastVM, type CatalogServerAvailability } from '../../../api/Podcasts/podcastService';
 import { serverVault } from '../../../utils/serverVault';
-import { usePlayer } from '../../../contexts/PlayerContext';
+import { usePlayer } from '../../../contexts/usePlayer';
 import { useDialog } from '../../../dialogs';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 

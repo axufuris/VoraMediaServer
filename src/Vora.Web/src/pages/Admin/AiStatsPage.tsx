@@ -45,7 +45,7 @@ export default function AiStatsPage() {
         fetchStats();
     }, [fetchStats]);
 
-    const handleFilter = (e: React.FormEvent) => {
+    const handleFilter = (e: React.SyntheticEvent<HTMLFormElement>) => {
         e.preventDefault();
         setPage(1);
         fetchStats();

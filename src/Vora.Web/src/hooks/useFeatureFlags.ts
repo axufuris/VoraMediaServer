@@ -11,8 +11,8 @@ export function useFeatureFlags(): FeatureFlagsVM {
         let cancelled = false;
         const targetServerId = serverId ?? serverVault.getActiveServerId() ?? undefined;
         if (!targetServerId) {
-            setFlags(DEFAULT_FEATURE_FLAGS);
-            return;
+            queueMicrotask(() => { if (!cancelled) setFlags(DEFAULT_FEATURE_FLAGS); });
+            return () => { cancelled = true; };
         }
         featureFlagsService.getFeatureFlags(targetServerId)
             .then(data => {

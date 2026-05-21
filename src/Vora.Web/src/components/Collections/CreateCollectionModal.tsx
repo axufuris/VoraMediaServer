@@ -68,7 +68,7 @@ export default function CreateCollectionModal({
         }
     }, [isOpen, activeTab, serverId]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!title.trim()) return;
         setIsCreating(true);

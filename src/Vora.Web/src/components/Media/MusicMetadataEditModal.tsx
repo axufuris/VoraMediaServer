@@ -208,7 +208,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
         }
     };
 
-    const handleSave = async (e: React.FormEvent) => {
+    const handleSave = async (e: React.SyntheticEvent<HTMLFormElement>) => {
         e.preventDefault();
         setSaving(true);
         try {

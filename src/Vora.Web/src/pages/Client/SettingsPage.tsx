@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { type IptvPlaylistVM } from '../../api/Iptv/iptvAdminService';
+import { type IptvPlaylistVM, type IptvChannelVM } from '../../api/Iptv/iptvAdminService';
 import { iptvClientService } from '../../api/Iptv/iptvClientService';
 import { serverVault } from '../../utils/serverVault';
 import { profileDeviceSettingsService } from '../../api/Users/profileDeviceSettingsService';
 import { clientTemplateService, type TemplateMetaVM } from '../../api/System/clientTemplateService';
-import { useClientTemplate } from '../../theme/ClientTemplateProvider';
+import { useClientTemplate } from '../../theme/useClientTemplate';
 import { useDialog } from '../../dialogs';
 import PageHeader from '../../components/Client/Primitives/PageHeader';
 import Tabs from '../../components/Client/Primitives/Tabs';
@@ -81,7 +81,7 @@ function TemplatesTab({ activeProfileId }: { activeProfileId: string }) {
     useEffect(() => {
         if (!activeProfileId) return;
         const stored = localStorage.getItem(SPOTLIGHT_PREF_KEY(activeProfileId));
-        setShowSpotlight(stored === null ? true : stored === 'true');
+        queueMicrotask(() => setShowSpotlight(stored === null ? true : stored === 'true'));
     }, [activeProfileId]);
 
     const handleSpotlightToggle = (next: boolean) => {
@@ -294,7 +294,8 @@ function PlaybackTab({ activeProfileId, serverId, onSaved }: { activeProfileId: 
     useEffect(() => {
         const deviceId = localStorage.getItem('device_id') || 'unknown';
         const savedPref = localStorage.getItem(`playback_prefs_${activeProfileId}_${deviceId}`);
-        if (savedPref) {
+        if (!savedPref) return;
+        queueMicrotask(() => {
             try {
                 const parsed = JSON.parse(savedPref);
                 if (parsed.bitrate) setClientBitrateLimit(parsed.bitrate);
@@ -303,7 +304,7 @@ function PlaybackTab({ activeProfileId, serverId, onSaved }: { activeProfileId: 
             } catch {
                 setClientBitrateLimit(parseInt(savedPref, 10) || 0);
             }
-        }
+        });
     }, [activeProfileId]);
 
     const save = async () => {
@@ -459,7 +460,59 @@ function ProvidersTab({ activeProfileId, serverId, onSaved }: { activeProfileId:
     const hiddenTvChannelIds = iptvPrefs.hiddenChannels.filter(id => (channelById.get(id)?.kind ?? 'Tv') === 'Tv');
     const hiddenRadioChannelIds = iptvPrefs.hiddenChannels.filter(id => channelById.get(id)?.kind === 'Radio');
 
-    const ProviderSection = ({ title, description, list, emptyLabel }: { title: string, description: string, list: IptvPlaylistVM[], emptyLabel: string }) => (
+    return (
+        <div className="space-y-6">
+            <ProviderSection
+                title="Live TV providers"
+                description="Pick which M3U Live TV providers are available on this device."
+                list={liveTvProviders}
+                emptyLabel="No Live TV providers available."
+                enabledIds={iptvPrefs.enabledProviders}
+                onToggle={toggleProvider}
+            />
+            <ProviderSection
+                title="Radio providers"
+                description="Pick which M3U radio providers are available on this device."
+                list={radioProviders}
+                emptyLabel="No radio providers available."
+                enabledIds={iptvPrefs.enabledProviders}
+                onToggle={toggleProvider}
+            />
+            <HiddenChannelsSection
+                title="Hidden Live TV channels"
+                description="Channels you have hidden from the Live TV guide."
+                ids={hiddenTvChannelIds}
+                emptyLabel="You have not hidden any Live TV channels."
+                channelById={channelById}
+                onUnhide={unhideChannel}
+            />
+            <HiddenChannelsSection
+                title="Hidden radio stations"
+                description="Stations you have hidden from the Audio hub."
+                ids={hiddenRadioChannelIds}
+                emptyLabel="You have not hidden any radio stations."
+                channelById={channelById}
+                onUnhide={unhideChannel}
+            />
+
+            <div className="flex justify-end">
+                <button type="button" onClick={save} className="vora-button-primary cursor-pointer">Save provider settings</button>
+            </div>
+        </div>
+    );
+}
+
+interface ProviderSectionProps {
+    title: string;
+    description: string;
+    list: IptvPlaylistVM[];
+    emptyLabel: string;
+    enabledIds: string[];
+    onToggle: (id: string) => void;
+}
+
+function ProviderSection({ title, description, list, emptyLabel, enabledIds, onToggle }: ProviderSectionProps) {
+    return (
         <section className="vora-card p-6">
             <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{title}</h2>
             <p className="m-0 mb-4 text-sm" style={{ color: 'var(--vora-text-muted)' }}>{description}</p>
@@ -475,8 +528,8 @@ function ProvidersTab({ activeProfileId, serverId, onSaved }: { activeProfileId:
                         >
                             <input
                                 type="checkbox"
-                                checked={iptvPrefs.enabledProviders.includes(p.id)}
-                                onChange={() => toggleProvider(p.id)}
+                                checked={enabledIds.includes(p.id)}
+                                onChange={() => onToggle(p.id)}
                                 className="h-4 w-4 cursor-pointer accent-[var(--vora-accent-500)]"
                             />
                             <span className="text-sm font-medium" style={{ color: 'var(--vora-text-primary)' }}>{p.name}</span>
@@ -486,8 +539,19 @@ function ProvidersTab({ activeProfileId, serverId, onSaved }: { activeProfileId:
             )}
         </section>
     );
+}
 
-    const HiddenChannelsSection = ({ title, description, ids, emptyLabel }: { title: string, description: string, ids: string[], emptyLabel: string }) => (
+interface HiddenChannelsSectionProps {
+    title: string;
+    description: string;
+    ids: string[];
+    emptyLabel: string;
+    channelById: Map<string, IptvChannelVM>;
+    onUnhide: (channelId: string) => void;
+}
+
+function HiddenChannelsSection({ title, description, ids, emptyLabel, channelById, onUnhide }: HiddenChannelsSectionProps) {
+    return (
         <section className="vora-card p-6">
             <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{title}</h2>
             <p className="m-0 mb-4 text-sm" style={{ color: 'var(--vora-text-muted)' }}>{description}</p>
@@ -511,7 +575,7 @@ function ProvidersTab({ activeProfileId, serverId, onSaved }: { activeProfileId:
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => unhideChannel(channelId)}
+                                    onClick={() => onUnhide(channelId)}
                                     className="vora-button-secondary cursor-pointer text-xs"
                                 >
                                     Unhide
@@ -522,19 +586,6 @@ function ProvidersTab({ activeProfileId, serverId, onSaved }: { activeProfileId:
                 </div>
             )}
         </section>
-    );
-
-    return (
-        <div className="space-y-6">
-            <ProviderSection title="Live TV providers" description="Pick which M3U Live TV providers are available on this device." list={liveTvProviders} emptyLabel="No Live TV providers available." />
-            <ProviderSection title="Radio providers" description="Pick which M3U radio providers are available on this device." list={radioProviders} emptyLabel="No radio providers available." />
-            <HiddenChannelsSection title="Hidden Live TV channels" description="Channels you have hidden from the Live TV guide." ids={hiddenTvChannelIds} emptyLabel="You have not hidden any Live TV channels." />
-            <HiddenChannelsSection title="Hidden radio stations" description="Stations you have hidden from the Audio hub." ids={hiddenRadioChannelIds} emptyLabel="You have not hidden any radio stations." />
-
-            <div className="flex justify-end">
-                <button type="button" onClick={save} className="vora-button-primary cursor-pointer">Save provider settings</button>
-            </div>
-        </div>
     );
 }
 

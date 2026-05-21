@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { collectionAdminService } from '../../api/Collections/collectionAdminService';
 import type { CollectionDetails } from '../../api/Collections/collectionService';
@@ -54,13 +54,13 @@ export default function EditCollectionModal({
     const [lockedFields, setLockedFields] = useState<string[]>(collection.lockedFields || []);
     const [isSaving, setIsSaving] = useState(false);
 
-    const fetchArtworkOptions = () => {
+    const fetchArtworkOptions = useCallback(() => {
         setLoadingArt(true);
         collectionAdminService.getArtworkOptions(collection.id, serverId)
             .then(setArtwork)
             .catch(console.error)
             .finally(() => setLoadingArt(false));
-    };
+    }, [collection.id, serverId]);
 
     useEffect(() => {
         if (isOpen) {
@@ -94,7 +94,7 @@ export default function EditCollectionModal({
         if (isOpen && (activeTab === 'poster' || activeTab === 'backdrop') && artwork.length === 0) {
             fetchArtworkOptions();
         }
-    }, [isOpen, activeTab, collection.id, artwork.length]);
+    }, [isOpen, activeTab, artwork.length, fetchArtworkOptions]);
 
 
     const toggleLock = (field: string) => {
@@ -148,10 +148,10 @@ export default function EditCollectionModal({
         try {
             await collectionAdminService.fetchProviderArtwork(collection.id, selectedProviderId, serverId);
             fetchArtworkOptions();
-        } catch (err) { await dialog.alert("Failed to fetch artwork"); setLoadingArt(false); }
+        } catch { await dialog.alert("Failed to fetch artwork"); setLoadingArt(false); }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
         e.preventDefault();
         setIsSaving(true);
         try {
@@ -168,7 +168,7 @@ export default function EditCollectionModal({
             }, serverId);
             onSaved();
             onClose();
-        } catch (error) { await dialog.alert('Failed to update collection.'); }
+        } catch { await dialog.alert('Failed to update collection.'); }
         finally { setIsSaving(false); }
     };
 

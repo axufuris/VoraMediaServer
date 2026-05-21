@@ -1,2 +1,3 @@
-export { DialogProvider, useDialog } from './Dialog';
-export type { AlertOptions, ConfirmOptions, PromptOptions, DialogTone } from './Dialog';
+export { DialogProvider } from './Dialog';
+export { useDialog } from './useDialog';
+export type { AlertOptions, ConfirmOptions, PromptOptions, DialogTone } from './useDialog';

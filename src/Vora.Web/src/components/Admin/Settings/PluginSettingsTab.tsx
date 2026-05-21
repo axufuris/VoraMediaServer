@@ -30,7 +30,7 @@ export function PluginSection({ serverId, plugin, showModal }: { serverId?: stri
         } finally {
             setIsLoading(false);
         }
-    }, [plugin.id, serverId, showModal]);
+    }, [plugin.id, plugin.name, serverId, showModal]);
 
     useEffect(() => {
         loadPluginSettings();

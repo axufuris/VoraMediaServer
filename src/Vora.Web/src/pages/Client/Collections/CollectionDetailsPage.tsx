@@ -49,7 +49,7 @@ export default function CollectionDetailsPage() {
         try {
             await collectionAdminService.syncChronology(collection.id);
             fetchCollection();
-        } catch (error) {
+        } catch {
             await dialog.alert('Failed to sync timeline. Check provider settings.');
         } finally {
             setIsSyncing(false);

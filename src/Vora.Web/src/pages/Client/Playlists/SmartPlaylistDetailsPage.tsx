@@ -7,7 +7,7 @@ import {
     type PlaylistMediaType
 } from '../../../api/Music/smartPlaylistService';
 import { musicService, type ArtistTrackVM } from '../../../api/Music/musicService';
-import { usePlayer, type PlayableMedia } from '../../../contexts/PlayerContext';
+import { usePlayer, type PlayableMedia } from '../../../contexts/usePlayer';
 import { serverVault } from '../../../utils/serverVault';
 import { audioQualityStore } from '../../../utils/audioQuality';
 import { useDialog } from '../../../dialogs';

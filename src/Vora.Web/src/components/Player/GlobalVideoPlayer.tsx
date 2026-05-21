@@ -1,4 +1,4 @@
-import { usePlayer } from '../../contexts/PlayerContext';
+import { usePlayer } from '../../contexts/usePlayer';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { mediaService, type MediaItem, type MediaPart, type UpNextItemVM, type UpNextResultVM } from '../../api/Media/mediaService';

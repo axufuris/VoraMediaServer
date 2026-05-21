@@ -50,7 +50,13 @@ export default function AdminNotificationBell() {
         }
     }, [serverId]);
 
-    useEffect(() => { refreshCount(); }, [refreshCount]);
+    useEffect(() => {
+        let cancelled = false;
+        adminNotificationService.getUnreadCount(serverId)
+            .then(count => { if (!cancelled) setUnreadCount(count); })
+            .catch(() => { /* ignore */ });
+        return () => { cancelled = true; };
+    }, [serverId]);
 
     useSignalREvent<AdminAlertEvent>('AdminAlert', useCallback((evt: AdminAlertEvent) => {
         if (!evt) return;
@@ -68,7 +74,7 @@ export default function AdminNotificationBell() {
     }, [isOpen, refreshCount, refreshList]));
 
     useEffect(() => {
-        if (isOpen) refreshList();
+        if (isOpen) queueMicrotask(refreshList);
     }, [isOpen, refreshList]);
 
     useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { libraryAdminService, type UpdateMediaRequest } from '../../api/Media/libraryAdminService';
 import { artworkService, type ArtworkResult } from '../../api/Media/artworkService';
@@ -36,13 +36,13 @@ export default function EditMetadataModal({
         lockedFields: []
     });
 
-    const fetchArtworkOptions = () => {
+    const fetchArtworkOptions = useCallback(() => {
         setLoadingArt(true);
         artworkService.getArtworkOptions(itemId, serverId)
             .then(setArtwork)
             .catch(console.error)
             .finally(() => setLoadingArt(false));
-    };
+    }, [itemId, serverId]);
 
     useEffect(() => {
         if (isOpen && initialData) {
@@ -64,7 +64,7 @@ export default function EditMetadataModal({
         if (isOpen && type === 'media' && (activeTab === 'poster' || activeTab === 'backdrop') && artwork.length === 0) {
             fetchArtworkOptions();
         }
-    }, [isOpen, activeTab, itemId, type, artwork.length]);
+    }, [isOpen, activeTab, type, artwork.length, fetchArtworkOptions]);
 
 
     const handleChange = (field: keyof UpdateMediaRequest, value: UpdateMediaRequest[keyof UpdateMediaRequest]) => {
@@ -131,7 +131,7 @@ export default function EditMetadataModal({
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
         e.preventDefault();
         setSaving(true);
         try {

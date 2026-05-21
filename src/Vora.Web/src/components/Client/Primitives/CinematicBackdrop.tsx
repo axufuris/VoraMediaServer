@@ -26,7 +26,7 @@ export default function CinematicBackdrop({ src, intensity = 'detail', parallax,
         const key = transitionKey ?? src ?? undefined;
         if (key === lastKeyRef.current) return;
         lastKeyRef.current = key;
-        setOpacity(0);
+        queueMicrotask(() => setOpacity(0));
         const t = window.setTimeout(() => {
             setCurrentSrc(src ?? null);
             setOpacity(src ? 1 : 0);

@@ -20,8 +20,12 @@ export default function TaskDashboard() {
     }, [serverId]);
 
     useEffect(() => {
-        fetchTasks();
-    }, [fetchTasks]);
+        let cancelled = false;
+        taskService.getTasks(serverId)
+            .then(data => { if (!cancelled) setTasks(data); })
+            .catch(error => { if (!cancelled) console.error('Failed to fetch tasks', error); });
+        return () => { cancelled = true; };
+    }, [serverId]);
 
     useSignalREvent('TasksUpdated', useCallback(() => {
         fetchTasks();

@@ -9,7 +9,7 @@ import MediaCastRow from '../../../components/Media/MediaCastRow';
 import MediaExtrasRow from '../../../components/Media/MediaExtrasRow';
 import MediaEpisodesList from '../../../components/Media/MediaEpisodesList';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
-import { usePlayer } from '../../../contexts/PlayerContext';
+import { usePlayer } from '../../../contexts/usePlayer';
 import { streamingService } from '../../../api/Streaming/streamingService';
 import { scanDeviceCapabilities } from '../../../utils/hardwareScanner';
 import { useDialog } from '../../../dialogs';

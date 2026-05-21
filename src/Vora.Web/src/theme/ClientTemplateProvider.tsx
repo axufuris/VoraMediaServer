@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { ThemeManifest } from './types';
 import { applyTheme } from './applyTheme';
@@ -6,28 +6,15 @@ import { voraCinema } from './clientTemplates/voraCinema';
 import { voraNoir } from './clientTemplates/voraNoir';
 import { voraVelvet } from './clientTemplates/voraVelvet';
 import { voraAurora } from './clientTemplates/voraAurora';
-import { clientTemplateService, type ActiveTemplateVM, type TemplateScheduleVM } from '../api/System/clientTemplateService';
+import { clientTemplateService, type ActiveTemplateVM } from '../api/System/clientTemplateService';
 import { useSignalREvent } from '../hooks/useSignalREvent';
+import { ClientTemplateContext, type ClientTemplateContextValue } from './useClientTemplate';
 
 const BUILT_IN_CLIENT_TEMPLATES: ThemeManifest[] = [voraCinema, voraNoir, voraVelvet, voraAurora];
 
 const STORAGE_KEY = 'vora_client_template_id';
 const URL_PARAM = 'template';
 const ADMIN_PATH_PREFIX_RE = /^(\/server\/[^/]+)?\/admin(\/|$)/;
-
-interface ClientTemplateContextValue {
-    builtInTemplates: ThemeManifest[];
-    active: ThemeManifest;
-    activeInfo: ActiveTemplateVM | null;
-    activeSchedule: TemplateScheduleVM | null;
-    isLoading: boolean;
-    isSwitching: boolean;
-    setActive: (id: string) => Promise<boolean>;
-    clearActive: () => Promise<boolean>;
-    refresh: () => Promise<void>;
-}
-
-const ClientTemplateContext = createContext<ClientTemplateContextValue | null>(null);
 
 function readUrlOverrideTemplateId(): string | null {
     if (typeof window === 'undefined') return null;
@@ -226,12 +213,4 @@ export function ClientTemplateProvider({ children }: ClientTemplateProviderProps
     }), [activeManifest, activeInfo, isLoading, isSwitching, setActive, clearActive, refresh]);
 
     return <ClientTemplateContext.Provider value={value}>{children}</ClientTemplateContext.Provider>;
-}
-
-export function useClientTemplate(): ClientTemplateContextValue {
-    const ctx = useContext(ClientTemplateContext);
-    if (!ctx) {
-        throw new Error('useClientTemplate must be used inside <ClientTemplateProvider>');
-    }
-    return ctx;
 }

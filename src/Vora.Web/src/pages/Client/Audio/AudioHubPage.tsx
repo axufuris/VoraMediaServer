@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { iptvClientService } from '../../../api/Iptv/iptvClientService';
 import { type IptvChannelVM } from '../../../api/Iptv/iptvAdminService';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
-import { usePlayer } from '../../../contexts/PlayerContext';
+import { usePlayer } from '../../../contexts/usePlayer';
 import { useFeatureFlags } from '../../../hooks/useFeatureFlags';
 import PodcastsTab from './PodcastsTab';
 import MusicTab from './MusicTab';

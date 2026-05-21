@@ -5,7 +5,7 @@ import { serverVault } from '../utils/serverVault';
 let sharedConnection: HubConnection | null = null;
 let currentConnectionUrl: string | null = null;
 
-export function useSignalREvent<T = any>(eventName: string, callback: (payload: T) => void) {
+export function useSignalREvent<T = unknown>(eventName: string, callback: (payload: T) => void) {
     useEffect(() => {
         const activeServer = serverVault.getActiveServer();
         const baseUrl = activeServer ? activeServer.url : (import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '');

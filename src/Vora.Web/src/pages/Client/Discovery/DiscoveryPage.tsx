@@ -166,18 +166,21 @@ function DiscoveryRow({ config, serverId, watchlistIds }: { config: DiscoveryRow
 
     useEffect(() => {
         let cancelled = false;
-        setErrorMessage(null);
-        setLoading(true);
         discoveryService.getRowItems(config.providerId, config.rowId, 1, serverId)
-            .then(data => { if (!cancelled) setItems(data); })
+            .then(data => {
+                if (cancelled) return;
+                setItems(data);
+                setErrorMessage(null);
+                setLoading(false);
+            })
             .catch(err => {
                 if (cancelled) return;
                 console.error(`Discovery row "${config.name}" (${config.providerId}/${config.rowId}) failed to load`, err);
                 const data = err?.response?.data;
                 const msg = (typeof data === 'string' ? data : data?.error || data?.detail || data?.title) || err?.message || 'Unknown error';
                 setErrorMessage(msg);
-            })
-            .finally(() => { if (!cancelled) setLoading(false); });
+                setLoading(false);
+            });
         return () => { cancelled = true; };
     }, [config, serverId]);
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { usePlayer } from '../../contexts/PlayerContext';
+import { usePlayer } from '../../contexts/usePlayer';
 import { musicService, type LyricsVM } from '../../api/Music/musicService';
 import { parseLrc, findActiveLineIndex, type LrcLine } from '../../utils/lrcParser';
 import { audioQualityStore, crossfadeStore, eqPresetStore, type AudioQuality, type EqPreset } from '../../utils/audioQuality';
@@ -89,7 +89,7 @@ export default function NowPlayingFullscreen() {
             setIsLiked(data.tracks.some(t => t.id === currentMedia.id));
         }).catch(() => { /* ignore */ });
         return () => { cancelled = true; };
-    }, [isFullscreen, currentMedia?.id, serverId]);
+    }, [isFullscreen, currentMedia, serverId]);
 
     useEffect(() => {
         if (!isFullscreen || !currentMedia || !lyricsOpen) {
@@ -103,7 +103,7 @@ export default function NowPlayingFullscreen() {
             .catch(() => { /* ignore */ })
             .finally(() => { if (!cancelled) setLyricsLoading(false); });
         return () => { cancelled = true; };
-    }, [isFullscreen, currentMedia?.id, serverId, lyricsOpen]);
+    }, [isFullscreen, currentMedia, serverId, lyricsOpen]);
 
     useEffect(() => {
         if (!lyricsOpen) return;

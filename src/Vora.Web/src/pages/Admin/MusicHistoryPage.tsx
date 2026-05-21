@@ -70,7 +70,7 @@ export default function MusicHistoryPage() {
 
     useEffect(() => {
         let mounted = true;
-        setLoading(true);
+        queueMicrotask(() => { if (mounted) setLoading(true); });
         musicService.getAdminMusicHistory(buildHistoryQuery(), serverId)
             .then(res => {
                 if (!mounted) return;
@@ -90,7 +90,7 @@ export default function MusicHistoryPage() {
 
     useEffect(() => {
         let mounted = true;
-        setSummaryLoading(true);
+        queueMicrotask(() => { if (mounted) setSummaryLoading(true); });
         const params: { from?: string; to?: string } = {};
         if (fromDate) params.from = new Date(fromDate).toISOString();
         if (toDate) {

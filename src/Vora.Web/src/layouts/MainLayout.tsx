@@ -6,7 +6,7 @@ import { useSignalREvent } from '../hooks/useSignalREvent';
 import GlobalVideoPlayer from '../components/Player/GlobalVideoPlayer';
 import { scanDeviceCapabilities } from '../utils/hardwareScanner';
 import { deviceService } from '../api/Users/deviceService';
-import { usePlayer } from '../contexts/PlayerContext';
+import { usePlayer } from '../contexts/usePlayer';
 import { serverVault } from '../utils/serverVault';
 import ServerManagerModal from '../components/Layout/ServerManagerModal';
 import LiveTvPlayer from '../components/Player/LiveTvPlayer';
@@ -102,13 +102,15 @@ export default function MainLayout() {
 
     const [isServerManagerOpen, setIsServerManagerOpen] = useState(false);
 
+    const flags = useFeatureFlags();
+
     useSignalREvent("UserAccessUpdated", useCallback(async (updatedUserId: string) => {
         if (currentUserId && updatedUserId.toLowerCase() === currentUserId.toLowerCase()) {
             await dialog.alert("Your account permissions have been updated by an administrator. Please re-select your profile to apply the changes.");
             localStorage.removeItem('profile_token');
             navigate('/profiles', { state: { manualSwitch: true } });
         }
-    }, [currentUserId, navigate]));
+    }, [currentUserId, navigate, dialog]));
 
     useSignalREvent("ProfileAccessUpdated", useCallback(async (updatedProfileId: string) => {
         if (activeProfileId && updatedProfileId.toLowerCase() === activeProfileId.toLowerCase()) {
@@ -116,7 +118,7 @@ export default function MainLayout() {
             localStorage.removeItem('profile_token');
             navigate('/profiles', { state: { manualSwitch: true } });
         }
-    }, [activeProfileId, navigate]));
+    }, [activeProfileId, navigate, dialog]));
 
     const loadNav = useCallback(async () => {
         const connectedServers = serverVault.getServers();
@@ -325,7 +327,6 @@ export default function MainLayout() {
         );
     }
 
-    const flags = useFeatureFlags();
     const gatedNavItems = navItems.filter(i => isNavItemEnabled(i, flags));
     const pinnedItems = gatedNavItems.filter(i => i.isPinned);
     const unpinnedItems = gatedNavItems.filter(i => !i.isPinned);

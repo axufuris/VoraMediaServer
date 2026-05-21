@@ -62,7 +62,7 @@ export default function DiscoveryViewAllPage() {
             }
         };
         loadPage();
-    }, [providerId, rowId, page, serverId]);
+    }, [providerId, rowId, page, serverId, hasMore]);
 
     useEffect(() => {
         const observer = new IntersectionObserver(

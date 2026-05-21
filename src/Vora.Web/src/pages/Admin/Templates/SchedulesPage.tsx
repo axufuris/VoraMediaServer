@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
     clientTemplateService,
@@ -168,7 +168,7 @@ export default function AdminTemplateSchedulesPage() {
     const [form, setForm] = useState<ScheduleFormState>(() => emptyForm('vora-cinema'));
     const [submittingForm, setSubmittingForm] = useState(false);
 
-    const loadAll = async () => {
+    const loadAll = useCallback(async () => {
         try {
             const [tpls, schs, def] = await Promise.all([
                 clientTemplateService.getAll(serverId),
@@ -183,11 +183,11 @@ export default function AdminTemplateSchedulesPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [serverId]);
 
     useEffect(() => {
         void loadAll();
-    }, [serverId]);
+    }, [loadAll]);
 
     const handleSetDefault = async (templateId: string) => {
         if (templateId === defaultId) return;
@@ -286,7 +286,7 @@ export default function AdminTemplateSchedulesPage() {
         }
     };
 
-    const now = useMemo(() => new Date(), [schedules]);
+    const now = useMemo(() => new Date(), []);
     const grouped = useMemo(() => {
         const groups: Record<'active' | 'upcoming' | 'past' | 'disabled', TemplateScheduleVM[]> = { active: [], upcoming: [], past: [], disabled: [] };
         for (const s of schedules) groups[bucket(s, now)].push(s);

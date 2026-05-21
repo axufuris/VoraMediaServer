@@ -1,15 +1,11 @@
-import { useEffect, useState } from 'react';
-
 interface GlobalSearchTriggerProps {
     onClick?: () => void;
 }
 
-export default function GlobalSearchTrigger({ onClick }: GlobalSearchTriggerProps) {
-    const [isMac, setIsMac] = useState(false);
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
-    useEffect(() => {
-        setIsMac(/Mac|iPhone|iPad/.test(navigator.platform));
-    }, []);
+export default function GlobalSearchTrigger({ onClick }: GlobalSearchTriggerProps) {
+    const isMac = IS_MAC;
 
     return (
         <button

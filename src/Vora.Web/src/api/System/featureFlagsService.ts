@@ -20,7 +20,7 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlagsVM = {
     podcasts: true
 };
 
-export interface UpdateFeatureFlagsRequest extends FeatureFlagsVM {}
+export type UpdateFeatureFlagsRequest = FeatureFlagsVM;
 
 export const featureFlagsService = {
     getFeatureFlags: async (serverId?: string): Promise<FeatureFlagsVM> => {

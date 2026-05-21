@@ -258,8 +258,10 @@ function useSpotlightItems(lists: SmartListClientDto[], serverId?: string): { it
 
     useEffect(() => {
         if (!spotlightList) {
-            setItems([]);
-            setSourceListId(null);
+            queueMicrotask(() => {
+                setItems([]);
+                setSourceListId(null);
+            });
             return;
         }
         let cancelled = false;
