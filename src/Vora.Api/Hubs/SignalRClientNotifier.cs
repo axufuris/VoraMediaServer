@@ -1,5 +1,6 @@
-﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.SignalR;
 using Vora.Application.Analysis;
+using Vora.Application.LibraryMigration.ViewModels;
 using Vora.Application.Logging.ViewModels;
 
 namespace Vora.Api.Hubs;
@@ -68,4 +69,7 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
 
     public Task NotifyBackupRestoredAsync(string fileName, IReadOnlyList<string> restoredSectionKeys) =>
         hubContext.Clients.Group("admins").SendAsync("BackupRestored", new { fileName, sectionKeys = restoredSectionKeys });
+
+    public Task NotifyLibraryMigrationUpdatedAsync(LibraryMigrationJobVM job) =>
+        hubContext.Clients.Group("admins").SendAsync("LibraryMigrationUpdated", job);
 }

@@ -83,6 +83,7 @@ export const ADMIN_NAV: AdminNavEntry[] = [
     { label: 'AI Usage & Stats',     pathTemplate: '/admin/ai-stats',         section: 'Server',  icon: 'chart',      keywords: ['tokens', 'openai', 'cost'], requires: 'ai' },
     { label: 'Server Logs',          pathTemplate: '/admin/logs',             section: 'Server',  icon: 'logs',       keywords: ['logs', 'errors', 'warnings', 'tail', 'trace', 'debug'] },
     { label: 'Backup & Restore',     pathTemplate: '/admin/backups',          section: 'Server',  icon: 'backup',     keywords: ['backup', 'restore', 'export', 'import', 'snapshot', 'schedule'] },
+    { label: 'Library Migration',    pathTemplate: '/admin/library-migration', section: 'Server', icon: 'copy',       keywords: ['plex', 'migrate', 'import', 'sync', 'watch state', 'ratings'] },
 
     // === Library ===
     { label: 'Libraries',            pathTemplate: '/admin/libraries',        section: 'Library', icon: 'folder',     keywords: ['media', 'sources', 'folders'] },

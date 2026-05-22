@@ -49,6 +49,7 @@ public static class WebApplicationExtensions
         app.MapIptvClientEndpoints();
         app.MapIptvPassthroughEndpoints();
         app.MapLibraryEndpoints();
+        app.MapLibraryMigrationEndpoints();
         app.MapLogEndpoints();
         app.MapMediaEndpoints();
         app.MapMusicEndpoints();

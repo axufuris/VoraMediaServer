@@ -31,8 +31,7 @@ All source lives under `/src`. The solution is `Vora.slnx` at the repo root.
 
 ### Plugin system
 
-- **`/src/plugins/Vora.Plugins.Abstractions`** — Interfaces and DTOs that every plugin implements/uses. The only plugin-system dependency concrete plugins should have (besides `Vora.Domain` if entities are needed).
-- **`/src/plugins/*`** — Individual plugin implementations. Each references `Vora.Plugins.Abstractions`. See `docs/plugins.md`.
+- **`/src/Vora.Plugins`** — Single project containing the provider interfaces, the DTOs that cross the plugin boundary, and the built-in provider implementations under `Providers/<Source>/`. External (third-party) plugins are separate `*.dll`s loaded at runtime from `<install>/Plugins/`. See `docs/plugins.md`.
 
 ### Frontend
 
@@ -52,8 +51,8 @@ All source lives under `/src`. The solution is `Vora.slnx` at the repo root.
 | `Vora.Application` | `Vora.Domain` |
 | `Vora.Infrastructure` | `Vora.Application`, `Vora.Domain` |
 | `Vora.Api` | `Vora.Application` (+ `Vora.Infrastructure` for DI wire-up) |
-| `Vora.Plugins.Abstractions` | nothing concrete (only `Vora.Domain` if entities are needed) |
-| individual plugins | `Vora.Plugins.Abstractions` (+ `Vora.Domain` if needed) |
+| `Vora.Plugins` | nothing concrete (only `Vora.Domain` if entities are needed) |
+| external plugin DLLs | `Vora.Plugins` (+ `Vora.Domain` if needed) |
 | `Vora.Web` | independent — talks to `Vora.Api` over HTTP only |
 
 If you ever feel like adding a reference that breaks this graph, stop and restructure.
@@ -71,8 +70,9 @@ If you ever feel like adding a reference that breaks this graph, stop and restru
 | New Request / Response shape | `Vora.Application` | — |
 | New background worker | `Vora.Infrastructure` | `ServiceRegistrationExtensions.AddVoraWorkers` |
 | New media or filesystem analyzer | `Vora.Infrastructure` | — |
-| New plugin contract | `Vora.Plugins.Abstractions` | also add to `PluginLoaderExtensions.PluginProviderInterfaces` |
-| New plugin implementation | new project under `/src/plugins/` | — |
+| New plugin contract | `Vora.Plugins/Interfaces/` (and supporting DTOs in `Vora.Plugins/Dtos/`) | also add to `PluginLoaderExtensions.PluginProviderInterfaces` |
+| New built-in provider | `Vora.Plugins/Providers/<Source>/` | — (the loader discovers it automatically) |
+| New external plugin | separate assembly built into `<install>/Plugins/`, references `Vora.Plugins` | — |
 | New React component / page / hook | `Vora.Web` (see `docs/frontend-conventions.md` for folder picking) | — |
 | New SignalR notification | method on `IClientNotifier` in `Vora.Application.Analysis`, then implement in `SignalRClientNotifier` (`Vora.Api/Hubs/`) | — |
 | New feature toggle | add a `bool EnableX` to `ServerSetting`, mirror in `FeatureFlagsVM` + `UpdateFeatureFlagsRequest`, add to `FeatureGate` enum and `RequireFeatureFilter`, mirror in `FeatureFlagsVM` on the frontend, then gate the relevant endpoints with `.RequireFeature(FeatureGate.X)` and the nav with `isNavItemEnabled` in `MainLayout.tsx` | run `add-migration AddXFeatureToggle` |

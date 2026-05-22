@@ -1,0 +1,113 @@
+using Microsoft.EntityFrameworkCore;
+using Vora.Application.LibraryMigration;
+using Vora.Domain.Entities.Users;
+
+namespace Vora.Infrastructure.Persistence.Repositories;
+
+public class LibraryMigrationRepository : ILibraryMigrationRepository
+{
+    private readonly VoraDbContext _context;
+
+    public LibraryMigrationRepository(VoraDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<List<MediaItemMatchRow>> FindMatchesAsync(IReadOnlyCollection<string> tmdbIds, IReadOnlyCollection<string> imdbIds, IReadOnlyCollection<string> tvdbIds)
+    {
+        if (tmdbIds.Count == 0 && imdbIds.Count == 0 && tvdbIds.Count == 0)
+        {
+            return new List<MediaItemMatchRow>();
+        }
+
+        var tmdbList = tmdbIds.ToList();
+        var imdbList = imdbIds.ToList();
+        var tvdbList = tvdbIds.ToList();
+
+        return await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => (m.TmdbId != null && tmdbList.Contains(m.TmdbId))
+                     || (m.ImdbId != null && imdbList.Contains(m.ImdbId))
+                     || (m.TvdbId != null && tvdbList.Contains(m.TvdbId)))
+            .Select(m => new MediaItemMatchRow
+            {
+                Id = m.Id,
+                TmdbId = m.TmdbId,
+                ImdbId = m.ImdbId,
+                TvdbId = m.TvdbId
+            })
+            .ToListAsync();
+    }
+
+    public async Task BulkUpsertWatchStatesAsync(Guid profileId, IReadOnlyCollection<WatchStateUpsert> entries)
+    {
+        if (entries.Count == 0) return;
+
+        var targetIds = entries.Select(e => e.MediaItemId).Distinct().ToList();
+        var existing = await _context.UserMediaStates
+            .Where(s => s.ProfileId == profileId && targetIds.Contains(s.MediaItemId))
+            .ToListAsync();
+        var byItem = existing.ToDictionary(s => s.MediaItemId);
+
+        foreach (var entry in entries)
+        {
+            if (byItem.TryGetValue(entry.MediaItemId, out var state))
+            {
+                state.IsPlayed = entry.IsPlayed;
+                state.ResumePositionSeconds = entry.ResumePositionSeconds;
+                if (entry.LastPlayedAt.HasValue)
+                {
+                    state.LastPlayedAt = entry.LastPlayedAt.Value;
+                }
+            }
+            else
+            {
+                _context.UserMediaStates.Add(new UserMediaState
+                {
+                    ProfileId = profileId,
+                    MediaItemId = entry.MediaItemId,
+                    IsPlayed = entry.IsPlayed,
+                    ResumePositionSeconds = entry.ResumePositionSeconds,
+                    LastPlayedAt = entry.LastPlayedAt ?? DateTime.UtcNow
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task BulkUpsertRatingsAsync(Guid profileId, IReadOnlyCollection<RatingUpsert> entries)
+    {
+        if (entries.Count == 0) return;
+
+        var targetIds = entries.Select(e => e.MediaItemId).Distinct().ToList();
+        var existing = await _context.UserMediaRatings
+            .Where(r => r.ProfileId == profileId && targetIds.Contains(r.MediaItemId))
+            .ToListAsync();
+        var byItem = existing.ToDictionary(r => r.MediaItemId);
+
+        foreach (var entry in entries)
+        {
+            if (byItem.TryGetValue(entry.MediaItemId, out var rating))
+            {
+                rating.Rating = entry.Rating;
+                if (entry.RatedAt.HasValue)
+                {
+                    rating.RatedAt = entry.RatedAt.Value;
+                }
+            }
+            else
+            {
+                _context.UserMediaRatings.Add(new UserMediaRating
+                {
+                    ProfileId = profileId,
+                    MediaItemId = entry.MediaItemId,
+                    Rating = entry.Rating,
+                    RatedAt = entry.RatedAt ?? DateTime.UtcNow
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
+}

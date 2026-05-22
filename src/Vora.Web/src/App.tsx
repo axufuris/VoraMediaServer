@@ -63,6 +63,7 @@ import AdminPodcastsPage from './pages/Admin/Podcasts/PodcastsAdminPage';
 import AdminMusicHistoryPage from './pages/Admin/MusicHistoryPage';
 import AdminLogsPage from './pages/Admin/LogsPage';
 import AdminBackupsPage from './pages/Admin/BackupsPage';
+import AdminLibraryMigrationPage from './pages/Admin/LibraryMigrationPage';
 import LiveTvPage from './pages/Client/LiveTv/LiveTvPage';
 import ClientSettingsPage from './pages/Client/SettingsPage';
 import DvrDashboard from './pages/Client/LiveTv/DvrDashboard'; // <-- NEW
@@ -226,6 +227,7 @@ export default function App() {
                         <Route path="client-templates" element={<AdminTemplateSchedulesPage />} />
                         <Route path="logs" element={<AdminLogsPage />} />
                         <Route path="backups" element={<AdminBackupsPage />} />
+                        <Route path="library-migration" element={<AdminLibraryMigrationPage />} />
 
                         <Route path="server/:serverId" element={<ServerContextWrapper />}>
                             <Route index element={<AdminDashboardPage />} />
@@ -258,6 +260,7 @@ export default function App() {
                             <Route path="client-templates" element={<AdminTemplateSchedulesPage />} />
                             <Route path="logs" element={<AdminLogsPage />} />
                             <Route path="backups" element={<AdminBackupsPage />} />
+                            <Route path="library-migration" element={<AdminLibraryMigrationPage />} />
                         </Route>
                     </Route>
 

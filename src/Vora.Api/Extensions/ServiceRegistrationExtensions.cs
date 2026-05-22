@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +18,7 @@ using Vora.Application.Email;
 using Vora.Application.FileSystem;
 using Vora.Application.Iptv;
 using Vora.Application.Libraries;
+using Vora.Application.LibraryMigration;
 using Vora.Application.Media;
 using Vora.Application.Media.SmartPlaylists;
 using Vora.Application.Metadata;
@@ -55,6 +56,7 @@ using Vora.Plugins.Providers.Itunes;
 using Vora.Plugins.Providers.LastFm;
 using Vora.Plugins.Providers.LrcLib;
 using Vora.Plugins.Providers.MusicBrainz;
+using Vora.Plugins.Providers.Plex;
 using Vora.Plugins.Providers.TheAudioDb;
 
 namespace Vora.Api.Extensions;
@@ -243,6 +245,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ISystemSettingsRepository, SystemSettingsRepository>();
         services.AddScoped<IUserMediaStateRepository, UserMediaStateRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<ILibraryMigrationRepository, LibraryMigrationRepository>();
         return services;
     }
 
@@ -263,6 +266,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IInvitationManager, InvitationManager>();
         services.AddScoped<IIptvManager, IptvManager>();
         services.AddScoped<ILibraryManager, LibraryManager>();
+        services.AddScoped<ILibraryMigrationManager, LibraryMigrationManager>();
+        services.AddSingleton<ILibraryMigrationJobRunner, LibraryMigrationJobRunner>();
         services.AddScoped<IMediaAnalyzerManager, MediaAnalyzerManager>();
         services.AddScoped<IMediaDedupeManager, MediaDedupeManager>();
         services.AddScoped<IMediaManager, MediaManager>();
@@ -399,6 +404,11 @@ public static class ServiceRegistrationExtensions
         {
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.Add("User-Agent", "Vora-Lyrics/1.0 (https://github.com/zenith/vora)");
+        });
+        services.AddHttpClient(PlexLibrarySyncProvider.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Library Migration)");
         });
         services.AddMemoryCache();
         return services;

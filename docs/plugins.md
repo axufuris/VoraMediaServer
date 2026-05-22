@@ -4,8 +4,11 @@ Plugins extend Vora at runtime with new providers — metadata sources, artwork 
 
 ## Layout
 
-- **`/src/plugins/Vora.Plugins.Abstractions/`** — the contracts every plugin implements. Only depends on `Vora.Domain` (for entities passed across the boundary). Plugins reference **this and only this** from the plugin system.
-- **`/src/plugins/<PluginName>/`** — individual plugin assemblies. Each builds into the folder the loader scans.
+- **`/src/Vora.Plugins/`** — single project containing:
+  - `Interfaces/` — provider contracts (`IVoraPlugin`, `IArtworkProvider`, `ICollectionSyncProvider`, `ILibrarySyncProvider`, …) and adapter interfaces (`IPluginSettingsProvider`, `IRequestServerLookup`).
+  - `Dtos/` — DTOs that cross the plugin boundary (`PluginSettingDefinitionDto`, `CollectionSyncItemDto`, `LibrarySyncPinDto`, …).
+  - `Providers/<Source>/` — built-in concrete providers (e.g. `Tmdb/`, `Trakt/`, `Plex/`). One folder per upstream source; a folder may contain multiple provider classes (e.g. `Radarr/RadarrRequestProvider.cs` + `Radarr/RadarrCalendarProvider.cs`).
+- **`<install>/Plugins/*.dll`** — external (third-party) plugin assemblies dropped in at runtime. The loader scans this folder recursively at startup. External plugins reference `Vora.Plugins` for the contracts and `Vora.Domain` only if entity shapes are required.
 
 ## Provider categories
 
@@ -44,11 +47,13 @@ User-facing docs and the full plugin/setting matrix live in the README's **Boots
 
 ## Writing a plugin
 
-A plugin project:
+**Built-in providers** live inside the `Vora.Plugins` project. To add one: drop a new file under `Providers/<Source>/<Whatever>Provider.cs`, implement `IVoraPlugin` plus the relevant provider interface, and the loader picks it up automatically on the next build.
 
-- References `Vora.Plugins.Abstractions` (and `Vora.Domain` only if entity shapes are required).
+**External (third-party) plugins** are separate assemblies dropped into `<install>/Plugins/`. An external plugin project:
+
+- References `Vora.Plugins` (and `Vora.Domain` only if entity shapes are required).
 - Implements one or more of the provider interfaces.
-- Builds to the folder the loader scans at runtime.
+- Builds to a `*.dll` placed under the `Plugins` folder the loader scans at runtime.
 
 Plugin settings (API keys, endpoints) come through `IPluginSettingsProvider`. The settings UI on the admin pages reads/writes via `pluginAdminService` on the frontend, which calls the corresponding backend endpoint. New settings fields are declared by the plugin and surfaced generically — you don't have to hand-build admin UI for them.
 

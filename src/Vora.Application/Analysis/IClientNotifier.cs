@@ -1,4 +1,5 @@
-﻿using Vora.Application.Logging.ViewModels;
+using Vora.Application.LibraryMigration.ViewModels;
+using Vora.Application.Logging.ViewModels;
 
 namespace Vora.Application.Analysis;
 
@@ -25,4 +26,5 @@ public interface IClientNotifier
     Task NotifyClientTemplateConfigurationChangedAsync();
     Task NotifyBackupCreatedAsync(string fileName);
     Task NotifyBackupRestoredAsync(string fileName, IReadOnlyList<string> restoredSectionKeys);
+    Task NotifyLibraryMigrationUpdatedAsync(LibraryMigrationJobVM job);
 }

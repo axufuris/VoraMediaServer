@@ -82,6 +82,7 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 | `vora_show_spotlight_<profileId>` | Per-profile toggle for the Home page spotlight hero. Default `true`. Setting this dispatches a `vora:home-prefs-changed` window event so `HomePage` re-reads it live. | `SettingsPage` (Templates tab) |
 | `playback_prefs_<profileId>_<deviceId>` | Per-profile/device bandwidth + max resolution + max audio channels JSON. Mirrored server-side via `profileDeviceSettingsService`. | `SettingsPage` (Playback tab) |
 | `iptv_prefs_<profileId>_<deviceId>` | Per-profile/device IPTV provider selection + timeshift prefs JSON. Mirrored server-side via `profileDeviceSettingsService`. | `SettingsPage` (Providers tab) |
+| `vora_library_migration_job_id` | Active library-migration job id. Lets the admin reload `/admin/library-migration` and re-attach to the running job. Cleared on "Run again" / "Start over" or when the backend returns 404 (job evicted on server restart). | `LibraryMigrationPage` |
 | Server vault keys | Managed by `utils/serverVault.ts` (`VAULT_KEY`, `ACTIVE_SERVER_KEY`) | `serverVault` |
 
 **`is_admin` is dead.** It is never written by any current code. If you find code reading `is_admin`, replace it with `is_server_admin`.
