@@ -22,6 +22,7 @@ public class UserProfileVM
     public bool CanRecordLiveTv { get; set; }
     public bool CanAddCustomPodcastFeeds { get; set; }
     public string? LastFmUsername { get; set; }
+    public string? ShowtimesLocation { get; set; }
 
     public static Expression<Func<UserProfile, UserProfileVM>> Projection =>
         p => new UserProfileVM
@@ -42,6 +43,7 @@ public class UserProfileVM
             CanRecordLiveTv = p.CanRecordLiveTv,
             CanAddCustomPodcastFeeds = p.CanAddCustomPodcastFeeds,
             LastFmUsername = p.LastFmUsername,
+            ShowtimesLocation = p.ShowtimesLocation,
             AccessSchedules = p.AccessSchedules.Select(s => new ProfileScheduleVM
             {
                 DayOfWeek = (int)s.DayOfWeek,

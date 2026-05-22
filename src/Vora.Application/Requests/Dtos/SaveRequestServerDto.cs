@@ -12,6 +12,7 @@ public class SaveRequestServerDto
     public string UrlBase { get; set; } = string.Empty;
     public bool IsDefault { get; set; }
     public bool Is4K { get; set; }
+    public bool ProvidesReleaseCalendar { get; set; }
     public string ProviderSettingsJson { get; set; } = "{}";
     public bool IsEnabled { get; set; }
 }

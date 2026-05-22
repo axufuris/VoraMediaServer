@@ -26,6 +26,8 @@ public class UserProfile
     public string? LastFmSessionKey { get; set; }
     public string? LastFmUsername { get; set; }
 
+    public string? ShowtimesLocation { get; set; }
+
     public string? ClientTemplateId { get; set; }
     public string? ScheduleOverrideTemplateId { get; set; }
     public Guid? ScheduleOverrideScheduleId { get; set; }

@@ -25,102 +25,88 @@ public class SonarrCalendarProvider : ICalendarProvider
         _scopeFactory = scopeFactory;
     }
 
-    public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions()
-    {
-        return new List<PluginSettingDefinitionDto>
-        {
-            new PluginSettingDefinitionDto
-            {
-                Key = "sonarr_url",
-                Label = "Sonarr URL",
-                Type = "text",
-                Description = "The base URL to your Sonarr instance (e.g., http://192.168.1.100:8989)"
-            },
-            new PluginSettingDefinitionDto
-            {
-                Key = "sonarr_api_key",
-                Label = "Sonarr API Key",
-                Type = "password",
-                Description = "Your Sonarr API key found in Settings > General"
-            }
-        };
-    }
+    public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() =>
+        new List<PluginSettingDefinitionDto>();
 
     public async Task<IEnumerable<CalendarEventDto>> GetEventsAsync(DateTime startDate, DateTime endDate)
     {
         using var scope = _scopeFactory.CreateScope();
-        var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
+        var lookup = scope.ServiceProvider.GetRequiredService<IRequestServerLookup>();
+        var servers = await lookup.GetCalendarServersAsync("sonarr_requester");
 
-        var url = await settings.GetSettingAsync(Id, "sonarr_url");
-        var apiKey = await settings.GetSettingAsync(Id, "sonarr_api_key");
+        if (servers.Count == 0) return new List<CalendarEventDto>();
 
-        if (string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(apiKey))
-            return new List<CalendarEventDto>();
-
-        url = url.TrimEnd('/');
         var startStr = startDate.ToString("yyyy-MM-dd");
         var endStr = endDate.ToString("yyyy-MM-dd");
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"{url}/api/v3/calendar?start={startStr}&end={endStr}&includeSeries=true");
-        request.Headers.Add("X-Api-Key", apiKey);
+        var combined = new List<CalendarEventDto>();
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
 
-        try
+        foreach (var server in servers)
         {
-            var response = await _httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode) return new List<CalendarEventDto>();
+            if (string.IsNullOrWhiteSpace(server.BaseUrl) || string.IsNullOrWhiteSpace(server.ApiKey)) continue;
 
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var doc = await JsonDocument.ParseAsync(stream);
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{server.BaseUrl.TrimEnd('/')}/api/v3/calendar?start={startStr}&end={endStr}&includeSeries=true");
+            request.Headers.Add("X-Api-Key", server.ApiKey);
 
-            var events = new List<CalendarEventDto>();
-
-            foreach (var episode in doc.RootElement.EnumerateArray())
+            try
             {
-                string showTitle = "Unknown Show";
-                string? tmdbId = null;
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode) continue;
 
-                if (episode.TryGetProperty("series", out var series) && series.ValueKind != JsonValueKind.Null)
+                using var stream = await response.Content.ReadAsStreamAsync();
+                using var doc = await JsonDocument.ParseAsync(stream);
+
+                foreach (var episode in doc.RootElement.EnumerateArray())
                 {
-                    showTitle = series.TryGetProperty("title", out var st) && st.ValueKind != JsonValueKind.Null ? st.GetString() ?? "Unknown Show" : "Unknown Show";
-                    tmdbId = series.TryGetProperty("tmdbId", out var tmdb) && tmdb.ValueKind == JsonValueKind.Number ? tmdb.GetInt32().ToString() : null;
-                }
+                    string showTitle = "Unknown Show";
+                    string? tmdbId = null;
 
-                var epTitle = episode.TryGetProperty("title", out var et) && et.ValueKind != JsonValueKind.Null ? et.GetString() ?? "TBA" : "TBA";
-                var seasonNumber = episode.TryGetProperty("seasonNumber", out var sn) && sn.ValueKind == JsonValueKind.Number ? sn.GetInt32() : 0;
-                var episodeNumber = episode.TryGetProperty("episodeNumber", out var en) && en.ValueKind == JsonValueKind.Number ? en.GetInt32() : 0;
-                var hasFile = episode.TryGetProperty("hasFile", out var hf) && hf.GetBoolean();
-                var id = episode.TryGetProperty("id", out var eid) && eid.ValueKind == JsonValueKind.Number ? eid.GetInt32().ToString() : Guid.NewGuid().ToString();
-
-                if (episode.TryGetProperty("airDateUtc", out var airDate) && airDate.ValueKind != JsonValueKind.Null)
-                {
-                    if (DateTime.TryParse(airDate.GetString(), out var parsedDate))
+                    if (episode.TryGetProperty("series", out var series) && series.ValueKind != JsonValueKind.Null)
                     {
-                        var utcDate = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
+                        showTitle = series.TryGetProperty("title", out var st) && st.ValueKind != JsonValueKind.Null ? st.GetString() ?? "Unknown Show" : "Unknown Show";
+                        tmdbId = series.TryGetProperty("tmdbId", out var tmdb) && tmdb.ValueKind == JsonValueKind.Number ? tmdb.GetInt32().ToString() : null;
+                    }
 
-                        events.Add(new CalendarEventDto
+                    var epTitle = episode.TryGetProperty("title", out var et) && et.ValueKind != JsonValueKind.Null ? et.GetString() ?? "TBA" : "TBA";
+                    var seasonNumber = episode.TryGetProperty("seasonNumber", out var sn) && sn.ValueKind == JsonValueKind.Number ? sn.GetInt32() : 0;
+                    var episodeNumber = episode.TryGetProperty("episodeNumber", out var en) && en.ValueKind == JsonValueKind.Number ? en.GetInt32() : 0;
+                    var hasFile = episode.TryGetProperty("hasFile", out var hf) && hf.GetBoolean();
+                    var id = episode.TryGetProperty("id", out var eid) && eid.ValueKind == JsonValueKind.Number ? eid.GetInt32().ToString() : Guid.NewGuid().ToString();
+
+                    if (episode.TryGetProperty("airDateUtc", out var airDate) && airDate.ValueKind != JsonValueKind.Null)
+                    {
+                        if (DateTime.TryParse(airDate.GetString(), out var parsedDate))
                         {
-                            Id = $"sonarr_{id}",
-                            ExternalId = tmdbId,
-                            ExternalProviderId = "tmdb_discovery",
-                            Title = showTitle,
-                            SubTitle = $"S{seasonNumber:D2}E{episodeNumber:D2} - {epTitle}",
-                            MediaType = "Episode",
-                            ReleaseDate = utcDate,
-                            AirTime = utcDate.TimeOfDay,
-                            ReleaseType = "TV Airing",
-                            ContentRating = "Unrated",
-                            IsInLibrary = hasFile,
-                            IsWatchlisted = false
-                        });
+                            var utcDate = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
+                            var dtoId = $"sonarr_{id}";
+                            if (seenIds.Add(dtoId))
+                            {
+                                combined.Add(new CalendarEventDto
+                                {
+                                    Id = dtoId,
+                                    ExternalId = tmdbId,
+                                    ExternalProviderId = "tmdb_discovery",
+                                    Title = showTitle,
+                                    SubTitle = $"S{seasonNumber:D2}E{episodeNumber:D2} - {epTitle}",
+                                    MediaType = "Episode",
+                                    ReleaseDate = utcDate,
+                                    AirTime = utcDate.TimeOfDay,
+                                    ReleaseType = "TV Airing",
+                                    ContentRating = "Unrated",
+                                    IsInLibrary = hasFile,
+                                    IsWatchlisted = false
+                                });
+                            }
+                        }
                     }
                 }
             }
+            catch
+            {
+            }
+        }
 
-            return events;
-        }
-        catch
-        {
-            return new List<CalendarEventDto>();
-        }
+        return combined;
     }
 }

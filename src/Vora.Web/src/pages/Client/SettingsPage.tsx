@@ -4,6 +4,7 @@ import { type IptvPlaylistVM, type IptvChannelVM } from '../../api/Iptv/iptvAdmi
 import { iptvClientService } from '../../api/Iptv/iptvClientService';
 import { serverVault } from '../../utils/serverVault';
 import { profileDeviceSettingsService } from '../../api/Users/profileDeviceSettingsService';
+import { profileService } from '../../api/Users/profileService';
 import { clientTemplateService, type TemplateMetaVM } from '../../api/System/clientTemplateService';
 import { useClientTemplate } from '../../theme/useClientTemplate';
 import { useDialog } from '../../dialogs';
@@ -605,7 +606,106 @@ function AccountTab({ serverId }: { serverId?: string }) {
                     <Link to="/profiles" className="vora-button-secondary cursor-pointer text-center">Switch profile</Link>
                 </div>
             </section>
+            <ShowtimesLocationSection serverId={serverId} />
         </div>
+    );
+}
+
+function ShowtimesLocationSection({ serverId }: { serverId?: string }) {
+    const dialog = useDialog();
+    const [value, setValue] = useState('');
+    const [originalValue, setOriginalValue] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const result = await profileService.getMyShowtimesLocation(serverId);
+                if (cancelled) return;
+                setValue(result.location ?? '');
+                setOriginalValue(result.location ?? '');
+            } catch (err) {
+                console.error('Failed to load showtimes location', err);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [serverId]);
+
+    const trimmed = value.trim();
+    const dirty = trimmed !== (originalValue ?? '').trim();
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const result = await profileService.saveMyShowtimesLocation(trimmed === '' ? null : trimmed, serverId);
+            setValue(result.location ?? '');
+            setOriginalValue(result.location ?? '');
+        } catch {
+            await dialog.alert('Could not save your showtimes location. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleClear = async () => {
+        setSaving(true);
+        try {
+            const result = await profileService.saveMyShowtimesLocation(null, serverId);
+            setValue(result.location ?? '');
+            setOriginalValue(result.location ?? '');
+        } catch {
+            await dialog.alert('Could not clear your showtimes location. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <section className="vora-card p-6">
+            <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Movie showtimes location</h2>
+            <p className="m-0 mb-4 text-sm" style={{ color: 'var(--vora-text-secondary)' }}>
+                Set a ZIP code or city to find theaters near you when browsing showtimes. Leave blank to use the server default set by your admin.
+            </p>
+            {loading ? (
+                <div className="vora-skeleton h-12" />
+            ) : (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <input
+                        type="text"
+                        value={value}
+                        onChange={e => setValue(e.target.value)}
+                        placeholder="e.g. 90210, or Austin TX"
+                        className="vora-input flex-1"
+                        maxLength={120}
+                    />
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={saving || !dirty}
+                            className="vora-button-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {saving ? 'Saving…' : 'Save'}
+                        </button>
+                        {originalValue && (
+                            <button
+                                type="button"
+                                onClick={handleClear}
+                                disabled={saving}
+                                className="vora-button-secondary cursor-pointer disabled:opacity-50"
+                                title="Clear and use the server default"
+                            >
+                                Clear
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+        </section>
     );
 }
 

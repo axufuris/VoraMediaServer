@@ -41,6 +41,9 @@ These are easy to overflow accidentally — note the limit when sending data fro
 | `ServerSetting.SmtpFromDisplayName` | display name in From header | 128 |
 | `ServerSetting.SmtpPasswordCiphertext` | DataProtection-encrypted SMTP password | `text` |
 | `ServerSetting.EmailPublicBaseUrl` | base URL for absolute links in emails | 512 |
+| `ServerSetting.BackupConfigurationJson` | JSON-serialized `BackupSettings` (cadence, retention, included section keys, last-run timestamp). See `docs/backups.md` | `text` |
+| `UserProfile.ShowtimesLocation` | per-profile ZIP/city used by the SerpApi theater plugin; null falls back to admin default | 120 |
+| `RequestServer.ProvidesReleaseCalendar` | when true, the Radarr/Sonarr calendar plugins read this server's URL+API key via `IRequestServerLookup` (see `docs/plugins.md`). Allows a single Arr instance to power both requests and the release calendar | (bool) |
 | `EmailTemplate.Key` | string-converted `EmailTemplateKey` enum, primary key | 64 |
 | `EmailTemplate.SubjectOverride` | admin-edited subject override | 256 |
 | `EmailTemplate.HtmlBodyOverride` / `TextBodyOverride` | admin-edited body overrides | `text` |

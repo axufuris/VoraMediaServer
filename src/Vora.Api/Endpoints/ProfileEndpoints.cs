@@ -1,8 +1,14 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Vora.Api.Extensions;
 using Vora.Application.Users;
 using Vora.Application.Users.ViewModels;
 
 namespace Vora.Api.Endpoints;
+
+public class ShowtimesLocationDto
+{
+    public string? Location { get; set; }
+}
 
 public class CreateProfileDto
 {
@@ -19,6 +25,7 @@ public class CreateProfileDto
     public bool HasAllIptvAccess { get; set; } = true;
     public List<Guid> AllowedIptvPlaylistIds { get; set; } = new();
     public bool CanAddCustomPodcastFeeds { get; set; } = true;
+    public string? ShowtimesLocation { get; set; }
 }
 
 public class UpdateProfileDto : CreateProfileDto
@@ -83,6 +90,15 @@ public static class ProfileEndpoints
 
         group.MapPut("/profiles/{profileId:guid}", UpdateProfileAsync);
         group.MapDelete("/profiles/{profileId:guid}", DeleteProfileAsync);
+
+        group.MapGet("/profiles/me/showtimes-location", GetMyShowtimesLocationAsync)
+            .Produces<ShowtimesLocationDto>(StatusCodes.Status200OK);
+        group.MapPut("/profiles/me/showtimes-location", SaveMyShowtimesLocationAsync)
+            .Produces<ShowtimesLocationDto>(StatusCodes.Status200OK);
+
+        group.MapPut("/profiles/{profileId:guid}/showtimes-location", AdminSetShowtimesLocationAsync)
+            .RequireAuthorization("AdminOnly")
+            .Produces<ShowtimesLocationDto>(StatusCodes.Status200OK);
     }
 
     private static void MapDevicePreferenceEndpoints(IEndpointRouteBuilder routes)
@@ -127,7 +143,8 @@ public static class ProfileEndpoints
             request.HasAllIptvAccess,
             request.AllowedIptvPlaylistIds,
             request.AccessSchedules,
-            request.CanAddCustomPodcastFeeds);
+            request.CanAddCustomPodcastFeeds,
+            request.ShowtimesLocation);
 
         return Results.Created($"/api/users/{userId}", new { ProfileId = profileId });
     }
@@ -154,7 +171,8 @@ public static class ProfileEndpoints
             request.HasAllIptvAccess,
             request.AllowedIptvPlaylistIds,
             request.AccessSchedules,
-            request.CanAddCustomPodcastFeeds);
+            request.CanAddCustomPodcastFeeds,
+            request.ShowtimesLocation);
         return Results.NoContent();
     }
 
@@ -162,6 +180,35 @@ public static class ProfileEndpoints
     {
         await manager.DeleteManagedProfileAsync(profileId);
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> GetMyShowtimesLocationAsync(HttpContext ctx, IUserManager manager)
+    {
+        var profileId = ctx.User.GetProfileId();
+        if (!profileId.HasValue) return Results.Unauthorized();
+        var location = await manager.GetShowtimesLocationAsync(profileId.Value);
+        return Results.Ok(new ShowtimesLocationDto { Location = location });
+    }
+
+    private static async Task<IResult> SaveMyShowtimesLocationAsync(HttpContext ctx, [FromBody] ShowtimesLocationDto body, IUserManager manager)
+    {
+        var profileId = ctx.User.GetProfileId();
+        if (!profileId.HasValue) return Results.Unauthorized();
+        await manager.SaveShowtimesLocationAsync(profileId.Value, body.Location);
+        return Results.Ok(new ShowtimesLocationDto { Location = string.IsNullOrWhiteSpace(body.Location) ? null : body.Location.Trim() });
+    }
+
+    private static async Task<IResult> AdminSetShowtimesLocationAsync(Guid profileId, [FromBody] ShowtimesLocationDto body, IUserManager manager)
+    {
+        try
+        {
+            await manager.SaveShowtimesLocationAsync(profileId, body.Location);
+            return Results.Ok(new ShowtimesLocationDto { Location = string.IsNullOrWhiteSpace(body.Location) ? null : body.Location.Trim() });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { Message = ex.Message });
+        }
     }
 
     private static async Task<IResult> GetNavPrefsAsync(Guid profileId, string deviceId, IUserManager manager)

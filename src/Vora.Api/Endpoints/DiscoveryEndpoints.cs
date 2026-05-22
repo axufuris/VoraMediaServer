@@ -2,6 +2,7 @@
 using Vora.Api.Extensions;
 using Vora.Application.Discovery;
 using Vora.Application.Requests;
+using Vora.Application.Users;
 using Vora.Domain.Entities.Discovery;
 using Vora.Plugins.Dtos;
 
@@ -120,16 +121,28 @@ public static class DiscoveryEndpoints
 
     private static async Task<IResult> GetShowtimesAsync(
         [FromQuery] string movieTitle,
-        [FromQuery] string location,
+        [FromQuery] string? location,
         [FromQuery] int? maxTheaters,
-        IDiscoveryManager manager)
+        HttpContext ctx,
+        IDiscoveryManager manager,
+        IUserManager userManager)
     {
         if (string.IsNullOrWhiteSpace(movieTitle))
         {
             return Results.BadRequest("Movie title is required");
         }
 
-        var showtimes = await manager.GetShowtimesAsync(movieTitle, location, DateTime.UtcNow, maxTheaters);
+        var effectiveLocation = location;
+        if (string.IsNullOrWhiteSpace(effectiveLocation))
+        {
+            var profileId = ctx.User.GetProfileId();
+            if (profileId.HasValue)
+            {
+                effectiveLocation = await userManager.GetShowtimesLocationAsync(profileId.Value);
+            }
+        }
+
+        var showtimes = await manager.GetShowtimesAsync(movieTitle, effectiveLocation ?? string.Empty, DateTime.UtcNow, maxTheaters);
         return Results.Ok(showtimes);
     }
 

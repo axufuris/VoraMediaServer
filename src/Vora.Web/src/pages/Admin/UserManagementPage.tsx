@@ -6,6 +6,7 @@ import { iptvAdminService, type IptvPlaylistVM } from '../../api/Iptv/iptvAdminS
 import UserAccessModal from '../../components/Admin/UserAccessModal';
 import { useDialog } from '../../dialogs';
 import { type UserVM, userService } from '../../api/Users/userService';
+import { profileService, type UserProfileVM } from '../../api/Users/profileService';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
 
@@ -19,6 +20,7 @@ export default function UserManagementPage() {
     const [loading, setLoading] = useState(true);
 
     const [editingUser, setEditingUser] = useState<UserVM | null>(null);
+    const [editingShowtimes, setEditingShowtimes] = useState<UserProfileVM | null>(null);
 
     const loadData = useCallback(async () => {
         try {
@@ -174,7 +176,25 @@ export default function UserManagementPage() {
                                                     )}
                                                 </div>
                                                 <span className="font-semibold text-[var(--vora-text-primary)] text-xs truncate w-full">{profile.name}</span>
-                                                {profile.hasPin && <span className="text-[9px] text-[var(--vora-text-muted)] mt-1 uppercase tracking-widest font-bold">PIN</span>}
+                                                <div className="flex items-center gap-1 mt-1 flex-wrap justify-center">
+                                                    {profile.hasPin && <span className="text-[9px] text-[var(--vora-text-muted)] uppercase tracking-widest font-bold">PIN</span>}
+                                                    {profile.showtimesLocation && (
+                                                        <span
+                                                            className="text-[9px] text-[var(--vora-accent-text)] uppercase tracking-widest font-bold truncate max-w-full"
+                                                            title={`Showtimes location: ${profile.showtimesLocation}`}
+                                                        >
+                                                            ⌖ {profile.showtimesLocation}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingShowtimes(profile)}
+                                                    title="Set movie showtimes location"
+                                                    className="mt-2 text-[10px] font-semibold px-2 py-0.5 rounded border border-[var(--vora-border-subtle)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:border-[var(--vora-accent-500)] cursor-pointer"
+                                                >
+                                                    Showtimes
+                                                </button>
                                             </div>
                                         ))
                                     )}
@@ -194,6 +214,93 @@ export default function UserManagementPage() {
                     onClose={() => setEditingUser(null)}
                 />
             )}
+
+            {editingShowtimes && (
+                <ShowtimesLocationModal
+                    profile={editingShowtimes}
+                    serverId={serverId}
+                    onClose={() => setEditingShowtimes(null)}
+                    onSaved={async () => { setEditingShowtimes(null); await loadData(); }}
+                />
+            )}
+        </div>
+    );
+}
+
+interface ShowtimesLocationModalProps {
+    profile: UserProfileVM;
+    serverId?: string;
+    onClose: () => void;
+    onSaved: () => void | Promise<void>;
+}
+
+function ShowtimesLocationModal({ profile, serverId, onClose, onSaved }: ShowtimesLocationModalProps) {
+    const dialog = useDialog();
+    const [value, setValue] = useState(profile.showtimesLocation || '');
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const trimmed = value.trim();
+            await profileService.adminSetShowtimesLocation(profile.id, trimmed === '' ? null : trimmed, serverId);
+            await onSaved();
+        } catch {
+            await dialog.alert('Failed to save showtimes location.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleClear = async () => {
+        setSaving(true);
+        try {
+            await profileService.adminSetShowtimesLocation(profile.id, null, serverId);
+            await onSaved();
+        } catch {
+            await dialog.alert('Failed to clear showtimes location.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-[var(--vora-radius-md)] max-w-md w-full">
+                <div className="p-5 border-b border-[var(--vora-border-subtle)]">
+                    <h2 className="text-base font-semibold text-[var(--vora-text-primary)]">Movie showtimes location</h2>
+                    <p className="text-xs text-[var(--vora-text-muted)] mt-1">
+                        Set the ZIP code or city used to look up movie theaters for <span className="font-semibold text-[var(--vora-text-secondary)]">{profile.name}</span>. Leave blank to fall back to the server default.
+                    </p>
+                </div>
+                <div className="p-5 space-y-3">
+                    <input
+                        type="text"
+                        value={value}
+                        onChange={e => setValue(e.target.value)}
+                        placeholder="e.g. 90210, or Austin TX"
+                        className="vora-input text-sm w-full"
+                        maxLength={120}
+                        autoFocus
+                    />
+                </div>
+                <div className="p-5 border-t border-[var(--vora-border-subtle)] flex items-center justify-between gap-2">
+                    <button
+                        type="button"
+                        onClick={handleClear}
+                        disabled={saving || !profile.showtimesLocation}
+                        className="text-xs font-semibold text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-text)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        Clear
+                    </button>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={onClose} disabled={saving} className="vora-button-secondary text-xs">Cancel</button>
+                        <button type="button" onClick={handleSave} disabled={saving} className="vora-button-primary text-xs">
+                            {saving ? 'Saving…' : 'Save'}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

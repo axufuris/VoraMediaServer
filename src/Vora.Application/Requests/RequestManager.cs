@@ -170,6 +170,7 @@ public class RequestManager : IRequestManager
             UrlBase = dto.UrlBase,
             IsDefault = dto.IsDefault,
             Is4K = dto.Is4K,
+            ProvidesReleaseCalendar = dto.ProvidesReleaseCalendar,
             ProviderSettingsJson = dto.ProviderSettingsJson,
             IsEnabled = dto.IsEnabled
         };
@@ -193,6 +194,7 @@ public class RequestManager : IRequestManager
             UrlBase = dto.UrlBase,
             IsDefault = dto.IsDefault,
             Is4K = dto.Is4K,
+            ProvidesReleaseCalendar = dto.ProvidesReleaseCalendar,
             ProviderSettingsJson = dto.ProviderSettingsJson,
             IsEnabled = dto.IsEnabled
         };

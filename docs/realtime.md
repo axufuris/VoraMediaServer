@@ -28,8 +28,15 @@ Events use PascalCase verbs in past tense matching backend method names: `Librar
 
 Most notifications go to `Clients.All`. Two patterns to be aware of:
 
-- **Admin-scoped events** target `Clients.Group("admins")` — connected admins are added to that group in `VoraHub.OnConnectedAsync` based on the `IsAdmin` claim. Used by `AdminAlert` and `AdminAlertUnreadChanged` so only admins receive notification toasts and badge updates.
+- **Admin-scoped events** target `Clients.Group("admins")` — connected admins are added to that group in `VoraHub.OnConnectedAsync` based on the `IsAdmin` claim. Used by `AdminAlert`, `AdminAlertUnreadChanged`, `LogEntryBatch`, `BackupCreated`, and `BackupRestored` so only admins receive these.
 - **`AdminThemeChanged`** goes to `Clients.All` (not the `admins` group) because `ThemeProvider` mounts at the app root and any authenticated session — admin or not — needs to re-apply CSS variables when the server theme changes. The payload is the new theme id (string).
+
+## Coalesced admin streams
+
+Some admin-only events would be too chatty if sent per-occurrence:
+
+- **`LogEntryBatch`** — server log entries. `LogBroadcastHostedService` (`Vora.Application/Logging/`) windows entries into ~150 ms / 200-entry batches and pushes the batch as one payload. The admin Logs page consumes this via `useSignalREvent<LogEntryVM[]>('LogEntryBatch', ...)`. See `docs/logs.md`.
+- **`BackupCreated` / `BackupRestored`** — fired once per operation by `BackupManager`. Payloads: a file name (string) and `{ fileName, sectionKeys: string[] }` respectively. The admin Backups page subscribes to refresh the list and invalidate caches. See `docs/backups.md`.
 
 ## Frontend client
 

@@ -51,6 +51,7 @@ export default function RequestServersTab({ serverId, showModal }: RequestServer
             isDefault: true,
             is4K: false,
             isEnabled: true,
+            providesReleaseCalendar: false,
             providerSettingsJson: '{}',
         });
         setDynamicSettings({ minimumAvailability: 'announced', searchOnAdd: true });
@@ -195,9 +196,11 @@ export default function RequestServersTab({ serverId, showModal }: RequestServer
                                 title={server.name}
                                 subtitle={`${server.useSsl ? 'https://' : 'http://'}${server.hostname}:${server.port}`}
                                 badge={
-                                    <div className="flex gap-1.5">
+                                    <div className="flex gap-1.5 flex-wrap justify-end">
                                         <HealthBadge tone="neutral" showDot={false}>{server.mediaType}</HealthBadge>
                                         {server.isDefault && <HealthBadge tone="info" showDot={false}>Default</HealthBadge>}
+                                        {server.is4K && <HealthBadge tone="warn" showDot={false}>4K</HealthBadge>}
+                                        {server.providesReleaseCalendar && <HealthBadge tone="info" showDot={false}>Calendar</HealthBadge>}
                                         <HealthBadge tone={server.isEnabled ? 'ok' : 'error'}>{server.isEnabled ? 'On' : 'Off'}</HealthBadge>
                                     </div>
                                 }
@@ -356,6 +359,18 @@ export default function RequestServersTab({ serverId, showModal }: RequestServer
                                     className="w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer"
                                 />
                                 <span className="text-sm text-[var(--vora-text-primary)]">4K server</span>
+                            </label>
+                            <label className="flex items-center gap-3 cursor-pointer group select-none col-span-2">
+                                <input
+                                    type="checkbox"
+                                    checked={editingRequestServer.providesReleaseCalendar}
+                                    onChange={e => setEditingRequestServer({ ...editingRequestServer, providesReleaseCalendar: e.target.checked })}
+                                    className="w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer mt-0.5"
+                                />
+                                <span className="min-w-0">
+                                    <span className="block text-sm text-[var(--vora-text-primary)]">Use for Release Calendar</span>
+                                    <span className="block text-xs text-[var(--vora-text-muted)]">When on, the Release Calendar pulls upcoming releases from this server. You can leave “Enable server connection” off if you only want this server for calendar data.</span>
+                                </span>
                             </label>
                         </div>
 

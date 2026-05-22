@@ -12,6 +12,7 @@ export interface RequestServerVM {
     urlBase: string;
     isDefault: boolean;
     is4K: boolean;
+    providesReleaseCalendar: boolean;
     providerSettingsJson: string;
     isEnabled: boolean;
 }

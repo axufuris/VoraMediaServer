@@ -32,6 +32,16 @@ When adding a **new** provider interface:
 
 `Vora.Api/Extensions/PluginSettingsAdapter.cs` adapts the application-layer `ISystemSettingsRepository` to the plugin-facing `IPluginSettingsProvider`, so plugins can read/write their own settings without knowing about EF Core.
 
+`Vora.Application/Requests/RequestServerLookupAdapter.cs` implements `IRequestServerLookup` (declared in `Vora.Plugins.Interfaces`). Plugins that need to consume credentials owned by a different aggregate — most prominently the Radarr/Sonarr calendar providers — resolve `IRequestServerLookup` and ask for "calendar servers" by request-provider id (e.g. `radarr_requester`). This is how the calendar plugins share credentials with the Request Servers admin page; see the section on the `ProvidesReleaseCalendar` flag in `docs/database.md`.
+
+## Seeding plugin settings from environment variables
+
+`Vora.Application/Plugins/PluginSettingsEnvSeeder.cs` runs as a startup task (after database migrations, before workers). It reads `Vora:PluginSettings:<pluginId>:<settingKey>` from `IConfiguration` — env var form `Vora__PluginSettings__<pluginId>__<settingKey>` — and writes values into the database **only when the row is empty**. Once a value lives in the database, the seeder leaves it alone so admin-UI edits survive container restarts.
+
+The seeder validates that `<pluginId>` matches a registered `IVoraPlugin.Id` and that `<settingKey>` exists in that plugin's `GetSettingDefinitions()` (or is the special `is_enabled` toggle). Anything else is skipped with a `WARN` log. Values are redacted from logs — only key names appear, so seeded API keys never end up in the in-app log viewer or the file sink.
+
+User-facing docs and the full plugin/setting matrix live in the README's **Bootstrapping plugin API keys from environment variables** section.
+
 ## Writing a plugin
 
 A plugin project:

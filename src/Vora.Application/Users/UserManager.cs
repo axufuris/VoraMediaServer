@@ -12,9 +12,9 @@ public interface IUserManager
     Task<List<UserVM>> GetAllUsersAsync();
     Task<UserVM?> GetUserAccountAsync(Guid userId);
     Task<bool> ValidateProfilePinAsync(Guid profileId, string pin);
-    Task<Guid> CreateManagedProfileAsync(Guid primaryUserId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds);
+    Task<Guid> CreateManagedProfileAsync(Guid primaryUserId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, string? showtimesLocation);
     Task UpdateUserAccountAsync(Guid userId, string email, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null);
-    Task UpdateManagedProfileAsync(Guid profileId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds);
+    Task UpdateManagedProfileAsync(Guid profileId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, string? showtimesLocation);
     Task DeleteManagedProfileAsync(Guid profileId);
     Task UpdateUserAccessAsync(Guid userId, bool hasAllLibraryAccess, List<Guid> allowedLibraries, bool canRequest, bool autoApprove, bool enableAiRecommendations, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, bool canRecordLiveTv, long dvrStorageQuotaBytes, bool canTimeshiftIptv, bool canAddCustomPodcastFeeds);
     Task<(List<UserProfileHistoryDto> Data, int Total)> GetUserPlayHistoryAsync(Guid userId, Guid? profileId, int page, int pageSize, string search, string typeFilter);
@@ -30,6 +30,9 @@ public interface IUserManager
     Task<string?> GetProfileDeviceIptvPrefsAsync(Guid profileId, string deviceId);
     Task<string?> GetProfileDeviceRadioPrefsAsync(Guid profileId, string deviceId);
     Task SaveProfileDeviceRadioPrefsAsync(Guid profileId, string deviceId, string radioPrefsJson);
+
+    Task<string?> GetShowtimesLocationAsync(Guid profileId);
+    Task SaveShowtimesLocationAsync(Guid profileId, string? location);
 }
 
 public class UserManager(
@@ -68,7 +71,8 @@ public class UserManager(
         bool hasAllIptvAccess,
         List<Guid> allowedIptvPlaylists,
         List<ProfileScheduleVM> schedules,
-        bool canAddCustomPodcastFeeds)
+        bool canAddCustomPodcastFeeds,
+        string? showtimesLocation)
     {
         var profile = new UserProfile
         {
@@ -83,7 +87,8 @@ public class UserManager(
             AllowedLibraryIds = allowedLibraries ?? new List<Guid>(),
             HasAllIptvAccess = hasAllIptvAccess,
             AllowedIptvPlaylistIds = allowedIptvPlaylists ?? new List<Guid>(),
-            CanAddCustomPodcastFeeds = canAddCustomPodcastFeeds
+            CanAddCustomPodcastFeeds = canAddCustomPodcastFeeds,
+            ShowtimesLocation = string.IsNullOrWhiteSpace(showtimesLocation) ? null : showtimesLocation.Trim()
         };
 
         if (!string.IsNullOrWhiteSpace(pin))
@@ -150,7 +155,8 @@ public class UserManager(
         bool hasAllIptvAccess,
         List<Guid> allowedIptvPlaylists,
         List<ProfileScheduleVM> schedules,
-        bool canAddCustomPodcastFeeds)
+        bool canAddCustomPodcastFeeds,
+        string? showtimesLocation)
     {
         var profile = await repository.GetProfileByIdAsync(profileId)
             ?? throw new InvalidOperationException("Profile not found.");
@@ -160,7 +166,7 @@ public class UserManager(
             imageService.DeleteImage(profile.ProfileImageUrl);
         }
 
-        ApplyProfileUpdates(profile, name, imageUrl, pin, allowedMovieRatings, allowedTvRatings, allowedMusicRatings, hasAllLibraryAccess, blockUnrated, allowedLibraries, hasAllIptvAccess, allowedIptvPlaylists, canAddCustomPodcastFeeds);
+        ApplyProfileUpdates(profile, name, imageUrl, pin, allowedMovieRatings, allowedTvRatings, allowedMusicRatings, hasAllLibraryAccess, blockUnrated, allowedLibraries, hasAllIptvAccess, allowedIptvPlaylists, canAddCustomPodcastFeeds, showtimesLocation);
 
         try
         {
@@ -296,7 +302,8 @@ public class UserManager(
         List<Guid> allowedLibraries,
         bool hasAllIptvAccess,
         List<Guid> allowedIptvPlaylists,
-        bool canAddCustomPodcastFeeds)
+        bool canAddCustomPodcastFeeds,
+        string? showtimesLocation)
     {
         profile.Name = name;
         profile.ProfileImageUrl = imageUrl;
@@ -309,11 +316,26 @@ public class UserManager(
         profile.HasAllIptvAccess = hasAllIptvAccess;
         profile.AllowedIptvPlaylistIds = allowedIptvPlaylists ?? new List<Guid>();
         profile.CanAddCustomPodcastFeeds = canAddCustomPodcastFeeds;
+        profile.ShowtimesLocation = string.IsNullOrWhiteSpace(showtimesLocation) ? null : showtimesLocation.Trim();
 
         if (pin != null)
         {
             profile.PinHash = string.IsNullOrWhiteSpace(pin) ? null : HashPin(pin);
         }
+    }
+
+    public async Task<string?> GetShowtimesLocationAsync(Guid profileId)
+    {
+        var profile = await repository.GetProfileByIdAsync(profileId);
+        return profile?.ShowtimesLocation;
+    }
+
+    public async Task SaveShowtimesLocationAsync(Guid profileId, string? location)
+    {
+        var profile = await repository.GetProfileByIdAsync(profileId)
+            ?? throw new InvalidOperationException("Profile not found.");
+        profile.ShowtimesLocation = string.IsNullOrWhiteSpace(location) ? null : location.Trim();
+        await repository.UpdateProfileAsync(profile);
     }
 
     private static IEnumerable<ProfileAccessSchedule> BuildScheduleEntities(Guid profileId, IEnumerable<ProfileScheduleVM> schedules)

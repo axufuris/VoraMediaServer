@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import FeatureToggle from '../../../components/Admin/Features/FeatureToggle';
 import FeaturePluginList from '../../../components/Admin/Features/FeaturePluginList';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
@@ -7,6 +7,7 @@ import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 export default function ReleaseCalendarPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const pluginTypes = useMemo(() => ['Calendar'], []);
+    const settingsHref = serverId ? `/admin/server/${serverId}/settings` : '/admin/settings';
 
     return (
         <div data-vora-page="">
@@ -23,9 +24,18 @@ export default function ReleaseCalendarPage() {
                     serverId={serverId}
                 />
 
+                <div className="vora-card p-4 mb-4 text-sm text-[var(--vora-text-secondary)] bg-[var(--vora-info-soft)]/30 border border-[var(--vora-info-500)]/30">
+                    <div className="font-semibold text-[var(--vora-text-primary)] mb-1">Radarr &amp; Sonarr credentials moved</div>
+                    The Radarr and Sonarr calendar providers now read directly from the request servers you configure in
+                    {' '}
+                    <Link to={settingsHref} className="text-[var(--vora-accent-text)] hover:underline">System Settings → Request Servers</Link>.
+                    {' '}
+                    Tick <span className="font-semibold">Use for Release Calendar</span> on any Radarr or Sonarr instance you want this page to pull from. You can use the same instance for requests and calendar, or set up a calendar-only server with requests disabled.
+                </div>
+
                 <section>
                     <p className="text-sm text-[var(--vora-text-muted)] mb-4">
-                        Calendar plugins supply upcoming releases. Configure API keys and per-source preferences below.
+                        Toggle which calendar sources are active. Source-specific credentials are managed where the source lives.
                     </p>
                     <FeaturePluginList
                         serverId={serverId}

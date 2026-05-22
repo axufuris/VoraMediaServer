@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { libraryService, type LibrarySummary } from '../../../api/Media/libraryService';
 import { collectionService, type CollectionSummary } from '../../../api/Collections/collectionService';
@@ -22,6 +22,21 @@ export default function CollectionsPage() {
     useEffect(() => {
         libraryService.getLibraries(serverId).then(setLibraries).catch(console.error);
     }, [serverId]);
+
+    const sortedLibraries = useMemo(() => {
+        const rank = (type: string): number => {
+            const t = (type || '').toLowerCase();
+            if (t === 'movie' || t === 'homevideo') return 0;
+            if (t === 'tvshow' || t === 'show' || t === 'tv') return 1;
+            if (t === 'music' || t === 'audio') return 2;
+            return 3;
+        };
+        return [...libraries].sort((a, b) => {
+            const diff = rank(a.type) - rank(b.type);
+            if (diff !== 0) return diff;
+            return a.name.localeCompare(b.name);
+        });
+    }, [libraries]);
 
     const fetchCollections = useCallback(async () => {
         try {
@@ -88,7 +103,7 @@ export default function CollectionsPage() {
                         Global
                         {activeTab === 'global' && <span className="absolute -bottom-px left-0 right-0 h-0.5 rounded-full" style={{ background: 'var(--vora-accent-500)' }} />}
                     </button>
-                    {libraries.map(lib => {
+                    {sortedLibraries.map(lib => {
                         const isActive = activeTab === lib.id;
                         return (
                             <button

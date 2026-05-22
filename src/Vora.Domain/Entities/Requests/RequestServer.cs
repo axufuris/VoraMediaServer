@@ -17,6 +17,7 @@ public class RequestServer
     public bool IsDefault { get; set; }
     public bool Is4K { get; set; }
     public bool IsEnabled { get; set; } = true;
+    public bool ProvidesReleaseCalendar { get; set; }
 
     public string ProviderSettingsJson { get; set; } = "{}";
 }

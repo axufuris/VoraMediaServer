@@ -16,6 +16,7 @@ public class RequestServerVM
     public string UrlBase { get; set; } = string.Empty;
     public bool IsDefault { get; set; }
     public bool Is4K { get; set; }
+    public bool ProvidesReleaseCalendar { get; set; }
     public string ProviderSettingsJson { get; set; } = "{}";
     public bool IsEnabled { get; set; } = true;
 
@@ -33,6 +34,7 @@ public class RequestServerVM
             UrlBase = s.UrlBase,
             IsDefault = s.IsDefault,
             Is4K = s.Is4K,
+            ProvidesReleaseCalendar = s.ProvidesReleaseCalendar,
             ProviderSettingsJson = s.ProviderSettingsJson,
             IsEnabled = s.IsEnabled
         };
@@ -50,6 +52,7 @@ public class RequestServerVM
         UrlBase = s.UrlBase,
         IsDefault = s.IsDefault,
         Is4K = s.Is4K,
+        ProvidesReleaseCalendar = s.ProvidesReleaseCalendar,
         ProviderSettingsJson = s.ProviderSettingsJson,
         IsEnabled = s.IsEnabled
     };

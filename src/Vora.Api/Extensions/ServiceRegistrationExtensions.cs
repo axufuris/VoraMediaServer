@@ -274,6 +274,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ISmartPlaylistManager, SmartPlaylistManager>();
         services.AddScoped<IPodcastManager, PodcastManager>();
         services.AddScoped<IPluginManager, PluginManager>();
+        services.AddScoped<IPluginSettingsEnvSeeder, PluginSettingsEnvSeeder>();
         services.AddScoped<IPosterOverlayManager, PosterOverlayManager>();
         services.AddScoped<IProviderConnectionManager, ProviderConnectionManager>();
         services.AddScoped<IRecommendationManager, RecommendationManager>();
@@ -440,6 +441,7 @@ public static class ServiceRegistrationExtensions
             : Path.Combine(AppContext.BaseDirectory, "Plugins");
         services.AddVoraPlugins(pluginsPath);
         services.AddScoped<IPluginSettingsProvider, PluginSettingsAdapter>();
+        services.AddScoped<Vora.Plugins.Interfaces.IRequestServerLookup, Vora.Application.Requests.RequestServerLookupAdapter>();
         return services;
     }
 

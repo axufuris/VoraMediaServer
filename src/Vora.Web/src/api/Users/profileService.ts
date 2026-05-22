@@ -24,28 +24,35 @@ export interface UserProfileVM {
     canRecordLiveTv: boolean;
     canAddCustomPodcastFeeds: boolean;
     lastFmUsername?: string;
+    showtimesLocation?: string | null;
+}
+
+export interface ShowtimesLocationDto {
+    location?: string | null;
 }
 
 export const profileService = {
-    createProfile: async (userId: string, name: string, profileImageUrl?: string, pin?: string, allowedMovieRatings: string[] = [], allowedTvRatings: string[] = [], allowedMusicRatings: string[] = [], hasAllLibraryAccess = true, blockUnrated = false, allowedLibs: string[] = [], hasAllIptv = true, allowedIptv: string[] = [], schedules: ProfileScheduleVM[] = [], canRecordLiveTv = false, canAddCustomPodcastFeeds = true, serverId?: string): Promise<void> => {
+    createProfile: async (userId: string, name: string, profileImageUrl?: string, pin?: string, allowedMovieRatings: string[] = [], allowedTvRatings: string[] = [], allowedMusicRatings: string[] = [], hasAllLibraryAccess = true, blockUnrated = false, allowedLibs: string[] = [], hasAllIptv = true, allowedIptv: string[] = [], schedules: ProfileScheduleVM[] = [], canRecordLiveTv = false, canAddCustomPodcastFeeds = true, serverId?: string, showtimesLocation: string | null = null): Promise<void> => {
         await apiClient.post(`/users/${userId}/profiles`, {
             name, profileImageUrl, pin,
             allowedMovieRatings, allowedTvRatings, allowedMusicRatings,
             hasAllLibraryAccess,
             blockUnratedContent: blockUnrated, allowedLibraryIds: allowedLibs,
             hasAllIptvAccess: hasAllIptv, allowedIptvPlaylistIds: allowedIptv,
-            accessSchedules: schedules, canRecordLiveTv, canAddCustomPodcastFeeds
+            accessSchedules: schedules, canRecordLiveTv, canAddCustomPodcastFeeds,
+            showtimesLocation
         }, { serverId });
     },
 
-    updateProfile: async (profileId: string, name: string, profileImageUrl?: string, pin?: string | null, allowedMovieRatings: string[] = [], allowedTvRatings: string[] = [], allowedMusicRatings: string[] = [], hasAllLibraryAccess = true, blockUnrated = false, allowedLibs: string[] = [], hasAllIptv = true, allowedIptv: string[] = [], schedules: ProfileScheduleVM[] = [], canRecordLiveTv = false, canAddCustomPodcastFeeds = true, serverId?: string): Promise<void> => {
+    updateProfile: async (profileId: string, name: string, profileImageUrl?: string, pin?: string | null, allowedMovieRatings: string[] = [], allowedTvRatings: string[] = [], allowedMusicRatings: string[] = [], hasAllLibraryAccess = true, blockUnrated = false, allowedLibs: string[] = [], hasAllIptv = true, allowedIptv: string[] = [], schedules: ProfileScheduleVM[] = [], canRecordLiveTv = false, canAddCustomPodcastFeeds = true, serverId?: string, showtimesLocation: string | null = null): Promise<void> => {
         await apiClient.put(`/users/profiles/${profileId}`, {
             name, profileImageUrl, pin,
             allowedMovieRatings, allowedTvRatings, allowedMusicRatings,
             hasAllLibraryAccess,
             blockUnratedContent: blockUnrated, allowedLibraryIds: allowedLibs,
             hasAllIptvAccess: hasAllIptv, allowedIptvPlaylistIds: allowedIptv,
-            accessSchedules: schedules, canRecordLiveTv, canAddCustomPodcastFeeds
+            accessSchedules: schedules, canRecordLiveTv, canAddCustomPodcastFeeds,
+            showtimesLocation
         }, { serverId });
     },
 
@@ -65,5 +72,28 @@ export const profileService = {
     validatePinWithToken: async (baseUrl: string, token: string, profileId: string, pin: string): Promise<void> => {
         const client = createDirectClient(baseUrl, token);
         await client.post(`/users/profiles/${profileId}/validate-pin`, { pin });
+    },
+
+    getMyShowtimesLocation: async (serverId?: string): Promise<ShowtimesLocationDto> => {
+        const response = await apiClient.get<ShowtimesLocationDto>('/users/profiles/me/showtimes-location', { serverId });
+        return response.data;
+    },
+
+    saveMyShowtimesLocation: async (location: string | null, serverId?: string): Promise<ShowtimesLocationDto> => {
+        const response = await apiClient.put<ShowtimesLocationDto, ShowtimesLocationDto>(
+            '/users/profiles/me/showtimes-location',
+            { location },
+            { serverId }
+        );
+        return response.data;
+    },
+
+    adminSetShowtimesLocation: async (profileId: string, location: string | null, serverId?: string): Promise<ShowtimesLocationDto> => {
+        const response = await apiClient.put<ShowtimesLocationDto, ShowtimesLocationDto>(
+            `/users/profiles/${profileId}/showtimes-location`,
+            { location },
+            { serverId }
+        );
+        return response.data;
     }
 };

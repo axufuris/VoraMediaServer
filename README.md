@@ -282,6 +282,168 @@ Postgres data directory persist across upgrades. If a migration fails,
 the container exits without serving traffic — check the logs, fix the
 issue, and restart.
 
+## Bootstrapping plugin API keys from environment variables
+
+You can supply plugin API keys (and any other plugin setting) as
+environment variables in your `docker run` / `docker-compose.yml`.
+On startup Vora reads them, validates that the plugin and setting key
+both exist, and writes the value into the database — but **only when
+the row is empty**. Once a value lives in the database, the seeder
+leaves it alone so changes you make later through the admin UI are
+preserved across container restarts.
+
+### Format
+
+```
+Vora__PluginSettings__<pluginId>__<settingKey>=<value>
+```
+
+The double underscores are the standard .NET configuration separator;
+they map to the `Vora:PluginSettings:<pluginId>:<settingKey>` config
+path inside the app. The `<pluginId>` matches the plugin's internal
+id (see the table below), and `<settingKey>` is one of the setting
+keys that plugin defines.
+
+Every plugin also responds to a special `is_enabled` key, so you can
+enable or disable a plugin from compose:
+
+```
+Vora__PluginSettings__openai_recommendations__is_enabled=true
+```
+
+### What gets seeded, what doesn't
+
+The seeder runs once per container start, after database migrations
+and before workers come up. For each environment variable it sees, it:
+
+1. **Verifies the plugin exists.** If `<pluginId>` doesn't match an
+   installed plugin, the variable is skipped with a warning in the
+   logs:
+   `WARN  Plugin settings environment variable references plugin 'foo', but no plugin with that id is installed — skipping.`
+2. **Verifies the setting key exists.** If `<settingKey>` isn't a
+   recognized setting for that plugin (and isn't `is_enabled`), it's
+   skipped with:
+   `WARN  Plugin 'tmdb_metadata' has no setting named 'bogus_key' — skipping seed value.`
+3. **Checks the database.** If the setting already has a non-empty
+   value in the database, the env var is ignored — admin UI edits win.
+   The seed only fires when the row is missing or blank.
+4. **Redacts values in logs.** The seeder logs which keys it wrote
+   (`fanart_artwork.api_key`, `tmdb_metadata.api_key`, …) but never
+   the values themselves, so API keys never end up in your log files
+   or the in-app log viewer.
+
+### Plugins and their settings
+
+The table below lists every plugin shipped with Vora and the settings
+it accepts. Every plugin also supports `is_enabled` (`true` / `false`)
+in addition to the keys shown.
+
+| Plugin id | Plugin name | Settings |
+| --- | --- | --- |
+| `tmdb_metadata` | The Movie Database (TMDB) | `api_key` |
+| `tmdb_discovery` | TMDB Discovery Engine | `discovery_region`, `discovery_language` |
+| `tmdb_artwork` | TMDB Artwork | — |
+| `tvdb_metadata` | The TV Database (TVDB) | `api_key` |
+| `tvdb_artwork` | TVDB Artwork | — |
+| `omdb_imdb` | OMDb — IMDb Ratings | `api_key` |
+| `fanart_artwork` | Fanart.tv Artwork | `api_key` |
+| `fanart_music_artwork` | Fanart.tv Music Artwork | — |
+| `mediux_artwork` | MediUX Artwork | `api_key` |
+| `theaudiodb_artwork` | TheAudioDB Artwork | `api_key` |
+| `musicbrainz_artwork` | MusicBrainz Artwork | — |
+| `mal_artwork` | MyAnimeList Artwork | `client_id` |
+| `mal_discovery` | MyAnimeList Discovery Engine | — |
+| `lastfm_listening` | Last.fm Scrobbling | `api_key`, `api_secret` |
+| `genius_lyrics` | Genius Lyrics | `access_token` |
+| `lrclib_lyrics` | LRClib Lyrics | — |
+| `serpapi_theater` | SerpApi Google Showtimes | `api_key`, `default_location`, `max_theaters`, `auto_showtimes` |
+| `radarr_calendar` | Radarr Calendar | — *(reads from Request Servers tagged "Use for Release Calendar")* |
+| `radarr_requester` | Radarr | — *(uses Request Servers admin page)* |
+| `sonarr_calendar` | Sonarr Calendar | — *(reads from Request Servers tagged "Use for Release Calendar")* |
+| `sonarr_requester` | Sonarr | — *(uses Request Servers admin page)* |
+| `trakt_collection_sync` | Trakt.tv Lists | `client_id` |
+| `trakt_chronology` | Trakt.tv Community Lists | — |
+| `mdblist_collection_sync` | MDbList.com | `api_key` |
+| `mdblist_chronology` | MDbList.com Timelines | — |
+| `imdb_collection_sync` | IMDb Public Lists | — |
+| `imdb_chronology` | IMDB Community Lists | — |
+| `itunes_podcast_discovery` | iTunes Podcast Discovery | — |
+| `openai_recommendations` | OpenAI Smart Recommendations | `api_key`, `chat_model`, `schedule_time` |
+| `local_imagesharp_overlays` | Vora Native Overlays | `enable_schedule`, `schedule_time` |
+| `local_metadata` | Local Assets (NFO & Images) | — |
+| `local_artwork` | Local Assets Artwork | — |
+| `local_recommendations` | Vora Local Recommendations | — |
+| `local_calendar` | Vora Local Calendar | — |
+| `Vora_scanner` | Vora Standard Scanner | — |
+| `polling_watcher` | Polling Watcher | — |
+| `native_watcher` | Native OS Watcher | — |
+
+### Full docker-compose example
+
+A realistic environment block prefilling the common third-party
+provider keys:
+
+```yaml
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=vora;Username=vora;Password=change-me"
+      Jwt__SecretKey: "REPLACE_WITH_A_LONG_RANDOM_STRING"
+
+      # Storage
+      StoragePaths__CustomArtwork: /app/data/custom_artwork
+      StoragePaths__OriginalArtworkCache: /app/data/original_artwork_cache
+      StoragePaths__EpgCache: /app/data/iptv/epg_cache
+      StoragePaths__IptvDvr: /app/data/iptv/dvr
+      StoragePaths__UserImages: /app/data/users
+      StoragePaths__Plugins: /app/data/plugins
+
+      # Metadata + artwork
+      Vora__PluginSettings__tmdb_metadata__api_key: "YOUR_TMDB_API_KEY"
+      Vora__PluginSettings__tvdb_metadata__api_key: "YOUR_TVDB_API_KEY"
+      Vora__PluginSettings__omdb_imdb__api_key: "YOUR_OMDB_API_KEY"
+      Vora__PluginSettings__fanart_artwork__api_key: "YOUR_FANART_KEY"
+      Vora__PluginSettings__mediux_artwork__api_key: "YOUR_MEDIUX_KEY"
+      Vora__PluginSettings__theaudiodb_artwork__api_key: "YOUR_AUDIODB_KEY"
+      Vora__PluginSettings__mal_artwork__client_id: "YOUR_MAL_CLIENT_ID"
+
+      # Discovery tuning
+      Vora__PluginSettings__tmdb_discovery__discovery_region: "US"
+      Vora__PluginSettings__tmdb_discovery__discovery_language: "en-US"
+
+      # Lyrics + scrobbling
+      Vora__PluginSettings__lastfm_listening__api_key: "YOUR_LASTFM_KEY"
+      Vora__PluginSettings__lastfm_listening__api_secret: "YOUR_LASTFM_SECRET"
+      Vora__PluginSettings__genius_lyrics__access_token: "YOUR_GENIUS_TOKEN"
+
+      # Movie showtimes
+      Vora__PluginSettings__serpapi_theater__api_key: "YOUR_SERPAPI_KEY"
+      Vora__PluginSettings__serpapi_theater__default_location: "90210"
+      Vora__PluginSettings__serpapi_theater__max_theaters: "10"
+      Vora__PluginSettings__serpapi_theater__auto_showtimes: "true"
+
+      # Trakt / MDbList list sync
+      Vora__PluginSettings__trakt_collection_sync__client_id: "YOUR_TRAKT_CLIENT_ID"
+      Vora__PluginSettings__mdblist_collection_sync__api_key: "YOUR_MDBLIST_KEY"
+
+      # OpenAI smart recommendations (opt-in)
+      Vora__PluginSettings__openai_recommendations__is_enabled: "true"
+      Vora__PluginSettings__openai_recommendations__api_key: "YOUR_OPENAI_KEY"
+      Vora__PluginSettings__openai_recommendations__chat_model: "gpt-4o-mini"
+      Vora__PluginSettings__openai_recommendations__schedule_time: "02:00"
+
+      # Local poster overlays
+      Vora__PluginSettings__local_imagesharp_overlays__enable_schedule: "true"
+      Vora__PluginSettings__local_imagesharp_overlays__schedule_time: "03:00"
+```
+
+Only set the keys you actually use — the seeder simply does nothing
+for plugins you don't reference. If you later add a new key to your
+compose file and rebuild, it will be picked up on the next start
+*provided* the database row is still empty for that key. If you've
+already saved a value through the admin UI, you can clear it in the
+UI to let the env var take effect on the next start, or just continue
+to manage it through the UI from then on.
+
 ## Documentation
 
 Project documentation lives under [`docs/`](docs/). Highlights:

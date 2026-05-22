@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Vora.Application.Iptv;
 using Vora.Application.Libraries;
+using Vora.Application.Plugins;
 using Vora.Application.Watchers;
 using Vora.Infrastructure.FileSystem;
 using Vora.Infrastructure.Persistence;
@@ -12,8 +13,24 @@ public static class StartupTaskExtensions
     public static async Task RunVoraStartupTasksAsync(this WebApplication app)
     {
         await MigrateDatabaseAsync(app);
+        await SeedPluginSettingsFromEnvironmentAsync(app);
         await InitializeFolderWatchersAsync(app);
         await PreloadIptvEpgCacheAsync(app);
+    }
+
+    private static async Task SeedPluginSettingsFromEnvironmentAsync(WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        try
+        {
+            var seeder = scope.ServiceProvider.GetRequiredService<IPluginSettingsEnvSeeder>();
+            await seeder.SeedAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to seed plugin settings from environment.");
+        }
     }
 
     private static async Task MigrateDatabaseAsync(WebApplication app)
