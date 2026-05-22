@@ -190,7 +190,7 @@ export default function RequestServersTab({ serverId, showModal }: RequestServer
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {requestServers.map(server => (
+                        {[...requestServers].sort((a, b) => a.name.localeCompare(b.name)).map(server => (
                             <EntityCard
                                 key={server.id}
                                 title={server.name}

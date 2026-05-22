@@ -135,6 +135,7 @@ export default function ManageLibrary() {
     const availableRatingProviders = ratingProviders.filter(p => !p.supportedLibraryTypes || p.supportedLibraryTypes.includes(currentTypeStr));
     const availableArtworkProviders = artworkProviders.filter(p => !p.supportedLibraryTypes || p.supportedLibraryTypes.includes(currentTypeStr));
     const isTvShow = library.type.toLowerCase() === 'tvshow';
+    const showVideoOptions = library.type.toLowerCase() === 'movie' || library.type.toLowerCase() === 'tvshow';
     const backUrl = serverId ? `/server/${serverId}/admin/libraries` : '/admin/libraries';
 
     return (
@@ -319,11 +320,11 @@ export default function ManageLibrary() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <Checkbox checked={library.useLocalAssets} onChange={v => handleChange('useLocalAssets', v)} label="Use local assets" />
-                        <Checkbox checked={library.findExtras} onChange={v => handleChange('findExtras', v)} label="Find extras" />
-                        <Checkbox checked={library.onlyShowTrailers} onChange={v => handleChange('onlyShowTrailers', v)} label="Only show trailers" />
+                        {showVideoOptions && <Checkbox checked={library.findExtras} onChange={v => handleChange('findExtras', v)} label="Find extras" />}
+                        {showVideoOptions && <Checkbox checked={library.onlyShowTrailers} onChange={v => handleChange('onlyShowTrailers', v)} label="Only show trailers" />}
                         <Checkbox checked={library.enableVideoPreviewThumbnails} onChange={v => handleChange('enableVideoPreviewThumbnails', v)} label="Enable video preview thumbnails" />
-                        <Checkbox checked={library.enableCreditsDetection} onChange={v => handleChange('enableCreditsDetection', v)} label="Enable credits detection" />
-                        <Checkbox checked={library.enableVoiceActivityDetection} onChange={v => handleChange('enableVoiceActivityDetection', v)} label="Enable voice activity detection" />
+                        {showVideoOptions && <Checkbox checked={library.enableCreditsDetection} onChange={v => handleChange('enableCreditsDetection', v)} label="Enable credits detection" />}
+                        {showVideoOptions && <Checkbox checked={library.enableVoiceActivityDetection} onChange={v => handleChange('enableVoiceActivityDetection', v)} label="Enable voice activity detection" />}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -80,7 +80,7 @@ export default function LibraryDashboard() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {libraries.map(lib => (
+                            {[...libraries].sort((a, b) => a.name.localeCompare(b.name)).map(lib => (
                                 <EntityCard
                                     key={lib.id}
                                     title={lib.name}
