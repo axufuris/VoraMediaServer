@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { libraryService, type MediaLibrary } from '../../../api/Media/libraryService';
-import { libraryAdminService } from '../../../api/Media/libraryAdminService';
+import { libraryAdminService, type MarkerCoverageVM } from '../../../api/Media/libraryAdminService';
 import { pluginAdminService, type PluginOptionVM } from '../../../api/System/pluginAdminService';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import FolderPathInput from '../../../components/Admin/FolderBrowser/FolderPathInput';
@@ -25,6 +25,77 @@ function Checkbox({ checked, onChange, label }: { checked: boolean, onChange: (v
             />
             <span className="text-sm text-[var(--vora-text-primary)]">{label}</span>
         </label>
+    );
+}
+
+function MarkerCoverageCard({ libraryId, serverId }: { libraryId: string, serverId?: string }) {
+    const [coverage, setCoverage] = useState<MarkerCoverageVM | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const data = await libraryAdminService.getLibraryMarkerCoverage(libraryId, serverId);
+            setCoverage(data);
+        } catch (err) {
+            console.error('Failed to load marker coverage', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        load();
+    }, [libraryId, serverId]);
+
+    if (!coverage && !loading) return null;
+
+    const pct = (n: number) => coverage && coverage.totalItems > 0
+        ? Math.round((n / coverage.totalItems) * 100)
+        : 0;
+
+    return (
+        <div className="vora-card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Marker coverage</h2>
+                <button
+                    type="button"
+                    onClick={load}
+                    disabled={loading}
+                    className="vora-button-secondary text-xs disabled:opacity-50"
+                >
+                    {loading ? 'Refreshing…' : 'Refresh'}
+                </button>
+            </div>
+            {coverage && coverage.totalItems === 0 ? (
+                <p className="text-sm" style={{ color: 'var(--vora-text-muted)' }}>This library has no movies or episodes yet.</p>
+            ) : coverage ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <CoverageStat label="Total items" value={`${coverage.totalItems}`} />
+                    <CoverageStat label="With any marker" value={`${coverage.itemsWithAnyMarker} (${pct(coverage.itemsWithAnyMarker)}%)`} />
+                    <CoverageStat label="Intro" value={`${coverage.itemsWithIntro} (${pct(coverage.itemsWithIntro)}%)`} />
+                    <CoverageStat label="Credits" value={`${coverage.itemsWithCredits} (${pct(coverage.itemsWithCredits)}%)`} />
+                    <CoverageStat label="Credits scene" value={`${coverage.itemsWithCreditsScene}`} />
+                    <CoverageStat label="Recap" value={`${coverage.itemsWithRecap}`} />
+                    <CoverageStat label="Preview" value={`${coverage.itemsWithPreview}`} />
+                    <CoverageStat label="Missing duration" value={`${coverage.itemsMissingDuration}`} warn={coverage.itemsMissingDuration > 0} />
+                </div>
+            ) : (
+                <div className="vora-skeleton h-24" />
+            )}
+            <p className="text-xs" style={{ color: 'var(--vora-text-muted)' }}>
+                Counts are over movies + episodes only. Items with locked markers are skipped by automatic re-analysis and keep whatever markers were last saved.
+            </p>
+        </div>
+    );
+}
+
+function CoverageStat({ label, value, warn = false }: { label: string, value: string, warn?: boolean }) {
+    return (
+        <div className="rounded-md p-3" style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}>
+            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>{label}</div>
+            <div className="mt-1 text-sm font-semibold" style={{ color: warn ? 'var(--vora-danger-text)' : 'var(--vora-text-primary)' }}>{value}</div>
+        </div>
     );
 }
 
@@ -201,6 +272,21 @@ export default function ManageLibrary() {
                     >
                         Refresh metadata
                     </button>
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            try {
+                                await libraryAdminService.analyzeLibrary(library.id, serverId);
+                                showAlert('Analysis started', 'Marker detection queued for every item in this library. Use the coverage card below to track progress.');
+                            } catch (err) {
+                                console.error(err);
+                                showAlert('Error', 'Failed to trigger library analysis.');
+                            }
+                        }}
+                        className="vora-button-secondary text-xs"
+                    >
+                        Analyze library
+                    </button>
                     <div className="ml-auto">
                         <button
                             type="button"
@@ -213,6 +299,8 @@ export default function ManageLibrary() {
                         </button>
                     </div>
                 </div>
+
+                <MarkerCoverageCard libraryId={library.id} serverId={serverId} />
 
                 <div className="vora-card p-6 space-y-6">
                     <SectionHeading>General</SectionHeading>

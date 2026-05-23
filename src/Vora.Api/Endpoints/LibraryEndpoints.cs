@@ -49,6 +49,9 @@ public static class LibraryEndpoints
         group.MapPost("/{id:guid}/analyze", QueueAnalyzeAsync)
             .Produces(StatusCodes.Status202Accepted);
 
+        group.MapGet("/{id:guid}/marker-coverage", GetMarkerCoverageAsync)
+            .Produces<MarkerCoverageVM>(StatusCodes.Status200OK);
+
         group.MapPost("/{id:guid}/ratings", QueueRefreshRatingsAsync)
             .Produces(StatusCodes.Status202Accepted);
 
@@ -108,8 +111,14 @@ public static class LibraryEndpoints
 
     private static IResult QueueAnalyzeAsync(Guid id, ITaskQueueManager taskQueue)
     {
-        taskQueue.QueueAnalyzeLibraryMediaContent(id);
+        taskQueue.QueueAnalyzeLibraryMediaContent(id, forceOverride: true);
         return Results.Accepted();
+    }
+
+    private static async Task<IResult> GetMarkerCoverageAsync(Guid id, IMediaManager manager)
+    {
+        var coverage = await manager.GetLibraryMarkerCoverageAsync(id);
+        return Results.Ok(coverage);
     }
 
     private static IResult QueueRefreshRatingsAsync(Guid id, [FromQuery] bool force, ITaskQueueManager taskQueue)

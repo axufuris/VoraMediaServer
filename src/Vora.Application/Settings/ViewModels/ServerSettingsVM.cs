@@ -11,6 +11,18 @@ public class ServerSettingsVM
     public int RegistrationMode { get; set; }
     public int RunDetections { get; set; }
     public string DetectionScheduleTime { get; set; } = "03:00";
+    public int SilenceThresholdOffsetDb { get; set; } = -12;
+    public double SilenceMinDurationMovieSec { get; set; } = 1.5;
+    public double SilenceMinDurationEpisodeSec { get; set; } = 1.0;
+    public double BlackFrameMinDurationSec { get; set; } = 0.5;
+    public int EpisodeIntroClusterToleranceSec { get; set; } = 5;
+    public int EpisodeIntroClusterMinAgreementPct { get; set; } = 70;
+    public string VideoThumbnailScheduleTime { get; set; } = "04:00";
+    public int VideoThumbnailIntervalSeconds { get; set; } = 10;
+    public int VideoThumbnailWidth { get; set; } = 320;
+    public int VideoThumbnailHeight { get; set; } = 180;
+    public int VideoThumbnailJpegQuality { get; set; } = 5;
+    public int VideoThumbnailSpriteColumns { get; set; } = 10;
     public string FolderWatcherProviderId { get; set; } = "polling_watcher";
     public int FolderWatcherPollingInterval { get; set; } = 30;
     public string LocalMediaScannerProviderId { get; set; } = "Vora_scanner";
@@ -63,6 +75,18 @@ public class ServerSettingsVM
             RegistrationMode = (int)s.RegistrationMode,
             RunDetections = (int)s.RunDetections,
             DetectionScheduleTime = s.DetectionScheduleTime.ToString(@"hh\:mm"),
+            SilenceThresholdOffsetDb = s.SilenceThresholdOffsetDb,
+            SilenceMinDurationMovieSec = s.SilenceMinDurationMovieSec,
+            SilenceMinDurationEpisodeSec = s.SilenceMinDurationEpisodeSec,
+            BlackFrameMinDurationSec = s.BlackFrameMinDurationSec,
+            EpisodeIntroClusterToleranceSec = s.EpisodeIntroClusterToleranceSec,
+            EpisodeIntroClusterMinAgreementPct = s.EpisodeIntroClusterMinAgreementPct,
+            VideoThumbnailScheduleTime = s.VideoThumbnailScheduleTime.ToString(@"hh\:mm"),
+            VideoThumbnailIntervalSeconds = s.VideoThumbnailIntervalSeconds,
+            VideoThumbnailWidth = s.VideoThumbnailWidth,
+            VideoThumbnailHeight = s.VideoThumbnailHeight,
+            VideoThumbnailJpegQuality = s.VideoThumbnailJpegQuality,
+            VideoThumbnailSpriteColumns = s.VideoThumbnailSpriteColumns,
             FolderWatcherProviderId = s.FolderWatcherProviderId,
             FolderWatcherPollingInterval = s.FolderWatcherPollingInterval,
             LocalMediaScannerProviderId = s.LocalMediaScannerProviderId,

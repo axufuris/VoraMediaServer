@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { RadioSeed } from '../api/Music/musicService';
+import type { MediaMarker } from '../api/Media/mediaService';
 
 export interface PlayableMedia {
     id: string;
@@ -29,6 +30,7 @@ export interface PlayableMedia {
     playbackContextType?: string;
     playbackContextId?: string;
     commercialMarkers?: { start: number, end: number }[];
+    skipMarkers?: MediaMarker[];
 }
 
 export type RepeatMode = 'off' | 'all' | 'one';

@@ -33,6 +33,9 @@ public interface IUserManager
 
     Task<string?> GetShowtimesLocationAsync(Guid profileId);
     Task SaveShowtimesLocationAsync(Guid profileId, string? location);
+
+    Task<PlaybackPreferencesVM> GetPlaybackPreferencesAsync(Guid profileId);
+    Task<PlaybackPreferencesVM> SavePlaybackPreferencesAsync(Guid profileId, PlaybackPreferencesVM prefs);
 }
 
 public class UserManager(
@@ -336,6 +339,34 @@ public class UserManager(
             ?? throw new InvalidOperationException("Profile not found.");
         profile.ShowtimesLocation = string.IsNullOrWhiteSpace(location) ? null : location.Trim();
         await repository.UpdateProfileAsync(profile);
+    }
+
+    public async Task<PlaybackPreferencesVM> GetPlaybackPreferencesAsync(Guid profileId)
+    {
+        var profile = await repository.GetProfileByIdAsync(profileId)
+            ?? throw new InvalidOperationException("Profile not found.");
+        return new PlaybackPreferencesVM
+        {
+            AutoSkipIntro = profile.AutoSkipIntro,
+            AutoSkipCredits = profile.AutoSkipCredits,
+            MinimumCreditsSceneSeconds = profile.MinimumCreditsSceneSeconds
+        };
+    }
+
+    public async Task<PlaybackPreferencesVM> SavePlaybackPreferencesAsync(Guid profileId, PlaybackPreferencesVM prefs)
+    {
+        var profile = await repository.GetProfileByIdAsync(profileId)
+            ?? throw new InvalidOperationException("Profile not found.");
+        profile.AutoSkipIntro = prefs.AutoSkipIntro;
+        profile.AutoSkipCredits = prefs.AutoSkipCredits;
+        profile.MinimumCreditsSceneSeconds = Math.Clamp(prefs.MinimumCreditsSceneSeconds, 0, 600);
+        await repository.UpdateProfileAsync(profile);
+        return new PlaybackPreferencesVM
+        {
+            AutoSkipIntro = profile.AutoSkipIntro,
+            AutoSkipCredits = profile.AutoSkipCredits,
+            MinimumCreditsSceneSeconds = profile.MinimumCreditsSceneSeconds
+        };
     }
 
     private static IEnumerable<ProfileAccessSchedule> BuildScheduleEntities(Guid profileId, IEnumerable<ProfileScheduleVM> schedules)

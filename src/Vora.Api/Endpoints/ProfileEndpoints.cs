@@ -99,6 +99,11 @@ public static class ProfileEndpoints
         group.MapPut("/profiles/{profileId:guid}/showtimes-location", AdminSetShowtimesLocationAsync)
             .RequireAuthorization("AdminOnly")
             .Produces<ShowtimesLocationDto>(StatusCodes.Status200OK);
+
+        group.MapGet("/profiles/me/playback-preferences", GetMyPlaybackPreferencesAsync)
+            .Produces<PlaybackPreferencesVM>(StatusCodes.Status200OK);
+        group.MapPut("/profiles/me/playback-preferences", SaveMyPlaybackPreferencesAsync)
+            .Produces<PlaybackPreferencesVM>(StatusCodes.Status200OK);
     }
 
     private static void MapDevicePreferenceEndpoints(IEndpointRouteBuilder routes)
@@ -209,6 +214,22 @@ public static class ProfileEndpoints
         {
             return Results.BadRequest(new { Message = ex.Message });
         }
+    }
+
+    private static async Task<IResult> GetMyPlaybackPreferencesAsync(HttpContext ctx, IUserManager manager)
+    {
+        var profileId = ctx.User.GetProfileId();
+        if (!profileId.HasValue) return Results.Unauthorized();
+        var prefs = await manager.GetPlaybackPreferencesAsync(profileId.Value);
+        return Results.Ok(prefs);
+    }
+
+    private static async Task<IResult> SaveMyPlaybackPreferencesAsync(HttpContext ctx, [FromBody] PlaybackPreferencesVM body, IUserManager manager)
+    {
+        var profileId = ctx.User.GetProfileId();
+        if (!profileId.HasValue) return Results.Unauthorized();
+        var saved = await manager.SavePlaybackPreferencesAsync(profileId.Value, body);
+        return Results.Ok(saved);
     }
 
     private static async Task<IResult> GetNavPrefsAsync(Guid profileId, string deviceId, IUserManager manager)

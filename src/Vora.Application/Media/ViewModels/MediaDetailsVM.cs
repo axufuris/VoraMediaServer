@@ -43,6 +43,7 @@ public class MediaDetailsVM
     public List<MediaVideoVM> Videos { get; set; } = new();
     public List<MediaDetailsPartVM> MediaParts { get; set; } = new();
     public List<string> Genres { get; set; } = new();
+    public List<MediaMarkerVM> Markers { get; set; } = new();
 
     public static Expression<Func<MediaItem, MediaDetailsVM>> Projection =>
         item => new MediaDetailsVM
@@ -134,6 +135,15 @@ public class MediaDetailsVM
                 DurationMinutes = e.Analysis.Duration.HasValue ? (int)e.Analysis.Duration.Value.TotalMinutes : (int?)null,
                 ServerAdminRating = e.ServerAdminRating
             }).OrderBy(e => e.EpisodeNumber).ToList() : new List<EpisodeVM>(),
+            Markers = item.Markers
+                .OrderBy(m => m.Start)
+                .Select(m => new MediaMarkerVM
+                {
+                    Type = m.Type.ToString(),
+                    StartSeconds = m.Start.TotalSeconds,
+                    EndSeconds = m.End.TotalSeconds,
+                    Order = m.Order
+                }).ToList(),
             MediaParts = item.MediaParts.Select(p => new MediaDetailsPartVM
             {
                 Id = p.Id,

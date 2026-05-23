@@ -10,8 +10,11 @@ namespace Vora.Infrastructure.Analysis;
 
 public class FFmpegAnalyzerService : IMediaAnalyzerService
 {
-    private static readonly Regex SilenceStartRegex = new(@"silence_start:\s*(?<Time>\d+(\.\d+)?)", RegexOptions.Compiled);
-    private static readonly Regex SilenceEndRegex = new(@"silence_end:\s*(?<Time>\d+(\.\d+)?)", RegexOptions.Compiled);
+    private static readonly Regex SilenceStartRegex = new(@"silence_start:\s*(?<Time>-?\d+(\.\d+)?)", RegexOptions.Compiled);
+    private static readonly Regex SilenceEndRegex = new(@"silence_end:\s*(?<Time>-?\d+(\.\d+)?)", RegexOptions.Compiled);
+    private static readonly Regex BlackStartRegex = new(@"black_start[:=]\s*(?<Time>\d+(\.\d+)?)", RegexOptions.Compiled);
+    private static readonly Regex BlackEndRegex = new(@"black_end[:=]\s*(?<Time>\d+(\.\d+)?)", RegexOptions.Compiled);
+    private static readonly Regex MeanVolumeRegex = new(@"mean_volume:\s*(?<Db>-?\d+(\.\d+)?)\s*dB", RegexOptions.Compiled);
 
     private readonly ILogger<FFmpegAnalyzerService> _logger;
 
@@ -27,10 +30,44 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         return result;
     }
 
-    public async Task<MediaAnalysisResult> AnalyzeSilenceDetectionsAsync(string filePath)
+    public async Task<double?> ProbeMeanVolumeDbAsync(string filePath)
+    {
+        _logger.LogInformation("Probing mean volume for {FilePath}.", filePath);
+
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "ffmpeg",
+            Arguments = $"-i \"{filePath}\" -af volumedetect -vn -sn -f null -",
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        double? meanDb = null;
+
+        using var process = new Process { StartInfo = processInfo };
+
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (string.IsNullOrEmpty(e.Data)) return;
+            var match = MeanVolumeRegex.Match(e.Data);
+            if (match.Success && double.TryParse(match.Groups["Db"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var db))
+            {
+                meanDb = db;
+            }
+        };
+
+        process.Start();
+        process.BeginErrorReadLine();
+        await process.WaitForExitAsync();
+
+        return meanDb;
+    }
+
+    public async Task<MediaAnalysisResult> AnalyzeSilenceDetectionsAsync(string filePath, SilenceDetectionParameters parameters)
     {
         var result = new MediaAnalysisResult();
-        await RunFFmpegSilenceDetectionAsync(filePath, result);
+        await RunFFmpegSilenceAndBlackDetectionAsync(filePath, parameters, result);
         return result;
     }
 
@@ -230,17 +267,25 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         }
     }
 
-    private async Task RunFFmpegSilenceDetectionAsync(string filePath, MediaAnalysisResult result)
+    private async Task RunFFmpegSilenceAndBlackDetectionAsync(string filePath, SilenceDetectionParameters parameters, MediaAnalysisResult result)
     {
-        _logger.LogInformation("Running FFmpeg silence detection on {FilePath}.", filePath);
+        _logger.LogInformation(
+            "Running FFmpeg silence+black detection on {FilePath} (silence threshold {Threshold} dB / {SilenceMin}s, black {BlackMin}s).",
+            filePath, parameters.NoiseThresholdDb, parameters.MinSilenceDurationSec, parameters.MinBlackFrameDurationSec);
 
         var silenceStarts = new List<double>();
         var silenceEnds = new List<double>();
+        var blackStarts = new List<double>();
+        var blackEnds = new List<double>();
+
+        var noiseArg = parameters.NoiseThresholdDb.ToString(CultureInfo.InvariantCulture);
+        var silenceMin = parameters.MinSilenceDurationSec.ToString(CultureInfo.InvariantCulture);
+        var blackMin = parameters.MinBlackFrameDurationSec.ToString(CultureInfo.InvariantCulture);
 
         var processInfo = new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            Arguments = $"-i \"{filePath}\" -af silencedetect=noise=-40dB:d=2 -f null -",
+            Arguments = $"-i \"{filePath}\" -af \"silencedetect=noise={noiseArg}dB:d={silenceMin}\" -vf \"blackdetect=d={blackMin}:pix_th=0.10\" -f null -",
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
@@ -252,34 +297,48 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         {
             if (string.IsNullOrEmpty(e.Data)) return;
 
-            var startMatch = SilenceStartRegex.Match(e.Data);
-            if (startMatch.Success && double.TryParse(startMatch.Groups["Time"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double startTime))
-            {
-                silenceStarts.Add(startTime);
-            }
+            var sStart = SilenceStartRegex.Match(e.Data);
+            if (sStart.Success && double.TryParse(sStart.Groups["Time"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var sStartSec))
+                silenceStarts.Add(Math.Max(0, sStartSec));
 
-            var endMatch = SilenceEndRegex.Match(e.Data);
-            if (endMatch.Success && double.TryParse(endMatch.Groups["Time"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double endTime))
-            {
-                silenceEnds.Add(endTime);
-            }
+            var sEnd = SilenceEndRegex.Match(e.Data);
+            if (sEnd.Success && double.TryParse(sEnd.Groups["Time"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var sEndSec))
+                silenceEnds.Add(Math.Max(0, sEndSec));
+
+            var bStart = BlackStartRegex.Match(e.Data);
+            if (bStart.Success && double.TryParse(bStart.Groups["Time"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var bStartSec))
+                blackStarts.Add(Math.Max(0, bStartSec));
+
+            var bEnd = BlackEndRegex.Match(e.Data);
+            if (bEnd.Success && double.TryParse(bEnd.Groups["Time"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var bEndSec))
+                blackEnds.Add(Math.Max(0, bEndSec));
         };
 
         process.Start();
         process.BeginErrorReadLine();
         await process.WaitForExitAsync();
 
-        if (silenceStarts.Count > 0 && silenceEnds.Count > 0)
+        result.SilenceIntervals = ZipIntervals(silenceStarts, silenceEnds);
+        result.BlackIntervals = ZipIntervals(blackStarts, blackEnds);
+
+        _logger.LogInformation(
+            "Detection complete: {SilenceCount} silence interval(s), {BlackCount} black interval(s).",
+            result.SilenceIntervals.Count, result.BlackIntervals.Count);
+    }
+
+    private static List<DetectedInterval> ZipIntervals(List<double> starts, List<double> ends)
+    {
+        var intervals = new List<DetectedInterval>();
+        var count = Math.Min(starts.Count, ends.Count);
+        for (var i = 0; i < count; i++)
         {
-            result.IntroStart = TimeSpan.FromSeconds(silenceStarts[0]);
-            result.IntroEnd = TimeSpan.FromSeconds(silenceEnds[0]);
-
-            if (silenceStarts.Count > 1)
+            if (ends[i] <= starts[i]) continue;
+            intervals.Add(new DetectedInterval
             {
-                result.CreditsStart = TimeSpan.FromSeconds(silenceStarts[^1]);
-            }
+                Start = TimeSpan.FromSeconds(starts[i]),
+                End = TimeSpan.FromSeconds(ends[i])
+            });
         }
-
-        _logger.LogInformation("Analysis complete. Intro: {IntroStart}-{IntroEnd}, Credits: {CreditsStart}", result.IntroStart, result.IntroEnd, result.CreditsStart);
+        return intervals;
     }
 }

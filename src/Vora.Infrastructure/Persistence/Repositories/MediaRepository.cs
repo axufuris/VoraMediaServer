@@ -218,30 +218,147 @@ public partial class MediaRepository : IMediaRepository
         return await _context.MediaItems.FirstOrDefaultAsync(m => m.Id == id);
     }
 
-    public async Task UpdateSilenceDetectionsAsync(Guid mediaItemId, TimeSpan? introStart, TimeSpan? introEnd, TimeSpan? creditsStart, TimeSpan? duration)
+    public async Task ReplaceMarkersAsync(Guid mediaItemId, IEnumerable<MediaItemMarker> markers)
     {
-        var rowsAffected = await _context.Set<MediaItemAnalysis>()
-            .Where(a => a.MediaItemId == mediaItemId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(a => a.Duration, duration)
-                .SetProperty(a => a.IntroStart, introStart)
-                .SetProperty(a => a.IntroEnd, introEnd)
-                .SetProperty(a => a.CreditsStart, creditsStart));
-
-        if (rowsAffected == 0)
+        await using var tx = await _context.Database.BeginTransactionAsync();
+        try
         {
-            var newAnalysis = new MediaItemAnalysis
-            {
-                MediaItemId = mediaItemId,
-                IntroStart = introStart,
-                IntroEnd = introEnd,
-                CreditsStart = creditsStart,
-                Duration = duration
-            };
+            await _context.Set<MediaItemMarker>()
+                .Where(m => m.MediaItemId == mediaItemId)
+                .ExecuteDeleteAsync();
 
-            await _context.Set<MediaItemAnalysis>().AddAsync(newAnalysis);
-            await _context.SaveChangesAsync();
+            var fresh = markers
+                .Select(m => new MediaItemMarker
+                {
+                    MediaItemId = mediaItemId,
+                    Type = m.Type,
+                    Start = m.Start,
+                    End = m.End,
+                    Order = m.Order
+                })
+                .ToList();
+
+            if (fresh.Count > 0)
+            {
+                await _context.Set<MediaItemMarker>().AddRangeAsync(fresh);
+                await _context.SaveChangesAsync();
+            }
+
+            await tx.CommitAsync();
         }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
+    }
+
+    public async Task<List<MediaItemMarker>> GetMarkersForSeasonAsync(Guid seasonId)
+    {
+        return await _context.Set<MediaItemMarker>()
+            .AsNoTracking()
+            .Where(m => _context.Set<Episode>().Any(e => e.SeasonId == seasonId && e.Id == m.MediaItemId))
+            .ToListAsync();
+    }
+
+    public async Task<List<MediaItemMarker>> GetMarkersAsync(Guid mediaItemId)
+    {
+        return await _context.Set<MediaItemMarker>()
+            .AsNoTracking()
+            .Where(m => m.MediaItemId == mediaItemId)
+            .OrderBy(m => m.Type)
+            .ThenBy(m => m.Order)
+            .ThenBy(m => m.Start)
+            .ToListAsync();
+    }
+
+    public async Task<(bool MidStinger, bool PostStinger)> GetStingerFlagsAsync(Guid mediaItemId)
+    {
+        var flags = await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == mediaItemId)
+            .Select(m => new { m.HasMidCreditsStinger, m.HasPostCreditsStinger })
+            .FirstOrDefaultAsync();
+        return flags == null ? (false, false) : (flags.HasMidCreditsStinger, flags.HasPostCreditsStinger);
+    }
+
+    public async Task<MarkerCoverageVM> GetMarkerCoverageAsync(Guid libraryId)
+    {
+        var libraryName = await _context.MediaLibraries
+            .AsNoTracking()
+            .Where(l => l.Id == libraryId)
+            .Select(l => l.Name)
+            .FirstOrDefaultAsync() ?? string.Empty;
+
+        var playable = _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m is Movie || m is Episode)
+            .Where(m =>
+                (m is Movie && m.LibraryId == libraryId) ||
+                (m is Episode && ((Episode)m).Season.TvShow.LibraryId == libraryId));
+
+        var totalItems = await playable.CountAsync();
+        var itemsWithAnyMarker = await playable.CountAsync(m => m.Markers.Any());
+        var itemsWithIntro = await playable.CountAsync(m => m.Markers.Any(k => k.Type == MarkerType.Intro));
+        var itemsWithCredits = await playable.CountAsync(m => m.Markers.Any(k => k.Type == MarkerType.Credits));
+        var itemsWithCreditsScene = await playable.CountAsync(m => m.Markers.Any(k => k.Type == MarkerType.CreditsScene));
+        var itemsWithRecap = await playable.CountAsync(m => m.Markers.Any(k => k.Type == MarkerType.Recap));
+        var itemsWithPreview = await playable.CountAsync(m => m.Markers.Any(k => k.Type == MarkerType.Preview));
+        var itemsMissingDuration = await playable.CountAsync(m => m.Analysis == null || m.Analysis.Duration == null);
+
+        return new MarkerCoverageVM
+        {
+            LibraryId = libraryId,
+            LibraryName = libraryName,
+            TotalItems = totalItems,
+            ItemsWithAnyMarker = itemsWithAnyMarker,
+            ItemsWithIntro = itemsWithIntro,
+            ItemsWithCredits = itemsWithCredits,
+            ItemsWithCreditsScene = itemsWithCreditsScene,
+            ItemsWithRecap = itemsWithRecap,
+            ItemsWithPreview = itemsWithPreview,
+            ItemsMissingDuration = itemsMissingDuration
+        };
+    }
+
+    public async Task<bool> AreMarkersLockedAsync(Guid mediaItemId)
+    {
+        var locked = await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == mediaItemId)
+            .Select(m => m.LockedFields)
+            .FirstOrDefaultAsync();
+        if (locked == null) return false;
+        return locked.Contains("Markers", StringComparer.OrdinalIgnoreCase);
+    }
+
+    public async Task SetMarkersLockedAsync(Guid mediaItemId, bool locked)
+    {
+        var item = await _context.MediaItems.FirstOrDefaultAsync(m => m.Id == mediaItemId);
+        if (item == null) return;
+        if (locked) item.LockField("Markers");
+        else item.UnlockField("Markers");
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<bool> AreThumbnailsLockedAsync(Guid mediaItemId)
+    {
+        var locked = await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == mediaItemId)
+            .Select(m => m.LockedFields)
+            .FirstOrDefaultAsync();
+        if (locked == null) return false;
+        return locked.Contains("Thumbnails", StringComparer.OrdinalIgnoreCase);
+    }
+
+    public async Task SetThumbnailsLockedAsync(Guid mediaItemId, bool locked)
+    {
+        var item = await _context.MediaItems.FirstOrDefaultAsync(m => m.Id == mediaItemId);
+        if (item == null) return;
+        if (locked) item.LockField("Thumbnails");
+        else item.UnlockField("Thumbnails");
+        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateMediaItemAsync(MediaItem item)

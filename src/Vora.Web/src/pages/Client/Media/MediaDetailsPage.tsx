@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { mediaService, type MediaItem } from '../../../api/Media/mediaService';
 import { libraryAdminService } from '../../../api/Media/libraryAdminService';
 import EditMetadataModal from '../../../components/Media/EditMetadataModal';
+import MarkerEditorModal from '../../../components/Admin/MarkerEditorModal';
 import AddToCollectionModal from '../../../components/Collections/AddToCollectionModal';
 import AddToPlaylistModal from '../../../components/Collections/AddToPlaylistModal';
 import MediaCastRow from '../../../components/Media/MediaCastRow';
@@ -65,6 +66,7 @@ export default function MediaDetailsPage() {
     const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
     const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
+    const [isMarkerEditorOpen, setIsMarkerEditorOpen] = useState(false);
     const [isQualityPanelOpen, setIsQualityPanelOpen] = useState(false);
 
     const [selectedVideoId, setSelectedVideoId] = useState<string>('');
@@ -387,6 +389,7 @@ export default function MediaDetailsPage() {
             <EditMetadataModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSaved={reloadMedia} itemId={media.id} type="media" initialData={{ ...media, lockedFields: media.lockedFields ?? [] }} />
             <AddToCollectionModal isOpen={isCollectionModalOpen} onClose={() => setIsCollectionModalOpen(false)} mediaId={media.id} libraryId={media.libraryId} mediaType={media.type} initialCollectionIds={media.collectionIds || []} onSaved={reloadMedia} />
             <AddToPlaylistModal isOpen={isPlaylistModalOpen} onClose={() => setIsPlaylistModalOpen(false)} mediaId={media.id} />
+            <MarkerEditorModal isOpen={isMarkerEditorOpen} onClose={() => setIsMarkerEditorOpen(false)} mediaItemId={media.id} mediaItemTitle={media.title} durationSeconds={media.durationMinutes ? media.durationMinutes * 60 : undefined} serverId={serverId} onSaved={reloadMedia} />
 
             <QualityPanel open={isQualityPanelOpen} onClose={() => setIsQualityPanelOpen(false)}>
                 {videoOptions.length > 0 && (
@@ -588,6 +591,7 @@ export default function MediaDetailsPage() {
                                                     <button type="button" onClick={handleRefresh} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Refresh metadata</button>
                                                     <button type="button" onClick={handleScan} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Scan files</button>
                                                     <button type="button" onClick={handleAnalyze} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Analyze media</button>
+                                                    <button type="button" onClick={() => { setIsMarkerEditorOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit markers</button>
                                                     <button type="button" onClick={handleDelete} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/5" style={{ color: 'var(--vora-danger-text)' }}>Delete item</button>
                                                 </>
                                             )}

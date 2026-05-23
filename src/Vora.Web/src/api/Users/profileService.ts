@@ -31,6 +31,12 @@ export interface ShowtimesLocationDto {
     location?: string | null;
 }
 
+export interface PlaybackPreferencesVM {
+    autoSkipIntro: boolean;
+    autoSkipCredits: boolean;
+    minimumCreditsSceneSeconds: number;
+}
+
 export const profileService = {
     createProfile: async (userId: string, name: string, profileImageUrl?: string, pin?: string, allowedMovieRatings: string[] = [], allowedTvRatings: string[] = [], allowedMusicRatings: string[] = [], hasAllLibraryAccess = true, blockUnrated = false, allowedLibs: string[] = [], hasAllIptv = true, allowedIptv: string[] = [], schedules: ProfileScheduleVM[] = [], canRecordLiveTv = false, canAddCustomPodcastFeeds = true, serverId?: string, showtimesLocation: string | null = null): Promise<void> => {
         await apiClient.post(`/users/${userId}/profiles`, {
@@ -92,6 +98,20 @@ export const profileService = {
         const response = await apiClient.put<ShowtimesLocationDto, ShowtimesLocationDto>(
             `/users/profiles/${profileId}/showtimes-location`,
             { location },
+            { serverId }
+        );
+        return response.data;
+    },
+
+    getMyPlaybackPreferences: async (serverId?: string): Promise<PlaybackPreferencesVM> => {
+        const response = await apiClient.get<PlaybackPreferencesVM>('/users/profiles/me/playback-preferences', { serverId });
+        return response.data;
+    },
+
+    saveMyPlaybackPreferences: async (prefs: PlaybackPreferencesVM, serverId?: string): Promise<PlaybackPreferencesVM> => {
+        const response = await apiClient.put<PlaybackPreferencesVM, PlaybackPreferencesVM>(
+            '/users/profiles/me/playback-preferences',
+            prefs,
             { serverId }
         );
         return response.data;

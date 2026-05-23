@@ -53,6 +53,7 @@ public class VoraDbContext : DbContext
     public DbSet<MediaArtwork> MediaArtwork { get; set; }
     public DbSet<MediaVideo> MediaVideos { get; set; }
     public DbSet<MediaItemAnalysis> MediaItemAnalysis { get; set; }
+    public DbSet<MediaItemMarker> MediaItemMarkers { get; set; }
     public DbSet<Genre> Genres { get; set; }
     public DbSet<Company> Companies { get; set; }
     public DbSet<Country> Countries { get; set; }
@@ -148,6 +149,7 @@ public class VoraDbContext : DbContext
         ConfigureMediaArtwork(modelBuilder);
         ConfigureMediaVideo(modelBuilder);
         ConfigureMediaItemAnalysis(modelBuilder);
+        ConfigureMediaItemMarkers(modelBuilder);
         ConfigureMediaItemRelationships(modelBuilder, converters);
         ConfigureReferenceTables(modelBuilder);
 
@@ -473,6 +475,26 @@ public class VoraDbContext : DbContext
                   .WithOne(m => m.Analysis)
                   .HasForeignKey<MediaItemAnalysis>(e => e.MediaItemId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureMediaItemMarkers(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<MediaItemMarker>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Type)
+                  .HasConversion<string>()
+                  .HasMaxLength(32)
+                  .IsRequired();
+
+            entity.HasOne(e => e.MediaItem)
+                  .WithMany(m => m.Markers)
+                  .HasForeignKey(e => e.MediaItemId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.MediaItemId, e.Type, e.Order });
         });
     }
 

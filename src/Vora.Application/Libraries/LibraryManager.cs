@@ -68,7 +68,7 @@ public class LibraryManager : ILibraryManager
             UseLocalAssets = request.UseLocalAssets,
             FindExtras = request.FindExtras,
             OnlyShowTrailers = request.OnlyShowTrailers,
-            EnableVideoPreviewThumbnails = request.EnableVideoPreviewThumbnails,
+            EnableVideoPreviewThumbnails = request.EnableVideoPreviewThumbnails && Vora.Application.Thumbnails.VideoThumbnailManager.IsVideoBearingLibrary(request.Type),
             CollectionDisplay = (Domain.Enums.CollectionDisplayMode)request.CollectionDisplay,
             EnableCreditsDetection = request.EnableCreditsDetection,
             EnableVoiceActivityDetection = request.EnableVoiceActivityDetection,
@@ -127,6 +127,9 @@ public class LibraryManager : ILibraryManager
         var pathsChanged = addedPaths.Any() || removedPaths.Any();
 
         bool artworkProviderChanged = library.ArtworkProviderId != request.ArtworkProviderId;
+        var requestedThumbnails = request.EnableVideoPreviewThumbnails &&
+            Vora.Application.Thumbnails.VideoThumbnailManager.IsVideoBearingLibrary(library.Type);
+        bool thumbnailsTurnedOff = library.EnableVideoPreviewThumbnails && !requestedThumbnails;
 
         library.Name = request.Name;
         library.FolderPaths = request.FolderPaths;
@@ -134,7 +137,7 @@ public class LibraryManager : ILibraryManager
         library.UseLocalAssets = request.UseLocalAssets;
         library.FindExtras = request.FindExtras;
         library.OnlyShowTrailers = request.OnlyShowTrailers;
-        library.EnableVideoPreviewThumbnails = request.EnableVideoPreviewThumbnails;
+        library.EnableVideoPreviewThumbnails = requestedThumbnails;
         library.CollectionDisplay = (Domain.Enums.CollectionDisplayMode)request.CollectionDisplay;
         library.EnableCreditsDetection = request.EnableCreditsDetection;
         library.EnableVoiceActivityDetection = request.EnableVoiceActivityDetection;
@@ -178,10 +181,21 @@ public class LibraryManager : ILibraryManager
         {
             _taskQueueManager.QueueArtworkProviderSwap(library.Id, library.Name);
         }
+
+        if (thumbnailsTurnedOff)
+        {
+            using var purgeScope = _serviceProvider.CreateScope();
+            var thumbnailManager = purgeScope.ServiceProvider.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
+            await thumbnailManager.PurgeLibraryThumbnailsAsync(library.Id);
+        }
     }
 
     public async Task DeleteLibraryAsync(Guid id)
     {
+        using var scope = _serviceProvider.CreateScope();
+        var thumbnailManager = scope.ServiceProvider.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
+        await thumbnailManager.PurgeLibraryThumbnailsAsync(id);
+
         await _repository.DeleteLibraryAsync(id);
     }
 

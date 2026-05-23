@@ -272,6 +272,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ILibraryMigrationManager, LibraryMigrationManager>();
         services.AddSingleton<ILibraryMigrationJobRunner, LibraryMigrationJobRunner>();
         services.AddScoped<IMediaAnalyzerManager, MediaAnalyzerManager>();
+        services.AddScoped<IMarkerAssembler, MarkerAssembler>();
+        services.AddScoped<Vora.Application.Thumbnails.IVideoThumbnailManager, Vora.Application.Thumbnails.VideoThumbnailManager>();
         services.AddScoped<IMediaDedupeManager, MediaDedupeManager>();
         services.AddScoped<IMediaManager, MediaManager>();
         services.AddScoped<IMusicManager, MusicManager>();
@@ -334,6 +336,8 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<IFolderWatcherService, FolderWatcherService>();
         services.AddSingleton<ITimeshiftCoordinator, TimeshiftCoordinator>();
         services.AddSingleton<ITranscodeService, FFmpegTranscodeService>();
+        services.AddSingleton<Vora.Application.Thumbnails.IVideoThumbnailStorageService, Vora.Application.Thumbnails.VideoThumbnailStorageService>();
+        services.AddSingleton<Vora.Application.Thumbnails.IVideoThumbnailGeneratorService, Vora.Infrastructure.Thumbnails.FFmpegVideoThumbnailGeneratorService>();
         return services;
     }
 

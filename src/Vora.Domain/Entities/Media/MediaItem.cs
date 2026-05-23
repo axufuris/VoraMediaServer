@@ -43,10 +43,20 @@ public abstract class MediaItem : LockableEntity
     public DateTime? LastMetadataRefresh { get; set; }
     public DateTime? LastOverlayGeneratedAt { get; set; }
 
+    public DateTime? LastVideoThumbnailGenerationAt { get; set; }
+    public string? VideoThumbnailSpriteVersion { get; set; }
+    public int VideoThumbnailSpriteCount { get; set; }
+    public int VideoThumbnailIntervalSeconds { get; set; }
+    public int VideoThumbnailSpriteColumns { get; set; }
+    public int VideoThumbnailWidth { get; set; }
+    public int VideoThumbnailHeight { get; set; }
+
     public Guid LibraryId { get; set; }
     public virtual MediaLibrary Library { get; set; } = null!;
 
     public virtual MediaItemAnalysis Analysis { get; set; } = null!;
+
+    public virtual ICollection<MediaItemMarker> Markers { get; set; } = new List<MediaItemMarker>();
 
     public virtual ICollection<MediaPart> MediaParts { get; set; } = new List<MediaPart>();
     public virtual ICollection<MediaArtwork> Artwork { get; set; } = new List<MediaArtwork>();

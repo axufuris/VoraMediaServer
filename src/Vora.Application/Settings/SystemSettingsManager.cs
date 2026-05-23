@@ -86,6 +86,19 @@ public class SystemSettingsManager : ISystemSettingsManager
 
         settings.RunDetections = (DetectionTrigger)request.RunDetections;
         if (TimeSpan.TryParse(request.DetectionScheduleTime, out var dsTime)) settings.DetectionScheduleTime = dsTime;
+        settings.SilenceThresholdOffsetDb = Math.Clamp(request.SilenceThresholdOffsetDb, -40, 0);
+        settings.SilenceMinDurationMovieSec = Math.Clamp(request.SilenceMinDurationMovieSec, 0.2, 10.0);
+        settings.SilenceMinDurationEpisodeSec = Math.Clamp(request.SilenceMinDurationEpisodeSec, 0.2, 10.0);
+        settings.BlackFrameMinDurationSec = Math.Clamp(request.BlackFrameMinDurationSec, 0.1, 10.0);
+        settings.EpisodeIntroClusterToleranceSec = Math.Clamp(request.EpisodeIntroClusterToleranceSec, 1, 60);
+        settings.EpisodeIntroClusterMinAgreementPct = Math.Clamp(request.EpisodeIntroClusterMinAgreementPct, 50, 100);
+
+        if (TimeSpan.TryParse(request.VideoThumbnailScheduleTime, out var vtTime)) settings.VideoThumbnailScheduleTime = vtTime;
+        settings.VideoThumbnailIntervalSeconds = Math.Clamp(request.VideoThumbnailIntervalSeconds, 2, 300);
+        settings.VideoThumbnailWidth = Math.Clamp(request.VideoThumbnailWidth, 80, 1280);
+        settings.VideoThumbnailHeight = Math.Clamp(request.VideoThumbnailHeight, 45, 720);
+        settings.VideoThumbnailJpegQuality = Math.Clamp(request.VideoThumbnailJpegQuality, 2, 31);
+        settings.VideoThumbnailSpriteColumns = Math.Clamp(request.VideoThumbnailSpriteColumns, 1, 20);
 
         settings.FolderWatcherProviderId = request.FolderWatcherProviderId;
         settings.FolderWatcherPollingInterval = request.FolderWatcherPollingInterval;

@@ -47,6 +47,8 @@ public interface ITaskQueueManager
     void QueueGenerateAiEmbeddings();
     void QueueGenerateLibraryPosterOverlays(Guid libraryId);
     void QueueIptvEpgSync();
+    void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false);
+    void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
 }
 
 public class TaskQueueManager : ITaskQueueManager
@@ -151,7 +153,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Analyze Media Item: {ResolveDisplayName(mediaItemId, mediaItemName)}", async (ct, sp) =>
         {
             var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
-            await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, isAdditionTrigger: true);
+            await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride);
         });
     }
 
@@ -400,6 +402,24 @@ public class TaskQueueManager : ITaskQueueManager
             await epgService.SyncEpgDataAsync(ct);
 
             await dvrManager.ProcessSchedulesIntoSessionsAsync();
+        });
+    }
+
+    public void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false)
+    {
+        EnqueueTask($"Generate Video Thumbnails: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
+        {
+            var manager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
+            await manager.TriggerLibraryThumbnailGenerationAsync(libraryId, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger);
+        });
+    }
+
+    public void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
+    {
+        EnqueueTask($"Generate Video Thumbnails: {ResolveDisplayName(mediaItemId, mediaItemName)}", async (ct, sp) =>
+        {
+            var manager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
+            await manager.TriggerMediaItemThumbnailGenerationAsync(mediaItemId, forceOverride: forceOverride);
         });
     }
 

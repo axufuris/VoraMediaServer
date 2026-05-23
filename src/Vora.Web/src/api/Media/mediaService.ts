@@ -95,6 +95,15 @@ export interface SeasonDetails {
     lockedFields?: string[];
 }
 
+export type MediaMarkerType = 'Intro' | 'Recap' | 'Preview' | 'Credits' | 'CreditsScene';
+
+export interface MediaMarker {
+    type: MediaMarkerType;
+    startSeconds: number;
+    endSeconds: number;
+    order: number;
+}
+
 export interface MediaItem {
     id: string;
     title: string;
@@ -130,6 +139,7 @@ export interface MediaItem {
     serverAdminRating?: number;
     myRating?: number;
     mediaParts?: MediaPart[];
+    markers?: MediaMarker[];
 }
 
 export interface UpNextItemVM {
@@ -180,5 +190,23 @@ export const mediaService = {
             serverId
         });
         return response.data;
+    },
+
+    getMarkers: async (mediaItemId: string, serverId?: string): Promise<MediaMarker[]> => {
+        const response = await apiClient.get<MediaMarker[]>(`/media/${mediaItemId}/markers`, { serverId });
+        return response.data;
+    },
+
+    replaceMarkers: async (mediaItemId: string, markers: MediaMarker[], serverId?: string): Promise<void> => {
+        await apiClient.put(`/media/${mediaItemId}/markers`, markers, { serverId });
+    },
+
+    getMarkersLocked: async (mediaItemId: string, serverId?: string): Promise<boolean> => {
+        const response = await apiClient.get<{ locked: boolean }>(`/media/${mediaItemId}/markers/lock`, { serverId });
+        return response.data.locked;
+    },
+
+    setMarkersLocked: async (mediaItemId: string, locked: boolean, serverId?: string): Promise<void> => {
+        await apiClient.put(`/media/${mediaItemId}/markers/lock`, { locked }, { serverId });
     }
 };

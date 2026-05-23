@@ -6,6 +6,12 @@ export interface ServerSettings {
     nightlyScanTime: string;
     runDetections: number;
     detectionScheduleTime: string;
+    silenceThresholdOffsetDb: number;
+    silenceMinDurationMovieSec: number;
+    silenceMinDurationEpisodeSec: number;
+    blackFrameMinDurationSec: number;
+    episodeIntroClusterToleranceSec: number;
+    episodeIntroClusterMinAgreementPct: number;
     folderWatcherProviderId: string;
     folderWatcherPollingInterval: number;
     localMediaScannerProviderId: string;

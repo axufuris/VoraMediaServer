@@ -21,6 +21,7 @@ public class ScheduledJobWorker : BackgroundService
     private DateTime _lastAiEmbedDate = DateTime.MinValue.Date;
     private DateTime _lastOverlaySyncDate = DateTime.MinValue.Date;
     private DateTime _lastIptvSyncDate = DateTime.MinValue.Date;
+    private DateTime _lastVideoThumbnailDate = DateTime.MinValue.Date;
 
     private int _scannerFrequency = 5;
 
@@ -177,5 +178,34 @@ public class ScheduledJobWorker : BackgroundService
 
             _lastIptvSyncDate = today;
         }
+
+        if (timeOfDay >= settings.VideoThumbnailScheduleTime && _lastVideoThumbnailDate < today)
+        {
+            _logger.LogInformation("Triggering Scheduled Video Thumbnail Generation.");
+
+            var libraries = await libraryManager.GetLibrariesAsync(true, new List<Guid>());
+
+            foreach (var lib in libraries)
+            {
+                if (!lib.EnableVideoPreviewThumbnails) continue;
+                if (!Vora.Application.Thumbnails.VideoThumbnailManager.IsVideoBearingLibrary(ParseLibraryType(lib.Type))) continue;
+                taskQueue.QueueGenerateLibraryVideoThumbnails(lib.Id, lib.Name, isScheduleTrigger: true);
+            }
+
+            _lastVideoThumbnailDate = today;
+        }
+    }
+
+    private static Vora.Domain.Enums.LibraryType ParseLibraryType(string typeString)
+    {
+        return typeString switch
+        {
+            "Movie" => Vora.Domain.Enums.LibraryType.Movie,
+            "TvShow" => Vora.Domain.Enums.LibraryType.TvShow,
+            "HomeVideo" => Vora.Domain.Enums.LibraryType.HomeVideo,
+            "Music" => Vora.Domain.Enums.LibraryType.Music,
+            "LiveTv" => Vora.Domain.Enums.LibraryType.LiveTv,
+            _ => Vora.Domain.Enums.LibraryType.Movie
+        };
     }
 }

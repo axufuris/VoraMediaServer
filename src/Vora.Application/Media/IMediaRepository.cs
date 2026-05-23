@@ -26,7 +26,15 @@ public interface IMediaRepository
     Task<IEnumerable<Guid>> GetMediaIdsMissingMetadataAsync(Guid libraryId);
     Task<MediaItem?> GetForBasicUpdateAsync(Guid id);
     Task SyncMediaTracksAsync(Guid mediaPartId, List<MediaVideoTrack> incomingVideo, List<MediaAudioTrack> incomingAudio, List<MediaSubtitleTrack> incomingSubtitles);
-    Task UpdateSilenceDetectionsAsync(Guid mediaItemId, TimeSpan? introStart, TimeSpan? introEnd, TimeSpan? creditsStart, TimeSpan? duration);
+    Task ReplaceMarkersAsync(Guid mediaItemId, IEnumerable<MediaItemMarker> markers);
+    Task<List<MediaItemMarker>> GetMarkersForSeasonAsync(Guid seasonId);
+    Task<List<MediaItemMarker>> GetMarkersAsync(Guid mediaItemId);
+    Task<(bool MidStinger, bool PostStinger)> GetStingerFlagsAsync(Guid mediaItemId);
+    Task<MarkerCoverageVM> GetMarkerCoverageAsync(Guid libraryId);
+    Task<bool> AreMarkersLockedAsync(Guid mediaItemId);
+    Task SetMarkersLockedAsync(Guid mediaItemId, bool locked);
+    Task<bool> AreThumbnailsLockedAsync(Guid mediaItemId);
+    Task SetThumbnailsLockedAsync(Guid mediaItemId, bool locked);
     Task UpdateMediaItemAsync(MediaItem item);
     Task AddMediaItemAsync(MediaItem item);
     Task AddMediaVideosAsync(IEnumerable<MediaVideo> videos);

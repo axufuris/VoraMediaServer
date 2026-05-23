@@ -1,8 +1,10 @@
 import { usePlayer } from '../../contexts/usePlayer';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { mediaService, type MediaItem, type MediaPart, type UpNextItemVM, type UpNextResultVM } from '../../api/Media/mediaService';
+import { mediaService, type MediaItem, type MediaPart, type UpNextItemVM, type UpNextResultVM, type MediaMarker } from '../../api/Media/mediaService';
+import { profileService, type PlaybackPreferencesVM } from '../../api/Users/profileService';
 import { streamingService } from '../../api/Streaming/streamingService';
+import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { scanDeviceCapabilities } from '../../utils/hardwareScanner';
 import Hls from 'hls.js';
 import { useDialog } from '../../dialogs';
@@ -30,6 +32,43 @@ const accentChipStyle: React.CSSProperties = {
     border: '1px solid var(--vora-accent-500)',
     color: 'var(--vora-accent-contrast)',
 };
+
+const markerBandColors: Record<string, string> = {
+    Intro: 'rgba(255, 255, 255, 0.22)',
+    Recap: 'rgba(255, 255, 255, 0.22)',
+    Credits: 'rgba(120, 170, 255, 0.32)',
+    CreditsScene: 'var(--vora-accent-500)',
+    Preview: 'var(--vora-accent-500)',
+};
+
+function MarkerBands({ markers, duration }: { markers: MediaMarker[]; duration: number }) {
+    if (!markers.length || !duration || !isFinite(duration) || duration <= 0) return null;
+    return (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
+            {markers.map((m, idx) => {
+                const start = Math.max(0, Math.min(100, (m.startSeconds / duration) * 100));
+                const end = Math.max(0, Math.min(100, (m.endSeconds / duration) * 100));
+                const width = Math.max(0.4, end - start);
+                const bg = markerBandColors[m.type] ?? 'rgba(255, 255, 255, 0.18)';
+                const isScene = m.type === 'CreditsScene' || m.type === 'Preview';
+                return (
+                    <div
+                        key={`${m.type}-${m.order}-${idx}`}
+                        className="absolute top-0 h-full"
+                        style={{
+                            left: `${start}%`,
+                            width: `${width}%`,
+                            background: bg,
+                            opacity: isScene ? 0.85 : 1,
+                            mixBlendMode: isScene ? 'normal' : 'screen',
+                        }}
+                        title={`${m.type} ${Math.round(m.startSeconds)}s – ${Math.round(m.endSeconds)}s`}
+                    />
+                );
+            })}
+        </div>
+    );
+}
 
 export default function GlobalVideoPlayer() {
     const dialog = useDialog();
@@ -74,6 +113,108 @@ export default function GlobalVideoPlayer() {
             return () => clearTimeout(timer);
         }
     }, [showSkipButton, activeCommId]);
+
+    const [markers, setMarkers] = useState<MediaMarker[]>([]);
+    const [playbackPrefs, setPlaybackPrefs] = useState<PlaybackPreferencesVM>({
+        autoSkipIntro: false,
+        autoSkipCredits: false,
+        minimumCreditsSceneSeconds: 15
+    });
+
+    useEffect(() => {
+        const mediaId = currentMedia?.id;
+        if (!mediaId) { setMarkers([]); return; }
+        if (currentMedia?.playbackContextType === 'LiveTv' || currentMedia?.playbackContextType === 'Dvr') {
+            setMarkers([]);
+            return;
+        }
+        if (currentMedia?.skipMarkers && currentMedia.skipMarkers.length > 0) {
+            setMarkers(currentMedia.skipMarkers);
+            return;
+        }
+        mediaService.getMarkers(mediaId, serverId)
+            .then(setMarkers)
+            .catch(err => { console.error('Failed to load markers', err); setMarkers([]); });
+    }, [currentMedia?.id, currentMedia?.skipMarkers, currentMedia?.playbackContextType, serverId]);
+
+    useEffect(() => {
+        profileService.getMyPlaybackPreferences(serverId)
+            .then(setPlaybackPrefs)
+            .catch(err => console.error('Failed to load playback preferences', err));
+    }, [serverId]);
+
+    useSignalREvent<string>('MediaAnalysisUpdated', (updatedId) => {
+        if (!currentMedia?.id || updatedId !== currentMedia.id) return;
+        mediaService.getMarkers(currentMedia.id, serverId)
+            .then(setMarkers)
+            .catch(err => console.error('Failed to refresh markers', err));
+    });
+
+    const activeSkipPrompt = useMemo<{ label: string; target: number; kind: 'intro' | 'credits-to-scene' | 'credits-to-end' } | null>(() => {
+        if (!markers.length || !duration || !isFinite(duration)) return null;
+
+        const introOrRecap = markers.find(m =>
+            (m.type === 'Intro' || m.type === 'Recap') &&
+            currentTime >= m.startSeconds && currentTime < m.endSeconds
+        );
+        if (introOrRecap) {
+            return {
+                label: introOrRecap.type === 'Recap' ? 'Skip Recap' : 'Skip Intro',
+                target: introOrRecap.endSeconds,
+                kind: 'intro'
+            };
+        }
+
+        const inScene = markers.some(m =>
+            (m.type === 'CreditsScene' || m.type === 'Preview') &&
+            currentTime >= m.startSeconds && currentTime < m.endSeconds
+        );
+        if (inScene) return null;
+
+        const credits = markers.find(m =>
+            m.type === 'Credits' && currentTime >= m.startSeconds && currentTime < m.endSeconds
+        );
+        if (credits) {
+            const nextScene = markers
+                .filter(m => (m.type === 'CreditsScene' || m.type === 'Preview') && m.startSeconds > currentTime)
+                .sort((a, b) => a.startSeconds - b.startSeconds)[0];
+
+            const minDelta = playbackPrefs.minimumCreditsSceneSeconds;
+            if (nextScene && (nextScene.startSeconds - currentTime) >= minDelta) {
+                return {
+                    label: nextScene.type === 'Preview' ? 'Skip to Preview' : 'Skip to Scene',
+                    target: nextScene.startSeconds,
+                    kind: 'credits-to-scene'
+                };
+            }
+            return {
+                label: 'Skip Credits',
+                target: Math.max(currentTime, duration - 2),
+                kind: 'credits-to-end'
+            };
+        }
+
+        return null;
+    }, [markers, currentTime, duration, playbackPrefs.minimumCreditsSceneSeconds]);
+
+    const autoSkippedRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!activeSkipPrompt) {
+            autoSkippedRef.current = null;
+            return;
+        }
+        const key = `${activeSkipPrompt.kind}:${activeSkipPrompt.target.toFixed(2)}`;
+        if (autoSkippedRef.current === key) return;
+
+        const shouldAutoSkip =
+            (activeSkipPrompt.kind === 'intro' && playbackPrefs.autoSkipIntro) ||
+            (activeSkipPrompt.kind === 'credits-to-end' && playbackPrefs.autoSkipCredits);
+
+        if (shouldAutoSkip) {
+            autoSkippedRef.current = key;
+            seek(activeSkipPrompt.target);
+        }
+    }, [activeSkipPrompt, playbackPrefs.autoSkipIntro, playbackPrefs.autoSkipCredits, seek]);
 
     useEffect(() => {
         if (currentMedia?.id) {
@@ -325,6 +466,7 @@ export default function GlobalVideoPlayer() {
                                 onClick={handleProgressClick}
                                 style={{ background: 'rgba(255, 255, 255, 0.12)' }}
                             >
+                                <MarkerBands markers={markers} duration={duration} />
                                 <div className="absolute left-0 top-0 h-full rounded-full" style={{ width: `${progressPercent}%`, background: 'var(--vora-accent-500)' }} />
                                 <div
                                     className="absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full opacity-0 shadow group-hover:opacity-100"
@@ -343,7 +485,7 @@ export default function GlobalVideoPlayer() {
             )}
 
             {showSkipButton && !isMinimized && !isEnding && (
-                <div className="absolute bottom-32 right-12 z-[100] animate-fade-in-up">
+                <div className="absolute bottom-32 right-12 z-[200] animate-fade-in-up">
                     <button
                         type="button"
                         onClick={(e) => {
@@ -355,6 +497,23 @@ export default function GlobalVideoPlayer() {
                         style={{ background: 'rgba(20, 20, 28, 0.85)', border: '1px solid rgba(255, 255, 255, 0.22)', color: '#fafafa' }}
                     >
                         Skip commercial
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" /></svg>
+                    </button>
+                </div>
+            )}
+
+            {activeSkipPrompt && !showSkipButton && !isMinimized && !isEnding && (
+                <div className="absolute bottom-32 right-12 z-[200] animate-fade-in-up">
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            seek(activeSkipPrompt.target);
+                        }}
+                        className="pointer-events-auto flex transform cursor-pointer items-center gap-3 rounded-md px-6 py-3 text-lg font-semibold shadow-2xl backdrop-blur-md transition-all hover:scale-105"
+                        style={{ background: 'var(--vora-accent-500)', border: '1px solid var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}
+                    >
+                        {activeSkipPrompt.label}
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" /></svg>
                     </button>
                 </div>
@@ -423,6 +582,7 @@ export default function GlobalVideoPlayer() {
                                 onClick={handleProgressClick}
                                 style={{ background: 'rgba(255, 255, 255, 0.18)' }}
                             >
+                                <MarkerBands markers={markers} duration={duration} />
                                 <div className="absolute left-0 top-0 h-full rounded-full transition-all" style={{ width: `${progressPercent}%`, background: 'var(--vora-accent-500)' }} />
                                 <div
                                     className="absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full opacity-0 shadow-lg transition-opacity group-hover:opacity-100"

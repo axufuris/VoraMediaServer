@@ -609,6 +609,7 @@ function AccountTab({ serverId }: { serverId?: string }) {
                 </div>
             </section>
             <ShowtimesLocationSection serverId={serverId} />
+            <PlaybackPreferencesSection serverId={serverId} />
             <YouTubeToggleSection serverId={serverId} />
         </div>
     );
@@ -781,6 +782,110 @@ function ShowtimesLocationSection({ serverId }: { serverId?: string }) {
                                 Clear
                             </button>
                         )}
+                    </div>
+                </div>
+            )}
+        </section>
+    );
+}
+
+function PlaybackPreferencesSection({ serverId }: { serverId?: string }) {
+    const dialog = useDialog();
+    const [autoSkipIntro, setAutoSkipIntro] = useState(false);
+    const [autoSkipCredits, setAutoSkipCredits] = useState(false);
+    const [minSceneSeconds, setMinSceneSeconds] = useState(15);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [dirty, setDirty] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const prefs = await profileService.getMyPlaybackPreferences(serverId);
+                if (cancelled) return;
+                setAutoSkipIntro(prefs.autoSkipIntro);
+                setAutoSkipCredits(prefs.autoSkipCredits);
+                setMinSceneSeconds(prefs.minimumCreditsSceneSeconds);
+            } catch (err) {
+                console.error('Failed to load playback preferences', err);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [serverId]);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const saved = await profileService.saveMyPlaybackPreferences({
+                autoSkipIntro,
+                autoSkipCredits,
+                minimumCreditsSceneSeconds: minSceneSeconds
+            }, serverId);
+            setAutoSkipIntro(saved.autoSkipIntro);
+            setAutoSkipCredits(saved.autoSkipCredits);
+            setMinSceneSeconds(saved.minimumCreditsSceneSeconds);
+            setDirty(false);
+        } catch {
+            await dialog.alert('Could not save your playback preferences. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <section className="vora-card p-6">
+            <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Playback preferences</h2>
+            <p className="m-0 mb-4 text-sm" style={{ color: 'var(--vora-text-secondary)' }}>
+                Choose what gets skipped automatically during playback. Credit scenes (mid-credits and post-credits stingers) are never auto-skipped — you'll always get a button to jump to the next one.
+            </p>
+            {loading ? (
+                <div className="vora-skeleton h-24" />
+            ) : (
+                <div className="flex flex-col gap-4">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={autoSkipIntro}
+                            onChange={e => { setAutoSkipIntro(e.target.checked); setDirty(true); }}
+                            className="h-4 w-4 cursor-pointer"
+                        />
+                        <span style={{ color: 'var(--vora-text-primary)' }}>Auto-skip intros and recaps</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={autoSkipCredits}
+                            onChange={e => { setAutoSkipCredits(e.target.checked); setDirty(true); }}
+                            className="h-4 w-4 cursor-pointer"
+                        />
+                        <span style={{ color: 'var(--vora-text-primary)' }}>Auto-skip end credits (only when no credit scene follows)</span>
+                    </label>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                        <label className="text-sm" style={{ color: 'var(--vora-text-primary)' }}>
+                            Hide "Skip to scene" button if next scene is within
+                        </label>
+                        <input
+                            type="number"
+                            min={0}
+                            max={600}
+                            value={minSceneSeconds}
+                            onChange={e => { setMinSceneSeconds(Math.max(0, Math.min(600, parseInt(e.target.value || '0', 10)))); setDirty(true); }}
+                            className="vora-input w-24"
+                        />
+                        <span className="text-sm" style={{ color: 'var(--vora-text-muted)' }}>seconds</span>
+                    </div>
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={saving || !dirty}
+                            className="vora-button-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {saving ? 'Saving…' : 'Save'}
+                        </button>
                     </div>
                 </div>
             )}

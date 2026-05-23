@@ -1638,16 +1638,7 @@ namespace Vora.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<TimeSpan?>("CreditsStart")
-                        .HasColumnType("interval");
-
                     b.Property<TimeSpan?>("Duration")
-                        .HasColumnType("interval");
-
-                    b.Property<TimeSpan?>("IntroEnd")
-                        .HasColumnType("interval");
-
-                    b.Property<TimeSpan?>("IntroStart")
                         .HasColumnType("interval");
 
                     b.Property<Guid>("MediaItemId")
@@ -1659,6 +1650,36 @@ namespace Vora.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("MediaItemAnalysis");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Media.MediaItemMarker", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<TimeSpan>("End")
+                        .HasColumnType("interval");
+
+                    b.Property<Guid>("MediaItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeSpan>("Start")
+                        .HasColumnType("interval");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaItemId", "Type", "Order");
+
+                    b.ToTable("MediaItemMarkers");
                 });
 
             modelBuilder.Entity("Vora.Domain.Entities.Media.MediaPart", b =>
@@ -2502,6 +2523,9 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<string>("BackupConfigurationJson")
                         .HasColumnType("text");
 
+                    b.Property<double>("BlackFrameMinDurationSec")
+                        .HasColumnType("double precision");
+
                     b.Property<int>("DailyMixCount")
                         .HasColumnType("integer");
 
@@ -2611,6 +2635,12 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<bool>("EnableWeeklyMixes")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("EpisodeIntroClusterMinAgreementPct")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EpisodeIntroClusterToleranceSec")
+                        .HasColumnType("integer");
+
                     b.Property<int>("FolderWatcherPollingInterval")
                         .HasColumnType("integer");
 
@@ -2666,6 +2696,15 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<double>("SilenceMinDurationEpisodeSec")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("SilenceMinDurationMovieSec")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("SilenceThresholdOffsetDb")
+                        .HasColumnType("integer");
 
                     b.Property<string>("SmtpFromAddress")
                         .HasMaxLength(256)
@@ -2745,6 +2784,7 @@ namespace Vora.Infrastructure.Migrations
                             Id = "GLOBAL_SETTINGS",
                             AdminThemeId = "vora-default",
                             BackgroundX264Preset = 2,
+                            BlackFrameMinDurationSec = 0.5,
                             DailyMixCount = 6,
                             DailyMixDriftPercent = 20,
                             DailyMixMinPlays = 50,
@@ -2777,6 +2817,8 @@ namespace Vora.Infrastructure.Migrations
                             EnableReleaseCalendar = true,
                             EnableRemoteAccess = true,
                             EnableWeeklyMixes = true,
+                            EpisodeIntroClusterMinAgreementPct = 70,
+                            EpisodeIntroClusterToleranceSec = 5,
                             FolderWatcherPollingInterval = 30,
                             FolderWatcherProviderId = "polling_watcher",
                             HardwareTranscodingDevice = "Auto",
@@ -2793,6 +2835,9 @@ namespace Vora.Infrastructure.Migrations
                             RegistrationMode = 2,
                             RunDetections = 0,
                             ServerName = "Vora Server",
+                            SilenceMinDurationEpisodeSec = 1.0,
+                            SilenceMinDurationMovieSec = 1.5,
+                            SilenceThresholdOffsetDb = -12,
                             SmtpPort = 587,
                             SmtpUseImplicitSsl = false,
                             SmtpUseStartTls = true,
@@ -3604,6 +3649,12 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<bool>("AutoApproveRequests")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("AutoSkipCredits")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("AutoSkipIntro")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("BlockUnratedContent")
                         .HasColumnType("boolean");
 
@@ -3633,6 +3684,9 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<string>("LastFmUsername")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<int>("MinimumCreditsSceneSeconds")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -4273,6 +4327,17 @@ namespace Vora.Infrastructure.Migrations
                     b.Navigation("MediaItem");
                 });
 
+            modelBuilder.Entity("Vora.Domain.Entities.Media.MediaItemMarker", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Media.MediaItem", "MediaItem")
+                        .WithMany("Markers")
+                        .HasForeignKey("MediaItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MediaItem");
+                });
+
             modelBuilder.Entity("Vora.Domain.Entities.Media.MediaPart", b =>
                 {
                     b.HasOne("Vora.Domain.Entities.Media.MediaItem", "MediaItem")
@@ -4719,6 +4784,8 @@ namespace Vora.Infrastructure.Migrations
                     b.Navigation("Artwork");
 
                     b.Navigation("Cast");
+
+                    b.Navigation("Markers");
 
                     b.Navigation("MediaParts");
 

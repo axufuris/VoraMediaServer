@@ -22,6 +22,9 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
     public Task NotifyMediaAnalysisUpdatedAsync(Guid mediaItemId) =>
         hubContext.Clients.All.SendAsync("MediaAnalysisUpdated", mediaItemId);
 
+    public Task NotifyVideoThumbnailsReadyAsync(Guid mediaItemId) =>
+        hubContext.Clients.All.SendAsync("VideoThumbnailsReady", mediaItemId);
+
     public Task NotifySmartListsUpdatedAsync() =>
         hubContext.Clients.All.SendAsync("SmartListsUpdated");
 

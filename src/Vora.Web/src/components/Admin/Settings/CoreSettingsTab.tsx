@@ -365,6 +365,88 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 </div>
             </SettingsCard>
 
+            <SettingsCard title="Detection Tuning">
+                <div className="space-y-4">
+                    <div>
+                        <FieldLabel>Silence threshold offset (dB)</FieldLabel>
+                        <input
+                            type="number"
+                            min={-40}
+                            max={0}
+                            value={serverSettings.silenceThresholdOffsetDb}
+                            onChange={e => setServerSettings({ ...serverSettings, silenceThresholdOffsetDb: parseInt(e.target.value) || -12 })}
+                            className="vora-input w-32"
+                        />
+                        <FieldHint>How many dB below the file's mean volume counts as silence. -12 dB is a balanced default. Lower values (-18, -24) catch quieter mixes; higher values (-6) only flag near-perfect silence.</FieldHint>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <FieldLabel>Min silence duration — movies (seconds)</FieldLabel>
+                            <input
+                                type="number"
+                                min={0.2}
+                                max={10}
+                                step={0.1}
+                                value={serverSettings.silenceMinDurationMovieSec}
+                                onChange={e => setServerSettings({ ...serverSettings, silenceMinDurationMovieSec: parseFloat(e.target.value) || 1.5 })}
+                                className="vora-input w-32"
+                            />
+                        </div>
+                        <div>
+                            <FieldLabel>Min silence duration — episodes (seconds)</FieldLabel>
+                            <input
+                                type="number"
+                                min={0.2}
+                                max={10}
+                                step={0.1}
+                                value={serverSettings.silenceMinDurationEpisodeSec}
+                                onChange={e => setServerSettings({ ...serverSettings, silenceMinDurationEpisodeSec: parseFloat(e.target.value) || 1.0 })}
+                                className="vora-input w-32"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <FieldLabel>Min black-frame duration (seconds)</FieldLabel>
+                        <input
+                            type="number"
+                            min={0.1}
+                            max={10}
+                            step={0.1}
+                            value={serverSettings.blackFrameMinDurationSec}
+                            onChange={e => setServerSettings({ ...serverSettings, blackFrameMinDurationSec: parseFloat(e.target.value) || 0.5 })}
+                            className="vora-input w-32"
+                        />
+                        <FieldHint>Minimum length of solid black frames to count as a scene boundary. Combined with silence to locate intro/credit boundaries.</FieldHint>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <FieldLabel>TV season cluster tolerance (seconds)</FieldLabel>
+                            <input
+                                type="number"
+                                min={1}
+                                max={60}
+                                value={serverSettings.episodeIntroClusterToleranceSec}
+                                onChange={e => setServerSettings({ ...serverSettings, episodeIntroClusterToleranceSec: parseInt(e.target.value) || 5 })}
+                                className="vora-input w-32"
+                            />
+                            <FieldHint>±N seconds counts as the same intro/credits position across a season.</FieldHint>
+                        </div>
+                        <div>
+                            <FieldLabel>TV season cluster min agreement (%)</FieldLabel>
+                            <input
+                                type="number"
+                                min={50}
+                                max={100}
+                                value={serverSettings.episodeIntroClusterMinAgreementPct}
+                                onChange={e => setServerSettings({ ...serverSettings, episodeIntroClusterMinAgreementPct: parseInt(e.target.value) || 70 })}
+                                className="vora-input w-32"
+                            />
+                            <FieldHint>Episodes must agree within tolerance this often before the season median wins.</FieldHint>
+                        </div>
+                    </div>
+                </div>
+            </SettingsCard>
+
             <SettingsCard title="Real-Time File Watcher">
                 <div className="space-y-4">
                     <div>

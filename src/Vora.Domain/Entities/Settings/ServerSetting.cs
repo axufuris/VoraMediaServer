@@ -19,6 +19,20 @@ public class ServerSetting
     public DetectionTrigger RunDetections { get; set; } = DetectionTrigger.OnSchedule;
     public TimeSpan DetectionScheduleTime { get; set; } = new(3, 0, 0);
 
+    public int SilenceThresholdOffsetDb { get; set; } = -12;
+    public double SilenceMinDurationMovieSec { get; set; } = 1.5;
+    public double SilenceMinDurationEpisodeSec { get; set; } = 1.0;
+    public double BlackFrameMinDurationSec { get; set; } = 0.5;
+    public int EpisodeIntroClusterToleranceSec { get; set; } = 5;
+    public int EpisodeIntroClusterMinAgreementPct { get; set; } = 70;
+
+    public TimeSpan VideoThumbnailScheduleTime { get; set; } = new(4, 0, 0);
+    public int VideoThumbnailIntervalSeconds { get; set; } = 10;
+    public int VideoThumbnailWidth { get; set; } = 320;
+    public int VideoThumbnailHeight { get; set; } = 180;
+    public int VideoThumbnailJpegQuality { get; set; } = 5;
+    public int VideoThumbnailSpriteColumns { get; set; } = 10;
+
     public TimeSpan IptvSyncTime { get; set; } = new(4, 0, 0);
 
     public string FolderWatcherProviderId { get; set; } = "polling_watcher";

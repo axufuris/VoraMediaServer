@@ -11,6 +11,7 @@ public interface IClientNotifier
     Task NotifyMediaItemUpdatedAsync(Guid mediaItemId);
     Task NotifySmartListsUpdatedAsync();
     Task NotifyMediaAnalysisUpdatedAsync(Guid mediaItemId);
+    Task NotifyVideoThumbnailsReadyAsync(Guid mediaItemId);
     Task NotifyTasksUpdatedAsync();
     Task NotifyUserAccessUpdatedAsync(Guid userId);
     Task NotifyProfileAccessUpdatedAsync(Guid profileId);

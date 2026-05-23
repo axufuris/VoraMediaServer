@@ -48,6 +48,19 @@ export interface CreateLibraryRequest {
 
 export type UpdateLibraryRequest = Omit<MediaLibrary, 'id' | 'type' | 'isBeingWatched'>;
 
+export interface MarkerCoverageVM {
+    libraryId: string;
+    libraryName: string;
+    totalItems: number;
+    itemsWithAnyMarker: number;
+    itemsWithIntro: number;
+    itemsWithCredits: number;
+    itemsWithCreditsScene: number;
+    itemsWithRecap: number;
+    itemsWithPreview: number;
+    itemsMissingDuration: number;
+}
+
 export const libraryAdminService = {
     createLibrary: async (request: CreateLibraryRequest, serverId?: string): Promise<string> => {
         const response = await apiClient.post<string>('/libraries', request, { serverId });
@@ -108,5 +121,10 @@ export const libraryAdminService = {
 
     analyzeLibrary: async (libraryId: string, serverId?: string): Promise<void> => {
         await apiClient.post(`/libraries/${libraryId}/analyze`, null, { serverId });
+    },
+
+    getLibraryMarkerCoverage: async (libraryId: string, serverId?: string): Promise<MarkerCoverageVM> => {
+        const response = await apiClient.get<MarkerCoverageVM>(`/libraries/${libraryId}/marker-coverage`, { serverId });
+        return response.data;
     }
 };

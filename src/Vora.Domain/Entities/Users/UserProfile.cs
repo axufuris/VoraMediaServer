@@ -28,6 +28,10 @@ public class UserProfile
 
     public string? ShowtimesLocation { get; set; }
 
+    public bool AutoSkipIntro { get; set; }
+    public bool AutoSkipCredits { get; set; }
+    public int MinimumCreditsSceneSeconds { get; set; } = 15;
+
     public string? ClientTemplateId { get; set; }
     public string? ScheduleOverrideTemplateId { get; set; }
     public Guid? ScheduleOverrideScheduleId { get; set; }

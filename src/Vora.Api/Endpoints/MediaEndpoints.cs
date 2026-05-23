@@ -8,6 +8,11 @@ using Vora.Application.Tasks;
 
 namespace Vora.Api.Endpoints;
 
+public class MarkersLockDto
+{
+    public bool Locked { get; set; }
+}
+
 public static class MediaEndpoints
 {
     public static IEndpointRouteBuilder MapMediaEndpoints(this IEndpointRouteBuilder routes)
@@ -27,6 +32,16 @@ public static class MediaEndpoints
             .Produces(StatusCodes.Status404NotFound);
 
         readGroup.MapGet("/{id:guid}/up-next", GetUpNextAsync);
+        readGroup.MapGet("/{id:guid}/markers", GetMarkersAsync)
+            .Produces<List<MediaMarkerVM>>(StatusCodes.Status200OK);
+
+        var markerAdminGroup = routes.MapGroup("/api/media").WithTags("Media Markers (Admin)").RequireAuthorization("AdminOnly");
+        markerAdminGroup.MapPut("/{id:guid}/markers", ReplaceMarkersAsync)
+            .Produces(StatusCodes.Status204NoContent);
+        markerAdminGroup.MapGet("/{id:guid}/markers/lock", GetMarkersLockedAsync)
+            .Produces<MarkersLockDto>(StatusCodes.Status200OK);
+        markerAdminGroup.MapPut("/{id:guid}/markers/lock", SetMarkersLockedAsync)
+            .Produces<MarkersLockDto>(StatusCodes.Status200OK);
         readGroup.MapPost("/{id:guid}/played", SetPlayedAsync);
         readGroup.MapPut("/{id:guid}/rating", SetRatingAsync)
             .Produces(StatusCodes.Status204NoContent)
@@ -76,6 +91,30 @@ public static class MediaEndpoints
 
         group.MapPost("/actors/refresh", QueueRefreshAllActorsAsync)
             .Produces(StatusCodes.Status202Accepted);
+    }
+
+    private static async Task<IResult> GetMarkersAsync(Guid id, IMediaManager manager)
+    {
+        var markers = await manager.GetMarkersAsync(id);
+        return Results.Ok(markers);
+    }
+
+    private static async Task<IResult> ReplaceMarkersAsync(Guid id, [FromBody] List<MediaMarkerVM> body, IMediaManager manager)
+    {
+        await manager.ReplaceMarkersAsync(id, body ?? new List<MediaMarkerVM>());
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> GetMarkersLockedAsync(Guid id, IMediaManager manager)
+    {
+        var locked = await manager.GetMarkersLockedAsync(id);
+        return Results.Ok(new MarkersLockDto { Locked = locked });
+    }
+
+    private static async Task<IResult> SetMarkersLockedAsync(Guid id, [FromBody] MarkersLockDto body, IMediaManager manager)
+    {
+        await manager.SetMarkersLockedAsync(id, body.Locked);
+        return Results.Ok(new MarkersLockDto { Locked = body.Locked });
     }
 
     private static async Task<IResult> GetMediaItemAsync(Guid id, ClaimsPrincipal user, IMediaManager manager)
@@ -161,7 +200,7 @@ public static class MediaEndpoints
 
     private static IResult QueueAnalyzeAsync(Guid id, ITaskQueueManager taskQueue)
     {
-        taskQueue.QueueAnalyzeMediaItemContent(id);
+        taskQueue.QueueAnalyzeMediaItemContent(id, forceOverride: true);
         return Results.Accepted();
     }
 

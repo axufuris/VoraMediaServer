@@ -18,6 +18,11 @@ public interface IMediaManager
     Task<MediaDetailsVM?> GetMediaItemAsync(Guid id);
     Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId);
     Task<SeasonDetailsVM?> GetSeasonDetailsAsync(Guid seasonId);
+    Task<List<MediaMarkerVM>> GetMarkersAsync(Guid mediaItemId);
+    Task ReplaceMarkersAsync(Guid mediaItemId, IEnumerable<MediaMarkerVM> markers);
+    Task<bool> GetMarkersLockedAsync(Guid mediaItemId);
+    Task SetMarkersLockedAsync(Guid mediaItemId, bool locked);
+    Task<MarkerCoverageVM> GetLibraryMarkerCoverageAsync(Guid libraryId);
     Task UpdateMediaMetadataAsync(Guid id, UpdateMediaRequest request);
     Task UpdateSeasonMetadataAsync(Guid id, UpdateSeasonRequest request);
     Task DeleteMediaAsync(Guid id);
@@ -38,6 +43,7 @@ public class MediaManager : IMediaManager
     private readonly ISystemSettingsRepository _settingsRepository;
     private readonly IEnumerable<ILocalMediaScannerProvider> _scanners;
     private readonly IConfiguration _config;
+    private readonly Vora.Application.Thumbnails.IVideoThumbnailStorageService _thumbnailStorage;
     private readonly ILogger<MediaManager> _logger;
 
     public MediaManager(
@@ -48,6 +54,7 @@ public class MediaManager : IMediaManager
         ISystemSettingsRepository settingsRepository,
         IEnumerable<ILocalMediaScannerProvider> scanners,
         IConfiguration config,
+        Vora.Application.Thumbnails.IVideoThumbnailStorageService thumbnailStorage,
         ILogger<MediaManager> logger)
     {
         _repository = repository;
@@ -57,6 +64,7 @@ public class MediaManager : IMediaManager
         _settingsRepository = settingsRepository;
         _scanners = scanners;
         _config = config;
+        _thumbnailStorage = thumbnailStorage;
         _logger = logger;
     }
 
@@ -91,6 +99,50 @@ public class MediaManager : IMediaManager
 
     public Task<SeasonDetailsVM?> GetSeasonDetailsAsync(Guid seasonId) =>
         _repository.GetProjectedAsync(seasonId, SeasonDetailsVM.Projection);
+
+    public async Task<List<MediaMarkerVM>> GetMarkersAsync(Guid mediaItemId)
+    {
+        var markers = await _repository.GetMarkersAsync(mediaItemId);
+        return markers
+            .OrderBy(m => m.Start)
+            .Select(m => new MediaMarkerVM
+            {
+                Type = m.Type.ToString(),
+                StartSeconds = m.Start.TotalSeconds,
+                EndSeconds = m.End.TotalSeconds,
+                Order = m.Order
+            })
+            .ToList();
+    }
+
+    public async Task ReplaceMarkersAsync(Guid mediaItemId, IEnumerable<MediaMarkerVM> markers)
+    {
+        var entities = markers
+            .Where(m => m.EndSeconds > m.StartSeconds && m.StartSeconds >= 0)
+            .Select(m => new Domain.Entities.Media.MediaItemMarker
+            {
+                MediaItemId = mediaItemId,
+                Type = Enum.TryParse<Domain.Entities.Media.MarkerType>(m.Type, out var t) ? t : Domain.Entities.Media.MarkerType.Intro,
+                Start = TimeSpan.FromSeconds(m.StartSeconds),
+                End = TimeSpan.FromSeconds(m.EndSeconds),
+                Order = m.Order
+            })
+            .ToList();
+        await _repository.ReplaceMarkersAsync(mediaItemId, entities);
+        await _notifier.NotifyMediaAnalysisUpdatedAsync(mediaItemId);
+    }
+
+    public Task<bool> GetMarkersLockedAsync(Guid mediaItemId) =>
+        _repository.AreMarkersLockedAsync(mediaItemId);
+
+    public async Task SetMarkersLockedAsync(Guid mediaItemId, bool locked)
+    {
+        await _repository.SetMarkersLockedAsync(mediaItemId, locked);
+        await _notifier.NotifyMediaAnalysisUpdatedAsync(mediaItemId);
+    }
+
+    public Task<MarkerCoverageVM> GetLibraryMarkerCoverageAsync(Guid libraryId) =>
+        _repository.GetMarkerCoverageAsync(libraryId);
 
     public async Task UpdateMediaMetadataAsync(Guid id, UpdateMediaRequest request)
     {
@@ -145,6 +197,7 @@ public class MediaManager : IMediaManager
         var libraryId = item.LibraryId;
 
         CleanupOrphanedOverlay(item);
+        _thumbnailStorage.DeleteItemDirectory(id);
 
         await _repository.DeleteMediaItemAsync(id);
         await _notifier.NotifyLibraryUpdatedAsync(libraryId);
