@@ -36,7 +36,7 @@ public class MyAnimeListArtworkProvider : IArtworkProvider
                 Key = "client_id",
                 Label = "MAL Client ID",
                 Type = "text",
-                Description = "Your Application Client ID from your MyAnimeList developer portal."
+                Description = "MyAnimeList API Client ID (free). Sign in at https://myanimelist.net, then create an API client at https://myanimelist.net/apiconfig (App Type: 'Web', App Purpose: 'Other'). Copy the Client ID shown after saving — the Client Secret is not needed. This single Client ID also powers the MAL Discovery rows."
             }
         };
     }

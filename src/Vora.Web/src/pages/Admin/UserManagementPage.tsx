@@ -88,7 +88,7 @@ export default function UserManagementPage() {
                         <div>
                             <h2 className="text-base font-semibold text-[var(--vora-text-primary)]">Server Invites</h2>
                             <p className="text-sm text-[var(--vora-text-muted)] mt-0.5">
-                                Generate a temporary three-word code so a friend or family member can register an account on this server.
+                                Generate a temporary 4-digit PIN so a friend or family member can register an account on this server.
                             </p>
                         </div>
                         {!inviteCode && (
@@ -103,7 +103,7 @@ export default function UserManagementPage() {
                             <p className="text-xs uppercase tracking-widest font-semibold text-[var(--vora-accent-text)] mb-2">
                                 Expires in 30 minutes
                             </p>
-                            <p className="text-2xl font-bold tracking-widest uppercase text-[var(--vora-accent-active)] mb-3 font-mono">{inviteCode}</p>
+                            <p className="text-5xl font-bold tracking-[0.4em] text-[var(--vora-accent-active)] mb-3 font-mono">{inviteCode}</p>
                             <button
                                 type="button"
                                 onClick={() => setInviteCode(null)}

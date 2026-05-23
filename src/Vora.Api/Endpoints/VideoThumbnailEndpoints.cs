@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Vora.Application.Libraries;
 using Vora.Application.Media;
 using Vora.Application.Tasks;
 using Vora.Application.Thumbnails;
@@ -72,15 +73,17 @@ public static class VideoThumbnailEndpoints
         return Results.File(path, "image/jpeg", entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue(etag), lastModified: lastWriteUtc);
     }
 
-    private static IResult QueueRegenerateMediaItemAsync(Guid id, ITaskQueueManager taskQueue)
+    private static async Task<IResult> QueueRegenerateMediaItemAsync(Guid id, ITaskQueueManager taskQueue, IMediaRepository mediaRepository)
     {
-        taskQueue.QueueGenerateMediaItemVideoThumbnails(id, forceOverride: true);
+        var title = await mediaRepository.GetProjectedAsync(id, m => m.Title);
+        taskQueue.QueueGenerateMediaItemVideoThumbnails(id, title, forceOverride: true);
         return Results.Accepted();
     }
 
-    private static IResult QueueRegenerateLibraryAsync(Guid id, ITaskQueueManager taskQueue)
+    private static async Task<IResult> QueueRegenerateLibraryAsync(Guid id, ITaskQueueManager taskQueue, ILibraryRepository libraryRepository)
     {
-        taskQueue.QueueGenerateLibraryVideoThumbnails(id, forceOverride: true);
+        var name = await libraryRepository.GetProjectedByIdAsync(id, l => l.Name);
+        taskQueue.QueueGenerateLibraryVideoThumbnails(id, name, forceOverride: true);
         return Results.Accepted();
     }
 

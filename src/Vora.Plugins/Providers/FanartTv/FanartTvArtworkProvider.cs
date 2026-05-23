@@ -36,7 +36,7 @@ public class FanartTvArtworkProvider : IArtworkProvider
                 Key = "api_key",
                 Label = "Fanart.tv Project API Key",
                 Type = "password",
-                Description = "Your personal Project API Key from https://fanart.tv/get-an-api-key/"
+                Description = "Fanart.tv Project API Key (free). Create an account at https://fanart.tv/register, then generate a project key at https://fanart.tv/get-an-api-key/ and copy the 'Project Key' value. Personal Keys are not supported — use a Project Key."
             }
         };
     }

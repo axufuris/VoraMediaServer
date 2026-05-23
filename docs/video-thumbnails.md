@@ -1,0 +1,134 @@
+# Video preview thumbnails
+
+Scrub-bar preview thumbnails for the video player, analogous to Plex's hover thumbnails. One JPEG sprite sheet plus a WebVTT cue file per media item. Generation runs as a daily background pass; only libraries with the "Enable video preview thumbnails" checkbox turned on are processed, and only items in video-bearing libraries (Movies, TV, HomeVideos).
+
+## Storage
+
+Configured via `StoragePaths:VideoThumbnails` (env var `StoragePaths__VideoThumbnails`). Defaults to `<AppContext.BaseDirectory>/video-thumbnails`; in Docker it lives at `/app/data/video-thumbnails` under the existing `./Vora-data:/app/data` volume so the cache survives container rebuilds. **No new Docker volume is required.**
+
+Per-item layout, sharded by the first two hex chars of the GUID to keep directories manageable:
+
+```
+<root>/<shard>/<mediaItemId>/
+  sprite.jpg          # tiled JPEG: COLS × ROWS tiles at WxH each
+  thumbnails.vtt      # WebVTT cues, each referencing sprite.jpg#xywh=x,y,w,h
+  .version            # short hash of the settings used at generation time
+```
+
+The `.version` file is a hash of `(interval, width, height, jpegQuality, columns)`; the manager compares it against `MediaItem.VideoThumbnailSpriteVersion` to decide whether the existing artifacts are still current.
+
+## Server-wide settings
+
+All in `ServerSetting` (admin UI: System Settings → Video Preview Thumbnails):
+
+- `VideoThumbnailScheduleTime` — `TimeSpan`, default `04:00`. Daily run time. Mirrors the `DetectionScheduleTime` pattern.
+- `VideoThumbnailIntervalSeconds` — seconds between captured frames, default `10`.
+- `VideoThumbnailWidth` / `VideoThumbnailHeight` — tile size, default `320 × 180`.
+- `VideoThumbnailJpegQuality` — FFmpeg's `-qscale:v` (2–31, lower = better), default `5`.
+- `VideoThumbnailSpriteColumns` — tiles per row in the sprite, default `10`.
+
+Changing any of those bumps the sprite-version hash, so the next scheduled pass regenerates affected items (locked items still skip).
+
+## Per-library opt-in
+
+`MediaLibrary.EnableVideoPreviewThumbnails` (existing flag). The UI checkbox is hidden for Music, LiveTv, and any non-video MediaType; `LibraryManager.CreateLibraryAsync` and `UpdateLibraryAsync` also coerce the value to `false` server-side for those types, so a stale client can't enable it.
+
+When the flag flips `true → false`, `LibraryManager.UpdateLibraryAsync` calls `IVideoThumbnailManager.PurgeLibraryThumbnailsAsync` to wipe stored sprites for that library.
+
+## Per-item state
+
+On `MediaItem`:
+
+- `LastVideoThumbnailGenerationAt` — UTC timestamp of the most recent successful run.
+- `VideoThumbnailSpriteVersion` — the hash used when this item was generated.
+- `VideoThumbnailSpriteCount`, `VideoThumbnailIntervalSeconds`, `VideoThumbnailSpriteColumns`, `VideoThumbnailWidth`, `VideoThumbnailHeight` — what was actually produced (the API doesn't currently surface these, but they're available for future scrub-bar density tuning).
+
+## Lock semantics
+
+`LockedFields["Thumbnails"]` follows the same `LockableEntity` pattern as `LockedFields["Markers"]`. When present, both the scheduled pass and admin "Regenerate thumbnails" skip the item until the lock is removed. Exposed via:
+
+- `IMediaRepository.AreThumbnailsLockedAsync(Guid)` / `SetThumbnailsLockedAsync(Guid, bool)`
+- `GET / PUT /api/media/{id}/thumbnails/lock` (admin only)
+
+## Generation pipeline
+
+`FFmpegVideoThumbnailGeneratorService` runs a single FFmpeg invocation per video:
+
+```
+ffmpeg -y -i <input>
+  -vf "fps=1/<interval>,scale=W:H:force_original_aspect_ratio=decrease:flags=fast_bilinear,
+       pad=W:H:(ow-iw)/2:(oh-ih)/2:color=black,
+       tile=COLSxROWS"
+  -qscale:v <q> -frames:v 1 -an -sn
+  -c:v mjpeg -f image2 <out>
+```
+
+`tile` flattens the captured frames into a single JPEG. The scale + pad chain ensures every tile is exactly W × H even when the source aspect ratio differs (letterboxed with black). Frame count is `ceil(duration / interval)`; row count is `ceil(count / columns)`. Source duration comes from `ffprobe -show_entries format=duration`.
+
+The `-c:v mjpeg -f image2` pair is load-bearing: the temp file uses a `.jpg.tmp` suffix during atomic write, and FFmpeg's extension-based muxer autodetect chokes on `.tmp`. Pinning the codec to MJPEG and the muxer to `image2` makes the filename irrelevant.
+
+After the sprite lands on disk, the service synthesizes a WebVTT file:
+
+```
+WEBVTT
+
+00:00:00.000 --> 00:00:10.000
+sprite.jpg#xywh=0,0,320,180
+
+00:00:10.000 --> 00:00:20.000
+sprite.jpg#xywh=320,0,320,180
+
+...
+```
+
+Both files are written to `<final>.tmp` first, then atomically renamed.
+
+## Scheduling
+
+`ScheduledJobWorker` checks the schedule on its existing 5-minute timer. When `timeOfDay >= VideoThumbnailScheduleTime` and we haven't run today, it queries `ILibraryRepository.GetAllProjectedAsync` for libraries that have the checkbox on **and** a video-bearing `Type`, and enqueues `ITaskQueueManager.QueueGenerateLibraryVideoThumbnails` for each.
+
+Thumbnails are **never** queued on ingestion — they're background-only by design (matches the original spec). DVR recordings are explicitly out of scope.
+
+## API surface
+
+Authenticated client endpoints (any logged-in profile with access to the library):
+
+- `GET /api/media/{id}/thumbnails.vtt` — serves the cue file with ETag based on file mtime, long Cache-Control.
+- `GET /api/media/{id}/thumbnails.jpg` — serves the sprite, same caching shape.
+
+Admin endpoints (`AdminOnly`):
+
+- `POST /api/media/{id}/thumbnails/regenerate` — queues a single-item regen (forces override). Looks up `MediaItem.Title` first so the Background Tasks list shows `Generate Video Thumbnails: <item title>` instead of a raw GUID.
+- `POST /api/libraries/{id}/thumbnails/regenerate` — queues a library-wide regen. Same name-lookup treatment via `ILibraryRepository.GetProjectedByIdAsync(id, l => l.Name)`.
+- `GET /api/libraries/{id}/thumbnails/coverage` — returns `{ total, withThumbnails }` filtered to Movies + Episodes only.
+- `GET / PUT /api/media/{id}/thumbnails/lock` — read/toggle the `LockedFields["Thumbnails"]` flag.
+
+## Player integration
+
+`GlobalVideoPlayer` calls `useVideoThumbnails(mediaItemId, serverId)` from `components/Player/VideoScrubThumbnails.tsx`. The hook:
+
+1. Fetches the VTT with the Authorization header.
+2. Parses cues into `{ start, end, x, y, w, h }`.
+3. Fetches the sprite as a Blob, creates an object URL for it (`<img>` and CSS `background-image` don't send Authorization headers, so a static URL wouldn't work).
+4. Returns `{ available, width, height, spriteUrl, findCue }`. Binary search on `findCue`.
+5. Subscribes to the `VideoThumbnailsReady` SignalR event — if the currently-playing item finishes generation, the hook re-fetches without a refresh.
+
+`<ScrubThumbnail>` renders a `position: fixed`, pointer-events-none tile above the progress bar at `barRect.top - height - 14`. Background-position uses the cue's `x,y` to expose the right slice of the sprite. Hover/leave handlers on both the maximized and minimized scrub bars feed it `hoverPercent` and the bar's `getBoundingClientRect`.
+
+Live TV and DVR contexts are excluded from the hook (`playbackContextType !== 'LiveTv' && !== 'Dvr'`).
+
+## Admin UI
+
+- **System Settings → Video Preview Thumbnails** — schedule time, interval, width, height, JPEG quality, sprite columns.
+- **Manage Library** — `ThumbnailCoverageCard` shows `total / withThumbnails / missing`, plus a "Regenerate missing" button that calls the library admin endpoint, pops a confirmation dialog, and auto-refreshes the coverage stats so the user can watch the missing count tick down. The card hides itself for non-video library types.
+- **Media details page (admin menu)** — "Regenerate thumbnails" and "Lock/Unlock thumbnails" appear in the dropdown next to "Analyze media" for Movie and Episode items.
+
+## SignalR
+
+`IClientNotifier.NotifyVideoThumbnailsReadyAsync(Guid mediaItemId)` → SignalR event `VideoThumbnailsReady` carrying the media item id. Fired at the end of `VideoThumbnailManager.RunSingleAsync` after the DB row is updated.
+
+## What's intentionally out of scope
+
+- **DVR recordings** — they're finished MP4-ish files but don't sit in a `MediaLibrary` with the checkbox. Adding them later would require a separate server-level toggle.
+- **Per-library overrides** for interval/dimensions — settings are server-wide for now. Add `MediaLibrary` columns if denser intervals on movies vs. home videos become useful.
+- **On-ingestion auto-queue** — the original spec said background-only. Hook into `MediaIngestionService` later if "new uploads should have thumbnails within minutes" becomes a requirement.

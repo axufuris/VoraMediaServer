@@ -157,6 +157,7 @@ export default function CreateLibrary() {
 
     const isTvShow = library.type === 2;
     const showVideoOptions = library.type === 1 || library.type === 2;
+    const showVideoPreviewThumbnails = library.type === 1 || library.type === 2 || library.type === 4;
     const backUrl = serverId ? `/server/${serverId}/admin/libraries` : '/admin/libraries';
 
     return (
@@ -302,7 +303,7 @@ export default function CreateLibrary() {
                         <Checkbox checked={library.useLocalAssets} onChange={v => handleChange('useLocalAssets', v)} label="Use local assets" />
                         {showVideoOptions && <Checkbox checked={library.findExtras} onChange={v => handleChange('findExtras', v)} label="Find extras" />}
                         {showVideoOptions && <Checkbox checked={library.onlyShowTrailers} onChange={v => handleChange('onlyShowTrailers', v)} label="Only show trailers" />}
-                        <Checkbox checked={library.enableVideoPreviewThumbnails} onChange={v => handleChange('enableVideoPreviewThumbnails', v)} label="Enable video preview thumbnails" />
+                        {showVideoPreviewThumbnails && <Checkbox checked={library.enableVideoPreviewThumbnails} onChange={v => handleChange('enableVideoPreviewThumbnails', v)} label="Enable video preview thumbnails" />}
                         {showVideoOptions && <Checkbox checked={library.enableCreditsDetection} onChange={v => handleChange('enableCreditsDetection', v)} label="Enable credits detection" />}
                         {showVideoOptions && <Checkbox checked={library.enableVoiceActivityDetection} onChange={v => handleChange('enableVoiceActivityDetection', v)} label="Enable voice activity detection" />}
                     </div>

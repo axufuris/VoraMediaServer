@@ -131,6 +131,17 @@ export default function RegisterPage() {
         );
     }
 
+    if (registrationMode === 3 && !invitedEmail) {
+        return (
+            <AuthLayout title="Invitation Required" subtitle="This server is invite-only.">
+                <p className="text-sm mb-4" style={{ color: 'var(--vora-text-secondary)' }}>
+                    Ask the server administrator to send you an email invitation. The link in that email will bring you back here with everything pre-filled.
+                </p>
+                <Link to="/login" className="vora-button-secondary block text-center cursor-pointer">Return to Login</Link>
+            </AuthLayout>
+        );
+    }
+
     const isInvited = invitedEmail !== null;
     const showSecretCode = !isInvited && registrationMode === 2;
 
@@ -175,9 +186,19 @@ export default function RegisterPage() {
                             border: '1px solid var(--vora-accent-500)',
                         }}
                     >
-                        <label className="block text-sm font-bold mb-1" style={{ color: 'var(--vora-accent-text)' }}>Secret Invite Code</label>
-                        <p className="text-xs mb-2" style={{ color: 'var(--vora-text-muted)' }}>Enter the 3-word code provided by the server admin.</p>
-                        <input required type="text" value={secretCode} onChange={e => setSecretCode(e.target.value)} className="vora-input w-full" placeholder="e.g. apple-river-cloud" />
+                        <label className="block text-sm font-bold mb-1" style={{ color: 'var(--vora-accent-text)' }}>Invite PIN</label>
+                        <p className="text-xs mb-2" style={{ color: 'var(--vora-text-muted)' }}>Enter the 4-digit PIN provided by the server admin.</p>
+                        <input
+                            required
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]{4}"
+                            maxLength={4}
+                            value={secretCode}
+                            onChange={e => setSecretCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                            className="vora-input w-full text-center text-2xl font-mono tracking-[0.5em]"
+                            placeholder="0000"
+                        />
                     </div>
                 )}
 

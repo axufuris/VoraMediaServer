@@ -1,7 +1,37 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import { systemSettingsAdminService, type PluginSettingField } from '../../../api/System/systemSettingsAdminService';
 import { type PluginVM } from '../../../api/System/pluginAdminService';
 import FolderPathInput from '../FolderBrowser/FolderPathInput';
+
+const URL_PATTERN = /https?:\/\/[^\s)]+[^\s).,;:!?]/g;
+
+function renderDescriptionWithLinks(text: string): ReactNode {
+    const parts: ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    URL_PATTERN.lastIndex = 0;
+    while ((match = URL_PATTERN.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+            parts.push(text.substring(lastIndex, match.index));
+        }
+        parts.push(
+            <a
+                key={`link-${match.index}`}
+                href={match[0]}
+                target="_blank"
+                rel="noreferrer"
+                className="underline hover:text-[var(--vora-accent-500)]"
+            >
+                {match[0]}
+            </a>
+        );
+        lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+        parts.push(text.substring(lastIndex));
+    }
+    return parts;
+}
 
 interface PluginSettingsTabProps {
     serverId?: string;
@@ -109,7 +139,7 @@ export function PluginSection({ serverId, plugin, showModal, onAfterChange }: { 
                     {configurableFields.map(field => (
                         <div key={field.key}>
                             <label className="block text-xs font-bold text-[var(--vora-text-secondary)] mb-0.5">{field.label}</label>
-                            {field.description && <p className="text-[11px] text-[var(--vora-text-muted)] mb-1.5">{field.description}</p>}
+                            {field.description && <p className="text-[11px] text-[var(--vora-text-muted)] mb-1.5">{renderDescriptionWithLinks(field.description)}</p>}
                             {field.type === 'boolean' || field.type === 'checkbox' ? (
                                 <label className="flex items-center gap-2 cursor-pointer w-max">
                                     <input

@@ -18,7 +18,8 @@ internal static class M3uChannelParser
     private static readonly Regex RadioAttrRegex = new(@"radio=""(true|1|yes)""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex TvgTypeAudioRegex = new(@"tvg-type=""audio""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex RadioGroupRegex = new(@"\b(radio|music|fm|am)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex IdCountryRegex = new(@"\.([a-zA-Z]{2})@", RegexOptions.Compiled);
+    private static readonly Regex TvgCountryRegex = new(@"tvg-country=""([a-zA-Z]{2})""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex IdCountryRegex = new(@"\.(US|UK|GB|CA|AU|NZ|IE|FR|DE|ES|IT|MX|BR|AR|GR|IN|RU|JP|KR|CN|NL|BE|PT|PL|SE|NO|DK|FI|CH|AT|ZA)(?:@|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex IdResolutionRegex = new(@"@(1080p|720p|480p|fhd|hd|sd|4k)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex NameResolutionRegex = new(@"(?i)\b(1080p|720p|480p|fhd|hd|sd|4k)\b", RegexOptions.Compiled);
     private static readonly Regex NameCountryRegex = new(@"(?i)\b(US|UK|CA|AU|FR|DE|ES|IT|MX|GR|IN|RU)\b", RegexOptions.Compiled);
@@ -57,7 +58,7 @@ internal static class M3uChannelParser
         }
 
         var rawName = ExtractRawName(line);
-        var (resolution, countryCode, cleanedName) = ExtractMetadata(extId, rawName);
+        var (resolution, countryCode, cleanedName) = ExtractMetadata(extId, rawName, line);
 
         var logoMatch = TvgLogoRegex.Match(line);
         var groupMatch = GroupTitleRegex.Match(line);
@@ -132,13 +133,19 @@ internal static class M3uChannelParser
             : DefaultChannelName;
     }
 
-    private static (string? Resolution, string? CountryCode, string CleanedName) ExtractMetadata(string extId, string rawName)
+    private static (string? Resolution, string? CountryCode, string CleanedName) ExtractMetadata(string extId, string rawName, string rawLine)
     {
         string? resolution = null;
         string? countryCode = null;
 
-        var idCountryMatch = IdCountryRegex.Match(extId);
-        if (idCountryMatch.Success) countryCode = idCountryMatch.Groups[1].Value.ToUpper();
+        var tvgCountryMatch = TvgCountryRegex.Match(rawLine);
+        if (tvgCountryMatch.Success) countryCode = tvgCountryMatch.Groups[1].Value.ToUpper();
+
+        if (string.IsNullOrEmpty(countryCode))
+        {
+            var idCountryMatch = IdCountryRegex.Match(extId);
+            if (idCountryMatch.Success) countryCode = idCountryMatch.Groups[1].Value.ToUpper();
+        }
 
         var idResMatch = IdResolutionRegex.Match(extId);
         if (idResMatch.Success) resolution = idResMatch.Groups[1].Value.ToUpper();
@@ -159,6 +166,11 @@ internal static class M3uChannelParser
 
         rawName = BracketRegex.Replace(rawName, string.Empty);
         var cleanedName = WhitespaceRegex.Replace(rawName, " ").Trim(' ', '-');
+
+        if (string.Equals(countryCode, "GB", StringComparison.OrdinalIgnoreCase))
+        {
+            countryCode = "UK";
+        }
 
         return (resolution, countryCode, cleanedName);
     }

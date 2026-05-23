@@ -14,6 +14,7 @@ import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeB
 import PlayerSettingsPanel from './Panels/PlayerSettingsPanel';
 import PlayerInfoPanel from './Panels/PlayerInfoPanel';
 import UpNextOverlay from './Panels/UpNextOverlay';
+import { useVideoThumbnails, ScrubThumbnail } from './VideoScrubThumbnails';
 
 type VideoTrackType = NonNullable<MediaPart['videoTracks']>[number];
 type AudioTrackType = NonNullable<MediaPart['audioTracks']>[number];
@@ -314,6 +315,11 @@ export default function GlobalVideoPlayer() {
 
     const toggleFullScreen = useFullscreen(playerContainerRef);
 
+    const thumbnailsEligible = currentMedia?.playbackContextType !== 'LiveTv' && currentMedia?.playbackContextType !== 'Dvr';
+    const thumbnails = useVideoThumbnails(thumbnailsEligible ? currentMedia?.id : undefined, serverId);
+    const [hoverPercent, setHoverPercent] = useState<number | null>(null);
+    const [hoverBarRect, setHoverBarRect] = useState<DOMRect | null>(null);
+
     if (!currentMedia) return null;
 
     const isEpisode = mediaDetails?.type === 'Episode' || /^S\d+\s*E\d+/i.test(currentMedia.subtitle ?? '');
@@ -333,6 +339,21 @@ export default function GlobalVideoPlayer() {
         const percent = (e.clientX - bounds.left) / bounds.width;
         seek(percent * duration);
     };
+
+    const handleProgressHover = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!isFinite(duration) || duration <= 0) return;
+        const bounds = e.currentTarget.getBoundingClientRect();
+        const percent = Math.max(0, Math.min(1, (e.clientX - bounds.left) / bounds.width));
+        setHoverPercent(percent);
+        setHoverBarRect(bounds);
+    };
+
+    const handleProgressLeave = () => {
+        setHoverPercent(null);
+        setHoverBarRect(null);
+    };
+
+    const hoverCue = hoverPercent !== null ? thumbnails.findCue(hoverPercent * duration) : null;
 
     const handlePlayNext = async (item: UpNextItemVM) => {
         const deviceId = localStorage.getItem('device_id') || 'unknown';
@@ -419,6 +440,18 @@ export default function GlobalVideoPlayer() {
                 />
             )}
 
+            {thumbnails.available && (
+                <ScrubThumbnail
+                    hoverPercent={hoverPercent}
+                    duration={duration}
+                    barRect={hoverBarRect}
+                    cue={hoverCue}
+                    spriteUrl={thumbnails.spriteUrl}
+                    width={thumbnails.width}
+                    height={thumbnails.height}
+                />
+            )}
+
             {isMinimized && (
                 <div className="z-10 flex h-full w-full flex-1 items-center justify-between px-6">
                     <div className="flex w-1/4 items-center gap-4">
@@ -464,6 +497,8 @@ export default function GlobalVideoPlayer() {
                             <div
                                 className="group relative h-1.5 flex-1 cursor-pointer rounded-full"
                                 onClick={handleProgressClick}
+                                onMouseMove={handleProgressHover}
+                                onMouseLeave={handleProgressLeave}
                                 style={{ background: 'rgba(255, 255, 255, 0.12)' }}
                             >
                                 <MarkerBands markers={markers} duration={duration} />
@@ -580,6 +615,8 @@ export default function GlobalVideoPlayer() {
                             <div
                                 className="group relative h-1.5 flex-1 cursor-pointer rounded-full"
                                 onClick={handleProgressClick}
+                                onMouseMove={handleProgressHover}
+                                onMouseLeave={handleProgressLeave}
                                 style={{ background: 'rgba(255, 255, 255, 0.18)' }}
                             >
                                 <MarkerBands markers={markers} duration={duration} />

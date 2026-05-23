@@ -43,7 +43,7 @@ public class TvdbMetadataProvider : IMetadataProvider
                 Key = "api_key",
                 Label = "TVDB API Key",
                 Type = "password",
-                Description = "Your personal API key from https://www.thetvdb.com/"
+                Description = "TVDB v4 API key. Requires a subscriber account — sign up at https://thetvdb.com/subscribe. Once subscribed, generate the key at https://thetvdb.com/dashboard/account/apikey and paste it here. Vora exchanges it for a session token automatically and caches that token in plugin settings."
             }
         };
     }

@@ -5,11 +5,13 @@ import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import YouTubeVideoCard from '../../../components/YouTube/YouTubeVideoCard';
 import { useDialog } from '../../../dialogs';
+import { useYouTubeWatchedSet } from '../../../hooks/useYouTubeWatchedSet';
 
 export default function YouTubeChannelPage() {
     const { serverId, channelId } = useParams<{ serverId?: string; channelId: string }>();
     const navigate = useNavigate();
     const dialog = useDialog();
+    const watchedSet = useYouTubeWatchedSet(serverId);
     const [channel, setChannel] = useState<YouTubeChannel | null>(null);
     const [videos, setVideos] = useState<YouTubeVideo[]>([]);
     const [nextPageToken, setNextPageToken] = useState<string | undefined>(undefined);
@@ -187,6 +189,7 @@ export default function YouTubeChannelPage() {
                                     durationSeconds={video.durationSeconds}
                                     viewCount={video.viewCount}
                                     publishedAt={video.publishedAt}
+                                    watched={watchedSet.has(video.videoId)}
                                     serverId={serverId}
                                 />
                             ))}

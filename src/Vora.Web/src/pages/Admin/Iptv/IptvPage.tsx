@@ -33,7 +33,7 @@ const FREE_PLAYLISTS: FreePlaylist[] = [
     { name: "US — IPTV Org (full country)", m3u: "https://iptv-org.github.io/iptv/countries/us.m3u", supportsWeb: true, maxConnections: 0, defaultKind: "Tv" },
     // TV — Greece — iptv-org country playlist (pairs with GreekTVApp + epgshare01 GR1 EPGs).
     { name: "Greece — IPTV Org", m3u: "https://iptv-org.github.io/iptv/countries/gr.m3u", supportsWeb: true, maxConnections: 0, defaultKind: "Tv" },
-    { name: "Greece — Free-Greek-IPTV", m3u: "https://raw.githubusercontent.com/free-greek-iptv/greek-iptv/master/greek-iptv.m3u", supportsWeb: true, maxConnections: 0, defaultKind: "Tv" },
+    { name: "Greece — Free-Greek-IPTV", m3u: "https://raw.githubusercontent.com/free-greek-iptv/greek-iptv/master/android.m3u", supportsWeb: true, maxConnections: 0, defaultKind: "Tv" },
     // Radio — Radio Browser's live API. Endpoints generate up-to-date M3Us; hidebroken=true filters dead streams.
     { name: "Radio — Top 100 Worldwide (Radio Browser)", m3u: "https://de1.api.radio-browser.info/m3u/stations/topclick/100", supportsWeb: true, maxConnections: 0, defaultKind: "Radio" },
     { name: "Radio — Top 200 Most Voted (Radio Browser)", m3u: "https://de1.api.radio-browser.info/m3u/stations/topvote/200", supportsWeb: true, maxConnections: 0, defaultKind: "Radio" },

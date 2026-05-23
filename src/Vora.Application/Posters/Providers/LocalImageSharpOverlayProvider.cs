@@ -29,6 +29,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
     private const float CompositeLogoTopPct = 0.10f;
     private const float CompositeTextYPct = 0.75f;
     private const int CompositeMaxItems = 3;
+    private const int MinPosterWidthPx = 1500;
 
     private static readonly JsonSerializerOptions ConfigurationParseOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -68,6 +69,20 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         }
 
         using var baseImage = await Image.LoadAsync<Rgba32>(originalArtworkPath);
+
+        if (baseImage.Width < MinPosterWidthPx)
+        {
+            var scale = (double)MinPosterWidthPx / baseImage.Width;
+            var newWidth = MinPosterWidthPx;
+            var newHeight = (int)Math.Round(baseImage.Height * scale);
+            baseImage.Mutate(x => x.Resize(new ResizeOptions
+            {
+                Size = new Size(newWidth, newHeight),
+                Mode = ResizeMode.Stretch,
+                Sampler = KnownResamplers.Lanczos3
+            }));
+        }
+
         var basePath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "Overlays");
 
         foreach (var element in layoutElements)
@@ -97,11 +112,14 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         return $"{CustomArtworkUrlPrefix}{outputFileName}";
     }
 
+    private const string CacheKeyVersion = "v3-hires-canvas";
+
     private static string ComputeOverlayCacheKey(OverlayMediaDto item, string originalArtworkPath, string templateJson)
     {
         var sourceInfo = new FileInfo(originalArtworkPath);
 
         var builder = new StringBuilder();
+        builder.Append(CacheKeyVersion).Append('|');
         builder.Append(templateJson).Append('|');
         builder.Append(sourceInfo.Length).Append('|');
         builder.Append(sourceInfo.LastWriteTimeUtc.Ticks).Append('|');
@@ -315,9 +333,19 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
             return;
         }
 
-        var scoreText = BadgeResolver.IsRottenTomatoesLogo(rating.ImagePath)
-            ? $"{Math.Round(rating.Score)}%"
-            : rating.Score.ToString("0.0");
+        string scoreText;
+        if (BadgeResolver.IsRottenTomatoesLogo(rating.ImagePath))
+        {
+            scoreText = $"{Math.Round(rating.Score)}%";
+        }
+        else if (BadgeResolver.IsVoraStarLogo(rating.ImagePath))
+        {
+            scoreText = (rating.Score / 2m).ToString("0.0");
+        }
+        else
+        {
+            scoreText = rating.Score.ToString("0.0");
+        }
 
         var textOptions = new RichTextOptions(font)
         {

@@ -46,7 +46,7 @@ public class TheAudioDbMusicArtworkProvider : IMusicArtworkProvider
                 Label = "TheAudioDB API Key",
                 Type = "password",
                 DefaultValue = DefaultApiKey,
-                Description = "Your TheAudioDB API key. Leave as \"2\" to use the public test key (rate-limited, not for heavy use)."
+                Description = "TheAudioDB API key. The default value \"2\" is the public test key (rate-limited; fine for trying it out). For production use, support the project on Patreon at https://www.patreon.com/theaudiodb — supporters at the $1+/month tier receive a personal API key via Patreon DM. See https://www.theaudiodb.com/api_guide.php for current details."
             }
         };
     }

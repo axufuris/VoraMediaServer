@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { libraryService, type MediaLibrary } from '../../../api/Media/libraryService';
-import { libraryAdminService, type MarkerCoverageVM } from '../../../api/Media/libraryAdminService';
+import { libraryAdminService, type MarkerCoverageVM, type ThumbnailCoverageVM } from '../../../api/Media/libraryAdminService';
 import { pluginAdminService, type PluginOptionVM } from '../../../api/System/pluginAdminService';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import FolderPathInput from '../../../components/Admin/FolderBrowser/FolderPathInput';
+import { useDialog } from '../../../dialogs';
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
     return <h2 className="text-base font-semibold text-[var(--vora-text-primary)] pb-2 border-b border-[var(--vora-border-subtle)]">{children}</h2>;
@@ -85,6 +86,86 @@ function MarkerCoverageCard({ libraryId, serverId }: { libraryId: string, server
             )}
             <p className="text-xs" style={{ color: 'var(--vora-text-muted)' }}>
                 Counts are over movies + episodes only. Items with locked markers are skipped by automatic re-analysis and keep whatever markers were last saved.
+            </p>
+        </div>
+    );
+}
+
+function ThumbnailCoverageCard({ libraryId, libraryType, enabled, serverId }: { libraryId: string, libraryType: string, enabled: boolean, serverId?: string }) {
+    const [coverage, setCoverage] = useState<ThumbnailCoverageVM | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [regenerating, setRegenerating] = useState(false);
+    const dialog = useDialog();
+
+    const isVideoType = ['movie', 'tvshow', 'homevideo'].includes(libraryType.toLowerCase());
+
+    const load = async () => {
+        if (!isVideoType) return;
+        setLoading(true);
+        try {
+            const data = await libraryAdminService.getLibraryThumbnailCoverage(libraryId, serverId);
+            setCoverage(data);
+        } catch (err) {
+            console.error('Failed to load thumbnail coverage', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void load();
+    }, [libraryId, serverId, isVideoType]);
+
+    const regenerate = async () => {
+        setRegenerating(true);
+        try {
+            await libraryAdminService.regenerateLibraryThumbnails(libraryId, serverId);
+            await dialog.alert('Video thumbnail generation started in the background!');
+            void load();
+        } catch (err) {
+            console.error('Failed to queue thumbnail regeneration', err);
+            await dialog.alert('Failed to queue thumbnail regeneration.');
+        } finally {
+            setRegenerating(false);
+        }
+    };
+
+    if (!isVideoType) return null;
+    if (!coverage && !loading) return null;
+
+    const pct = coverage && coverage.total > 0 ? Math.round((coverage.withThumbnails / coverage.total) * 100) : 0;
+
+    return (
+        <div className="vora-card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Video preview thumbnails</h2>
+                <div className="flex items-center gap-2">
+                    <button type="button" onClick={load} disabled={loading} className="vora-button-secondary text-xs disabled:opacity-50">
+                        {loading ? 'Refreshing…' : 'Refresh'}
+                    </button>
+                    <button type="button" onClick={regenerate} disabled={regenerating || !enabled} className="vora-button-secondary text-xs disabled:opacity-50" title={enabled ? '' : 'Enable the checkbox in library settings first'}>
+                        {regenerating ? 'Queued…' : 'Regenerate missing'}
+                    </button>
+                </div>
+            </div>
+            {!enabled && (
+                <p className="text-xs" style={{ color: 'var(--vora-warning-text)' }}>
+                    Thumbnails are disabled for this library. Turn on "Enable video preview thumbnails" above to start generation on the next scheduled pass.
+                </p>
+            )}
+            {coverage && coverage.total === 0 ? (
+                <p className="text-sm" style={{ color: 'var(--vora-text-muted)' }}>This library has no movies or episodes yet.</p>
+            ) : coverage ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <CoverageStat label="Total items" value={`${coverage.total}`} />
+                    <CoverageStat label="With thumbnails" value={`${coverage.withThumbnails} (${pct}%)`} />
+                    <CoverageStat label="Missing" value={`${coverage.total - coverage.withThumbnails}`} warn={coverage.total - coverage.withThumbnails > 0} />
+                </div>
+            ) : (
+                <div className="vora-skeleton h-20" />
+            )}
+            <p className="text-xs" style={{ color: 'var(--vora-text-muted)' }}>
+                Generation runs daily at the time set in System Settings → Video Preview Thumbnails. Items with locked thumbnails are skipped. "Regenerate missing" enqueues this library now.
             </p>
         </div>
     );
@@ -207,6 +288,7 @@ export default function ManageLibrary() {
     const availableArtworkProviders = artworkProviders.filter(p => !p.supportedLibraryTypes || p.supportedLibraryTypes.includes(currentTypeStr));
     const isTvShow = library.type.toLowerCase() === 'tvshow';
     const showVideoOptions = library.type.toLowerCase() === 'movie' || library.type.toLowerCase() === 'tvshow';
+    const showVideoPreviewThumbnails = library.type.toLowerCase() === 'movie' || library.type.toLowerCase() === 'tvshow' || library.type.toLowerCase() === 'homevideo';
     const backUrl = serverId ? `/server/${serverId}/admin/libraries` : '/admin/libraries';
 
     return (
@@ -301,6 +383,8 @@ export default function ManageLibrary() {
                 </div>
 
                 <MarkerCoverageCard libraryId={library.id} serverId={serverId} />
+
+                <ThumbnailCoverageCard libraryId={library.id} libraryType={library.type} enabled={library.enableVideoPreviewThumbnails} serverId={serverId} />
 
                 <div className="vora-card p-6 space-y-6">
                     <SectionHeading>General</SectionHeading>
@@ -410,7 +494,7 @@ export default function ManageLibrary() {
                         <Checkbox checked={library.useLocalAssets} onChange={v => handleChange('useLocalAssets', v)} label="Use local assets" />
                         {showVideoOptions && <Checkbox checked={library.findExtras} onChange={v => handleChange('findExtras', v)} label="Find extras" />}
                         {showVideoOptions && <Checkbox checked={library.onlyShowTrailers} onChange={v => handleChange('onlyShowTrailers', v)} label="Only show trailers" />}
-                        <Checkbox checked={library.enableVideoPreviewThumbnails} onChange={v => handleChange('enableVideoPreviewThumbnails', v)} label="Enable video preview thumbnails" />
+                        {showVideoPreviewThumbnails && <Checkbox checked={library.enableVideoPreviewThumbnails} onChange={v => handleChange('enableVideoPreviewThumbnails', v)} label="Enable video preview thumbnails" />}
                         {showVideoOptions && <Checkbox checked={library.enableCreditsDetection} onChange={v => handleChange('enableCreditsDetection', v)} label="Enable credits detection" />}
                         {showVideoOptions && <Checkbox checked={library.enableVoiceActivityDetection} onChange={v => handleChange('enableVoiceActivityDetection', v)} label="Enable voice activity detection" />}
                     </div>

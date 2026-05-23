@@ -39,7 +39,7 @@ public class TmdbMetadataProvider : IMetadataProvider
                 Key = "api_key",
                 Label = "TMDB API Key",
                 Type = "password",
-                Description = "Your personal v3 API key from https://www.themoviedb.org/?language=en-US"
+                Description = "Free TMDB v3 API key. Sign up at https://www.themoviedb.org/signup, then request a key under Settings → API (https://www.themoviedb.org/settings/api) and click 'Create'. Copy the 'API Key (v3 auth)' value — not the Read Access Token."
             }
         };
     }

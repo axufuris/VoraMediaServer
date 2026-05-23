@@ -32,7 +32,7 @@ public class TraktCollectionSyncProvider : ICollectionSyncProvider
     {
         return new List<PluginSettingDefinitionDto>
         {
-            new PluginSettingDefinitionDto { Key = "client_id", Label = "Trakt Client ID", Type = "password", Description = "Your Trakt API Client ID" }
+            new PluginSettingDefinitionDto { Key = "client_id", Label = "Trakt Client ID", Type = "password", Description = "Trakt API Client ID (free). Create a Trakt account at https://trakt.tv, then register a new application at https://trakt.tv/oauth/applications/new (any Name; set Redirect URI to 'urn:ietf:wg:oauth:2.0:oob'). After saving, copy the 'Client ID' value shown on the app page — the Client Secret is not needed. This same Client ID is also used by the Trakt chronology provider." }
         };
     }
 

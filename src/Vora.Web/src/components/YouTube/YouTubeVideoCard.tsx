@@ -10,6 +10,7 @@ interface YouTubeVideoCardProps {
     viewCount?: number;
     publishedAt?: string;
     progressPercent?: number;
+    watched?: boolean;
     serverId?: string;
     width?: number;
 }
@@ -24,6 +25,7 @@ export default function YouTubeVideoCard({
     viewCount,
     publishedAt,
     progressPercent,
+    watched,
     serverId,
     width = 280,
 }: YouTubeVideoCardProps) {
@@ -65,14 +67,29 @@ export default function YouTubeVideoCard({
                 }}
             >
                 {thumbnailUrl ? (
-                    <img src={thumbnailUrl} alt={title} loading="lazy" className="h-full w-full object-cover" />
+                    <img
+                        src={thumbnailUrl}
+                        alt={title}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-opacity"
+                        style={{ opacity: watched ? 0.5 : 1 }}
+                    />
                 ) : (
-                    <div className="flex h-full w-full items-center justify-center" style={{ color: 'var(--vora-text-muted)' }}>
+                    <div className="flex h-full w-full items-center justify-center" style={{ color: 'var(--vora-text-muted)', opacity: watched ? 0.5 : 1 }}>
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <rect x="3" y="3" width="18" height="18" rx="2" />
                             <polygon points="10 8 16 12 10 16 10 8" />
                         </svg>
                     </div>
+                )}
+                {watched && (
+                    <span
+                        className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full"
+                        style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)' }}
+                        title="Watched"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                    </span>
                 )}
                 {durationSeconds != null && durationSeconds > 0 && (
                     <span

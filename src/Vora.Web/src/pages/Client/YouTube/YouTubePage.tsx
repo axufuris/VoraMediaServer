@@ -6,10 +6,13 @@ import MediaRail from '../../../components/Client/Primitives/MediaRail';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import YouTubeVideoCard from '../../../components/YouTube/YouTubeVideoCard';
 import { useDialog } from '../../../dialogs';
+import { useYouTubeWatchedSet } from '../../../hooks/useYouTubeWatchedSet';
 
 export default function YouTubePage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const dialog = useDialog();
+    const watchedSet = useYouTubeWatchedSet(serverId);
+    const isWatched = (videoId: string) => watchedSet.has(videoId);
 
     const [feed, setFeed] = useState<YouTubeHomeFeed | null>(null);
     const [isLoadingFeed, setIsLoadingFeed] = useState(true);
@@ -133,9 +136,10 @@ export default function YouTubePage() {
                     hasMore={Boolean(searchNextPageToken)}
                     isLoadingMore={isLoadingMore}
                     onLoadMore={handleLoadMore}
+                    isWatched={isWatched}
                 />
             ) : (
-                <FeedSections feed={feed} isLoading={isLoadingFeed} error={feedError} serverId={serverId} />
+                <FeedSections feed={feed} isLoading={isLoadingFeed} error={feedError} serverId={serverId} isWatched={isWatched} />
             )}
         </div>
     );
@@ -146,9 +150,10 @@ interface FeedSectionsProps {
     isLoading: boolean;
     error: string | null;
     serverId?: string;
+    isWatched: (videoId: string) => boolean;
 }
 
-function FeedSections({ feed, isLoading, error, serverId }: FeedSectionsProps) {
+function FeedSections({ feed, isLoading, error, serverId, isWatched }: FeedSectionsProps) {
     if (isLoading) {
         return (
             <div className="space-y-8 px-8">
@@ -201,19 +206,19 @@ function FeedSections({ feed, isLoading, error, serverId }: FeedSectionsProps) {
     return (
         <div className="space-y-10">
             {feed.continueWatching.length > 0 && (
-                <ContinueWatchingRail items={feed.continueWatching} serverId={serverId} />
+                <ContinueWatchingRail items={feed.continueWatching} serverId={serverId} isWatched={isWatched} />
             )}
 
             {feed.fromSubscriptions.length > 0 && (
-                <VideoRail title="From your subscriptions" videos={feed.fromSubscriptions} serverId={serverId} />
+                <VideoRail title="From your subscriptions" videos={feed.fromSubscriptions} serverId={serverId} isWatched={isWatched} />
             )}
 
             {feed.recommendedForYou.length > 0 && (
-                <VideoRail title="Recommended for you" videos={feed.recommendedForYou} serverId={serverId} />
+                <VideoRail title="Recommended for you" videos={feed.recommendedForYou} serverId={serverId} isWatched={isWatched} />
             )}
 
             {feed.trending.length > 0 && (
-                <VideoRail title="Trending" videos={feed.trending} serverId={serverId} />
+                <VideoRail title="Trending" videos={feed.trending} serverId={serverId} isWatched={isWatched} />
             )}
         </div>
     );
@@ -222,9 +227,10 @@ function FeedSections({ feed, isLoading, error, serverId }: FeedSectionsProps) {
 interface ContinueWatchingRailProps {
     items: YouTubeContinueWatching[];
     serverId?: string;
+    isWatched: (videoId: string) => boolean;
 }
 
-function ContinueWatchingRail({ items, serverId }: ContinueWatchingRailProps) {
+function ContinueWatchingRail({ items, serverId, isWatched }: ContinueWatchingRailProps) {
     return (
         <MediaRail title="Continue watching">
             {items.map((item) => (
@@ -236,6 +242,7 @@ function ContinueWatchingRail({ items, serverId }: ContinueWatchingRailProps) {
                     channelId={item.channelId}
                     channelName={item.channelName}
                     progressPercent={Math.round((item.percentComplete ?? 0) * 100)}
+                    watched={isWatched(item.videoId)}
                     serverId={serverId}
                 />
             ))}
@@ -247,9 +254,10 @@ interface VideoRailProps {
     title: string;
     videos: YouTubeVideo[];
     serverId?: string;
+    isWatched: (videoId: string) => boolean;
 }
 
-function VideoRail({ title, videos, serverId }: VideoRailProps) {
+function VideoRail({ title, videos, serverId, isWatched }: VideoRailProps) {
     return (
         <MediaRail title={title}>
             {videos.map((video) => (
@@ -263,6 +271,7 @@ function VideoRail({ title, videos, serverId }: VideoRailProps) {
                     durationSeconds={video.durationSeconds}
                     viewCount={video.viewCount}
                     publishedAt={video.publishedAt}
+                    watched={isWatched(video.videoId)}
                     serverId={serverId}
                 />
             ))}
@@ -277,9 +286,10 @@ interface SearchResultsGridProps {
     hasMore: boolean;
     isLoadingMore: boolean;
     onLoadMore: () => void;
+    isWatched: (videoId: string) => boolean;
 }
 
-function SearchResultsGrid({ results, serverId, query, hasMore, isLoadingMore, onLoadMore }: SearchResultsGridProps) {
+function SearchResultsGrid({ results, serverId, query, hasMore, isLoadingMore, onLoadMore, isWatched }: SearchResultsGridProps) {
     if (results.length === 0) {
         return (
             <EmptyState
@@ -305,6 +315,7 @@ function SearchResultsGrid({ results, serverId, query, hasMore, isLoadingMore, o
                         durationSeconds={video.durationSeconds}
                         viewCount={video.viewCount}
                         publishedAt={video.publishedAt}
+                        watched={isWatched(video.videoId)}
                         serverId={serverId}
                     />
                 ))}

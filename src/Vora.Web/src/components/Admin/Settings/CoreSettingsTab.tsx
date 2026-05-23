@@ -331,7 +331,8 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 >
                     <option value={0}>Disabled (no new users allowed)</option>
                     <option value={1}>Simple (open registration)</option>
-                    <option value={2}>Secret Word (requires admin invite code)</option>
+                    <option value={2}>Invite PIN (requires 4-digit code from admin)</option>
+                    <option value={3}>Invitation only (admin must send an email invite from /admin/invitations)</option>
                 </select>
                 <FieldHint>Control how new users can create accounts on this server.</FieldHint>
             </SettingsCard>
@@ -444,6 +445,84 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                             <FieldHint>Episodes must agree within tolerance this often before the season median wins.</FieldHint>
                         </div>
                     </div>
+                </div>
+            </SettingsCard>
+
+            <SettingsCard title="Video Preview Thumbnails">
+                <div className="space-y-4">
+                    <div>
+                        <FieldLabel>Schedule Time</FieldLabel>
+                        <input
+                            type="time"
+                            value={serverSettings.videoThumbnailScheduleTime}
+                            onChange={e => setServerSettings({ ...serverSettings, videoThumbnailScheduleTime: e.target.value })}
+                            className="vora-input w-40"
+                        />
+                        <FieldHint>Daily time the thumbnail generation pass runs. Only libraries with "Enable video preview thumbnails" turned on are processed.</FieldHint>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div>
+                            <FieldLabel>Interval (seconds)</FieldLabel>
+                            <input
+                                type="number"
+                                min={2}
+                                max={300}
+                                value={serverSettings.videoThumbnailIntervalSeconds}
+                                onChange={e => setServerSettings({ ...serverSettings, videoThumbnailIntervalSeconds: parseInt(e.target.value) || 10 })}
+                                className="vora-input w-32"
+                            />
+                            <FieldHint>Seconds between captured frames. Lower = denser scrub-bar preview but bigger sprites.</FieldHint>
+                        </div>
+                        <div>
+                            <FieldLabel>Width (px)</FieldLabel>
+                            <input
+                                type="number"
+                                min={80}
+                                max={1280}
+                                value={serverSettings.videoThumbnailWidth}
+                                onChange={e => setServerSettings({ ...serverSettings, videoThumbnailWidth: parseInt(e.target.value) || 320 })}
+                                className="vora-input w-32"
+                            />
+                        </div>
+                        <div>
+                            <FieldLabel>Height (px)</FieldLabel>
+                            <input
+                                type="number"
+                                min={45}
+                                max={720}
+                                value={serverSettings.videoThumbnailHeight}
+                                onChange={e => setServerSettings({ ...serverSettings, videoThumbnailHeight: parseInt(e.target.value) || 180 })}
+                                className="vora-input w-32"
+                            />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <FieldLabel>JPEG Quality</FieldLabel>
+                            <input
+                                type="number"
+                                min={2}
+                                max={31}
+                                value={serverSettings.videoThumbnailJpegQuality}
+                                onChange={e => setServerSettings({ ...serverSettings, videoThumbnailJpegQuality: parseInt(e.target.value) || 5 })}
+                                className="vora-input w-32"
+                            />
+                            <FieldHint>FFmpeg JPEG quality scale (2 = best, 31 = worst). Default 5 keeps sprites small without visible artifacts.</FieldHint>
+                        </div>
+                        <div>
+                            <FieldLabel>Sprite Columns</FieldLabel>
+                            <input
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={serverSettings.videoThumbnailSpriteColumns}
+                                onChange={e => setServerSettings({ ...serverSettings, videoThumbnailSpriteColumns: parseInt(e.target.value) || 10 })}
+                                className="vora-input w-32"
+                            />
+                            <FieldHint>How many thumbnail tiles per row in the sprite sheet. Higher = wider sprites, fewer rows.</FieldHint>
+                        </div>
+                    </div>
+                    <FieldHint>Changing any of these values invalidates existing sprites — the next scheduled pass regenerates affected items (locked items are skipped).</FieldHint>
                 </div>
             </SettingsCard>
 

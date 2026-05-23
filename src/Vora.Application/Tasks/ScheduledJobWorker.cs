@@ -183,29 +183,23 @@ public class ScheduledJobWorker : BackgroundService
         {
             _logger.LogInformation("Triggering Scheduled Video Thumbnail Generation.");
 
-            var libraries = await libraryManager.GetLibrariesAsync(true, new List<Guid>());
+            var libraryRepo = scope.ServiceProvider.GetRequiredService<ILibraryRepository>();
+            var thumbnailLibraries = await libraryRepo.GetAllProjectedAsync(l => new
+            {
+                l.Id,
+                l.Name,
+                l.Type,
+                l.EnableVideoPreviewThumbnails
+            });
 
-            foreach (var lib in libraries)
+            foreach (var lib in thumbnailLibraries)
             {
                 if (!lib.EnableVideoPreviewThumbnails) continue;
-                if (!Vora.Application.Thumbnails.VideoThumbnailManager.IsVideoBearingLibrary(ParseLibraryType(lib.Type))) continue;
+                if (!Vora.Application.Thumbnails.VideoThumbnailManager.IsVideoBearingLibrary(lib.Type)) continue;
                 taskQueue.QueueGenerateLibraryVideoThumbnails(lib.Id, lib.Name, isScheduleTrigger: true);
             }
 
             _lastVideoThumbnailDate = today;
         }
-    }
-
-    private static Vora.Domain.Enums.LibraryType ParseLibraryType(string typeString)
-    {
-        return typeString switch
-        {
-            "Movie" => Vora.Domain.Enums.LibraryType.Movie,
-            "TvShow" => Vora.Domain.Enums.LibraryType.TvShow,
-            "HomeVideo" => Vora.Domain.Enums.LibraryType.HomeVideo,
-            "Music" => Vora.Domain.Enums.LibraryType.Music,
-            "LiveTv" => Vora.Domain.Enums.LibraryType.LiveTv,
-            _ => Vora.Domain.Enums.LibraryType.Movie
-        };
     }
 }

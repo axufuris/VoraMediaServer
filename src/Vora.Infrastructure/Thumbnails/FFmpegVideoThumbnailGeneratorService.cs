@@ -93,6 +93,10 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
         startInfo.ArgumentList.Add("1");
         startInfo.ArgumentList.Add("-an");
         startInfo.ArgumentList.Add("-sn");
+        startInfo.ArgumentList.Add("-c:v");
+        startInfo.ArgumentList.Add("mjpeg");
+        startInfo.ArgumentList.Add("-f");
+        startInfo.ArgumentList.Add("image2");
         startInfo.ArgumentList.Add(tempSpritePath);
 
         using var process = new Process { StartInfo = startInfo };

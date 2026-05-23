@@ -48,6 +48,15 @@ export interface CreateLibraryRequest {
 
 export type UpdateLibraryRequest = Omit<MediaLibrary, 'id' | 'type' | 'isBeingWatched'>;
 
+export interface ThumbnailCoverageVM {
+    total: number;
+    withThumbnails: number;
+}
+
+export interface ThumbnailsLockVM {
+    locked: boolean;
+}
+
 export interface MarkerCoverageVM {
     libraryId: string;
     libraryName: string;
@@ -125,6 +134,29 @@ export const libraryAdminService = {
 
     getLibraryMarkerCoverage: async (libraryId: string, serverId?: string): Promise<MarkerCoverageVM> => {
         const response = await apiClient.get<MarkerCoverageVM>(`/libraries/${libraryId}/marker-coverage`, { serverId });
+        return response.data;
+    },
+
+    getLibraryThumbnailCoverage: async (libraryId: string, serverId?: string): Promise<ThumbnailCoverageVM> => {
+        const response = await apiClient.get<ThumbnailCoverageVM>(`/libraries/${libraryId}/thumbnails/coverage`, { serverId });
+        return response.data;
+    },
+
+    regenerateLibraryThumbnails: async (libraryId: string, serverId?: string): Promise<void> => {
+        await apiClient.post(`/libraries/${libraryId}/thumbnails/regenerate`, null, { serverId });
+    },
+
+    regenerateMediaItemThumbnails: async (mediaItemId: string, serverId?: string): Promise<void> => {
+        await apiClient.post(`/media/${mediaItemId}/thumbnails/regenerate`, null, { serverId });
+    },
+
+    getThumbnailsLock: async (mediaItemId: string, serverId?: string): Promise<ThumbnailsLockVM> => {
+        const response = await apiClient.get<ThumbnailsLockVM>(`/media/${mediaItemId}/thumbnails/lock`, { serverId });
+        return response.data;
+    },
+
+    setThumbnailsLock: async (mediaItemId: string, locked: boolean, serverId?: string): Promise<ThumbnailsLockVM> => {
+        const response = await apiClient.put<ThumbnailsLockVM>(`/media/${mediaItemId}/thumbnails/lock`, { locked }, { serverId });
         return response.data;
     }
 };

@@ -12,6 +12,12 @@ export interface ServerSettings {
     blackFrameMinDurationSec: number;
     episodeIntroClusterToleranceSec: number;
     episodeIntroClusterMinAgreementPct: number;
+    videoThumbnailScheduleTime: string;
+    videoThumbnailIntervalSeconds: number;
+    videoThumbnailWidth: number;
+    videoThumbnailHeight: number;
+    videoThumbnailJpegQuality: number;
+    videoThumbnailSpriteColumns: number;
     folderWatcherProviderId: string;
     folderWatcherPollingInterval: number;
     localMediaScannerProviderId: string;

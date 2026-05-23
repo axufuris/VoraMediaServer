@@ -36,7 +36,7 @@ public class OpenAiRecommendationProvider : IRecommendationProvider
     {
         return new List<PluginSettingDefinitionDto>
         {
-            new PluginSettingDefinitionDto { Key = "api_key", Label = "OpenAI API Key", Type = "password", Description = "Your secret key (sk-...) from platform.openai.com" },
+            new PluginSettingDefinitionDto { Key = "api_key", Label = "OpenAI API Key", Type = "password", Description = "OpenAI secret key (sk-...). Create one at https://platform.openai.com/api-keys. Requires an OpenAI account with billing enabled (https://platform.openai.com/account/billing) — usage is metered. Used only for the nightly category-generation pass; cost is typically a few cents per refresh with the default gpt-4o-mini model." },
             new PluginSettingDefinitionDto { Key = "chat_model", Label = "Chat Model", Type = "text", DefaultValue = "gpt-4o-mini", Description = "Model used for generating categories." },
             new PluginSettingDefinitionDto { Key = "schedule_time", Label = "Nightly Vector Generation Time", Type = "time", DefaultValue = "02:00", Description = "Time to run the nightly AI vector generation (HH:mm format)." }
         };

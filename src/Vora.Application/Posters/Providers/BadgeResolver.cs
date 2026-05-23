@@ -32,6 +32,9 @@ internal static class BadgeResolver
         imagePath.Contains("RT-", StringComparison.OrdinalIgnoreCase)
         || imagePath.Contains("rotten", StringComparison.OrdinalIgnoreCase);
 
+    public static bool IsVoraStarLogo(string imagePath) =>
+        imagePath.EndsWith("Star.png", StringComparison.OrdinalIgnoreCase);
+
     private static string? GetResolutionBadge(string? resolution, string? hdrType, string basePath)
     {
         var resBase = string.Empty;

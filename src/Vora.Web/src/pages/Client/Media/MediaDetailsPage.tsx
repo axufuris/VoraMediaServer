@@ -182,6 +182,14 @@ export default function MediaDetailsPage() {
         if (id && updatedId.toLowerCase() === id.toLowerCase()) reloadMedia();
     }, [id, reloadMedia]));
 
+    useEffect(() => {
+        if (!media || !isAdmin) return;
+        if (media.type !== 'Movie' && media.type !== 'Episode') return;
+        libraryAdminService.getThumbnailsLock(media.id, serverId)
+            .then(r => setThumbnailsLocked(r.locked))
+            .catch(() => setThumbnailsLocked(null));
+    }, [media, isAdmin, serverId]);
+
     const handlePlay = async (resume: boolean = true) => {
         if (!media) return;
 
@@ -238,6 +246,31 @@ export default function MediaDetailsPage() {
         if (!media) return;
         libraryAdminService.analyzeMedia(media.id);
         await dialog.alert('Media analysis started in the background!');
+        setShowMenu(false);
+    };
+
+    const [thumbnailsLocked, setThumbnailsLocked] = useState<boolean | null>(null);
+
+    const handleRegenerateThumbnails = async () => {
+        if (!media) return;
+        try {
+            await libraryAdminService.regenerateMediaItemThumbnails(media.id, serverId);
+            await dialog.alert('Thumbnail regeneration started in the background!');
+        } catch {
+            await dialog.alert('Failed to queue thumbnail regeneration.');
+        }
+        setShowMenu(false);
+    };
+
+    const handleToggleThumbnailsLock = async () => {
+        if (!media) return;
+        try {
+            const next = !(thumbnailsLocked ?? false);
+            const result = await libraryAdminService.setThumbnailsLock(media.id, next, serverId);
+            setThumbnailsLocked(result.locked);
+        } catch {
+            await dialog.alert('Failed to update thumbnails lock.');
+        }
         setShowMenu(false);
     };
 
@@ -591,6 +624,14 @@ export default function MediaDetailsPage() {
                                                     <button type="button" onClick={handleRefresh} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Refresh metadata</button>
                                                     <button type="button" onClick={handleScan} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Scan files</button>
                                                     <button type="button" onClick={handleAnalyze} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Analyze media</button>
+                                                    {(media.type === 'Movie' || media.type === 'Episode') && (
+                                                        <>
+                                                            <button type="button" onClick={handleRegenerateThumbnails} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Regenerate thumbnails</button>
+                                                            <button type="button" onClick={handleToggleThumbnailsLock} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>
+                                                                {thumbnailsLocked ? 'Unlock thumbnails' : 'Lock thumbnails'}
+                                                            </button>
+                                                        </>
+                                                    )}
                                                     <button type="button" onClick={() => { setIsMarkerEditorOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit markers</button>
                                                     <button type="button" onClick={handleDelete} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/5" style={{ color: 'var(--vora-danger-text)' }}>Delete item</button>
                                                 </>

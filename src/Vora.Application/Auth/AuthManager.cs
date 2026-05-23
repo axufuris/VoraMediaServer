@@ -52,15 +52,7 @@ public class AuthManager(
     private const int MinPasswordLength = 6;
     private const string PasswordResetThrottlePrefix = "pwreset:throttle:";
 
-    private static readonly string[] WordDictionary =
-    {
-        "apple", "brave", "crane", "dance", "eagle", "flame", "grape", "heart", "image", "juice",
-        "kite", "lemon", "magic", "noble", "ocean", "peach", "quill", "river", "stone", "train",
-        "uncle", "vivid", "water", "xenon", "yacht", "zebra", "acorn", "brick", "cloud", "dream",
-        "earth", "frost", "ghost", "house", "iron", "jelly", "knife", "light", "moon", "night",
-        "onion", "plant", "queen", "robin", "snake", "tiger", "unity", "voice", "whale", "yard",
-        "amber", "bread", "chair", "desk", "engine", "fruit", "glass", "honey", "island", "jewel"
-    };
+    private const int InvitePinLength = 4;
 
     public async Task<(bool IsClaimed, RegistrationMode Mode)> GetSetupStatusAsync()
     {
@@ -73,7 +65,7 @@ public class AuthManager(
     {
         try
         {
-            var code = $"{RandomWord()}-{RandomWord()}-{RandomWord()}";
+            var code = GeneratePin(InvitePinLength);
 
             var ticket = new RegistrationTicket
             {
@@ -134,6 +126,11 @@ public class AuthManager(
         if (status.Mode == RegistrationMode.Disabled)
         {
             throw new InvalidOperationException("Registration is currently disabled by the server administrator.");
+        }
+
+        if (status.Mode == RegistrationMode.Invitation)
+        {
+            throw new InvalidOperationException("Registration is invitation-only on this server. Ask the administrator to send you an email invitation.");
         }
 
         if (status.Mode == RegistrationMode.SecretWord)
@@ -477,7 +474,17 @@ public class AuthManager(
         public int Count;
     }
 
-    private static string RandomWord() => WordDictionary[Random.Shared.Next(WordDictionary.Length)];
+    private static string GeneratePin(int length)
+    {
+        Span<byte> buffer = stackalloc byte[length];
+        RandomNumberGenerator.Fill(buffer);
+        var chars = new char[length];
+        for (var i = 0; i < length; i++)
+        {
+            chars[i] = (char)('0' + (buffer[i] % 10));
+        }
+        return new string(chars);
+    }
     private static string HashPassword(string password) => BCrypt.Net.BCrypt.HashPassword(password);
     private static bool VerifyPassword(string password, string hash) => BCrypt.Net.BCrypt.Verify(password, hash);
 }

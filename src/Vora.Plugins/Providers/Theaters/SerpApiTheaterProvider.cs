@@ -40,7 +40,7 @@ public class SerpApiTheaterProvider : IDiscoveryTheaterProvider
                 Key = "api_key",
                 Label = "SerpApi Key",
                 Type = "password",
-                Description = "Get 100 free searches/month at https://serpapi.com"
+                Description = "SerpApi Private API Key. Sign up at https://serpapi.com/users/sign_up (free tier = 100 searches/month). After signing in, copy the 'Private API Key' from https://serpapi.com/manage-api-key. Showtimes are cached per movie + location + date to minimize search usage."
             },
             new PluginSettingDefinitionDto
             {

@@ -541,7 +541,10 @@ export default function OverlayEditor() {
                             {el.type === 'composite_ratings' ? (
                                 <div className="w-full h-full flex flex-col gap-1.5 sm:gap-2 pointer-events-none">
                                     {el.previewImages?.map((img, i) => {
-                                        const dummyLabel = i === 0 ? "8.0" : i === 1 ? "82%" : "7.0";
+                                        const imgLower = (img ?? '').toLowerCase();
+                                        const isRottenTomatoes = imgLower.includes('rt-') || imgLower.includes('rotten');
+                                        const isStar = imgLower.endsWith('star.png');
+                                        const dummyLabel = isStar ? "4.0" : isRottenTomatoes ? "82%" : "7.0";
                                         return (
                                             <div key={i} className="flex-1 bg-black/65 rounded-xl p-1.5 flex flex-col items-center justify-center min-h-0 w-full">
                                                 <div className="h-1/2 w-full flex items-center justify-center">
