@@ -368,6 +368,7 @@ in addition to the keys shown.
 | `imdb_collection_sync` | IMDb Public Lists | — |
 | `imdb_chronology` | IMDB Community Lists | — |
 | `itunes_podcast_discovery` | iTunes Podcast Discovery | — |
+| `youtube` | YouTube | `api_key`, `trending_region` |
 | `openai_recommendations` | OpenAI Smart Recommendations | `api_key`, `chat_model`, `schedule_time` |
 | `local_imagesharp_overlays` | Vora Native Overlays | `enable_schedule`, `schedule_time` |
 | `local_metadata` | Local Assets (NFO & Images) | — |
@@ -430,6 +431,11 @@ provider keys:
       Vora__PluginSettings__openai_recommendations__api_key: "YOUR_OPENAI_KEY"
       Vora__PluginSettings__openai_recommendations__chat_model: "gpt-4o-mini"
       Vora__PluginSettings__openai_recommendations__schedule_time: "02:00"
+
+      # YouTube (opt-in; the standard is_enabled toggle is the master switch — it's on by default once the plugin is loaded, set to "false" to hide the feature)
+      Vora__PluginSettings__youtube__api_key: "YOUR_YOUTUBE_DATA_API_V3_KEY"
+      Vora__PluginSettings__youtube__is_enabled: "true"
+      Vora__PluginSettings__youtube__trending_region: "US"
 
       # Local poster overlays
       Vora__PluginSettings__local_imagesharp_overlays__enable_schedule: "true"

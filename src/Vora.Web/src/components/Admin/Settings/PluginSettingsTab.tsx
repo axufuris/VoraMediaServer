@@ -10,7 +10,7 @@ interface PluginSettingsTabProps {
     showModal: (title: string, message: string, isError?: boolean) => void;
 }
 
-export function PluginSection({ serverId, plugin, showModal }: { serverId?: string, plugin: PluginVM, showModal: (title: string, message: string, isError?: boolean) => void }) {
+export function PluginSection({ serverId, plugin, showModal, onAfterChange }: { serverId?: string, plugin: PluginVM, showModal: (title: string, message: string, isError?: boolean) => void, onAfterChange?: () => void }) {
     const [pluginFields, setPluginFields] = useState<PluginSettingField[]>([]);
     const [pluginValues, setPluginValues] = useState<Record<string, string>>({});
     const [isSaving, setIsSaving] = useState(false);
@@ -46,6 +46,7 @@ export function PluginSection({ serverId, plugin, showModal }: { serverId?: stri
         setIsTogglingEnabled(true);
         try {
             await systemSettingsAdminService.updatePluginSettings(plugin.id, { is_enabled: next ? 'true' : 'false' }, serverId);
+            onAfterChange?.();
         } catch {
             setPluginValues(prev => ({ ...prev, is_enabled: previous ?? 'true' }));
             showModal('Error', `Failed to toggle ${plugin.name}.`, true);
@@ -62,6 +63,7 @@ export function PluginSection({ serverId, plugin, showModal }: { serverId?: stri
             configurableFields.forEach(f => { payload[f.key] = pluginValues[f.key] ?? ''; });
             await systemSettingsAdminService.updatePluginSettings(plugin.id, payload, serverId);
             showModal('Success', `${plugin.name} settings saved.`);
+            onAfterChange?.();
         } catch {
             showModal('Error', `Failed to save settings for ${plugin.name}.`, true);
         } finally {

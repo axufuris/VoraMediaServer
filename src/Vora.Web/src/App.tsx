@@ -44,6 +44,11 @@ import ClientDiscoveryPage from './pages/Client/Discovery/DiscoveryPage';
 import ClientDiscoveryDetailsPage from './pages/Client/Discovery/DiscoveryDetailsPage';
 import ClientDiscoveryActorPage from './pages/Client/Discovery/DiscoveryActorPage';
 import ClientWatchlistPage from './pages/Client/WatchlistPage';
+import ClientYouTubePage from './pages/Client/YouTube/YouTubePage';
+import ClientYouTubeChannelPage from './pages/Client/YouTube/YouTubeChannelPage';
+import ClientYouTubePlayerPage from './pages/Client/YouTube/YouTubePlayerPage';
+import ClientYouTubeSubscriptionsPage from './pages/Client/YouTube/YouTubeSubscriptionsPage';
+import AdminYouTubePage from './pages/Admin/Features/YouTubeAdminPage';
 import ClientDiscoveryViewAllPage from './pages/Client/Discovery/DiscoveryViewAllPage';
 import AdminRequestsPage from './pages/Admin/RequestsPage';
 import CalendarPage from './pages/Client/CalendarPage';
@@ -170,6 +175,10 @@ export default function App() {
                         <Route path="discovery/:providerId/row/:rowId" element={<ClientDiscoveryViewAllPage />} />
                         <Route path="discovery/:providerId/:type/:externalId" element={<ClientDiscoveryDetailsPage />} />
                         <Route path="discovery/:providerId/actor/:externalId" element={<ClientDiscoveryActorPage />} />
+                        <Route path="youtube" element={<ClientYouTubePage />} />
+                        <Route path="youtube/subscriptions" element={<ClientYouTubeSubscriptionsPage />} />
+                        <Route path="youtube/channel/:channelId" element={<ClientYouTubeChannelPage />} />
+                        <Route path="youtube/watch/:videoId" element={<ClientYouTubePlayerPage />} />
 
                         <Route path="server/:serverId" element={<ServerContextWrapper />}>
                             <Route path="search" element={<SearchPage />} />
@@ -192,6 +201,10 @@ export default function App() {
                             <Route path="discovery/:providerId/row/:rowId" element={<ClientDiscoveryViewAllPage />} />
                             <Route path="discovery/:providerId/:type/:externalId" element={<ClientDiscoveryDetailsPage />} />
                             <Route path="discovery/:providerId/actor/:externalId" element={<ClientDiscoveryActorPage />} />
+                            <Route path="youtube" element={<ClientYouTubePage />} />
+                            <Route path="youtube/subscriptions" element={<ClientYouTubeSubscriptionsPage />} />
+                            <Route path="youtube/channel/:channelId" element={<ClientYouTubeChannelPage />} />
+                            <Route path="youtube/watch/:videoId" element={<ClientYouTubePlayerPage />} />
                         </Route>
                     </Route>
 
@@ -216,6 +229,7 @@ export default function App() {
                         <Route path="dvr-settings" element={<AdminDvrPage />} />
                         <Route path="collections" element={<AdminCollectionsPage />} />
                         <Route path="music" element={<AdminMusicPage />} />
+                        <Route path="youtube" element={<AdminYouTubePage />} />
                         <Route path="requests" element={<AdminRequestsPage />} />
                         <Route path="ai-stats" element={<AdminAiStatsPage />} />
                         <Route path="overlays" element={<OverlayEditor />} />
@@ -249,6 +263,7 @@ export default function App() {
                         <Route path="dvr-settings" element={<AdminDvrPage />} />
                         <Route path="collections" element={<AdminCollectionsPage />} />
                         <Route path="music" element={<AdminMusicPage />} />
+                        <Route path="youtube" element={<AdminYouTubePage />} />
                             <Route path="requests" element={<AdminRequestsPage />} />
                             <Route path="ai-stats" element={<AdminAiStatsPage />} />
                             <Route path="overlays" element={<OverlayEditor />} />

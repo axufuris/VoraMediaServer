@@ -54,6 +54,14 @@ These are easy to overflow accidentally — note the limit when sending data fro
 | `InvitationTicket.Email` | invited email address | 256 |
 | `InvitationTicket.TokenHash` | SHA-256 of the invite token (hex, lowercased) | 128 |
 | `RegistrationTicket.SecretCode` | legacy 3-word shared invite code | 128 |
+| `YouTubeAccountSettings.YouTubeAccess` | tri-state enum stored as string (`Inherit` / `Enabled` / `Disabled`); unique on `(AccountId)`. See `docs/youtube.md` | 16 |
+| `YouTubeSubscription.ChannelId` | YouTube channel id (e.g. `UCxxxxxx`); unique with `(UserProfileId, ChannelId)` | 64 |
+| `YouTubeSubscription.ChannelName` | snapshot at subscribe time | 256 |
+| `YouTubeSubscription.ChannelThumbnailUrl` | snapshot at subscribe time | 1024 |
+| `YouTubeWatchHistory.VideoId` | YouTube video id | 32 |
+| `YouTubeWatchHistory.VideoTitle` | snapshot at time of watch | 500 |
+| `YouTubeWatchHistory.ThumbnailUrl` | snapshot at time of watch | 1024 |
+| `YouTubeWatchHistory.ChannelName` | snapshot at time of watch | 256 |
 
 When auditing column lengths, look at `ConfigureXxx` helpers in `VoraDbContext.cs` — those have the truth.
 

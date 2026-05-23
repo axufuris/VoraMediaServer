@@ -43,6 +43,7 @@ api/Iptv/                 iptvClientService, iptvAdminService,
                           dvrPlaybackService, timeshiftService
 api/Discovery/            discoveryService, recommendationService, searchService,
                           requestAdminService, calendarService
+api/YouTube/              youtubeService
 api/System/               systemSettingsAdminService, emailAdminService,
                           pluginAdminService, taskService, aiStatsService,
                           adminService (dedupe), remoteAccessService,
@@ -96,6 +97,10 @@ components/Player/Panels/ PlayerSettingsPanel, PlayerInfoPanel, UpNextOverlay,
                           LiveTvInfoPanel, LiveTvRecordModal
 components/Iptv/          GuideProgramModal
 components/Dvr/           DvrSessionCard
+components/YouTube/       YouTubeVideoCard, YouTubeChannelBadge,
+                          YouTubePlayerEmbed (lazy-loads the official
+                          YouTube iframe Player API once and exposes
+                          play/pause/seek via useImperativeHandle)
 ```
 
 All folder names are PascalCase. Files use PascalCase for components, camelCase for hooks/utilities.
@@ -115,7 +120,8 @@ pages/Admin/Libraries/    CreateLibrary, ManageLibrary
 pages/Admin/SmartLists/   SmartListsPage
 pages/Admin/Discovery/    DiscoveryPage
 pages/Admin/Features/     ForYouPage, ReleaseCalendarPage, DvrPage,
-                          MusicAdminPage, CollectionsAdminPage
+                          MusicAdminPage, CollectionsAdminPage,
+                          YouTubeAdminPage
 pages/Admin/Iptv/         IptvPage (renders Live TV + Internet Radio via prop)
 pages/Admin/Podcasts/     PodcastsAdminPage
 pages/Admin/Tasks/        TaskDashboard
@@ -129,6 +135,7 @@ pages/Client/Playlists/   PlaylistsPage, PlaylistDetailsPage
 pages/Client/Discovery/   DiscoveryPage, DiscoveryActorPage,
                           DiscoveryDetailsPage, DiscoveryViewAllPage
 pages/Client/LiveTv/      LiveTvPage, LiveTvGuide, DvrDashboard
+pages/Client/YouTube/     YouTubePage, YouTubeChannelPage, YouTubePlayerPage
 ```
 
 ## Dialog system — replaces all `alert/confirm/prompt`

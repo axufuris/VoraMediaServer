@@ -5,6 +5,8 @@ import { iptvClientService } from '../../api/Iptv/iptvClientService';
 import { serverVault } from '../../utils/serverVault';
 import { profileDeviceSettingsService } from '../../api/Users/profileDeviceSettingsService';
 import { profileService } from '../../api/Users/profileService';
+import { youtubeService } from '../../api/YouTube/youtubeService';
+import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { clientTemplateService, type TemplateMetaVM } from '../../api/System/clientTemplateService';
 import { useClientTemplate } from '../../theme/useClientTemplate';
 import { useDialog } from '../../dialogs';
@@ -607,7 +609,84 @@ function AccountTab({ serverId }: { serverId?: string }) {
                 </div>
             </section>
             <ShowtimesLocationSection serverId={serverId} />
+            <YouTubeToggleSection serverId={serverId} />
         </div>
+    );
+}
+
+function YouTubeToggleSection({ serverId }: { serverId?: string }) {
+    const dialog = useDialog();
+    const [isEnabled, setIsEnabled] = useState(true);
+    const [isAvailable, setIsAvailable] = useState(false);
+    const [unavailableReason, setUnavailableReason] = useState<string | undefined>(undefined);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    const currentUserId = localStorage.getItem('user_id');
+
+    const refresh = useMemo(() => async () => {
+        try {
+            const settings = await youtubeService.getProfileSettings(serverId);
+            setIsEnabled(settings.isEnabled);
+            setIsAvailable(settings.isAvailable);
+            setUnavailableReason(settings.unavailableReason);
+        } catch {
+            // Swallow — the unavailable banner will surface if the refetch fails after first load
+        } finally {
+            setLoading(false);
+        }
+    }, [serverId]);
+
+    useEffect(() => {
+        void refresh();
+    }, [refresh]);
+
+    useSignalREvent("YouTubeAccessChanged", (changedUserId: string) => {
+        if (currentUserId && changedUserId.toLowerCase() === currentUserId.toLowerCase()) {
+            void refresh();
+        }
+    });
+
+    const handleToggle = async () => {
+        const next = !isEnabled;
+        setSaving(true);
+        try {
+            const updated = await youtubeService.updateProfileSettings(next, serverId);
+            setIsEnabled(updated.isEnabled);
+            setIsAvailable(updated.isAvailable);
+            setUnavailableReason(updated.unavailableReason);
+        } catch {
+            await dialog.alert({ title: 'YouTube', message: 'Could not update YouTube preference.' });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <section className="vora-card p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex-1">
+                    <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>YouTube</h2>
+                    <p className="m-0 text-sm" style={{ color: 'var(--vora-text-muted)' }}>
+                        Show the YouTube tab in this profile&apos;s navigation. Subscriptions and watch history stay inside Vora.
+                    </p>
+                    {!isAvailable && !loading && (
+                        <p className="mt-2 text-xs" style={{ color: 'var(--vora-warning-500, var(--vora-text-muted))' }}>
+                            {unavailableReason ?? 'YouTube is unavailable for this profile.'}
+                        </p>
+                    )}
+                </div>
+                <button
+                    type="button"
+                    onClick={handleToggle}
+                    disabled={loading || saving}
+                    className={isEnabled ? 'vora-button-primary cursor-pointer' : 'vora-button-secondary cursor-pointer'}
+                    style={{ minWidth: 120 }}
+                >
+                    {loading ? '…' : isEnabled ? 'Enabled' : 'Disabled'}
+                </button>
+            </div>
+        </section>
     );
 }
 

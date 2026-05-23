@@ -21,6 +21,7 @@ using Vora.Domain.Entities.Streaming;
 using Vora.Domain.Entities.Ai;
 using Vora.Domain.Entities.Tracking;
 using Vora.Domain.Entities.Users;
+using Vora.Domain.Entities.YouTube;
 using Vora.Domain.Enums;
 
 namespace Vora.Infrastructure.Persistence;
@@ -129,6 +130,11 @@ public class VoraDbContext : DbContext
     public DbSet<DiscoveryRowConfig> DiscoveryRowConfigs { get; set; }
     public DbSet<UserWatchlistItem> UserWatchlistItems { get; set; }
 
+    public DbSet<YouTubeAccountSettings> YouTubeAccountSettings { get; set; }
+    public DbSet<YouTubeProfileSettings> YouTubeProfileSettings { get; set; }
+    public DbSet<YouTubeSubscription> YouTubeSubscriptions { get; set; }
+    public DbSet<YouTubeWatchHistory> YouTubeWatchHistory { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -184,6 +190,8 @@ public class VoraDbContext : DbContext
         ConfigureMediaItemEmbeddings(modelBuilder);
 
         ConfigureDiscovery(modelBuilder);
+
+        ConfigureYouTube(modelBuilder);
 
         SeedReferenceData(modelBuilder);
         SeedSystemDefaults(modelBuilder);
@@ -1277,6 +1285,46 @@ public class VoraDbContext : DbContext
 
             entity.HasIndex(e => e.ProfileId);
             entity.HasIndex(e => new { e.ProfileId, e.ExternalId, e.ProviderId }).IsUnique();
+        });
+    }
+
+    private static void ConfigureYouTube(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<YouTubeAccountSettings>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.YouTubeAccess).HasConversion<string>().HasMaxLength(16);
+            entity.HasIndex(e => e.AccountId).IsUnique();
+        });
+
+        modelBuilder.Entity<YouTubeProfileSettings>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserProfileId).IsUnique();
+        });
+
+        modelBuilder.Entity<YouTubeSubscription>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ChannelId).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.ChannelName).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.ChannelThumbnailUrl).HasMaxLength(1024);
+
+            entity.HasIndex(e => new { e.UserProfileId, e.ChannelId }).IsUnique();
+            entity.HasIndex(e => e.UserProfileId);
+        });
+
+        modelBuilder.Entity<YouTubeWatchHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.VideoId).IsRequired().HasMaxLength(32);
+            entity.Property(e => e.VideoTitle).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.ThumbnailUrl).IsRequired().HasMaxLength(1024);
+            entity.Property(e => e.ChannelId).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.ChannelName).IsRequired().HasMaxLength(256);
+
+            entity.HasIndex(e => new { e.UserProfileId, e.WatchedAt });
+            entity.HasIndex(e => new { e.UserProfileId, e.VideoId });
         });
     }
 

@@ -75,6 +75,7 @@ public static class WebApplicationExtensions
         app.MapTimeshiftEndpoints();
         app.MapUserEndpoints();
         app.MapUserImageEndpoints();
+        app.MapYouTubeEndpoints();
 
         app.MapHub<VoraHub>("/hubs/Vora");
         app.MapFallbackToFile("index.html");

@@ -27,4 +27,5 @@ public interface IClientNotifier
     Task NotifyBackupCreatedAsync(string fileName);
     Task NotifyBackupRestoredAsync(string fileName, IReadOnlyList<string> restoredSectionKeys);
     Task NotifyLibraryMigrationUpdatedAsync(LibraryMigrationJobVM job);
+    Task NotifyYouTubeAccessChangedAsync(Guid userId);
 }

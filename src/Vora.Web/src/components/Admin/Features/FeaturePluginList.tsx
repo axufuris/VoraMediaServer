@@ -7,6 +7,7 @@ interface FeaturePluginListProps {
     pluginTypes: string[];
     title?: string;
     emptyLabel?: string;
+    onAfterChange?: () => void;
 }
 
 function formatTypeLabel(type: string): string {
@@ -14,7 +15,7 @@ function formatTypeLabel(type: string): string {
     return withSpaces.replace(/\b\w/g, c => c.toUpperCase());
 }
 
-export default function FeaturePluginList({ serverId, pluginTypes, title, emptyLabel }: FeaturePluginListProps) {
+export default function FeaturePluginList({ serverId, pluginTypes, title, emptyLabel, onAfterChange }: FeaturePluginListProps) {
     const [plugins, setPlugins] = useState<PluginVM[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -85,7 +86,7 @@ export default function FeaturePluginList({ serverId, pluginTypes, title, emptyL
                                 </h3>
                             )}
                             {group.plugins.map(p => (
-                                <PluginSection key={p.id} serverId={serverId} plugin={p} showModal={showModal} />
+                                <PluginSection key={p.id} serverId={serverId} plugin={p} showModal={showModal} onAfterChange={onAfterChange} />
                             ))}
                         </div>
                     ))}

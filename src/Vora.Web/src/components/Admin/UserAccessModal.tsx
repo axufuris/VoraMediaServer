@@ -3,8 +3,9 @@ import { type LibrarySummary } from '../../api/Media/libraryService';
 import { type IptvPlaylistVM } from '../../api/Iptv/iptvAdminService';
 import { type UserVM } from '../../api/Users/userService';
 import { Modal, ModalHeader } from '../Common/Modal';
+import { youtubeService, type YouTubeAccessSetting } from '../../api/YouTube/youtubeService';
 
-type AccessTab = 'libraries' | 'liveTv' | 'podcasts' | 'requests';
+type AccessTab = 'libraries' | 'liveTv' | 'podcasts' | 'requests' | 'features';
 
 interface UserAccessModalProps {
     user: UserVM;
@@ -86,6 +87,7 @@ export default function UserAccessModal({ user, libraries, iptvPlaylists, onSave
         { id: 'liveTv', label: 'Live TV' },
         { id: 'podcasts', label: 'Podcasts' },
         { id: 'requests', label: 'Requests & AI' },
+        { id: 'features', label: 'Features' },
     ];
 
     return (
@@ -256,6 +258,10 @@ export default function UserAccessModal({ user, libraries, iptvPlaylists, onSave
                             </div>
                         </>
                     )}
+
+                    {activeTab === 'features' && (
+                        <YouTubeAccessControl userId={user.id} />
+                    )}
                 </div>
 
                 <div className="pt-4">
@@ -265,5 +271,71 @@ export default function UserAccessModal({ user, libraries, iptvPlaylists, onSave
                 </div>
             </form>
         </Modal>
+    );
+}
+
+function YouTubeAccessControl({ userId }: { userId: string }) {
+    const [value, setValue] = useState<YouTubeAccessSetting>('Inherit');
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        youtubeService.getAccountSettings(userId)
+            .then((settings) => { if (!cancelled) setValue(settings.youTubeAccess); })
+            .catch(() => { if (!cancelled) setError('Could not load YouTube setting.'); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [userId]);
+
+    const handleChange = async (next: YouTubeAccessSetting) => {
+        setSaving(true);
+        setError(null);
+        try {
+            const updated = await youtubeService.updateAccountSettings(userId, next);
+            setValue(updated.youTubeAccess);
+        } catch {
+            setError('Could not update YouTube setting.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const options: { id: YouTubeAccessSetting; label: string; hint: string }[] = [
+        { id: 'Inherit', label: 'Inherit', hint: 'Follow the server-wide YouTube toggle.' },
+        { id: 'Enabled', label: 'Enabled', hint: 'YouTube is available to this user\'s profiles (subject to per-profile preference).' },
+        { id: 'Disabled', label: 'Disabled', hint: 'Hide YouTube for every profile under this account.' },
+    ];
+
+    return (
+        <div>
+            <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-3">YouTube access</label>
+            <div className="space-y-2">
+                {options.map((opt) => (
+                    <label
+                        key={opt.id}
+                        className={`flex items-start gap-3 rounded-md p-3 cursor-pointer select-none ${value === opt.id ? 'border border-[var(--vora-accent-500)]' : 'border border-[var(--vora-border-subtle)]'}`}
+                        style={{ background: value === opt.id ? 'var(--vora-accent-soft)' : 'transparent' }}
+                    >
+                        <input
+                            type="radio"
+                            name="youtube-access"
+                            checked={value === opt.id}
+                            onChange={() => handleChange(opt.id)}
+                            disabled={loading || saving}
+                            className="mt-0.5 accent-[var(--vora-accent-500)]"
+                        />
+                        <span className="flex flex-col">
+                            <span className="text-sm font-medium text-[var(--vora-text-primary)]">{opt.label}</span>
+                            <span className="text-xs text-[var(--vora-text-muted)] mt-0.5">{opt.hint}</span>
+                        </span>
+                    </label>
+                ))}
+            </div>
+            {error && (
+                <p className="mt-3 text-xs text-[var(--vora-danger-500, var(--vora-text-muted))]">{error}</p>
+            )}
+        </div>
     );
 }

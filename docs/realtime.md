@@ -38,6 +38,14 @@ Some admin-only events would be too chatty if sent per-occurrence:
 - **`LogEntryBatch`** — server log entries. `LogBroadcastHostedService` (`Vora.Application/Logging/`) windows entries into ~150 ms / 200-entry batches and pushes the batch as one payload. The admin Logs page consumes this via `useSignalREvent<LogEntryVM[]>('LogEntryBatch', ...)`. See `docs/logs.md`.
 - **`BackupCreated` / `BackupRestored`** — fired once per operation by `BackupManager`. Payloads: a file name (string) and `{ fileName, sectionKeys: string[] }` respectively. The admin Backups page subscribes to refresh the list and invalidate caches. See `docs/backups.md`.
 
+## Per-user nav-visibility events
+
+Some features have a per-account access flag that affects whether a nav item is visible. When an admin flips it, the change needs to take effect immediately without forcing the user to re-select their profile (because the access flag isn't in the JWT — it's resolved live from a backend service). The pattern:
+
+- **`YouTubeAccessChanged`** — payload is the affected user's id (string). Fired by `YouTubeManager.UpdateAccountSettingsAsync`. `MainLayout` and the `YouTubeToggleSection` on the client settings page both subscribe and re-fetch `youtubeService.getProfileSettings()` when the changed user matches `localStorage.user_id`. The nav item appears or disappears live. See `docs/youtube.md`.
+
+When you add another feature with this shape (multi-tier access gate, per-account override that doesn't live in the JWT), follow the same naming — `<Feature>AccessChanged`, payload `userId` — and add both the `MainLayout` listener (to refresh nav visibility) and any per-feature settings-section listener (to refresh the "unavailable" banner).
+
 ## Frontend client
 
 `@microsoft/signalr` connects against `/hubs/Vora` on the active server. The connection is managed centrally so individual `useSignalREvent` calls share one socket. Don't open a second connection from a component.

@@ -19,8 +19,9 @@ import MainLayoutSidebar from './parts/MainLayoutSidebar';
 import MainLayoutUserMenu from './parts/MainLayoutUserMenu';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import type { FeatureFlagsVM } from '../api/System/featureFlagsService';
+import { youtubeService } from '../api/YouTube/youtubeService';
 
-const isNavItemEnabled = (item: NavItem, flags: FeatureFlagsVM): boolean => {
+const isNavItemEnabled = (item: NavItem, flags: FeatureFlagsVM, youtubeAvailable: boolean): boolean => {
     if (item.type !== 'system') return true;
     switch (item.id) {
         case 'discovery': return flags.discover;
@@ -28,6 +29,7 @@ const isNavItemEnabled = (item: NavItem, flags: FeatureFlagsVM): boolean => {
         case 'calendar': return flags.releaseCalendar;
         case 'livetv': return flags.liveTv;
         case 'dvr': return flags.liveTv && flags.dvr;
+        case 'youtube': return youtubeAvailable;
         default: return true;
     }
 };
@@ -103,6 +105,27 @@ export default function MainLayout() {
     const [isServerManagerOpen, setIsServerManagerOpen] = useState(false);
 
     const flags = useFeatureFlags();
+    const [youtubeAvailable, setYoutubeAvailable] = useState(false);
+
+    const refreshYouTubeAvailability = useCallback(() => {
+        if (!activeProfileId) {
+            setYoutubeAvailable(false);
+            return;
+        }
+        youtubeService.getProfileSettings(serverId)
+            .then((settings) => setYoutubeAvailable(settings.isAvailable && settings.isEnabled))
+            .catch(() => setYoutubeAvailable(false));
+    }, [activeProfileId, serverId]);
+
+    useEffect(() => {
+        refreshYouTubeAvailability();
+    }, [refreshYouTubeAvailability]);
+
+    useSignalREvent("YouTubeAccessChanged", useCallback((changedUserId: string) => {
+        if (currentUserId && changedUserId.toLowerCase() === currentUserId.toLowerCase()) {
+            refreshYouTubeAvailability();
+        }
+    }, [currentUserId, refreshYouTubeAvailability]));
 
     useSignalREvent("UserAccessUpdated", useCallback(async (updatedUserId: string) => {
         if (currentUserId && updatedUserId.toLowerCase() === currentUserId.toLowerCase()) {
@@ -179,7 +202,8 @@ export default function MainLayout() {
                 { id: 'calendar', title: 'Release Calendar', path: '/calendar', type: 'system', isPinned: true, order: 5 },
                 { id: 'livetv', title: 'Live TV', path: '/livetv', type: 'system', isPinned: true, order: 6 },
                 { id: 'dvr', title: 'DVR', path: '/dvr', type: 'system', isPinned: true, order: 7 },
-                { id: 'audio', title: 'Audio', path: '/audio', type: 'system', isPinned: true, order: 8 }
+                { id: 'audio', title: 'Audio', path: '/audio', type: 'system', isPinned: true, order: 8 },
+                { id: 'youtube', title: 'YouTube', path: '/youtube', type: 'system', isPinned: true, order: 9 }
             ];
 
             const combinedItems = [...baseItems, ...allLibraries];
@@ -327,7 +351,7 @@ export default function MainLayout() {
         );
     }
 
-    const gatedNavItems = navItems.filter(i => isNavItemEnabled(i, flags));
+    const gatedNavItems = navItems.filter(i => isNavItemEnabled(i, flags, youtubeAvailable));
     const pinnedItems = gatedNavItems.filter(i => i.isPinned);
     const unpinnedItems = gatedNavItems.filter(i => !i.isPinned);
 
