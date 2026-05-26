@@ -281,7 +281,7 @@ public class IptvEpgService : IIptvEpgService
         }
     }
 
-    private static void ClaimChannelsForSource(
+    internal static void ClaimChannelsForSource(
         Guid sourceId,
         Dictionary<string, List<IptvProgramDto>> parsed,
         Dictionary<string, List<IptvProgramDto>> mergedCache,
@@ -337,7 +337,7 @@ public class IptvEpgService : IIptvEpgService
         await JsonSerializer.SerializeAsync(fileStream, cache, cancellationToken: cancellationToken);
     }
 
-    private static void ApplyParentalControls(Dictionary<string, List<IptvProgramDto>> guide, List<string> allowedRatings, bool blockUnratedContent)
+    internal static void ApplyParentalControls(Dictionary<string, List<IptvProgramDto>> guide, List<string> allowedRatings, bool blockUnratedContent)
     {
         foreach (var channel in guide)
         {

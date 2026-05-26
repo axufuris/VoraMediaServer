@@ -25,6 +25,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Vora.Application.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Email\Templates\PasswordReset.subject.txt" />
     <EmbeddedResource Include="Email\Templates\PasswordReset.html" />
     <EmbeddedResource Include="Email\Templates\PasswordReset.txt" />

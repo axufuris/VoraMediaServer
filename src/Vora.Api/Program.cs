@@ -12,3 +12,5 @@ app.MapVoraEndpoints();
 await app.RunVoraStartupTasksAsync();
 
 app.Run();
+
+public partial class Program { }

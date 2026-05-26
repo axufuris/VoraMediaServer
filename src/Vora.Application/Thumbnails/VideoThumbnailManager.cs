@@ -236,7 +236,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
     public static bool IsVideoBearingLibrary(LibraryType type) =>
         type == LibraryType.Movie || type == LibraryType.TvShow || type == LibraryType.HomeVideo;
 
-    private static string ComputeSpriteVersion(int interval, int width, int height, int quality, int columns)
+    internal static string ComputeSpriteVersion(int interval, int width, int height, int quality, int columns)
     {
         var seed = string.Create(CultureInfo.InvariantCulture, $"v1|{interval}|{width}|{height}|{quality}|{columns}");
         var bytes = SHA1.HashData(Encoding.UTF8.GetBytes(seed));

@@ -12,6 +12,11 @@ public static class StartupTaskExtensions
 {
     public static async Task RunVoraStartupTasksAsync(this WebApplication app)
     {
+        if (app.Environment.IsEnvironment("Testing"))
+        {
+            return;
+        }
+
         await MigrateDatabaseAsync(app);
         await SeedPluginSettingsFromEnvironmentAsync(app);
         await InitializeFolderWatchersAsync(app);

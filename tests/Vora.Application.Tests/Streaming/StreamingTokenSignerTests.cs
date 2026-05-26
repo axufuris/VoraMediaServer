@@ -71,10 +71,13 @@ public class StreamingTokenSignerTests
         var signer = NewSigner();
         var token = signer.Sign("hls", "media-123", TimeSpan.FromMinutes(5));
 
+        // Flip a byte near the START of the signature — the last base64url char
+        // can have padding bits that don't affect the decoded value, so flipping
+        // it isn't always a real change. The first chars always encode meaningful bits.
         var parts = token.Split('.');
-        var lastChar = parts[1][^1];
-        var swap = lastChar == 'A' ? 'B' : 'A';
-        var tampered = parts[0] + "." + parts[1][..^1] + swap;
+        var firstChar = parts[1][0];
+        var swap = firstChar == 'A' ? 'B' : 'A';
+        var tampered = parts[0] + "." + swap + parts[1][1..];
 
         signer.TryVerify(tampered, "hls", out _).Should().BeFalse();
     }

@@ -323,7 +323,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         return await _musicRepo.GetLikedTrackIdsAsync(profileId, tracks.Select(t => t.Id));
     }
 
-    private static bool ProfileHasFewPlays(List<ArtistPlayScore> topArtists, int minPlays)
+    internal static bool ProfileHasFewPlays(List<ArtistPlayScore> topArtists, int minPlays)
     {
         return topArtists.Sum(a => a.Score) < minPlays;
     }
@@ -372,7 +372,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         return interleaved.Take(targetSize).Select(t => t.Id).ToList();
     }
 
-    private static List<Track> DedupeById(List<Track> tracks)
+    internal static List<Track> DedupeById(List<Track> tracks)
     {
         var seen = new HashSet<Guid>();
         var output = new List<Track>(tracks.Count);
@@ -383,7 +383,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         return output;
     }
 
-    private static List<Track> InterleaveForVariety(List<Track> input, int maxConsecutiveSameArtist, int maxPerArtist)
+    internal static List<Track> InterleaveForVariety(List<Track> input, int maxConsecutiveSameArtist, int maxPerArtist)
     {
         var groups = input
             .GroupBy(t => t.Album?.ArtistId ?? Guid.Empty)
@@ -409,7 +409,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         return output;
     }
 
-    private static List<Guid> DriftBlend(List<Guid> existing, List<Guid> fresh, int driftPercent)
+    internal static List<Guid> DriftBlend(List<Guid> existing, List<Guid> fresh, int driftPercent)
     {
         if (existing.Count == 0) return fresh;
         if (fresh.Count == 0) return existing;

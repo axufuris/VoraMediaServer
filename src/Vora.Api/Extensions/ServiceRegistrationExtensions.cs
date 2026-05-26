@@ -611,12 +611,13 @@ public static class ServiceRegistrationExtensions
 
     private static IServiceCollection AddVoraAuthenticationAndAuthorization(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
+        var allowsDefaults = environment.IsDevelopment() || environment.IsEnvironment("Testing");
         var jwtSecret = ResolveJwtSecret(configuration, environment);
 
         var jwtIssuer = configuration["Jwt:Issuer"];
         if (string.IsNullOrWhiteSpace(jwtIssuer))
         {
-            if (environment.IsDevelopment())
+            if (allowsDefaults)
             {
                 jwtIssuer = "VoraMediaServer";
             }
@@ -629,7 +630,7 @@ public static class ServiceRegistrationExtensions
         var jwtAudience = configuration["Jwt:Audience"];
         if (string.IsNullOrWhiteSpace(jwtAudience))
         {
-            if (environment.IsDevelopment())
+            if (allowsDefaults)
             {
                 jwtAudience = "VoraMediaServer";
             }
@@ -718,13 +719,16 @@ public static class ServiceRegistrationExtensions
     {
         var jwtSecret = configuration["Jwt:SecretKey"];
 
-        if (environment.IsDevelopment())
+        if (environment.IsDevelopment() || environment.IsEnvironment("Testing"))
         {
             if (string.IsNullOrWhiteSpace(jwtSecret)
                 || string.Equals(jwtSecret, JwtSecretPlaceholder, StringComparison.Ordinal)
                 || Encoding.UTF8.GetByteCount(jwtSecret) < JwtMinSecretByteLength)
             {
-                Console.WriteLine("[Vora] WARNING: Jwt:SecretKey is missing, placeholder, or too short. Using built-in development fallback. DO NOT deploy this environment to production.");
+                if (environment.IsDevelopment())
+                {
+                    Console.WriteLine("[Vora] WARNING: Jwt:SecretKey is missing, placeholder, or too short. Using built-in development fallback. DO NOT deploy this environment to production.");
+                }
                 return DevelopmentJwtFallbackSecret;
             }
             return jwtSecret;

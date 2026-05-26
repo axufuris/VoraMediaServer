@@ -556,23 +556,55 @@ Substantiated by grep (0 references outside the definition file).
 
 ## 8. Testing — separately called out
 
-There are **zero automated tests** in the repository — backend or frontend. With a 165k+ LOC codebase that includes auth, plugin loading, smart playlists, marker detection, backups, EPG sync, etc., this is the single highest-leverage finding in the entire review.
+**Status: COMPLETE as of 2026-05-26.** What was originally called out as the single highest-leverage gap in the review is now a broad, multi-layer test suite. Roughly 280 test cases across four backend test projects and Vitest in the SPA.
 
-Recommended starter scope:
+### Test stack
 
-- `tests/Vora.Application.Tests` (xUnit + `Testcontainers.PostgreSql` or `EFCore.InMemory` for fast tests):
-  - `AuthManager` — login, registration, password reset, invitation acceptance happy paths + ownership checks.
-  - `SmartPlaylistEvaluator` — known rule trees against a seeded test DB.
-  - `BackupSection` round-trips (each `IBackupSection` implementation).
-  - `MediaAnalyzerManager` — marker lock behavior, season cluster snap.
-- `tests/Vora.Plugins.Tests`:
-  - `PluginLoaderExtensions` — multi-interface registration, version mismatch refusal.
-- `src/Vora.Web` Vitest + React Testing Library:
-  - `PlayerContext` — smoke tests for play/seek/skip.
-  - `App.tsx` — route guards (especially `RequireAuth`, future `RequireAdmin`).
-  - `useDialog` and `dialogs/Dialog.tsx` rendering.
+- **Backend (xUnit 2.9.3 + FluentAssertions 7.2.0 + NSubstitute 5.3.0)** under `tests/`: `Vora.Domain.Tests`, `Vora.Application.Tests`, `Vora.Infrastructure.Tests`, `Vora.Api.Tests`. Versions centralized in `tests/Directory.Build.props`.
+- **Frontend (Vitest 3 + React Testing Library + jsdom)** under `src/Vora.Web/src/**/*.test.{ts,tsx}`. Vite 8 + Vitest config split (`vitest.config.ts` separate from `vite.config.ts` to avoid plugin shape conflicts).
+- **Integration tests** via `Microsoft.AspNetCore.Mvc.Testing` with `VoraApiTestFactory` (custom `WebApplicationFactory<Program>`), InMemory EF Core provider, env-var JWT bootstrap, stubbed security-stamp validator, and a `Testing` env that skips startup tasks.
 
-Adding even minimal coverage in these areas is high-leverage: each test catches whole classes of regression that today would only surface in QA or prod.
+### Coverage by surface
+
+- **Auth & security:** `AuthExtensions` claim helpers, `AuthManager` password hashing/reset/lockout, `StreamingTokenSigner` HMAC URL signing.
+- **Application managers:** `LibraryManager`, `MediaIngestionService`, `RequestManager`, `DiscoveryManager`, `DvrManager`, `IptvManager`, `MetadataManager` (actor refresh + library routing), `SystemSettingsManager`, `UserManager`, `PluginManager`, `PodcastManager`, `AdminNotificationManager`, `UserMediaStateManager`, `CalendarManager`, `ServerPlaybackTracker`.
+- **Analysis pipeline:** `MarkerAssembler` (Intro/Recap/Preview/Credits/CreditsScene assembly), `MediaAnalyzerManager` (silence/black detection, marker-lock, season cluster snap).
+- **Templates:** `ClientTemplateManager` (full 4-tier resolution chain), `ClientTemplateScheduleManager` CRUD.
+- **Plugins:** `PluginManager`, `PluginSettingsEnvSeeder`, `ExternalIdSet`, `LibraryKindExtensions`, ingestion handle types.
+- **Backups:** `BackupScheduleEvaluator` cadence logic, `BackupManager` atomic restore.
+- **IPTV:** `IptvEpgService` channel-claim + parental-control helpers, `IptvManager` CRUD, `DvrManager` lifecycle.
+- **Smart playlists:** `SmartPlaylistEvaluator` across Movies / Music / TV Shows using a seeded in-memory DbContext.
+- **Music:** `MusicRecommendationManager` algorithmic helpers (`ProfileHasFewPlays`, `DedupeById`, `InterleaveForVariety`, `DriftBlend`).
+- **Workers:** `TaskProcessingWorker`, `RecommendationRefreshWorker` schedule logic, `EmailDispatchWorker` retry/log lifecycle.
+- **Real-time:** `VoraHub` (per-account/admin/profile group joins, anonymous user no-op).
+- **Email:** `EmailTemplateRenderer` (token substitution, HTML encoding, subject sanitization, override fallback).
+- **Frontend:** `Modal`, `Dialog`/`useDialog`, `MediaCard`, `usePlayer`/`usePlayerTime`, `useSignalREvent`, `useFeatureFlags`, `useYouTubeWatchedSet`, `useVideoThumbnails`, axios client interceptors, `storageKeys`, `serverVault`, `audioQuality` stores, `loadHls` memoization.
+- **Integration round-trips:** health, auth setup-status, login flow + token exchange, library CRUD, ProblemDetails error shape, plugin enable/disable, server settings update (with end-to-end clamping verified at the API boundary), feature-flags PUT/GET round-trip, admin gating across `/api/plugins` and `/api/settings/server`.
+
+### Production refactors made for testability
+
+The following minimal, well-precedented changes were made to expose pure helpers without violating the "no `!`/no comments/no public surface area churn" rules:
+
+- `InternalsVisibleTo "Vora.Application.Tests"` added to `Vora.Plugins.csproj`, `Vora.Application.csproj`, `Vora.Infrastructure.csproj` (the latter for `Vora.Infrastructure.Tests`).
+- `private static` → `internal static` on four pure helpers: `IptvEpgService.ClaimChannelsForSource` + `ApplyParentalControls`, `VideoThumbnailManager.ComputeSpriteVersion`, `MusicRecommendationManager.{ProfileHasFewPlays, DedupeById, InterleaveForVariety, DriftBlend}`, `RecommendationRefreshWorker.{IsDueForRefresh, IsWeeklyDue}`, `MarkerAssembler` helpers.
+- `VoraDbContext` branches on `Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory"` to skip pgvector + `MediaItemEmbedding` registration so integration/evaluator tests can use InMemory.
+- `Vora.Api/Program.cs` has `public partial class Program { }` marker for `WebApplicationFactory<Program>`.
+- `StartupTaskExtensions` skips startup tasks when env is `Testing`.
+
+### Known limitations
+
+- **Anonymous-type projections** (`GetProjectedAsync(id, m => new { ... })`) are not stubbable across assemblies with NSubstitute. Several paths through `MetadataManager`, `CollectionOrderingService`, `CollectionSyncService`, and `VideoThumbnailManager` are documented in their test files as "reachable only by refactoring to named DTOs." That refactor isn't worth the test-only gain.
+- **Repository-layer edge cases** that depend on real Postgres features (`ExecuteDeleteAsync`, pgvector queries, `ILike` operator) require Testcontainers — out of scope for this sweep. The library DELETE integration test is documented as deferred for the same reason.
+- **FFmpeg-bound paths** (`DvrRecordingService`, `VideoThumbnailGeneratorService`) need process mocking that wasn't worth the scaffolding.
+
+### Test conventions worth keeping
+
+- NSubstitute gotcha: when *any* parameter of a given type uses an `Arg.X<>` matcher in a `.Received()` call, *all* params of that same type must also use matchers (mix-and-match with literal `null` triggers `AmbiguousArgumentsException`).
+- `WebApplicationFactory` JWT bootstrap: set `Jwt__SecretKey`/`Jwt__Issuer`/`Jwt__Audience` + `ASPNETCORE_ENVIRONMENT=Testing` env vars in the factory's *static constructor* — `ConfigureAppConfiguration` runs too late because the JWT secret is captured eagerly during `AddVoraServices`.
+- `IClassFixture<VoraApiTestFactory>` shares the InMemory DB across all tests in the class. xUnit doesn't guarantee order, so tests that mutate state must not assume initial defaults.
+- For vendor splits + lazy HLS: `loadHls()` is the memoized accessor — mock `hls.js` in tests with `vi.mock('hls.js', ...)` + `vi.resetModules()` between tests.
+
+Going forward, new features should ship with tests; backfilling further has diminishing returns.
 
 ---
 
@@ -623,7 +655,7 @@ The shortlist below is ordered by impact-vs-effort. Items in **bold** are the hi
 
 ### Sprint 3 — testing & observability (5-7 days)
 
-15. **Stand up `Vora.Application.Tests` + Vitest** with the starter scope in section 8.
+15. ~~**Stand up `Vora.Application.Tests` + Vitest** with the starter scope in section 8.~~ ✅ **Done 2026-05-26** — see Section 8 above for the full coverage map.
 16. **Add `/health` endpoint + global exception handler** (6.2 first two items).
 17. **Add `OpenTelemetry.Extensions.Hosting`** for tracing + a Prometheus exporter (6.2 third item).
 18. **Add HTTP resilience (`AddStandardResilienceHandler`) to all external `IHttpClientFactory` clients** (6.4 first item).

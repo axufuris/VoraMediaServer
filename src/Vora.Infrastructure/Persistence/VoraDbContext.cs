@@ -140,7 +140,16 @@ public class VoraDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.HasPostgresExtension("vector");
+        var isInMemoryProvider = Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+
+        if (!isInMemoryProvider)
+        {
+            modelBuilder.HasPostgresExtension("vector");
+        }
+        else
+        {
+            modelBuilder.Ignore<MediaItemEmbedding>();
+        }
 
         var converters = new ListValueConverters();
 
@@ -189,7 +198,10 @@ public class VoraDbContext : DbContext
         ConfigureNotifications(modelBuilder);
 
         ConfigureAiUsage(modelBuilder);
-        ConfigureMediaItemEmbeddings(modelBuilder);
+        if (!isInMemoryProvider)
+        {
+            ConfigureMediaItemEmbeddings(modelBuilder);
+        }
 
         ConfigureDiscovery(modelBuilder);
 

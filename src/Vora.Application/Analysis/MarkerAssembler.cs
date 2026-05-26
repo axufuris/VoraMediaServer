@@ -103,23 +103,22 @@ public class MarkerAssembler : IMarkerAssembler
 
     private static DetectedMarker? FindIntroMarker(List<DetectedInterval> jointGaps, MarkerAssemblerInput input)
     {
-        DetectedInterval? first = null;
-        foreach (var gap in jointGaps)
-        {
-            if (gap.Start > IntroWindow) break;
-            first = gap;
-            break;
-        }
-        if (first == null) return null;
+        // Intro means "skip past the opening into the real content". When an episode
+        // has a "Previously on..." recap followed by a title sequence, both produce
+        // joint silence+black gaps within the IntroWindow. We want the intro to cover
+        // EVERYTHING leading up to actual content, so use the LAST gap in the window.
+        var gapsInWindow = jointGaps
+            .Where(g => g.Start <= IntroWindow)
+            .ToList();
+        if (gapsInWindow.Count == 0) return null;
 
-        var introStart = TimeSpan.Zero;
-        var introEnd = first.End;
-        if (introEnd <= introStart) return null;
+        var introEnd = gapsInWindow[^1].End;
+        if (introEnd <= TimeSpan.Zero) return null;
 
         return new DetectedMarker
         {
             Type = MarkerType.Intro,
-            Start = introStart,
+            Start = TimeSpan.Zero,
             End = introEnd
         };
     }
@@ -127,14 +126,22 @@ public class MarkerAssembler : IMarkerAssembler
     private static DetectedMarker? FindRecapMarker(List<DetectedInterval> jointGaps, MarkerAssemblerInput input, DetectedMarker? intro)
     {
         if (!input.IsEpisode || intro == null) return null;
-        var preIntro = jointGaps.FirstOrDefault(g => g.End <= intro.Start && g.Start <= EpisodeRecapWindow);
-        if (preIntro == null) return null;
-        if (preIntro.End <= TimeSpan.Zero) return null;
+
+        // Recap is a finer-grained subset of the intro: when the player offers
+        // "Skip Recap" alongside "Skip Intro", recap covers just the "Previously on..."
+        // segment. We only emit a recap marker if there's an early gap (within
+        // EpisodeRecapWindow) that ENDS strictly before the intro's end — i.e. the
+        // episode has multiple gaps and the first one bounds the recap.
+        var earlyGap = jointGaps.FirstOrDefault(g =>
+            g.Start <= EpisodeRecapWindow && g.End < intro.End);
+        if (earlyGap == null) return null;
+        if (earlyGap.End <= TimeSpan.Zero) return null;
+
         return new DetectedMarker
         {
             Type = MarkerType.Recap,
             Start = TimeSpan.Zero,
-            End = preIntro.End
+            End = earlyGap.End
         };
     }
 
