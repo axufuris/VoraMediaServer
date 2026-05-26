@@ -6,7 +6,8 @@ import { profileService, type PlaybackPreferencesVM } from '../../api/Users/prof
 import { streamingService } from '../../api/Streaming/streamingService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { scanDeviceCapabilities } from '../../utils/hardwareScanner';
-import Hls from 'hls.js';
+import type Hls from 'hls.js';
+import { loadHls } from '../../utils/loadHls';
 import { useDialog } from '../../dialogs';
 import { useAutoHideControls } from './Controls/useAutoHideControls';
 import { useFullscreen } from './Controls/useFullscreen';
@@ -252,40 +253,51 @@ export default function GlobalVideoPlayer() {
         if (!video || !currentMedia?.streamUrl) return;
 
         let hls: Hls | null = null;
+        let cancelled = false;
 
         if (currentMedia.container === 'hls' || currentMedia.strategy === 'Transcode' || currentMedia.streamUrl.includes('.m3u8')) {
-            if (Hls.isSupported()) {
-                hls = new Hls({
-                    enableWorker: true,
-                    lowLatencyMode: true,
-                });
-                hls.loadSource(currentMedia.streamUrl);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    video.play().catch(e => console.error('Auto-play blocked:', e));
-                });
+            (async () => {
+                const HlsClass = await loadHls();
+                if (cancelled) return;
 
-                hls.on(Hls.Events.ERROR, (_, data) => {
-                    if (data.fatal) {
-                        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                            hls?.startLoad();
-                        } else {
-                            hls?.destroy();
+                if (HlsClass.isSupported()) {
+                    const instance = new HlsClass({
+                        enableWorker: true,
+                        lowLatencyMode: true,
+                    });
+                    if (cancelled) { instance.destroy(); return; }
+
+                    instance.loadSource(currentMedia.streamUrl!);
+                    instance.attachMedia(video);
+                    instance.on(HlsClass.Events.MANIFEST_PARSED, () => {
+                        video.play().catch(e => console.error('Auto-play blocked:', e));
+                    });
+
+                    instance.on(HlsClass.Events.ERROR, (_, data) => {
+                        if (data.fatal) {
+                            if (data.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
+                                instance.startLoad();
+                            } else {
+                                instance.destroy();
+                            }
                         }
-                    }
-                });
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = currentMedia.streamUrl;
-                video.addEventListener('loadedmetadata', () => {
-                    video.play().catch(e => console.error('Auto-play blocked:', e));
-                });
-            }
+                    });
+
+                    hls = instance;
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = currentMedia.streamUrl!;
+                    video.addEventListener('loadedmetadata', () => {
+                        video.play().catch(e => console.error('Auto-play blocked:', e));
+                    });
+                }
+            })();
         } else {
             video.src = currentMedia.streamUrl;
             video.play().catch(e => console.error('Auto-play blocked:', e));
         }
 
         return () => {
+            cancelled = true;
             if (hls) {
                 hls.destroy();
             }

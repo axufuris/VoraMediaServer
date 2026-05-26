@@ -1,6 +1,7 @@
 import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
 import { useEffect, useState, useRef, useMemo } from 'react';
-import Hls from 'hls.js';
+import type Hls from 'hls.js';
+import { loadHls } from '../../utils/loadHls';
 import { type IptvChannelVM } from '../../api/Iptv/iptvAdminService';
 import { iptvClientService, type IptvProgramDto } from '../../api/Iptv/iptvClientService';
 import { dvrService, type IptvRecordingSessionVM } from '../../api/Iptv/dvrService';
@@ -164,17 +165,20 @@ export default function LiveTvPlayer() {
                 return;
             }
 
-            if (Hls.isSupported()) {
-                hls = new Hls();
+            const HlsClass = await loadHls();
+            if (!isMounted) return;
+
+            if (HlsClass.isSupported()) {
+                hls = new HlsClass();
                 hls.loadSource(passthroughUrl);
                 hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
                     if (isMounted) {
                         video.play().catch(e => console.error(e));
                         setIsVideoLoading(false);
                     }
                 });
-                hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_, data) => {
+                hls.on(HlsClass.Events.SUBTITLE_TRACKS_UPDATED, (_, data) => {
                     setCcAvailable(data.subtitleTracks.length > 0);
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -197,8 +201,11 @@ export default function LiveTvPlayer() {
 
                 const finalUrl = `${import.meta.env.VITE_API_URL || ''}${data.url}`;
 
-                if (Hls.isSupported()) {
-                    hls = new Hls({
+                const HlsClass = await loadHls();
+                if (!isMounted) return;
+
+                if (HlsClass.isSupported()) {
+                    hls = new HlsClass({
                         enableWorker: true,
                         lowLatencyMode: false,
                         liveSyncDurationCount: 3,
@@ -209,18 +216,18 @@ export default function LiveTvPlayer() {
                     hls.loadSource(finalUrl);
                     hls.attachMedia(video);
 
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
                         if (isMounted) {
                             video.play().catch(e => console.error("Auto-play blocked:", e));
                             setIsVideoLoading(false);
                         }
                     });
 
-                    hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_, data) => {
+                    hls.on(HlsClass.Events.SUBTITLE_TRACKS_UPDATED, (_, data) => {
                         setCcAvailable(data.subtitleTracks.length > 0);
                     });
 
-                    hls.on(Hls.Events.ERROR, (_, data) => {
+                    hls.on(HlsClass.Events.ERROR, (_, data) => {
                         if (data.fatal) {
                             console.error("Fatal Stream Error:", data);
                             hls?.destroy();

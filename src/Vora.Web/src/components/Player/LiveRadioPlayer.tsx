@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
-import Hls from 'hls.js';
+import type Hls from 'hls.js';
+import { loadHls } from '../../utils/loadHls';
 import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
 import { type IptvChannelVM } from '../../api/Iptv/iptvAdminService';
 import { iptvClientService } from '../../api/Iptv/iptvClientService';
@@ -125,11 +126,14 @@ export default function LiveRadioPlayer() {
                 return;
             }
 
-            if (Hls.isSupported()) {
-                hls = new Hls();
+            const HlsClass = await loadHls();
+            if (!isMounted) return;
+
+            if (HlsClass.isSupported()) {
+                hls = new HlsClass();
                 hls.loadSource(streamUrl);
                 hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
                     if (isMounted) {
                         video.play().catch(e => console.error(e));
                         setIsLoading(false);
@@ -155,15 +159,18 @@ export default function LiveRadioPlayer() {
 
                 const finalUrl = `${import.meta.env.VITE_API_URL || ''}${data.url}`;
 
-                if (Hls.isSupported()) {
-                    hls = new Hls({
+                const HlsClass = await loadHls();
+                if (!isMounted) return;
+
+                if (HlsClass.isSupported()) {
+                    hls = new HlsClass({
                         enableWorker: true,
                         lowLatencyMode: false,
                         liveSyncDurationCount: 3
                     });
                     hls.loadSource(finalUrl);
                     hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
                         if (isMounted) {
                             video.play().catch(e => console.error(e));
                             setIsLoading(false);
