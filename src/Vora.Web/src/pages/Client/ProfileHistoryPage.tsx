@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import { useParams } from 'react-router-dom';
 import { type UserProfileHistoryDto, type UserVM, userService } from '../../api/Users/userService';
+import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 export default function ProfileHistoryPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const [data, setData] = useState<UserProfileHistoryDto[]>([]);
@@ -8,10 +9,10 @@ export default function ProfileHistoryPage() {
     const [totalItems, setTotalItems] = useState(0);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-    const userId = localStorage.getItem('user_id');
-    const profileToken = localStorage.getItem('profile_token');
-    const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : null;
-    const isServerAdmin = localStorage.getItem('is_server_admin') === 'true';
+    const userId = localStorage.getItem(StorageKeys.userId);
+    const profileToken = localStorage.getItem(StorageKeys.profileToken);
+    const activeProfileId = getProfileIdFromToken(profileToken);
+    const isServerAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
 
     const [userAccount, setUserAccount] = useState<UserVM | null>(null);
     const [selectedProfileId, setSelectedProfileId] = useState<string | null>(activeProfileId);
@@ -162,7 +163,7 @@ export default function ProfileHistoryPage() {
                                         <tr className="hover:bg-[color-mix(in_srgb,var(--vora-bg-surface)_50%,transparent)] transition-colors">
                                             <td className="px-5 py-3 text-[var(--vora-text-muted)] font-medium flex items-center gap-2">
                                                 {row.isGrouped ? (
-                                                    <button onClick={() => toggleRow(row.sessionId)} className="w-4 h-4 flex items-center justify-center bg-[var(--vora-bg-raised)] rounded-sm text-[var(--vora-text-primary)] font-bold text-xs hover:bg-gray-600 cursor-pointer">
+                                                    <button onClick={() => toggleRow(row.sessionId)} className="w-4 h-4 flex items-center justify-center bg-[var(--vora-bg-raised)] rounded-sm text-[var(--vora-text-primary)] font-bold text-xs hover:bg-[var(--vora-bg-raised)] cursor-pointer">
                                                         {expandedRows.has(row.sessionId) ? '-' : '+'}
                                                     </button>
                                                 ) : <span className="w-4"></span>}
@@ -190,7 +191,7 @@ export default function ProfileHistoryPage() {
                                                 </span>
                                             </td>
                                             <td className="px-5 py-3 text-center">
-                                                {row.contentRating ? <span className="text-xs font-bold text-[var(--vora-text-muted)] border border-gray-600 px-1.5 py-0.5 rounded">{row.contentRating}</span> : <span className="text-gray-600">--</span>}
+                                                {row.contentRating ? <span className="text-xs font-bold text-[var(--vora-text-muted)] border border-[var(--vora-border-subtle)] px-1.5 py-0.5 rounded">{row.contentRating}</span> : <span className="text-[var(--vora-text-muted)]">--</span>}
                                             </td>
                                             <td className="px-5 py-3 text-right text-[var(--vora-text-disabled)]">{row.pausedMinutes > 0 ? `${row.pausedMinutes}m` : '--'}</td>
                                             <td className="px-5 py-3 text-right text-[var(--vora-text-muted)]">{formatDuration(row.durationMinutes)}</td>
@@ -210,7 +211,7 @@ export default function ProfileHistoryPage() {
                                                             {sub.type === 'Episode' ? sub.tvShowTitle : sub.title}
                                                         </span>
                                                         {sub.type === 'Episode' && (
-                                                            <span className="text-xs font-semibold text-gray-600 mt-0.5">
+                                                            <span className="text-xs font-semibold text-[var(--vora-text-muted)] mt-0.5">
                                                                 S{sub.seasonNumber} E{sub.episodeNumber} - {sub.title}
                                                             </span>
                                                         )}
@@ -223,9 +224,9 @@ export default function ProfileHistoryPage() {
                                                     </span>
                                                 </td>
                                                 <td className="px-5 py-3 text-center">
-                                                    {sub.contentRating ? <span className="text-xs font-bold text-gray-600 border border-[var(--vora-border-subtle)] px-1.5 py-0.5 rounded">{sub.contentRating}</span> : <span className="text-gray-700">--</span>}
+                                                    {sub.contentRating ? <span className="text-xs font-bold text-[var(--vora-text-muted)] border border-[var(--vora-border-subtle)] px-1.5 py-0.5 rounded">{sub.contentRating}</span> : <span className="text-[var(--vora-text-muted)]">--</span>}
                                                 </td>
-                                                <td className="px-5 py-3 text-right text-gray-600">{sub.pausedMinutes > 0 ? `${sub.pausedMinutes}m` : '--'}</td>
+                                                <td className="px-5 py-3 text-right text-[var(--vora-text-muted)]">{sub.pausedMinutes > 0 ? `${sub.pausedMinutes}m` : '--'}</td>
                                                 <td className="px-5 py-3 text-right text-[var(--vora-text-disabled)]">{formatDuration(sub.durationMinutes)}</td>
                                                 <td className="px-5 py-3 text-right text-[var(--vora-text-muted)] font-medium">{formatLocalTime(sub.timeStarted)}</td>
                                                 <td className="px-5 py-3 text-right text-[var(--vora-text-disabled)]">{formatLocalTime(sub.timeStopped)}</td>

@@ -17,9 +17,6 @@ public class DeviceRepository(VoraDbContext context) : IDeviceRepository
     public Task<ClientDevice?> GetDeviceByIdAsync(Guid id) =>
         context.ClientDevices.FindAsync(id).AsTask();
 
-    public Task<ClientDevice?> GetDeviceByDeviceIdAsync(string deviceId) =>
-        context.ClientDevices.FirstOrDefaultAsync(d => d.DeviceId == deviceId);
-
     public async Task UpdateDeviceAsync(ClientDevice device)
     {
         context.ClientDevices.Update(device);
@@ -29,12 +26,6 @@ public class DeviceRepository(VoraDbContext context) : IDeviceRepository
     public async Task DeleteDeviceAsync(ClientDevice device)
     {
         context.ClientDevices.Remove(device);
-        await context.SaveChangesAsync();
-    }
-
-    public async Task AddDeviceAsync(ClientDevice device)
-    {
-        context.ClientDevices.Add(device);
         await context.SaveChangesAsync();
     }
 

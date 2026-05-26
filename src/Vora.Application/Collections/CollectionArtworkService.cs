@@ -1,5 +1,7 @@
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using Vora.Application.FileSystem;
+using Vora.Application.Net;
+using Vora.Application.Settings;
 using Vora.Domain.Entities.Collections;
 using Vora.Domain.Enums;
 using Vora.Plugins.Interfaces;
@@ -9,7 +11,7 @@ namespace Vora.Application.Collections;
 public interface ICollectionArtworkService
 {
     Task<IEnumerable<CollectionArtwork>> GetArtworkAsync(Guid collectionId);
-    Task<string> UploadAsync(Guid collectionId, IFormFile file, ArtworkKind kind);
+    Task<string> UploadAsync(Guid collectionId, UploadedFile file, ArtworkKind kind);
     Task<string> AddUrlAsync(Guid collectionId, string url, ArtworkKind kind);
     Task DeleteAsync(Guid artworkId);
     Task RefreshProviderArtworkAsync(Guid collectionId, string providerId);
@@ -19,14 +21,16 @@ public class CollectionArtworkService : ICollectionArtworkService
 {
     private readonly ICollectionRepository _repository;
     private readonly IEnumerable<IArtworkProvider> _artworkProviders;
+    private readonly ISafeImageDownloader _imageDownloader;
     private readonly string _basePath;
 
-    public CollectionArtworkService(ICollectionRepository repository, IConfiguration config, IEnumerable<IArtworkProvider> artworkProviders)
+    public CollectionArtworkService(ICollectionRepository repository, IOptions<StoragePathsOptions> storagePaths, IEnumerable<IArtworkProvider> artworkProviders, ISafeImageDownloader imageDownloader)
     {
         _repository = repository;
         _artworkProviders = artworkProviders;
+        _imageDownloader = imageDownloader;
 
-        var configPath = config["StoragePaths:CustomArtwork"];
+        var configPath = storagePaths.Value.CustomArtwork;
         _basePath = !string.IsNullOrWhiteSpace(configPath)
             ? configPath
             : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
@@ -39,7 +43,7 @@ public class CollectionArtworkService : ICollectionArtworkService
         return await _repository.GetCollectionArtworkAsync(collectionId);
     }
 
-    public async Task<string> UploadAsync(Guid collectionId, IFormFile file, ArtworkKind kind)
+    public async Task<string> UploadAsync(Guid collectionId, UploadedFile file, ArtworkKind kind)
     {
         var ext = Path.GetExtension(file.FileName);
         var fileName = $"coll_{collectionId}_{kind.ToString().ToLower()}_{Guid.NewGuid()}{ext}";
@@ -47,7 +51,7 @@ public class CollectionArtworkService : ICollectionArtworkService
 
         using (var stream = new FileStream(filePath, FileMode.Create))
         {
-            await file.CopyToAsync(stream);
+            await file.Content.CopyToAsync(stream);
         }
 
         var publicUrl = $"/api/artwork/custom/{fileName}";
@@ -70,12 +74,8 @@ public class CollectionArtworkService : ICollectionArtworkService
         var fileName = $"coll_{collectionId}_{kind.ToString().ToLower()}_{Guid.NewGuid()}.jpg";
         var filePath = Path.Combine(_basePath, fileName);
 
-        using (var httpClient = new HttpClient())
-        {
-            httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0");
-            var imageBytes = await httpClient.GetByteArrayAsync(url);
-            await File.WriteAllBytesAsync(filePath, imageBytes);
-        }
+        var imageBytes = await _imageDownloader.DownloadAsync(url);
+        await File.WriteAllBytesAsync(filePath, imageBytes);
 
         var publicUrl = $"/api/artwork/custom/{fileName}";
 

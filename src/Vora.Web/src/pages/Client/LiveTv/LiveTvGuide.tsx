@@ -1,25 +1,17 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { type IptvChannelVM } from '../../../api/Iptv/iptvAdminService';
-import { iptvClientService, type IptvProgramDto } from '../../../api/Iptv/iptvClientService';
-import { dvrService, type IptvRecordingSessionVM } from '../../../api/Iptv/dvrService';
+import { type IptvProgramDto } from '../../../api/Iptv/iptvClientService';
+import { dvrService } from '../../../api/Iptv/dvrService';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { serverVault } from '../../../utils/serverVault';
-import { useSignalREvent } from '../../../hooks/useSignalREvent';
-import { useCallback } from 'react';
-
-import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
+import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { useDialog } from '../../../dialogs';
 import GuideProgramModal from '../../../components/Iptv/GuideProgramModal';
-const ROW_HEIGHT = 80;
-const PX_PER_MINUTE = 6;
-const HOURS_TO_SHOW = 6;
-
-const parseDate = (dateStr: string) => {
-    if (!dateStr) return new Date();
-    if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-')) return new Date(dateStr + 'Z');
-    return new Date(dateStr);
-};
+import { ROW_HEIGHT, PX_PER_MINUTE, HOURS_TO_SHOW, parseDate } from './guideConstants';
+import { useGuideData } from './hooks/useGuideData';
+import { useGuideVirtualization } from './hooks/useGuideVirtualization';
+import GuideRow, { type CleanedProgram } from './components/GuideRow';
 
 export interface LiveTvGuideProps {
     isEmbedded?: boolean;
@@ -34,44 +26,15 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
     const { playMedia } = usePlayer();
 
     const canRecord = useMemo(() => {
-        const token = localStorage.getItem('profile_token');
+        const token = localStorage.getItem(StorageKeys.profileToken);
         if (!token) return false;
         try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            return payload.canRecordLiveTv === 'True';
+            const payload = decodeJwtPayload(token);
+            return payload?.canRecordLiveTv === 'True';
         } catch {
             return false;
         }
     }, []);
-
-    const [channels, setChannels] = useState<IptvChannelVM[]>([]);
-    const [guideData, setGuideData] = useState<Record<string, IptvProgramDto[]>>({});
-    const [recordingSessions, setRecordingSessions] = useState<IptvRecordingSessionVM[]>([]); // <-- NEW
-    const [isLoading, setIsLoading] = useState(true);
-
-    const [scrollTop, setScrollTop] = useState(0);
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-    const [hoveredProgram, setHoveredProgram] = useState<{ channel: IptvChannelVM, program: IptvProgramDto | null } | null>(null);
-
-    const [showRegionMenu, setShowRegionMenu] = useState(false);
-    const [showResMenu, setShowResMenu] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [activeCategory, setActiveCategory] = useState<string>('All');
-    const [currentTimelineX, setCurrentTimelineX] = useState<number>(0);
-
-    const [prefs, setPrefs] = useState({
-        enabledProviders: [] as string[],
-        hiddenChannels: [] as string[],
-        favoriteChannels: [] as string[],
-        regions: [] as string[], // FIXED: Defaults to 'All Regions' instead of 'US'
-        resolutions: [] as string[],
-        hideEmpty: false
-    });
-
-    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, channelId: string } | null>(null);
-    const [programModal, setProgramModal] = useState<{ isOpen: boolean, channel: IptvChannelVM, program: IptvProgramDto } | null>(null);
-    const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
 
     const { timelineStart, timelineEnd, timeMarkers } = useMemo(() => {
         const now = new Date();
@@ -85,23 +48,20 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
         return { timelineStart: start, timelineEnd: end, timeMarkers: markers };
     }, []);
 
-    useSignalREvent("DvrSessionsUpdated", useCallback(() => {
-        const fetchFreshSessions = async () => {
-            try {
-                const activeServer = serverVault.getActiveServer();
-                if (!activeServer) return;
+    const { channels, guideData, recordingSessions, isLoading, prefs, updatePrefs } = useGuideData(serverId, timelineStart, timelineEnd);
+    const [recordingSessionsLocal, setRecordingSessionsLocal] = useState(recordingSessions);
+    useEffect(() => { setRecordingSessionsLocal(recordingSessions); }, [recordingSessions]);
 
-                const profileToken = localStorage.getItem('profile_token');
-                const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : activeServer.profileId;
+    const [hoveredProgram, setHoveredProgram] = useState<{ channel: IptvChannelVM, program: IptvProgramDto | null } | null>(null);
+    const [showRegionMenu, setShowRegionMenu] = useState(false);
+    const [showResMenu, setShowResMenu] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeCategory, setActiveCategory] = useState<string>('All');
+    const [currentTimelineX, setCurrentTimelineX] = useState<number>(0);
 
-                const sessions = await dvrService.getRecordingSessions(activeProfileId, activeServer.id);
-                setRecordingSessions(sessions);
-            } catch (e) {
-                console.error("SignalR: Failed to refresh DVR sessions", e);
-            }
-        };
-        fetchFreshSessions();
-    }, []));
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, channelId: string } | null>(null);
+    const [programModal, setProgramModal] = useState<{ isOpen: boolean, channel: IptvChannelVM, program: IptvProgramDto } | null>(null);
+    const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
 
     useEffect(() => {
         const updateTimeLine = () => {
@@ -113,80 +73,6 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
         const intervalId = setInterval(updateTimeLine, 60000);
         return () => clearInterval(intervalId);
     }, [timelineStart]);
-
-    const updatePrefs = (newPrefs: typeof prefs) => {
-        setPrefs(newPrefs);
-        const activeServer = serverVault.getActiveServer();
-        if (!activeServer) return;
-
-        const deviceId = localStorage.getItem('device_id') || 'unknown';
-        const json = JSON.stringify(newPrefs);
-        localStorage.setItem(`iptv_prefs_${activeServer.profileId}_${deviceId}`, json);
-        if (profileDeviceSettingsService.saveIptvPrefs) profileDeviceSettingsService.saveIptvPrefs(activeServer.profileId, deviceId, json, serverId).catch(console.error);
-    };
-
-    useEffect(() => {
-        const loadGuide = async () => {
-            try {
-                const activeServer = serverVault.getActiveServer();
-                if (!activeServer) return;
-
-                const profileToken = localStorage.getItem('profile_token');
-                const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : activeServer.profileId;
-                const userId = localStorage.getItem('user_id') || activeProfileId;
-                const deviceId = localStorage.getItem('device_id') || 'unknown';
-
-                const allProviders = await iptvClientService.getPlaylists(userId, activeProfileId, serverId);
-
-                let currentPrefs = {
-                    enabledProviders: [] as string[],
-                    hiddenChannels: [] as string[],
-                    favoriteChannels: [] as string[],
-                    regions: [] as string[],
-                    resolutions: [] as string[],
-                    hideEmpty: false
-                };
-
-                let hasSavedSettings = false;
-                const savedIptv = localStorage.getItem(`iptv_prefs_${activeProfileId}_${deviceId}`);
-
-                if (savedIptv && savedIptv !== "[]" && savedIptv !== "") {
-                    hasSavedSettings = true;
-                    const raw = JSON.parse(savedIptv);
-                    if (Array.isArray(raw)) currentPrefs.enabledProviders = raw;
-                    else currentPrefs = { ...currentPrefs, ...raw };
-                }
-
-                currentPrefs.enabledProviders = currentPrefs.enabledProviders.filter(id => allProviders.some(p => p.id === id));
-
-                if (!hasSavedSettings && currentPrefs.enabledProviders.length === 0 && allProviders.length > 0) {
-                    currentPrefs.enabledProviders = allProviders.map(p => p.id);
-                }
-                setPrefs(currentPrefs);
-
-                const activeChannels = allProviders.filter(p => currentPrefs.enabledProviders.includes(p.id)).flatMap(p => p.channels || []).filter(c => c.kind === 'Tv');
-                setChannels(activeChannels);
-
-                const channelIds = activeChannels.map(c => c.externalChannelId);
-                const guide = await iptvClientService.getGuide(userId, activeProfileId, channelIds, timelineStart.toISOString(), timelineEnd.toISOString(), serverId);
-
-                const normalizedGuide: Record<string, IptvProgramDto[]> = {};
-                for (const [key, value] of Object.entries(guide)) normalizedGuide[key.toLowerCase()] = value;
-                setGuideData(normalizedGuide);
-
-                try {
-                    const sessions = await dvrService.getRecordingSessions(activeProfileId, serverId);
-                    setRecordingSessions(sessions);
-                } catch (e) { console.error(e); }
-
-            } catch (error) {
-                console.error("Failed to load Live TV Guide", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        loadGuide();
-    }, [serverId, timelineStart, timelineEnd]);
 
     useEffect(() => {
         const closeMenu = () => setContextMenu(null);
@@ -303,6 +189,8 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
         });
     }, [channels, activeCategory, prefs, searchQuery, guideData]);
 
+    const { setScrollTop, scrollContainerRef, handleScroll, startIndex, endIndex, offsetY, totalHeight, visibleCount } = useGuideVirtualization(filteredChannels.length);
+
     useEffect(() => {
         if (!hasAutoScrolled && !isLoading && filteredChannels.length > 0 && currentPlayingChannelId && scrollContainerRef.current) {
             const activeIndex = filteredChannels.findIndex(c => c.id === currentPlayingChannelId);
@@ -315,20 +203,31 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
 
                 scrollContainerRef.current.scrollTo({ top: targetY, left: targetX, behavior: 'smooth' });
 
-                setScrollTop(targetY); // Update virtualization state
+                setScrollTop(targetY);
                 setHasAutoScrolled(true);
             }
         }
-    }, [filteredChannels, currentPlayingChannelId, isLoading, hasAutoScrolled, currentTimelineX]);
+    }, [filteredChannels, currentPlayingChannelId, isLoading, hasAutoScrolled, currentTimelineX, scrollContainerRef, setScrollTop]);
 
-    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => setScrollTop(e.currentTarget.scrollTop);
+    const cleanedGuideData = useMemo(() => {
+        const cleaned = new Map<string, CleanedProgram[]>();
+        for (const [channelKey, rawPrograms] of Object.entries(guideData)) {
+            const sorted = [...rawPrograms].sort((a, b) => new Date(a.startTime.endsWith('Z') ? a.startTime : a.startTime + 'Z').getTime() - new Date(b.startTime.endsWith('Z') ? b.startTime : b.startTime + 'Z').getTime());
+            const cleanPrograms: CleanedProgram[] = [];
+            let lastEnd = 0;
+            for (const p of sorted) {
+                let pStart = new Date(p.startTime.endsWith('Z') ? p.startTime : p.startTime + 'Z').getTime();
+                const pEnd = new Date(p.endTime.endsWith('Z') ? p.endTime : p.endTime + 'Z').getTime();
+                if (pEnd <= lastEnd) continue;
+                if (pStart < lastEnd) pStart = lastEnd;
+                if (pEnd > pStart) { cleanPrograms.push({ ...p, _safeStart: pStart, _safeEnd: pEnd }); lastEnd = pEnd; }
+            }
+            cleaned.set(channelKey, cleanPrograms);
+        }
+        return cleaned;
+    }, [guideData]);
 
-    const visibleRows = Math.ceil(window.innerHeight / ROW_HEIGHT);
-    const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 3);
-    const endIndex = Math.min(filteredChannels.length, startIndex + visibleRows + 6);
     const visibleChannels = filteredChannels.slice(startIndex, endIndex);
-    const totalHeight = filteredChannels.length * ROW_HEIGHT;
-    const offsetY = startIndex * ROW_HEIGHT;
     const timelineWidth = HOURS_TO_SHOW * 60 * PX_PER_MINUTE;
 
     const handlePlayChannel = (channel: IptvChannelVM, program?: IptvProgramDto) => {
@@ -340,8 +239,8 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
         try {
             const activeServer = serverVault.getActiveServer();
             if (!activeServer) return;
-            const profileToken = localStorage.getItem('profile_token');
-            const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : activeServer.profileId;
+            const profileToken = localStorage.getItem(StorageKeys.profileToken);
+            const activeProfileId = getProfileIdFromToken(profileToken) ?? activeServer.profileId;
 
             await dvrService.scheduleRecording(
                 activeProfileId,
@@ -354,7 +253,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
             );
 
             const newSessions = await dvrService.getRecordingSessions(activeProfileId, serverId);
-            setRecordingSessions(newSessions);
+            setRecordingSessionsLocal(newSessions);
 
             await dialog.alert({ title: "Success", message: "Recording scheduled successfully!" });
             setProgramModal(null);
@@ -399,6 +298,15 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
         else if (newArr.includes(item)) newArr = newArr.filter(i => i !== item);
         else newArr.push(item);
         updatePrefs({ ...prefs, [key]: newArr });
+    };
+
+    const handleHoverProgram = (channel: IptvChannelVM, program: IptvProgramDto | null) => {
+        if (onHoverProgram) onHoverProgram(channel, program);
+        else setHoveredProgram({ channel, program });
+    };
+
+    const handleProgramContextMenu = (channel: IptvChannelVM, program: IptvProgramDto) => {
+        setProgramModal({ isOpen: true, channel, program });
     };
 
     if (isLoading) {
@@ -689,217 +597,32 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                                 className="pointer-events-none absolute bottom-0 top-0 z-30 w-0.5"
                                 style={{
                                     left: `${256 + currentTimelineX}px`,
-                                    height: `${visibleChannels.length * ROW_HEIGHT}px`,
+                                    height: `${visibleCount * ROW_HEIGHT}px`,
                                     background: 'var(--vora-danger-500)',
                                     boxShadow: '0 0 12px color-mix(in srgb, var(--vora-danger-500) 70%, transparent)',
                                 }}
                             />
 
                             {visibleChannels.map(channel => {
-                                const rawPrograms = guideData[(channel.externalChannelId || '').toLowerCase()] || [];
-                                const now = new Date();
-                                const sorted = [...rawPrograms].sort((a, b) => new Date(a.startTime.endsWith('Z') ? a.startTime : a.startTime + 'Z').getTime() - new Date(b.startTime.endsWith('Z') ? b.startTime : b.startTime + 'Z').getTime());
-
-                                const cleanPrograms: (IptvProgramDto & { _safeStart: number, _safeEnd: number })[] = [];
-                                let lastEnd = 0;
-
-                                for (const p of sorted) {
-                                    let pStart = new Date(p.startTime.endsWith('Z') ? p.startTime : p.startTime + 'Z').getTime();
-                                    const pEnd = new Date(p.endTime.endsWith('Z') ? p.endTime : p.endTime + 'Z').getTime();
-                                    if (pEnd <= lastEnd) continue;
-                                    if (pStart < lastEnd) pStart = lastEnd;
-                                    if (pEnd > pStart) { cleanPrograms.push({ ...p, _safeStart: pStart, _safeEnd: pEnd }); lastEnd = pEnd; }
-                                }
-
-                                const currentProgram = cleanPrograms.find(p => p._safeStart <= now.getTime() && p._safeEnd > now.getTime());
+                                const cleanPrograms = cleanedGuideData.get((channel.externalChannelId || '').toLowerCase()) || [];
                                 const isCurrentlyPlaying = channel.id === currentPlayingChannelId;
                                 const isFavorite = prefs.favoriteChannels.includes(channel.externalChannelId);
 
                                 return (
-                                    <div
+                                    <GuideRow
                                         key={channel.id}
-                                        onContextMenu={(e) => handleRightClick(e, channel.externalChannelId)}
-                                        className="vora-guide-row group flex h-[80px] transition-colors"
-                                        style={{
-                                            background: isCurrentlyPlaying ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
-                                            borderBottom: '1px solid var(--vora-border-subtle)',
-                                        }}
-                                    >
-                                        <div
-                                            onClick={() => handlePlayChannel(channel, currentProgram)}
-                                            onMouseEnter={() => {
-                                                if (onHoverProgram) onHoverProgram(channel, currentProgram || null);
-                                                else setHoveredProgram({ channel, program: currentProgram || null });
-                                            }}
-                                            className="vora-guide-channel sticky left-0 z-20 flex w-64 shrink-0 cursor-pointer items-center gap-3 p-3 transition-colors"
-                                            style={{
-                                                background: isCurrentlyPlaying ? 'var(--vora-bg-raised)' : 'var(--vora-bg-surface)',
-                                                borderLeft: `3px solid ${isCurrentlyPlaying ? 'var(--vora-accent-500)' : 'transparent'}`,
-                                                borderRight: '1px solid var(--vora-border-subtle)',
-                                            }}
-                                        >
-                                            <div
-                                                className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full"
-                                                style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
-                                            >
-                                                {channel.logoUrl ? (
-                                                    <img src={channel.logoUrl} alt="" className="max-h-[78%] max-w-[78%] object-contain" />
-                                                ) : (
-                                                    <span className="text-[9px]" style={{ color: 'var(--vora-text-disabled)' }}>No logo</span>
-                                                )}
-                                                {isFavorite && (
-                                                    <span
-                                                        className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full"
-                                                        style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}
-                                                    >
-                                                        <svg width="9" height="9" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center justify-between gap-1.5">
-                                                    <h3
-                                                        className="m-0 truncate text-sm font-semibold"
-                                                        style={{ color: isCurrentlyPlaying ? 'var(--vora-accent-text)' : 'var(--vora-text-primary)' }}
-                                                    >
-                                                        {channel.name}
-                                                    </h3>
-                                                    {channel.resolution && channel.resolution !== 'Unknown' && (
-                                                        <span
-                                                            className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold"
-                                                            style={{ background: 'var(--vora-accent-soft)', color: 'var(--vora-accent-text)' }}
-                                                        >
-                                                            {channel.resolution}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="mt-0.5 flex items-center gap-2">
-                                                    {channel.countryCode && channel.countryCode !== 'Unknown' && (
-                                                        <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>
-                                                            {channel.countryCode}
-                                                        </span>
-                                                    )}
-                                                    {channel.groupTitle && (
-                                                        <span className="truncate text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>
-                                                            {channel.groupTitle.replace(/;/g, ' • ')}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex-1 relative overflow-hidden" style={{ width: `${HOURS_TO_SHOW * 60 * PX_PER_MINUTE}px` }}>
-                                            {cleanPrograms.map(program => {
-                                                const start = new Date(program._safeStart);
-                                                const end = new Date(program._safeEnd);
-                                                if (end <= timelineStart || start >= timelineEnd) return null;
-
-                                                const startDiffMins = (start.getTime() - timelineStart.getTime()) / 60000;
-                                                const durationMins = (end.getTime() - start.getTime()) / 60000;
-                                                let left = startDiffMins * PX_PER_MINUTE;
-                                                let width = durationMins * PX_PER_MINUTE;
-
-                                                if (left < 0) { width += left; left = 0; }
-                                                if (width <= 0 || isNaN(width) || isNaN(left)) return null;
-
-                                                const isPlayingNow = start <= now && end > now;
-                                                const isRestricted = program.title === "Restricted Content";
-
-                                                const isScheduled = recordingSessions.some(s => {
-                                                    if (s.status !== 'Pending' && s.status !== 'Recording') return false;
-
-                                                    if (s.externalProgramId && s.externalProgramId === program.id) return true;
-
-                                                    if (s.title !== program.title || s.schedule?.channel?.name !== channel.name) return false;
-
-                                                    const sStart = new Date(s.startTime).getTime();
-                                                    const sEnd = new Date(s.endTime).getTime();
-                                                    const pStart = new Date(program._safeStart).getTime();
-                                                    const pEnd = new Date(program._safeEnd).getTime();
-
-                                                    const overlapStart = Math.max(sStart, pStart);
-                                                    const overlapEnd = Math.min(sEnd, pEnd);
-
-                                                    return (overlapEnd - overlapStart) > 360000;
-                                                });
-
-                                                const isActivePlayback = isCurrentlyPlaying && isPlayingNow;
-
-                                                let tileBg: string;
-                                                let tileBorder: string;
-                                                let tileShadow: string;
-                                                let tileZ: number;
-                                                if (isActivePlayback) {
-                                                    tileBg = 'var(--vora-accent-soft)';
-                                                    tileBorder = 'var(--vora-accent-500)';
-                                                    tileShadow = '0 0 14px color-mix(in srgb, var(--vora-accent-500) 35%, transparent)';
-                                                    tileZ = 20;
-                                                } else if (isPlayingNow) {
-                                                    tileBg = 'var(--vora-bg-raised)';
-                                                    tileBorder = 'var(--vora-border-strong)';
-                                                    tileShadow = 'var(--vora-shadow-sm)';
-                                                    tileZ = 10;
-                                                } else {
-                                                    tileBg = 'var(--vora-bg-surface)';
-                                                    tileBorder = 'var(--vora-border-subtle)';
-                                                    tileShadow = 'none';
-                                                    tileZ = 0;
-                                                }
-                                                if (isScheduled) {
-                                                    tileBorder = 'var(--vora-danger-500)';
-                                                }
-
-                                                return (
-                                                    <div
-                                                        key={program.id}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handlePlayChannel(channel, program);
-                                                        }}
-                                                        onContextMenu={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            setProgramModal({ isOpen: true, channel, program });
-                                                        }}
-                                                        onMouseEnter={() => {
-                                                            if (onHoverProgram) onHoverProgram(channel, program);
-                                                            else setHoveredProgram({ channel, program });
-                                                        }}
-                                                        className={`vora-guide-tile absolute bottom-1 top-1 cursor-pointer overflow-hidden transition-all duration-200 ${isRestricted ? 'opacity-50 grayscale' : ''}`}
-                                                        style={{
-                                                            left: `${left}px`,
-                                                            width: `${width}px`,
-                                                            background: tileBg,
-                                                            border: `1px solid ${tileBorder}`,
-                                                            borderRadius: 'var(--vora-radius-md)',
-                                                            boxShadow: tileShadow,
-                                                            zIndex: tileZ,
-                                                        }}
-                                                    >
-                                                        <div className="flex h-full flex-col justify-center p-2">
-                                                            <div className="flex items-center gap-1.5">
-                                                                {isScheduled && (
-                                                                    <span
-                                                                        className="h-2 w-2 shrink-0 rounded-full"
-                                                                        style={{
-                                                                            background: 'var(--vora-danger-500)',
-                                                                            boxShadow: '0 0 6px color-mix(in srgb, var(--vora-danger-500) 70%, transparent)',
-                                                                        }}
-                                                                    />
-                                                                )}
-                                                                <h4
-                                                                    className="m-0 truncate text-sm font-semibold"
-                                                                    style={{ color: isPlayingNow || isActivePlayback ? 'var(--vora-text-primary)' : 'var(--vora-text-secondary)' }}
-                                                                >
-                                                                    {program.title}
-                                                                </h4>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
+                                        channel={channel}
+                                        cleanPrograms={cleanPrograms}
+                                        timelineStart={timelineStart}
+                                        timelineEnd={timelineEnd}
+                                        recordingSessions={recordingSessionsLocal}
+                                        isCurrentlyPlaying={isCurrentlyPlaying}
+                                        isFavorite={isFavorite}
+                                        onPlay={handlePlayChannel}
+                                        onHover={handleHoverProgram}
+                                        onRightClick={handleRightClick}
+                                        onProgramContextMenu={handleProgramContextMenu}
+                                    />
                                 );
                             })}
                         </div>
@@ -907,7 +630,6 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                 </div>
             </div>
 
-            {/* NEW: Program Action Modal */}
             {programModal && programModal.isOpen && (
                 <GuideProgramModal
                     channel={programModal.channel}

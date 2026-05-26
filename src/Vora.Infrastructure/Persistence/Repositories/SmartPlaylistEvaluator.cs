@@ -112,6 +112,15 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
             }
         }
 
+        var playStats = _context.TrackPlayHistory
+            .Where(p => p.ProfileId == profileId)
+            .GroupBy(p => p.TrackId)
+            .Select(g => new { TrackId = g.Key, PlayCount = g.Count(), LastPlayedAt = (DateTime?)g.Max(p => p.PlayedAt) });
+
+        var likedTrackIds = _context.TrackLikes
+            .Where(l => l.ProfileId == profileId)
+            .Select(l => l.TrackId);
+
         var rowQuery = baseQuery.Select(t => new MusicRow
         {
             TrackId = t.Id,
@@ -131,11 +140,9 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
             DiscNumber = t.DiscNumber,
             DurationSeconds = t.DurationSeconds,
             AddedAt = t.AddedAt,
-            PlayCount = _context.TrackPlayHistory.Count(p => p.ProfileId == profileId && p.TrackId == t.Id),
-            LastPlayedAt = _context.TrackPlayHistory
-                .Where(p => p.ProfileId == profileId && p.TrackId == t.Id)
-                .Max(p => (DateTime?)p.PlayedAt),
-            Liked = _context.TrackLikes.Any(l => l.ProfileId == profileId && l.TrackId == t.Id)
+            PlayCount = playStats.Where(s => s.TrackId == t.Id).Select(s => s.PlayCount).FirstOrDefault(),
+            LastPlayedAt = playStats.Where(s => s.TrackId == t.Id).Select(s => s.LastPlayedAt).FirstOrDefault(),
+            Liked = likedTrackIds.Contains(t.Id)
         });
 
         var predicate = BuildGroupPredicate<MusicRow>(definition.Root, MusicFieldAccessor);
@@ -172,7 +179,7 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
             EpisodeNumber = null,
             ReleaseYear = m.ReleaseDate != null ? m.ReleaseDate.Value.Year : (int?)null,
             ContentRating = m.ContentRating,
-            DurationSeconds = m.MediaParts.Any() ? (int?)(int)m.MediaParts.First().Duration!.Value.TotalSeconds : null,
+            DurationSeconds = m.Analysis != null && m.Analysis.Duration != null ? (int?)(int)m.Analysis.Duration.Value.TotalSeconds : null,
             AddedAt = m.AddedAt,
             LibraryId = m.LibraryId,
             Genres = m.Genres.Select(g => g.Name.ToLower()),
@@ -224,7 +231,7 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
             EpisodeNumber = e.EpisodeNumber,
             ReleaseYear = e.ReleaseDate != null ? e.ReleaseDate.Value.Year : (int?)null,
             ContentRating = e.ContentRating,
-            DurationSeconds = e.MediaParts.Any() ? (int?)(int)e.MediaParts.First().Duration!.Value.TotalSeconds : null,
+            DurationSeconds = e.Analysis != null && e.Analysis.Duration != null ? (int?)(int)e.Analysis.Duration.Value.TotalSeconds : null,
             AddedAt = e.AddedAt,
             LibraryId = e.LibraryId,
             Genres = e.Season.TvShow.Genres.Select(g => g.Name.ToLower()),

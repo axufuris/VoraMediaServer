@@ -1,10 +1,11 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Text.Json;
 using Vora.Application.Iptv.Dtos;
+using Vora.Application.Settings;
 using Vora.Application.Users;
 using Vora.Domain.Entities.Iptv;
 
@@ -17,7 +18,6 @@ public interface IIptvEpgService
     Task RemoveChannelsFromCacheAsync(List<string> channelIds);
     Dictionary<string, List<IptvProgramDto>> GetProgramsForChannels(List<string> channelIds, DateTime startTime, DateTime endTime);
     Task<Dictionary<string, List<IptvProgramDto>>> GetFilteredGuideAsync(Guid userId, Guid profileId, List<string> requestedChannelIds, DateTime startTime, DateTime endTime);
-    IptvSourceSyncStats? GetSyncStats(Guid sourceId);
     IReadOnlyDictionary<Guid, IptvSourceSyncStats> GetAllSyncStats();
     IReadOnlySet<string> GetCoveredChannelIds();
 }
@@ -53,13 +53,13 @@ public class IptvEpgService : IIptvEpgService
     private readonly ILogger<IptvEpgService> _logger;
     private readonly string _cacheFilePath;
 
-    public IptvEpgService(IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory, IConfiguration config, ILogger<IptvEpgService> logger)
+    public IptvEpgService(IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory, IOptions<StoragePathsOptions> storagePaths, ILogger<IptvEpgService> logger)
     {
         _scopeFactory = scopeFactory;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
 
-        var configured = config["StoragePaths:EpgCache"];
+        var configured = storagePaths.Value.EpgCache;
         var cacheDirectory = !string.IsNullOrWhiteSpace(configured)
             ? configured
             : Path.Combine(AppContext.BaseDirectory, StorageRoot, CacheFolder);
@@ -165,9 +165,6 @@ public class IptvEpgService : IIptvEpgService
             _cacheLock.Release();
         }
     }
-
-    public IptvSourceSyncStats? GetSyncStats(Guid sourceId) =>
-        _syncStats.TryGetValue(sourceId, out var stats) ? stats : null;
 
     public IReadOnlyDictionary<Guid, IptvSourceSyncStats> GetAllSyncStats() => _syncStats;
 

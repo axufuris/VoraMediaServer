@@ -13,7 +13,7 @@ public interface IUserManager
     Task<UserVM?> GetUserAccountAsync(Guid userId);
     Task<bool> ValidateProfilePinAsync(Guid profileId, string pin);
     Task<Guid> CreateManagedProfileAsync(Guid primaryUserId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, string? showtimesLocation);
-    Task UpdateUserAccountAsync(Guid userId, string email, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null);
+    Task UpdateUserAccountAsync(Guid userId, Guid callingAccountId, bool callerIsAdmin, string email, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null);
     Task UpdateManagedProfileAsync(Guid profileId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, string? showtimesLocation);
     Task DeleteManagedProfileAsync(Guid profileId);
     Task UpdateUserAccessAsync(Guid userId, bool hasAllLibraryAccess, List<Guid> allowedLibraries, bool canRequest, bool autoApprove, bool enableAiRecommendations, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, bool canRecordLiveTv, long dvrStorageQuotaBytes, bool canTimeshiftIptv, bool canAddCustomPodcastFeeds);
@@ -117,8 +117,13 @@ public class UserManager(
         return profile.Id;
     }
 
-    public async Task UpdateUserAccountAsync(Guid userId, string email, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null)
+    public async Task UpdateUserAccountAsync(Guid userId, Guid callingAccountId, bool callerIsAdmin, string email, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null)
     {
+        if (!callerIsAdmin && callingAccountId != userId)
+        {
+            throw new UnauthorizedAccessException("You may only update your own account.");
+        }
+
         var user = await repository.GetUserByIdAsync(userId)
             ?? throw new InvalidOperationException("User not found.");
 
@@ -127,6 +132,7 @@ public class UserManager(
         if (!string.IsNullOrWhiteSpace(newPassword))
         {
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            user.SecurityStamp = Guid.NewGuid().ToString("N");
         }
         if (emailNotifyOnRequestAvailable.HasValue)
         {
@@ -170,6 +176,7 @@ public class UserManager(
         }
 
         ApplyProfileUpdates(profile, name, imageUrl, pin, allowedMovieRatings, allowedTvRatings, allowedMusicRatings, hasAllLibraryAccess, blockUnrated, allowedLibraries, hasAllIptvAccess, allowedIptvPlaylists, canAddCustomPodcastFeeds, showtimesLocation);
+        profile.SecurityStamp = Guid.NewGuid().ToString("N");
 
         try
         {
@@ -243,6 +250,7 @@ public class UserManager(
         user.DvrStorageQuotaBytes = dvrStorageQuotaBytes;
         user.CanTimeshiftIptv = user.IsAdmin || canTimeshiftIptv;
         user.CanAddCustomPodcastFeeds = user.IsAdmin || canAddCustomPodcastFeeds;
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
 
         try
         {

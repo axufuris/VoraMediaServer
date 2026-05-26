@@ -145,7 +145,7 @@ export default function PlaylistsPage() {
 
                 {visibleMixes.length > 0 && (
                     <div className="mb-10">
-                        <h2 className="text-xl font-bold text-gray-200 mb-4">For You</h2>
+                        <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4">For You</h2>
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
                             {visibleMixes.map(mix => (
                                 <button
@@ -155,15 +155,15 @@ export default function PlaylistsPage() {
                                     className="group text-left cursor-pointer"
                                     title={mix.name}
                                 >
-                                    <div className="w-full aspect-square rounded bg-gradient-to-br from-orange-700 via-purple-900 to-indigo-900 border border-gray-800 group-hover:border-orange-500 transition-all overflow-hidden mb-2 relative">
+                                    <div className="w-full aspect-square rounded bg-gradient-to-br from-orange-700 via-purple-900 to-indigo-900 border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-all overflow-hidden mb-2 relative">
                                         {mix.artworkUrl ? <img src={mix.artworkUrl} alt="" className="w-full h-full object-cover opacity-70" /> : null}
                                         <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-black/80 via-black/30 to-transparent">
                                             <div className="text-xs uppercase tracking-widest text-orange-300/90 font-bold">Daily Mix {mix.slot}</div>
-                                            <div className="text-sm font-bold text-white drop-shadow-md truncate">{mix.descriptionTag ?? 'Mix'}</div>
+                                            <div className="text-sm font-bold text-[var(--vora-text-primary)] drop-shadow-md truncate">{mix.descriptionTag ?? 'Mix'}</div>
                                         </div>
                                     </div>
-                                    <div className="text-sm font-bold text-gray-200 truncate" title={mix.name}>{mix.name}</div>
-                                    <div className="text-xs text-gray-500">{mix.trackCount} tracks</div>
+                                    <div className="text-sm font-bold text-[var(--vora-text-secondary)] truncate" title={mix.name}>{mix.name}</div>
+                                    <div className="text-xs text-[var(--vora-text-muted)]">{mix.trackCount} tracks</div>
                                 </button>
                             ))}
                         </div>
@@ -172,7 +172,7 @@ export default function PlaylistsPage() {
 
                 {visibleSmart.length > 0 && (
                     <div className="mb-10">
-                        <h2 className="text-xl font-bold text-gray-200 mb-4 flex items-center gap-2">
+                        <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4 flex items-center gap-2">
                             <span className="text-fuchsia-400">⚙</span> Smart Playlists
                         </h2>
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
@@ -190,12 +190,12 @@ export default function PlaylistsPage() {
                                         className="group text-left cursor-pointer"
                                         title={sp.name}
                                     >
-                                        <div className={`w-full aspect-square rounded bg-gradient-to-br ${grad} border border-gray-800 group-hover:border-fuchsia-400 transition-all overflow-hidden mb-2 relative`}>
-                                            {sp.artworkUrl ? <img src={sp.artworkUrl} alt="" className="w-full h-full object-cover opacity-70" /> : <div className="absolute inset-0 flex items-center justify-center text-5xl text-white/50">⚙</div>}
+                                        <div className={`w-full aspect-square rounded bg-gradient-to-br ${grad} border border-[var(--vora-border-subtle)] group-hover:border-fuchsia-400 transition-all overflow-hidden mb-2 relative`}>
+                                            {sp.artworkUrl ? <img src={sp.artworkUrl} alt="" className="w-full h-full object-cover opacity-70" /> : <div className="absolute inset-0 flex items-center justify-center text-5xl text-[var(--vora-text-primary)]/50">⚙</div>}
                                             <div className="absolute top-2 right-2 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold rounded bg-fuchsia-500/30 text-fuchsia-100 border border-fuchsia-400/40">{sp.mediaType}</div>
                                         </div>
-                                        <div className="text-sm font-bold text-gray-200 truncate" title={sp.name}>{sp.name}</div>
-                                        <div className="text-xs text-gray-500">{sp.trackCount} {sp.mediaType === 'Shows' ? 'episodes' : sp.mediaType === 'Movies' ? 'movies' : 'tracks'}</div>
+                                        <div className="text-sm font-bold text-[var(--vora-text-secondary)] truncate" title={sp.name}>{sp.name}</div>
+                                        <div className="text-xs text-[var(--vora-text-muted)]">{sp.trackCount} {sp.mediaType === 'Shows' ? 'episodes' : sp.mediaType === 'Movies' ? 'movies' : 'tracks'}</div>
                                     </button>
                                 );
                             })}
@@ -221,7 +221,7 @@ export default function PlaylistsPage() {
                     />
                 ) : visiblePlaylists.length === 0 ? null : (
                     <>
-                        {(visibleMixes.length > 0 || visibleSmart.length > 0) && <h2 className="text-xl font-bold text-gray-200 mb-4">Your Playlists</h2>}
+                        {(visibleMixes.length > 0 || visibleSmart.length > 0) && <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4">Your Playlists</h2>}
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
                             {visiblePlaylists.map(p => (
                                 <MediaCard
@@ -253,33 +253,33 @@ export default function PlaylistsPage() {
 
             {manualCreatorType && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl max-w-md w-full p-6">
-                        <h2 className="text-2xl font-bold text-white mb-2">Create Playlist</h2>
-                        <div className="text-xs uppercase tracking-widest text-orange-400 font-bold mb-6">{manualCreatorType}</div>
+                    <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-2xl max-w-md w-full p-6">
+                        <h2 className="text-2xl font-bold text-[var(--vora-text-primary)] mb-2">Create Playlist</h2>
+                        <div className="text-xs uppercase tracking-widest text-[var(--vora-accent-500)] font-bold mb-6">{manualCreatorType}</div>
                         <form onSubmit={handleManualCreate} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-gray-400 mb-2">Name</label>
+                                <label className="block text-sm font-bold text-[var(--vora-text-muted)] mb-2">Name</label>
                                 <input
                                     autoFocus
                                     required
                                     type="text"
                                     value={newName}
                                     onChange={e => setNewName(e.target.value)}
-                                    className="w-full bg-gray-950 border border-gray-700 rounded-md p-3 text-white outline-none focus:border-orange-500"
+                                    className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-3 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)]"
                                     placeholder={manualCreatorType === 'Music' ? 'e.g. Workout' : manualCreatorType === 'Movies' ? 'e.g. Comfort movies' : manualCreatorType === 'Shows' ? 'e.g. Sunday binge' : 'e.g. My picks'}
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-gray-400 mb-2">Description (Optional)</label>
+                                <label className="block text-sm font-bold text-[var(--vora-text-muted)] mb-2">Description (Optional)</label>
                                 <textarea
                                     value={newDescription}
                                     onChange={e => setNewDescription(e.target.value)}
-                                    className="w-full bg-gray-950 border border-gray-700 rounded-md p-3 text-white outline-none focus:border-orange-500 min-h-[100px] resize-none"
+                                    className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-3 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)] min-h-[100px] resize-none"
                                 />
                             </div>
-                            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-800">
-                                <button type="button" onClick={() => setManualCreatorType(null)} disabled={isSubmitting} className="px-4 py-2 rounded text-gray-300 hover:bg-gray-700 transition-colors cursor-pointer">Cancel</button>
-                                <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded shadow-lg transition-colors cursor-pointer disabled:opacity-50">
+                            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-[var(--vora-border-subtle)]">
+                                <button type="button" onClick={() => setManualCreatorType(null)} disabled={isSubmitting} className="px-4 py-2 rounded text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-raised)] transition-colors cursor-pointer">Cancel</button>
+                                <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors cursor-pointer disabled:opacity-50">
                                     {isSubmitting ? 'Creating...' : 'Create'}
                                 </button>
                             </div>
@@ -316,10 +316,10 @@ function PlaylistTypeChooser({ onCancel, onPickManual, onPickSmart }: ChooserPro
     if (!pickedType) {
         return (
             <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl max-w-lg w-full p-6">
+                <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-2xl max-w-lg w-full p-6">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-bold text-white">What kind of playlist?</h2>
-                        <button onClick={onCancel} className="text-gray-400 hover:text-white cursor-pointer text-2xl leading-none">×</button>
+                        <h2 className="text-xl font-bold text-[var(--vora-text-primary)]">What kind of playlist?</h2>
+                        <button onClick={onCancel} className="text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] cursor-pointer text-2xl leading-none">×</button>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <TypeChoice label="Music" icon="🎵" colorClass="from-fuchsia-700 to-violet-900" onClick={() => setPickedType('Music')} />
@@ -334,37 +334,37 @@ function PlaylistTypeChooser({ onCancel, onPickManual, onPickSmart }: ChooserPro
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl max-w-lg w-full p-6">
+            <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-2xl max-w-lg w-full p-6">
                 <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xl font-bold text-white">Manual or Smart?</h2>
-                    <button onClick={onCancel} className="text-gray-400 hover:text-white cursor-pointer text-2xl leading-none">×</button>
+                    <h2 className="text-xl font-bold text-[var(--vora-text-primary)]">Manual or Smart?</h2>
+                    <button onClick={onCancel} className="text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] cursor-pointer text-2xl leading-none">×</button>
                 </div>
-                <div className="text-xs uppercase tracking-widest text-orange-400 font-bold mb-6">{pickedType}</div>
+                <div className="text-xs uppercase tracking-widest text-[var(--vora-accent-500)] font-bold mb-6">{pickedType}</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button
                         onClick={() => onPickManual(pickedType)}
-                        className="text-left p-4 border border-gray-700 hover:border-orange-500 rounded transition-colors cursor-pointer bg-gray-950/40"
+                        className="text-left p-4 border border-[var(--vora-border-subtle)] hover:border-[var(--vora-accent-500)] rounded transition-colors cursor-pointer bg-[var(--vora-bg-canvas)]/40"
                     >
-                        <div className="text-lg font-bold text-white mb-1">Manual</div>
-                        <div className="text-xs text-gray-400">Pick items yourself. Order them however you like. Best for one-off mixes.</div>
+                        <div className="text-lg font-bold text-[var(--vora-text-primary)] mb-1">Manual</div>
+                        <div className="text-xs text-[var(--vora-text-muted)]">Pick items yourself. Order them however you like. Best for one-off mixes.</div>
                     </button>
                     {pickedType !== 'Mixed' ? (
                         <button
                             onClick={() => onPickSmart(pickedType)}
-                            className="text-left p-4 border border-gray-700 hover:border-fuchsia-500 rounded transition-colors cursor-pointer bg-gray-950/40"
+                            className="text-left p-4 border border-[var(--vora-border-subtle)] hover:border-fuchsia-500 rounded transition-colors cursor-pointer bg-[var(--vora-bg-canvas)]/40"
                         >
-                            <div className="text-lg font-bold text-white mb-1 flex items-center gap-2"><span className="text-fuchsia-400">⚙</span> Smart</div>
-                            <div className="text-xs text-gray-400">Define rules. Auto-updates as your library changes. Best for living views like "Unwatched comedy" or "Heavy rotation rock."</div>
+                            <div className="text-lg font-bold text-[var(--vora-text-primary)] mb-1 flex items-center gap-2"><span className="text-fuchsia-400">⚙</span> Smart</div>
+                            <div className="text-xs text-[var(--vora-text-muted)]">Define rules. Auto-updates as your library changes. Best for living views like "Unwatched comedy" or "Heavy rotation rock."</div>
                         </button>
                     ) : (
-                        <div className="p-4 border border-dashed border-gray-800 rounded bg-gray-950/20 opacity-60">
-                            <div className="text-lg font-bold text-gray-500 mb-1">Smart</div>
-                            <div className="text-xs text-gray-500">Smart playlists need a single media type. Pick Music, Movies, or Shows.</div>
+                        <div className="p-4 border border-dashed border-[var(--vora-border-subtle)] rounded bg-[var(--vora-bg-canvas)]/20 opacity-60">
+                            <div className="text-lg font-bold text-[var(--vora-text-muted)] mb-1">Smart</div>
+                            <div className="text-xs text-[var(--vora-text-muted)]">Smart playlists need a single media type. Pick Music, Movies, or Shows.</div>
                         </div>
                     )}
                 </div>
-                <div className="flex justify-end mt-6 pt-4 border-t border-gray-800">
-                    <button onClick={() => setPickedType(null)} className="px-4 py-2 rounded text-gray-300 hover:bg-gray-700 transition-colors cursor-pointer">Back</button>
+                <div className="flex justify-end mt-6 pt-4 border-t border-[var(--vora-border-subtle)]">
+                    <button onClick={() => setPickedType(null)} className="px-4 py-2 rounded text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-raised)] transition-colors cursor-pointer">Back</button>
                 </div>
             </div>
         </div>
@@ -375,10 +375,10 @@ function TypeChoice({ label, icon, colorClass, onClick }: { label: string; icon:
     return (
         <button
             onClick={onClick}
-            className={`p-6 rounded border border-gray-700 hover:border-orange-500 transition-all cursor-pointer text-left bg-gradient-to-br ${colorClass}`}
+            className={`p-6 rounded border border-[var(--vora-border-subtle)] hover:border-[var(--vora-accent-500)] transition-all cursor-pointer text-left bg-gradient-to-br ${colorClass}`}
         >
             <div className="text-3xl mb-2">{icon}</div>
-            <div className="font-bold text-white text-lg">{label}</div>
+            <div className="font-bold text-[var(--vora-text-primary)] text-lg">{label}</div>
         </button>
     );
 }

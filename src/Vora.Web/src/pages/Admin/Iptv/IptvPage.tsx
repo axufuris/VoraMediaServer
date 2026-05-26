@@ -418,7 +418,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                             type="button"
                             onClick={handleRefreshAllPlaylists}
                             disabled={playlists.length === 0 || isRefreshingAllPlaylists}
-                            className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-info-text)] bg-[var(--vora-info-soft)] hover:bg-[var(--vora-info-500)] hover:text-white cursor-pointer transition-colors disabled:opacity-50"
+                            className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-info-text)] bg-[var(--vora-info-soft)] hover:bg-[var(--vora-info-500)] hover:text-[var(--vora-text-primary)] cursor-pointer transition-colors disabled:opacity-50"
                         >
                             {isRefreshingAllPlaylists ? 'Refreshing all…' : 'Refresh all'}
                         </button>
@@ -473,14 +473,14 @@ export default function IptvPage({ kind }: IptvPageProps) {
                                                     type="button"
                                                     onClick={() => handleRefreshPlaylist(p.id)}
                                                     disabled={refreshingPlaylistIds.has(p.id)}
-                                                    className="text-xs font-semibold px-2.5 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-info-text)] bg-[var(--vora-info-soft)] hover:bg-[var(--vora-info-500)] hover:text-white cursor-pointer transition-colors disabled:opacity-50"
+                                                    className="text-xs font-semibold px-2.5 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-info-text)] bg-[var(--vora-info-soft)] hover:bg-[var(--vora-info-500)] hover:text-[var(--vora-text-primary)] cursor-pointer transition-colors disabled:opacity-50"
                                                 >
                                                     {refreshingPlaylistIds.has(p.id) ? 'Refreshing…' : 'Refresh'}
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDeletePlaylist(p.id)}
-                                                    className="text-xs font-semibold px-2.5 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-white cursor-pointer transition-colors"
+                                                    className="text-xs font-semibold px-2.5 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] cursor-pointer transition-colors"
                                                 >
                                                     Delete
                                                 </button>
@@ -550,7 +550,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                             <button
                                 type="button"
                                 onClick={() => setShowDiagnostics(true)}
-                                className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-warning-text)] bg-[var(--vora-warning-soft)] hover:bg-[var(--vora-warning-500)] hover:text-white cursor-pointer transition-colors"
+                                className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-warning-text)] bg-[var(--vora-warning-soft)] hover:bg-[var(--vora-warning-500)] hover:text-[var(--vora-text-primary)] cursor-pointer transition-colors"
                             >
                                 Match diagnostics
                             </button>
@@ -558,7 +558,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                                 type="button"
                                 onClick={handleRefreshAllEpgSources}
                                 disabled={epgSources.length === 0 || isRefreshingAllEpg}
-                                className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-info-text)] bg-[var(--vora-info-soft)] hover:bg-[var(--vora-info-500)] hover:text-white cursor-pointer transition-colors disabled:opacity-50"
+                                className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-info-text)] bg-[var(--vora-info-soft)] hover:bg-[var(--vora-info-500)] hover:text-[var(--vora-text-primary)] cursor-pointer transition-colors disabled:opacity-50"
                             >
                                 {isRefreshingAllEpg ? 'Refreshing all…' : 'Refresh all'}
                             </button>
@@ -605,14 +605,14 @@ export default function IptvPage({ kind }: IptvPageProps) {
                                                     type="button"
                                                     onClick={() => handleRefreshEpgSource(s.id)}
                                                     disabled={refreshingEpgIds.has(s.id)}
-                                                    className="text-xs font-semibold px-2.5 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-info-text)] bg-[var(--vora-info-soft)] hover:bg-[var(--vora-info-500)] hover:text-white cursor-pointer transition-colors disabled:opacity-50"
+                                                    className="text-xs font-semibold px-2.5 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-info-text)] bg-[var(--vora-info-soft)] hover:bg-[var(--vora-info-500)] hover:text-[var(--vora-text-primary)] cursor-pointer transition-colors disabled:opacity-50"
                                                 >
                                                     {refreshingEpgIds.has(s.id) ? 'Refreshing…' : 'Refresh'}
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDeleteEpgSource(s.id)}
-                                                    className="text-xs font-semibold px-2.5 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-white cursor-pointer transition-colors"
+                                                    className="text-xs font-semibold px-2.5 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] cursor-pointer transition-colors"
                                                 >
                                                     Delete
                                                 </button>

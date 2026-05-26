@@ -1,4 +1,3 @@
-﻿using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Mvc;
 using Vora.Application.Plugins.ViewModels;
 using Vora.Application.Settings;
@@ -74,21 +73,8 @@ public static class SettingsEndpoints
         return Results.NoContent();
     }
 
-    private static IResult GetHardwareDevices()
+    private static IResult GetHardwareDevices(IHardwareCapabilityService hardware)
     {
-        var devices = new List<string> { "Auto" };
-
-        if (Directory.Exists("/dev/dri"))
-        {
-            devices.AddRange(Directory.GetFiles("/dev/dri", "renderD*"));
-        }
-
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            devices.Add("0");
-            devices.Add("1");
-        }
-
-        return Results.Ok(devices);
+        return Results.Ok(hardware.GetAvailableTranscodingDevices());
     }
 }

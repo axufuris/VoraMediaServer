@@ -1,5 +1,6 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Vora.Application.Settings;
 
 namespace Vora.Application.Thumbnails;
 
@@ -9,10 +10,10 @@ public class VideoThumbnailStorageService : IVideoThumbnailStorageService
 
     public string RootDirectory { get; }
 
-    public VideoThumbnailStorageService(IConfiguration configuration, ILogger<VideoThumbnailStorageService> logger)
+    public VideoThumbnailStorageService(IOptions<StoragePathsOptions> storagePaths, ILogger<VideoThumbnailStorageService> logger)
     {
         _logger = logger;
-        var configured = configuration["StoragePaths:VideoThumbnails"];
+        var configured = storagePaths.Value.VideoThumbnails;
         RootDirectory = !string.IsNullOrWhiteSpace(configured)
             ? configured
             : Path.Combine(AppContext.BaseDirectory, "video-thumbnails");

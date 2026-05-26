@@ -75,7 +75,7 @@ function PluginCard({ plugin, onUninstall }: { plugin: PluginVM, onUninstall: (i
                     <button
                         type="button"
                         onClick={() => onUninstall(plugin.id, plugin.name)}
-                        className="text-xs font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-white px-3 py-1 rounded-[var(--vora-radius-md)] transition-colors cursor-pointer"
+                        className="text-xs font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] px-3 py-1 rounded-[var(--vora-radius-md)] transition-colors cursor-pointer"
                     >
                         Uninstall
                     </button>

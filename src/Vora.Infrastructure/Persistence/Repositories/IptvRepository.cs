@@ -208,12 +208,6 @@ public class IptvRepository : IIptvRepository
         }
     }
 
-    public async Task<bool> ProfileHasDvrPermissionAsync(Guid profileId)
-    {
-        var profile = await _context.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == profileId);
-        return profile != null && (profile.IsAdmin || profile.CanRecordLiveTv);
-    }
-
     public async Task<IptvRecordingSchedule> CreateRecordingScheduleAsync(IptvRecordingSchedule schedule)
     {
         await _context.IptvRecordingSchedules.AddAsync(schedule);

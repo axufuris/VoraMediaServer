@@ -4,6 +4,7 @@ import { discoveryService, type WatchlistItem } from '../../api/Discovery/discov
 import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
+import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 
 export default function WatchlistPage() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -11,8 +12,8 @@ export default function WatchlistPage() {
     const [items, setItems] = useState<WatchlistItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const profileToken = localStorage.getItem('profile_token');
-    const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : '';
+    const profileToken = localStorage.getItem(StorageKeys.profileToken);
+    const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
 
     useEffect(() => {
         if (!activeProfileId) {

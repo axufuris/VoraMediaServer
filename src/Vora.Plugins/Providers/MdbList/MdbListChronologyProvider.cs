@@ -19,7 +19,7 @@ public class MdbListChronologyProvider : IChronologyProvider
     public string ExternalIdLabel => "MDbList URL";
     public string ExternalIdPlaceholder => "e.g., https://mdblist.com/lists/hdlists/latest-hd-family-movies-top-rated-from-1980-to-today";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public MdbListChronologyProvider(IHttpClientFactory httpClientFactory, IPluginSettingsProvider settings)
     {
@@ -35,7 +35,7 @@ public class MdbListChronologyProvider : IChronologyProvider
         return new List<PluginSettingDefinitionDto>();
     }
 
-    public async Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null)
+    public async Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(externalId))
             throw new ArgumentException("MDbList requires an externalId to fetch the timeline.");
@@ -69,7 +69,7 @@ public class MdbListChronologyProvider : IChronologyProvider
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("User-Agent", "VoraMediaServer/1.0");
 
-            var response = await client.SendAsync(request);
+            var response = await client.SendAsync(request, cancellationToken);
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
@@ -78,7 +78,7 @@ public class MdbListChronologyProvider : IChronologyProvider
 
             response.EnsureSuccessStatusCode();
 
-            var jsonString = await response.Content.ReadAsStringAsync();
+            var jsonString = await response.Content.ReadAsStringAsync(cancellationToken);
             using var doc = JsonDocument.Parse(jsonString);
             var root = doc.RootElement;
 

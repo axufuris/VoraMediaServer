@@ -11,7 +11,7 @@ public class CollectionOrderingService(
     IClientNotifier notifier,
     ILogger<CollectionOrderingService> logger)
 {
-    public async Task ApplyChronologicalOrderAsync(Guid collectionId)
+    public async Task ApplyChronologicalOrderAsync(Guid collectionId, CancellationToken cancellationToken = default)
     {
         var config = await repository.GetProjectedByIdAsync(collectionId, c => new
         {
@@ -30,7 +30,7 @@ public class CollectionOrderingService(
 
         try
         {
-            var remoteOrder = await provider.GetChronologicalOrderAsync(config.Title, config.ExternalListId);
+            var remoteOrder = await provider.GetChronologicalOrderAsync(config.Title, config.ExternalListId, cancellationToken);
             var collectionItems = await repository.GetCollectionItemsWithMediaAsync(collectionId);
 
             foreach (var item in collectionItems)
@@ -54,7 +54,7 @@ public class CollectionOrderingService(
         }
     }
 
-    public async Task ReevaluateOrderOnItemAddedAsync(Guid collectionId, Guid newMediaItemId, bool forceFullRefetch = false, string? providerId = null)
+    public async Task ReevaluateOrderOnItemAddedAsync(Guid collectionId, Guid newMediaItemId, bool forceFullRefetch = false, string? providerId = null, CancellationToken cancellationToken = default)
     {
         var defaultSort = await repository.GetProjectedByIdAsync(collectionId, c => c.DefaultSort);
         if (defaultSort != CollectionSortOrder.Chronological)
@@ -64,7 +64,7 @@ public class CollectionOrderingService(
 
         if (forceFullRefetch && !string.IsNullOrEmpty(providerId))
         {
-            await ApplyChronologicalOrderAsync(collectionId);
+            await ApplyChronologicalOrderAsync(collectionId, cancellationToken);
             await notifier.NotifyCollectionUpdatedAsync(collectionId);
         }
     }

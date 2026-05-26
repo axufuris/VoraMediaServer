@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.SmartLists.Dtos;
+using Vora.Application.SmartLists.Requests;
 using Vora.Application.SmartLists.ViewModels;
 using Vora.Domain.Entities.SmartLists;
 
@@ -13,8 +14,8 @@ public interface ISmartListManager
     Task<List<SmartListClientVM>> GetActiveSmartListsAsync(Guid userId, bool isAdmin);
     Task<IEnumerable<LibraryItemVM>> GetSmartListItemsAsync(Guid listId, Guid? profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, bool hasAllRatings, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated);
     Task<List<SmartListAdminVM>> GetAllAdminListsAsync();
-    Task<Guid> CreateListAsync(SmartList request);
-    Task<bool> UpdateListAsync(Guid id, SmartList request);
+    Task<Guid> CreateListAsync(SmartListSaveRequest request);
+    Task<bool> UpdateListAsync(Guid id, SmartListSaveRequest request);
     Task<bool> DeleteListAsync(Guid id);
     Task ReorderListsAsync(List<Guid> orderedListIds);
 }
@@ -72,23 +73,42 @@ public class SmartListManager(
         return items;
     }
 
-    public async Task<Guid> CreateListAsync(SmartList request)
+    public async Task<Guid> CreateListAsync(SmartListSaveRequest request)
     {
+        var list = new SmartList
+        {
+            Id = Guid.NewGuid(),
+            Title = request.Title,
+            FilterRulesJson = request.FilterRulesJson,
+            SortBy = request.SortBy,
+            MaxItems = request.MaxItems,
+            DisplayOrder = request.DisplayOrder,
+            ShowOnHomepage = request.ShowOnHomepage,
+            ShowToFriends = request.ShowToFriends,
+            IsSpotlight = request.IsSpotlight,
+            ActiveStartMonth = request.ActiveStartMonth,
+            ActiveStartDay = request.ActiveStartDay,
+            ActiveEndMonth = request.ActiveEndMonth,
+            ActiveEndDay = request.ActiveEndDay,
+            LibraryId = request.LibraryId,
+            CollectionId = request.CollectionId,
+            IsSystemList = false
+        };
+
         try
         {
-            request.Id = Guid.NewGuid();
-            await repository.CreateListAsync(request);
+            await repository.CreateListAsync(list);
             await notifier.NotifySmartListsUpdatedAsync();
-            return request.Id;
+            return list.Id;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to create smart list '{Title}'.", request.Title);
+            logger.LogError(ex, "Failed to create smart list '{Title}'.", list.Title);
             throw;
         }
     }
 
-    public async Task<bool> UpdateListAsync(Guid id, SmartList request)
+    public async Task<bool> UpdateListAsync(Guid id, SmartListSaveRequest request)
     {
         var list = await repository.GetListByIdAsync(id);
         if (list == null)
@@ -102,6 +122,11 @@ public class SmartListManager(
         list.DisplayOrder = request.DisplayOrder;
         list.CollectionId = request.CollectionId;
         list.IsSpotlight = request.IsSpotlight;
+        list.ActiveStartMonth = request.ActiveStartMonth;
+        list.ActiveStartDay = request.ActiveStartDay;
+        list.ActiveEndMonth = request.ActiveEndMonth;
+        list.ActiveEndDay = request.ActiveEndDay;
+        list.LibraryId = request.LibraryId;
 
         if (!list.IsSystemList)
         {

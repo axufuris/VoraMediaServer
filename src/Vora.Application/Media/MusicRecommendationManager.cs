@@ -32,7 +32,6 @@ public interface IMusicRecommendationManager
     Task<List<ArtistVM>> GetSimilarArtistsAsync(Guid artistId, MusicAccessFilter access, CancellationToken cancellationToken);
     Task<List<string>> GetArtistTagsAsync(Guid artistId, CancellationToken cancellationToken);
 
-    Task RefreshWeeklyMixesForProfileAsync(Guid profileId, CancellationToken cancellationToken);
     Task RefreshWeeklyMixesForAllAsync(CancellationToken cancellationToken);
 }
 
@@ -223,7 +222,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         var access = BuildAccessFilter(profile);
 
         var topArtists = await _repo.GetTopArtistsForProfileAsync(profileId, access, TopArtistsWindowDays, TopArtistsLimit);
-        if (topArtists.Count < 3 || profileHasFewPlaysAsync(topArtists, settings.DailyMixMinPlays))
+        if (topArtists.Count < 3 || ProfileHasFewPlays(topArtists, settings.DailyMixMinPlays))
         {
             _logger.LogDebug("Profile {ProfileId} has insufficient plays for daily mix generation", profileId);
             return;
@@ -324,7 +323,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         return await _musicRepo.GetLikedTrackIdsAsync(profileId, tracks.Select(t => t.Id));
     }
 
-    private static bool profileHasFewPlaysAsync(List<ArtistPlayScore> topArtists, int minPlays)
+    private static bool ProfileHasFewPlays(List<ArtistPlayScore> topArtists, int minPlays)
     {
         return topArtists.Sum(a => a.Score) < minPlays;
     }
@@ -994,7 +993,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         )
     };
 
-    public async Task RefreshWeeklyMixesForProfileAsync(Guid profileId, CancellationToken cancellationToken)
+    private async Task RefreshWeeklyMixesForProfileAsync(Guid profileId, CancellationToken cancellationToken)
     {
         var profile = await _userRepo.GetProfileByIdAsync(profileId);
         if (profile == null) return;

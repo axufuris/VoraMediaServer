@@ -50,7 +50,7 @@ These are project-wide. The deeper docs add their own rules; these never bend.
 - Nullable reference types are **on**. Treat warnings as bugs. **Never** suppress with `!` or `#pragma`. Fix the null path.
 - Async methods always use the `Async` suffix.
 - The codebase is intentionally **comment-free**. Let names and structure carry meaning. XML doc comments are also off.
-- `Vora.Domain` depends on nothing else in the solution. `Vora.Application` depends only on `Vora.Domain`. Implementations of repository interfaces live in `Vora.Infrastructure`.
+- `Vora.Domain` depends on nothing else in the solution (the base `Pgvector` value-type package is allowed for the `MediaItemEmbedding` entity, but the EF Core variant is not). `Vora.Application` depends only on `Vora.Domain` and `Vora.Plugins` — `Vora.Plugins` defines the provider contracts Application code consumes (`IMetadataProvider`, `IArtworkProvider`, `IMediaIngestionService`, etc.). Implementations of repository interfaces live in `Vora.Infrastructure`.
 - Endpoints stay thin: parse → call manager/service → return. Heavy logic goes into a Manager/Service in `Vora.Application`.
 - Claims access **always** goes through `Vora.Api/Extensions/AuthExtensions.cs` (`GetProfileId`, `GetAccountId`, `HasAllLibraryAccess`, …). Never call `user.FindFirst("...")` directly.
 - HTTP clients use `IHttpClientFactory`. No static `HttpClient`.

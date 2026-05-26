@@ -13,4 +13,10 @@
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vora.Application" />
+    <InternalsVisibleTo Include="Vora.Application.Tests" />
+    <InternalsVisibleTo Include="Vora.Plugins.Tests" />
+  </ItemGroup>
+
 </Project>

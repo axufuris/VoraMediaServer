@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../../api/Auth/authService';
 import { serverVault } from '../../utils/serverVault';
+import { StorageKeys, SessionKeys, decodeJwtPayload, getProfileIdFromToken } from '../../utils/storageKeys';
 import { useDialog } from '../../dialogs';
 
 import { profileService, type UserProfileVM } from '../../api/Users/profileService';
@@ -21,7 +22,7 @@ export default function ProfileSelectionPage() {
     const [newName, setNewName] = useState('');
     const [newPin, setNewPin] = useState('');
 
-    const [autoLogin, setAutoLogin] = useState(localStorage.getItem('auto_login_profile_id') !== null);
+    const [autoLogin, setAutoLogin] = useState(localStorage.getItem(StorageKeys.autoLoginProfileId) !== null);
 
     const isManualSwitch = location.state?.manualSwitch === true;
 
@@ -31,7 +32,7 @@ export default function ProfileSelectionPage() {
                 await profileService.validatePin(profileId, enteredPin);
             }
 
-            const userId = sessionStorage.getItem('pending_user_id') || localStorage.getItem('user_id')!;
+            const userId = sessionStorage.getItem('pending_user_id') || localStorage.getItem(StorageKeys.userId)!;
             const profileToken = await authService.exchangeProfileToken(userId, profileId);
 
             let fullUser = prefetchedUser;
@@ -39,11 +40,11 @@ export default function ProfileSelectionPage() {
 
             const activeProfile = fullUser.profiles.find(p => p.id === profileId);
 
-            localStorage.setItem('user_id', userId);
-            localStorage.setItem('profile_token', profileToken);
-            localStorage.setItem('profile_name', activeProfile?.name || 'User');
-            localStorage.setItem('is_server_admin', fullUser.isAdmin ? 'true' : 'false');
-            localStorage.setItem('is_profile_admin', activeProfile?.isAdmin ? 'true' : 'false');
+            localStorage.setItem(StorageKeys.userId, userId);
+            localStorage.setItem(StorageKeys.profileToken, profileToken);
+            localStorage.setItem(StorageKeys.profileName, activeProfile?.name || 'User');
+            localStorage.setItem(StorageKeys.isServerAdmin, fullUser.isAdmin ? 'true' : 'false');
+            localStorage.setItem(StorageKeys.isProfileAdmin, activeProfile?.isAdmin ? 'true' : 'false');
 
             const activeServer = serverVault.getActiveServer();
             if (activeServer) {
@@ -56,16 +57,16 @@ export default function ProfileSelectionPage() {
             }
 
             if (autoLogin && !isAutoLoginFlag) {
-                localStorage.setItem('auto_login_profile_id', profileId);
+                localStorage.setItem(StorageKeys.autoLoginProfileId, profileId);
             } else if (!autoLogin && !isAutoLoginFlag) {
-                localStorage.removeItem('auto_login_profile_id');
+                localStorage.removeItem(StorageKeys.autoLoginProfileId);
             }
 
-            const pendingUrl = sessionStorage.getItem('pending_server_url');
+            const pendingUrl = sessionStorage.getItem(SessionKeys.pendingServerUrl);
             const pendingServerName = sessionStorage.getItem('pending_server_name') || 'Vora Server'; // <-- Pull the real name
 
             if (pendingUrl) {
-                const decodedToken = JSON.parse(atob(profileToken.split('.')[1]));
+                const decodedToken = decodeJwtPayload(profileToken) ?? {};
                 const newServerId = `server_${Date.now()}`;
 
                 serverVault.addOrUpdateServer({
@@ -79,9 +80,9 @@ export default function ProfileSelectionPage() {
 
                 serverVault.setActiveServerId(newServerId);
 
-                sessionStorage.removeItem('pending_server_url');
+                sessionStorage.removeItem(SessionKeys.pendingServerUrl);
                 sessionStorage.removeItem('pending_server_name'); // Cleanup
-                sessionStorage.removeItem('pending_user_token');
+                sessionStorage.removeItem(SessionKeys.pendingUserToken);
                 sessionStorage.removeItem('pending_user_id');
             } else if (serverVault.getServers().length === 0) {
                 const newServerId = 'legacy_server';
@@ -100,7 +101,7 @@ export default function ProfileSelectionPage() {
                     name: sName, // <-- USE IT HERE
                     url: localUrl,
                     token: profileToken,
-                    profileId: JSON.parse(atob(profileToken.split('.')[1])).sub,
+                    profileId: getProfileIdFromToken(profileToken),
                     isAdmin: fullUser.isAdmin
                 });
                 serverVault.setActiveServerId(newServerId);
@@ -117,7 +118,7 @@ export default function ProfileSelectionPage() {
         let isMounted = true;
 
         const fetchData = async () => {
-            const userId = sessionStorage.getItem('pending_user_id') || localStorage.getItem('user_id');
+            const userId = sessionStorage.getItem('pending_user_id') || localStorage.getItem(StorageKeys.userId);
             if (!userId) {
                 navigate('/login');
                 return;
@@ -126,7 +127,7 @@ export default function ProfileSelectionPage() {
                 const userData = await userService.getUserAccount(userId);
                 if (!isMounted) return;
 
-                const savedAutoProfileId = localStorage.getItem('auto_login_profile_id');
+                const savedAutoProfileId = localStorage.getItem(StorageKeys.autoLoginProfileId);
 
                 if (savedAutoProfileId && !isManualSwitch) {
                     const autoProfile = userData.profiles.find(p => p.id === savedAutoProfileId);
@@ -141,7 +142,7 @@ export default function ProfileSelectionPage() {
                             return;
                         }
                     } else {
-                        localStorage.removeItem('auto_login_profile_id');
+                        localStorage.removeItem(StorageKeys.autoLoginProfileId);
                     }
                 } else if (!isManualSwitch && userData.profiles.length === 1 && !userData.profiles[0].hasPin) {
                     await authenticateProfile(userData.profiles[0].id, null, true, userData);
@@ -152,8 +153,8 @@ export default function ProfileSelectionPage() {
                 setLoading(false);
             } catch {
                 if (!isMounted) return;
-                sessionStorage.removeItem('pending_server_url');
-                sessionStorage.removeItem('pending_user_token');
+                sessionStorage.removeItem(SessionKeys.pendingServerUrl);
+                sessionStorage.removeItem(SessionKeys.pendingUserToken);
                 sessionStorage.removeItem('pending_user_id');
                 navigate('/login');
             }
@@ -184,7 +185,7 @@ export default function ProfileSelectionPage() {
 
     const handleCreateProfile = async (e: React.SyntheticEvent) => {
         e.preventDefault();
-        const userId = sessionStorage.getItem('pending_user_id') || localStorage.getItem('user_id');
+        const userId = sessionStorage.getItem('pending_user_id') || localStorage.getItem(StorageKeys.userId);
         if (!userId || !newName.trim()) return;
 
         try {

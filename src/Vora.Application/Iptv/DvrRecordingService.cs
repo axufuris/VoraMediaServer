@@ -1,9 +1,10 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Vora.Application.Analysis;
+using Vora.Application.Settings;
 using Vora.Domain.Enums;
 
 namespace Vora.Application.Iptv;
@@ -24,13 +25,13 @@ public class DvrRecordingService : IDvrRecordingService
 
     private readonly ConcurrentDictionary<Guid, ActiveRecording> _activeRecordings = new();
     private readonly IServiceProvider _serviceProvider;
-    private readonly IConfiguration _configuration;
+    private readonly StoragePathsOptions _storagePaths;
     private readonly ILogger<DvrRecordingService> _logger;
 
-    public DvrRecordingService(IServiceProvider serviceProvider, IConfiguration configuration, ILogger<DvrRecordingService> logger)
+    public DvrRecordingService(IServiceProvider serviceProvider, IOptions<StoragePathsOptions> storagePaths, ILogger<DvrRecordingService> logger)
     {
         _serviceProvider = serviceProvider;
-        _configuration = configuration;
+        _storagePaths = storagePaths.Value;
         _logger = logger;
     }
 
@@ -62,7 +63,7 @@ public class DvrRecordingService : IDvrRecordingService
 
         string dvrBaseDir = !string.IsNullOrWhiteSpace(settings.DvrStoragePath)
             ? settings.DvrStoragePath
-            : (_configuration["StoragePaths:IptvDvr"] ?? "/app/data/iptv/dvr");
+            : (_storagePaths.IptvDvr ?? "/app/data/iptv/dvr");
         if (!Directory.Exists(dvrBaseDir)) Directory.CreateDirectory(dvrBaseDir);
 
         string safeTitle = string.Join("_", session.Title.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_");
@@ -93,19 +94,33 @@ public class DvrRecordingService : IDvrRecordingService
 
             while (DateTime.UtcNow < endTime && !token.IsCancellationRequested)
             {
-                var args = $"-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i \"{streamUrl}\" -fflags +genpts -c copy -f mpegts pipe:1";
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                psi.ArgumentList.Add("-reconnect");
+                psi.ArgumentList.Add("1");
+                psi.ArgumentList.Add("-reconnect_streamed");
+                psi.ArgumentList.Add("1");
+                psi.ArgumentList.Add("-reconnect_delay_max");
+                psi.ArgumentList.Add("5");
+                psi.ArgumentList.Add("-i");
+                psi.ArgumentList.Add(streamUrl);
+                psi.ArgumentList.Add("-fflags");
+                psi.ArgumentList.Add("+genpts");
+                psi.ArgumentList.Add("-c");
+                psi.ArgumentList.Add("copy");
+                psi.ArgumentList.Add("-f");
+                psi.ArgumentList.Add("mpegts");
+                psi.ArgumentList.Add("pipe:1");
 
                 var process = new Process
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "ffmpeg",
-                        Arguments = args,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    }
+                    StartInfo = psi
                 };
 
                 activeRec.Process = process;

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { libraryService } from '../api/Media/libraryService';
 import { authService } from '../api/Auth/authService';
@@ -117,15 +117,20 @@ export default function MainLayout() {
             .catch(() => setYoutubeAvailable(false));
     }, [activeProfileId, serverId]);
 
+    const refreshYouTubeAvailabilityRef = useRef(refreshYouTubeAvailability);
     useEffect(() => {
-        refreshYouTubeAvailability();
-    }, [refreshYouTubeAvailability]);
+        refreshYouTubeAvailabilityRef.current = refreshYouTubeAvailability;
+    });
+
+    useEffect(() => {
+        refreshYouTubeAvailabilityRef.current();
+    }, [activeProfileId, serverId]);
 
     useSignalREvent("YouTubeAccessChanged", useCallback((changedUserId: string) => {
         if (currentUserId && changedUserId.toLowerCase() === currentUserId.toLowerCase()) {
-            refreshYouTubeAvailability();
+            refreshYouTubeAvailabilityRef.current();
         }
-    }, [currentUserId, refreshYouTubeAvailability]));
+    }, [currentUserId]));
 
     useSignalREvent("UserAccessUpdated", useCallback(async (updatedUserId: string) => {
         if (currentUserId && updatedUserId.toLowerCase() === currentUserId.toLowerCase()) {

@@ -34,9 +34,9 @@ public class SearchRepository(VoraDbContext context) : ISearchRepository
             _ => dbQuery
         };
 
-        var searchLower = query.ToLower();
+        var searchPattern = $"%{query}%";
         return await dbQuery
-            .Where(m => m.Title.ToLower().Contains(searchLower))
+            .Where(m => EF.Functions.ILike(m.Title, searchPattern))
             .OrderBy(m => m.Title)
             .Take(limit)
             .Select(MediaSearchResultVM.Projection)
@@ -45,10 +45,10 @@ public class SearchRepository(VoraDbContext context) : ISearchRepository
 
     public async Task<IEnumerable<ActorSearchResultVM>> SearchActorsAsync(string query, int limit)
     {
-        var searchLower = query.ToLower();
+        var searchPattern = $"%{query}%";
         return await context.Actors
             .AsNoTracking()
-            .Where(a => a.Name.ToLower().Contains(searchLower))
+            .Where(a => EF.Functions.ILike(a.Name, searchPattern))
             .OrderBy(a => a.Name)
             .Take(limit)
             .Select(ActorSearchResultVM.Projection)
@@ -64,9 +64,9 @@ public class SearchRepository(VoraDbContext context) : ISearchRepository
             dbQuery = dbQuery.Where(c => c.LibraryId == null || allowedLibs.Contains(c.LibraryId.Value));
         }
 
-        var searchLower = query.ToLower();
+        var searchPattern = $"%{query}%";
         return await dbQuery
-            .Where(c => c.Title.ToLower().Contains(searchLower))
+            .Where(c => EF.Functions.ILike(c.Title, searchPattern))
             .OrderBy(c => c.Title)
             .Take(limit)
             .Select(CollectionSearchResultVM.Projection)

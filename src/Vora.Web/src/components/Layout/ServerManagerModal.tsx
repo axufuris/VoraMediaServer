@@ -4,6 +4,7 @@ import { serverVault, type VoraServer } from '../../utils/serverVault';
 import { Modal } from '../Common/Modal';
 import { authService } from '../../api/Auth/authService';
 import { useDialog } from '../../dialogs';
+import { StorageKeys, decodeJwtPayload } from '../../utils/storageKeys';
 
 import { profileService, type UserProfileVM } from '../../api/Users/profileService';
 import { type UserVM, userService } from '../../api/Users/userService';
@@ -46,8 +47,8 @@ export default function ServerManagerModal({
 
                 const fetchPromises = s.map(async (server) => {
                     try {
-                        const decoded = JSON.parse(atob(server.token.split('.')[1]));
-                        const userId = decoded.accountId || decoded.UserId || decoded.userId || decoded.nameid || localStorage.getItem('user_id');
+                        const decoded = decodeJwtPayload(server.token) ?? {};
+                        const userId = decoded.accountId || decoded.UserId || decoded.userId || decoded.nameid || localStorage.getItem(StorageKeys.userId);
 
                         if (userId) {
                             const account = await userService.getUserAccountWithToken(server.url, server.token, userId);
@@ -86,8 +87,8 @@ export default function ServerManagerModal({
         setIsLoading(true);
         setError('');
         try {
-            const decoded = JSON.parse(atob(server.token.split('.')[1]));
-            const userId = decoded.accountId || decoded.UserId || decoded.userId || decoded.nameid || localStorage.getItem('user_id');
+            const decoded = decodeJwtPayload(server.token) ?? {};
+            const userId = decoded.accountId || decoded.UserId || decoded.userId || decoded.nameid || localStorage.getItem(StorageKeys.userId);
 
             if (!userId) throw new Error("Could not determine User ID for this server.");
 
@@ -176,7 +177,7 @@ export default function ServerManagerModal({
                 profileId
             );
 
-            const decodedToken = JSON.parse(atob(profileToken.split('.')[1]));
+            const decodedToken = decodeJwtPayload(profileToken) ?? {};
             const targetServerId = tempAccountData.serverId || `server_${Date.now()}`;
             const pName = userAccount.profiles.find(p => p.id === profileId)?.name || 'User';
 
@@ -198,9 +199,9 @@ export default function ServerManagerModal({
             });
 
             if (serverVault.getActiveServerId() === targetServerId) {
-                localStorage.setItem('profile_name', pName);
-                localStorage.setItem('profile_token', profileToken);
-                localStorage.setItem('is_server_admin', userAccount.isAdmin ? 'true' : 'false');
+                localStorage.setItem(StorageKeys.profileName, pName);
+                localStorage.setItem(StorageKeys.profileToken, profileToken);
+                localStorage.setItem(StorageKeys.isServerAdmin, userAccount.isAdmin ? 'true' : 'false');
             }
 
             setProfileNames(prev => ({ ...prev, [targetServerId]: pName }));
@@ -240,8 +241,8 @@ export default function ServerManagerModal({
                             {servers.map(server => {
                                 let pName = profileNames[server.id] || localStorage.getItem(`profile_name_${server.id}`) || 'Unknown Profile';
 
-                                if (pName === 'Unknown Profile' && server.id === serverVault.getActiveServerId() && localStorage.getItem('profile_name')) {
-                                    pName = localStorage.getItem('profile_name')!;
+                                if (pName === 'Unknown Profile' && server.id === serverVault.getActiveServerId() && localStorage.getItem(StorageKeys.profileName)) {
+                                    pName = localStorage.getItem(StorageKeys.profileName)!;
                                 }
 
                                 return (

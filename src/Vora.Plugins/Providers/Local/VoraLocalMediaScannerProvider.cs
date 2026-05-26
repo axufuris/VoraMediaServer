@@ -32,25 +32,29 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
     public async Task ScanMovieLibraryAsync(Guid libraryId)
     {
-        var details = await _ingestionService.GetLibraryDetailsAsync(libraryId);
-        await ProcessMovieDirectoriesAsync(libraryId, details.FolderPaths, details.ScannerRegex);
+        var library = LibraryHandle.FromGuid(libraryId);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        await ProcessMovieDirectoriesAsync(library, details.FolderPaths, details.ScannerRegex);
     }
 
     public async Task ScanTvShowLibraryAsync(Guid libraryId)
     {
-        var details = await _ingestionService.GetLibraryDetailsAsync(libraryId);
-        await ProcessTvDirectoriesAsync(libraryId, details.FolderPaths, details.ScannerRegex);
+        var library = LibraryHandle.FromGuid(libraryId);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        await ProcessTvDirectoriesAsync(library, details.FolderPaths, details.ScannerRegex);
     }
 
     public async Task ScanMusicLibraryAsync(Guid libraryId)
     {
-        var details = await _ingestionService.GetLibraryDetailsAsync(libraryId);
-        await ProcessMusicDirectoriesAsync(libraryId, details.FolderPaths);
+        var library = LibraryHandle.FromGuid(libraryId);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        await ProcessMusicDirectoriesAsync(library, details.FolderPaths);
     }
 
     public async Task ScanMovieAsync(Guid movieId)
     {
-        var paths = await _ingestionService.GetMediaFilePathsAsync(movieId);
+        var item = new MediaItemHandle(movieId);
+        var paths = await _ingestionService.GetMediaFilePathsAsync(item);
         if (!paths.Any()) return;
 
         var directories = paths
@@ -60,56 +64,59 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
             .Cast<string>()
             .ToList();
 
-        var libraryId = await _ingestionService.GetLibraryIdForMediaAsync(movieId);
-        if (libraryId == null) return;
+        var library = await _ingestionService.GetLibraryForMediaAsync(item);
+        if (library == null) return;
 
-        var details = await _ingestionService.GetLibraryDetailsAsync(libraryId.Value);
-        await ProcessMovieDirectoriesAsync(libraryId.Value, directories, details.ScannerRegex);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library.Value);
+        await ProcessMovieDirectoriesAsync(library.Value, directories, details.ScannerRegex);
     }
 
     public async Task ScanTvShowAsync(Guid tvShowId)
     {
-        var paths = await _ingestionService.GetMediaFilePathsAsync(tvShowId);
+        var item = new MediaItemHandle(tvShowId);
+        var paths = await _ingestionService.GetMediaFilePathsAsync(item);
         if (!paths.Any()) return;
 
         var directories = GetUniqueTvShowRootDirectories(paths);
 
-        var libraryId = await _ingestionService.GetLibraryIdForMediaAsync(tvShowId);
-        if (libraryId == null) return;
+        var library = await _ingestionService.GetLibraryForMediaAsync(item);
+        if (library == null) return;
 
-        var details = await _ingestionService.GetLibraryDetailsAsync(libraryId.Value);
-        await ProcessTvDirectoriesAsync(libraryId.Value, directories, details.ScannerRegex);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library.Value);
+        await ProcessTvDirectoriesAsync(library.Value, directories, details.ScannerRegex);
     }
 
     public async Task ScanSeasonAsync(Guid seasonId)
     {
-        var paths = await _ingestionService.GetMediaFilePathsAsync(seasonId);
+        var item = new MediaItemHandle(seasonId);
+        var paths = await _ingestionService.GetMediaFilePathsAsync(item);
         if (!paths.Any()) return;
 
         var directories = GetUniqueTvShowRootDirectories(paths);
 
-        var libraryId = await _ingestionService.GetLibraryIdForMediaAsync(seasonId);
-        if (libraryId == null) return;
+        var library = await _ingestionService.GetLibraryForMediaAsync(item);
+        if (library == null) return;
 
-        var details = await _ingestionService.GetLibraryDetailsAsync(libraryId.Value);
-        await ProcessTvDirectoriesAsync(libraryId.Value, directories, details.ScannerRegex);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library.Value);
+        await ProcessTvDirectoriesAsync(library.Value, directories, details.ScannerRegex);
     }
 
     public async Task ScanEpisodeAsync(Guid episodeId)
     {
-        var paths = await _ingestionService.GetMediaFilePathsAsync(episodeId);
+        var item = new MediaItemHandle(episodeId);
+        var paths = await _ingestionService.GetMediaFilePathsAsync(item);
         if (!paths.Any()) return;
 
         var directories = GetUniqueTvShowRootDirectories(paths);
 
-        var libraryId = await _ingestionService.GetLibraryIdForMediaAsync(episodeId);
-        if (libraryId == null) return;
+        var library = await _ingestionService.GetLibraryForMediaAsync(item);
+        if (library == null) return;
 
-        var details = await _ingestionService.GetLibraryDetailsAsync(libraryId.Value);
-        await ProcessTvDirectoriesAsync(libraryId.Value, directories, details.ScannerRegex);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library.Value);
+        await ProcessTvDirectoriesAsync(library.Value, directories, details.ScannerRegex);
     }
 
-    private async Task ProcessMovieDirectoriesAsync(Guid libraryId, IEnumerable<string> directories, string? customRegex)
+    private async Task ProcessMovieDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex)
     {
         var regexPattern = customRegex ?? @"^(?<Title>.*?(?=\s*\(\d{4}\)|\s*\{|\s*\[|$))(?:\s*\((?<Year>\d{4})\))?(?:\s*\{(?<Provider>imdb|tmdb|tvdb)-(?<ProviderId>[^}]+)\})?";
         var regex = new Regex(regexPattern, RegexOptions.IgnoreCase);
@@ -117,7 +124,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
         var editionRegex = new Regex(@"(?i)\b(Extended|Director'?s\s*Cut|Unrated|Theatrical|Remastered|Ultimate|Final\s*Cut|Special\s*Edition|Collector'?s\s*Edition|Uncut|IMAX\s*Enhanced|IMAX|Alternate|Criterion|Anniversary|Black\s*Chrome|Coda|Definitive|Diamond|Platinum|Producer'?s\s*Cut|Richard\s*Donner|Ulysses|Open\s*Matte)\b", RegexOptions.IgnoreCase);
 
-        var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(libraryId);
+        var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
         var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet);
 
         foreach (var filePath in filesToProcess)
@@ -148,12 +155,12 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
             string? imdbId = provider == "imdb" ? providerId : null;
             string? tvdbId = provider == "tvdb" ? providerId : null;
 
-            var movieId = await _ingestionService.EnsureMovieAsync(libraryId, title, year, tmdbId, imdbId, tvdbId, edition);
+            var movieId = await _ingestionService.EnsureMovieAsync(library, title, year, tmdbId, imdbId, tvdbId, edition);
             await _ingestionService.AddMediaPartAsync(movieId, filePath, resolution);
         }
     }
 
-    private async Task ProcessTvDirectoriesAsync(Guid libraryId, IEnumerable<string> directories, string? customRegex)
+    private async Task ProcessTvDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex)
     {
         var episodeRegexPattern = customRegex ?? @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*(?<Absolute>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$";
         var episodeRegex = new Regex(episodeRegexPattern, RegexOptions.IgnoreCase);
@@ -162,7 +169,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
         var editionRegex = new Regex(@"(?i)\b(Extended|Director'?s\s*Cut|Unrated|Theatrical|Remastered|Ultimate|Final\s*Cut|Special\s*Edition|Collector'?s\s*Edition|Uncut|IMAX\s*Enhanced|IMAX|Alternate|Criterion|Anniversary|Black\s*Chrome|Coda|Definitive|Diamond|Platinum|Producer'?s\s*Cut|Richard\s*Donner|Ulysses|Open\s*Matte)\b", RegexOptions.IgnoreCase);
 
-        var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(libraryId);
+        var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
         var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet);
 
         foreach (var filePath in filesToProcess)
@@ -211,14 +218,14 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
             string? imdbId = provider == "imdb" ? providerId : null;
             string? tvdbId = provider == "tvdb" ? providerId : null;
 
-            var showId = await _ingestionService.EnsureTvShowAsync(libraryId, showTitle, showYear, tmdbId, imdbId, tvdbId);
-            var seasonId = await _ingestionService.EnsureSeasonAsync(libraryId, showId, seasonNumber);
+            var showId = await _ingestionService.EnsureTvShowAsync(library, showTitle, showYear, tmdbId, imdbId, tvdbId);
+            var seasonId = await _ingestionService.EnsureSeasonAsync(library, showId, seasonNumber);
 
             string finalTitle = string.IsNullOrWhiteSpace(episodeTitle)
                 ? $"{showTitle} - S{seasonNumber:D2}E{episodeNumber:D2}"
                 : episodeTitle;
 
-            var episodeId = await _ingestionService.EnsureEpisodeAsync(libraryId, seasonId, episodeNumber, finalTitle, airDate, edition);
+            var episodeId = await _ingestionService.EnsureEpisodeAsync(library, seasonId, episodeNumber, finalTitle, airDate, edition);
 
             await _ingestionService.AddMediaPartAsync(episodeId, filePath, resolution);
         }
@@ -243,9 +250,9 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         return newFiles;
     }
 
-    private async Task ProcessMusicDirectoriesAsync(Guid libraryId, IEnumerable<string> directories)
+    private async Task ProcessMusicDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories)
     {
-        var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(libraryId);
+        var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
         var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet, _supportedAudioExtensions).ToList();
 
         if (filesToProcess.Count == 0) return;
@@ -375,7 +382,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
             }
 
             var artistId = await _ingestionService.EnsureArtistAsync(
-                libraryId,
+                library,
                 artistGroup.Key,
                 sortName: null,
                 artworkBytes: artistArtworkBytes,
@@ -453,7 +460,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                 var isCompilation = compilationFromTag || distinctTrackArtists > 1;
 
                 var albumId = await _ingestionService.EnsureAlbumAsync(
-                    libraryId,
+                    library,
                     artistId,
                     albumGroup.Key,
                     year: albumGroup.Select(t => t.Year).FirstOrDefault(y => y > 0) is int yr && yr > 0 ? yr : null,
@@ -470,7 +477,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                 foreach (var track in albumGroup.OrderBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber))
                 {
                     var trackId = await _ingestionService.EnsureTrackAsync(
-                        libraryId,
+                        library,
                         albumId,
                         track.TrackTitle,
                         track.TrackNumber,

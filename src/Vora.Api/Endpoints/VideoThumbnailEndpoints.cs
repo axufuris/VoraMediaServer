@@ -53,23 +53,25 @@ public static class VideoThumbnailEndpoints
         return routes;
     }
 
-    private static IResult ServeVttAsync(Guid id, IVideoThumbnailStorageService storage)
+    private static IResult ServeVttAsync(Guid id, IVideoThumbnailStorageService storage, HttpContext httpContext)
     {
         var path = storage.GetVttPath(id);
         if (!File.Exists(path)) return Results.NotFound();
 
         var lastWriteUtc = File.GetLastWriteTimeUtc(path);
         var etag = $"\"{lastWriteUtc.Ticks:x}\"";
+        httpContext.Response.Headers.CacheControl = "public, max-age=86400";
         return Results.File(path, "text/vtt", entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue(etag), lastModified: lastWriteUtc);
     }
 
-    private static IResult ServeSpriteAsync(Guid id, IVideoThumbnailStorageService storage)
+    private static IResult ServeSpriteAsync(Guid id, IVideoThumbnailStorageService storage, HttpContext httpContext)
     {
         var path = storage.GetSpritePath(id);
         if (!File.Exists(path)) return Results.NotFound();
 
         var lastWriteUtc = File.GetLastWriteTimeUtc(path);
         var etag = $"\"{lastWriteUtc.Ticks:x}\"";
+        httpContext.Response.Headers.CacheControl = "public, max-age=86400";
         return Results.File(path, "image/jpeg", entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue(etag), lastModified: lastWriteUtc);
     }
 

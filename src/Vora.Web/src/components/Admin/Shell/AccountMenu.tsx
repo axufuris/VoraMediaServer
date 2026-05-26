@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { serverVault } from '../../../utils/serverVault';
+import { StorageKeys } from '../../../utils/storageKeys';
 
 export default function AccountMenu() {
     const navigate = useNavigate();
@@ -23,7 +24,7 @@ export default function AccountMenu() {
 
     const signOut = () => {
         serverVault.clearVault();
-        localStorage.removeItem('profile_token');
+        localStorage.removeItem(StorageKeys.profileToken);
         navigate('/');
         window.location.reload();
     };

@@ -20,6 +20,7 @@ import MediaRail from '../../../components/Client/Primitives/MediaRail';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import QualityPanel, { QualityPanelSection, type QualityOption } from '../../../components/Client/Primitives/QualityPanel';
 import StarRating from '../../../components/Client/Primitives/StarRating';
+import { StorageKeys } from '../../../utils/storageKeys';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -73,7 +74,9 @@ export default function MediaDetailsPage() {
     const [selectedAudioId, setSelectedAudioId] = useState<string>('');
     const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>('none');
 
-    const isAdmin = localStorage.getItem('is_server_admin') === 'true';
+    const [thumbnailsLocked, setThumbnailsLocked] = useState<boolean | null>(null);
+
+    const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
     const caps = useMemo(() => scanDeviceCapabilities(), []);
     const { playMedia, isPlaying } = usePlayer();
 
@@ -197,7 +200,7 @@ export default function MediaDetailsPage() {
         if (media.type === 'Episode') subtitle = `S${media.seasonNumber} E${media.episodeNumber} - ${media.tvShowTitle}`;
         else if (media.releaseDate) subtitle = new Date(media.releaseDate).getFullYear().toString();
 
-        const deviceId = localStorage.getItem('device_id');
+        const deviceId = localStorage.getItem(StorageKeys.deviceId);
         if (!deviceId) return;
 
         try {
@@ -248,8 +251,6 @@ export default function MediaDetailsPage() {
         await dialog.alert('Media analysis started in the background!');
         setShowMenu(false);
     };
-
-    const [thumbnailsLocked, setThumbnailsLocked] = useState<boolean | null>(null);
 
     const handleRegenerateThumbnails = async () => {
         if (!media) return;

@@ -42,7 +42,7 @@ public class OpenAiRecommendationProvider : IRecommendationProvider
         };
     }
 
-    public async Task<IEnumerable<RecommendationListDto>> GetRecommendationsAsync(Guid profileId, Guid? libraryId)
+    public async Task<IEnumerable<RecommendationListDto>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, CancellationToken cancellationToken = default)
     {
         var cacheKey = $"ai_recs_{profileId}_{libraryId}";
         if (_cache.TryGetValue(cacheKey, out List<RecommendationListDto>? cachedLists) && cachedLists != null)

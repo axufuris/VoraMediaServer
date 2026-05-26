@@ -3,15 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.SmartLists;
+using Vora.Application.SmartLists.Requests;
 using Vora.Application.SmartLists.ViewModels;
-using Vora.Domain.Entities.SmartLists;
 
 namespace Vora.Api.Endpoints;
-
-public class ToggleAdminRequest
-{
-    public bool ShowToAdminOnly { get; set; }
-}
 
 public class ReorderSmartListsRequest
 {
@@ -62,8 +57,7 @@ public static class SmartListEndpoints
 
     private static async Task<IResult> GetActiveListsAsync(ClaimsPrincipal user, ISmartListManager manager)
     {
-        var isAdmin = user.FindFirst("isAdmin")?.Value == "True";
-        var lists = await manager.GetActiveSmartListsAsync(Guid.Empty, isAdmin);
+        var lists = await manager.GetActiveSmartListsAsync(Guid.Empty, user.IsAdmin());
         return Results.Ok(lists);
     }
 
@@ -88,7 +82,7 @@ public static class SmartListEndpoints
         return Results.Ok(lists);
     }
 
-    private static async Task<IResult> CreateListAsync([FromBody] SmartList request, ISmartListManager manager)
+    private static async Task<IResult> CreateListAsync([FromBody] SmartListSaveRequest request, ISmartListManager manager)
     {
         var newId = await manager.CreateListAsync(request);
         return Results.Created($"/api/smartlists/{newId}", newId);
@@ -100,7 +94,7 @@ public static class SmartListEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> UpdateListAsync(Guid id, [FromBody] SmartList request, ISmartListManager manager)
+    private static async Task<IResult> UpdateListAsync(Guid id, [FromBody] SmartListSaveRequest request, ISmartListManager manager)
     {
         var success = await manager.UpdateListAsync(id, request);
         return success ? Results.NoContent() : Results.NotFound();

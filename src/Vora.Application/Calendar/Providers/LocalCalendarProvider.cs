@@ -25,7 +25,7 @@ public class LocalCalendarProvider(
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() =>
         new List<PluginSettingDefinitionDto>();
 
-    public async Task<IEnumerable<CalendarEventDto>> GetEventsAsync(DateTime startDate, DateTime endDate)
+    public async Task<IEnumerable<CalendarEventDto>> GetEventsAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
     {
         var events = new List<CalendarEventDto>();
 

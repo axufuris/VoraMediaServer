@@ -1,4 +1,4 @@
-import { apiClient } from '../client';
+import { apiClient, getResponseStatus } from '../client';
 import type { ArtistTrackVM } from './musicService';
 
 export type PlaylistMediaType = 'Mixed' | 'Music' | 'Movies' | 'Shows';
@@ -134,7 +134,7 @@ export const smartPlaylistService = {
             const response = await apiClient.get<SmartPlaylistDetailVM>(`/smart-playlists/${id}`, { serverId });
             return response.data;
         } catch (err: unknown) {
-            const status = (err as { response?: { status?: number } })?.response?.status;
+            const status = getResponseStatus(err);
             if (status === 404) return null;
             throw err;
         }

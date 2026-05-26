@@ -27,7 +27,7 @@ public class LastFmListeningDataProvider : IListeningDataProvider
     public bool IsSystemPlugin => true;
     public string Type => "ListeningData";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Music" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Music };
 
     public LastFmListeningDataProvider(IHttpClientFactory httpClientFactory, IServiceScopeFactory scopeFactory, ILogger<LastFmListeningDataProvider> logger)
     {

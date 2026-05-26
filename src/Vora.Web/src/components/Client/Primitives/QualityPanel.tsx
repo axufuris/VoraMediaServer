@@ -68,7 +68,7 @@ export default function QualityPanel({ open, onClose, title = 'Quality & tracks'
     if (!open) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex justify-end" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-[200] flex justify-end" role="dialog" aria-modal="true">
             <div
                 onClick={onClose}
                 className="absolute inset-0 cursor-pointer"

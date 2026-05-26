@@ -33,7 +33,7 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
     public bool IsSystemPlugin => true;
     public string Type => "Library_Sync";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow", "Music" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow, LibraryKind.Music };
 
     public PlexLibrarySyncProvider(
         IHttpClientFactory httpClientFactory,

@@ -1,11 +1,19 @@
-import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { streamingService } from '../api/Streaming/streamingService';
 import { useSignalREvent } from '../hooks/useSignalREvent';
 import { musicService, type RadioSeed } from '../api/Music/musicService';
 import { serverVault } from '../utils/serverVault';
 import { audioQualityStore, crossfadeStore, eqPresetStore, EQ_PRESETS } from '../utils/audioQuality';
+import { StorageKeys } from '../utils/storageKeys';
 import { useDialog } from '../dialogs';
-import { PlayerContext, type PlayableMedia, type RepeatMode } from './usePlayer';
+import {
+    PlayerContext,
+    PlayerTimeContext,
+    type PlayableMedia,
+    type RepeatMode,
+    type PlayerContextType,
+    type PlayerTimeContextType,
+} from './usePlayer';
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
     const dialog = useDialog();
@@ -20,6 +28,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const [adminMessage, setAdminMessage] = useState<string | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
 
+    const currentMediaRef = useRef<PlayableMedia | null>(null);
+    useEffect(() => { currentMediaRef.current = currentMedia; }, [currentMedia]);
+
+    const isPlayingRef = useRef(false);
+    useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
     const [queue, setQueue] = useState<PlayableMedia[]>([]);
     const [queueIndex, setQueueIndex] = useState(0);
     const queueRef = useRef<PlayableMedia[]>([]);
@@ -28,15 +42,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     useEffect(() => { queueIndexRef.current = queueIndex; }, [queueIndex]);
 
     const [isFullscreen, setIsFullscreen] = useState(false);
-    useEffect(() => {
-        queueMicrotask(() => {
-            if (!currentMedia || currentMedia.playbackContextType !== 'Music') {
-                setIsFullscreen(false);
-            } else {
-                setIsMinimized(true);
-            }
-        });
+    const handleMediaChangedSyncFullscreen = useCallback(() => {
+        if (!currentMedia || currentMedia.playbackContextType !== 'Music') {
+            setIsFullscreen(false);
+        } else {
+            setIsMinimized(true);
+        }
     }, [currentMedia]);
+
+    useEffect(() => {
+        queueMicrotask(handleMediaChangedSyncFullscreen);
+    }, [handleMediaChangedSyncFullscreen]);
+
     const [isShuffled, setIsShuffled] = useState(false);
     const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
     const repeatModeRef = useRef<RepeatMode>('off');
@@ -79,7 +96,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         return () => {
-            if (!localStorage.getItem('profile_token') && !localStorage.getItem('account_token')) return;
+            if (!localStorage.getItem(StorageKeys.profileToken) && !localStorage.getItem(StorageKeys.accountToken)) return;
             musicService.playbackStop(currentServerIdRef.current).catch(() => { /* ignore */ });
         };
     }, []);
@@ -223,7 +240,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         const onQualityChange = () => {
-            const media = currentMedia;
+            const media = currentMediaRef.current;
             if (!media || media.playbackContextType !== 'Music' || !media.id) return;
             const idx = queueIndexRef.current;
             const q = queueRef.current;
@@ -249,7 +266,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         };
         window.addEventListener('audio-quality-changed', onQualityChange);
         return () => window.removeEventListener('audio-quality-changed', onQualityChange);
-    }, [currentMedia]);
+    }, []);
 
     useEffect(() => {
         preloadedUrlRef.current = null;
@@ -286,19 +303,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setIsPlaying(true);
     }, []);
 
+    const playMediaRef = useRef(playMedia);
+    useEffect(() => { playMediaRef.current = playMedia; }, [playMedia]);
+
+    const currentMediaId = currentMedia?.id;
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
         const updateTime = () => {
             setCurrentTime(video.currentTime);
-            if (currentMedia?.playbackContextType === 'Music' && currentMedia.id) {
-                if (recordedPlayTrackIdRef.current !== currentMedia.id) {
+            const media = currentMediaRef.current;
+            if (media?.playbackContextType === 'Music' && media.id) {
+                if (recordedPlayTrackIdRef.current !== media.id) {
                     const t = video.currentTime;
                     const d = video.duration || 0;
                     if (t >= 30 || (d > 0 && t / d >= 0.5)) {
-                        recordedPlayTrackIdRef.current = currentMedia.id;
-                        musicService.recordPlay(currentMedia.id, Math.floor(t), false, currentMedia.serverId).catch(() => { /* ignore */ });
+                        recordedPlayTrackIdRef.current = media.id;
+                        musicService.recordPlay(media.id, Math.floor(t), false, media.serverId).catch(() => { /* ignore */ });
                     }
                 }
             }
@@ -306,8 +328,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
         const onLoadedMetadata = () => {
             setDuration(video.duration);
-            if (currentMedia?.startPosition && currentMedia.startPosition > 0) {
-                video.currentTime = currentMedia.startPosition;
+            const media = currentMediaRef.current;
+            if (media?.startPosition && media.startPosition > 0) {
+                video.currentTime = media.startPosition;
             }
         };
 
@@ -316,30 +339,32 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const onPause = () => setIsPlaying(false);
         const onEnded = () => {
             setIsPlaying(false);
-            if (currentMedia?.playbackContextType !== 'Music') return;
-            if (currentMedia.id && recordedPlayTrackIdRef.current !== currentMedia.id) {
-                recordedPlayTrackIdRef.current = currentMedia.id;
-                musicService.recordPlay(currentMedia.id, Math.floor(video.currentTime), true, currentMedia.serverId).catch(() => { /* ignore */ });
+            const media = currentMediaRef.current;
+            if (media?.playbackContextType !== 'Music') return;
+            if (media.id && recordedPlayTrackIdRef.current !== media.id) {
+                recordedPlayTrackIdRef.current = media.id;
+                musicService.recordPlay(media.id, Math.floor(video.currentTime), true, media.serverId).catch(() => { /* ignore */ });
             }
             const q = queueRef.current;
             const idx = queueIndexRef.current;
             const mode = repeatModeRef.current;
+            const play = playMediaRef.current;
 
             if (mode === 'one' && q.length > 0) {
-                playMedia(q[idx]);
+                play(q[idx]);
                 return;
             }
             if (idx < q.length - 1) {
                 const newIndex = idx + 1;
                 setQueueIndex(newIndex);
                 queueIndexRef.current = newIndex;
-                playMedia(q[newIndex]);
+                play(q[newIndex]);
                 return;
             }
             if (mode === 'all' && q.length > 0) {
                 setQueueIndex(0);
                 queueIndexRef.current = 0;
-                playMedia(q[0]);
+                play(q[0]);
             }
         };
 
@@ -358,7 +383,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             video.removeEventListener('pause', onPause);
             video.removeEventListener('ended', onEnded);
         };
-    }, [currentMedia, playMedia]);
+    }, [currentMediaId]);
 
     useEffect(() => {
         if (!sessionId) return;
@@ -379,9 +404,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, [sessionId]);
 
     const closePlayer = useCallback(async () => {
+        const media = currentMediaRef.current;
         if (sessionId) {
             try {
-                const sessionServerId = currentMedia?.serverId;
+                const sessionServerId = media?.serverId;
                 const finalPos = videoRef.current?.currentTime || 0;
                 const finalDur = videoRef.current?.duration || 0;
                 await streamingService.pingSession(sessionId, finalPos, finalDur, true, sessionServerId);
@@ -394,8 +420,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             videoRef.current.pause();
             videoRef.current.src = "";
         }
-        if (currentMedia?.playbackContextType === 'Music') {
-            musicService.playbackStop(currentMedia.serverId).catch(() => { /* ignore */ });
+        if (media?.playbackContextType === 'Music') {
+            musicService.playbackStop(media.serverId).catch(() => { /* ignore */ });
         }
         setCurrentMedia(null);
         setSessionId(null);
@@ -405,7 +431,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         queueRef.current = [];
         queueIndexRef.current = 0;
         linearQueueRef.current = [];
-    }, [sessionId, currentMedia]);
+    }, [sessionId]);
 
     useSignalREvent<{ sessionId: string, command: string, message?: string }>(
         "StreamCommandReceived",
@@ -421,7 +447,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         }, [sessionId, closePlayer])
     );
 
-    const playQueue = (items: PlayableMedia[], startIndex = 0) => {
+    const playQueue = useCallback((items: PlayableMedia[], startIndex = 0) => {
         if (items.length === 0) return;
         setRadioSeed(null);
         setRadioLabel(null);
@@ -445,10 +471,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setQueueIndex(finalIndex);
         queueRef.current = finalItems;
         queueIndexRef.current = finalIndex;
-        playMedia(finalItems[finalIndex]);
-    };
+        playMediaRef.current(finalItems[finalIndex]);
+    }, [isShuffled]);
 
-    const startRadio = (seed: RadioSeed, label: string, items: PlayableMedia[]) => {
+    const startRadio = useCallback((seed: RadioSeed, label: string, items: PlayableMedia[]) => {
         if (items.length === 0) return;
         linearQueueRef.current = [...items];
         setQueue(items);
@@ -457,8 +483,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         queueIndexRef.current = 0;
         setRadioSeed(seed);
         setRadioLabel(label);
-        playMedia(items[0]);
-    };
+        playMediaRef.current(items[0]);
+    }, []);
 
     useEffect(() => {
         if (!radioSeed) return;
@@ -549,7 +575,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             queueRef.current = newQueue;
             queueIndexRef.current = 0;
             linearQueueRef.current = [...newQueue];
-            playMedia(newQueue[0]);
+            playMediaRef.current(newQueue[0]);
             return;
         }
         const newQueue = [...q, ...items];
@@ -558,7 +584,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (linearQueueRef.current.length > 0) {
             linearQueueRef.current = [...linearQueueRef.current, ...items];
         }
-    }, [playMedia]);
+    }, []);
 
     const playNext = useCallback((items: PlayableMedia[]) => {
         if (items.length === 0) return;
@@ -571,7 +597,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             queueRef.current = newQueue;
             queueIndexRef.current = 0;
             linearQueueRef.current = [...newQueue];
-            playMedia(newQueue[0]);
+            playMediaRef.current(newQueue[0]);
             return;
         }
         const newQueue = [...q.slice(0, idx + 1), ...items, ...q.slice(idx + 1)];
@@ -585,15 +611,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 ...linearQueueRef.current.slice(linearIdx + 1)
             ];
         }
-    }, [playMedia]);
+    }, []);
 
     const jumpToQueueIndex = useCallback((idx: number) => {
         const q = queueRef.current;
         if (idx < 0 || idx >= q.length) return;
         setQueueIndex(idx);
         queueIndexRef.current = idx;
-        playMedia(q[idx]);
-    }, [playMedia]);
+        playMediaRef.current(q[idx]);
+    }, []);
 
     const nextTrack = useCallback(() => {
         const q = queueRef.current;
@@ -603,11 +629,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             const newIndex = idx + 1;
             setQueueIndex(newIndex);
             queueIndexRef.current = newIndex;
-            playMedia(q[newIndex]);
+            playMediaRef.current(q[newIndex]);
         } else if (repeatModeRef.current === 'all' && q.length > 0) {
             setQueueIndex(0);
             queueIndexRef.current = 0;
-            playMedia(q[0]);
+            playMediaRef.current(q[0]);
         } else {
             setQueue([]);
             setQueueIndex(0);
@@ -618,7 +644,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             }
             setIsPlaying(false);
         }
-    }, [playMedia]);
+    }, []);
 
     const previousTrack = useCallback(() => {
         const q = queueRef.current;
@@ -633,20 +659,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             const newIndex = idx - 1;
             setQueueIndex(newIndex);
             queueIndexRef.current = newIndex;
-            playMedia(q[newIndex]);
+            playMediaRef.current(q[newIndex]);
         } else if (video) {
             video.currentTime = 0;
             setCurrentTime(0);
         }
-    }, [playMedia]);
+    }, []);
 
     const hasNext = queue.length > 0 && queueIndex < queue.length - 1;
     const hasPrevious = queue.length > 0 && queueIndex > 0;
 
-    const changeStreams = async (videoTrackId: string, audioTrackId: string, subtitleTrackId: string) => {
-        if (!currentMedia) return;
+    const changeStreams = useCallback(async (videoTrackId: string, audioTrackId: string, subtitleTrackId: string) => {
+        const media = currentMediaRef.current;
+        if (!media) return;
         const currentPos = videoRef.current?.currentTime || 0;
-        const sourceServerId = currentMedia.serverId;
+        const sourceServerId = media.serverId;
 
         if (sessionId) {
             try {
@@ -657,9 +684,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         }
 
         try {
-            const deviceId = localStorage.getItem('device_id') || 'unknown';
+            const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
             const res = await streamingService.startSession(
-                currentMedia.id,
+                media.id,
                 deviceId,
                 currentPos,
                 videoTrackId,
@@ -669,7 +696,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             );
 
             const newMedia = {
-                ...currentMedia,
+                ...media,
                 ...res,
                 startPosition: currentPos
             };
@@ -681,74 +708,153 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             console.error("Failed to change streams", e);
             await dialog.alert("Failed to change streams.");
         }
-    };
+    }, [sessionId, dialog]);
 
-    const togglePlayPause = () => {
+    const togglePlayPause = useCallback(() => {
         if (!videoRef.current) return;
-        if (isPlaying) videoRef.current.pause();
+        if (isPlayingRef.current) videoRef.current.pause();
         else videoRef.current.play();
-    };
+    }, []);
 
-    const seek = (time: number) => {
+    const seek = useCallback((time: number) => {
         if (videoRef.current) {
             videoRef.current.currentTime = time;
             setCurrentTime(time);
         }
-    };
+    }, []);
 
-    const skipForward = (seconds: number = 30) => {
-        if (videoRef.current) seek(videoRef.current.currentTime + seconds);
-    };
+    const skipForward = useCallback((seconds: number = 30) => {
+        const video = videoRef.current;
+        if (!video) return;
+        const target = video.currentTime + seconds;
+        video.currentTime = target;
+        setCurrentTime(target);
+    }, []);
 
-    const skipBackward = (seconds: number = 10) => {
-        if (videoRef.current) seek(Math.max(0, videoRef.current.currentTime - seconds));
-    };
+    const skipBackward = useCallback((seconds: number = 10) => {
+        const video = videoRef.current;
+        if (!video) return;
+        const target = Math.max(0, video.currentTime - seconds);
+        video.currentTime = target;
+        setCurrentTime(target);
+    }, []);
 
-    const setVolume = (vol: number) => {
+    const setVolume = useCallback((vol: number) => {
         if (videoRef.current) {
             videoRef.current.volume = vol;
             setVolumeState(vol);
         }
-    };
+    }, []);
+
+    const toggleFullscreen = useCallback(() => {
+        setIsFullscreen(v => !v);
+    }, []);
+
+    const contextValue = useMemo<PlayerContextType>(() => ({
+        currentMedia,
+        isPlaying,
+        isMinimized,
+        volume,
+        sessionId,
+        playMedia,
+        playQueue,
+        addToQueue,
+        playNext,
+        nextTrack,
+        previousTrack,
+        jumpToQueueIndex,
+        hasNext,
+        hasPrevious,
+        queue,
+        queueIndex,
+        isShuffled,
+        toggleShuffle,
+        repeatMode,
+        cycleRepeatMode,
+        togglePlayPause,
+        seek,
+        skipForward,
+        skipBackward,
+        setMinimized: setIsMinimized,
+        isFullscreen,
+        toggleFullscreen,
+        setFullscreen: setIsFullscreen,
+        closePlayer,
+        setVolume,
+        changeStreams,
+        videoRef,
+        radioSeed,
+        radioLabel,
+        startRadio,
+    }), [
+        currentMedia,
+        isPlaying,
+        isMinimized,
+        volume,
+        sessionId,
+        playMedia,
+        playQueue,
+        addToQueue,
+        playNext,
+        nextTrack,
+        previousTrack,
+        jumpToQueueIndex,
+        hasNext,
+        hasPrevious,
+        queue,
+        queueIndex,
+        isShuffled,
+        toggleShuffle,
+        repeatMode,
+        cycleRepeatMode,
+        togglePlayPause,
+        seek,
+        skipForward,
+        skipBackward,
+        isFullscreen,
+        toggleFullscreen,
+        closePlayer,
+        setVolume,
+        changeStreams,
+        radioSeed,
+        radioLabel,
+        startRadio,
+    ]);
+
+    const timeValue = useMemo<PlayerTimeContextType>(() => ({
+        currentTime,
+        duration,
+    }), [currentTime, duration]);
 
     return (
-        <PlayerContext.Provider value={{
-            currentMedia, isPlaying, isMinimized, currentTime, duration, volume, sessionId,
-            playMedia, playQueue, addToQueue, playNext, nextTrack, previousTrack, jumpToQueueIndex, hasNext, hasPrevious,
-            queue, queueIndex, isShuffled, toggleShuffle, repeatMode, cycleRepeatMode,
-            togglePlayPause, seek, skipForward, skipBackward,
-            setMinimized: setIsMinimized,
-            isFullscreen,
-            toggleFullscreen: () => setIsFullscreen(v => !v),
-            setFullscreen: setIsFullscreen,
-            closePlayer, setVolume, changeStreams, videoRef,
-            radioSeed, radioLabel, startRadio
-        }}>
-            {children}
-            <audio ref={preloadAudioRef} preload="auto" style={{ display: 'none' }} muted />
+        <PlayerContext.Provider value={contextValue}>
+            <PlayerTimeContext.Provider value={timeValue}>
+                {children}
+                <audio ref={preloadAudioRef} preload="auto" style={{ display: 'none' }} muted />
 
 
-            {adminMessage && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 transition-opacity">
-                    <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl max-w-sm w-full p-6 text-center transform transition-all scale-100">
-                        <div className="w-16 h-16 bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-900/50 shadow-inner">
-                            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                {adminMessage && (
+                    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-[var(--vora-bg-overlay)] backdrop-blur-sm p-4 transition-opacity">
+                        <div role="dialog" aria-modal="true" className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-[var(--vora-shadow-overlay)] max-w-sm w-full p-6 text-center transform transition-all scale-100">
+                            <div className="w-16 h-16 bg-[var(--vora-danger-soft)] text-[var(--vora-danger-500)] rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--vora-danger-text)]/50 shadow-inner">
+                                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                                 </svg>
+                            </div>
+                            <h2 className="text-2xl font-bold text-[var(--vora-text-primary)] mb-2 tracking-tight">Stream Terminated</h2>
+                            <p className="text-[var(--vora-text-muted)] mb-8 text-sm leading-relaxed px-2">
+                                {adminMessage}
+                            </p>
+                            <button
+                                onClick={() => setAdminMessage(null)}
+                                className="w-full py-3 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] font-bold rounded-lg transition-colors border border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-strong)] shadow-[var(--vora-shadow-md)] cursor-pointer"
+                            >
+                                Dismiss
+                            </button>
                         </div>
-                        <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Stream Terminated</h2>
-                        <p className="text-gray-400 mb-8 text-sm leading-relaxed px-2">
-                            {adminMessage}
-                        </p>
-                        <button
-                            onClick={() => setAdminMessage(null)}
-                            className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-lg transition-colors border border-gray-600 hover:border-gray-500 shadow-md cursor-pointer"
-                        >
-                            Dismiss
-                        </button>
                     </div>
-                </div>
-            )}
+                )}
+            </PlayerTimeContext.Provider>
         </PlayerContext.Provider>
     );
 }

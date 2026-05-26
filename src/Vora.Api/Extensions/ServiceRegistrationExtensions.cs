@@ -1,12 +1,19 @@
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.Threading.RateLimiting;
 using Vora.Api.Hubs;
 using Vora.Api.Middleware;
 using Vora.Application.Actors;
 using Vora.Application.Admin;
+using Vora.Application.Ai;
 using Vora.Application.Analysis;
 using Vora.Application.Artwork;
 using Vora.Application.Auth;
@@ -22,6 +29,7 @@ using Vora.Application.LibraryMigration;
 using Vora.Application.Media;
 using Vora.Application.Media.SmartPlaylists;
 using Vora.Application.Metadata;
+using Vora.Application.Net;
 using Vora.Application.Notifications;
 using Vora.Application.Playlists;
 using Vora.Application.Plugins;
@@ -38,16 +46,15 @@ using Vora.Application.Sync;
 using Vora.Application.Tasks;
 using Vora.Application.Templates;
 using Vora.Application.Themes;
-using Vora.Application.Tracking;
 using Vora.Application.Users;
 using Vora.Application.Watchers;
 using Vora.Application.YouTube;
 using Vora.Infrastructure.Analysis;
 using Vora.Infrastructure.Email;
 using Vora.Infrastructure.FileSystem;
-using Vora.Infrastructure.Notifications;
 using Vora.Infrastructure.Persistence;
 using Vora.Infrastructure.Persistence.Repositories;
+using Vora.Infrastructure.Settings;
 using Vora.Infrastructure.Transcoding;
 using Vora.Infrastructure.Workers;
 using Vora.Plugins.Interfaces;
@@ -71,6 +78,7 @@ public static class ServiceRegistrationExtensions
     {
         builder.AddVoraLogging();
         builder.Services.AddVoraSwagger();
+        builder.Services.AddVoraOptions(builder.Configuration);
         builder.Services.AddVoraDatabase(builder.Configuration);
         builder.Services.AddVoraRepositories();
         builder.Services.AddVoraManagers();
@@ -81,22 +89,119 @@ public static class ServiceRegistrationExtensions
         builder.Services.AddVoraRealtime();
         builder.Services.AddVoraPluginSystem(builder.Configuration);
         builder.Services.AddVoraBackups(builder.Configuration);
-        builder.Services.AddVoraAuthenticationAndAuthorization(builder.Configuration);
-        builder.Services.AddVoraCors();
+        builder.Services.AddVoraAuthenticationAndAuthorization(builder.Configuration, builder.Environment);
+        builder.Services.AddVoraCors(builder.Configuration);
         builder.Services.AddVoraJsonOptions();
+        builder.Services.AddVoraRateLimiting();
+        builder.Services.AddVoraHealthChecks();
+        builder.Services.AddProblemDetails();
+        builder.Services.AddExceptionHandler<VoraGlobalExceptionHandler>();
+        builder.Services.AddVoraResponseCompression();
         return builder;
+    }
+
+    private static IHttpClientBuilder AddVoraResilience(this IHttpClientBuilder builder, int totalTimeoutSeconds)
+    {
+        _ = totalTimeoutSeconds;
+        builder.AddStandardResilienceHandler();
+        return builder;
+    }
+
+    private static IServiceCollection AddVoraResponseCompression(this IServiceCollection services)
+    {
+        services.AddResponseCompression(options =>
+        {
+            options.EnableForHttps = true;
+            options.Providers.Add<BrotliCompressionProvider>();
+            options.Providers.Add<GzipCompressionProvider>();
+            options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+            {
+                "application/json",
+                "application/javascript",
+                "text/css",
+                "text/html",
+                "text/json",
+                "text/plain",
+                "text/vtt",
+                "image/svg+xml",
+                "application/xml",
+                "application/rss+xml"
+            });
+        });
+
+        services.Configure<BrotliCompressionProviderOptions>(o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+        services.Configure<GzipCompressionProviderOptions>(o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+
+        return services;
+    }
+
+    private static IServiceCollection AddVoraHealthChecks(this IServiceCollection services)
+    {
+        services.AddHealthChecks()
+            .AddDbContextCheck<VoraDbContext>(name: "database", failureStatus: HealthStatus.Unhealthy);
+        return services;
+    }
+
+    private static IServiceCollection AddVoraRateLimiting(this IServiceCollection services)
+    {
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            options.AddPolicy(VoraRateLimitPolicies.AuthStrict, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: GetClientPartitionKey(httpContext),
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(5),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+
+            options.AddPolicy(VoraRateLimitPolicies.AuthBurst, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: GetClientPartitionKey(httpContext),
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+        });
+
+        return services;
+    }
+
+    private static string GetClientPartitionKey(HttpContext httpContext)
+    {
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString();
+        return string.IsNullOrEmpty(ip) ? "unknown" : ip;
+    }
+
+    private static IServiceCollection AddVoraOptions(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<Vora.Application.Auth.JwtOptions>(configuration.GetSection(Vora.Application.Auth.JwtOptions.SectionName));
+        services.Configure<Vora.Application.Settings.StoragePathsOptions>(configuration.GetSection(Vora.Application.Settings.StoragePathsOptions.SectionName));
+        services.Configure<Vora.Application.Iptv.IptvPassthroughOptions>(configuration.GetSection(Vora.Application.Iptv.IptvPassthroughOptions.SectionName));
+        services.Configure<Vora.Application.Settings.ForwardedHeadersConfigOptions>(configuration.GetSection(Vora.Application.Settings.ForwardedHeadersConfigOptions.SectionName));
+        services.Configure<Vora.Application.Settings.CorsConfigOptions>(configuration.GetSection(Vora.Application.Settings.CorsConfigOptions.SectionName));
+        return services;
     }
 
     private static IServiceCollection AddVoraBackups(this IServiceCollection services, IConfiguration configuration)
     {
-        var backupsDir = configuration["StoragePaths:Backups"];
+        var storagePaths = ReadStoragePaths(configuration);
+
+        var backupsDir = storagePaths.Backups;
         if (string.IsNullOrWhiteSpace(backupsDir))
         {
             backupsDir = Path.Combine(AppContext.BaseDirectory, "backups");
         }
         Directory.CreateDirectory(backupsDir);
 
-        var dpDir = configuration["StoragePaths:DataProtection"];
+        var dpDir = storagePaths.DataProtection;
         if (string.IsNullOrWhiteSpace(dpDir))
         {
             dpDir = Path.Combine(AppContext.BaseDirectory, "DataProtectionKeys");
@@ -143,13 +248,14 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.RatingsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ExternalConnectionsBackupSection>();
 
-        services.AddHostedService<Vora.Application.Backups.BackupScheduleWorker>();
+        services.AddHostedService<BackupScheduleWorker>();
         return services;
     }
 
     private static WebApplicationBuilder AddVoraLogging(this WebApplicationBuilder builder)
     {
-        var configuredLogDir = builder.Configuration["StoragePaths:Logs"];
+        var storagePaths = ReadStoragePaths(builder.Configuration);
+        var configuredLogDir = storagePaths.Logs;
         var logDir = !string.IsNullOrWhiteSpace(configuredLogDir)
             ? configuredLogDir
             : Path.Combine(AppContext.BaseDirectory, "logs");
@@ -203,7 +309,7 @@ public static class ServiceRegistrationExtensions
 
     private static IServiceCollection AddVoraDatabase(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<VoraDbContext>(options =>
+        services.AddDbContextPool<VoraDbContext>(options =>
             options.UseNpgsql(
                 configuration.GetConnectionString("DefaultConnection"),
                 npgsql => npgsql.UseVector()));
@@ -256,7 +362,9 @@ public static class ServiceRegistrationExtensions
     {
         services.AddScoped<IActorManager, ActorManager>();
         services.AddScoped<IAdminNotificationManager, AdminNotificationManager>();
+        services.AddScoped<IAiStatsManager, AiStatsManager>();
         services.AddScoped<IAuthManager, AuthManager>();
+        services.AddScoped<IJwtSecurityStampValidator, JwtSecurityStampValidator>();
         services.AddScoped<IBestPathDecisionManager, BestPathDecisionManager>();
         services.AddScoped<ICalendarManager, CalendarManager>();
         services.AddScoped<ICollectionManager, CollectionManager>();
@@ -285,6 +393,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IPodcastManager, PodcastManager>();
         services.AddScoped<IPluginManager, PluginManager>();
         services.AddScoped<IPluginSettingsEnvSeeder, PluginSettingsEnvSeeder>();
+        services.AddScoped<IOverlayTemplateManager, OverlayTemplateManager>();
+        services.AddSingleton<IOverlaySweepService, Vora.Infrastructure.Posters.OverlaySweepService>();
         services.AddScoped<IPosterOverlayManager, PosterOverlayManager>();
         services.AddScoped<IProviderConnectionManager, ProviderConnectionManager>();
         services.AddScoped<IRecommendationManager, RecommendationManager>();
@@ -296,13 +406,15 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ISyncAndStateManager, SyncAndStateManager>();
         services.AddScoped<ISystemSettingsManager, SystemSettingsManager>();
         services.AddSingleton<ITaskQueueManager, TaskQueueManager>();
-        services.AddSingleton<IThemeBundleLoader>(_ =>
-            new ThemeBundleLoader(Path.Combine(AppContext.BaseDirectory, "Themes")));
+        services.AddSingleton<IThemeBundleLoader>(sp =>
+            new ThemeBundleLoader(Path.Combine(AppContext.BaseDirectory, "Themes"),
+                sp.GetRequiredService<ILogger<ThemeBundleLoader>>()));
         services.AddSingleton<IThemeAssetService, ThemeAssetService>();
         services.AddSingleton<IThemeRegistry, ThemeRegistry>();
         services.AddScoped<IThemeManager, ThemeManager>();
-        services.AddSingleton<IClientTemplateBundleLoader>(_ =>
-            new ClientTemplateBundleLoader(Path.Combine(AppContext.BaseDirectory, "Templates")));
+        services.AddSingleton<IClientTemplateBundleLoader>(sp =>
+            new ClientTemplateBundleLoader(Path.Combine(AppContext.BaseDirectory, "Templates"),
+                sp.GetRequiredService<ILogger<ClientTemplateBundleLoader>>()));
         services.AddSingleton<IClientTemplateAssetService, ClientTemplateAssetService>();
         services.AddSingleton<IClientTemplateRegistry, ClientTemplateRegistry>();
         services.AddScoped<IClientTemplateScheduleManager, ClientTemplateScheduleManager>();
@@ -336,6 +448,9 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<IFolderWatcherService, FolderWatcherService>();
         services.AddSingleton<ITimeshiftCoordinator, TimeshiftCoordinator>();
         services.AddSingleton<ITranscodeService, FFmpegTranscodeService>();
+        services.AddSingleton<IAudioTranscodeService, FFmpegAudioTranscodeService>();
+        services.AddSingleton<IHardwareCapabilityService, HardwareCapabilityService>();
+        services.AddSingleton<IStreamingTokenSigner, StreamingTokenSigner>();
         services.AddSingleton<Vora.Application.Thumbnails.IVideoThumbnailStorageService, Vora.Application.Thumbnails.VideoThumbnailStorageService>();
         services.AddSingleton<Vora.Application.Thumbnails.IVideoThumbnailGeneratorService, Vora.Infrastructure.Thumbnails.FFmpegVideoThumbnailGeneratorService>();
         return services;
@@ -360,7 +475,12 @@ public static class ServiceRegistrationExtensions
     private static IServiceCollection AddVoraInfrastructure(this IServiceCollection services)
     {
         services.AddHttpClient();
-        services.AddHttpClient<IWebhookDispatcherService, WebhookDispatcherService>();
+        services.AddHttpClient(SafeImageDownloader.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddSingleton<ISafeImageDownloader, SafeImageDownloader>();
         services.AddHttpClient(DeviceTrackingMiddleware.GeoLookupHttpClientName, client =>
         {
             client.Timeout = TimeSpan.FromSeconds(5);
@@ -377,68 +497,69 @@ public static class ServiceRegistrationExtensions
         });
         services.AddHttpClient(MusicBrainzArtworkProvider.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora-MusicMetadata/1.0 (https://github.com/zenith/vora)");
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-        });
+        }).AddVoraResilience(totalTimeoutSeconds: 30);
         services.AddHttpClient(FanartTvMusicArtworkProvider.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora-MusicMetadata/1.0 (https://github.com/zenith/vora)");
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-        });
+        }).AddVoraResilience(totalTimeoutSeconds: 30);
         services.AddHttpClient(TheAudioDbMusicArtworkProvider.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora-MusicMetadata/1.0 (https://github.com/zenith/vora)");
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-        });
+        }).AddVoraResilience(totalTimeoutSeconds: 30);
         services.AddHttpClient(ItunesPodcastDiscoveryProvider.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Podcast Discovery)");
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-        });
+        }).AddVoraResilience(totalTimeoutSeconds: 30);
         services.AddHttpClient(LrcLibLyricsProvider.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(10);
+            client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora-Lyrics/1.0 (https://github.com/zenith/vora)");
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-        });
+        }).AddVoraResilience(totalTimeoutSeconds: 20);
         services.AddHttpClient(LastFmListeningDataProvider.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Last.fm Scrobbler)");
-        });
+        }).AddVoraResilience(totalTimeoutSeconds: 30);
         services.AddHttpClient(GeniusLyricsProvider.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora-Lyrics/1.0 (https://github.com/zenith/vora)");
-        });
+        }).AddVoraResilience(totalTimeoutSeconds: 30);
         services.AddHttpClient(PlexLibrarySyncProvider.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Library Migration)");
-        });
+        }).AddVoraResilience(totalTimeoutSeconds: 60);
         services.AddHttpClient(YouTubeDataApiClient.DataApiHttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (YouTube Client)");
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-        });
+        }).AddVoraResilience(totalTimeoutSeconds: 30);
         services.AddHttpClient(YouTubeDataApiClient.RssHttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (YouTube RSS Reader)");
             client.DefaultRequestHeaders.Add("Accept", "application/atom+xml, application/xml, text/xml");
-        });
+        }).AddVoraResilience(totalTimeoutSeconds: 30);
         services.AddMemoryCache();
         return services;
     }
 
     private static IServiceCollection AddVoraEmail(this IServiceCollection services, IConfiguration configuration)
     {
-        var configuredKeyPath = configuration["StoragePaths:DataProtection"];
+        var storagePaths = ReadStoragePaths(configuration);
+        var configuredKeyPath = storagePaths.DataProtection;
         var keyPath = !string.IsNullOrWhiteSpace(configuredKeyPath)
             ? configuredKeyPath
             : Path.Combine(AppContext.BaseDirectory, "DataProtectionKeys");
@@ -467,48 +588,186 @@ public static class ServiceRegistrationExtensions
 
     private static IServiceCollection AddVoraPluginSystem(this IServiceCollection services, IConfiguration configuration)
     {
-        var configured = configuration["StoragePaths:Plugins"];
+        var storagePaths = ReadStoragePaths(configuration);
+        var configured = storagePaths.Plugins;
         var pluginsPath = !string.IsNullOrWhiteSpace(configured)
             ? configured
             : Path.Combine(AppContext.BaseDirectory, "Plugins");
-        services.AddVoraPlugins(pluginsPath);
+
+        using var startupLoggerFactory = LoggerFactory.Create(b => b.AddConsole());
+        var startupLogger = startupLoggerFactory.CreateLogger("Vora.PluginLoader");
+
+        services.AddVoraPlugins(pluginsPath, startupLogger);
         services.AddScoped<IPluginSettingsProvider, PluginSettingsAdapter>();
         services.AddScoped<Vora.Plugins.Interfaces.IRequestServerLookup, Vora.Application.Requests.RequestServerLookupAdapter>();
         return services;
     }
 
-    private static IServiceCollection AddVoraAuthenticationAndAuthorization(this IServiceCollection services, IConfiguration configuration)
+    private static StoragePathsOptions ReadStoragePaths(IConfiguration configuration)
+        => configuration.GetSection(StoragePathsOptions.SectionName).Get<StoragePathsOptions>() ?? new StoragePathsOptions();
+
+    private const string JwtSecretPlaceholder = "REPLACE_THIS_WITH_A_VERY_LONG_AND_SECURE_RANDOM_STRING_IN_PRODUCTION!";
+    private const int JwtMinSecretByteLength = 32;
+
+    private static IServiceCollection AddVoraAuthenticationAndAuthorization(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        var jwtSecret = configuration["Jwt:SecretKey"] ?? string.Empty;
+        var jwtSecret = ResolveJwtSecret(configuration, environment);
+
+        var jwtIssuer = configuration["Jwt:Issuer"];
+        if (string.IsNullOrWhiteSpace(jwtIssuer))
+        {
+            if (environment.IsDevelopment())
+            {
+                jwtIssuer = "VoraMediaServer";
+            }
+            else
+            {
+                throw new InvalidOperationException("Jwt:Issuer is not configured. Set it via appsettings.json, environment variable (Jwt__Issuer), or user-secrets.");
+            }
+        }
+
+        var jwtAudience = configuration["Jwt:Audience"];
+        if (string.IsNullOrWhiteSpace(jwtAudience))
+        {
+            if (environment.IsDevelopment())
+            {
+                jwtAudience = "VoraMediaServer";
+            }
+            else
+            {
+                throw new InvalidOperationException("Jwt:Audience is not configured. Set it via appsettings.json, environment variable (Jwt__Audience), or user-secrets.");
+            }
+        }
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtIssuer,
+                    ValidAudience = jwtAudience,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"].ToString();
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/Vora"))
+                        {
+                            context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    },
+                    OnTokenValidated = async context =>
+                    {
+                        var principal = context.Principal;
+                        if (principal is null)
+                        {
+                            context.Fail("Principal missing.");
+                            return;
+                        }
+
+                        var stampValidator = context.HttpContext.RequestServices.GetRequiredService<IJwtSecurityStampValidator>();
+
+                        var accountIdValue = principal.GetAccountId();
+                        var profileIdValue = principal.GetProfileId();
+                        var accountStamp = principal.FindFirst("stamp")?.Value;
+                        var profileStamp = principal.FindFirst("profileStamp")?.Value;
+
+                        if (accountIdValue is null || string.IsNullOrEmpty(accountStamp))
+                        {
+                            context.Fail("Stamp missing.");
+                            return;
+                        }
+
+                        var hasProfileToken = !string.IsNullOrEmpty(profileStamp);
+                        var profileIdForValidation = hasProfileToken ? profileIdValue : null;
+
+                        var isValid = await stampValidator.IsStampValidAsync(
+                            accountIdValue.Value,
+                            accountStamp,
+                            profileIdForValidation,
+                            hasProfileToken ? profileStamp : null);
+
+                        if (!isValid)
+                        {
+                            context.Fail("Stamp invalid.");
+                        }
+                    }
                 };
             });
 
         services.AddAuthorization(options =>
         {
-            options.AddPolicy(AdminPolicyName, policy => policy.RequireClaim("IsAdmin", "True"));
+            options.AddPolicy(AdminPolicyName, policy => policy.RequireClaim("isAdmin", "True"));
         });
 
         return services;
     }
 
-    private static IServiceCollection AddVoraCors(this IServiceCollection services)
+    private const string DevelopmentJwtFallbackSecret = "vora-development-only-do-not-use-in-production-environments-please";
+
+    private static string ResolveJwtSecret(IConfiguration configuration, IHostEnvironment environment)
     {
+        var jwtSecret = configuration["Jwt:SecretKey"];
+
+        if (environment.IsDevelopment())
+        {
+            if (string.IsNullOrWhiteSpace(jwtSecret)
+                || string.Equals(jwtSecret, JwtSecretPlaceholder, StringComparison.Ordinal)
+                || Encoding.UTF8.GetByteCount(jwtSecret) < JwtMinSecretByteLength)
+            {
+                Console.WriteLine("[Vora] WARNING: Jwt:SecretKey is missing, placeholder, or too short. Using built-in development fallback. DO NOT deploy this environment to production.");
+                return DevelopmentJwtFallbackSecret;
+            }
+            return jwtSecret;
+        }
+
+        if (string.IsNullOrWhiteSpace(jwtSecret))
+        {
+            throw new InvalidOperationException(
+                "Jwt:SecretKey is not configured. Set it via environment variable (Jwt__SecretKey) or user-secrets. The value must be at least " + JwtMinSecretByteLength + " UTF-8 bytes long.");
+        }
+
+        if (string.Equals(jwtSecret, JwtSecretPlaceholder, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Jwt:SecretKey is still set to the placeholder value. Replace it via environment variable (Jwt__SecretKey) or user-secrets with a unique secret of at least " + JwtMinSecretByteLength + " UTF-8 bytes.");
+        }
+
+        if (Encoding.UTF8.GetByteCount(jwtSecret) < JwtMinSecretByteLength)
+        {
+            throw new InvalidOperationException(
+                "Jwt:SecretKey is too short. Provide a value of at least " + JwtMinSecretByteLength + " UTF-8 bytes via environment variable (Jwt__SecretKey) or user-secrets.");
+        }
+
+        return jwtSecret;
+    }
+
+    private static IServiceCollection AddVoraCors(this IServiceCollection services, IConfiguration configuration)
+    {
+        var configured = configuration.GetSection(Vora.Application.Settings.CorsConfigOptions.SectionName).Get<Vora.Application.Settings.CorsConfigOptions>()
+            ?? new Vora.Application.Settings.CorsConfigOptions();
+
+        var defaultOrigins = new[] { "https://localhost:5173", "http://localhost:5173" };
+        var merged = defaultOrigins
+            .Concat(configured.AllowedOrigins ?? new List<string>())
+            .Where(o => !string.IsNullOrWhiteSpace(o))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
         services.AddCors(options =>
         {
             options.AddPolicy(CorsPolicyName, policy =>
             {
-                policy.WithOrigins("https://localhost:5173", "http://localhost:5173")
+                policy.WithOrigins(merged)
                     .AllowAnyHeader()
                     .AllowAnyMethod()
                     .AllowCredentials();

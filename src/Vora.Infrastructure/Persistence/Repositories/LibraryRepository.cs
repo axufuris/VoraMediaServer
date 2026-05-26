@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using System.Linq.Expressions;
 using Vora.Application.Libraries;
+using Vora.Application.Posters;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
 
@@ -10,12 +10,12 @@ namespace Vora.Infrastructure.Persistence.Repositories;
 public class LibraryRepository : ILibraryRepository
 {
     private readonly VoraDbContext _context;
-    private readonly IConfiguration _config;
+    private readonly IOverlaySweepService _overlaySweep;
 
-    public LibraryRepository(VoraDbContext context, IConfiguration config)
+    public LibraryRepository(VoraDbContext context, IOverlaySweepService overlaySweep)
     {
         _context = context;
-        _config = config;
+        _overlaySweep = overlaySweep;
     }
 
     public async Task<T?> GetProjectedByIdAsync<T>(Guid id, Expression<Func<MediaLibrary, T>> projection)
@@ -158,7 +158,7 @@ public class LibraryRepository : ILibraryRepository
             urlsToSweep.AddRange(orphanedArtists.Select(a => a.BackgroundUrl));
         }
 
-        SweepPhysicalOverlays(urlsToSweep);
+        _overlaySweep.SweepPhysicalOverlays(urlsToSweep);
 
         await _context.MediaParts.Where(p => orphanedPartIds.Contains(p.Id)).ExecuteDeleteAsync();
 
@@ -200,7 +200,7 @@ public class LibraryRepository : ILibraryRepository
             .Select(m => new { m.PosterUrl, m.BackgroundUrl })
             .ToListAsync();
 
-        SweepPhysicalOverlays(itemsToDelete.Select(i => i.PosterUrl).Concat(itemsToDelete.Select(i => i.BackgroundUrl)));
+        _overlaySweep.SweepPhysicalOverlays(itemsToDelete.Select(i => i.PosterUrl).Concat(itemsToDelete.Select(i => i.BackgroundUrl)));
 
         var showIds = await _context.MediaItems
             .AsNoTracking()
@@ -223,22 +223,4 @@ public class LibraryRepository : ILibraryRepository
         await _context.SaveChangesAsync();
     }
 
-    private void SweepPhysicalOverlays(IEnumerable<string?> urls)
-    {
-        var configPath = _config["StoragePaths:CustomArtwork"];
-        var overlayDir = !string.IsNullOrWhiteSpace(configPath) ? configPath : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
-
-        foreach (var url in urls)
-        {
-            if (!string.IsNullOrEmpty(url) && url.Contains("_overlay_") && url.StartsWith("/api/artwork/custom/"))
-            {
-                var fileName = url.Split('/').Last();
-                var physicalPath = Path.Combine(overlayDir, fileName);
-                if (File.Exists(physicalPath))
-                {
-                    try { File.Delete(physicalPath); } catch { }
-                }
-            }
-        }
-    }
 }

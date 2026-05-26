@@ -72,12 +72,12 @@ export default function AddToPlaylistModal({
             cardClassName="p-6"
         >
             <ModalHeader title="Add to Playlist" onClose={onClose} bordered={false} />
-            <div className="border-b border-gray-800 mb-6" />
+            <div className="border-b border-[var(--vora-border-subtle)] mb-6" />
 
             {loading ? (
-                <div className="py-8 text-center text-gray-500 font-medium">Loading playlists...</div>
+                <div className="py-8 text-center text-[var(--vora-text-muted)] font-medium">Loading playlists...</div>
             ) : playlists.length === 0 ? (
-                <div className="py-8 text-center text-gray-500 font-medium">
+                <div className="py-8 text-center text-[var(--vora-text-muted)] font-medium">
                     You don't have any playlists yet.<br />
                     <span className="text-sm mt-2 block">Create one from the Playlists page!</span>
                 </div>
@@ -89,14 +89,14 @@ export default function AddToPlaylistModal({
                             <div
                                 key={p.id}
                                 onClick={() => togglePlaylist(p.id)}
-                                className={`flex items-center gap-4 p-3 rounded-lg border transition-all cursor-pointer ${isActive ? 'bg-orange-600/10 border-orange-500/50' : 'bg-gray-800/50 border-gray-700 hover:bg-gray-800'}`}
+                                className={`flex items-center gap-4 p-3 rounded-lg border transition-all cursor-pointer ${isActive ? 'bg-[var(--vora-accent-500)]/10 border-[var(--vora-accent-500)]/50' : 'bg-[var(--vora-bg-sunken)]/50 border-[var(--vora-border-subtle)] hover:bg-[var(--vora-bg-sunken)]'}`}
                             >
-                                <div className={`w-6 h-6 rounded flex items-center justify-center border transition-colors shrink-0 ${isActive ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-600'}`}>
+                                <div className={`w-6 h-6 rounded flex items-center justify-center border transition-colors shrink-0 ${isActive ? 'bg-[var(--vora-accent-500)] border-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)]'}`}>
                                     {isActive && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                                 </div>
                                 <div className="flex-1 overflow-hidden">
-                                    <h3 className={`font-bold text-sm truncate transition-colors ${isActive ? 'text-orange-400' : 'text-gray-200'}`}>{p.name}</h3>
-                                    <p className="text-xs text-gray-500">{p.itemCount} Items</p>
+                                    <h3 className={`font-bold text-sm truncate transition-colors ${isActive ? 'text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-secondary)]'}`}>{p.name}</h3>
+                                    <p className="text-xs text-[var(--vora-text-muted)]">{p.itemCount} Items</p>
                                 </div>
                             </div>
                         );

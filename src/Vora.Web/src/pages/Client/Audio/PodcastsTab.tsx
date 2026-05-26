@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { podcastService, type PodcastSubscriptionVM, type PodcastEpisodeVM, type DiscoveredPodcastVM, type PodcastFeedEpisodeVM, type AggregatedCatalogPodcastVM, type CatalogServerAvailability } from '../../../api/Podcasts/podcastService';
 import { serverVault } from '../../../utils/serverVault';
+import { StorageKeys, decodeJwtPayload } from '../../../utils/storageKeys';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { useDialog } from '../../../dialogs';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
@@ -37,11 +38,11 @@ export default function PodcastsTab() {
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     const canAddCustomFeeds = useMemo(() => {
-        const token = localStorage.getItem('profile_token');
+        const token = localStorage.getItem(StorageKeys.profileToken);
         if (!token) return false;
         try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            return payload.canAddCustomPodcastFeeds === 'True';
+            const payload = decodeJwtPayload(token);
+            return payload?.canAddCustomPodcastFeeds === 'True';
         } catch {
             return false;
         }

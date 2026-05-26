@@ -112,7 +112,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         return (list.Count, list.Count(c => c.Has));
     }
 
-    public async Task PurgeMediaItemThumbnailsAsync(Guid mediaItemId)
+    private async Task PurgeMediaItemThumbnailsAsync(Guid mediaItemId)
     {
         _storage.DeleteItemDirectory(mediaItemId);
 

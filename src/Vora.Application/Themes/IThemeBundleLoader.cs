@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace Vora.Application.Themes;
 
@@ -25,12 +26,14 @@ public interface IThemeBundleLoader
 public class ThemeBundleLoader : IThemeBundleLoader
 {
     private readonly string _bundlesRootPath;
+    private readonly ILogger<ThemeBundleLoader> _logger;
     private readonly object _lock = new();
     private Dictionary<string, ThemeBundle> _bundles = new(StringComparer.Ordinal);
 
-    public ThemeBundleLoader(string bundlesRootPath)
+    public ThemeBundleLoader(string bundlesRootPath, ILogger<ThemeBundleLoader> logger)
     {
         _bundlesRootPath = bundlesRootPath;
+        _logger = logger;
         Refresh();
     }
 
@@ -67,28 +70,28 @@ public class ThemeBundleLoader : IThemeBundleLoader
             var manifestPath = Path.Combine(dir, "manifest.json");
             if (!File.Exists(manifestPath))
             {
-                Console.WriteLine($"[Theme bundles] Skipping {folderName}: missing manifest.json");
+                _logger.LogWarning("Skipping theme bundle {FolderName}: missing manifest.json", folderName);
                 continue;
             }
 
             try
             {
                 var json = File.ReadAllText(manifestPath);
-                var bundle = ParseAndValidate(json, dir, folderName);
+                var bundle = ParseAndValidate(json, dir, folderName, _logger);
                 if (bundle != null)
                 {
                     if (loaded.ContainsKey(bundle.Id))
                     {
-                        Console.WriteLine($"[Theme bundles] Skipping {folderName}: duplicate theme id '{bundle.Id}'");
+                        _logger.LogWarning("Skipping theme bundle {FolderName}: duplicate theme id '{BundleId}'", folderName, bundle.Id);
                         continue;
                     }
                     loaded[bundle.Id] = bundle;
-                    Console.WriteLine($"[Theme bundles] Loaded '{bundle.Id}' ({bundle.Name})");
+                    _logger.LogInformation("Loaded theme bundle '{BundleId}' ({BundleName})", bundle.Id, bundle.Name);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Theme bundles] Failed to load {folderName}: {ex.Message}");
+                _logger.LogError(ex, "Failed to load theme bundle {FolderName}", folderName);
             }
         }
 
@@ -96,36 +99,34 @@ public class ThemeBundleLoader : IThemeBundleLoader
         return loaded.Count;
     }
 
-    private static ThemeBundle? ParseAndValidate(string rawJson, string bundlePath, string folderName)
+    private static ThemeBundle? ParseAndValidate(string rawJson, string bundlePath, string folderName, ILogger logger)
     {
         using var doc = JsonDocument.Parse(rawJson);
         var root = doc.RootElement;
 
-        if (root.ValueKind != JsonValueKind.Object) return Reject(folderName, "root is not an object");
+        if (root.ValueKind != JsonValueKind.Object) return Reject(folderName, "root is not an object", logger);
 
         var id = TryGetString(root, "id");
         var name = TryGetString(root, "name");
         var version = TryGetString(root, "version");
 
-        if (string.IsNullOrWhiteSpace(id)) return Reject(folderName, "missing 'id'");
-        if (string.IsNullOrWhiteSpace(name)) return Reject(folderName, "missing 'name'");
-        if (string.IsNullOrWhiteSpace(version)) return Reject(folderName, "missing 'version'");
+        if (string.IsNullOrWhiteSpace(id)) return Reject(folderName, "missing 'id'", logger);
+        if (string.IsNullOrWhiteSpace(name)) return Reject(folderName, "missing 'name'", logger);
+        if (string.IsNullOrWhiteSpace(version)) return Reject(folderName, "missing 'version'", logger);
 
-        // Folder name must match id to keep asset path resolution unambiguous.
         if (!string.Equals(folderName, id, StringComparison.Ordinal))
         {
-            return Reject(folderName, $"folder name '{folderName}' must match manifest id '{id}'");
+            return Reject(folderName, $"folder name '{folderName}' must match manifest id '{id}'", logger);
         }
 
-        // Reject reserved built-in ids so plugin themes can't shadow them.
         if (id == "vora-default" || id == "vora-dark")
         {
-            return Reject(folderName, $"id '{id}' is reserved for built-in themes");
+            return Reject(folderName, $"id '{id}' is reserved for built-in themes", logger);
         }
 
         if (!root.TryGetProperty("tokens", out var tokens) || tokens.ValueKind != JsonValueKind.Object)
         {
-            return Reject(folderName, "missing or invalid 'tokens' block");
+            return Reject(folderName, "missing or invalid 'tokens' block", logger);
         }
 
         return new ThemeBundle
@@ -141,9 +142,9 @@ public class ThemeBundleLoader : IThemeBundleLoader
         };
     }
 
-    private static ThemeBundle? Reject(string folderName, string reason)
+    private static ThemeBundle? Reject(string folderName, string reason, ILogger logger)
     {
-        Console.WriteLine($"[Theme bundles] Rejected {folderName}: {reason}");
+        logger.LogWarning("Rejected theme bundle {FolderName}: {Reason}", folderName, reason);
         return null;
     }
 

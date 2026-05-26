@@ -8,7 +8,7 @@ namespace Vora.Api.Hubs;
 public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNotifier
 {
     public Task NotifyLogEntriesAsync(IReadOnlyList<LogEntryVM> entries) =>
-        hubContext.Clients.Group("admins").SendAsync("LogEntryBatch", entries);
+        hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("LogEntryBatch", entries);
 
     public Task NotifyCollectionUpdatedAsync(Guid collectionId) =>
         hubContext.Clients.All.SendAsync("CollectionUpdated", collectionId);
@@ -32,10 +32,10 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
         hubContext.Clients.All.SendAsync("TasksUpdated");
 
     public Task NotifyUserAccessUpdatedAsync(Guid userId) =>
-        hubContext.Clients.All.SendAsync("UserAccessUpdated", userId.ToString());
+        hubContext.Clients.Groups(VoraHub.UserGroupName(userId), VoraHub.AdminGroupName).SendAsync("UserAccessUpdated", userId.ToString());
 
     public Task NotifyProfileAccessUpdatedAsync(Guid profileId) =>
-        hubContext.Clients.All.SendAsync("ProfileAccessUpdated", profileId.ToString());
+        hubContext.Clients.Groups(VoraHub.ProfileGroupName(profileId), VoraHub.AdminGroupName).SendAsync("ProfileAccessUpdated", profileId.ToString());
 
     public Task NotifyDvrSessionsUpdatedAsync() =>
         hubContext.Clients.All.SendAsync("DvrSessionsUpdated");
@@ -50,16 +50,16 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
         hubContext.Clients.All.SendAsync("MusicAlbumUpdated", albumId.ToString());
 
     public Task NotifyMusicMixesUpdatedAsync(Guid profileId) =>
-        hubContext.Clients.All.SendAsync("MusicMixesUpdated", profileId.ToString());
+        hubContext.Clients.Groups(VoraHub.ProfileGroupName(profileId), VoraHub.AdminGroupName).SendAsync("MusicMixesUpdated", profileId.ToString());
 
     public Task NotifyServerPlaybackUpdatedAsync() =>
         hubContext.Clients.All.SendAsync("ServerPlaybackUpdated");
 
     public Task NotifyAdminAlertAsync(string severity, string title, string message) =>
-        hubContext.Clients.Group("admins").SendAsync("AdminAlert", new { severity, title, message, timestamp = DateTime.UtcNow });
+        hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("AdminAlert", new { severity, title, message, timestamp = DateTime.UtcNow });
 
     public Task NotifyAdminAlertUnreadChangedAsync() =>
-        hubContext.Clients.Group("admins").SendAsync("AdminAlertUnreadChanged");
+        hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("AdminAlertUnreadChanged");
 
     public Task NotifyAdminThemeChangedAsync(string themeId) =>
         hubContext.Clients.All.SendAsync("AdminThemeChanged", themeId);
@@ -68,14 +68,14 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
         hubContext.Clients.All.SendAsync("ClientTemplateConfigurationChanged");
 
     public Task NotifyBackupCreatedAsync(string fileName) =>
-        hubContext.Clients.Group("admins").SendAsync("BackupCreated", fileName);
+        hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("BackupCreated", fileName);
 
     public Task NotifyBackupRestoredAsync(string fileName, IReadOnlyList<string> restoredSectionKeys) =>
-        hubContext.Clients.Group("admins").SendAsync("BackupRestored", new { fileName, sectionKeys = restoredSectionKeys });
+        hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("BackupRestored", new { fileName, sectionKeys = restoredSectionKeys });
 
     public Task NotifyLibraryMigrationUpdatedAsync(LibraryMigrationJobVM job) =>
-        hubContext.Clients.Group("admins").SendAsync("LibraryMigrationUpdated", job);
+        hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("LibraryMigrationUpdated", job);
 
     public Task NotifyYouTubeAccessChangedAsync(Guid userId) =>
-        hubContext.Clients.All.SendAsync("YouTubeAccessChanged", userId.ToString());
+        hubContext.Clients.Groups(VoraHub.UserGroupName(userId), VoraHub.AdminGroupName).SendAsync("YouTubeAccessChanged", userId.ToString());
 }

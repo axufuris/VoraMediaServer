@@ -227,7 +227,7 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
                                             <button
                                                 type="button"
                                                 onClick={() => handleDelete(group.mediaItemId, part.partId, true)}
-                                                className="text-xs font-semibold px-3 py-1.5 bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] text-[var(--vora-danger-text)] hover:text-white rounded-[var(--vora-radius-md)] transition-colors cursor-pointer"
+                                                className="text-xs font-semibold px-3 py-1.5 bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] text-[var(--vora-danger-text)] hover:text-[var(--vora-text-primary)] rounded-[var(--vora-radius-md)] transition-colors cursor-pointer"
                                             >
                                                 Delete file & DB
                                             </button>

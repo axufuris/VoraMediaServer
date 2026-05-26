@@ -237,7 +237,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
 
         if (candidateShowIds.Count > 0)
         {
-            var firstUnplayedEpisodes = await _context.Set<Episode>()
+            var candidateEpisodes = await _context.Set<Episode>()
                 .AsNoTracking()
                 .Where(e => candidateShowIds.Contains(e.Season.TvShowId))
                 .Where(e => !_context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == e.Id && (s.IsPlayed || s.IsHiddenFromContinueWatching)))
@@ -254,13 +254,35 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                     TvShowTitle = e.Season.TvShow.Title,
                     ShowPosterUrl = e.Season.TvShow.PosterUrl,
                     ShowBackgroundUrl = e.Season.TvShow.BackgroundUrl,
-                    DurationSeconds = e.Analysis != null && e.Analysis.Duration.HasValue ? (double?)e.Analysis.Duration.Value.TotalSeconds : null,
-                    ResumePositionSeconds = _context.UserMediaStates
-                        .Where(s => s.ProfileId == profileId && s.MediaItemId == e.Id)
-                        .Select(s => (double?)s.ResumePositionSeconds)
-                        .FirstOrDefault(),
+                    DurationSeconds = e.Analysis != null && e.Analysis.Duration.HasValue ? (double?)e.Analysis.Duration.Value.TotalSeconds : null
                 })
                 .ToListAsync();
+
+            var candidateEpisodeIds = candidateEpisodes.Select(e => e.Id).ToList();
+            var resumePositions = await _context.UserMediaStates
+                .AsNoTracking()
+                .Where(s => s.ProfileId == profileId && candidateEpisodeIds.Contains(s.MediaItemId))
+                .Select(s => new { s.MediaItemId, s.ResumePositionSeconds })
+                .ToDictionaryAsync(s => s.MediaItemId, s => (double?)s.ResumePositionSeconds);
+
+            var firstUnplayedEpisodes = candidateEpisodes
+                .Select(e => new
+                {
+                    e.Id,
+                    e.Title,
+                    e.EpisodePosterUrl,
+                    e.EpisodeBackdrop,
+                    e.ReleaseDate,
+                    e.SeasonNumber,
+                    e.EpisodeNumber,
+                    e.TvShowId,
+                    e.TvShowTitle,
+                    e.ShowPosterUrl,
+                    e.ShowBackgroundUrl,
+                    e.DurationSeconds,
+                    ResumePositionSeconds = resumePositions.TryGetValue(e.Id, out var r) ? r : null
+                })
+                .ToList();
 
             var earliestPerShow = firstUnplayedEpisodes
                 .GroupBy(e => e.TvShowId)

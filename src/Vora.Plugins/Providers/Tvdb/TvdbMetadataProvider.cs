@@ -23,7 +23,7 @@ public class TvdbMetadataProvider : IMetadataProvider
     public bool IsSystemPlugin => true;
     public string Type => "Metadata";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public string ProviderName => "TVDB";
 
@@ -74,12 +74,12 @@ public class TvdbMetadataProvider : IMetadataProvider
         return token;
     }
 
-    public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null)
+    public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
         return await ExecuteSearch(query, "movie", year);
     }
 
-    public async Task<MetadataResult?> FetchTvShowMetadataAsync(string query, int? year = null)
+    public async Task<MetadataResult?> FetchTvShowMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
         return await ExecuteSearch(query, "series", year);
     }
@@ -114,7 +114,7 @@ public class TvdbMetadataProvider : IMetadataProvider
         };
     }
 
-    public async Task<MetadataResult?> FetchMovieMetadataByIdAsync(string id, string source)
+    public async Task<MetadataResult?> FetchMovieMetadataByIdAsync(string id, string source, CancellationToken cancellationToken = default)
     {
         var token = await GetValidTokenAsync();
         if (string.IsNullOrEmpty(token)) return null;
@@ -227,7 +227,7 @@ public class TvdbMetadataProvider : IMetadataProvider
         return result;
     }
 
-    public async Task<MetadataResult?> FetchTvShowMetadataByIdAsync(string id, string source)
+    public async Task<MetadataResult?> FetchTvShowMetadataByIdAsync(string id, string source, CancellationToken cancellationToken = default)
     {
         var token = await GetValidTokenAsync();
         if (string.IsNullOrEmpty(token)) return null;
@@ -333,14 +333,15 @@ public class TvdbMetadataProvider : IMetadataProvider
 
         if (data.TryGetProperty("seasons", out var seasons) && seasons.ValueKind == JsonValueKind.Array)
         {
-            var seasonDataList = new List<(int Number, int Id, string? Name, string? Poster)>();
+            var seasonDataList = new List<(int Number, int Id, string Name, string? Poster)>();
             foreach (var season in seasons.EnumerateArray())
             {
                 if (season.TryGetProperty("type", out var typeObj) && typeObj.TryGetProperty("id", out var typeId) && typeId.GetInt32() != 1) continue;
 
                 var sNumber = season.TryGetProperty("number", out var sn) && sn.ValueKind == JsonValueKind.Number ? sn.GetInt32() : 0;
                 var sId = season.TryGetProperty("id", out var sid) && sid.ValueKind == JsonValueKind.Number ? sid.GetInt32() : 0;
-                var sName = season.TryGetProperty("name", out var sname) && sname.ValueKind != JsonValueKind.Null && !string.IsNullOrEmpty(sname.GetString()) ? sname.GetString() : $"Season {sNumber}";
+                var sNameRaw = season.TryGetProperty("name", out var sname) && sname.ValueKind != JsonValueKind.Null ? sname.GetString() : null;
+                var sName = string.IsNullOrEmpty(sNameRaw) ? $"Season {sNumber}" : sNameRaw;
                 var sPoster = season.TryGetProperty("image", out var simg) && simg.ValueKind != JsonValueKind.Null ? simg.GetString() : null;
 
                 seasonDataList.Add((sNumber, sId, sName, sPoster));
@@ -426,7 +427,7 @@ public class TvdbMetadataProvider : IMetadataProvider
         return result;
     }
 
-    public async Task<MetadataResult?> FetchEpisodeMetadataAsync(string showTmdbId, int seasonNumber, int episodeNumber)
+    public async Task<MetadataResult?> FetchEpisodeMetadataAsync(string showTmdbId, int seasonNumber, int episodeNumber, CancellationToken cancellationToken = default)
     {
         await Task.Delay(250);
 
@@ -493,7 +494,7 @@ public class TvdbMetadataProvider : IMetadataProvider
         return null;
     }
 
-    public async Task<ActorMetadataResult?> FetchActorMetadataAsync(int personId)
+    public async Task<ActorMetadataResult?> FetchActorMetadataAsync(int personId, CancellationToken cancellationToken = default)
     {
         var token = await GetValidTokenAsync();
         if (string.IsNullOrEmpty(token)) return null;

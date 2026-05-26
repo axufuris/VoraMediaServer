@@ -15,7 +15,8 @@ public interface ICalendarManager
         bool hasAllRatings,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
-        bool blockUnrated);
+        bool blockUnrated,
+        CancellationToken cancellationToken = default);
 }
 
 public class CalendarManager(
@@ -38,9 +39,10 @@ public class CalendarManager(
         bool hasAllRatings,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
-        bool blockUnrated)
+        bool blockUnrated,
+        CancellationToken cancellationToken = default)
     {
-        var allEvents = await CollectEventsFromActiveProvidersAsync(startDate, endDate);
+        var allEvents = await CollectEventsFromActiveProvidersAsync(startDate, endDate, cancellationToken);
         var libraryMap = await BuildExternalIdToLibraryMapAsync(allEvents);
 
         var filtered = allEvents
@@ -51,7 +53,7 @@ public class CalendarManager(
         return DeduplicateAndMerge(filtered);
     }
 
-    private async Task<List<CalendarEventDto>> CollectEventsFromActiveProvidersAsync(DateTime startDate, DateTime endDate)
+    private async Task<List<CalendarEventDto>> CollectEventsFromActiveProvidersAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
     {
         var activeProviders = new List<ICalendarProvider>();
 
@@ -64,16 +66,16 @@ public class CalendarManager(
             }
         }
 
-        var fetchTasks = activeProviders.Select(p => SafeFetchAsync(p, startDate, endDate));
+        var fetchTasks = activeProviders.Select(p => SafeFetchAsync(p, startDate, endDate, cancellationToken));
         var results = await Task.WhenAll(fetchTasks);
         return results.SelectMany(e => e).ToList();
     }
 
-    private async Task<IEnumerable<CalendarEventDto>> SafeFetchAsync(ICalendarProvider provider, DateTime startDate, DateTime endDate)
+    private async Task<IEnumerable<CalendarEventDto>> SafeFetchAsync(ICalendarProvider provider, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await provider.GetEventsAsync(startDate, endDate);
+            return await provider.GetEventsAsync(startDate, endDate, cancellationToken);
         }
         catch (Exception ex)
         {

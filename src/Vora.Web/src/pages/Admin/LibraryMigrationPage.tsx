@@ -283,14 +283,14 @@ export default function LibraryMigrationPage() {
 
     const accentBorder = 'border-l-4 border-[var(--vora-accent-500)]';
     const onlineBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-green-900/50 text-green-300';
-    const offlineBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-800 text-gray-400';
+    const offlineBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)]';
     const ownerKindBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--vora-accent-500)]/30 text-[var(--vora-accent-text)]';
     const homeKindBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300';
     const pinBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-yellow-900/50 text-yellow-300';
-    const libraryKindBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-800 text-gray-400';
-    const primaryButton = 'px-4 py-2 text-sm rounded-md bg-[var(--vora-accent-500)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-default';
+    const libraryKindBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)]';
+    const primaryButton = 'px-4 py-2 text-sm rounded-md bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)] hover:opacity-90 disabled:opacity-50 disabled:cursor-default';
     const secondaryButton = 'px-3 py-1.5 text-xs text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)]';
-    const inputClass = 'bg-gray-900 border border-gray-700 rounded-md text-sm px-2 py-1.5 text-[var(--vora-text-primary)]';
+    const inputClass = 'bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md text-sm px-2 py-1.5 text-[var(--vora-text-primary)]';
 
     const renderKindBadge = (kind: string) => {
         if (kind === 'Owner') return <span className={ownerKindBadge}>Owner</span>;
@@ -303,9 +303,9 @@ export default function LibraryMigrationPage() {
         switch (state) {
             case 'Running': return <span className={base + ' bg-blue-900/50 text-blue-300'}>Running</span>;
             case 'Completed': return <span className={base + ' bg-green-900/50 text-green-300'}>Completed</span>;
-            case 'Failed': return <span className={base + ' bg-red-900/50 text-red-300'}>Failed</span>;
-            case 'Skipped': return <span className={base + ' bg-gray-800 text-gray-400'}>Skipped</span>;
-            default: return <span className={base + ' bg-gray-800 text-gray-400'}>Pending</span>;
+            case 'Failed': return <span className={base + ' bg-[var(--vora-danger-soft)]/50 text-[var(--vora-danger-500)]'}>Failed</span>;
+            case 'Skipped': return <span className={base + ' bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)]'}>Skipped</span>;
+            default: return <span className={base + ' bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)]'}>Pending</span>;
         }
     };
 
@@ -320,7 +320,7 @@ export default function LibraryMigrationPage() {
                     <button type="button" onClick={handleResetForNewRun} className={secondaryButton}>Run again</button>
                 )}
             </div>
-            {job.errorMessage && <p className="text-sm text-red-500">{job.errorMessage}</p>}
+            {job.errorMessage && <p className="text-sm text-[var(--vora-danger-500)]">{job.errorMessage}</p>}
             {job.users.map(user => (
                 <div key={user.accountId} className="border-t border-[var(--vora-border-subtle)] pt-2">
                     <div className="flex items-center justify-between">
@@ -335,7 +335,7 @@ export default function LibraryMigrationPage() {
                         Ratings: {user.ratingsImported} imported / {user.ratingsFetched} fetched
                         {user.skipped > 0 && (' · ' + user.skipped + ' skipped (no match)')}
                     </div>
-                    {user.errorMessage && <p className="text-xs text-red-500 mt-1">{user.errorMessage}</p>}
+                    {user.errorMessage && <p className="text-xs text-[var(--vora-danger-500)] mt-1">{user.errorMessage}</p>}
                 </div>
             ))}
         </div>
@@ -367,7 +367,7 @@ export default function LibraryMigrationPage() {
                 {!activeJob && !restoringJob && (
                     <>
                         {loadingProviders && <p className="text-sm text-[var(--vora-text-muted)]">Loading available migration sources...</p>}
-                        {loadError && <p className="text-sm text-red-500">{loadError}</p>}
+                        {loadError && <p className="text-sm text-[var(--vora-danger-500)]">{loadError}</p>}
                         {!loadingProviders && !loadError && providers.length === 0 && (
                             <p className="text-sm text-[var(--vora-text-muted)]">No library sync providers are installed.</p>
                         )}
@@ -400,7 +400,7 @@ export default function LibraryMigrationPage() {
                                 {!selectedServer && (
                                     <>
                                         {loadingServers && <p className="text-sm text-[var(--vora-text-muted)]">Loading servers...</p>}
-                                        {serversError && <p className="text-sm text-red-500">{serversError}</p>}
+                                        {serversError && <p className="text-sm text-[var(--vora-danger-500)]">{serversError}</p>}
                                         {!loadingServers && !serversError && servers.length === 0 && (
                                             <p className="text-sm text-[var(--vora-text-muted)]">No servers were found on this account.</p>
                                         )}
@@ -439,8 +439,8 @@ export default function LibraryMigrationPage() {
                                         </div>
 
                                         {(loadingAccounts || loadingVoraUsers) && <p className="text-sm text-[var(--vora-text-muted)]">Loading users...</p>}
-                                        {accountsError && <p className="text-sm text-red-500">{accountsError}</p>}
-                                        {voraUsersError && <p className="text-sm text-red-500">{voraUsersError}</p>}
+                                        {accountsError && <p className="text-sm text-[var(--vora-danger-500)]">{accountsError}</p>}
+                                        {voraUsersError && <p className="text-sm text-[var(--vora-danger-500)]">{voraUsersError}</p>}
 
                                         {!loadingAccounts && !loadingVoraUsers && !accountsError && !voraUsersError && accounts.length === 0 && (
                                             <p className="text-sm text-[var(--vora-text-muted)]">No {connected.provider.providerName} users were found.</p>
@@ -453,7 +453,7 @@ export default function LibraryMigrationPage() {
                                                     return (
                                                         <div key={account.id} className="vora-card p-4 flex items-center gap-4">
                                                             {account.avatarUrl && (
-                                                                <img src={account.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover bg-gray-800" referrerPolicy="no-referrer" />
+                                                                <img src={account.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover bg-[var(--vora-bg-sunken)]" referrerPolicy="no-referrer" />
                                                             )}
                                                             <div className="flex-1">
                                                                 <div className="font-semibold text-[var(--vora-text-primary)] flex items-center gap-2">
@@ -519,7 +519,7 @@ export default function LibraryMigrationPage() {
                                                     <div>
                                                         <div className="text-sm font-semibold text-[var(--vora-text-primary)] mb-2">{connected.provider.providerName} libraries to import from</div>
                                                         {loadingLibraries && <p className="text-xs text-[var(--vora-text-muted)]">Loading libraries...</p>}
-                                                        {librariesError && <p className="text-xs text-red-500">{librariesError}</p>}
+                                                        {librariesError && <p className="text-xs text-[var(--vora-danger-500)]">{librariesError}</p>}
                                                         {!loadingLibraries && !librariesError && libraries.length === 0 && (
                                                             <p className="text-xs text-[var(--vora-text-muted)]">No libraries were found on this server.</p>
                                                         )}
@@ -560,7 +560,7 @@ export default function LibraryMigrationPage() {
                                                         </button>
                                                     </div>
 
-                                                    {runError && <p className="text-sm text-red-500">{runError}</p>}
+                                                    {runError && <p className="text-sm text-[var(--vora-danger-500)]">{runError}</p>}
                                                 </div>
                                             </>
                                         )}

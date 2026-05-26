@@ -7,6 +7,7 @@ import { usePlayer } from '../../../contexts/usePlayer';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import DvrSessionCard from '../../../components/Dvr/DvrSessionCard';
 import { useDialog } from '../../../dialogs';
+import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import Tabs from '../../../components/Client/Primitives/Tabs';
@@ -41,8 +42,8 @@ export default function DvrDashboard() {
                 const activeServer = serverVault.getActiveServer();
                 if (!activeServer) return;
 
-                const profileToken = localStorage.getItem('profile_token');
-                const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : activeServer.profileId;
+                const profileToken = localStorage.getItem(StorageKeys.profileToken);
+                const activeProfileId = getProfileIdFromToken(profileToken) ?? activeServer.profileId;
 
                 const data = await dvrService.getRecordingSessions(activeProfileId, serverId);
                 setSessions(data.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));
@@ -64,8 +65,8 @@ export default function DvrDashboard() {
                 const activeServer = serverVault.getActiveServer();
                 if (!activeServer) return;
 
-                const profileToken = localStorage.getItem('profile_token');
-                const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : activeServer.profileId;
+                const profileToken = localStorage.getItem(StorageKeys.profileToken);
+                const activeProfileId = getProfileIdFromToken(profileToken) ?? activeServer.profileId;
 
                 const freshData = await dvrService.getRecordingSessions(activeProfileId, activeServer.id);
                 setSessions(freshData.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));
@@ -88,12 +89,12 @@ export default function DvrDashboard() {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'Recording': return 'text-red-500 bg-red-500/10 border-red-500/50';
+            case 'Recording': return 'text-[var(--vora-danger-500)] bg-red-500/10 border-red-500/50';
             case 'Pending': return 'text-blue-400 bg-blue-400/10 border-blue-400/50';
             case 'Completed': return 'text-green-500 bg-green-500/10 border-green-500/50';
             case 'Completed (Partial)': return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/50';
-            case 'Post-Processing': return 'text-orange-400 bg-orange-400/10 border-orange-400/50';
-            default: return 'text-gray-400 bg-gray-500/10 border-gray-600/50';
+            case 'Post-Processing': return 'text-[var(--vora-accent-500)] bg-orange-400/10 border-orange-400/50';
+            default: return 'text-[var(--vora-text-muted)] bg-[var(--vora-bg-raised)]/50 border-[var(--vora-border-subtle)]/50';
         }
     };
 

@@ -12,6 +12,7 @@ import Tabs from '../../components/Client/Primitives/Tabs';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
 import MediaStill from '../../components/Client/Primitives/MediaStill';
 import LetterRail from '../../components/Client/Primitives/LetterRail';
+import { StorageKeys } from '../../utils/storageKeys';
 
 type LibraryTabKey = 'library' | 'collections' | 'recommendations';
 
@@ -122,7 +123,7 @@ export default function LibraryPage() {
     const [providersFetched, setProvidersFetched] = useState(false);
 
     const [showMenu, setShowMenu] = useState(false);
-    const isAdmin = localStorage.getItem('is_server_admin') === 'true';
+    const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
 
     const loadData = useCallback(async (silent = false) => {
         if (!id) return;

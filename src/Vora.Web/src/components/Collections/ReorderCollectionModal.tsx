@@ -72,20 +72,20 @@ export default function ReorderCollectionModal({
                         onDragEnter={() => (dragOverItem.current = index)}
                         onDragEnd={handleSort}
                         onDragOver={(e) => e.preventDefault()}
-                        className="flex items-center gap-4 p-3 bg-gray-900 border border-gray-700 rounded-lg cursor-grab active:cursor-grabbing hover:border-orange-500 transition-colors"
+                        className="flex items-center gap-4 p-3 bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-lg cursor-grab active:cursor-grabbing hover:border-[var(--vora-accent-500)] transition-colors"
                     >
-                        <div className="text-gray-500 font-bold w-6 text-center">{index + 1}</div>
+                        <div className="text-[var(--vora-text-muted)] font-bold w-6 text-center">{index + 1}</div>
 
-                        <div className="w-10 h-14 bg-gray-800 rounded shrink-0 overflow-hidden">
+                        <div className="w-10 h-14 bg-[var(--vora-bg-sunken)] rounded shrink-0 overflow-hidden">
                             {item.posterUrl && <img src={item.posterUrl} alt="" className="w-full h-full object-cover" />}
                         </div>
 
                         <div className="flex-1">
-                            <h4 className="font-bold text-gray-200 text-sm">{item.title}</h4>
-                            <p className="text-xs text-gray-500">{item.releaseDate ? new Date(item.releaseDate).getFullYear() : 'Unknown'}</p>
+                            <h4 className="font-bold text-[var(--vora-text-secondary)] text-sm">{item.title}</h4>
+                            <p className="text-xs text-[var(--vora-text-muted)]">{item.releaseDate ? new Date(item.releaseDate).getFullYear() : 'Unknown'}</p>
                         </div>
 
-                        <div className="text-gray-600">
+                        <div className="text-[var(--vora-text-muted)]">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
                         </div>
                     </div>
@@ -93,12 +93,12 @@ export default function ReorderCollectionModal({
             </ModalBody>
 
             <ModalFooter className="flex justify-between items-center">
-                <span className="text-xs text-orange-400 font-medium bg-orange-500/10 px-3 py-1 rounded">
+                <span className="text-xs text-[var(--vora-accent-500)] font-medium bg-[var(--vora-accent-500)]/10 px-3 py-1 rounded">
                     Note: Collection Default Sort must be set to 'Chronological' for this to apply.
                 </span>
                 <div className="flex gap-3">
-                    <button onClick={onClose} className="px-5 py-2 text-gray-400 hover:text-white font-medium transition-colors cursor-pointer">Cancel</button>
-                    <button onClick={handleSave} disabled={isSaving} className="px-6 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold rounded shadow-lg transition-colors cursor-pointer">
+                    <button onClick={onClose} className="px-5 py-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] font-medium transition-colors cursor-pointer">Cancel</button>
+                    <button onClick={handleSave} disabled={isSaving} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors cursor-pointer">
                         {isSaving ? 'Saving...' : 'Save Order'}
                     </button>
                 </div>

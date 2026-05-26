@@ -1,6 +1,10 @@
-﻿using Vora.Api.Endpoints;
+﻿using System.Net;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Options;
+using Vora.Api.Endpoints;
 using Vora.Api.Hubs;
 using Vora.Api.Middleware;
+using Vora.Application.Settings;
 
 namespace Vora.Api.Extensions;
 
@@ -8,6 +12,9 @@ public static class WebApplicationExtensions
 {
     public static WebApplication UseVoraPipeline(this WebApplication app)
     {
+        app.UseExceptionHandler();
+        app.UseStatusCodePages();
+
         if (app.Environment.IsDevelopment())
         {
             app.UseSwagger();
@@ -18,13 +25,61 @@ public static class WebApplicationExtensions
             });
         }
 
+        app.UseVoraForwardedHeaders();
+
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseHsts();
+        }
+
         app.UseHttpsRedirection();
+        app.UseMiddleware<SecurityHeadersMiddleware>();
+        app.UseResponseCompression();
         app.UseStaticFiles();
         app.UseCors(ServiceRegistrationExtensions.CorsPolicy);
+        app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseMiddleware<DeviceTrackingMiddleware>();
 
+        return app;
+    }
+
+    private static WebApplication UseVoraForwardedHeaders(this WebApplication app)
+    {
+        var config = app.Services.GetRequiredService<IOptions<ForwardedHeadersConfigOptions>>().Value;
+        if (!config.Enabled)
+        {
+            return app;
+        }
+
+        var options = new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+            ForwardLimit = Math.Max(1, config.ForwardLimit)
+        };
+
+        options.KnownProxies.Clear();
+        options.KnownIPNetworks.Clear();
+
+        foreach (var proxy in config.KnownProxies)
+        {
+            if (IPAddress.TryParse(proxy, out var ip))
+            {
+                options.KnownProxies.Add(ip);
+            }
+        }
+
+        foreach (var network in config.KnownNetworks)
+        {
+            var parts = network.Split('/', 2);
+            if (parts.Length == 2 && IPAddress.TryParse(parts[0], out var prefix) && int.TryParse(parts[1], out var prefixLength))
+            {
+                options.KnownIPNetworks.Add(new System.Net.IPNetwork(prefix, prefixLength));
+            }
+        }
+
+        app.UseForwardedHeaders(options);
         return app;
     }
 
@@ -78,7 +133,8 @@ public static class WebApplicationExtensions
         app.MapVideoThumbnailEndpoints();
         app.MapYouTubeEndpoints();
 
-        app.MapHub<VoraHub>("/hubs/Vora");
+        app.MapHub<VoraHub>("/hubs/Vora").RequireAuthorization();
+        app.MapHealthChecks("/health").AllowAnonymous();
         app.MapFallbackToFile("index.html");
 
         return app;

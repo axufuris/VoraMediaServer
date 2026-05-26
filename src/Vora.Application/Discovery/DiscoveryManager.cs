@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Vora.Application.Discovery.Requests;
 using Vora.Plugins.Dtos;
 using Vora.Domain.Entities.Discovery;
 using Vora.Plugins.Interfaces;
@@ -7,15 +8,15 @@ namespace Vora.Application.Discovery;
 
 public interface IDiscoveryManager
 {
-    Task<List<DiscoveryRowConfig>> GetAdminRowConfigsAsync();
-    Task UpdateAdminRowConfigsAsync(List<DiscoveryRowConfig> configs);
-    Task<IEnumerable<DiscoveryItemDto>> GetRowItemsAsync(string providerId, string rowId, int page = 1);
-    Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string providerId, string externalId, string type);
+    Task<List<DiscoveryRowConfig>> GetAdminRowConfigsAsync(CancellationToken cancellationToken = default);
+    Task UpdateAdminRowConfigsAsync(List<DiscoveryRowConfigRequest> configs);
+    Task<IEnumerable<DiscoveryItemDto>> GetRowItemsAsync(string providerId, string rowId, int page = 1, CancellationToken cancellationToken = default);
+    Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string providerId, string externalId, string type, CancellationToken cancellationToken = default);
     Task<List<UserWatchlistItem>> GetWatchlistAsync(Guid profileId);
     Task ToggleWatchlistAsync(Guid profileId, string externalId, string providerId, string type, string title, string? posterUrl, DateTime? expectedReleaseDate);
     Task<bool> CheckWatchlistStatusAsync(Guid profileId, string externalId, string providerId);
-    Task<DiscoveryActorDto?> GetActorDetailsAsync(string providerId, string externalId);
-    Task<IEnumerable<DiscoveryItemDto>> SearchAsync(string query);
+    Task<DiscoveryActorDto?> GetActorDetailsAsync(string providerId, string externalId, CancellationToken cancellationToken = default);
+    Task<IEnumerable<DiscoveryItemDto>> SearchAsync(string query, CancellationToken cancellationToken = default);
     Task<IEnumerable<TheaterDto>> GetShowtimesAsync(string movieTitle, string location, DateTime date, int? maxTheaters);
     Task<bool> IsTheaterAutoLoadEnabledAsync();
 }
@@ -26,14 +27,14 @@ public class DiscoveryManager(
     IDiscoveryRepository repository,
     ILogger<DiscoveryManager> logger) : IDiscoveryManager
 {
-    public async Task<List<DiscoveryRowConfig>> GetAdminRowConfigsAsync()
+    public async Task<List<DiscoveryRowConfig>> GetAdminRowConfigsAsync(CancellationToken cancellationToken = default)
     {
         var dbConfigs = await repository.GetRowConfigsAsync();
         var availableRows = new List<DiscoveryRowDefinitionDto>();
 
         foreach (var plugin in plugins)
         {
-            availableRows.AddRange(await plugin.GetAvailableRowsAsync());
+            availableRows.AddRange(await plugin.GetAvailableRowsAsync(cancellationToken));
         }
 
         var result = new List<DiscoveryRowConfig>();
@@ -73,16 +74,26 @@ public class DiscoveryManager(
         return result.OrderBy(r => r.OrderIndex).ToList();
     }
 
-    public async Task UpdateAdminRowConfigsAsync(List<DiscoveryRowConfig> configs)
+    public async Task UpdateAdminRowConfigsAsync(List<DiscoveryRowConfigRequest> configs)
     {
+        var entities = new List<DiscoveryRowConfig>(configs.Count);
         for (var i = 0; i < configs.Count; i++)
         {
-            configs[i].OrderIndex = i;
+            var source = configs[i];
+            entities.Add(new DiscoveryRowConfig
+            {
+                Id = Guid.NewGuid(),
+                RowId = source.RowId,
+                ProviderId = source.ProviderId,
+                Name = source.Name,
+                OrderIndex = i,
+                IsEnabled = source.IsEnabled
+            });
         }
 
         try
         {
-            await repository.UpdateRowConfigsAsync(configs);
+            await repository.UpdateRowConfigsAsync(entities);
         }
         catch (Exception ex)
         {
@@ -91,7 +102,7 @@ public class DiscoveryManager(
         }
     }
 
-    public async Task<IEnumerable<DiscoveryItemDto>> GetRowItemsAsync(string providerId, string rowId, int page = 1)
+    public async Task<IEnumerable<DiscoveryItemDto>> GetRowItemsAsync(string providerId, string rowId, int page = 1, CancellationToken cancellationToken = default)
     {
         var dbConfigs = await repository.GetRowConfigsAsync();
         var rowConfig = dbConfigs.FirstOrDefault(c => c.ProviderId == providerId && c.RowId == rowId);
@@ -110,7 +121,7 @@ public class DiscoveryManager(
 
         try
         {
-            return await plugin.GetRowItemsAsync(rowId, page);
+            return await plugin.GetRowItemsAsync(rowId, page, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -119,7 +130,7 @@ public class DiscoveryManager(
         }
     }
 
-    public async Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string providerId, string externalId, string type)
+    public async Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string providerId, string externalId, string type, CancellationToken cancellationToken = default)
     {
         var plugin = plugins.FirstOrDefault(p => p.Id == providerId);
         if (plugin == null)
@@ -129,7 +140,7 @@ public class DiscoveryManager(
 
         try
         {
-            return await plugin.GetItemDetailsAsync(externalId, type);
+            return await plugin.GetItemDetailsAsync(externalId, type, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -172,7 +183,7 @@ public class DiscoveryManager(
     public Task<bool> CheckWatchlistStatusAsync(Guid profileId, string externalId, string providerId) =>
         repository.IsInWatchlistAsync(profileId, externalId, providerId);
 
-    public async Task<DiscoveryActorDto?> GetActorDetailsAsync(string providerId, string externalId)
+    public async Task<DiscoveryActorDto?> GetActorDetailsAsync(string providerId, string externalId, CancellationToken cancellationToken = default)
     {
         var plugin = plugins.FirstOrDefault(p => p.Id == providerId);
         if (plugin == null)
@@ -182,7 +193,7 @@ public class DiscoveryManager(
 
         try
         {
-            return await plugin.GetActorDetailsAsync(externalId);
+            return await plugin.GetActorDetailsAsync(externalId, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -191,14 +202,14 @@ public class DiscoveryManager(
         }
     }
 
-    public async Task<IEnumerable<DiscoveryItemDto>> SearchAsync(string query)
+    public async Task<IEnumerable<DiscoveryItemDto>> SearchAsync(string query, CancellationToken cancellationToken = default)
     {
         var results = new List<DiscoveryItemDto>();
         foreach (var plugin in plugins)
         {
             try
             {
-                results.AddRange(await plugin.SearchAsync(query));
+                results.AddRange(await plugin.SearchAsync(query, cancellationToken));
             }
             catch (Exception ex)
             {

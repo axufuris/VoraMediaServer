@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using Vora.Application.Iptv.Dtos;
 using Vora.Application.Iptv.ViewModels;
+using Vora.Application.Streaming;
 using Vora.Application.Tasks;
 using Vora.Application.Users;
 using Vora.Domain.Entities.Iptv;
@@ -41,8 +42,10 @@ public class IptvManager : IIptvManager
     private const string PlaylistFileName = "index.m3u8";
     private const string SegmentFilePattern = "seg_%03d.ts";
     private const string SecondSegmentFileName = "seg_001.ts";
+    private const string TimeshiftTokenScope = "timeshift";
     private const int InitializationRetryLimit = 40;
     private const int InitializationRetryDelayMs = 500;
+    private static readonly TimeSpan TimeshiftTokenTtl = TimeSpan.FromHours(4);
 
     private readonly IIptvRepository _repository;
     private readonly IIptvEpgService _epgService;
@@ -50,6 +53,7 @@ public class IptvManager : IIptvManager
     private readonly ITaskQueueManager _taskQueue;
     private readonly ITimeshiftCoordinator _timeshiftCoordinator;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IStreamingTokenSigner _tokenSigner;
     private readonly ILogger<IptvManager> _logger;
 
     public IptvManager(
@@ -59,6 +63,7 @@ public class IptvManager : IIptvManager
         ITaskQueueManager taskQueue,
         ITimeshiftCoordinator timeshiftCoordinator,
         IHttpClientFactory httpClientFactory,
+        IStreamingTokenSigner tokenSigner,
         ILogger<IptvManager> logger)
     {
         _repository = repository;
@@ -67,6 +72,7 @@ public class IptvManager : IIptvManager
         _taskQueue = taskQueue;
         _timeshiftCoordinator = timeshiftCoordinator;
         _httpClientFactory = httpClientFactory;
+        _tokenSigner = tokenSigner;
         _logger = logger;
     }
 
@@ -94,7 +100,7 @@ public class IptvManager : IIptvManager
         await _repository.AddPlaylistAsync(playlist);
         await SyncM3uChannelsAsync(playlist);
 
-        _ = Task.Run(() => _epgService.SyncEpgDataAsync(CancellationToken.None));
+        _taskQueue.QueueIptvEpgSync();
 
         return MapToViewModel(playlist);
     }
@@ -131,7 +137,7 @@ public class IptvManager : IIptvManager
         if (m3uChanged || defaultKindChanged)
         {
             await SyncM3uChannelsAsync(playlist);
-            _ = Task.Run(() => _epgService.SyncEpgDataAsync(CancellationToken.None));
+            _taskQueue.QueueIptvEpgSync();
         }
 
         var refreshed = await _repository.GetPlaylistByIdAsync(playlist.Id) ?? playlist;
@@ -154,7 +160,7 @@ public class IptvManager : IIptvManager
         if (playlist == null) return;
 
         await SyncM3uChannelsAsync(playlist);
-        _ = Task.Run(() => _epgService.SyncEpgDataAsync(CancellationToken.None));
+        _taskQueue.QueueIptvEpgSync();
     }
 
     public async Task<List<IptvEpgSourceVM>> GetAllEpgSourcesAsync()
@@ -329,7 +335,8 @@ public class IptvManager : IIptvManager
             throw new InvalidOperationException("FFmpeg failed to generate the stream playlist in time. The stream source may be dead or incompatible.");
         }
 
-        return $"/api/streaming/hls/timeshift/{profileId}/{sessionId}/{PlaylistFileName}";
+        var token = _tokenSigner.Sign(TimeshiftTokenScope, $"{profileId}:{sessionId}", TimeshiftTokenTtl);
+        return $"/api/streaming/hls/timeshift/{token}/{profileId}/{sessionId}/{PlaylistFileName}";
     }
 
     public Task StopTimeshiftSessionAsync(Guid profileId) =>

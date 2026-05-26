@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using Vora.Application.Media;
 using Vora.Application.Providers.ViewModels;
 using Vora.Domain.Entities.Users;
 
@@ -14,17 +13,10 @@ public interface IProviderConnectionManager
 
 public class ProviderConnectionManager(
     IProviderConnectionRepository repository,
-    IEnumerable<IMediaProvider> mediaProviders,
     ILogger<ProviderConnectionManager> logger) : IProviderConnectionManager
 {
     public async Task LinkProviderAsync(Guid userId, string providerName, string accessToken, string? refreshToken, DateTime? expiresAt)
     {
-        var provider = mediaProviders.FirstOrDefault(p => p.ProviderName.Equals(providerName, StringComparison.OrdinalIgnoreCase));
-        if (provider == null)
-        {
-            throw new InvalidOperationException($"Plugin for {providerName} is not installed.");
-        }
-
         try
         {
             var existing = await repository.GetConnectionAsync(userId, providerName);

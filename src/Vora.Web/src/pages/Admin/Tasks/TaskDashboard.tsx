@@ -101,7 +101,7 @@ export default function TaskDashboard() {
                                             <button
                                                 type="button"
                                                 onClick={() => handleCancel(task.id)}
-                                                className="px-3 py-1 rounded-[var(--vora-radius-md)] text-xs font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-white transition-colors cursor-pointer"
+                                                className="px-3 py-1 rounded-[var(--vora-radius-md)] text-xs font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer"
                                             >
                                                 Cancel
                                             </button>

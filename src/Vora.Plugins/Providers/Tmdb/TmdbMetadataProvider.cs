@@ -19,7 +19,7 @@ public class TmdbMetadataProvider : IMetadataProvider
     public bool IsSystemPlugin => true;
     public string Type => "Metadata";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public string ProviderName => "TMDB";
 
@@ -51,7 +51,7 @@ public class TmdbMetadataProvider : IMetadataProvider
         return await settings.GetSettingAsync(Id, "api_key");
     }
 
-    public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null)
+    public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
         if (string.IsNullOrEmpty(apiKey)) return null;
@@ -72,7 +72,7 @@ public class TmdbMetadataProvider : IMetadataProvider
         return await FetchMovieMetadataByIdAsync(tmdbId, "tmdb");
     }
 
-    public async Task<MetadataResult?> FetchTvShowMetadataAsync(string query, int? year = null)
+    public async Task<MetadataResult?> FetchTvShowMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
         if (string.IsNullOrEmpty(apiKey)) return null;
@@ -93,7 +93,7 @@ public class TmdbMetadataProvider : IMetadataProvider
         return await FetchTvShowMetadataByIdAsync(tmdbId, "tmdb");
     }
 
-    public async Task<MetadataResult?> FetchMovieMetadataByIdAsync(string id, string source)
+    public async Task<MetadataResult?> FetchMovieMetadataByIdAsync(string id, string source, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
         string tmdbIdToFetch = id;
@@ -118,7 +118,7 @@ public class TmdbMetadataProvider : IMetadataProvider
         return MapResult(doc.RootElement, isTv: false);
     }
 
-    public async Task<MetadataResult?> FetchTvShowMetadataByIdAsync(string id, string source)
+    public async Task<MetadataResult?> FetchTvShowMetadataByIdAsync(string id, string source, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
         string tmdbIdToFetch = id;
@@ -432,7 +432,7 @@ public class TmdbMetadataProvider : IMetadataProvider
         return result;
     }
 
-    public async Task<MetadataResult?> FetchEpisodeMetadataAsync(string showTmdbId, int seasonNumber, int episodeNumber)
+    public async Task<MetadataResult?> FetchEpisodeMetadataAsync(string showTmdbId, int seasonNumber, int episodeNumber, CancellationToken cancellationToken = default)
     {
         await Task.Delay(250);
         var cacheKey = $"{showTmdbId}_{seasonNumber}";
@@ -536,7 +536,7 @@ public class TmdbMetadataProvider : IMetadataProvider
         return null;
     }
 
-    public async Task<ActorMetadataResult?> FetchActorMetadataAsync(int personId)
+    public async Task<ActorMetadataResult?> FetchActorMetadataAsync(int personId, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
         var url = $"person/{personId}?api_key={apiKey}";

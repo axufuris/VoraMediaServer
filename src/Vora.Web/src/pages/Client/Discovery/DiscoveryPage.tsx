@@ -8,6 +8,7 @@ import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import MediaRail from '../../../components/Client/Primitives/MediaRail';
 import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 
 export default function DiscoveryPage() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -17,9 +18,9 @@ export default function DiscoveryPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
 
-    const profileToken = localStorage.getItem('profile_token');
-    const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : '';
-    const deviceId = localStorage.getItem('device_id') || 'unknown';
+    const profileToken = localStorage.getItem(StorageKeys.profileToken);
+    const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
+    const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
 
     useEffect(() => {
         const fetchData = async () => {

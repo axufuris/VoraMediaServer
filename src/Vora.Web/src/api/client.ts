@@ -1,12 +1,35 @@
-import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosRequestConfig } from 'axios';
+import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosRequestConfig, isAxiosError } from 'axios';
 import { serverVault, type VoraServer } from '../utils/serverVault';
+import { StorageKeys, SessionKeys } from '../utils/storageKeys';
 
 export interface VoraRequestConfig extends AxiosRequestConfig {
     serverId?: string;
 }
 
-function detectOs(): string {
-    const ua = navigator.userAgent || '';
+export function getResponseStatus(err: unknown): number | undefined {
+    return isAxiosError(err) ? err.response?.status : undefined;
+}
+
+let unauthorizedRedirectInFlight = false;
+function handleUnauthorized(): void {
+    if (unauthorizedRedirectInFlight) return;
+    unauthorizedRedirectInFlight = true;
+    try {
+        localStorage.removeItem(StorageKeys.profileToken);
+        localStorage.removeItem(StorageKeys.accountToken);
+        localStorage.removeItem(StorageKeys.isServerAdmin);
+        localStorage.removeItem(StorageKeys.isProfileAdmin);
+        clientCache.clear();
+    } catch {
+        // ignore storage clear failures (e.g. private mode quota)
+    }
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.assign('/login');
+    }
+}
+
+const DETECTED_OS: string = (() => {
+    const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
     if (/Windows NT 10\.0/.test(ua)) return 'Windows 10/11';
     if (/Windows NT 6\.3/.test(ua)) return 'Windows 8.1';
     if (/Windows NT 6\.2/.test(ua)) return 'Windows 8';
@@ -18,49 +41,78 @@ function detectOs(): string {
     if (/CrOS/.test(ua)) return 'ChromeOS';
     if (/Linux/.test(ua)) return 'Linux';
     return 'Unknown OS';
+})();
+
+const FALLBACK_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
+const PENDING_KEY = '__pending__';
+
+interface ClientResolution {
+    cacheKey: string;
+    baseUrl: string;
+    server: VoraServer | undefined;
 }
 
-export const createServerClient = (serverId?: string): AxiosInstance => {
-    const pendingUrl = sessionStorage.getItem('pending_server_url');
-    const pendingToken = sessionStorage.getItem('pending_user_token');
+function resolveClient(serverId?: string): ClientResolution {
+    const pendingUrl = sessionStorage.getItem(SessionKeys.pendingServerUrl);
 
     let server: VoraServer | undefined;
-
     if (serverId) {
         server = serverVault.getServer(serverId);
     } else if (!pendingUrl) {
         server = serverVault.getActiveServer();
     }
 
-    let baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+    let baseUrl = FALLBACK_BASE_URL;
     if (server) {
         baseUrl = `${server.url}/api`;
     } else if (pendingUrl) {
         baseUrl = `${pendingUrl}/api`;
     }
 
-    let token = server?.token || pendingToken || localStorage.getItem('profile_token') || localStorage.getItem('account_token');
-
-    if (token === 'undefined' || token === 'null') {
-        token = null;
+    let cacheKey: string;
+    if (server) {
+        cacheKey = `server:${server.id}`;
+    } else if (pendingUrl) {
+        cacheKey = `${PENDING_KEY}:${pendingUrl}`;
+    } else {
+        cacheKey = `fallback:${baseUrl}`;
     }
 
+    return { cacheKey, baseUrl, server };
+}
+
+const clientCache = new Map<string, AxiosInstance>();
+
+function buildAxiosInstance(baseUrl: string, server: VoraServer | undefined): AxiosInstance {
     const instance = axios.create({
         baseURL: baseUrl,
         headers: {
             'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        }
+        },
     });
 
     instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-        const deviceId = localStorage.getItem('device_id');
-        if (deviceId && config.headers) {
-            config.headers['X-Vora-Device-Id'] = deviceId;
-            config.headers['X-Vora-Client'] = 'Vora Web';
-            config.headers['X-Vora-Device'] = 'Web Browser';
-            config.headers['X-Vora-Device-Type'] = 'Browser';
-            config.headers['X-Vora-OS'] = detectOs();
+        const pendingToken = sessionStorage.getItem(SessionKeys.pendingUserToken);
+        let token = server?.token || pendingToken || localStorage.getItem(StorageKeys.profileToken) || localStorage.getItem(StorageKeys.accountToken);
+        if (token === 'undefined' || token === 'null') {
+            token = null;
+        }
+        if (config.headers) {
+            if (token) {
+                config.headers['Authorization'] = `Bearer ${token}`;
+            } else {
+                delete config.headers['Authorization'];
+            }
+
+            const deviceId = localStorage.getItem(StorageKeys.deviceId);
+            if (deviceId) {
+                config.headers['X-Vora-Device-Id'] = deviceId;
+                config.headers['X-Vora-Client'] = 'Vora Web';
+                config.headers['X-Vora-Device'] = 'Web Browser';
+                config.headers['X-Vora-Device-Type'] = 'Browser';
+                config.headers['X-Vora-OS'] = DETECTED_OS;
+            }
         }
         return config;
     });
@@ -68,14 +120,29 @@ export const createServerClient = (serverId?: string): AxiosInstance => {
     instance.interceptors.response.use(
         (response) => response,
         (error) => {
-            if (error.response?.status === 401) {
+            const status = getResponseStatus(error);
+            if (status === 401) {
                 console.error(`Authentication failed for server: ${server?.name || 'Pending'}`);
+                handleUnauthorized();
             }
             return Promise.reject(error);
         }
     );
 
     return instance;
+}
+
+export const createServerClient = (serverId?: string): AxiosInstance => {
+    const { cacheKey, baseUrl, server } = resolveClient(serverId);
+    const cached = clientCache.get(cacheKey);
+    if (cached) return cached;
+    const instance = buildAxiosInstance(baseUrl, server);
+    clientCache.set(cacheKey, instance);
+    return instance;
+};
+
+export const clearApiClientCache = (): void => {
+    clientCache.clear();
 };
 
 export const createDirectClient = (baseUrl: string, token?: string): AxiosInstance => {

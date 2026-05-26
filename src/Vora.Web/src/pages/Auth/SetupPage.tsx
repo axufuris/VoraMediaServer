@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { authService } from '../../api/Auth/authService';
+import { StorageKeys, SessionKeys } from '../../utils/storageKeys';
 import AuthLayout from '../../layouts/AuthLayout';
 
 export default function SetupPage() {
@@ -12,7 +13,7 @@ export default function SetupPage() {
     const [error, setError] = useState('');
 
     const getTargetUrl = () => {
-        const pending = sessionStorage.getItem('pending_server_url');
+        const pending = sessionStorage.getItem(SessionKeys.pendingServerUrl);
         if (pending) return pending;
         const envUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
         return envUrl.endsWith('/api') ? envUrl.slice(0, -4) : envUrl;
@@ -37,12 +38,12 @@ export default function SetupPage() {
             const targetUrl = getTargetUrl();
             const auth = await authService.setupServerAt(targetUrl, email, password, displayName);
 
-            sessionStorage.setItem('pending_server_url', targetUrl);
-            sessionStorage.setItem('pending_user_token', auth.accessToken);
+            sessionStorage.setItem(SessionKeys.pendingServerUrl, targetUrl);
+            sessionStorage.setItem(SessionKeys.pendingUserToken, auth.accessToken);
             sessionStorage.setItem('pending_user_id', auth.userId);
 
-            localStorage.setItem('account_token', auth.accessToken);
-            localStorage.setItem('user_id', auth.userId);
+            localStorage.setItem(StorageKeys.accountToken, auth.accessToken);
+            localStorage.setItem(StorageKeys.userId, auth.userId);
 
             navigate('/profiles');
         } catch (err) {

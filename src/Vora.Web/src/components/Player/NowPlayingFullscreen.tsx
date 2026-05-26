@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { usePlayer } from '../../contexts/usePlayer';
+import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
 import { musicService, type LyricsVM } from '../../api/Music/musicService';
 import { parseLrc, findActiveLineIndex, type LrcLine } from '../../utils/lrcParser';
 import { audioQualityStore, crossfadeStore, eqPresetStore, type AudioQuality, type EqPreset } from '../../utils/audioQuality';
@@ -16,12 +16,13 @@ const formatTime = (sec: number): string => {
 export default function NowPlayingFullscreen() {
     const { serverId } = useParams<{ serverId?: string }>();
     const {
-        currentMedia, isPlaying, currentTime, duration, isFullscreen, setFullscreen,
+        currentMedia, isPlaying, isFullscreen, setFullscreen,
         togglePlayPause, nextTrack, previousTrack, hasNext, hasPrevious, seek,
         queue, queueIndex, jumpToQueueIndex,
         isShuffled, toggleShuffle, repeatMode, cycleRepeatMode, closePlayer,
         radioSeed, radioLabel,
     } = usePlayer();
+    const { currentTime, duration } = usePlayerTime();
 
     const [lyricsOpen, setLyricsOpen] = useState(false);
     const [queueOpen, setQueueOpen] = useState(false);
@@ -380,6 +381,7 @@ export default function NowPlayingFullscreen() {
                         step={0.1}
                         value={currentTime}
                         onChange={onScrubChange}
+                        aria-label="Playback position"
                         className="flex-1 cursor-pointer accent-[var(--vora-accent-500)]"
                     />
                     <span className="w-10">{formatTime(duration)}</span>

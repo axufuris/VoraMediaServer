@@ -1,4 +1,5 @@
-import { apiClient, createDirectClient } from '../client';
+import { apiClient, createDirectClient, clearApiClientCache } from '../client';
+import { StorageKeys } from '../../utils/storageKeys';
 
 export interface AuthResponse {
     accessToken: string;
@@ -92,14 +93,15 @@ export const authService = {
     },
 
     logout: () => {
-        localStorage.removeItem('account_token');
-        localStorage.removeItem('profile_token');
-        localStorage.removeItem('user_id');
-        localStorage.removeItem('profile_name');
-        localStorage.removeItem('is_server_admin');
-        localStorage.removeItem('is_profile_admin');
+        localStorage.removeItem(StorageKeys.accountToken);
+        localStorage.removeItem(StorageKeys.profileToken);
+        localStorage.removeItem(StorageKeys.userId);
+        localStorage.removeItem(StorageKeys.profileName);
+        localStorage.removeItem(StorageKeys.isServerAdmin);
+        localStorage.removeItem(StorageKeys.isProfileAdmin);
 
         sessionStorage.clear();
+        clearApiClientCache();
 
         window.location.href = '/login';
     }

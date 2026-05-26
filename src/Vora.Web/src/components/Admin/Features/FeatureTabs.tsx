@@ -12,7 +12,7 @@ interface FeatureTabsProps {
 
 export default function FeatureTabs({ tabs, activeKey, onChange, className }: FeatureTabsProps) {
     return (
-        <div className={`border-b border-gray-800 mb-6 ${className ?? ''}`}>
+        <div className={`border-b border-[var(--vora-border-subtle)] mb-6 ${className ?? ''}`}>
             <div className="flex gap-1">
                 {tabs.map(tab => {
                     const isActive = tab.key === activeKey;

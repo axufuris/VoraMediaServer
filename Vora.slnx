@@ -13,6 +13,12 @@
       <Deploy />
     </Project>
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Vora.Api.Tests/Vora.Api.Tests.csproj" />
+    <Project Path="tests/Vora.Application.Tests/Vora.Application.Tests.csproj" />
+    <Project Path="tests/Vora.Domain.Tests/Vora.Domain.Tests.csproj" />
+    <Project Path="tests/Vora.Infrastructure.Tests/Vora.Infrastructure.Tests.csproj" />
+  </Folder>
   <Project Path="docker-compose.dcproj" Id="12345678-abcd-1234-abcd-1234567890ab">
     <Build />
   </Project>

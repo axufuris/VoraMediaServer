@@ -8,6 +8,7 @@ import { voraVelvet } from './clientTemplates/voraVelvet';
 import { voraAurora } from './clientTemplates/voraAurora';
 import { clientTemplateService, type ActiveTemplateVM } from '../api/System/clientTemplateService';
 import { useSignalREvent } from '../hooks/useSignalREvent';
+import { StorageKeys } from '../utils/storageKeys';
 import { ClientTemplateContext, type ClientTemplateContextValue } from './useClientTemplate';
 
 const BUILT_IN_CLIENT_TEMPLATES: ThemeManifest[] = [voraCinema, voraNoir, voraVelvet, voraAurora];
@@ -98,7 +99,7 @@ export function ClientTemplateProvider({ children }: ClientTemplateProviderProps
     }, [serverId]);
 
     const reconcileWithBackend = useCallback(async () => {
-        if (!localStorage.getItem('profile_token') && !localStorage.getItem('account_token')) {
+        if (!localStorage.getItem(StorageKeys.profileToken) && !localStorage.getItem(StorageKeys.accountToken)) {
             return;
         }
         try {

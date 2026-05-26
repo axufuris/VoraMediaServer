@@ -9,6 +9,7 @@ import { serverVault } from '../../../utils/serverVault';
 import { useDialog } from '../../../dialogs';
 import { audioQualityStore } from '../../../utils/audioQuality';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
+import { StorageKeys } from '../../../utils/storageKeys';
 
 export default function PlaylistDetailsPage() {
     const dialog = useDialog();
@@ -139,7 +140,7 @@ export default function PlaylistDetailsPage() {
             return;
         }
 
-        const deviceId = localStorage.getItem('device_id') || 'unknown';
+        const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
 
         let targetMediaId = selectedItem.mediaItemId;
         let startPos = selectedItem.resumePositionSeconds || 0;
@@ -186,8 +187,8 @@ export default function PlaylistDetailsPage() {
         }
     };
 
-    if (loading) return <div className="p-12 text-center text-gray-500 mt-16">Loading playlist...</div>;
-    if (!playlist) return <div className="p-12 text-center text-red-500 mt-16">Playlist not found.</div>;
+    if (loading) return <div className="p-12 text-center text-[var(--vora-text-muted)] mt-16">Loading playlist...</div>;
+    if (!playlist) return <div className="p-12 text-center text-[var(--vora-danger-500)] mt-16">Playlist not found.</div>;
 
     const inProgress = selectedItem && selectedItem.resumePositionSeconds > 0 && !selectedItem.isPlayed;
 
@@ -244,21 +245,21 @@ export default function PlaylistDetailsPage() {
 
                 <div className="flex flex-col md:flex-row gap-10 mb-16">
                     <div className="w-64 shrink-0 relative">
-                        <div className={`${selectedItem?.type === 'Track' ? 'aspect-square' : 'aspect-[2/3]'} rounded-lg overflow-hidden shadow-2xl border border-gray-700 bg-gray-800 relative`}>
+                        <div className={`${selectedItem?.type === 'Track' ? 'aspect-square' : 'aspect-[2/3]'} rounded-lg overflow-hidden shadow-2xl border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] relative`}>
                             {(selectedItem?.type === 'Track' ? selectedItem.albumArtworkUrl : selectedItem?.posterUrl) ? (
                                 <img src={selectedItem?.type === 'Track' ? selectedItem.albumArtworkUrl : selectedItem?.posterUrl} alt="" className="w-full h-full object-cover" />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-500">{selectedItem?.type === 'Track' ? <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg> : 'No Image'}</div>
+                                <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-muted)]">{selectedItem?.type === 'Track' ? <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg> : 'No Image'}</div>
                             )}
                             {selectedItem?.isPlayed && (
                                 <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full p-1 shadow-lg border border-white/10">
-                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                    <svg className="w-5 h-5 text-[var(--vora-text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                 </div>
                             )}
 
                             {inProgress && selectedItem.durationMinutes && (
-                                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-800 z-10">
-                                    <div className="h-full bg-orange-500" style={{ width: `${(selectedItem.resumePositionSeconds / (selectedItem.durationMinutes * 60)) * 100}%` }}></div>
+                                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-[var(--vora-bg-sunken)] z-10">
+                                    <div className="h-full bg-[var(--vora-accent-500)]" style={{ width: `${(selectedItem.resumePositionSeconds / (selectedItem.durationMinutes * 60)) * 100}%` }}></div>
                                 </div>
                             )}
                         </div>
@@ -266,44 +267,44 @@ export default function PlaylistDetailsPage() {
 
                     <div className="flex-1 pt-0">
                         <div className="flex items-center justify-between mb-1">
-                            <h2 className="text-xl font-bold text-orange-500 tracking-wider uppercase flex items-center gap-3">
+                            <h2 className="text-xl font-bold text-[var(--vora-accent-500)] tracking-wider uppercase flex items-center gap-3">
                                 {playlist.name}
-                                <span className="text-gray-500 text-sm font-medium tracking-normal normal-case">
+                                <span className="text-[var(--vora-text-muted)] text-sm font-medium tracking-normal normal-case">
                                     ({playlist.items.length} items {totalDurationFormatted ? `• ${totalDurationFormatted}` : ''})
                                 </span>
                             </h2>
 
                             <div className="flex gap-2">
-                                <button onClick={handleOpenEdit} className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" title="Edit Playlist">
+                                <button onClick={handleOpenEdit} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)] transition-colors" title="Edit Playlist">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                 </button>
-                                <button onClick={handleDeletePlaylist} className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-gray-800 transition-colors" title="Delete Playlist">
+                                <button onClick={handleDeletePlaylist} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] hover:bg-[var(--vora-bg-sunken)] transition-colors" title="Delete Playlist">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 </button>
                             </div>
                         </div>
 
                         {playlist.description && (
-                            <p className="text-gray-400 text-sm mb-4 max-w-3xl">{playlist.description}</p>
+                            <p className="text-[var(--vora-text-muted)] text-sm mb-4 max-w-3xl">{playlist.description}</p>
                         )}
 
-                        <h1 className="text-[2.75rem] leading-tight font-bold text-white drop-shadow-lg mb-1">
+                        <h1 className="text-[2.75rem] leading-tight font-bold text-[var(--vora-text-primary)] drop-shadow-lg mb-1">
                             {selectedItem?.type === 'Episode' || selectedItem?.type === 'Season'
                                 ? selectedItem.tvShowTitle
                                 : selectedItem?.title || "Empty Playlist"}
                         </h1>
 
                         {(selectedItem?.type === 'Episode' || selectedItem?.type === 'Season') && (
-                            <h2 className="text-2xl font-bold text-gray-300 mb-5">{selectedItem.title}</h2>
+                            <h2 className="text-2xl font-bold text-[var(--vora-text-secondary)] mb-5">{selectedItem.title}</h2>
                         )}
 
                         {selectedItem?.type === 'Track' && (
-                            <h2 className="text-2xl font-bold text-gray-300 mb-5">
+                            <h2 className="text-2xl font-bold text-[var(--vora-text-secondary)] mb-5">
                                 {selectedItem.artistName ? `${selectedItem.artistName}${selectedItem.albumTitle ? ` — ${selectedItem.albumTitle}` : ''}` : selectedItem.albumTitle}
                             </h2>
                         )}
 
-                        <div className="flex items-center gap-3 text-sm font-medium text-gray-400 mb-8">
+                        <div className="flex items-center gap-3 text-sm font-medium text-[var(--vora-text-muted)] mb-8">
                             {selectedItem?.type === 'Episode' && <span>Season {selectedItem.seasonNumber} &nbsp;&nbsp; Episode {selectedItem.episodeNumber}</span>}
                             {selectedItem?.releaseYear && <span>{selectedItem.releaseYear}</span>}
                             {selectedItem?.type === 'Track' && selectedItem.durationSeconds ? (
@@ -323,7 +324,7 @@ export default function PlaylistDetailsPage() {
 
                                 <button
                                     onClick={(e) => handleTogglePlayed(e, selectedItem.mediaItemId, selectedItem.isPlayed)}
-                                    className={`p-2.5 rounded-full transition-colors border cursor-pointer shrink-0 ${selectedItem.isPlayed ? 'bg-orange-600 text-white border-orange-500 hover:bg-orange-500' : 'text-gray-300 hover:bg-gray-800 hover:text-white border-gray-600 hover:border-gray-400'}`}
+                                    className={`p-2.5 rounded-full transition-colors border cursor-pointer shrink-0 ${selectedItem.isPlayed ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)] border-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)]' : 'text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)] hover:text-[var(--vora-text-primary)] border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-subtle)]'}`}
                                     title={selectedItem.isPlayed ? "Mark as Unplayed" : "Mark as Played"}
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -332,14 +333,14 @@ export default function PlaylistDetailsPage() {
                                 </button>
                                 <button
                                     onClick={(e) => handleGoToDetails(e, selectedItem.mediaItemId)}
-                                    className="p-2.5 rounded-full text-gray-300 hover:bg-gray-800 hover:text-white transition-colors border border-gray-600 hover:border-gray-400 cursor-pointer shrink-0"
+                                    className="p-2.5 rounded-full text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)] hover:text-[var(--vora-text-primary)] transition-colors border border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-subtle)] cursor-pointer shrink-0"
                                     title="View Details"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 </button>
                                 <button
                                     onClick={handleMarkAllUnwatched}
-                                    className="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded shadow-lg transition-colors border border-gray-600 cursor-pointer text-sm"
+                                    className="px-4 py-2.5 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-secondary)] font-bold rounded shadow-lg transition-colors border border-[var(--vora-border-subtle)] cursor-pointer text-sm"
                                 >
                                     Unwatch All
                                 </button>
@@ -349,7 +350,7 @@ export default function PlaylistDetailsPage() {
                 </div>
 
                 <div>
-                    <h2 className="text-2xl font-bold mb-6 text-gray-100 border-b border-gray-800 pb-2">Up Next ({playlist.items.length})</h2>
+                    <h2 className="text-2xl font-bold mb-6 text-[var(--vora-text-primary)] border-b border-[var(--vora-border-subtle)] pb-2">Up Next ({playlist.items.length})</h2>
                     <div className="space-y-3">
                         {playlist.items.map((item, index) => (
                             <div
@@ -359,37 +360,37 @@ export default function PlaylistDetailsPage() {
                                 onDragOver={handleDragOver}
                                 onDrop={(e) => handleDrop(e, index)}
                                 onClick={() => setSelectedItem(item)}
-                                className={`flex items-center gap-4 p-3 rounded-lg border transition-all cursor-pointer ${draggedIndex === index ? 'opacity-50' : 'opacity-100'} ${item.isPlayed ? 'opacity-60 grayscale-[40%]' : ''} ${selectedItem?.id === item.id ? 'bg-gray-800 border-orange-500' : 'bg-gray-900/50 border-gray-800 hover:border-gray-600'}`}
+                                className={`flex items-center gap-4 p-3 rounded-lg border transition-all cursor-pointer ${draggedIndex === index ? 'opacity-50' : 'opacity-100'} ${item.isPlayed ? 'opacity-60 grayscale-[40%]' : ''} ${selectedItem?.id === item.id ? 'bg-[var(--vora-bg-sunken)] border-[var(--vora-accent-500)]' : 'bg-[var(--vora-bg-raised)]/50 border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-subtle)]'}`}
                             >
-                                <div className="text-gray-600 px-2 cursor-grab" title="Drag to reorder">
+                                <div className="text-[var(--vora-text-muted)] px-2 cursor-grab" title="Drag to reorder">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
                                 </div>
                                 {item.type === 'Track' ? (
-                                    <div className="w-16 h-16 shrink-0 bg-gray-800 rounded overflow-hidden relative">
+                                    <div className="w-16 h-16 shrink-0 bg-[var(--vora-bg-sunken)] rounded overflow-hidden relative">
                                         {item.albumArtworkUrl
                                             ? <img src={item.albumArtworkUrl} className="w-full h-full object-cover" />
-                                            : <div className="w-full h-full flex items-center justify-center text-gray-700"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg></div>}
+                                            : <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-muted)]"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg></div>}
                                     </div>
                                 ) : (
-                                    <div className="w-16 h-24 shrink-0 bg-gray-800 rounded overflow-hidden relative">
+                                    <div className="w-16 h-24 shrink-0 bg-[var(--vora-bg-sunken)] rounded overflow-hidden relative">
                                         {item.posterUrl ? <img src={item.posterUrl} className="w-full h-full object-cover" /> : null}
                                         {item.isPlayed && (
                                             <div className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5">
-                                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                <svg className="w-3 h-3 text-[var(--vora-text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                             </div>
                                         )}
                                         {!item.isPlayed && item.resumePositionSeconds > 0 && item.durationMinutes && (
-                                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800 z-10">
-                                                <div className="h-full bg-orange-500" style={{ width: `${(item.resumePositionSeconds / (item.durationMinutes * 60)) * 100}%` }}></div>
+                                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--vora-bg-sunken)] z-10">
+                                                <div className="h-full bg-[var(--vora-accent-500)]" style={{ width: `${(item.resumePositionSeconds / (item.durationMinutes * 60)) * 100}%` }}></div>
                                             </div>
                                         )}
                                     </div>
                                 )}
                                 <div className="flex-1 flex flex-col justify-center">
-                                    <h4 className={`font-bold text-lg ${selectedItem?.id === item.id ? 'text-orange-400' : 'text-gray-200'}`}>
+                                    <h4 className={`font-bold text-lg ${selectedItem?.id === item.id ? 'text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-secondary)]'}`}>
                                         {item.type === 'Episode' ? `${item.episodeNumber}. ${item.title}` : item.title}
                                     </h4>
-                                    <div className="flex items-center gap-3 text-sm text-gray-500 font-medium">
+                                    <div className="flex items-center gap-3 text-sm text-[var(--vora-text-muted)] font-medium">
                                         {item.type === 'Track' ? (
                                             <span>
                                                 {item.artistName ? `${item.artistName}${item.albumTitle ? ` — ${item.albumTitle}` : ''}` : (item.albumTitle ?? 'Track')}
@@ -401,12 +402,12 @@ export default function PlaylistDetailsPage() {
                                         )}
                                         {item.type === 'Track' && item.durationSeconds ? (
                                             <>
-                                                <span className="w-1 h-1 rounded-full bg-gray-700"></span>
+                                                <span className="w-1 h-1 rounded-full bg-[var(--vora-bg-sunken)]"></span>
                                                 <span>{formatTrackDuration(item.durationSeconds)}</span>
                                             </>
                                         ) : item.durationMinutes ? (
                                             <>
-                                                <span className="w-1 h-1 rounded-full bg-gray-700"></span>
+                                                <span className="w-1 h-1 rounded-full bg-[var(--vora-bg-sunken)]"></span>
                                                 <span>{item.durationMinutes} min</span>
                                             </>
                                         ) : null}
@@ -416,7 +417,7 @@ export default function PlaylistDetailsPage() {
                                 <div className="flex items-center">
                                     <button
                                         onClick={(e) => handleTogglePlayed(e, item.mediaItemId, item.isPlayed)}
-                                        className={`p-2 transition-colors cursor-pointer ${item.isPlayed ? 'text-orange-500 hover:text-orange-400' : 'text-gray-600 hover:text-white'}`}
+                                        className={`p-2 transition-colors cursor-pointer ${item.isPlayed ? 'text-[var(--vora-accent-500)] hover:text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)]'}`}
                                         title={item.isPlayed ? "Mark as Unplayed" : "Mark as Played"}
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -425,7 +426,7 @@ export default function PlaylistDetailsPage() {
                                     </button>
                                     <button
                                         onClick={(e) => handleGoToDetails(e, item.mediaItemId)}
-                                        className="p-2 text-gray-600 hover:text-white transition-colors cursor-pointer"
+                                        className="p-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer"
                                         title="View Details"
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -434,7 +435,7 @@ export default function PlaylistDetailsPage() {
                                     </button>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id); }}
-                                        className="p-2 text-gray-600 hover:text-red-500 transition-colors cursor-pointer"
+                                        className="p-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] transition-colors cursor-pointer"
                                         title="Remove from Playlist"
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -450,42 +451,42 @@ export default function PlaylistDetailsPage() {
 
             {isEditModalOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl max-w-md w-full p-6">
-                        <h2 className="text-2xl font-bold text-white mb-6">Edit Playlist</h2>
+                    <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-2xl max-w-md w-full p-6">
+                        <h2 className="text-2xl font-bold text-[var(--vora-text-primary)] mb-6">Edit Playlist</h2>
 
                         <form onSubmit={handleSaveEdit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-gray-400 mb-2">Name</label>
+                                <label className="block text-sm font-bold text-[var(--vora-text-muted)] mb-2">Name</label>
                                 <input
                                     autoFocus
                                     required
                                     type="text"
                                     value={editName}
                                     onChange={e => setEditName(e.target.value)}
-                                    className="w-full bg-gray-950 border border-gray-700 rounded-md p-3 text-white outline-none focus:border-orange-500"
+                                    className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-3 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)]"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-400 mb-2">Description</label>
+                                <label className="block text-sm font-bold text-[var(--vora-text-muted)] mb-2">Description</label>
                                 <textarea
                                     value={editDescription}
                                     onChange={e => setEditDescription(e.target.value)}
-                                    className="w-full bg-gray-950 border border-gray-700 rounded-md p-3 text-white outline-none focus:border-orange-500 min-h-[100px] resize-none"
+                                    className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-3 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)] min-h-[100px] resize-none"
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-800">
+                            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-[var(--vora-border-subtle)]">
                                 <button
                                     type="button"
                                     onClick={() => setIsEditModalOpen(false)}
-                                    className="px-4 py-2 rounded text-gray-300 hover:bg-gray-700 transition-colors cursor-pointer"
+                                    className="px-4 py-2 rounded text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-raised)] transition-colors cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded shadow-lg transition-colors cursor-pointer"
+                                    className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors cursor-pointer"
                                 >
                                     Save Changes
                                 </button>

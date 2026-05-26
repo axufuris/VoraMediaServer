@@ -261,7 +261,7 @@ export default function CreateLibrary() {
                                 <button
                                     type="button"
                                     onClick={() => handleRemovePath(path)}
-                                    className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-white transition-colors cursor-pointer shrink-0"
+                                    className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer shrink-0"
                                 >
                                     Remove
                                 </button>

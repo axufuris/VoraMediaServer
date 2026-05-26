@@ -1,11 +1,18 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Vora.Application.Artwork;
+using Vora.Application.FileSystem;
+using Vora.Application.Settings;
 using Vora.Domain.Enums;
 
 namespace Vora.Api.Endpoints;
 
-public static class ArtworkEndpoints
+public static partial class ArtworkEndpoints
 {
+    [GeneratedRegex(@"^[A-Za-z0-9._-]+\.(png|jpg|jpeg|webp)$", RegexOptions.IgnoreCase)]
+    private static partial Regex CustomArtworkFileNameRegex();
+
     public static RouteGroupBuilder MapArtworkEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/api").WithTags("Artwork");
@@ -23,23 +30,32 @@ public static class ArtworkEndpoints
         return group;
     }
 
-    private static IResult ServeCustomArtwork(string fileName, IConfiguration config)
+    private static IResult ServeCustomArtwork(string fileName, IOptions<StoragePathsOptions> storagePaths, HttpContext httpContext)
     {
-        var configPath = config["StoragePaths:CustomArtwork"];
+        if (string.IsNullOrWhiteSpace(fileName) || !CustomArtworkFileNameRegex().IsMatch(fileName))
+        {
+            return Results.NotFound();
+        }
+
+        var configPath = storagePaths.Value.CustomArtwork;
         var basePath = !string.IsNullOrWhiteSpace(configPath)
             ? configPath
             : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
 
-        var path = Path.Combine(basePath, fileName);
-        if (!File.Exists(path)) return Results.NotFound();
+        var path = SafePathResolver.ResolveContainedFilePath(basePath, fileName);
+        if (path == null || !File.Exists(path))
+        {
+            return Results.NotFound();
+        }
 
         var contentType = Path.GetExtension(path).ToLowerInvariant() switch
         {
             ".png" => "image/png",
             ".webp" => "image/webp",
-            ".gif" => "image/gif",
             _ => "image/jpeg"
         };
+
+        httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
         return Results.File(path, contentType);
     }
 
@@ -51,7 +67,8 @@ public static class ArtworkEndpoints
 
     private static async Task<IResult> UploadMediaArtworkAsync(Guid id, [FromForm] IFormFile file, [FromQuery] ArtworkKind kind, IArtworkService service)
     {
-        var url = await service.UploadAsync(id, file, kind);
+        await using var stream = file.OpenReadStream();
+        var url = await service.UploadAsync(id, new UploadedFile(stream, file.FileName, file.ContentType), kind);
         return Results.Ok(new { Url = url });
     }
 

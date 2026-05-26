@@ -132,7 +132,7 @@ public class LibraryManager : ILibraryManager
         bool thumbnailsTurnedOff = library.EnableVideoPreviewThumbnails && !requestedThumbnails;
 
         library.Name = request.Name;
-        library.FolderPaths = request.FolderPaths;
+        library.FolderPaths = newPaths;
         library.MetadataProviderId = request.MetadataProviderId;
         library.UseLocalAssets = request.UseLocalAssets;
         library.FindExtras = request.FindExtras;
@@ -170,7 +170,7 @@ public class LibraryManager : ILibraryManager
         if (library.EnableRealTimeWatching)
         {
             _folderWatcher.StopWatching(library.Id);
-            _folderWatcher.StartWatching(library.Id, request.FolderPaths);
+            _folderWatcher.StartWatching(library.Id, newPaths);
         }
         else
         {

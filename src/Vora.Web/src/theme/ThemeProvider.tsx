@@ -7,6 +7,7 @@ import { voraDark } from './themes/voraDark';
 import { voraOcean } from './themes/voraOcean';
 import { themeService } from '../api/System/themeService';
 import { useSignalREvent } from '../hooks/useSignalREvent';
+import { StorageKeys } from '../utils/storageKeys';
 import { ThemeContext, type ThemeContextValue } from './useTheme';
 
 const BUILT_IN_THEMES: ThemeManifest[] = [voraDefault, voraDark, voraOcean];
@@ -132,7 +133,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         }
 
         let cancelled = false;
-        if (!localStorage.getItem('profile_token') && !localStorage.getItem('account_token')) {
+        if (!localStorage.getItem(StorageKeys.profileToken) && !localStorage.getItem(StorageKeys.accountToken)) {
             return () => { cancelled = true; };
         }
         themeService.getActiveId(serverId)

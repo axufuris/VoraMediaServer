@@ -14,7 +14,8 @@ import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeB
 import PlayerSettingsPanel from './Panels/PlayerSettingsPanel';
 import PlayerInfoPanel from './Panels/PlayerInfoPanel';
 import UpNextOverlay from './Panels/UpNextOverlay';
-import { useVideoThumbnails, ScrubThumbnail } from './VideoScrubThumbnails';
+import { useVideoThumbnails } from '../../hooks/useVideoThumbnails';
+import { ScrubThumbnail } from './VideoScrubThumbnails';
 
 type VideoTrackType = NonNullable<MediaPart['videoTracks']>[number];
 type AudioTrackType = NonNullable<MediaPart['audioTracks']>[number];
@@ -122,20 +123,26 @@ export default function GlobalVideoPlayer() {
         minimumCreditsSceneSeconds: 15
     });
 
+    const setMarkersRef = useRef(setMarkers);
+    useEffect(() => {
+        setMarkersRef.current = setMarkers;
+    }, []);
+
     useEffect(() => {
         const mediaId = currentMedia?.id;
-        if (!mediaId) { setMarkers([]); return; }
+        const apply = setMarkersRef.current;
+        if (!mediaId) { apply([]); return; }
         if (currentMedia?.playbackContextType === 'LiveTv' || currentMedia?.playbackContextType === 'Dvr') {
-            setMarkers([]);
+            apply([]);
             return;
         }
         if (currentMedia?.skipMarkers && currentMedia.skipMarkers.length > 0) {
-            setMarkers(currentMedia.skipMarkers);
+            apply(currentMedia.skipMarkers);
             return;
         }
         mediaService.getMarkers(mediaId, serverId)
-            .then(setMarkers)
-            .catch(err => { console.error('Failed to load markers', err); setMarkers([]); });
+            .then(apply)
+            .catch(err => { console.error('Failed to load markers', err); apply([]); });
     }, [currentMedia?.id, currentMedia?.skipMarkers, currentMedia?.playbackContextType, serverId]);
 
     useEffect(() => {

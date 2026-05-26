@@ -152,7 +152,7 @@ export default function AuthorizedDevicesPage() {
                                                         onClick={() => handleToggleBlock(device)}
                                                         className={`px-3 py-1 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer ${device.isBlocked
                                                             ? 'bg-[var(--vora-bg-sunken)] text-[var(--vora-text-primary)] hover:bg-[var(--vora-border-strong)]'
-                                                            : 'bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)] hover:bg-[var(--vora-danger-500)] hover:text-white'}`}
+                                                            : 'bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)]'}`}
                                                     >
                                                         {device.isBlocked ? 'Unblock' : 'Block'}
                                                     </button>

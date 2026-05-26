@@ -1,6 +1,7 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Vora.Application.Media;
+using Vora.Application.Settings;
 using Vora.Domain.Entities.Media;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
@@ -9,8 +10,8 @@ namespace Vora.Application.Posters;
 
 public interface IPosterOverlayManager
 {
-    Task<bool> RunLibraryOverlaySyncAsync(Guid libraryId);
-    Task<bool> GenerateOverlaysForMediaAsync(Guid mediaItemId);
+    Task<bool> RunLibraryOverlaySyncAsync(Guid libraryId, CancellationToken cancellationToken = default);
+    Task<bool> GenerateOverlaysForMediaAsync(Guid mediaItemId, CancellationToken cancellationToken = default);
 }
 
 public class PosterOverlayManager : IPosterOverlayManager
@@ -27,7 +28,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         IMediaRepository mediaRepo,
         IOverlayTemplateRepository templateRepo,
         IEnumerable<IOverlayProvider> providers,
-        IConfiguration config,
+        IOptions<StoragePathsOptions> storagePaths,
         IHttpClientFactory httpClientFactory,
         ILogger<PosterOverlayManager> logger)
     {
@@ -37,18 +38,18 @@ public class PosterOverlayManager : IPosterOverlayManager
         _httpClientFactory = httpClientFactory;
         _logger = logger;
 
-        var configPath = config["StoragePaths:CustomArtwork"];
+        var configPath = storagePaths.Value.CustomArtwork;
         _overlayDirectory = !string.IsNullOrWhiteSpace(configPath) ? configPath : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
         if (!Directory.Exists(_overlayDirectory)) Directory.CreateDirectory(_overlayDirectory);
 
-        var originalCachePath = config["StoragePaths:OriginalArtworkCache"];
+        var originalCachePath = storagePaths.Value.OriginalArtworkCache;
         _originalArtworkCacheDir = !string.IsNullOrWhiteSpace(originalCachePath)
             ? originalCachePath
             : Path.Combine(AppContext.BaseDirectory, "Storage", "OriginalArtworkCache");
         if (!Directory.Exists(_originalArtworkCacheDir)) Directory.CreateDirectory(_originalArtworkCacheDir);
     }
 
-    public async Task<bool> RunLibraryOverlaySyncAsync(Guid libraryId)
+    public async Task<bool> RunLibraryOverlaySyncAsync(Guid libraryId, CancellationToken cancellationToken = default)
     {
         var templates = await _templateRepo.GetTemplatesForLibraryAsync(libraryId);
 
@@ -78,7 +79,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         {
             try
             {
-                await ProcessSingleItemAsync(item, templates, activeProvider);
+                await ProcessSingleItemAsync(item, templates, activeProvider, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -89,7 +90,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         return true;
     }
 
-    public async Task<bool> GenerateOverlaysForMediaAsync(Guid mediaItemId)
+    public async Task<bool> GenerateOverlaysForMediaAsync(Guid mediaItemId, CancellationToken cancellationToken = default)
     {
         var item = await _mediaRepo.GetForPosterOverlayAsync(mediaItemId);
         if (item == null) return false;
@@ -108,7 +109,7 @@ public class PosterOverlayManager : IPosterOverlayManager
 
         try
         {
-            await ProcessSingleItemAsync(item, templates, activeProvider);
+            await ProcessSingleItemAsync(item, templates, activeProvider, cancellationToken);
             return true;
         }
         catch (Exception ex)
@@ -118,7 +119,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         }
     }
 
-    private async Task ProcessSingleItemAsync(MediaItem item, IEnumerable<Vora.Domain.Entities.Posters.OverlayTemplate> templates, IOverlayProvider activeProvider)
+    private async Task ProcessSingleItemAsync(MediaItem item, IEnumerable<Vora.Domain.Entities.Posters.OverlayTemplate> templates, IOverlayProvider activeProvider, CancellationToken cancellationToken = default)
     {
         string mediaType = item switch
         {
@@ -153,7 +154,7 @@ public class PosterOverlayManager : IPosterOverlayManager
 
         if (string.IsNullOrEmpty(item.OriginalPosterUrl)) return;
 
-        string? physicalSourcePath = await EnsureLocalArtworkAsync(item.OriginalPosterUrl);
+        string? physicalSourcePath = await EnsureLocalArtworkAsync(item.OriginalPosterUrl, cancellationToken);
 
         if (string.IsNullOrEmpty(physicalSourcePath) || !File.Exists(physicalSourcePath)) return;
 
@@ -181,7 +182,7 @@ public class PosterOverlayManager : IPosterOverlayManager
             OriginalPosterUrl = item.OriginalPosterUrl
         };
 
-        var newPosterUrl = await activeProvider.GenerateOverlayAsync(dto, physicalSourcePath, template.ConfigurationJson, _overlayDirectory);
+        var newPosterUrl = await activeProvider.GenerateOverlayAsync(dto, physicalSourcePath, template.ConfigurationJson, _overlayDirectory, cancellationToken);
 
         if (!string.Equals(newPosterUrl, item.PosterUrl, StringComparison.Ordinal))
         {
@@ -199,7 +200,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         await _mediaRepo.UpdateMediaItemAsync(item);
     }
 
-    private async Task<string> EnsureLocalArtworkAsync(string urlOrPath)
+    private async Task<string> EnsureLocalArtworkAsync(string urlOrPath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(urlOrPath)) return string.Empty;
 
@@ -228,8 +229,8 @@ public class PosterOverlayManager : IPosterOverlayManager
         try
         {
             var httpClient = _httpClientFactory.CreateClient();
-            var imageBytes = await httpClient.GetByteArrayAsync(fetchUrl);
-            await File.WriteAllBytesAsync(localPath, imageBytes);
+            var imageBytes = await httpClient.GetByteArrayAsync(fetchUrl, cancellationToken);
+            await File.WriteAllBytesAsync(localPath, imageBytes, cancellationToken);
 
             return localPath;
         }

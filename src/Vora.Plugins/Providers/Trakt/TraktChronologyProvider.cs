@@ -19,7 +19,7 @@ public class TraktChronologyProvider : IChronologyProvider
     public string ExternalIdLabel => "Trakt List ID or Slug";
     public string ExternalIdPlaceholder => "e.g., marvel-cinematic-universe";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public TraktChronologyProvider(IHttpClientFactory httpClientFactory, IPluginSettingsProvider settings)
     {
@@ -35,7 +35,7 @@ public class TraktChronologyProvider : IChronologyProvider
         return new List<PluginSettingDefinitionDto>();
     }
 
-    public async Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null)
+    public async Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(externalId))
             throw new ArgumentException("Trakt requires an externalId (the Trakt List ID) to fetch the timeline.");
@@ -58,10 +58,10 @@ public class TraktChronologyProvider : IChronologyProvider
         listRequest.Headers.Add("trakt-api-key", clientId);
         listRequest.Headers.Add("User-Agent", "VoraMediaServer/1.0");
 
-        var listResponse = await client.SendAsync(listRequest);
+        var listResponse = await client.SendAsync(listRequest, cancellationToken);
         listResponse.EnsureSuccessStatusCode();
 
-        using var listDoc = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync());
+        using var listDoc = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync(cancellationToken));
         var root = listDoc.RootElement;
 
         string? username = null;
@@ -85,15 +85,15 @@ public class TraktChronologyProvider : IChronologyProvider
         itemsRequest.Headers.Add("trakt-api-key", clientId);
         itemsRequest.Headers.Add("User-Agent", "VoraMediaServer/1.0");
 
-        var itemsResponse = await client.SendAsync(itemsRequest);
+        var itemsResponse = await client.SendAsync(itemsRequest, cancellationToken);
         itemsResponse.EnsureSuccessStatusCode();
 
-        using var stream = await itemsResponse.Content.ReadAsStreamAsync();
+        using var stream = await itemsResponse.Content.ReadAsStreamAsync(cancellationToken);
 
         List<TraktListItem>? items = null;
         try
         {
-            items = await JsonSerializer.DeserializeAsync<List<TraktListItem>>(stream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            items = await JsonSerializer.DeserializeAsync<List<TraktListItem>>(stream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, cancellationToken);
         }
         catch (JsonException ex)
         {

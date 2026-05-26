@@ -191,6 +191,8 @@ namespace Vora.Infrastructure.Migrations
 
                     b.HasIndex("ProfileId");
 
+                    b.HasIndex("Timestamp");
+
                     b.ToTable("AiUsageLogs");
                 });
 
@@ -206,6 +208,11 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("MediaItemId");
+
+                    b.HasIndex("Embedding");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Embedding"), "hnsw");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Embedding"), new[] { "vector_cosine_ops" });
 
                     b.ToTable("MediaItemEmbeddings");
                 });
@@ -402,6 +409,8 @@ namespace Vora.Infrastructure.Migrations
 
                     b.HasIndex("CreatedAt");
 
+                    b.HasIndex("Status", "CreatedAt");
+
                     b.HasIndex("TemplateKey", "CreatedAt");
 
                     b.ToTable("EmailDeliveryLogs");
@@ -482,9 +491,8 @@ namespace Vora.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ExternalChannelId");
-
-                    b.HasIndex("PlaylistId");
+                    b.HasIndex("PlaylistId", "ExternalChannelId")
+                        .IsUnique();
 
                     b.ToTable("IptvChannels");
                 });
@@ -668,7 +676,13 @@ namespace Vora.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EndTime");
+
                     b.HasIndex("ScheduleId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("Status", "StartTime");
 
                     b.ToTable("IptvRecordingSessions");
                 });
@@ -1644,7 +1658,16 @@ namespace Vora.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ImdbId")
+                        .HasFilter("\"ImdbId\" IS NOT NULL");
+
                     b.HasIndex("LibraryId");
+
+                    b.HasIndex("TmdbId")
+                        .HasFilter("\"TmdbId\" IS NOT NULL");
+
+                    b.HasIndex("TvdbId")
+                        .HasFilter("\"TvdbId\" IS NOT NULL");
 
                     b.ToTable("MediaItems");
 
@@ -2018,6 +2041,8 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IsRead", "CreatedAt");
 
                     b.ToTable("AdminNotifications");
                 });
@@ -3161,9 +3186,10 @@ namespace Vora.Infrastructure.Migrations
 
                     b.HasIndex("MediaItemId");
 
-                    b.HasIndex("UserId");
-
                     b.HasIndex("UserProfileId");
+
+                    b.HasIndex("UserId", "StartedAt")
+                        .HasFilter("\"EndedAt\" IS NULL");
 
                     b.ToTable("StreamSessions");
                 });
@@ -3230,6 +3256,8 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Timestamp");
 
                     b.ToTable("SystemMetrics");
                 });
@@ -3539,10 +3567,17 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("SecurityStamp");
 
                     b.ToTable("Users");
                 });
@@ -3753,6 +3788,11 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("ShowtimesLocation")
                         .HasColumnType("text");
 
@@ -3760,6 +3800,8 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SecurityStamp");
 
                     b.HasIndex("UserId");
 

@@ -4,6 +4,7 @@ import { libraryService, type LibrarySummary } from '../../api/Media/libraryServ
 import { iptvClientService } from '../../api/Iptv/iptvClientService';
 import { type IptvPlaylistVM } from '../../api/Iptv/iptvAdminService';
 import { useDialog } from '../../dialogs';
+import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 
 import { profileService, type ProfileScheduleVM, type UserProfileVM } from '../../api/Users/profileService';
 import { userImageService } from '../../api/Users/userImageService';
@@ -26,15 +27,15 @@ export default function AccountSettingsPage() {
     const [editingProfile, setEditingProfile] = useState<UserProfileVM | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0); // Safely triggers re-fetches
 
-    const isProfileAdmin = localStorage.getItem('is_profile_admin') === 'true';
-    const profileToken = localStorage.getItem('profile_token');
-    const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : '';
+    const isProfileAdmin = localStorage.getItem(StorageKeys.isProfileAdmin) === 'true';
+    const profileToken = localStorage.getItem(StorageKeys.profileToken);
+    const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
 
     useEffect(() => {
         let isMounted = true;
 
         const fetchData = async () => {
-            const userId = localStorage.getItem('user_id');
+            const userId = localStorage.getItem(StorageKeys.userId);
             if (!userId) return;
 
             try {
@@ -196,7 +197,7 @@ export default function AccountSettingsPage() {
             </div>
 
             {editingProfile && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[200] p-4">
                     <div className="bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-center mb-6 border-b border-[var(--vora-border-subtle)] pb-4">
                             <h2 className="text-2xl font-bold">{editingProfile.id === 'NEW' ? 'Create Profile' : `Edit Profile: ${editingProfile.name}`}</h2>
@@ -312,9 +313,9 @@ function ProfileEditor({ profile, user, libraries, iptvPlaylists, serverId, onCl
     };
 
     const showParentalTabs = isProfileAdmin && !profile.isAdmin;
-    const currentProfileToken = localStorage.getItem('profile_token');
+    const currentProfileToken = localStorage.getItem(StorageKeys.profileToken);
     const currentProfileId = currentProfileToken
-        ? (() => { try { return JSON.parse(atob(currentProfileToken.split('.')[1])).sub as string; } catch { return ''; } })()
+        ? (getProfileIdFromToken(currentProfileToken) ?? '')
         : '';
     const isOwnProfile = profile.id !== 'NEW' && profile.id === currentProfileId;
     const tabs: { id: ProfileEditTab; label: string; show: boolean }[] = [
@@ -650,7 +651,7 @@ function LastFmConnectionPanel({ serverId, lastFmUsername, onChanged }: LastFmCo
         <div className="space-y-4">
             <div className="bg-[color-mix(in_srgb,var(--vora-bg-canvas)_60%,transparent)] border border-[var(--vora-border-subtle)] rounded-lg p-5">
                 <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded bg-red-900/40 border border-red-500/30 flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 rounded bg-[var(--vora-danger-soft)]/40 border border-red-500/30 flex items-center justify-center shrink-0">
                         <svg className="w-7 h-7 text-[var(--vora-danger-text)]" fill="currentColor" viewBox="0 0 24 24"><path d="M10.584 17.21l-.88-2.392s-1.44 1.601-3.6 1.601c-1.92 0-3.28-1.652-3.28-4.296 0-3.385 1.696-4.59 3.36-4.59 2.4 0 3.16 1.546 3.84 3.605l.88 2.752c.92 2.806 2.661 5.06 7.665 5.06 3.595 0 6.034-1.106 6.034-4.022 0-2.354-1.336-3.589-3.826-4.17l-1.853-.434c-1.276-.295-1.657-.829-1.657-1.71 0-1.001.778-1.59 2.055-1.59 1.396 0 2.139.529 2.258 1.78l2.879-.353c-.234-2.604-2.018-3.687-4.99-3.687-2.62 0-5.19.99-5.19 4.176 0 1.99 1.078 3.243 2.879 3.69l1.973.476c1.476.352 1.97 1.022 1.97 1.91 0 1.137-1.07 1.602-3.097 1.602-3.018 0-4.275-1.589-4.98-3.747l-.91-2.751c-1.16-3.621-3.04-4.92-6.74-4.92C2.382 6.494 0 8.85 0 12.83c0 3.831 1.937 5.871 5.43 5.871 2.815 0 4.182-1.323 5.154-2.491z" /></svg>
                     </div>
                     <div className="flex-1">
@@ -677,7 +678,7 @@ function LastFmConnectionPanel({ serverId, lastFmUsername, onChanged }: LastFmCo
                                     type="button"
                                     onClick={handleConnect}
                                     disabled={busy}
-                                    className="text-sm px-4 py-1.5 bg-red-600 hover:bg-red-500 text-[var(--vora-text-primary)] rounded font-bold transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                                    className="text-sm px-4 py-1.5 bg-[var(--vora-danger-500)] hover:bg-[var(--vora-danger-500)] text-[var(--vora-text-primary)] rounded font-bold transition-colors cursor-pointer disabled:opacity-50 shrink-0"
                                 >
                                     {busy ? 'Working...' : 'Connect'}
                                 </button>

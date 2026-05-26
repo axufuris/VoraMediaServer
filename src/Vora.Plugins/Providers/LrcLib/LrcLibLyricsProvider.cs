@@ -21,7 +21,7 @@ public class LrcLibLyricsProvider : ILyricsProvider
     public bool IsSystemPlugin => true;
     public string Type => "Lyrics";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Music" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Music };
 
     public LrcLibLyricsProvider(IHttpClientFactory httpClientFactory, ILogger<LrcLibLyricsProvider> logger)
     {

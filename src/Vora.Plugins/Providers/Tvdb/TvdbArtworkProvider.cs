@@ -20,7 +20,7 @@ public class TvdbArtworkProvider : IArtworkProvider
     public bool IsSystemPlugin => true;
     public string Type => "Artwork";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public TvdbArtworkProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory)
     {
@@ -57,7 +57,7 @@ public class TvdbArtworkProvider : IArtworkProvider
         return token;
     }
 
-    public async Task<IEnumerable<ArtworkResult>> GetArtworkAsync(string? tmdbId, string? tvdbId, string? imdbId, string mediaType, string? localPath = null, string? title = null)
+    public async Task<IEnumerable<ArtworkResult>> GetArtworkAsync(string? tmdbId, string? tvdbId, string? imdbId, string mediaType, string? localPath = null, string? title = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(tvdbId)) return new List<ArtworkResult>();
 

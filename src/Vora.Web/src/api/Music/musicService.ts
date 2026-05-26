@@ -1,4 +1,4 @@
-import { apiClient } from '../client';
+import { apiClient, getResponseStatus } from '../client';
 
 export interface ArtistVM {
     id: string;
@@ -521,7 +521,7 @@ export const musicService = {
             const response = await apiClient.get<LyricsVM>(`/music/tracks/${trackId}/lyrics`, { serverId });
             return response.data;
         } catch (err: unknown) {
-            const status = (err as { response?: { status?: number } })?.response?.status;
+            const status = getResponseStatus(err);
             if (status === 404) return null;
             throw err;
         }
@@ -587,7 +587,7 @@ export const musicService = {
             const response = await apiClient.get<GeneratedMixDetailVM>(`/music/recommendations/mixes/${mixId}`, { serverId });
             return response.data;
         } catch (err: unknown) {
-            const status = (err as { response?: { status?: number } })?.response?.status;
+            const status = getResponseStatus(err);
             if (status === 404) return null;
             throw err;
         }
@@ -659,7 +659,7 @@ export const musicService = {
             const response = await apiClient.get<GenreContentVM>(`/music/genres/${encodeURIComponent(genre)}`, { serverId });
             return response.data;
         } catch (err: unknown) {
-            const status = (err as { response?: { status?: number } })?.response?.status;
+            const status = getResponseStatus(err);
             if (status === 404) return null;
             throw err;
         }

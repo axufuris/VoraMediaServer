@@ -6,17 +6,14 @@ namespace Vora.Application.Backups;
 public sealed class ZipBackupReader : IBackupReader, IDisposable
 {
     private readonly ZipArchive _archive;
-    private string _currentSection = string.Empty;
 
     public ZipBackupReader(Stream input)
     {
         _archive = new ZipArchive(input, ZipArchiveMode.Read, leaveOpen: true);
     }
 
-    public void BeginSection(string sectionKey) => _currentSection = sectionKey;
-    public void EndSection() => _currentSection = string.Empty;
-
-    public bool FileExists(string path) => _archive.GetEntry(path) != null;
+    public void BeginSection(string sectionKey) { }
+    public void EndSection() { }
 
     public async Task<T?> ReadJsonAsync<T>(string path, CancellationToken ct)
     {
@@ -42,18 +39,6 @@ public sealed class ZipBackupReader : IBackupReader, IDisposable
         if (entry == null) return null;
         using var stream = entry.Open();
         return JsonSerializer.Deserialize<BackupManifest>(stream);
-    }
-
-    public IEnumerable<string> ListFilesInSection(string sectionKey)
-    {
-        var prefix = sectionKey + "/";
-        foreach (var entry in _archive.Entries)
-        {
-            if (entry.FullName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                yield return entry.FullName;
-            }
-        }
     }
 
     public void Dispose() => _archive.Dispose();

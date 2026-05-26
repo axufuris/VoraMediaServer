@@ -18,7 +18,7 @@ public class ImdbChronologyProvider : IChronologyProvider
     public string ExternalIdLabel => "IMDb List ID";
     public string ExternalIdPlaceholder => "e.g., ls022528662";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
     public bool IsEnabled => false;
 
     public ImdbChronologyProvider(HttpClient httpClient)
@@ -31,7 +31,7 @@ public class ImdbChronologyProvider : IChronologyProvider
 
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>();
 
-    public async Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null)
+    public async Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(externalId))
             throw new ArgumentException("IMDb requires an externalId (the IMDb List ID, e.g., ls022528662) to fetch the timeline.");
@@ -52,10 +52,10 @@ public class ImdbChronologyProvider : IChronologyProvider
         request.Headers.Add("Sec-Fetch-User", "?1");
         request.Headers.Add("Upgrade-Insecure-Requests", "1");
 
-        var response = await _httpClient.SendAsync(request);
+        var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        var html = await response.Content.ReadAsStringAsync();
+        var html = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (html.Contains("awsWafCookieDomainList") || html.Contains("challenge.js"))
         {

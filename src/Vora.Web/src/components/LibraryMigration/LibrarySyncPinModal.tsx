@@ -51,9 +51,14 @@ export function LibrarySyncPinModal({
         }
     };
 
+    const startFlowRef = useRef(startFlow);
+    useEffect(() => {
+        startFlowRef.current = startFlow;
+    });
+
     useEffect(() => {
         if (!isOpen) return;
-        startFlow();
+        void startFlowRef.current();
         return () => {
             cancelledRef.current = true;
         };

@@ -6,6 +6,7 @@ import { syncService, type ContinueWatchingItem } from '../../api/Media/syncServ
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import ClientHomeCustomizeModal, { type HomeLayoutItem } from '../../components/Home/HomeCustomizeModal';
 import { profileDeviceSettingsService } from '../../api/Users/profileDeviceSettingsService';
+import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import MediaRail from '../../components/Client/Primitives/MediaRail';
@@ -290,9 +291,9 @@ export default function HomePage() {
     const [loading, setLoading] = useState(true);
     const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
 
-    const profileToken = localStorage.getItem('profile_token');
-    const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : '';
-    const deviceId = localStorage.getItem('device_id') || 'unknown';
+    const profileToken = localStorage.getItem(StorageKeys.profileToken);
+    const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
+    const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
 
     useEffect(() => {
         const fetchData = async () => {
@@ -341,14 +342,14 @@ export default function HomePage() {
 
     const [showSpotlightPref, setShowSpotlightPref] = useState<boolean>(() => {
         if (!activeProfileId) return true;
-        const stored = localStorage.getItem(`vora_show_spotlight_${activeProfileId}`);
+        const stored = localStorage.getItem(StorageKeys.spotlight(activeProfileId));
         return stored === null ? true : stored === 'true';
     });
 
     useEffect(() => {
         const handler = () => {
             if (!activeProfileId) return;
-            const stored = localStorage.getItem(`vora_show_spotlight_${activeProfileId}`);
+            const stored = localStorage.getItem(StorageKeys.spotlight(activeProfileId));
             setShowSpotlightPref(stored === null ? true : stored === 'true');
         };
         handler();

@@ -14,7 +14,8 @@ public interface ISearchManager
         List<string> allowedTvRatings,
         List<string> allowedMusicRatings,
         bool blockUnrated,
-        int limitPerCategory = 10);
+        int limitPerCategory = 10,
+        CancellationToken cancellationToken = default);
 }
 
 public class SearchManager(ISearchRepository repository, IMusicManager musicManager) : ISearchManager
@@ -30,7 +31,8 @@ public class SearchManager(ISearchRepository repository, IMusicManager musicMana
         List<string> allowedTvRatings,
         List<string> allowedMusicRatings,
         bool blockUnrated,
-        int limitPerCategory = 10)
+        int limitPerCategory = 10,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(query) || query.Length < MinimumQueryLength)
         {
@@ -38,9 +40,13 @@ public class SearchManager(ISearchRepository repository, IMusicManager musicMana
         }
 
         var movies = await repository.SearchMediaAsync("Movie", query, limitPerCategory, hasAllAccess, allowedLibs, hasAllRatings, allowedMovieRatings, allowedTvRatings, blockUnrated);
+        cancellationToken.ThrowIfCancellationRequested();
         var tvShows = await repository.SearchMediaAsync("TvShow", query, limitPerCategory, hasAllAccess, allowedLibs, hasAllRatings, allowedMovieRatings, allowedTvRatings, blockUnrated);
+        cancellationToken.ThrowIfCancellationRequested();
         var actors = await repository.SearchActorsAsync(query, limitPerCategory);
+        cancellationToken.ThrowIfCancellationRequested();
         var collections = await repository.SearchCollectionsAsync(query, limitPerCategory, hasAllAccess, allowedLibs);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var musicAccess = new MusicAccessFilter
         {

@@ -1,3 +1,5 @@
+import { StorageKeys, getProfileIdFromToken } from './storageKeys';
+
 export interface DeviceCapabilities {
     videoCodecs: string[];
     audioCodecs: string[];
@@ -30,10 +32,10 @@ export const scanDeviceCapabilities = (): DeviceCapabilities => {
     let requestedMaxAudioChannels = 0;
 
     try {
-        const token = localStorage.getItem('profile_token');
+        const token = localStorage.getItem(StorageKeys.profileToken);
         if (token) {
-            const profileId = JSON.parse(atob(token.split('.')[1])).sub;
-            const deviceId = localStorage.getItem('device_id') || 'unknown';
+            const profileId = getProfileIdFromToken(token);
+            const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
             const savedPref = localStorage.getItem(`playback_prefs_${profileId}_${deviceId}`);
 
             if (savedPref) {

@@ -20,7 +20,7 @@ const SCROLL_VARIANT: Record<MediaRowVariant, string> = {
 
 const HEADER_VARIANT: Record<MediaRowVariant, string> = {
     home: 'px-8 mb-4',
-    detail: 'mb-6 border-b border-gray-800 pb-2'
+    detail: 'mb-6 border-b border-[var(--vora-border-subtle)] pb-2'
 };
 
 const GAP_CLASS: Record<MediaRowGap, string> = {
@@ -41,8 +41,8 @@ export default function MediaRow({
     const showHeader = title !== undefined || headerAction !== undefined;
     const headerWrapper = HEADER_VARIANT[variant];
     const titleStyle = titleClassName ?? (variant === 'home'
-        ? 'text-xl font-bold text-gray-100 tracking-wide'
-        : 'text-2xl font-bold text-gray-100');
+        ? 'text-xl font-bold text-[var(--vora-text-primary)] tracking-wide'
+        : 'text-2xl font-bold text-[var(--vora-text-primary)]');
     const containerMargin = variant === 'home' ? 'mb-10' : 'mt-16';
 
     return (
@@ -51,7 +51,7 @@ export default function MediaRow({
                 <div className={`${headerWrapper} flex items-center justify-between`}>
                     <div>
                         {title !== undefined && <h2 className={titleStyle}>{title}</h2>}
-                        {subtitle !== undefined && <p className="text-sm text-gray-400 mt-1">{subtitle}</p>}
+                        {subtitle !== undefined && <p className="text-sm text-[var(--vora-text-muted)] mt-1">{subtitle}</p>}
                     </div>
                     {headerAction}
                 </div>

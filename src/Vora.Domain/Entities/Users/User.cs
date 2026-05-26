@@ -9,6 +9,8 @@ public class User
 
     public string PasswordHash { get; set; } = string.Empty;
 
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
+
     public bool IsAdmin { get; set; }
 
     public bool HasAllLibraryAccess { get; set; } = true;

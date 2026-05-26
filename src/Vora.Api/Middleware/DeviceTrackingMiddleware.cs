@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Vora.Api.Extensions;
 using Vora.Domain.Entities.Users;
@@ -16,7 +17,6 @@ public class DeviceTrackingMiddleware
     private const string DeviceNameHeader = "X-Vora-Device";
     private const string DeviceTypeHeader = "X-Vora-Device-Type";
     private const string OperatingSystemHeader = "X-Vora-OS";
-    private const string ForwardedForHeader = "X-Forwarded-For";
 
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(5);
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> DeviceLocks = new();
@@ -105,7 +105,7 @@ public class DeviceTrackingMiddleware
             var dbContext = scope.ServiceProvider.GetRequiredService<VoraDbContext>();
             var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
 
-            var existingDevice = dbContext.ClientDevices.FirstOrDefault(d => d.DeviceId == deviceId);
+            var existingDevice = await dbContext.ClientDevices.FirstOrDefaultAsync(d => d.DeviceId == deviceId);
             var ip = ResolveClientIp(context);
 
             if (existingDevice?.IsBlocked == true)
@@ -179,14 +179,7 @@ public class DeviceTrackingMiddleware
 
     private static string ResolveClientIp(HttpContext context)
     {
-        var ip = context.Request.Headers[ForwardedForHeader].FirstOrDefault()
-                 ?? context.Connection.RemoteIpAddress?.ToString()
-                 ?? "Unknown IP";
-
-        if (ip.Contains(','))
-        {
-            ip = ip.Split(',')[0].Trim();
-        }
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "Unknown IP";
 
         if (ip.StartsWith("::ffff:"))
         {
@@ -206,7 +199,7 @@ public class DeviceTrackingMiddleware
         try
         {
             var client = httpClientFactory.CreateClient(GeoLookupHttpClientName);
-            var response = await client.GetStringAsync($"http://ip-api.com/json/{ip}");
+            var response = await client.GetStringAsync($"https://ip-api.com/json/{Uri.EscapeDataString(ip)}");
             using var doc = JsonDocument.Parse(response);
 
             if (doc.RootElement.TryGetProperty("status", out var status) && status.GetString() == "success")

@@ -12,13 +12,14 @@ public interface IUserRepository
     Task<T?> GetProjectedUserByEmailAsync<T>(string email, Expression<Func<User, T>> projection);
     Task<T?> GetProjectedProfileByIdAsync<T>(Guid profileId, Expression<Func<UserProfile, T>> projection);
     Task<bool> HasAdminUserAsync();
-    Task<RegistrationMode> GetRegistrationModeAsync();
 
     Task<User?> GetUserByIdAsync(Guid id);
     Task<User?> GetUserWithProfilesByEmailAsync(string email);
     Task<User?> GetUserForProfileAsync(Guid profileId);
     Task<UserProfile?> GetProfileByIdAsync(Guid id);
     Task<UserProfile?> GetProfileWithUserAsync(Guid accountId, Guid profileId);
+    Task<string?> GetUserSecurityStampAsync(Guid userId);
+    Task<string?> GetProfileSecurityStampAsync(Guid profileId);
 
     Task AddUserAsync(User user);
     Task UpdateUserAsync(User user);

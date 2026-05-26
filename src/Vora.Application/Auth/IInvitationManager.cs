@@ -26,12 +26,6 @@ public class InvitationCreateResult
     public string? ErrorMessage { get; init; }
 }
 
-public class InvitationConsumptionInfo
-{
-    public required string Email { get; init; }
-    public required string TokenHash { get; init; }
-}
-
 public interface IInvitationManager
 {
     Task<InvitationCreateResult> CreateInvitationAsync(string email, int? expiresInDays, Guid? invitedByUserId, CancellationToken cancellationToken = default);
@@ -39,8 +33,6 @@ public interface IInvitationManager
     Task<InvitationTicket?> ValidateTokenAsync(string token);
     Task<bool> RevokeAsync(Guid id);
     Task ConsumeAsync(string tokenHash);
-
-    string HashToken(string token);
 }
 
 public class InvitationManager : IInvitationManager
@@ -175,7 +167,7 @@ public class InvitationManager : IInvitationManager
 
     public Task ConsumeAsync(string tokenHash) => _invitationRepo.DeleteByTokenHashAsync(tokenHash);
 
-    public string HashToken(string token)
+    private static string HashToken(string token)
     {
         var bytes = Encoding.UTF8.GetBytes(token);
         var hash = SHA256.HashData(bytes);

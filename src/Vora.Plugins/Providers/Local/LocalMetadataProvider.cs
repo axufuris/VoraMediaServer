@@ -13,38 +13,38 @@ public class LocalMetadataProvider : IMetadataProvider
     public bool IsSystemPlugin => true;
     public string Type => "Metadata";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow", "Music", "HomeVideo" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow, LibraryKind.Music, LibraryKind.HomeVideo };
 
     public string ProviderName => "Local";
 
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>();
 
-    public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null)
+    public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
-        return await Task.Run(() => ParseMovieDirectory(query));
+        return await Task.Run(() => ParseMovieDirectory(query), cancellationToken);
     }
 
-    public async Task<MetadataResult?> FetchMovieMetadataByIdAsync(string id, string source)
+    public async Task<MetadataResult?> FetchMovieMetadataByIdAsync(string id, string source, CancellationToken cancellationToken = default)
     {
-        return await Task.Run(() => ParseMovieDirectory(id));
+        return await Task.Run(() => ParseMovieDirectory(id), cancellationToken);
     }
 
-    public async Task<MetadataResult?> FetchTvShowMetadataAsync(string query, int? year = null)
+    public async Task<MetadataResult?> FetchTvShowMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
-        return await Task.Run(() => ParseTvShowDirectory(query));
+        return await Task.Run(() => ParseTvShowDirectory(query), cancellationToken);
     }
 
-    public async Task<MetadataResult?> FetchTvShowMetadataByIdAsync(string id, string source)
+    public async Task<MetadataResult?> FetchTvShowMetadataByIdAsync(string id, string source, CancellationToken cancellationToken = default)
     {
-        return await Task.Run(() => ParseTvShowDirectory(id));
+        return await Task.Run(() => ParseTvShowDirectory(id), cancellationToken);
     }
 
-    public async Task<MetadataResult?> FetchEpisodeMetadataAsync(string showTmdbId, int seasonNumber, int episodeNumber)
+    public async Task<MetadataResult?> FetchEpisodeMetadataAsync(string showTmdbId, int seasonNumber, int episodeNumber, CancellationToken cancellationToken = default)
     {
-        return await Task.Run(() => ParseEpisode(showTmdbId, seasonNumber, episodeNumber));
+        return await Task.Run(() => ParseEpisode(showTmdbId, seasonNumber, episodeNumber), cancellationToken);
     }
 
-    public Task<ActorMetadataResult?> FetchActorMetadataAsync(int personId)
+    public Task<ActorMetadataResult?> FetchActorMetadataAsync(int personId, CancellationToken cancellationToken = default)
     {
         return Task.FromResult<ActorMetadataResult?>(null);
     }

@@ -49,14 +49,27 @@ public static class StreamingAdminEndpoints
     private static async Task<IResult> SendSessionCommandAsync(
         Guid sessionId,
         IHubContext<VoraHub> hub,
+        IStreamRepository streamRepository,
         [FromBody] StreamCommandRequest req)
     {
-        await hub.Clients.All.SendAsync("StreamCommandReceived", new
+        var session = await streamRepository.GetSessionAsync(sessionId);
+        if (session == null)
+        {
+            return Results.NotFound(new { Message = "Stream session not found." });
+        }
+
+        var payload = new
         {
             SessionId = sessionId.ToString(),
             req.Command,
             req.Message
-        });
+        };
+
+        var target = session.UserProfileId.HasValue
+            ? hub.Clients.Group(VoraHub.ProfileGroupName(session.UserProfileId.Value))
+            : hub.Clients.Group(VoraHub.UserGroupName(session.UserId));
+
+        await target.SendAsync("StreamCommandReceived", payload);
         return Results.Ok();
     }
 }

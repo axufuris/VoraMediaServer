@@ -22,7 +22,7 @@ public class ItunesPodcastDiscoveryProvider : IPodcastDiscoveryProvider
     public bool IsSystemPlugin => true;
     public string Type => "PodcastDiscovery";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Podcast" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Podcast };
 
     public ItunesPodcastDiscoveryProvider(IHttpClientFactory httpClientFactory, ILogger<ItunesPodcastDiscoveryProvider> logger)
     {

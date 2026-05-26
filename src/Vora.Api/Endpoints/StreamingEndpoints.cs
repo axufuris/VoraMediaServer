@@ -1,6 +1,7 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
+using Vora.Application.FileSystem;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
 using Vora.Application.Streaming.ViewModels;
@@ -22,6 +23,10 @@ public record StreamPingRequest(double CurrentPosition, double Duration, bool Is
 
 public static class StreamingEndpoints
 {
+    private const string PlayTokenScope = "play";
+    private const string HlsTokenScope = "hls";
+    private static readonly TimeSpan HlsTokenTtl = TimeSpan.FromHours(4);
+
     public static RouteGroupBuilder MapStreamingEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/api/streaming").WithTags("Streaming");
@@ -31,7 +36,7 @@ public static class StreamingEndpoints
         group.MapDelete("/sessions/{sessionId:guid}", StopSessionAsync).RequireAuthorization();
 
         group.MapGet("/play/{sessionId:guid}", PlaySessionAsync);
-        group.MapGet("/hls/{fileName}", ServeHlsChunkAsync);
+        group.MapGet("/hls/s/{token}/{fileName}", ServeHlsChunkAsync);
 
         return group;
     }
@@ -102,11 +107,18 @@ public static class StreamingEndpoints
 
     private static async Task<IResult> PlaySessionAsync(
         Guid sessionId,
+        [FromQuery] string? t,
         IStreamManager streamManager,
         IStreamRepository streamRepo,
         ITranscodeService transcodeService,
-        ISystemSettingsRepository settingsRepo)
+        ISystemSettingsRepository settingsRepo,
+        IStreamingTokenSigner signer)
     {
+        if (string.IsNullOrEmpty(t) || !signer.TryVerify(t, PlayTokenScope, out var payload) || payload != sessionId.ToString())
+        {
+            return Results.NotFound();
+        }
+
         var session = await streamRepo.GetSessionAsync(sessionId);
         if (session == null)
         {
@@ -130,8 +142,11 @@ public static class StreamingEndpoints
 
         try
         {
-            var playlistPath = await transcodeService.StartTranscodeSessionAsync(filePath, tempDir, decision);
-            return Results.Redirect($"/api/streaming/hls/{Path.GetFileName(playlistPath)}");
+            var playlistPath = await transcodeService.StartTranscodeSessionAsync(filePath, tempDir, decision, CancellationToken.None);
+            var playlistFileName = Path.GetFileName(playlistPath);
+            var prefix = ComputeHlsPrefix(playlistFileName);
+            var hlsToken = signer.Sign(HlsTokenScope, prefix, HlsTokenTtl);
+            return Results.Redirect($"/api/streaming/hls/s/{hlsToken}/{playlistFileName}");
         }
         catch (Exception ex)
         {
@@ -139,19 +154,52 @@ public static class StreamingEndpoints
         }
     }
 
-    private static async Task<IResult> ServeHlsChunkAsync(string fileName, ISystemSettingsRepository settingsRepo)
+    private static async Task<IResult> ServeHlsChunkAsync(
+        string token,
+        string fileName,
+        ISystemSettingsRepository settingsRepo,
+        IStreamingTokenSigner signer)
     {
-        var settings = await settingsRepo.GetSettingsAsync();
-        var tempDir = ResolveTempDirectory(settings);
-        var path = Path.Combine(tempDir, fileName);
-
-        if (!File.Exists(path))
+        if (!signer.TryVerify(token, HlsTokenScope, out var payload) || string.IsNullOrEmpty(payload))
         {
             return Results.NotFound();
         }
 
-        var contentType = fileName.EndsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/MP2T";
+        if (!fileName.StartsWith(payload, StringComparison.Ordinal))
+        {
+            return Results.NotFound();
+        }
+
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        if (ext is not (".m3u8" or ".ts" or ".m4s" or ".mp4" or ".vtt"))
+        {
+            return Results.NotFound();
+        }
+
+        var settings = await settingsRepo.GetSettingsAsync();
+        var tempDir = ResolveTempDirectory(settings);
+        var path = SafePathResolver.ResolveContainedFilePath(tempDir, fileName);
+
+        if (path == null || !File.Exists(path))
+        {
+            return Results.NotFound();
+        }
+
+        var contentType = ext switch
+        {
+            ".m3u8" => "application/vnd.apple.mpegurl",
+            ".m4s" => "video/iso.segment",
+            ".mp4" => "video/mp4",
+            ".vtt" => "text/vtt",
+            _ => "video/MP2T"
+        };
         return Results.File(path, contentType, enableRangeProcessing: true);
+    }
+
+    private static string ComputeHlsPrefix(string playlistFileName)
+    {
+        var dot = playlistFileName.LastIndexOf('.');
+        return dot > 0 ? playlistFileName[..dot] : playlistFileName;
     }
 
     private static PlaybackDecisionVM BuildPlaybackDecision(Vora.Domain.Entities.Streaming.StreamSession session) => new()

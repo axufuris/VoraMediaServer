@@ -449,7 +449,7 @@ public class PodcastManager : IPodcastManager
 
                 merged.Add(new DiscoveredPodcastVM
                 {
-                    Title = item.Title,
+                    Title = item.Title ?? string.Empty,
                     Author = item.Author,
                     FeedUrl = item.FeedUrl,
                     ArtworkUrl = item.ArtworkUrl,

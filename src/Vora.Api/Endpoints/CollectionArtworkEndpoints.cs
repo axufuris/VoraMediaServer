@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Vora.Application.Collections;
+using Vora.Application.FileSystem;
 using Vora.Domain.Enums;
 
 namespace Vora.Api.Endpoints;
@@ -40,7 +41,8 @@ public static class CollectionArtworkEndpoints
 
     private static async Task<IResult> UploadArtworkAsync(Guid id, [FromForm] IFormFile file, [FromQuery] ArtworkKind kind, ICollectionArtworkService service)
     {
-        var url = await service.UploadAsync(id, file, kind);
+        await using var stream = file.OpenReadStream();
+        var url = await service.UploadAsync(id, new UploadedFile(stream, file.FileName, file.ContentType), kind);
         return Results.Ok(new { Url = url });
     }
 

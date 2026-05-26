@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { searchService, type AggregatedGlobalSearchResponse } from '../../api/Discovery/searchService';
 import { discoveryService, type DiscoveryItem } from '../../api/Discovery/discoveryService';
+import { StorageKeys, SessionKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 
 export default function SearchBar() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -93,11 +94,11 @@ export default function SearchBar() {
             const navState = albumId
                 ? { view: 'album', albumId, artistId }
                 : { view: 'artist', artistId };
-            sessionStorage.setItem('music_nav_state', JSON.stringify(navState));
+            sessionStorage.setItem(SessionKeys.musicNavState, JSON.stringify(navState));
             sessionStorage.setItem('audio_active_tab', 'Music');
-            const token = localStorage.getItem('profile_token');
-            const profileId = token ? JSON.parse(atob(token.split('.')[1])).sub : '';
-            sessionStorage.setItem('music_nav_profile', profileId || '');
+            const token = localStorage.getItem(StorageKeys.profileToken);
+            const profileId = getProfileIdFromToken(token) ?? '';
+            sessionStorage.setItem(SessionKeys.musicNavProfile, profileId || '');
         } catch { /* ignore */ }
         handleItemClick(`/server/${targetServerId}/audio`);
     };

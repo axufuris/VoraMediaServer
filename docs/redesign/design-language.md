@@ -139,7 +139,7 @@ Keep using stroke-style icons. We do not switch icon libraries — too much chur
 - Color is never the only carrier of state — pair with icon/label.
 - Hero backdrops always pair with a solid scrim under text. Contrast ratio target 4.5:1 minimum on body, 3:1 on display text per WCAG AA.
 - `prefers-reduced-motion` disables parallax and card scale. Crossfades remain.
-- Keyboard: every rail/grid supports arrow keys, `Home`/`End`. Player keyboard map documented in `page-redesigns.md`.
+- Keyboard: every rail/grid supports arrow keys, `Home`/`End`.
 
 ## What is removed
 

@@ -155,7 +155,7 @@ public partial class MediaRepository : IMediaRepository
 
     public async Task<MediaItem?> GetForMetadataSyncAsync(Guid id)
     {
-        var item = await _context.MediaItems
+        return await _context.MediaItems
             .Include(m => m.Analysis)
             .Include(m => m.MediaParts)
             .Include(m => m.Library)
@@ -167,21 +167,8 @@ public partial class MediaRepository : IMediaRepository
             .Include(m => m.Videos)
             .Include(m => ((TvShow)m).Networks)
             .Include(m => ((TvShow)m).Seasons)
+            .Include(m => ((Episode)m).Season).ThenInclude(s => s.TvShow).ThenInclude(t => t.Cast).ThenInclude(c => c.Actor)
             .FirstOrDefaultAsync(m => m.Id == id);
-
-        if (item is Episode episode)
-        {
-            await _context.Entry(episode).Reference(e => e.Season).LoadAsync();
-            if (episode.Season != null)
-            {
-                await _context.Entry(episode.Season).Reference(s => s.TvShow).LoadAsync();
-                if (episode.Season.TvShow != null)
-                {
-                    await _context.Entry(episode.Season.TvShow).Collection(t => t.Cast).Query().Include(c => c.Actor).LoadAsync();
-                }
-            }
-        }
-        return item;
     }
 
     public async Task<IEnumerable<Guid>> GetMediaIdsMissingMetadataAsync(Guid libraryId)
@@ -297,27 +284,33 @@ public partial class MediaRepository : IMediaRepository
                 (m is Movie && m.LibraryId == libraryId) ||
                 (m is Episode && ((Episode)m).Season.TvShow.LibraryId == libraryId));
 
-        var totalItems = await playable.CountAsync();
-        var itemsWithAnyMarker = await playable.CountAsync(m => m.Markers.Any());
-        var itemsWithIntro = await playable.CountAsync(m => m.Markers.Any(k => k.Type == MarkerType.Intro));
-        var itemsWithCredits = await playable.CountAsync(m => m.Markers.Any(k => k.Type == MarkerType.Credits));
-        var itemsWithCreditsScene = await playable.CountAsync(m => m.Markers.Any(k => k.Type == MarkerType.CreditsScene));
-        var itemsWithRecap = await playable.CountAsync(m => m.Markers.Any(k => k.Type == MarkerType.Recap));
-        var itemsWithPreview = await playable.CountAsync(m => m.Markers.Any(k => k.Type == MarkerType.Preview));
-        var itemsMissingDuration = await playable.CountAsync(m => m.Analysis == null || m.Analysis.Duration == null);
+        var counts = await playable
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                WithAny = g.Sum(m => m.Markers.Any() ? 1 : 0),
+                WithIntro = g.Sum(m => m.Markers.Any(k => k.Type == MarkerType.Intro) ? 1 : 0),
+                WithCredits = g.Sum(m => m.Markers.Any(k => k.Type == MarkerType.Credits) ? 1 : 0),
+                WithCreditsScene = g.Sum(m => m.Markers.Any(k => k.Type == MarkerType.CreditsScene) ? 1 : 0),
+                WithRecap = g.Sum(m => m.Markers.Any(k => k.Type == MarkerType.Recap) ? 1 : 0),
+                WithPreview = g.Sum(m => m.Markers.Any(k => k.Type == MarkerType.Preview) ? 1 : 0),
+                MissingDuration = g.Sum(m => (m.Analysis == null || m.Analysis.Duration == null) ? 1 : 0)
+            })
+            .FirstOrDefaultAsync();
 
         return new MarkerCoverageVM
         {
             LibraryId = libraryId,
             LibraryName = libraryName,
-            TotalItems = totalItems,
-            ItemsWithAnyMarker = itemsWithAnyMarker,
-            ItemsWithIntro = itemsWithIntro,
-            ItemsWithCredits = itemsWithCredits,
-            ItemsWithCreditsScene = itemsWithCreditsScene,
-            ItemsWithRecap = itemsWithRecap,
-            ItemsWithPreview = itemsWithPreview,
-            ItemsMissingDuration = itemsMissingDuration
+            TotalItems = counts?.Total ?? 0,
+            ItemsWithAnyMarker = counts?.WithAny ?? 0,
+            ItemsWithIntro = counts?.WithIntro ?? 0,
+            ItemsWithCredits = counts?.WithCredits ?? 0,
+            ItemsWithCreditsScene = counts?.WithCreditsScene ?? 0,
+            ItemsWithRecap = counts?.WithRecap ?? 0,
+            ItemsWithPreview = counts?.WithPreview ?? 0,
+            ItemsMissingDuration = counts?.MissingDuration ?? 0
         };
     }
 

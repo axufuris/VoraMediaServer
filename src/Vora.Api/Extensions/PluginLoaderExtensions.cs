@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System.Runtime.Loader;
+using Microsoft.Extensions.Logging;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Api.Extensions;
@@ -28,14 +29,14 @@ public static class PluginLoaderExtensions
         typeof(ILibrarySyncProvider)
     };
 
-    public static IServiceCollection AddVoraPlugins(this IServiceCollection services, string pluginsFolderPath)
+    public static IServiceCollection AddVoraPlugins(this IServiceCollection services, string pluginsFolderPath, ILogger logger)
     {
-        LoadBuiltInPlugins(services);
-        LoadExternalPlugins(services, pluginsFolderPath);
+        LoadBuiltInPlugins(services, logger);
+        LoadExternalPlugins(services, pluginsFolderPath, logger);
         return services;
     }
 
-    private static void LoadBuiltInPlugins(IServiceCollection services)
+    private static void LoadBuiltInPlugins(IServiceCollection services, ILogger logger)
     {
         var basePath = AppContext.BaseDirectory;
         foreach (var dll in Directory.GetFiles(basePath, "Vora*.dll"))
@@ -50,7 +51,7 @@ public static class PluginLoaderExtensions
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Plugin System] Could not pre-load {dll}: {ex.Message}");
+                logger.LogWarning(ex, "Could not pre-load assembly {Dll}", dll);
             }
         }
 
@@ -61,11 +62,11 @@ public static class PluginLoaderExtensions
         foreach (var type in pluginTypes)
         {
             RegisterPluginType(services, type);
-            Console.WriteLine($"[Plugin System] Loaded BUILT-IN plugin: {type.Name}");
+            logger.LogInformation("Loaded BUILT-IN plugin: {Type}", type.Name);
         }
     }
 
-    private static void LoadExternalPlugins(IServiceCollection services, string pluginsFolderPath)
+    private static void LoadExternalPlugins(IServiceCollection services, string pluginsFolderPath, ILogger logger)
     {
         if (!Directory.Exists(pluginsFolderPath))
         {
@@ -89,12 +90,12 @@ public static class PluginLoaderExtensions
                 foreach (var type in SafeGetTypes(assembly).Where(IsConcretePlugin))
                 {
                     RegisterPluginType(services, type);
-                    Console.WriteLine($"[Plugin System] Loaded EXTERNAL plugin: {type.Name} from {Path.GetFileName(file)}");
+                    logger.LogInformation("Loaded EXTERNAL plugin: {Type} from {File}", type.Name, Path.GetFileName(file));
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Plugin System] Failed to load plugin {file}: {ex.Message}");
+                logger.LogError(ex, "Failed to load plugin {File}", file);
             }
         }
     }
@@ -106,7 +107,6 @@ public static class PluginLoaderExtensions
             if (providerInterface.IsAssignableFrom(type))
             {
                 services.AddTransient(providerInterface, type);
-                break;
             }
         }
 

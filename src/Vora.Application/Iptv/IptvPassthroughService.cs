@@ -1,7 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Vora.Application.Auth;
 using Vora.Application.Users;
 
 namespace Vora.Application.Iptv;
@@ -28,7 +29,6 @@ public interface IIptvPassthroughService
 
 public class IptvPassthroughService : IIptvPassthroughService
 {
-    private const string HmacSecretConfigKey = "Jwt:SecretKey";
     private const string PlaylistTokenTag = "p";
     private const string SegmentTokenTag = "s";
     private const string AudioTokenTag = "a";
@@ -43,20 +43,23 @@ public class IptvPassthroughService : IIptvPassthroughService
     private readonly IIptvRepository _repository;
     private readonly IUserManager _userManager;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IConfiguration _configuration;
+    private readonly IptvPassthroughOptions _passthroughOptions;
+    private readonly JwtOptions _jwtOptions;
     private readonly ILogger<IptvPassthroughService> _logger;
 
     public IptvPassthroughService(
         IIptvRepository repository,
         IUserManager userManager,
         IHttpClientFactory httpClientFactory,
-        IConfiguration configuration,
+        IOptions<IptvPassthroughOptions> passthroughOptions,
+        IOptions<JwtOptions> jwtOptions,
         ILogger<IptvPassthroughService> logger)
     {
         _repository = repository;
         _userManager = userManager;
         _httpClientFactory = httpClientFactory;
-        _configuration = configuration;
+        _passthroughOptions = passthroughOptions.Value;
+        _jwtOptions = jwtOptions.Value;
         _logger = logger;
     }
 
@@ -468,7 +471,14 @@ public class IptvPassthroughService : IIptvPassthroughService
         }
     }
 
-    private string GetSecret() => _configuration[HmacSecretConfigKey] ?? string.Empty;
+    private string GetSecret()
+    {
+        if (!string.IsNullOrWhiteSpace(_passthroughOptions.SecretKey))
+        {
+            return _passthroughOptions.SecretKey;
+        }
+        return _jwtOptions.SecretKey ?? string.Empty;
+    }
 
     private static string Base64UrlEncode(byte[] data) =>
         Convert.ToBase64String(data).TrimEnd('=').Replace('+', '-').Replace('/', '_');

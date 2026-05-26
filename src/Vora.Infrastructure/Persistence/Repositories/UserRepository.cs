@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Vora.Application.Users;
 using Vora.Application.Users.ViewModels;
 using Vora.Domain.Entities.Users;
-using Vora.Domain.Enums;
 
 namespace Vora.Infrastructure.Persistence.Repositories;
 
@@ -42,12 +41,6 @@ public class UserRepository(VoraDbContext context) : IUserRepository
     public Task<bool> HasAdminUserAsync() =>
         context.Users.AnyAsync(u => u.IsAdmin);
 
-    public async Task<RegistrationMode> GetRegistrationModeAsync()
-    {
-        var settings = await context.ServerSettings.FirstOrDefaultAsync(s => s.Id == "GLOBAL_SETTINGS");
-        return settings?.RegistrationMode ?? RegistrationMode.Simple;
-    }
-
     public Task<User?> GetUserByIdAsync(Guid id) =>
         context.Users.FirstOrDefaultAsync(u => u.Id == id);
 
@@ -77,6 +70,20 @@ public class UserRepository(VoraDbContext context) : IUserRepository
             .Include(p => p.User)
             .Include(p => p.AccessSchedules)
             .FirstOrDefaultAsync(p => p.Id == profileId && p.UserId == accountId);
+
+    public Task<string?> GetUserSecurityStampAsync(Guid userId) =>
+        context.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.SecurityStamp)
+            .FirstOrDefaultAsync();
+
+    public Task<string?> GetProfileSecurityStampAsync(Guid profileId) =>
+        context.UserProfiles
+            .AsNoTracking()
+            .Where(p => p.Id == profileId)
+            .Select(p => p.SecurityStamp)
+            .FirstOrDefaultAsync();
 
     public async Task AddUserAsync(User user)
     {

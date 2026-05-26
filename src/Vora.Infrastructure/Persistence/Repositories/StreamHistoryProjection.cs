@@ -70,11 +70,11 @@ internal static class StreamHistoryProjection
             return query;
         }
 
-        var searchLower = search.ToLower();
+        var searchPattern = $"%{search}%";
         return query.Where(s =>
-            s.MediaItem.Title.ToLower().Contains(searchLower)
-            || (s.ClientDevice != null && s.ClientDevice.DeviceName.ToLower().Contains(searchLower))
-            || (s.UserProfile != null && s.UserProfile.Name.ToLower().Contains(searchLower)));
+            EF.Functions.ILike(s.MediaItem.Title, searchPattern)
+            || (s.ClientDevice != null && EF.Functions.ILike(s.ClientDevice.DeviceName, searchPattern))
+            || (s.UserProfile != null && EF.Functions.ILike(s.UserProfile.Name, searchPattern)));
     }
 
     private static async Task<List<StreamSession>> LoadRawSessionDataAsync(IQueryable<StreamSession> baseQuery, List<HistoryGroupKey> pagedKeys)

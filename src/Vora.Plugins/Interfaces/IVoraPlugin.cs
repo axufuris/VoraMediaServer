@@ -15,7 +15,18 @@ public interface IVoraPlugin
     string? LatestVersionApiUrl => null;
     string? DocumentationUrl => null;
     bool IsAiPlugin => false;
-    IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow", "Music", "HomeVideo" };
+    int ContractVersion => 1;
+
+    IEnumerable<LibraryKind> SupportedLibraryKinds => new[]
+    {
+        LibraryKind.Movie,
+        LibraryKind.TvShow,
+        LibraryKind.Music,
+        LibraryKind.HomeVideo,
+    };
+
+    IEnumerable<string> SupportedLibraryTypes =>
+        SupportedLibraryKinds.Select(k => k.ToString());
 
     IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions();
 }

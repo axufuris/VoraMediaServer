@@ -9,5 +9,4 @@ public interface IAdminNotificationRepository
     Task<int> GetUnreadCountAsync();
     Task<bool> MarkReadAsync(Guid id);
     Task MarkAllReadAsync();
-    Task DeleteOlderThanAsync(DateTime threshold);
 }

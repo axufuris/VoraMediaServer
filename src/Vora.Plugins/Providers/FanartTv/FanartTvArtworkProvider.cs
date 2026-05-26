@@ -18,7 +18,7 @@ public class FanartTvArtworkProvider : IArtworkProvider
     public bool IsSystemPlugin => true;
     public string Type => "Artwork";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public FanartTvArtworkProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory)
     {
@@ -41,7 +41,7 @@ public class FanartTvArtworkProvider : IArtworkProvider
         };
     }
 
-    public async Task<IEnumerable<ArtworkResult>> GetArtworkAsync(string? tmdbId, string? tvdbId, string? imdbId, string mediaType, string? localPath = null, string? title = null)
+    public async Task<IEnumerable<ArtworkResult>> GetArtworkAsync(string? tmdbId, string? tvdbId, string? imdbId, string mediaType, string? localPath = null, string? title = null, CancellationToken cancellationToken = default)
     {
         var results = new List<ArtworkResult>();
 

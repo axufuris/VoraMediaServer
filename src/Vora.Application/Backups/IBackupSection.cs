@@ -25,8 +25,6 @@ public interface IBackupReader
 {
     Task<T?> ReadJsonAsync<T>(string path, CancellationToken ct);
     Task<byte[]?> ReadBytesAsync(string path, CancellationToken ct);
-    bool FileExists(string path);
-    IEnumerable<string> ListFilesInSection(string sectionKey);
     void BeginSection(string sectionKey);
     void EndSection();
 }

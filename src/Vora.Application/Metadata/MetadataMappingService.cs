@@ -1,9 +1,10 @@
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 using Vora.Application.Actors;
 using Vora.Application.Artwork;
 using Vora.Application.Collections;
 using Vora.Application.Media;
+using Vora.Application.Settings;
 using Vora.Domain.Entities.Actors;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
@@ -29,7 +30,7 @@ public class MetadataMappingService : IMetadataMappingService
     private readonly IActorRepository _actorRepository;
     private readonly ICollectionRepository _collectionRepository;
     private readonly IReferenceRepository _referenceRepository;
-    private readonly IConfiguration _config;
+    private readonly StoragePathsOptions _storagePaths;
 
     public MetadataMappingService(
         IMediaRepository repository,
@@ -37,14 +38,14 @@ public class MetadataMappingService : IMetadataMappingService
         IActorRepository actorRepository,
         ICollectionRepository collectionRepository,
         IReferenceRepository referenceRepository,
-        IConfiguration config)
+        IOptions<StoragePathsOptions> storagePaths)
     {
         _repository = repository;
         _artworkRepository = artworkRepository;
         _actorRepository = actorRepository;
         _collectionRepository = collectionRepository;
         _referenceRepository = referenceRepository;
-        _config = config;
+        _storagePaths = storagePaths.Value;
     }
 
     public async Task ApplyTextMetadataAsync(MediaItem item, MetadataResult metadata, bool forceOverride, string providerId, string providerName)
@@ -541,7 +542,7 @@ public class MetadataMappingService : IMetadataMappingService
 
     private void CleanupOrphanedOverlay(MediaItem item)
     {
-        var configPath = _config["StoragePaths:CustomArtwork"];
+        var configPath = _storagePaths.CustomArtwork;
         var overlayDir = !string.IsNullOrWhiteSpace(configPath) ? configPath : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
 
         var urlsToCheck = new[] { item.PosterUrl, item.BackgroundUrl };

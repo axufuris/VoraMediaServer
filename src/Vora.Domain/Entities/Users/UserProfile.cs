@@ -6,6 +6,7 @@ public class UserProfile
     public required string Name { get; set; }
     public string? ProfileImageUrl { get; set; }
     public string? PinHash { get; set; }
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
     public bool IsAdmin { get; set; }
 
     public bool HasAllLibraryAccess { get; set; } = true;

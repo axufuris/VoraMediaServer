@@ -18,7 +18,7 @@ public static class SearchEndpoints
         return group;
     }
 
-    private static async Task<IResult> SearchAllAsync(string? q, ClaimsPrincipal user, ISearchManager manager)
+    private static async Task<IResult> SearchAllAsync(string? q, ClaimsPrincipal user, ISearchManager manager, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 3)
         {
@@ -33,7 +33,8 @@ public static class SearchEndpoints
             user.GetAllowedMovieRatings(),
             user.GetAllowedTvRatings(),
             user.GetAllowedMusicRatings(),
-            user.BlockUnratedContent());
+            user.BlockUnratedContent(),
+            cancellationToken: cancellationToken);
 
         return Results.Ok(results);
     }

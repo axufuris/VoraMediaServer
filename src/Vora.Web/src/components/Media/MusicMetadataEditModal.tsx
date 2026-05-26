@@ -260,11 +260,11 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
 
     const FieldLabel = ({ field, label }: { field: string; label: string }) => (
         <div className="flex items-center justify-between mb-1">
-            <label className="text-sm font-medium text-gray-400">{label}</label>
+            <label className="text-sm font-medium text-[var(--vora-text-muted)]">{label}</label>
             <button
                 type="button"
                 onClick={() => toggleLock(field)}
-                className={`text-xs px-2 py-0.5 rounded transition-colors cursor-pointer ${isLocked(field) ? 'bg-orange-600/30 text-orange-400 hover:bg-orange-600/40' : 'bg-gray-800 text-gray-500 hover:text-gray-300'}`}
+                className={`text-xs px-2 py-0.5 rounded transition-colors cursor-pointer ${isLocked(field) ? 'bg-[var(--vora-accent-500)]/30 text-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)]/40' : 'bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] hover:text-[var(--vora-text-secondary)]'}`}
                 title={isLocked(field) ? 'Field is locked — won\'t be overwritten by future scans' : 'Click to lock this field'}
             >
                 {isLocked(field) ? '🔒 Locked' : 'Unlocked'}
@@ -273,7 +273,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
     );
 
     const inputClass = (field: string) =>
-        `w-full bg-gray-950 border border-gray-700 rounded p-2 text-white outline-none focus:border-orange-500 ${isLocked(field) ? 'opacity-60' : ''}`;
+        `w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded p-2 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)] ${isLocked(field) ? 'opacity-60' : ''}`;
 
     const tabs: { id: MusicEditTab; label: string }[] = hasImageTab
         ? [{ id: 'details', label: 'Details' }, { id: 'image', label: kind === 'artist' ? 'Image' : 'Cover Art' }]
@@ -282,7 +282,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
     return (
         <Modal isOpen={isOpen} onClose={onClose} size="2xl" surface="gray-900" cardClassName="p-8 flex flex-col max-h-[90vh]">
             <ModalHeader title={title_modal} onClose={onClose} closeDisabled={saving} bordered={false} />
-            <div className="border-b border-gray-800 mb-4" />
+            <div className="border-b border-[var(--vora-border-subtle)] mb-4" />
 
             <input
                 ref={fileInputRef}
@@ -327,7 +327,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                             key={tab.id}
                             type="button"
                             onClick={() => setActiveTab(tab.id)}
-                            className={`px-4 py-2 text-sm font-bold rounded-md transition-colors cursor-pointer ${activeTab === tab.id ? 'bg-gray-800 text-orange-400' : 'text-gray-500 hover:text-gray-200 hover:bg-gray-800/50'}`}
+                            className={`px-4 py-2 text-sm font-bold rounded-md transition-colors cursor-pointer ${activeTab === tab.id ? 'bg-[var(--vora-bg-sunken)] text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)]/50'}`}
                         >
                             {tab.label}
                         </button>
@@ -522,7 +522,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                                             key={r}
                                             type="button"
                                             onClick={() => setContentRating(r)}
-                                            className={`text-xs px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${contentRating === r ? 'bg-orange-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'}`}
+                                            className={`text-xs px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${contentRating === r ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-raised)]'}`}
                                         >
                                             {r}
                                         </button>
@@ -530,7 +530,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                                     <button
                                         type="button"
                                         onClick={() => setContentRating('')}
-                                        className="text-xs px-2.5 py-1 rounded font-bold bg-gray-800 text-gray-500 hover:text-red-400 hover:bg-gray-700 transition-colors cursor-pointer"
+                                        className="text-xs px-2.5 py-1 rounded font-bold bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] hover:bg-[var(--vora-bg-raised)] transition-colors cursor-pointer"
                                     >
                                         Clear
                                     </button>
@@ -541,10 +541,10 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                 </div>
 
                 <div className="pt-4 flex gap-2 shrink-0">
-                    <button type="button" onClick={onClose} disabled={saving} className="flex-1 bg-gray-800 hover:bg-gray-700 py-2.5 rounded-md font-bold transition-colors cursor-pointer">
+                    <button type="button" onClick={onClose} disabled={saving} className="flex-1 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] py-2.5 rounded-md font-bold transition-colors cursor-pointer">
                         Cancel
                     </button>
-                    <button type="submit" disabled={saving} className="flex-1 bg-orange-600 hover:bg-orange-500 py-2.5 rounded-md font-bold transition-colors cursor-pointer">
+                    <button type="submit" disabled={saving} className="flex-1 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] py-2.5 rounded-md font-bold transition-colors cursor-pointer">
                         {saving ? 'Saving...' : 'Save'}
                     </button>
                 </div>
@@ -619,13 +619,13 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
     };
 
     return (
-        <div className="pt-2 border-t border-gray-800/60">
+        <div className="pt-2 border-t border-[var(--vora-border-subtle)]/60">
             <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-medium text-gray-400">{label}</label>
+                <label className="text-sm font-medium text-[var(--vora-text-muted)]">{label}</label>
                 <button
                     type="button"
                     onClick={onLockToggle}
-                    className={`text-xs px-2 py-0.5 rounded transition-colors cursor-pointer ${isLocked ? 'bg-orange-600/30 text-orange-400 hover:bg-orange-600/40' : 'bg-gray-800 text-gray-500 hover:text-gray-300'}`}
+                    className={`text-xs px-2 py-0.5 rounded transition-colors cursor-pointer ${isLocked ? 'bg-[var(--vora-accent-500)]/30 text-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)]/40' : 'bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] hover:text-[var(--vora-text-secondary)]'}`}
                     title={isLocked ? "Field is locked — won't be overwritten by future scans" : 'Click to lock this field'}
                 >
                     {isLocked ? '🔒 Locked' : 'Unlocked'}
@@ -633,10 +633,10 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
             </div>
 
             <div className="flex gap-4 mb-3">
-                <div className={`${containerClass} bg-gray-950 border border-gray-800 flex items-center justify-center overflow-hidden shrink-0`}>
+                <div className={`${containerClass} bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shrink-0`}>
                     {artworkUrl
                         ? <img src={artworkUrl} alt="Preview" className="w-full h-full object-cover" />
-                        : <svg className="w-10 h-10 text-gray-700" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>}
+                        : <svg className="w-10 h-10 text-[var(--vora-text-muted)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>}
                 </div>
                 <div className="flex-1 flex flex-col gap-2">
                     <input
@@ -651,7 +651,7 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
                             type="button"
                             onClick={onUploadClick}
                             disabled={uploading}
-                            className="text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 hover:text-white rounded transition-colors cursor-pointer flex items-center gap-1"
+                            className="text-xs px-3 py-1.5 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] disabled:opacity-50 text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] rounded transition-colors cursor-pointer flex items-center gap-1"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" /></svg>
                             {uploading ? 'Uploading...' : 'Upload image'}
@@ -660,7 +660,7 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
                             <button
                                 type="button"
                                 onClick={handleBrowse}
-                                className="text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded transition-colors cursor-pointer flex items-center gap-1"
+                                className="text-xs px-3 py-1.5 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] rounded transition-colors cursor-pointer flex items-center gap-1"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                 {suggestionsOpen ? 'Hide alternatives' : 'Browse alternatives'}
@@ -671,7 +671,7 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
                                 type="button"
                                 onClick={handleRefresh}
                                 disabled={refreshing}
-                                className="text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 hover:text-white rounded transition-colors cursor-pointer flex items-center gap-1"
+                                className="text-xs px-3 py-1.5 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] disabled:opacity-50 text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] rounded transition-colors cursor-pointer flex items-center gap-1"
                                 title="Pick the best result from configured providers and save it"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
@@ -683,13 +683,13 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
             </div>
 
             {suggestionsOpen && (
-                <div className="bg-gray-950/60 border border-gray-800 rounded p-3">
+                <div className="bg-[var(--vora-bg-canvas)]/60 border border-[var(--vora-border-subtle)] rounded p-3">
                     {suggestionsLoading ? (
-                        <div className="text-xs text-gray-500 py-2 text-center">Searching providers...</div>
+                        <div className="text-xs text-[var(--vora-text-muted)] py-2 text-center">Searching providers...</div>
                     ) : suggestionsError ? (
-                        <div className="text-xs text-red-400 py-2 text-center">{suggestionsError}</div>
+                        <div className="text-xs text-[var(--vora-danger-500)] py-2 text-center">{suggestionsError}</div>
                     ) : suggestions && suggestions.length === 0 ? (
-                        <div className="text-xs text-gray-600 py-2 text-center">No alternatives found from metadata providers.</div>
+                        <div className="text-xs text-[var(--vora-text-muted)] py-2 text-center">No alternatives found from metadata providers.</div>
                     ) : suggestions && suggestions.length > 0 ? (
                         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-72 overflow-y-auto pr-1">
                             {suggestions.map((s, i) => (
@@ -697,11 +697,11 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
                                     key={`${s.url}-${i}`}
                                     type="button"
                                     onClick={() => onUrlChange(s.url)}
-                                    className={`relative aspect-square rounded overflow-hidden border-2 transition-all cursor-pointer ${artworkUrl === s.url ? 'border-orange-500 ring-2 ring-orange-500/40' : 'border-gray-800 hover:border-gray-600'}`}
+                                    className={`relative aspect-square rounded overflow-hidden border-2 transition-all cursor-pointer ${artworkUrl === s.url ? 'border-orange-500 ring-2 ring-orange-500/40' : 'border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-strong)]'}`}
                                     title={`${s.providerName}${s.width && s.height ? ` — ${s.width}×${s.height}` : ''}`}
                                 >
                                     <img src={s.thumbnailUrl || s.url} alt="" className="w-full h-full object-cover" />
-                                    <div className="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-gray-300 py-0.5 px-1 text-center truncate">{s.providerName}</div>
+                                    <div className="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-[var(--vora-text-secondary)] py-0.5 px-1 text-center truncate">{s.providerName}</div>
                                 </button>
                             ))}
                         </div>

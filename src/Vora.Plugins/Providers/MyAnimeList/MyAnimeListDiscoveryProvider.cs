@@ -44,7 +44,7 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
         return await settings.GetSettingAsync("mal_artwork", "client_id");
     }
 
-    public async Task<IEnumerable<DiscoveryRowDefinitionDto>> GetAvailableRowsAsync()
+    public async Task<IEnumerable<DiscoveryRowDefinitionDto>> GetAvailableRowsAsync(CancellationToken cancellationToken = default)
     {
         var clientId = await GetClientIdAsync();
         if (string.IsNullOrEmpty(clientId)) return new List<DiscoveryRowDefinitionDto>();
@@ -58,7 +58,7 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
         };
     }
 
-    public async Task<IEnumerable<DiscoveryItemDto>> GetRowItemsAsync(string rowId, int page = 1)
+    public async Task<IEnumerable<DiscoveryItemDto>> GetRowItemsAsync(string rowId, int page = 1, CancellationToken cancellationToken = default)
     {
         var cacheKey = $"mal_row_{rowId}_{page}";
 
@@ -87,7 +87,7 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("X-MAL-CLIENT-ID", clientId);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await _httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(1);
@@ -98,8 +98,8 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(6);
             entry.Size = CacheEntrySize;
 
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var doc = await JsonDocument.ParseAsync(stream);
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             var results = new List<DiscoveryItemDto>();
 
             if (doc.RootElement.TryGetProperty("data", out var dataArray))
@@ -133,7 +133,7 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
         return cachedItems ?? new List<DiscoveryItemDto>();
     }
 
-    public async Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string externalId, string type)
+    public async Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string externalId, string type, CancellationToken cancellationToken = default)
     {
         var cacheKey = $"mal_details_{externalId}";
 
@@ -152,7 +152,7 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("X-MAL-CLIENT-ID", clientId);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await _httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(1);
@@ -163,8 +163,8 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24);
             entry.Size = CacheEntrySize;
 
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var doc = await JsonDocument.ParseAsync(stream);
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             var node = doc.RootElement;
 
             var mediaType = node.TryGetProperty("media_type", out var mt) ? mt.GetString() : "tv";
@@ -193,12 +193,12 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
         });
     }
 
-    public Task<DiscoveryActorDto?> GetActorDetailsAsync(string externalId)
+    public Task<DiscoveryActorDto?> GetActorDetailsAsync(string externalId, CancellationToken cancellationToken = default)
     {
         return Task.FromResult<DiscoveryActorDto?>(null);
     }
 
-    public async Task<IEnumerable<DiscoveryItemDto>> SearchAsync(string query)
+    public async Task<IEnumerable<DiscoveryItemDto>> SearchAsync(string query, CancellationToken cancellationToken = default)
     {
         var cacheKey = $"mal_search_{query.ToLowerInvariant()}";
 
@@ -217,7 +217,7 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("X-MAL-CLIENT-ID", clientId);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await _httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(1);
@@ -228,8 +228,8 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(6);
             entry.Size = CacheEntrySize;
 
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var doc = await JsonDocument.ParseAsync(stream);
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             var results = new List<DiscoveryItemDto>();
 
             if (doc.RootElement.TryGetProperty("data", out var dataArray))

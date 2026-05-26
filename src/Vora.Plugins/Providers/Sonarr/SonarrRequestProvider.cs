@@ -37,15 +37,15 @@ public class SonarrRequestProvider : IRequestProvider
         return client;
     }
 
-    public async Task<IEnumerable<ProviderOptionDto>> GetQualityProfilesAsync(string host, int port, bool useSsl, string urlBase, string apiKey)
+    public async Task<IEnumerable<ProviderOptionDto>> GetQualityProfilesAsync(string host, int port, bool useSsl, string urlBase, string apiKey, CancellationToken cancellationToken = default)
     {
         var client = CreateClient(host, port, useSsl, urlBase, apiKey);
-        var response = await client.GetAsync("api/v3/qualityprofile");
+        var response = await client.GetAsync("api/v3/qualityprofile", cancellationToken);
 
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException($"Provider returned {response.StatusCode} for Quality Profiles");
 
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
         var profiles = JsonSerializer.Deserialize<JsonElement>(content);
 
         return profiles.EnumerateArray().Select(p => new ProviderOptionDto
@@ -55,15 +55,15 @@ public class SonarrRequestProvider : IRequestProvider
         });
     }
 
-    public async Task<IEnumerable<ProviderOptionDto>> GetRootFoldersAsync(string host, int port, bool useSsl, string urlBase, string apiKey)
+    public async Task<IEnumerable<ProviderOptionDto>> GetRootFoldersAsync(string host, int port, bool useSsl, string urlBase, string apiKey, CancellationToken cancellationToken = default)
     {
         var client = CreateClient(host, port, useSsl, urlBase, apiKey);
-        var response = await client.GetAsync("api/v3/rootfolder");
+        var response = await client.GetAsync("api/v3/rootfolder", cancellationToken);
 
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException($"Provider returned {response.StatusCode} for Root Folders");
 
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
         var folders = JsonSerializer.Deserialize<JsonElement>(content);
 
         return folders.EnumerateArray().Select(p => new ProviderOptionDto
@@ -73,7 +73,7 @@ public class SonarrRequestProvider : IRequestProvider
         });
     }
 
-    public async Task<bool> SubmitRequestAsync(string tmdbId, string title, string host, int port, bool useSsl, string urlBase, string apiKey, string providerSettingsJson)
+    public async Task<bool> SubmitRequestAsync(string tmdbId, string title, string host, int port, bool useSsl, string urlBase, string apiKey, string providerSettingsJson, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -87,10 +87,10 @@ public class SonarrRequestProvider : IRequestProvider
 
             var client = CreateClient(host, port, useSsl, urlBase, apiKey);
 
-            var lookupResponse = await client.GetAsync($"api/v3/series/lookup?term=tmdb:{tmdbId}");
+            var lookupResponse = await client.GetAsync($"api/v3/series/lookup?term=tmdb:{tmdbId}", cancellationToken);
             if (!lookupResponse.IsSuccessStatusCode) return false;
 
-            var lookupContent = await lookupResponse.Content.ReadAsStringAsync();
+            var lookupContent = await lookupResponse.Content.ReadAsStringAsync(cancellationToken);
             var lookupResult = JsonSerializer.Deserialize<JsonElement>(lookupContent);
 
             if (lookupResult.ValueKind != JsonValueKind.Array || lookupResult.GetArrayLength() == 0) return false;
@@ -117,7 +117,7 @@ public class SonarrRequestProvider : IRequestProvider
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await client.PostAsync("api/v3/series", content);
+            var response = await client.PostAsync("api/v3/series", content, cancellationToken);
 
             return response.IsSuccessStatusCode;
         }

@@ -20,12 +20,18 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
         var startInfo = new ProcessStartInfo
         {
             FileName = "ffprobe",
-            Arguments = $"-v error -show_entries format=duration -of default=nokey=1:noprint_wrappers=1 \"{inputPath}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        startInfo.ArgumentList.Add("-v");
+        startInfo.ArgumentList.Add("error");
+        startInfo.ArgumentList.Add("-show_entries");
+        startInfo.ArgumentList.Add("format=duration");
+        startInfo.ArgumentList.Add("-of");
+        startInfo.ArgumentList.Add("default=nokey=1:noprint_wrappers=1");
+        startInfo.ArgumentList.Add(inputPath);
 
         using var process = new Process { StartInfo = startInfo };
         process.Start();

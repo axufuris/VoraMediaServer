@@ -184,7 +184,7 @@ export default function EditCollectionModal({
     const LockIcon = ({ field }: { field: string }) => {
         const isLocked = lockedFields.includes(field);
         return (
-            <button type="button" onClick={() => toggleLock(field)} className={`ml-2 focus:outline-none transition-colors cursor-pointer ${isLocked ? 'text-orange-500 hover:text-orange-400' : 'text-gray-600 hover:text-gray-400'}`}>
+            <button type="button" onClick={() => toggleLock(field)} className={`ml-2 focus:outline-none transition-colors cursor-pointer ${isLocked ? 'text-[var(--vora-accent-500)] hover:text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-muted)] hover:text-[var(--vora-text-muted)]'}`}>
                 {isLocked ? <svg className="w-4 h-4 inline-block" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg> : <svg className="w-4 h-4 inline-block" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a5 5 0 00-5 5v2a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2H7V7a3 3 0 015.905-.75 1 1 0 001.937-.5A5.002 5.002 0 0010 2z" clipRule="evenodd" /></svg>}
             </button>
         );
@@ -198,15 +198,15 @@ export default function EditCollectionModal({
             cardClassName="flex flex-col max-h-[90vh]"
         >
 
-                <div className="px-6 pt-6 border-b border-gray-800">
+                <div className="px-6 pt-6 border-b border-[var(--vora-border-subtle)]">
                     <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-bold text-white">Edit Collection</h2>
-                        <button onClick={onClose} className="text-gray-500 hover:text-white text-2xl font-bold cursor-pointer">&times;</button>
+                        <h2 className="text-xl font-bold text-[var(--vora-text-primary)]">Edit Collection</h2>
+                        <button onClick={onClose} className="text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] text-2xl font-bold cursor-pointer">&times;</button>
                     </div>
-                    <div className="flex gap-6 text-sm font-bold text-gray-400">
-                        <button onClick={() => setActiveTab('general')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'general' ? 'border-orange-500 text-orange-400' : 'border-transparent hover:text-white'}`}>General</button>
-                        <button onClick={() => setActiveTab('poster')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'poster' ? 'border-orange-500 text-orange-400' : 'border-transparent hover:text-white'}`}>Posters</button>
-                        <button onClick={() => setActiveTab('backdrop')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'backdrop' ? 'border-orange-500 text-orange-400' : 'border-transparent hover:text-white'}`}>Backdrops</button>
+                    <div className="flex gap-6 text-sm font-bold text-[var(--vora-text-muted)]">
+                        <button onClick={() => setActiveTab('general')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'general' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>General</button>
+                        <button onClick={() => setActiveTab('poster')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'poster' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>Posters</button>
+                        <button onClick={() => setActiveTab('backdrop')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'backdrop' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>Backdrops</button>
                     </div>
                 </div>
 
@@ -214,41 +214,41 @@ export default function EditCollectionModal({
                     {activeTab === 'general' && (
                         <form id="edit-collection-form" onSubmit={handleSubmit} className="space-y-5">
                             <div>
-                                <label className="flex items-center text-sm font-medium text-gray-400 mb-1">Title {!collection.systemGenerated && <LockIcon field="Title" />}</label>
-                                <input required type="text" value={title} onChange={e => setTitle(e.target.value)} disabled={collection.systemGenerated} className={`w-full bg-gray-900 border border-gray-700 rounded-md p-2 text-white focus:border-orange-500 outline-none ${collection.systemGenerated ? 'opacity-50' : ''}`} />
+                                <label className="flex items-center text-sm font-medium text-[var(--vora-text-muted)] mb-1">Title {!collection.systemGenerated && <LockIcon field="Title" />}</label>
+                                <input required type="text" value={title} onChange={e => setTitle(e.target.value)} disabled={collection.systemGenerated} className={`w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none ${collection.systemGenerated ? 'opacity-50' : ''}`} />
                             </div>
                             <div>
-                                <label className="flex items-center text-sm font-medium text-gray-400 mb-1">Description <LockIcon field="Description" /></label>
-                                <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-md p-2 text-white focus:border-orange-500 outline-none" />
+                                <label className="flex items-center text-sm font-medium text-[var(--vora-text-muted)] mb-1">Description <LockIcon field="Description" /></label>
+                                <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
                             </div>
                             <div>
-                                <label className="flex items-center text-sm font-medium text-gray-400 mb-1">Sort Title <LockIcon field="SortTitle" /></label>
-                                <input type="text" value={sortTitle} onChange={e => setSortTitle(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-md p-2 text-white focus:border-orange-500 outline-none" />
+                                <label className="flex items-center text-sm font-medium text-[var(--vora-text-muted)] mb-1">Sort Title <LockIcon field="SortTitle" /></label>
+                                <input type="text" value={sortTitle} onChange={e => setSortTitle(e.target.value)} className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="flex items-center text-sm font-medium text-gray-400 mb-1">Visible Start Date <LockIcon field="VisibleStartDate" /></label>
-                                    <input type="date" value={visibleStartDate} onChange={e => setVisibleStartDate(e.target.value)} className="w-full bg-gray-950 border border-gray-700 rounded-md p-2 text-white outline-none color-scheme-dark" />
+                                    <label className="flex items-center text-sm font-medium text-[var(--vora-text-muted)] mb-1">Visible Start Date <LockIcon field="VisibleStartDate" /></label>
+                                    <input type="date" value={visibleStartDate} onChange={e => setVisibleStartDate(e.target.value)} className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none color-scheme-dark" />
                                 </div>
                                 <div>
-                                    <label className="flex items-center text-sm font-medium text-gray-400 mb-1">Visible End Date <LockIcon field="VisibleEndDate" /></label>
-                                    <input type="date" value={visibleEndDate} onChange={e => setVisibleEndDate(e.target.value)} className="w-full bg-gray-950 border border-gray-700 rounded-md p-2 text-white outline-none color-scheme-dark" />
+                                    <label className="flex items-center text-sm font-medium text-[var(--vora-text-muted)] mb-1">Visible End Date <LockIcon field="VisibleEndDate" /></label>
+                                    <input type="date" value={visibleEndDate} onChange={e => setVisibleEndDate(e.target.value)} className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none color-scheme-dark" />
                                 </div>
                             </div>
 
                             {!collection.systemGenerated && (
-                                <div className="pt-4 border-t border-gray-800">
-                                    <h3 className="text-lg font-bold text-gray-200 mb-4">Auto-Fill Content</h3>
-                                    <p className="text-sm text-gray-400 mb-4">Automatically add movies and shows to this collection from an external list.</p>
+                                <div className="pt-4 border-t border-[var(--vora-border-subtle)]">
+                                    <h3 className="text-lg font-bold text-[var(--vora-text-primary)] mb-4">Auto-Fill Content</h3>
+                                    <p className="text-sm text-[var(--vora-text-muted)] mb-4">Automatically add movies and shows to this collection from an external list.</p>
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-400 mb-1">List Provider</label>
+                                            <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">List Provider</label>
                                             <select
                                                 value={contentSyncProviderId}
                                                 onChange={e => setContentSyncProviderId(e.target.value)}
-                                                className="w-full bg-gray-950 border border-gray-700 rounded-md p-2 text-white outline-none"
+                                                className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none"
                                             >
                                                 <option value="">Manual Management (None)</option>
                                                 {syncProviders.map(provider => (
@@ -261,7 +261,7 @@ export default function EditCollectionModal({
 
                                         {contentSyncProviderId && (
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-400 mb-1">
+                                                <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">
                                                     {syncProviders.find(p => p.id === contentSyncProviderId)?.externalIdLabel || 'List ID'}
                                                 </label>
                                                 <input
@@ -269,7 +269,7 @@ export default function EditCollectionModal({
                                                     value={contentSyncExternalId}
                                                     onChange={e => setContentSyncExternalId(e.target.value)}
                                                     placeholder={syncProviders.find(p => p.id === contentSyncProviderId)?.externalIdPlaceholder || 'Enter ID'}
-                                                    className="w-full bg-gray-950 border border-gray-700 rounded-md p-2 text-white outline-none"
+                                                    className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none"
                                                 />
                                             </div>
                                         )}
@@ -277,9 +277,9 @@ export default function EditCollectionModal({
                                 </div>
                             )}
 
-                            <div className="pt-4 border-t border-gray-800">
-                                <label className="flex items-center text-sm font-medium text-gray-400 mb-1">Default Sort Order <LockIcon field="DefaultSort" /></label>
-                                <select value={defaultSort} onChange={e => setDefaultSort(Number(e.target.value))} className="w-full bg-gray-900 border border-gray-700 rounded-md p-2 text-white focus:border-orange-500 outline-none">
+                            <div className="pt-4 border-t border-[var(--vora-border-subtle)]">
+                                <label className="flex items-center text-sm font-medium text-[var(--vora-text-muted)] mb-1">Default Sort Order <LockIcon field="DefaultSort" /></label>
+                                <select value={defaultSort} onChange={e => setDefaultSort(Number(e.target.value))} className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none">
                                     <option value={0}>Release Date (Oldest First)</option>
                                     <option value={1}>Release Date (Newest First)</option>
                                     <option value={2}>Date Added</option>
@@ -288,16 +288,16 @@ export default function EditCollectionModal({
                                 </select>
                             </div>
                             {Number(defaultSort) === 4 && (
-                                <div className="p-4 bg-gray-900/50 border border-orange-500/30 rounded-lg space-y-4 mt-4">
-                                    <h3 className="text-orange-400 font-bold text-sm tracking-wide uppercase">Chronological Sync Settings</h3>
+                                <div className="p-4 bg-[var(--vora-bg-raised)]/50 border border-orange-500/30 rounded-lg space-y-4 mt-4">
+                                    <h3 className="text-[var(--vora-accent-500)] font-bold text-sm tracking-wide uppercase">Chronological Sync Settings</h3>
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-400 mb-1">Data Provider</label>
+                                            <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Data Provider</label>
                                             <select
                                                 value={sortProviderId}
                                                 onChange={e => setSortProviderId(e.target.value)}
-                                                className="w-full bg-gray-950 border border-gray-700 rounded-md p-2 text-white outline-none"
+                                                className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none"
                                             >
                                                 <option value="">Select a Provider...</option>
                                                 {chronologyProviders.map(provider => (
@@ -310,7 +310,7 @@ export default function EditCollectionModal({
 
                                         {sortProviderId && (
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-400 mb-1">
+                                                <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">
                                                     {chronologyProviders.find(p => p.id === sortProviderId)?.externalIdLabel || 'List ID'}
                                                 </label>
                                                 <input
@@ -318,32 +318,32 @@ export default function EditCollectionModal({
                                                     value={externalListId}
                                                     onChange={e => setExternalListId(e.target.value)}
                                                     placeholder={chronologyProviders.find(p => p.id === sortProviderId)?.externalIdPlaceholder || 'Enter ID'}
-                                                    className="w-full bg-gray-950 border border-gray-700 rounded-md p-2 text-white outline-none"
+                                                    className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none"
                                                 />
                                             </div>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-2 pt-2 border-t border-gray-800/50 mt-4">
+                                    <div className="flex items-center gap-2 pt-2 border-t border-[var(--vora-border-subtle)]/50 mt-4">
                                         <input
                                             type="checkbox"
                                             id="autoSyncChronologyEdit"
                                             checked={autoSyncChronology}
                                             onChange={e => setAutoSyncChronology(e.target.checked)}
-                                            className="w-4 h-4 accent-orange-500 rounded bg-gray-900 border-gray-700 cursor-pointer"
+                                            className="w-4 h-4 accent-orange-500 rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)] cursor-pointer"
                                         />
-                                        <label htmlFor="autoSyncChronologyEdit" className="text-sm text-gray-300 font-medium cursor-pointer">
+                                        <label htmlFor="autoSyncChronologyEdit" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">
                                             Enable Auto-Sync
                                         </label>
                                     </div>
-                                    <p className="text-xs text-gray-500 leading-relaxed mt-2">
+                                    <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-2">
                                         If enabled, Vora will run a background task periodically to check the provider for updates and automatically sort new items into this collection's timeline.
                                     </p>
                                 </div>
                             )}
                             {collection.libraryId && !collection.systemGenerated && (
-                                <div className="flex items-center gap-2 pt-4 border-t border-gray-800">
+                                <div className="flex items-center gap-2 pt-4 border-t border-[var(--vora-border-subtle)]">
                                     <input type="checkbox" checked={makeGlobal} onChange={e => setMakeGlobal(e.target.checked)} className="w-4 h-4 accent-orange-500" />
-                                    <label className="text-sm text-gray-300">Make this a Global Collection</label>
+                                    <label className="text-sm text-[var(--vora-text-secondary)]">Make this a Global Collection</label>
                                 </div>
                             )}
                         </form>
@@ -367,19 +367,19 @@ export default function EditCollectionModal({
                                         <select
                                             value={selectedProviderId}
                                             onChange={e => setSelectedProviderId(e.target.value)}
-                                            className="p-1.5 bg-gray-900 border border-gray-700 text-white text-xs rounded outline-none focus:border-orange-500"
+                                            className="p-1.5 bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)] text-xs rounded outline-none focus:border-[var(--vora-accent-500)]"
                                         >
                                             {artworkProviders.map(p => (
                                                 <option key={p.id} value={p.id}>{p.name}</option>
                                             ))}
                                         </select>
-                                        <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-bold rounded cursor-pointer transition-colors">
+                                        <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-[var(--vora-text-primary)] text-xs font-bold rounded cursor-pointer transition-colors">
                                             Fetch Artwork
                                         </button>
                                     </div>
                                 }
                                 actionRowRight={
-                                    <div className="flex items-center text-sm text-gray-400">
+                                    <div className="flex items-center text-sm text-[var(--vora-text-muted)]">
                                         <span className="mr-2">Selected {activeTab}:</span>
                                         <LockIcon field={lockField} />
                                     </div>
@@ -389,13 +389,13 @@ export default function EditCollectionModal({
                     })()}
                 </div>
 
-                <div className="p-5 border-t border-gray-800 bg-gray-900 rounded-b-xl flex justify-between">
+                <div className="p-5 border-t border-[var(--vora-border-subtle)] bg-[var(--vora-bg-raised)] rounded-b-xl flex justify-between">
                     <div>
-                        {!collection.systemGenerated && <button type="button" onClick={handleDelete} className="px-4 py-2 bg-red-900/30 text-red-500 hover:bg-red-600 hover:text-white font-bold rounded">Delete Collection</button>}
+                        {!collection.systemGenerated && <button type="button" onClick={handleDelete} className="px-4 py-2 bg-[var(--vora-danger-soft)]/30 text-[var(--vora-danger-500)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] font-bold rounded">Delete Collection</button>}
                     </div>
                     <div className="flex gap-3">
-                        <button type="button" onClick={onClose} className="px-5 py-2 text-gray-400 hover:text-white">Cancel</button>
-                        <button type="submit" form="edit-collection-form" onClick={activeTab !== 'general' ? handleSubmit : undefined} disabled={isSaving} className="px-6 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold rounded shadow-lg">{isSaving ? 'Saving...' : 'Save Collection'}</button>
+                        <button type="button" onClick={onClose} className="px-5 py-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)]">Cancel</button>
+                        <button type="submit" form="edit-collection-form" onClick={activeTab !== 'general' ? handleSubmit : undefined} disabled={isSaving} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-text-primary)] font-bold rounded shadow-lg">{isSaving ? 'Saving...' : 'Save Collection'}</button>
                     </div>
                 </div>
         </Modal>

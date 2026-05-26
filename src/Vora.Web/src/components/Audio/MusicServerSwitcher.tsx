@@ -41,14 +41,14 @@ export default function MusicServerSwitcher() {
 
     return (
         <div className="flex flex-wrap items-center gap-2 mb-4">
-            <span className="text-xs font-bold uppercase tracking-widest text-gray-500 mr-1">Server</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mr-1">Server</span>
             {serversWithMusic.map(s => {
                 const isActive = s.id === activeId;
                 return (
                     <button
                         key={s.id}
                         onClick={() => navigate(`/server/${s.id}/audio`)}
-                        className={`px-3 py-1.5 text-xs font-bold rounded transition-colors cursor-pointer ${isActive ? 'bg-orange-600 text-white' : 'bg-gray-900/60 text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                        className={`px-3 py-1.5 text-xs font-bold rounded transition-colors cursor-pointer ${isActive ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-raised)]/60 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                     >
                         {s.name}
                     </button>

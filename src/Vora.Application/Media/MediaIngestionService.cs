@@ -1,11 +1,13 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Vora.Application.Libraries;
 using Vora.Application.Requests;
+using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
+using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Media;
@@ -28,7 +30,7 @@ public class MediaIngestionService : IMediaIngestionService
         IRequestManager requestManager,
         IMusicRepository musicRepository,
         ITaskQueueManager taskQueue,
-        IConfiguration config,
+        IOptions<StoragePathsOptions> storagePaths,
         ILogger<MediaIngestionService> logger)
     {
         _repository = repository;
@@ -38,7 +40,7 @@ public class MediaIngestionService : IMediaIngestionService
         _taskQueue = taskQueue;
         _logger = logger;
 
-        var configured = config["StoragePaths:CustomArtwork"];
+        var configured = storagePaths.Value.CustomArtwork;
         _artworkBasePath = !string.IsNullOrWhiteSpace(configured)
             ? configured
             : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
@@ -49,30 +51,32 @@ public class MediaIngestionService : IMediaIngestionService
         }
     }
 
-    public async Task<(List<string> FolderPaths, string? ScannerRegex)> GetLibraryDetailsAsync(Guid libraryId)
+    public async Task<(List<string> FolderPaths, string? ScannerRegex)> GetLibraryDetailsAsync(LibraryHandle library)
     {
-        var library = await _libraryRepository.GetProjectedByIdAsync(libraryId, l => new { l.FolderPaths, l.ScannerRegex });
-        if (library == null) throw new InvalidOperationException($"Library {libraryId} not found.");
+        var libraryId = library.Value;
+        var row = await _libraryRepository.GetProjectedByIdAsync(libraryId, l => new { l.FolderPaths, l.ScannerRegex });
+        if (row == null) throw new InvalidOperationException($"Library {libraryId} not found.");
 
-        return (library.FolderPaths, library.ScannerRegex);
+        return (row.FolderPaths, row.ScannerRegex);
     }
 
-    public async Task<Guid?> GetLibraryIdForMediaAsync(Guid mediaItemId)
+    public async Task<LibraryHandle?> GetLibraryForMediaAsync(MediaItemHandle item)
     {
-        var item = await _repository.GetProjectedAsync(mediaItemId, m => new { m.LibraryId });
-        return item?.LibraryId;
+        var row = await _repository.GetProjectedAsync(item.Value, m => new { m.LibraryId });
+        return row == null ? null : new LibraryHandle(row.LibraryId);
     }
 
-    public Task<HashSet<string>> GetExistingLibraryPathsAsync(Guid libraryId) =>
-        _repository.GetExistingLibraryPathsAsync(libraryId);
+    public Task<HashSet<string>> GetExistingLibraryPathsAsync(LibraryHandle library) =>
+        _repository.GetExistingLibraryPathsAsync(library.Value);
 
-    public Task<List<string>> GetMediaFilePathsAsync(Guid mediaItemId) =>
-        _repository.GetMediaFilePathsAsync(mediaItemId);
+    public Task<List<string>> GetMediaFilePathsAsync(MediaItemHandle item) =>
+        _repository.GetMediaFilePathsAsync(item.Value);
 
-    public async Task<Guid> EnsureMovieAsync(Guid libraryId, string title, int? year, string? tmdbId, string? imdbId, string? tvdbId = null, string? edition = null)
+    public async Task<MediaItemHandle> EnsureMovieAsync(LibraryHandle library, string title, int? year, string? tmdbId, string? imdbId, string? tvdbId = null, string? edition = null)
     {
+        var libraryId = library.Value;
         var movieId = await _repository.GetMovieIdByTitleAndYearAsync(title, year, libraryId);
-        if (movieId.HasValue) return movieId.Value;
+        if (movieId.HasValue) return new MediaItemHandle(movieId.Value);
 
         var movie = new Movie
         {
@@ -92,13 +96,14 @@ public class MediaIngestionService : IMediaIngestionService
             await _requestManager.ResolveRequestAsync(tmdbId, "Movie", movie.Id);
         }
 
-        return movie.Id;
+        return new MediaItemHandle(movie.Id);
     }
 
-    public async Task<Guid> EnsureTvShowAsync(Guid libraryId, string title, int? year, string? tmdbId, string? imdbId, string? tvdbId = null)
+    public async Task<MediaItemHandle> EnsureTvShowAsync(LibraryHandle library, string title, int? year, string? tmdbId, string? imdbId, string? tvdbId = null)
     {
+        var libraryId = library.Value;
         var showId = await _repository.GetTvShowIdByTitleAsync(title, libraryId);
-        if (showId.HasValue) return showId.Value;
+        if (showId.HasValue) return new MediaItemHandle(showId.Value);
 
         var show = new TvShow
         {
@@ -119,13 +124,15 @@ public class MediaIngestionService : IMediaIngestionService
             await _requestManager.ResolveRequestAsync(tmdbId, "TvShow", show.Id);
         }
 
-        return show.Id;
+        return new MediaItemHandle(show.Id);
     }
 
-    public async Task<Guid> EnsureSeasonAsync(Guid libraryId, Guid tvShowId, int seasonNumber)
+    public async Task<SeasonHandle> EnsureSeasonAsync(LibraryHandle library, MediaItemHandle tvShow, int seasonNumber)
     {
+        var libraryId = library.Value;
+        var tvShowId = tvShow.Value;
         var seasonId = await _repository.GetSeasonIdByNumberAsync(tvShowId, seasonNumber);
-        if (seasonId.HasValue) return seasonId.Value;
+        if (seasonId.HasValue) return new SeasonHandle(seasonId.Value);
 
         var season = new Season
         {
@@ -137,13 +144,15 @@ public class MediaIngestionService : IMediaIngestionService
             LibraryId = libraryId
         };
         await _repository.AddMediaItemAsync(season);
-        return season.Id;
+        return new SeasonHandle(season.Id);
     }
 
-    public async Task<Guid> EnsureEpisodeAsync(Guid libraryId, Guid seasonId, int episodeNumber, string title, DateTime? airDate, string? edition = null)
+    public async Task<MediaItemHandle> EnsureEpisodeAsync(LibraryHandle library, SeasonHandle season, int episodeNumber, string title, DateTime? airDate, string? edition = null)
     {
+        var libraryId = library.Value;
+        var seasonId = season.Value;
         var episodeId = await _repository.GetEpisodeIdByNumberAsync(seasonId, episodeNumber);
-        if (episodeId.HasValue) return episodeId.Value;
+        if (episodeId.HasValue) return new MediaItemHandle(episodeId.Value);
 
         var episode = new Episode
         {
@@ -158,11 +167,12 @@ public class MediaIngestionService : IMediaIngestionService
             Edition = edition
         };
         await _repository.AddMediaItemAsync(episode);
-        return episode.Id;
+        return new MediaItemHandle(episode.Id);
     }
 
-    public async Task<Guid> EnsureArtistAsync(Guid libraryId, string name, string? sortName, byte[]? artworkBytes, string? artworkMimeType, byte[]? backgroundBytes = null, string? backgroundMimeType = null, byte[]? bannerBytes = null, string? bannerMimeType = null, byte[]? clearLogoBytes = null, string? clearLogoMimeType = null)
+    public async Task<ArtistHandle> EnsureArtistAsync(LibraryHandle library, string name, string? sortName, byte[]? artworkBytes, string? artworkMimeType, byte[]? backgroundBytes = null, string? backgroundMimeType = null, byte[]? bannerBytes = null, string? bannerMimeType = null, byte[]? clearLogoBytes = null, string? clearLogoMimeType = null)
     {
+        var libraryId = library.Value;
         var existing = await _musicRepository.GetArtistByNameAsync(libraryId, name);
         if (existing != null)
         {
@@ -191,7 +201,7 @@ public class MediaIngestionService : IMediaIngestionService
             {
                 await _musicRepository.UpdateArtistAsync(existing);
             }
-            return existing.Id;
+            return new ArtistHandle(existing.Id);
         }
 
         var artist = new Artist
@@ -211,11 +221,13 @@ public class MediaIngestionService : IMediaIngestionService
             _taskQueue.QueueRefreshArtistArtwork(artist.Id, artist.Name);
         }
 
-        return artist.Id;
+        return new ArtistHandle(artist.Id);
     }
 
-    public async Task<Guid> EnsureAlbumAsync(Guid libraryId, Guid artistId, string title, int? year, string? genre, byte[]? artworkBytes, string? artworkMimeType, byte[]? backgroundBytes = null, string? backgroundMimeType = null, byte[]? discArtBytes = null, string? discArtMimeType = null, string? albumArtist = null, bool isCompilation = false)
+    public async Task<AlbumHandle> EnsureAlbumAsync(LibraryHandle library, ArtistHandle artist, string title, int? year, string? genre, byte[]? artworkBytes, string? artworkMimeType, byte[]? backgroundBytes = null, string? backgroundMimeType = null, byte[]? discArtBytes = null, string? discArtMimeType = null, string? albumArtist = null, bool isCompilation = false)
     {
+        var libraryId = library.Value;
+        var artistId = artist.Value;
         var existing = await _musicRepository.GetAlbumByTitleAsync(artistId, title);
         if (existing != null)
         {
@@ -249,7 +261,7 @@ public class MediaIngestionService : IMediaIngestionService
             {
                 await _musicRepository.UpdateAlbumAsync(existing);
             }
-            return existing.Id;
+            return new AlbumHandle(existing.Id);
         }
 
         var album = new Album
@@ -273,11 +285,13 @@ public class MediaIngestionService : IMediaIngestionService
             _taskQueue.QueueRefreshAlbumArtwork(album.Id, album.Title);
         }
 
-        return album.Id;
+        return new AlbumHandle(album.Id);
     }
 
-    public async Task<Guid> EnsureTrackAsync(Guid libraryId, Guid albumId, string title, int trackNumber, int? discNumber, int? durationSeconds, string? audioCodec, int? sampleRate, int? bitrate, string? contentRating, string? trackArtist = null)
+    public async Task<MediaItemHandle> EnsureTrackAsync(LibraryHandle library, AlbumHandle album, string title, int trackNumber, int? discNumber, int? durationSeconds, string? audioCodec, int? sampleRate, int? bitrate, string? contentRating, string? trackArtist = null)
     {
+        var libraryId = library.Value;
+        var albumId = album.Value;
         var existing = await _musicRepository.GetTrackByAlbumAndNumberAsync(albumId, trackNumber, discNumber);
         if (existing != null)
         {
@@ -298,7 +312,7 @@ public class MediaIngestionService : IMediaIngestionService
             {
                 await _musicRepository.UpdateTrackAsync(existing);
             }
-            return existing.Id;
+            return new MediaItemHandle(existing.Id);
         }
 
         var track = new Track
@@ -318,10 +332,10 @@ public class MediaIngestionService : IMediaIngestionService
             ContentRating = contentRating
         };
         await _repository.AddMediaItemAsync(track);
-        return track.Id;
+        return new MediaItemHandle(track.Id);
     }
 
-    public async Task AddMediaPartAsync(Guid mediaItemId, string filePath, string? resolution)
+    public async Task AddMediaPartAsync(MediaItemHandle item, string filePath, string? resolution)
     {
         var fileInfo = new FileInfo(filePath);
         var part = new MediaPart
@@ -329,7 +343,7 @@ public class MediaIngestionService : IMediaIngestionService
             FilePath = filePath,
             Resolution = resolution,
             FileSizeBytes = fileInfo.Length,
-            MediaItemId = mediaItemId,
+            MediaItemId = item.Value,
             Container = Path.GetExtension(filePath).TrimStart('.').ToLower()
         };
         await _repository.AddMediaPartAsync(part);

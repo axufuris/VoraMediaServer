@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.Discovery;
+using Vora.Application.Discovery.Requests;
 using Vora.Application.Requests;
 using Vora.Application.Users;
-using Vora.Domain.Entities.Discovery;
 using Vora.Plugins.Dtos;
 
 namespace Vora.Api.Endpoints;
@@ -45,17 +45,18 @@ public static class DiscoveryEndpoints
     private static async Task<IResult> GetAdminConfigsAsync(IDiscoveryManager manager) =>
         Results.Ok(await manager.GetAdminRowConfigsAsync());
 
-    private static async Task<IResult> UpdateAdminConfigsAsync([FromBody] List<DiscoveryRowConfig> configs, IDiscoveryManager manager)
+    private static async Task<IResult> UpdateAdminConfigsAsync([FromBody] List<DiscoveryRowConfigRequest> configs, IDiscoveryManager manager)
     {
         await manager.UpdateAdminRowConfigsAsync(configs);
         return Results.NoContent();
     }
 
-    private static async Task<IResult> GetRowItemsAsync(string providerId, string rowId, [FromQuery] int page, IDiscoveryManager manager)
+    private static async Task<IResult> GetRowItemsAsync(string providerId, string rowId, [FromQuery] int page, IDiscoveryManager manager, CancellationToken cancellationToken)
     {
         try
         {
-            return Results.Ok(await manager.GetRowItemsAsync(providerId, rowId, page > 0 ? page : 1));
+            cancellationToken.ThrowIfCancellationRequested();
+            return Results.Ok(await manager.GetRowItemsAsync(providerId, rowId, page > 0 ? page : 1, cancellationToken));
         }
         catch (KeyNotFoundException ex)
         {
@@ -71,25 +72,28 @@ public static class DiscoveryEndpoints
         }
     }
 
-    private static async Task<IResult> GetItemDetailsAsync(string providerId, string type, string externalId, IDiscoveryManager manager)
+    private static async Task<IResult> GetItemDetailsAsync(string providerId, string type, string externalId, IDiscoveryManager manager, CancellationToken cancellationToken)
     {
-        var details = await manager.GetItemDetailsAsync(providerId, externalId, type);
+        cancellationToken.ThrowIfCancellationRequested();
+        var details = await manager.GetItemDetailsAsync(providerId, externalId, type, cancellationToken);
         return details != null ? Results.Ok(details) : Results.NotFound();
     }
 
-    private static async Task<IResult> GetActorAsync(string providerId, string externalId, IDiscoveryManager manager)
+    private static async Task<IResult> GetActorAsync(string providerId, string externalId, IDiscoveryManager manager, CancellationToken cancellationToken)
     {
-        var actor = await manager.GetActorDetailsAsync(providerId, externalId);
+        cancellationToken.ThrowIfCancellationRequested();
+        var actor = await manager.GetActorDetailsAsync(providerId, externalId, cancellationToken);
         return actor != null ? Results.Ok(actor) : Results.NotFound();
     }
 
-    private static async Task<IResult> SearchAsync([FromQuery] string q, IDiscoveryManager manager)
+    private static async Task<IResult> SearchAsync([FromQuery] string q, IDiscoveryManager manager, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(q) || q.Length < 3)
         {
             return Results.Ok(new List<DiscoveryItemDto>());
         }
-        return Results.Ok(await manager.SearchAsync(q));
+        cancellationToken.ThrowIfCancellationRequested();
+        return Results.Ok(await manager.SearchAsync(q, cancellationToken));
     }
 
     private static async Task<IResult> GetWatchlistAsync(Guid profileId, IDiscoveryManager manager) =>

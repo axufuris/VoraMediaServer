@@ -30,7 +30,7 @@ public class FanartTvMusicArtworkProvider : IMusicArtworkProvider
     public bool IsSystemPlugin => true;
     public string Type => "Artwork";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Music" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Music };
 
     public FanartTvMusicArtworkProvider(IHttpClientFactory httpClientFactory, IServiceScopeFactory scopeFactory, ILogger<FanartTvMusicArtworkProvider> logger)
     {

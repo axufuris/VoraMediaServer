@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { pluginAdminService, type PluginVM } from '../../../api/System/pluginAdminService';
+import { useDialog } from '../../../dialogs';
 import { PluginSection } from '../Settings/PluginSettingsTab';
 
 interface FeaturePluginListProps {
@@ -18,12 +19,11 @@ function formatTypeLabel(type: string): string {
 export default function FeaturePluginList({ serverId, pluginTypes, title, emptyLabel, onAfterChange }: FeaturePluginListProps) {
     const [plugins, setPlugins] = useState<PluginVM[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const dialog = useDialog();
 
-    const [modal, setModal] = useState<{ isOpen: boolean, title: string, message: string, isError: boolean }>({ isOpen: false, title: '', message: '', isError: false });
     const showModal = useCallback((modalTitle: string, message: string, isError: boolean = false) => {
-        setModal({ isOpen: true, title: modalTitle, message, isError });
-    }, []);
-    const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
+        dialog.alert({ title: modalTitle, message, tone: isError ? 'danger' : 'default' });
+    }, [dialog]);
 
     useEffect(() => {
         let cancelled = false;
@@ -93,15 +93,6 @@ export default function FeaturePluginList({ serverId, pluginTypes, title, emptyL
                 </div>
             )}
 
-            {modal.isOpen && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--vora-bg-overlay)] backdrop-blur-sm p-4" onClick={closeModal}>
-                    <div className="vora-card shadow-[var(--vora-shadow-overlay)] p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-                        <h2 className={`text-base font-semibold mb-2 ${modal.isError ? 'text-[var(--vora-danger-text)]' : 'text-[var(--vora-text-primary)]'}`}>{modal.title}</h2>
-                        <p className="text-sm text-[var(--vora-text-secondary)] mb-6">{modal.message}</p>
-                        <button type="button" onClick={closeModal} className="vora-button-primary w-full">Close</button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

@@ -24,7 +24,7 @@ public class OmdbImdbRatingsProvider : IRatingsProvider
     public bool IsSystemPlugin => true;
     public string Type => "Ratings";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public string RatingSourceName => "Internet Movie Database";
 
@@ -52,9 +52,9 @@ public class OmdbImdbRatingsProvider : IRatingsProvider
         };
     }
 
-    public async Task<decimal?> FetchRatingAsync(string? imdbId, string? tmdbId, string? tvdbId, string mediaType)
+    public async Task<decimal?> FetchRatingAsync(string? imdbId, string? tmdbId, string? tvdbId, string mediaType, CancellationToken cancellationToken = default)
     {
-        return await OmdbFetcher.FetchRatingCoreAsync(_httpClient, _scopeFactory, imdbId, RatingSourceName);
+        return await OmdbFetcher.FetchRatingCoreAsync(_httpClient, _scopeFactory, imdbId, RatingSourceName, cancellationToken);
     }
 }
 
@@ -70,7 +70,7 @@ public class OmdbRottenTomatoesRatingsProvider : IRatingsProvider
     public bool IsSystemPlugin => true;
     public string Type => "Ratings";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public string RatingSourceName => "Rotten Tomatoes";
 
@@ -89,9 +89,9 @@ public class OmdbRottenTomatoesRatingsProvider : IRatingsProvider
         return new List<PluginSettingDefinitionDto>();
     }
 
-    public async Task<decimal?> FetchRatingAsync(string? imdbId, string? tmdbId, string? tvdbId, string mediaType)
+    public async Task<decimal?> FetchRatingAsync(string? imdbId, string? tmdbId, string? tvdbId, string mediaType, CancellationToken cancellationToken = default)
     {
-        return await OmdbFetcher.FetchRatingCoreAsync(_httpClient, _scopeFactory, imdbId, RatingSourceName);
+        return await OmdbFetcher.FetchRatingCoreAsync(_httpClient, _scopeFactory, imdbId, RatingSourceName, cancellationToken);
     }
 }
 
@@ -107,7 +107,7 @@ public class OmdbMetacriticRatingsProvider : IRatingsProvider
     public bool IsSystemPlugin => true;
     public string Type => "Ratings";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public string RatingSourceName => "Metacritic";
 
@@ -126,15 +126,15 @@ public class OmdbMetacriticRatingsProvider : IRatingsProvider
         return new List<PluginSettingDefinitionDto>();
     }
 
-    public async Task<decimal?> FetchRatingAsync(string? imdbId, string? tmdbId, string? tvdbId, string mediaType)
+    public async Task<decimal?> FetchRatingAsync(string? imdbId, string? tmdbId, string? tvdbId, string mediaType, CancellationToken cancellationToken = default)
     {
-        return await OmdbFetcher.FetchRatingCoreAsync(_httpClient, _scopeFactory, imdbId, RatingSourceName);
+        return await OmdbFetcher.FetchRatingCoreAsync(_httpClient, _scopeFactory, imdbId, RatingSourceName, cancellationToken);
     }
 }
 
 internal static class OmdbFetcher
 {
-    public static async Task<decimal?> FetchRatingCoreAsync(HttpClient httpClient, IServiceScopeFactory scopeFactory, string? imdbId, string sourceName)
+    public static async Task<decimal?> FetchRatingCoreAsync(HttpClient httpClient, IServiceScopeFactory scopeFactory, string? imdbId, string sourceName, CancellationToken cancellationToken = default)
     {
         if (OmdbCircuitBreaker.IsBlocked || string.IsNullOrEmpty(imdbId)) return null;
 
@@ -145,11 +145,11 @@ internal static class OmdbFetcher
         if (string.IsNullOrEmpty(apiKey)) return null;
 
         var url = $"?i={imdbId}&apikey={apiKey}";
-        var response = await httpClient.GetAsync(url);
+        var response = await httpClient.GetAsync(url, cancellationToken);
 
         if (!response.IsSuccessStatusCode) return null;
 
-        var body = await response.Content.ReadAsStringAsync();
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
         using var doc = JsonDocument.Parse(body);
         var root = doc.RootElement;
 

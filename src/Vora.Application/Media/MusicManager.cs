@@ -1,11 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Vora.Application.Analysis;
 using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
 using Vora.Application.Search.ViewModels;
+using Vora.Application.Settings;
 using Vora.Application.Users;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
@@ -42,7 +43,6 @@ public interface IMusicManager
 
     Task<bool> SetTrackLikedAsync(Guid profileId, Guid trackId, bool liked);
     Task<List<ArtistTrackVM>> GetLikedTracksAsync(Guid profileId, MusicAccessFilter access);
-    Task<int> GetLikedTrackCountAsync(Guid profileId);
 
     Task<SetMusicRatingResult> SetAlbumRatingAsync(Guid profileId, Guid albumId, decimal? rating, bool isAdmin);
     Task<SetMusicRatingResult> SetArtistRatingAsync(Guid profileId, Guid artistId, decimal? rating, bool isAdmin);
@@ -87,7 +87,7 @@ public class MusicManager : IMusicManager
     private readonly ILogger<MusicManager> _logger;
     private readonly string _artworkBasePath;
 
-    public MusicManager(IMusicRepository repository, IUserRepository userRepository, IUserMediaStateRepository userMediaStateRepository, IEnumerable<IMusicArtworkProvider> artworkProviders, IEnumerable<ILyricsProvider> lyricsProviders, IEnumerable<IListeningDataProvider> listeningProviders, IClientNotifier notifier, IConfiguration config, ILogger<MusicManager> logger)
+    public MusicManager(IMusicRepository repository, IUserRepository userRepository, IUserMediaStateRepository userMediaStateRepository, IEnumerable<IMusicArtworkProvider> artworkProviders, IEnumerable<ILyricsProvider> lyricsProviders, IEnumerable<IListeningDataProvider> listeningProviders, IClientNotifier notifier, IOptions<StoragePathsOptions> storagePaths, ILogger<MusicManager> logger)
     {
         _repository = repository;
         _userRepository = userRepository;
@@ -98,7 +98,7 @@ public class MusicManager : IMusicManager
         _notifier = notifier;
         _logger = logger;
 
-        var configured = config["StoragePaths:CustomArtwork"];
+        var configured = storagePaths.Value.CustomArtwork;
         _artworkBasePath = !string.IsNullOrWhiteSpace(configured)
             ? configured
             : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
@@ -507,9 +507,6 @@ public class MusicManager : IMusicManager
             IsLiked = true
         }).ToList();
     }
-
-    public Task<int> GetLikedTrackCountAsync(Guid profileId) =>
-        _repository.GetLikedTrackCountAsync(profileId);
 
     public async Task RecordTrackPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed)
     {

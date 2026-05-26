@@ -1,4 +1,4 @@
-import { usePlayer } from '../../contexts/usePlayer';
+import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import Hls from 'hls.js';
 import { type IptvChannelVM } from '../../api/Iptv/iptvAdminService';
@@ -7,6 +7,7 @@ import { dvrService, type IptvRecordingSessionVM } from '../../api/Iptv/dvrServi
 import { timeshiftService } from '../../api/Iptv/timeshiftService';
 import { passthroughService } from '../../api/Iptv/passthroughService';
 import { serverVault } from '../../utils/serverVault';
+import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../utils/storageKeys';
 import LiveTvGuide from '../../pages/Client/LiveTv/LiveTvGuide';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { useAutoHideControls } from './Controls/useAutoHideControls';
@@ -20,14 +21,15 @@ import { userService } from '../../api/Users/userService';
 
 export default function LiveTvPlayer() {
     const dialog = useDialog();
-    const { currentMedia, isPlaying, isMinimized, volume, togglePlayPause, setMinimized, closePlayer, setVolume, videoRef, playMedia, currentTime, duration, seek, skipForward, skipBackward } = usePlayer();
+    const { currentMedia, isPlaying, isMinimized, volume, togglePlayPause, setMinimized, closePlayer, setVolume, videoRef, playMedia, seek, skipForward, skipBackward } = usePlayer();
+    const { currentTime, duration } = usePlayerTime();
 
     const initialPermissions = useMemo(() => {
-        const token = localStorage.getItem('profile_token');
-        const isServerAdmin = localStorage.getItem('is_server_admin') === 'true';
+        const token = localStorage.getItem(StorageKeys.profileToken);
+        const isServerAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
         if (!token) return { canTimeshift: isServerAdmin, canRecord: isServerAdmin };
         try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
+            const payload = decodeJwtPayload(token) ?? {};
             const truthy = (v: unknown) => v === true || v === 'True' || v === 'true' || v === '1' || v === 1;
             return {
                 canTimeshift: isServerAdmin || truthy(payload.canTimeshiftIptv),
@@ -41,7 +43,7 @@ export default function LiveTvPlayer() {
     const [canRecord, setCanRecord] = useState(initialPermissions.canRecord);
 
     useEffect(() => {
-        const userId = localStorage.getItem('user_id');
+        const userId = localStorage.getItem(StorageKeys.userId);
         if (!userId) return;
         userService.getUserAccount(userId, serverVault.getActiveServerId() || undefined)
             .then(u => {
@@ -76,15 +78,15 @@ export default function LiveTvPlayer() {
                 const activeServer = serverVault.getActiveServer();
                 if (!activeServer) return;
 
-                const profileToken = localStorage.getItem('profile_token');
-                const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : activeServer.profileId;
-                const userId = localStorage.getItem('user_id') || activeProfileId;
-                const deviceId = localStorage.getItem('device_id') || 'unknown';
+                const profileToken = localStorage.getItem(StorageKeys.profileToken);
+                const activeProfileId = getProfileIdFromToken(profileToken) ?? activeServer.profileId;
+                const userId = localStorage.getItem(StorageKeys.userId) || activeProfileId;
+                const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
 
                 const allProviders = await iptvClientService.getPlaylists(userId, activeProfileId, activeServer.id);
                 let enabledProviderIds: string[] = [];
                 let hasSavedSettings = false;
-                const savedIptv = localStorage.getItem(`iptv_prefs_${activeProfileId}_${deviceId}`);
+                const savedIptv = localStorage.getItem(StorageKeys.iptvPrefs(activeProfileId, deviceId));
 
                 if (savedIptv && savedIptv !== "[]" && savedIptv !== "") {
                     hasSavedSettings = true;
@@ -129,8 +131,8 @@ export default function LiveTvPlayer() {
                 const activeServer = serverVault.getActiveServer();
                 if (!activeServer) return;
 
-                const profileToken = localStorage.getItem('profile_token');
-                const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : activeServer.profileId;
+                const profileToken = localStorage.getItem(StorageKeys.profileToken);
+                const activeProfileId = getProfileIdFromToken(profileToken) ?? activeServer.profileId;
 
                 const sessions = await dvrService.getRecordingSessions(activeProfileId, activeServer.id);
                 setRecordingSessions(sessions);
@@ -600,6 +602,7 @@ export default function LiveTvPlayer() {
                                 <input
                                     type="range" min={0} max={duration || 100} value={currentTime}
                                     onChange={e => seek(Number(e.target.value))}
+                                    aria-label="Playback position"
                                     className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                                 />
                             </div>
@@ -676,7 +679,7 @@ export default function LiveTvPlayer() {
                     onChangeRetention={setRecordRetention}
                     onRecordEpisode={async () => {
                         const activeServer = serverVault.getActiveServer();
-                        const profileId = JSON.parse(atob((localStorage.getItem('profile_token') || '').split('.')[1])).sub;
+                        const profileId = getProfileIdFromToken(localStorage.getItem(StorageKeys.profileToken));
                         await dvrService.scheduleRecording(profileId, currentChannel.id, activeProgram.title, activeProgram.id, false, 0, activeServer?.id);
                         const newSessions = await dvrService.getRecordingSessions(profileId, activeServer?.id);
                         setRecordingSessions(newSessions);
@@ -685,7 +688,7 @@ export default function LiveTvPlayer() {
                     }}
                     onRecordSeries={async () => {
                         const activeServer = serverVault.getActiveServer();
-                        const profileId = JSON.parse(atob((localStorage.getItem('profile_token') || '').split('.')[1])).sub;
+                        const profileId = getProfileIdFromToken(localStorage.getItem(StorageKeys.profileToken));
                         await dvrService.scheduleRecording(profileId, currentChannel.id, activeProgram.title, activeProgram.id, true, recordRetention, activeServer?.id);
                         const newSessions = await dvrService.getRecordingSessions(profileId, activeServer?.id);
                         setRecordingSessions(newSessions);

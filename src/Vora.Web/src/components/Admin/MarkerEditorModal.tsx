@@ -207,9 +207,17 @@ export default function MarkerEditorModal({ isOpen, mediaItemId, mediaItemTitle,
 function MarkerRow({ marker, duration, onChange, onDelete }: { marker: MediaMarker, duration?: number, onChange: (patch: Partial<MediaMarker>) => void, onDelete: () => void }) {
     const [startInput, setStartInput] = useState(formatHms(marker.startSeconds));
     const [endInput, setEndInput] = useState(formatHms(marker.endSeconds));
+    const [lastStartSeconds, setLastStartSeconds] = useState(marker.startSeconds);
+    const [lastEndSeconds, setLastEndSeconds] = useState(marker.endSeconds);
 
-    useEffect(() => { setStartInput(formatHms(marker.startSeconds)); }, [marker.startSeconds]);
-    useEffect(() => { setEndInput(formatHms(marker.endSeconds)); }, [marker.endSeconds]);
+    if (lastStartSeconds !== marker.startSeconds) {
+        setLastStartSeconds(marker.startSeconds);
+        setStartInput(formatHms(marker.startSeconds));
+    }
+    if (lastEndSeconds !== marker.endSeconds) {
+        setLastEndSeconds(marker.endSeconds);
+        setEndInput(formatHms(marker.endSeconds));
+    }
 
     const commitStart = () => {
         const parsed = parseHms(startInput);

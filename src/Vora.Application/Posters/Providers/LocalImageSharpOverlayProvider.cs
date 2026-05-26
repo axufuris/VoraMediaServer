@@ -46,7 +46,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         new() { Key = "schedule_time", Label = "Schedule Time", Type = "time", DefaultValue = "03:00" }
     };
 
-    public async Task<string> GenerateOverlayAsync(OverlayMediaDto item, string originalArtworkPath, string templateJson, string outputDirectory)
+    public async Task<string> GenerateOverlayAsync(OverlayMediaDto item, string originalArtworkPath, string templateJson, string outputDirectory, CancellationToken cancellationToken = default)
     {
         if (!File.Exists(originalArtworkPath))
         {
@@ -68,7 +68,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
             return $"{CustomArtworkUrlPrefix}{outputFileName}";
         }
 
-        using var baseImage = await Image.LoadAsync<Rgba32>(originalArtworkPath);
+        using var baseImage = await Image.LoadAsync<Rgba32>(originalArtworkPath, cancellationToken);
 
         if (baseImage.Width < MinPosterWidthPx)
         {
@@ -94,11 +94,11 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
 
             if (element.Type == CompositeRatingsType)
             {
-                await DrawCompositeRatingsAsync(baseImage, item, element, basePath);
+                await DrawCompositeRatingsAsync(baseImage, item, element, basePath, cancellationToken);
                 continue;
             }
 
-            await DrawBadgeElementAsync(baseImage, item, element, basePath);
+            await DrawBadgeElementAsync(baseImage, item, element, basePath, cancellationToken);
         }
 
         var encoder = new PngEncoder
@@ -108,7 +108,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
             BitDepth = PngBitDepth.Bit8
         };
 
-        await baseImage.SaveAsPngAsync(outputPath, encoder);
+        await baseImage.SaveAsPngAsync(outputPath, encoder, cancellationToken);
         return $"{CustomArtworkUrlPrefix}{outputFileName}";
     }
 
@@ -139,7 +139,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         return Convert.ToHexString(bytes, 0, 8).ToLowerInvariant();
     }
 
-    private async Task DrawBadgeElementAsync(Image<Rgba32> baseImage, OverlayMediaDto item, OverlayElementDto element, string basePath)
+    private async Task DrawBadgeElementAsync(Image<Rgba32> baseImage, OverlayMediaDto item, OverlayElementDto element, string basePath, CancellationToken cancellationToken = default)
     {
         var badgePath = BadgeResolver.DetermineBadgePath(item, element.Type, basePath);
         if (string.IsNullOrEmpty(badgePath) || !File.Exists(badgePath))
@@ -147,7 +147,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
             return;
         }
 
-        using var badgeImage = await Image.LoadAsync<Rgba32>(badgePath);
+        using var badgeImage = await Image.LoadAsync<Rgba32>(badgePath, cancellationToken);
 
         var targetWidth = Math.Max(1, (int)(baseImage.Width * element.WidthPct));
         var targetHeight = Math.Max(1, (int)(baseImage.Height * element.HeightPct));
@@ -220,7 +220,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         context.Fill(fillColor, path);
     }
 
-    private async Task DrawCompositeRatingsAsync(Image<Rgba32> baseImage, OverlayMediaDto item, OverlayElementDto element, string basePath)
+    private async Task DrawCompositeRatingsAsync(Image<Rgba32> baseImage, OverlayMediaDto item, OverlayElementDto element, string basePath, CancellationToken cancellationToken = default)
     {
         var validRatings = ResolveValidRatings(item, basePath);
         if (validRatings.Count == 0)
@@ -244,7 +244,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
 
         for (var i = 0; i < validRatings.Count; i++)
         {
-            await DrawCompositeRatingRowAsync(baseImage, validRatings[i], targetX, targetY, containerWidth, boxHeight, gap, radius, innerWidth, i, font);
+            await DrawCompositeRatingRowAsync(baseImage, validRatings[i], targetX, targetY, containerWidth, boxHeight, gap, radius, innerWidth, i, font, cancellationToken);
         }
     }
 
@@ -305,13 +305,14 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         float radius,
         int innerWidth,
         int index,
-        Font? font)
+        Font? font,
+        CancellationToken cancellationToken = default)
     {
         var currentBoxY = targetY + (index * (boxHeight + gap));
 
         baseImage.Mutate(x => DrawRoundedBackground(x, targetX, currentBoxY, containerWidth, boxHeight, radius));
 
-        using var logoImage = await Image.LoadAsync<Rgba32>(rating.ImagePath);
+        using var logoImage = await Image.LoadAsync<Rgba32>(rating.ImagePath, cancellationToken);
 
         var maxLogoW = Math.Max(1, innerWidth);
         var maxLogoH = Math.Max(1, (int)(boxHeight * CompositeLogoHeightPct));

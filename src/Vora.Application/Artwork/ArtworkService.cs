@@ -1,6 +1,8 @@
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Vora.Application.FileSystem;
+using Vora.Application.Net;
+using Vora.Application.Settings;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Enums;
 
@@ -9,7 +11,7 @@ namespace Vora.Application.Artwork;
 public interface IArtworkService
 {
     Task<IEnumerable<Vora.Plugins.Dtos.ArtworkResult>> GetArtworkOptionsAsync(Guid mediaItemId);
-    Task<string> UploadAsync(Guid mediaItemId, IFormFile file, ArtworkKind kind);
+    Task<string> UploadAsync(Guid mediaItemId, UploadedFile file, ArtworkKind kind);
     Task<string> AddUrlAsync(Guid mediaItemId, string url, ArtworkKind kind);
     Task DeleteAsync(Guid artworkId);
 }
@@ -21,21 +23,21 @@ public class ArtworkService : IArtworkService
     private const string UserUrlProvider = "user_url";
 
     private readonly IMediaArtworkRepository _repository;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ISafeImageDownloader _imageDownloader;
     private readonly ILogger<ArtworkService> _logger;
     private readonly string _basePath;
 
     public ArtworkService(
         IMediaArtworkRepository repository,
-        IConfiguration config,
-        IHttpClientFactory httpClientFactory,
+        IOptions<StoragePathsOptions> storagePaths,
+        ISafeImageDownloader imageDownloader,
         ILogger<ArtworkService> logger)
     {
         _repository = repository;
-        _httpClientFactory = httpClientFactory;
+        _imageDownloader = imageDownloader;
         _logger = logger;
 
-        var configPath = config["StoragePaths:CustomArtwork"];
+        var configPath = storagePaths.Value.CustomArtwork;
         _basePath = !string.IsNullOrWhiteSpace(configPath)
             ? configPath
             : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
@@ -62,7 +64,7 @@ public class ArtworkService : IArtworkService
         });
     }
 
-    public async Task<string> UploadAsync(Guid mediaItemId, IFormFile file, ArtworkKind kind)
+    public async Task<string> UploadAsync(Guid mediaItemId, UploadedFile file, ArtworkKind kind)
     {
         var ext = Path.GetExtension(file.FileName);
         var fileName = $"media_{mediaItemId}_{kind.ToString().ToLower()}_{Guid.NewGuid()}{ext}";
@@ -71,7 +73,7 @@ public class ArtworkService : IArtworkService
         try
         {
             await using var stream = new FileStream(filePath, FileMode.Create);
-            await file.CopyToAsync(stream);
+            await file.Content.CopyToAsync(stream);
         }
         catch (Exception ex)
         {
@@ -91,9 +93,7 @@ public class ArtworkService : IArtworkService
 
         try
         {
-            var client = _httpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
-            var imageBytes = await client.GetByteArrayAsync(url);
+            var imageBytes = await _imageDownloader.DownloadAsync(url);
             await File.WriteAllBytesAsync(filePath, imageBytes);
         }
         catch (Exception ex)

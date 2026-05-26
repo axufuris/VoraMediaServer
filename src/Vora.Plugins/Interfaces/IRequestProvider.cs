@@ -12,8 +12,8 @@ public interface IRequestProvider : IVoraPlugin
 {
     string[] SupportedMediaTypes { get; }
 
-    Task<IEnumerable<ProviderOptionDto>> GetQualityProfilesAsync(string host, int port, bool useSsl, string urlBase, string apiKey);
-    Task<IEnumerable<ProviderOptionDto>> GetRootFoldersAsync(string host, int port, bool useSsl, string urlBase, string apiKey);
+    Task<IEnumerable<ProviderOptionDto>> GetQualityProfilesAsync(string host, int port, bool useSsl, string urlBase, string apiKey, CancellationToken cancellationToken = default);
+    Task<IEnumerable<ProviderOptionDto>> GetRootFoldersAsync(string host, int port, bool useSsl, string urlBase, string apiKey, CancellationToken cancellationToken = default);
 
     Task<bool> SubmitRequestAsync(
         string tmdbId,
@@ -23,5 +23,6 @@ public interface IRequestProvider : IVoraPlugin
         bool useSsl,
         string urlBase,
         string apiKey,
-        string providerSettingsJson);
+        string providerSettingsJson,
+        CancellationToken cancellationToken = default);
 }

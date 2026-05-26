@@ -78,8 +78,8 @@ internal static class UserPlayHistoryProjection
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var searchLower = search.ToLower();
-            query = query.Where(x => x.Media.Title.ToLower().Contains(searchLower));
+            var searchPattern = $"%{search}%";
+            query = query.Where(x => EF.Functions.ILike(x.Media.Title, searchPattern));
         }
 
         if (!string.IsNullOrWhiteSpace(typeFilter) && typeFilter != "All")

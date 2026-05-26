@@ -35,6 +35,8 @@ RUN npm run build
 # Stage 5: final
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
-COPY --from=ui-build /ui-src/dist ./wwwroot
+COPY --from=publish --chown=app:app /app/publish .
+COPY --from=ui-build --chown=app:app /ui-src/dist ./wwwroot
+RUN mkdir -p /app/data /transcode && chown -R app:app /app/data /transcode
+USER app
 ENTRYPOINT ["dotnet", "Vora.Api.dll"]

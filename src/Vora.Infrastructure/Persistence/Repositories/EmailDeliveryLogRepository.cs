@@ -41,26 +41,4 @@ public class EmailDeliveryLogRepository : IEmailDeliveryLogRepository
             .ToListAsync(cancellationToken);
         return rows;
     }
-
-    public async Task<int> PruneOldAsync(int keepCount, CancellationToken cancellationToken = default)
-    {
-        if (keepCount <= 0) keepCount = 200;
-
-        var keepIds = await _dbContext.EmailDeliveryLogs
-            .OrderByDescending(l => l.CreatedAt)
-            .Take(keepCount)
-            .Select(l => l.Id)
-            .ToListAsync(cancellationToken);
-
-        var keepSet = keepIds.ToHashSet();
-        var stale = await _dbContext.EmailDeliveryLogs
-            .Where(l => !keepSet.Contains(l.Id))
-            .ToListAsync(cancellationToken);
-
-        if (stale.Count == 0) return 0;
-
-        _dbContext.EmailDeliveryLogs.RemoveRange(stale);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return stale.Count;
-    }
 }

@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Vora.Application.FileSystem;
 using Vora.Application.Plugins.ViewModels;
 using Vora.Application.Settings;
 using Vora.Plugins.Interfaces;
@@ -11,14 +11,14 @@ public interface IPluginManager
 {
     Task<IEnumerable<PluginVM>> GetActivePluginsAsync();
     Task<IEnumerable<PluginOptionVM>> GetPluginOptionsAsync(string type);
-    Task UploadPluginAsync(IFormFile file);
+    Task UploadPluginAsync(UploadedFile file);
     bool UninstallPlugin(string id);
 }
 
 public class PluginManager(
     IEnumerable<IVoraPlugin> plugins,
     ISystemSettingsRepository settingsRepo,
-    IConfiguration configuration,
+    IOptions<StoragePathsOptions> storagePaths,
     ILogger<PluginManager> logger) : IPluginManager
 {
     private const string EnabledSettingKey = "is_enabled";
@@ -87,14 +87,14 @@ public class PluginManager(
         return validOptions;
     }
 
-    public async Task UploadPluginAsync(IFormFile file)
+    public async Task UploadPluginAsync(UploadedFile file)
     {
         if (file == null || !file.FileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Only .dll plugin files are supported.");
         }
 
-        var configured = configuration["StoragePaths:Plugins"];
+        var configured = storagePaths.Value.Plugins;
         var pluginsPath = !string.IsNullOrWhiteSpace(configured)
             ? configured
             : Path.Combine(AppContext.BaseDirectory, "Plugins");
@@ -108,7 +108,7 @@ public class PluginManager(
         try
         {
             await using var stream = new FileStream(filePath, FileMode.Create);
-            await file.CopyToAsync(stream);
+            await file.Content.CopyToAsync(stream);
         }
         catch (Exception ex)
         {

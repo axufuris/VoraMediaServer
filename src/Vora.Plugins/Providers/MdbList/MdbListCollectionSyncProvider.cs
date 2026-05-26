@@ -17,7 +17,7 @@ public class MdbListCollectionSyncProvider : ICollectionSyncProvider
     public bool IsSystemPlugin => true;
     public string Type => "Collection_Sync";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public string ExternalIdLabel => "MDbList URL";
     public string ExternalIdPlaceholder => "e.g., https://mdblist.com/lists/hdlists/latest-hd-family-movies-top-rated-from-1980-to-today";

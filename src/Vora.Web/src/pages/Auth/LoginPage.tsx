@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { serverVault } from '../../utils/serverVault';
 import { authService } from '../../api/Auth/authService';
+import { StorageKeys, SessionKeys } from '../../utils/storageKeys';
 import AuthLayout from '../../layouts/AuthLayout';
 
 function resolveServerUrl(): string {
@@ -35,7 +36,7 @@ export default function LoginPage() {
                 setEmailEnabled(status.emailEnabled ?? false);
 
                 if (!status.isClaimed) {
-                    sessionStorage.setItem('pending_server_url', serverUrl);
+                    sessionStorage.setItem(SessionKeys.pendingServerUrl, serverUrl);
                     navigate('/setup');
                 }
             } catch (err) {
@@ -54,7 +55,7 @@ export default function LoginPage() {
 
         try {
             const status = await authService.probeServer(serverUrl);
-            sessionStorage.setItem('pending_server_url', serverUrl);
+            sessionStorage.setItem(SessionKeys.pendingServerUrl, serverUrl);
             sessionStorage.setItem('pending_server_name', status.serverName || 'Vora Server');
 
             if (!status.isClaimed) {
@@ -69,16 +70,16 @@ export default function LoginPage() {
                 throw new Error("Connected successfully, but the server returned an unrecognized token format.");
             }
 
-            sessionStorage.setItem('pending_user_token', accessToken);
+            sessionStorage.setItem(SessionKeys.pendingUserToken, accessToken);
             sessionStorage.setItem('pending_user_id', userId);
 
-            localStorage.setItem('account_token', accessToken);
-            localStorage.setItem('user_id', userId);
+            localStorage.setItem(StorageKeys.accountToken, accessToken);
+            localStorage.setItem(StorageKeys.userId, userId);
 
             navigate('/profiles');
         } catch (err) {
-            sessionStorage.removeItem('pending_server_url');
-            sessionStorage.removeItem('pending_user_token');
+            sessionStorage.removeItem(SessionKeys.pendingServerUrl);
+            sessionStorage.removeItem(SessionKeys.pendingUserToken);
             sessionStorage.removeItem('pending_user_id');
 
             if (isAxiosError(err)) {

@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Vora.Application.FileSystem;
 using Vora.Application.Plugins;
 using Vora.Application.Plugins.ViewModels;
 
@@ -40,7 +41,8 @@ public static class PluginEndpoints
     {
         try
         {
-            await manager.UploadPluginAsync(file);
+            await using var stream = file.OpenReadStream();
+            await manager.UploadPluginAsync(new UploadedFile(stream, file.FileName, file.ContentType));
             return Results.Ok(new { Message = "Plugin uploaded successfully. Restart the server to load it." });
         }
         catch (InvalidOperationException ex)

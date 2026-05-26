@@ -104,12 +104,12 @@ export default function AddToCollectionModal({
 
             <ModalBody className="space-y-2">
                 {loading ? (
-                    <div className="text-center text-gray-500 py-4">Loading...</div>
+                    <div className="text-center text-[var(--vora-text-muted)] py-4">Loading...</div>
                 ) : collections.length === 0 ? (
-                    <div className="text-center text-gray-500 py-4">No collections available.</div>
+                    <div className="text-center text-[var(--vora-text-muted)] py-4">No collections available.</div>
                 ) : (
                     collections.map(c => (
-                        <label key={c.id} className="flex items-center gap-3 p-3 bg-gray-900 rounded-lg border border-gray-800 hover:border-orange-500 cursor-pointer transition-colors">
+                        <label key={c.id} className="flex items-center gap-3 p-3 bg-[var(--vora-bg-raised)] rounded-lg border border-[var(--vora-border-subtle)] hover:border-[var(--vora-accent-500)] cursor-pointer transition-colors">
                             <input
                                 type="checkbox"
                                 checked={checkedIds.has(c.id)}
@@ -117,8 +117,8 @@ export default function AddToCollectionModal({
                                 className="w-5 h-5 accent-orange-500 cursor-pointer"
                             />
                             <div className="flex-1">
-                                <h4 className="font-bold text-gray-200">{c.title}</h4>
-                                <p className="text-xs text-gray-500">{c.systemGenerated ? 'System Collection' : 'Custom Collection'}</p>
+                                <h4 className="font-bold text-[var(--vora-text-secondary)]">{c.title}</h4>
+                                <p className="text-xs text-[var(--vora-text-muted)]">{c.systemGenerated ? 'System Collection' : 'Custom Collection'}</p>
                             </div>
                         </label>
                     ))
@@ -127,26 +127,26 @@ export default function AddToCollectionModal({
 
             <ModalFooter>
                 {!isCreating ? (
-                    <button onClick={() => setIsCreating(true)} className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded transition-colors border border-gray-700 cursor-pointer">
+                    <button onClick={() => setIsCreating(true)} className="w-full py-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] font-bold rounded transition-colors border border-[var(--vora-border-subtle)] cursor-pointer">
                         + Create New Collection
                     </button>
                 ) : (
                     <form onSubmit={handleCreateCollection} className="space-y-4">
                         <div>
-                            <label className="block text-xs text-gray-400 mb-1">Collection Name</label>
-                            <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} autoFocus className="w-full p-2 bg-gray-950 rounded border border-gray-700 outline-none focus:border-orange-500 text-sm text-white" required />
+                            <label className="block text-xs text-[var(--vora-text-muted)] mb-1">Collection Name</label>
+                            <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} autoFocus className="w-full p-2 bg-[var(--vora-bg-canvas)] rounded border border-[var(--vora-border-subtle)] outline-none focus:border-[var(--vora-accent-500)] text-sm text-[var(--vora-text-primary)]" required />
                         </div>
 
                         {mediaType !== 'Episode' && (
                             <div className="flex items-center gap-2">
                                 <input type="checkbox" id="globalCheck" checked={isGlobal} onChange={e => setIsGlobal(e.target.checked)} className="accent-orange-500 cursor-pointer" />
-                                <label htmlFor="globalCheck" className="text-sm text-gray-300 cursor-pointer">Make this a Global Collection</label>
+                                <label htmlFor="globalCheck" className="text-sm text-[var(--vora-text-secondary)] cursor-pointer">Make this a Global Collection</label>
                             </div>
                         )}
 
                         <div className="flex gap-2">
-                            <button type="button" onClick={() => setIsCreating(false)} className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded transition-colors text-sm cursor-pointer">Cancel</button>
-                            <button type="submit" className="flex-1 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded transition-colors text-sm cursor-pointer">Create</button>
+                            <button type="button" onClick={() => setIsCreating(false)} className="flex-1 py-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-secondary)] font-bold rounded transition-colors text-sm cursor-pointer">Cancel</button>
+                            <button type="submit" className="flex-1 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-text-primary)] font-bold rounded transition-colors text-sm cursor-pointer">Create</button>
                         </div>
                     </form>
                 )}

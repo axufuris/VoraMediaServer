@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
+using Vora.Api.Extensions;
 using Vora.Application.Users;
 using Vora.Application.Users.ViewModels;
 
@@ -86,9 +88,28 @@ public static class UserEndpoints
         return Results.Ok(new { result.Data, result.Total });
     }
 
-    private static async Task<IResult> UpdateUserAsync(Guid userId, [FromBody] UpdateUserDto request, IUserManager manager)
+    private static async Task<IResult> UpdateUserAsync(Guid userId, [FromBody] UpdateUserDto request, ClaimsPrincipal user, IUserManager manager)
     {
-        await manager.UpdateUserAccountAsync(userId, request.Email, request.DisplayName, request.NewPassword, request.EmailNotifyOnRequestAvailable);
+        var callingAccountId = user.GetAccountId();
+        if (callingAccountId is null)
+        {
+            return Results.Forbid();
+        }
+
+        var callerIsAdmin = user.IsAdmin();
+        if (!callerIsAdmin && callingAccountId.Value != userId)
+        {
+            return Results.Forbid();
+        }
+
+        try
+        {
+            await manager.UpdateUserAccountAsync(userId, callingAccountId.Value, callerIsAdmin, request.Email, request.DisplayName, request.NewPassword, request.EmailNotifyOnRequestAvailable);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Forbid();
+        }
         return Results.NoContent();
     }
 

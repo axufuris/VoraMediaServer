@@ -211,8 +211,8 @@ export default function RemoteAccessTab({ serverId, showModal }: RemoteAccessTab
                     disabled={isSaving || isCheckingRemote}
                     className={`px-4 py-2 rounded-[var(--vora-radius-md)] text-sm font-semibold border transition-colors cursor-pointer disabled:opacity-50 ${
                         remoteStatus.isEnabled
-                            ? 'text-[var(--vora-danger-text)] border-[var(--vora-danger-soft)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-white hover:border-[var(--vora-danger-500)]'
-                            : 'text-[var(--vora-success-text)] border-[var(--vora-success-soft)] bg-[var(--vora-success-soft)] hover:bg-[var(--vora-success-500)] hover:text-white hover:border-[var(--vora-success-500)]'
+                            ? 'text-[var(--vora-danger-text)] border-[var(--vora-danger-soft)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] hover:border-[var(--vora-danger-500)]'
+                            : 'text-[var(--vora-success-text)] border-[var(--vora-success-soft)] bg-[var(--vora-success-soft)] hover:bg-[var(--vora-success-500)] hover:text-[var(--vora-text-primary)] hover:border-[var(--vora-success-500)]'
                     }`}
                 >
                     {remoteStatus.isEnabled ? 'Disable remote access' : 'Enable remote access'}

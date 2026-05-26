@@ -3,12 +3,11 @@
 public interface IChronologyProvider : IVoraPlugin
 {
     string ProviderId { get; }
-    string ProviderName { get; }
 
     string ExternalIdLabel { get; }
     string ExternalIdPlaceholder { get; }
 
-    Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null);
+    Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, CancellationToken cancellationToken = default);
 }
 
 public class ChronologyResult

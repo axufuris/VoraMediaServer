@@ -17,13 +17,13 @@ public interface IRequestManager
 {
     Task ProcessWatchlistAdditionAsync(string externalId, string providerId, string title, string type, string posterUrl, Guid profileId, DateTime? expectedReleaseDate);
 
-    Task<bool> ApproveRequestAsync(Guid requestId, Guid? specificServerId = null, int? overrideProfileId = null);
+    Task<bool> ApproveRequestAsync(Guid requestId, Guid? specificServerId = null, int? overrideProfileId = null, CancellationToken cancellationToken = default);
     Task<List<RequestServerVM>> GetAllServersAsync();
     Task<RequestServer> AddServerAsync(SaveRequestServerDto dto);
     Task UpdateServerAsync(Guid id, SaveRequestServerDto dto);
     Task DeleteServerAsync(Guid id);
     Task<List<MediaRequestVM>> GetAllRequestsAsync();
-    Task<IEnumerable<ProviderOptionDto>> GetProviderOptionsAsync(string providerId, string optionType, string host, int port, bool useSsl, string urlBase, string apiKey);
+    Task<IEnumerable<ProviderOptionDto>> GetProviderOptionsAsync(string providerId, string optionType, string host, int port, bool useSsl, string urlBase, string apiKey, CancellationToken cancellationToken = default);
     Task DeleteRequestAsync(Guid id);
     Task ResolveRequestAsync(string externalId, string type, Guid? mediaItemId = null);
     Task<int?> GetRequestStatusAsync(string externalId, string type);
@@ -104,7 +104,7 @@ public class RequestManager : IRequestManager
         }
     }
 
-    public async Task<bool> ApproveRequestAsync(Guid requestId, Guid? specificServerId = null, int? overrideProfileId = null)
+    public async Task<bool> ApproveRequestAsync(Guid requestId, Guid? specificServerId = null, int? overrideProfileId = null, CancellationToken cancellationToken = default)
     {
         var request = await _requestRepo.GetRequestByIdAsync(requestId);
         if (request == null || request.Status == RequestStatus.Available) return false;
@@ -141,7 +141,8 @@ public class RequestManager : IRequestManager
             serverToUse.UseSsl,
             serverToUse.UrlBase,
             serverToUse.ApiKey,
-            settingsJson);
+            settingsJson,
+            cancellationToken);
 
         if (success)
         {
@@ -206,7 +207,7 @@ public class RequestManager : IRequestManager
 
     public async Task<List<MediaRequestVM>> GetAllRequestsAsync() => await _requestRepo.GetAllRequestsAsync();
 
-    public async Task<IEnumerable<ProviderOptionDto>> GetProviderOptionsAsync(string providerId, string optionType, string host, int port, bool useSsl, string urlBase, string apiKey)
+    public async Task<IEnumerable<ProviderOptionDto>> GetProviderOptionsAsync(string providerId, string optionType, string host, int port, bool useSsl, string urlBase, string apiKey, CancellationToken cancellationToken = default)
     {
         var allPlugins = _serviceProvider.GetServices<IVoraPlugin>();
         var plugin = allPlugins.OfType<IRequestProvider>().FirstOrDefault(p => p.Id == providerId);
@@ -218,11 +219,11 @@ public class RequestManager : IRequestManager
 
         if (optionType.Equals("qualityProfiles", StringComparison.OrdinalIgnoreCase))
         {
-            return await plugin.GetQualityProfilesAsync(host, port, useSsl, urlBase, apiKey);
+            return await plugin.GetQualityProfilesAsync(host, port, useSsl, urlBase, apiKey, cancellationToken);
         }
         else if (optionType.Equals("rootFolders", StringComparison.OrdinalIgnoreCase))
         {
-            return await plugin.GetRootFoldersAsync(host, port, useSsl, urlBase, apiKey);
+            return await plugin.GetRootFoldersAsync(host, port, useSsl, urlBase, apiKey, cancellationToken);
         }
 
         return new List<ProviderOptionDto>();

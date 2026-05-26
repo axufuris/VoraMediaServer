@@ -27,7 +27,7 @@ public class TheAudioDbMusicArtworkProvider : IMusicArtworkProvider
     public bool IsSystemPlugin => true;
     public string Type => "Artwork";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Music" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Music };
 
     public TheAudioDbMusicArtworkProvider(IHttpClientFactory httpClientFactory, IServiceScopeFactory scopeFactory, ILogger<TheAudioDbMusicArtworkProvider> logger)
     {

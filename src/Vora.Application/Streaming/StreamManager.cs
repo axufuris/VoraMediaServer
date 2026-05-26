@@ -22,15 +22,20 @@ public interface IStreamManager
 
 public class StreamManager : IStreamManager
 {
+    public const string PlayTokenScope = "play";
+    public static readonly TimeSpan PlayTokenTtl = TimeSpan.FromHours(4);
+
     private readonly IStreamRepository _repository;
     private readonly IBestPathDecisionManager _decisionManager;
     private readonly ISystemSettingsRepository _settingsRepo;
+    private readonly IStreamingTokenSigner _tokenSigner;
 
-    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo)
+    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner)
     {
         _repository = repository;
         _decisionManager = decisionManager;
         _settingsRepo = settingsRepo;
+        _tokenSigner = tokenSigner;
     }
 
     public async Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null)
@@ -137,7 +142,8 @@ public class StreamManager : IStreamManager
 
         var createdSession = await _repository.CreateSessionAsync(session);
 
-        return (createdSession, $"/api/streaming/play/{createdSession.Id}");
+        var playToken = _tokenSigner.Sign(PlayTokenScope, createdSession.Id.ToString(), PlayTokenTtl);
+        return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}");
     }
 
     public async Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search)

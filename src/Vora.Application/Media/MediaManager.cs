@@ -1,5 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Vora.Application.Analysis;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Media.Requests;
@@ -42,7 +42,7 @@ public class MediaManager : IMediaManager
     private readonly ITaskQueueManager _taskQueueManager;
     private readonly ISystemSettingsRepository _settingsRepository;
     private readonly IEnumerable<ILocalMediaScannerProvider> _scanners;
-    private readonly IConfiguration _config;
+    private readonly StoragePathsOptions _storagePaths;
     private readonly Vora.Application.Thumbnails.IVideoThumbnailStorageService _thumbnailStorage;
     private readonly ILogger<MediaManager> _logger;
 
@@ -53,7 +53,7 @@ public class MediaManager : IMediaManager
         ITaskQueueManager taskQueueManager,
         ISystemSettingsRepository settingsRepository,
         IEnumerable<ILocalMediaScannerProvider> scanners,
-        IConfiguration config,
+        IOptions<StoragePathsOptions> storagePaths,
         Vora.Application.Thumbnails.IVideoThumbnailStorageService thumbnailStorage,
         ILogger<MediaManager> logger)
     {
@@ -63,7 +63,7 @@ public class MediaManager : IMediaManager
         _taskQueueManager = taskQueueManager;
         _settingsRepository = settingsRepository;
         _scanners = scanners;
-        _config = config;
+        _storagePaths = storagePaths.Value;
         _thumbnailStorage = thumbnailStorage;
         _logger = logger;
     }
@@ -178,7 +178,7 @@ public class MediaManager : IMediaManager
 
         ApplyPosterChange(season, request.PosterUrl);
 
-        season.Title = request.Title;
+        season.Title = request.Title ?? season.Title;
         season.Overview = request.Overview;
         season.LockedFields = request.LockedFields;
 
@@ -252,7 +252,7 @@ public class MediaManager : IMediaManager
 
     private void CleanupOrphanedOverlay(MediaItem item)
     {
-        var configPath = _config["StoragePaths:CustomArtwork"];
+        var configPath = _storagePaths.CustomArtwork;
         var overlayDir = !string.IsNullOrWhiteSpace(configPath)
             ? configPath
             : Path.Combine(AppContext.BaseDirectory, DefaultStorageRoot, DefaultCustomArtworkFolder);

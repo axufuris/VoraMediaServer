@@ -75,7 +75,7 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
         return string.IsNullOrWhiteSpace(language) ? "en-US" : language.Trim();
     }
 
-    public async Task<IEnumerable<DiscoveryRowDefinitionDto>> GetAvailableRowsAsync()
+    public async Task<IEnumerable<DiscoveryRowDefinitionDto>> GetAvailableRowsAsync(CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
         if (string.IsNullOrEmpty(apiKey)) return new List<DiscoveryRowDefinitionDto>();
@@ -90,7 +90,7 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
         };
     }
 
-    public async Task<IEnumerable<DiscoveryItemDto>> GetRowItemsAsync(string rowId, int page = 1)
+    public async Task<IEnumerable<DiscoveryItemDto>> GetRowItemsAsync(string rowId, int page = 1, CancellationToken cancellationToken = default)
     {
         var region = await GetRegionAsync();
         var language = await GetLanguageAsync();
@@ -130,11 +130,11 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
 
             if (string.IsNullOrEmpty(url)) return new List<DiscoveryItemDto>();
 
-            var response = await _httpClient.GetAsync($"{url}&api_key={apiKey}");
+            var response = await _httpClient.GetAsync($"{url}&api_key={apiKey}", cancellationToken);
             if (!response.IsSuccessStatusCode) return new List<DiscoveryItemDto>();
 
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var doc = await JsonDocument.ParseAsync(stream);
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             var results = new List<DiscoveryItemDto>();
 
             bool isTv = rowId.StartsWith("tv_");
@@ -162,7 +162,7 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
         return cachedItems ?? new List<DiscoveryItemDto>();
     }
 
-    public async Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string externalId, string type)
+    public async Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string externalId, string type, CancellationToken cancellationToken = default)
     {
         var language = await GetLanguageAsync();
         var cacheKey = $"tmdb_details_{type}_{externalId}_{language}";
@@ -178,11 +178,11 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
             var isTv = type.Equals("TvShow", StringComparison.OrdinalIgnoreCase);
             var endpoint = isTv ? $"tv/{externalId}" : $"movie/{externalId}";
 
-            var response = await _httpClient.GetAsync($"{endpoint}?api_key={apiKey}&append_to_response=credits,videos&language={language}");
+            var response = await _httpClient.GetAsync($"{endpoint}?api_key={apiKey}&append_to_response=credits,videos&language={language}", cancellationToken);
             if (!response.IsSuccessStatusCode) return null;
 
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var doc = await JsonDocument.ParseAsync(stream);
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             var el = doc.RootElement;
 
             var rawDate = el.TryGetProperty(isTv ? "first_air_date" : "release_date", out var dStr) ? dStr.GetString() : "";
@@ -248,7 +248,7 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
         });
     }
 
-    public async Task<DiscoveryActorDto?> GetActorDetailsAsync(string externalId)
+    public async Task<DiscoveryActorDto?> GetActorDetailsAsync(string externalId, CancellationToken cancellationToken = default)
     {
         var language = await GetLanguageAsync();
         var cacheKey = $"tmdb_actor_{externalId}_{language}";
@@ -261,11 +261,11 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
             var apiKey = await GetApiKeyAsync();
             if (string.IsNullOrEmpty(apiKey)) return null;
 
-            var response = await _httpClient.GetAsync($"person/{externalId}?api_key={apiKey}&append_to_response=combined_credits&language={language}");
+            var response = await _httpClient.GetAsync($"person/{externalId}?api_key={apiKey}&append_to_response=combined_credits&language={language}", cancellationToken);
             if (!response.IsSuccessStatusCode) return null;
 
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var doc = await JsonDocument.ParseAsync(stream);
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             var el = doc.RootElement;
 
             var actor = new DiscoveryActorDto
@@ -311,7 +311,7 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
         });
     }
 
-    public async Task<IEnumerable<DiscoveryItemDto>> SearchAsync(string query)
+    public async Task<IEnumerable<DiscoveryItemDto>> SearchAsync(string query, CancellationToken cancellationToken = default)
     {
         var language = await GetLanguageAsync();
         var cacheKey = $"tmdb_search_{query.ToLowerInvariant()}_{language}";
@@ -324,11 +324,11 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
             var apiKey = await GetApiKeyAsync();
             if (string.IsNullOrEmpty(apiKey)) return new List<DiscoveryItemDto>();
 
-            var response = await _httpClient.GetAsync($"search/multi?api_key={apiKey}&query={Uri.EscapeDataString(query)}&language={language}&page=1");
+            var response = await _httpClient.GetAsync($"search/multi?api_key={apiKey}&query={Uri.EscapeDataString(query)}&language={language}&page=1", cancellationToken);
             if (!response.IsSuccessStatusCode) return new List<DiscoveryItemDto>();
 
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var doc = await JsonDocument.ParseAsync(stream);
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             var results = new List<DiscoveryItemDto>();
 
             foreach (var el in doc.RootElement.GetProperty("results").EnumerateArray())

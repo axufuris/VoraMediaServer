@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { searchService, type AggregatedGlobalSearchResponse } from '../../api/Discovery/searchService';
 import { discoveryService, type DiscoveryItem } from '../../api/Discovery/discoveryService';
+import { StorageKeys, SessionKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 import MediaCard from '../../components/Media/MediaCard';
 import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
@@ -100,11 +101,11 @@ export default function SearchPage() {
             const navState = albumId
                 ? { view: 'album', albumId, artistId }
                 : { view: 'artist', artistId };
-            sessionStorage.setItem('music_nav_state', JSON.stringify(navState));
+            sessionStorage.setItem(SessionKeys.musicNavState, JSON.stringify(navState));
             sessionStorage.setItem('audio_active_tab', 'Music');
-            const token = localStorage.getItem('profile_token');
-            const profileId = token ? JSON.parse(atob(token.split('.')[1])).sub : '';
-            sessionStorage.setItem('music_nav_profile', profileId || '');
+            const token = localStorage.getItem(StorageKeys.profileToken);
+            const profileId = getProfileIdFromToken(token) ?? '';
+            sessionStorage.setItem(SessionKeys.musicNavProfile, profileId || '');
         } catch { /* ignore */ }
         navigate(`/server/${targetServerId}/audio`);
     };
@@ -196,15 +197,15 @@ export default function SearchPage() {
                         <div className="flex flex-wrap gap-4">
                             {results.actors.map(a => (
                                 <div key={`${a.serverId}-${a.id}`} onClick={() => navigateToActor(a.serverId, a.id)} className="flex flex-col items-center cursor-pointer group w-28 sm:w-32 shrink-0">
-                                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-gray-800 mb-3 border-2 border-transparent group-hover:border-orange-500 transition-all shadow-lg">
+                                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-[var(--vora-bg-sunken)] mb-3 border-2 border-transparent group-hover:border-[var(--vora-accent-500)] transition-all shadow-lg">
                                         {a.profileImageUrl ? (
                                             <img src={a.profileImageUrl} alt={a.name} className="w-full h-full object-cover" />
                                         ) : (
-                                            <svg className="w-full h-full text-gray-600 p-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
+                                            <svg className="w-full h-full text-[var(--vora-text-muted)] p-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
                                         )}
                                     </div>
-                                    <span className="text-gray-300 font-medium text-center text-sm group-hover:text-white transition-colors">{a.name}</span>
-                                    {showServerLabels && <span className="text-xs text-gray-500 mt-0.5">{a.serverName}</span>}
+                                    <span className="text-[var(--vora-text-secondary)] font-medium text-center text-sm group-hover:text-[var(--vora-text-primary)] transition-colors">{a.name}</span>
+                                    {showServerLabels && <span className="text-xs text-[var(--vora-text-muted)] mt-0.5">{a.serverName}</span>}
                                 </div>
                             ))}
                         </div>
@@ -244,13 +245,13 @@ export default function SearchPage() {
                                         onClick={() => handleMusicNavigate(r.serverId, r.artistId, r.albumId)}
                                         className="w-32 sm:w-40 shrink-0 cursor-pointer group"
                                     >
-                                        <div className={`w-full aspect-square bg-gray-900 border border-gray-800 group-hover:border-orange-500 transition-all overflow-hidden flex items-center justify-center mb-3 ${r.type === 'Artist' ? 'rounded-full' : 'rounded'}`}>
+                                        <div className={`w-full aspect-square bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-all overflow-hidden flex items-center justify-center mb-3 ${r.type === 'Artist' ? 'rounded-full' : 'rounded'}`}>
                                             {r.artworkUrl
                                                 ? <img src={r.artworkUrl} alt={r.title} className="w-full h-full object-cover" />
-                                                : <svg className="w-10 h-10 text-gray-700" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>}
+                                                : <svg className="w-10 h-10 text-[var(--vora-text-muted)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>}
                                         </div>
-                                        <div className="text-sm font-bold text-gray-200 truncate" title={r.title}>{r.title}</div>
-                                        <div className="text-xs text-gray-500 truncate">{subtitle}</div>
+                                        <div className="text-sm font-bold text-[var(--vora-text-secondary)] truncate" title={r.title}>{r.title}</div>
+                                        <div className="text-xs text-[var(--vora-text-muted)] truncate">{subtitle}</div>
                                     </div>
                                 );
                             })}

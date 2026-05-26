@@ -44,8 +44,8 @@ export default function ResetPasswordPage() {
             setError('Reset link is missing the token. Request a new link from the sign-in page.');
             return;
         }
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters.');
+        if (password.length < 8) {
+            setError('Password must be at least 8 characters.');
             return;
         }
         if (password !== confirmPassword) {

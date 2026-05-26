@@ -1,14 +1,15 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Vora.Application.FileSystem;
+using Vora.Application.Settings;
 
 namespace Vora.Application.Users;
 
 public interface IUserProfileImageService
 {
-    Task<string> UploadAsync(IFormFile file, string? oldImageUrl);
+    Task<string> UploadAsync(UploadedFile file, string? oldImageUrl);
     void DeleteImage(string? imageUrl);
-    string ResolvePath(string fileName);
+    string? ResolvePath(string fileName);
 }
 
 public class UserProfileImageService : IUserProfileImageService
@@ -18,10 +19,10 @@ public class UserProfileImageService : IUserProfileImageService
     private readonly ILogger<UserProfileImageService> _logger;
     private readonly string _basePath;
 
-    public UserProfileImageService(IConfiguration config, ILogger<UserProfileImageService> logger)
+    public UserProfileImageService(IOptions<StoragePathsOptions> storagePaths, ILogger<UserProfileImageService> logger)
     {
         _logger = logger;
-        var configured = config["StoragePaths:UserImages"];
+        var configured = storagePaths.Value.UserImages;
         _basePath = !string.IsNullOrWhiteSpace(configured)
             ? configured
             : Path.Combine(AppContext.BaseDirectory, "Users");
@@ -31,9 +32,9 @@ public class UserProfileImageService : IUserProfileImageService
         }
     }
 
-    public string ResolvePath(string fileName) => Path.Combine(_basePath, fileName);
+    public string? ResolvePath(string fileName) => SafePathResolver.ResolveContainedFilePath(_basePath, fileName);
 
-    public async Task<string> UploadAsync(IFormFile file, string? oldImageUrl)
+    public async Task<string> UploadAsync(UploadedFile file, string? oldImageUrl)
     {
         if (!string.IsNullOrWhiteSpace(oldImageUrl))
         {
@@ -47,7 +48,7 @@ public class UserProfileImageService : IUserProfileImageService
         try
         {
             await using var stream = new FileStream(filePath, FileMode.Create);
-            await file.CopyToAsync(stream);
+            await file.Content.CopyToAsync(stream);
         }
         catch (Exception ex)
         {
@@ -68,8 +69,8 @@ public class UserProfileImageService : IUserProfileImageService
         try
         {
             var fileName = imageUrl.Split('/').Last();
-            var physicalPath = Path.Combine(_basePath, fileName);
-            if (File.Exists(physicalPath))
+            var physicalPath = SafePathResolver.ResolveContainedFilePath(_basePath, fileName);
+            if (physicalPath != null && File.Exists(physicalPath))
             {
                 File.Delete(physicalPath);
             }

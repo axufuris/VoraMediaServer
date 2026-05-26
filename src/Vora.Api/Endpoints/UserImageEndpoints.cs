@@ -1,9 +1,14 @@
-﻿using Vora.Application.Users;
+using System.Text.RegularExpressions;
+using Vora.Application.FileSystem;
+using Vora.Application.Users;
 
 namespace Vora.Api.Endpoints;
 
-public static class UserImageEndpoints
+public static partial class UserImageEndpoints
 {
+    [GeneratedRegex(@"^profile_[A-Za-z0-9._-]+\.(png|jpg|jpeg|webp)$", RegexOptions.IgnoreCase)]
+    private static partial Regex ProfileImageFileNameRegex();
+
     public static RouteGroupBuilder MapUserImageEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/api/users/images").WithTags("User Images");
@@ -32,15 +37,21 @@ public static class UserImageEndpoints
         }
 
         var oldUrl = request.Form["oldUrl"].ToString();
-        var url = await imgService.UploadAsync(file, oldUrl);
+        await using var stream = file.OpenReadStream();
+        var url = await imgService.UploadAsync(new UploadedFile(stream, file.FileName, file.ContentType), oldUrl);
 
         return Results.Ok(new { Url = url });
     }
 
-    private static IResult ServeCustomImage(string fileName, IUserProfileImageService imgService)
+    private static IResult ServeCustomImage(string fileName, IUserProfileImageService imgService, HttpContext httpContext)
     {
+        if (string.IsNullOrWhiteSpace(fileName) || !ProfileImageFileNameRegex().IsMatch(fileName))
+        {
+            return Results.NotFound();
+        }
+
         var path = imgService.ResolvePath(fileName);
-        if (!File.Exists(path))
+        if (path == null || !File.Exists(path))
         {
             return Results.NotFound();
         }
@@ -49,11 +60,11 @@ public static class UserImageEndpoints
         var mime = ext switch
         {
             ".png" => "image/png",
-            ".gif" => "image/gif",
             ".webp" => "image/webp",
             _ => "image/jpeg"
         };
 
+        httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
         return Results.File(path, contentType: mime);
     }
 }

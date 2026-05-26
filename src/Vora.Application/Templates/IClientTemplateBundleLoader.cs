@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace Vora.Application.Templates;
 
@@ -20,12 +21,14 @@ public class ClientTemplateBundleLoader : IClientTemplateBundleLoader
     };
 
     private readonly string _bundlesRootPath;
+    private readonly ILogger<ClientTemplateBundleLoader> _logger;
     private readonly object _lock = new();
     private Dictionary<string, TemplateBundle> _bundles = new(StringComparer.Ordinal);
 
-    public ClientTemplateBundleLoader(string bundlesRootPath)
+    public ClientTemplateBundleLoader(string bundlesRootPath, ILogger<ClientTemplateBundleLoader> logger)
     {
         _bundlesRootPath = bundlesRootPath;
+        _logger = logger;
         Refresh();
     }
 
@@ -61,28 +64,28 @@ public class ClientTemplateBundleLoader : IClientTemplateBundleLoader
             var manifestPath = Path.Combine(dir, "manifest.json");
             if (!File.Exists(manifestPath))
             {
-                Console.WriteLine($"[Client templates] Skipping {folderName}: missing manifest.json");
+                _logger.LogWarning("Skipping client template {FolderName}: missing manifest.json", folderName);
                 continue;
             }
 
             try
             {
                 var json = File.ReadAllText(manifestPath);
-                var bundle = ParseAndValidate(json, dir, folderName);
+                var bundle = ParseAndValidate(json, dir, folderName, _logger);
                 if (bundle != null)
                 {
                     if (loaded.ContainsKey(bundle.Id))
                     {
-                        Console.WriteLine($"[Client templates] Skipping {folderName}: duplicate template id '{bundle.Id}'");
+                        _logger.LogWarning("Skipping client template {FolderName}: duplicate template id '{BundleId}'", folderName, bundle.Id);
                         continue;
                     }
                     loaded[bundle.Id] = bundle;
-                    Console.WriteLine($"[Client templates] Loaded '{bundle.Id}' ({bundle.Name})");
+                    _logger.LogInformation("Loaded client template '{BundleId}' ({BundleName})", bundle.Id, bundle.Name);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Client templates] Failed to load {folderName}: {ex.Message}");
+                _logger.LogError(ex, "Failed to load client template {FolderName}", folderName);
             }
         }
 
@@ -90,34 +93,34 @@ public class ClientTemplateBundleLoader : IClientTemplateBundleLoader
         return loaded.Count;
     }
 
-    private static TemplateBundle? ParseAndValidate(string rawJson, string bundlePath, string folderName)
+    private static TemplateBundle? ParseAndValidate(string rawJson, string bundlePath, string folderName, ILogger logger)
     {
         using var doc = JsonDocument.Parse(rawJson);
         var root = doc.RootElement;
 
-        if (root.ValueKind != JsonValueKind.Object) return Reject(folderName, "root is not an object");
+        if (root.ValueKind != JsonValueKind.Object) return Reject(folderName, "root is not an object", logger);
 
         var id = TryGetString(root, "id");
         var name = TryGetString(root, "name");
         var version = TryGetString(root, "version");
 
-        if (string.IsNullOrWhiteSpace(id)) return Reject(folderName, "missing 'id'");
-        if (string.IsNullOrWhiteSpace(name)) return Reject(folderName, "missing 'name'");
-        if (string.IsNullOrWhiteSpace(version)) return Reject(folderName, "missing 'version'");
+        if (string.IsNullOrWhiteSpace(id)) return Reject(folderName, "missing 'id'", logger);
+        if (string.IsNullOrWhiteSpace(name)) return Reject(folderName, "missing 'name'", logger);
+        if (string.IsNullOrWhiteSpace(version)) return Reject(folderName, "missing 'version'", logger);
 
         if (!string.Equals(folderName, id, StringComparison.Ordinal))
         {
-            return Reject(folderName, $"folder name '{folderName}' must match manifest id '{id}'");
+            return Reject(folderName, $"folder name '{folderName}' must match manifest id '{id}'", logger);
         }
 
         if (ReservedIds.Contains(id!))
         {
-            return Reject(folderName, $"id '{id}' is reserved for built-in templates");
+            return Reject(folderName, $"id '{id}' is reserved for built-in templates", logger);
         }
 
         if (!root.TryGetProperty("tokens", out var tokens) || tokens.ValueKind != JsonValueKind.Object)
         {
-            return Reject(folderName, "missing or invalid 'tokens' block");
+            return Reject(folderName, "missing or invalid 'tokens' block", logger);
         }
 
         return new TemplateBundle
@@ -133,9 +136,9 @@ public class ClientTemplateBundleLoader : IClientTemplateBundleLoader
         };
     }
 
-    private static TemplateBundle? Reject(string folderName, string reason)
+    private static TemplateBundle? Reject(string folderName, string reason, ILogger logger)
     {
-        Console.WriteLine($"[Client templates] Rejected {folderName}: {reason}");
+        logger.LogWarning("Rejected client template {FolderName}: {Reason}", folderName, reason);
         return null;
     }
 

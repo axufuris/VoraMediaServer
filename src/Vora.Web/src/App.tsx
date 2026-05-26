@@ -1,88 +1,91 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams, Outlet } from 'react-router-dom';
-import { useEffect, type ReactElement } from 'react';
+import { useEffect, lazy, Suspense, type ReactElement } from 'react';
 import { serverVault } from './utils/serverVault';
+import { StorageKeys, getProfileIdFromToken } from './utils/storageKeys';
 import MainLayout from './layouts/MainLayout';
 import AdminShell from './components/Admin/Shell/AdminShell';
-import ClientLibraryPage from './pages/Client/LibraryPage';
-import LibraryDashboard from './pages/Client/LibraryDashboard';
-import ManageLibrary from './pages/Admin/Libraries/ManageLibrary';
-import ClientMediaDetailsPage from './pages/Client/Media/MediaDetailsPage';
-import ClientCollectionDetailsPage from './pages/Client/Collections/CollectionDetailsPage';
-import ClientCollectionsPage from './pages/Client/Collections/CollectionsPage';
-import TaskDashboard from './pages/Admin/Tasks/TaskDashboard';
-import ClientActorDetailsPage from './pages/Client/Media/ActorDetailsPage';
-import ClientHomePage from './pages/Client/HomePage';
-import AdminSmartListsPage from './pages/Admin/SmartLists/SmartListsPage';
-import AdminPluginsPage from './pages/Admin/PluginsPage';
-import AdminSettingsPage from './pages/Admin/SettingsPage';
-import CreateLibrary from './pages/Admin/Libraries/CreateLibrary';
-import RegisterPage from './pages/Auth/RegisterPage';
-import AccountSettingsPage from './pages/Profile/AccountSettingsPage';
-import AdminUserManagementPage from './pages/Admin/UserManagementPage';
-import AdminInvitationsPage from './pages/Admin/InvitationsPage';
-import AuthorizedDevicesPage from './pages/Admin/AuthorizedDevicesPage';
 import { PlayerProvider } from './contexts/PlayerContext';
 import { DialogProvider } from './dialogs';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { ClientTemplateProvider } from './theme/ClientTemplateProvider';
-import AdminDashboardPage from './pages/Admin/DashboardPage';
-import AdminAppearancePage from './pages/Admin/AppearancePage';
-import AdminTemplateSchedulesPage from './pages/Admin/Templates/SchedulesPage';
-import AdminHistoryPage from './pages/Admin/HistoryPage';
-import ProfileHistoryPage from './pages/Client/ProfileHistoryPage';
+
 import SetupPage from './pages/Auth/SetupPage';
 import LoginPage from './pages/Auth/LoginPage';
+import RegisterPage from './pages/Auth/RegisterPage';
 import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/Auth/ResetPasswordPage';
 import ProfileSelectionPage from './pages/Profile/ProfileSelectionPage';
-import ClientPlaylistsPage from './pages/Client/Playlists/PlaylistsPage';
-import ClientPlaylistDetailsPage from './pages/Client/Playlists/PlaylistDetailsPage';
-import SmartPlaylistDetailsPage from './pages/Client/Playlists/SmartPlaylistDetailsPage';
-import SearchPage from './pages/Client/SearchPage';
-import AdminDiscoveryPage from './pages/Admin/Discovery/DiscoveryPage';
-import ClientDiscoveryPage from './pages/Client/Discovery/DiscoveryPage';
-import ClientDiscoveryDetailsPage from './pages/Client/Discovery/DiscoveryDetailsPage';
-import ClientDiscoveryActorPage from './pages/Client/Discovery/DiscoveryActorPage';
-import ClientWatchlistPage from './pages/Client/WatchlistPage';
-import ClientYouTubePage from './pages/Client/YouTube/YouTubePage';
-import ClientYouTubeChannelPage from './pages/Client/YouTube/YouTubeChannelPage';
-import ClientYouTubePlayerPage from './pages/Client/YouTube/YouTubePlayerPage';
-import ClientYouTubeSubscriptionsPage from './pages/Client/YouTube/YouTubeSubscriptionsPage';
-import AdminYouTubePage from './pages/Admin/Features/YouTubeAdminPage';
-import ClientDiscoveryViewAllPage from './pages/Client/Discovery/DiscoveryViewAllPage';
-import AdminRequestsPage from './pages/Admin/RequestsPage';
-import CalendarPage from './pages/Client/CalendarPage';
-import ClientRecommendationsPage from './pages/Client/RecommendationsPage';
-import AdminAiStatsPage from './pages/Admin/AiStatsPage';
-import AdminDedupePage from './pages/Admin/DedupePage';
-import OverlayEditor from './pages/Admin/Overlay/OverlayEditor';
-import AdminIptvPage from './pages/Admin/Iptv/IptvPage';
-import AdminForYouPage from './pages/Admin/Features/ForYouPage';
-import AdminReleaseCalendarPage from './pages/Admin/Features/ReleaseCalendarPage';
-import AdminDvrPage from './pages/Admin/Features/DvrPage';
-import AdminCollectionsPage from './pages/Admin/Features/CollectionsAdminPage';
-import AdminMusicPage from './pages/Admin/Features/MusicAdminPage';
+
+const ClientLibraryPage = lazy(() => import('./pages/Client/LibraryPage'));
+const LibraryDashboard = lazy(() => import('./pages/Client/LibraryDashboard'));
+const ManageLibrary = lazy(() => import('./pages/Admin/Libraries/ManageLibrary'));
+const ClientMediaDetailsPage = lazy(() => import('./pages/Client/Media/MediaDetailsPage'));
+const ClientCollectionDetailsPage = lazy(() => import('./pages/Client/Collections/CollectionDetailsPage'));
+const ClientCollectionsPage = lazy(() => import('./pages/Client/Collections/CollectionsPage'));
+const TaskDashboard = lazy(() => import('./pages/Admin/Tasks/TaskDashboard'));
+const ClientActorDetailsPage = lazy(() => import('./pages/Client/Media/ActorDetailsPage'));
+const ClientHomePage = lazy(() => import('./pages/Client/HomePage'));
+const AdminSmartListsPage = lazy(() => import('./pages/Admin/SmartLists/SmartListsPage'));
+const AdminPluginsPage = lazy(() => import('./pages/Admin/PluginsPage'));
+const AdminSettingsPage = lazy(() => import('./pages/Admin/SettingsPage'));
+const CreateLibrary = lazy(() => import('./pages/Admin/Libraries/CreateLibrary'));
+const AccountSettingsPage = lazy(() => import('./pages/Profile/AccountSettingsPage'));
+const AdminUserManagementPage = lazy(() => import('./pages/Admin/UserManagementPage'));
+const AdminInvitationsPage = lazy(() => import('./pages/Admin/InvitationsPage'));
+const AuthorizedDevicesPage = lazy(() => import('./pages/Admin/AuthorizedDevicesPage'));
+const AdminDashboardPage = lazy(() => import('./pages/Admin/DashboardPage'));
+const AdminAppearancePage = lazy(() => import('./pages/Admin/AppearancePage'));
+const AdminTemplateSchedulesPage = lazy(() => import('./pages/Admin/Templates/SchedulesPage'));
+const AdminHistoryPage = lazy(() => import('./pages/Admin/HistoryPage'));
+const ProfileHistoryPage = lazy(() => import('./pages/Client/ProfileHistoryPage'));
+const ClientPlaylistsPage = lazy(() => import('./pages/Client/Playlists/PlaylistsPage'));
+const ClientPlaylistDetailsPage = lazy(() => import('./pages/Client/Playlists/PlaylistDetailsPage'));
+const SmartPlaylistDetailsPage = lazy(() => import('./pages/Client/Playlists/SmartPlaylistDetailsPage'));
+const SearchPage = lazy(() => import('./pages/Client/SearchPage'));
+const AdminDiscoveryPage = lazy(() => import('./pages/Admin/Discovery/DiscoveryPage'));
+const ClientDiscoveryPage = lazy(() => import('./pages/Client/Discovery/DiscoveryPage'));
+const ClientDiscoveryDetailsPage = lazy(() => import('./pages/Client/Discovery/DiscoveryDetailsPage'));
+const ClientDiscoveryActorPage = lazy(() => import('./pages/Client/Discovery/DiscoveryActorPage'));
+const ClientWatchlistPage = lazy(() => import('./pages/Client/WatchlistPage'));
+const ClientYouTubePage = lazy(() => import('./pages/Client/YouTube/YouTubePage'));
+const ClientYouTubeChannelPage = lazy(() => import('./pages/Client/YouTube/YouTubeChannelPage'));
+const ClientYouTubePlayerPage = lazy(() => import('./pages/Client/YouTube/YouTubePlayerPage'));
+const ClientYouTubeSubscriptionsPage = lazy(() => import('./pages/Client/YouTube/YouTubeSubscriptionsPage'));
+const AdminYouTubePage = lazy(() => import('./pages/Admin/Features/YouTubeAdminPage'));
+const ClientDiscoveryViewAllPage = lazy(() => import('./pages/Client/Discovery/DiscoveryViewAllPage'));
+const AdminRequestsPage = lazy(() => import('./pages/Admin/RequestsPage'));
+const CalendarPage = lazy(() => import('./pages/Client/CalendarPage'));
+const ClientRecommendationsPage = lazy(() => import('./pages/Client/RecommendationsPage'));
+const AdminAiStatsPage = lazy(() => import('./pages/Admin/AiStatsPage'));
+const AdminDedupePage = lazy(() => import('./pages/Admin/DedupePage'));
+const OverlayEditor = lazy(() => import('./pages/Admin/Overlay/OverlayEditor'));
+const AdminIptvPage = lazy(() => import('./pages/Admin/Iptv/IptvPage'));
+const AdminForYouPage = lazy(() => import('./pages/Admin/Features/ForYouPage'));
+const AdminReleaseCalendarPage = lazy(() => import('./pages/Admin/Features/ReleaseCalendarPage'));
+const AdminDvrPage = lazy(() => import('./pages/Admin/Features/DvrPage'));
+const AdminCollectionsPage = lazy(() => import('./pages/Admin/Features/CollectionsAdminPage'));
+const AdminMusicPage = lazy(() => import('./pages/Admin/Features/MusicAdminPage'));
 const AdminLiveTvPage = () => <AdminIptvPage kind="Tv" />;
 const AdminInternetRadioPage = () => <AdminIptvPage kind="Radio" />;
-import AdminPodcastsPage from './pages/Admin/Podcasts/PodcastsAdminPage';
-import AdminMusicHistoryPage from './pages/Admin/MusicHistoryPage';
-import AdminLogsPage from './pages/Admin/LogsPage';
-import AdminBackupsPage from './pages/Admin/BackupsPage';
-import AdminLibraryMigrationPage from './pages/Admin/LibraryMigrationPage';
-import LiveTvPage from './pages/Client/LiveTv/LiveTvPage';
-import ClientSettingsPage from './pages/Client/SettingsPage';
-import DvrDashboard from './pages/Client/LiveTv/DvrDashboard'; // <-- NEW
-import AudioHubPage from './pages/Client/Audio/AudioHubPage';
+const AdminPodcastsPage = lazy(() => import('./pages/Admin/Podcasts/PodcastsAdminPage'));
+const AdminMusicHistoryPage = lazy(() => import('./pages/Admin/MusicHistoryPage'));
+const AdminLogsPage = lazy(() => import('./pages/Admin/LogsPage'));
+const AdminBackupsPage = lazy(() => import('./pages/Admin/BackupsPage'));
+const AdminLibraryMigrationPage = lazy(() => import('./pages/Admin/LibraryMigrationPage'));
+const LiveTvPage = lazy(() => import('./pages/Client/LiveTv/LiveTvPage'));
+const ClientSettingsPage = lazy(() => import('./pages/Client/SettingsPage'));
+const DvrDashboard = lazy(() => import('./pages/Client/LiveTv/DvrDashboard'));
+const AudioHubPage = lazy(() => import('./pages/Client/Audio/AudioHubPage'));
 
-if (!localStorage.getItem('device_id')) {
-    localStorage.setItem('device_id', crypto.randomUUID());
+if (!localStorage.getItem(StorageKeys.deviceId)) {
+    localStorage.setItem(StorageKeys.deviceId, crypto.randomUUID());
 }
 
-if (serverVault.getServers().length === 0 && localStorage.getItem('profile_token')) {
+if (serverVault.getServers().length === 0 && localStorage.getItem(StorageKeys.profileToken)) {
     try {
-        const token = localStorage.getItem('profile_token')!;
-        const profileId = JSON.parse(atob(token.split('.')[1])).sub;
-        const isAdmin = localStorage.getItem('is_server_admin') === 'true';
+        const token = localStorage.getItem(StorageKeys.profileToken)!;
+        const profileId = getProfileIdFromToken(token);
+        const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
 
         const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
         const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
@@ -115,22 +118,31 @@ const ServerContextWrapper = () => {
 
 const RequireAuth = ({ children }: { children: ReactElement }) => {
     const servers = serverVault.getServers();
-    let activeServer = serverVault.getActiveServer();
+    const activeServer = serverVault.getActiveServer();
+
+    useEffect(() => {
+        if (!activeServer && servers.length > 0) {
+            serverVault.setActiveServerId(servers[0].id);
+        }
+    }, [activeServer, servers]);
 
     if (servers.length === 0) {
         return <Navigate to="/login" replace />;
     }
 
-    if (!activeServer && servers.length > 0) {
-        serverVault.setActiveServerId(servers[0].id);
-        activeServer = servers[0];
-    }
-
-    const profileToken = localStorage.getItem('profile_token');
+    const profileToken = localStorage.getItem(StorageKeys.profileToken);
     if (!profileToken) {
         return <Navigate to="/profiles" replace />;
     }
 
+    return children;
+};
+
+const RequireAdmin = ({ children }: { children: ReactElement }) => {
+    const isServerAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
+    if (!isServerAdmin) {
+        return <Navigate to="/" replace />;
+    }
     return children;
 };
 
@@ -141,6 +153,7 @@ export default function App() {
                 <BrowserRouter>
                     <ThemeProvider>
                         <ClientTemplateProvider>
+                        <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center" style={{ background: 'var(--vora-bg-canvas)' }}><div className="vora-skeleton h-12 w-48" /></div>}>
                         <Routes>
                     <Route path="/setup" element={<SetupPage />} />
                     <Route path="/login" element={<LoginPage />} />
@@ -209,7 +222,7 @@ export default function App() {
                     </Route>
 
                     {/* ADMIN ROUTES */}
-                    <Route path="/admin" element={<RequireAuth><AdminShell /></RequireAuth>}>
+                    <Route path="/admin" element={<RequireAuth><RequireAdmin><AdminShell /></RequireAdmin></RequireAuth>}>
                         <Route index element={<AdminDashboardPage />} />
                         <Route path="history" element={<AdminHistoryPage />} />
                         <Route path="libraries" element={<LibraryDashboard />} />
@@ -281,6 +294,7 @@ export default function App() {
 
                         <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
+                        </Suspense>
                         </ClientTemplateProvider>
                     </ThemeProvider>
                 </BrowserRouter>

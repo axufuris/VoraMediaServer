@@ -5,7 +5,6 @@ public interface IServerPlaybackTracker
     void Heartbeat(ServerPlaybackHeartbeat heartbeat);
     void Stop(Guid profileId);
     List<ServerPlaybackSessionVM> GetActive(Guid? excludeProfileId);
-    int PruneExpired();
 }
 
 public sealed class ServerPlaybackHeartbeat

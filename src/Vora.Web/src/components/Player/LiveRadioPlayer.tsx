@@ -1,16 +1,18 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import Hls from 'hls.js';
-import { usePlayer } from '../../contexts/usePlayer';
+import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
 import { type IptvChannelVM } from '../../api/Iptv/iptvAdminService';
 import { iptvClientService } from '../../api/Iptv/iptvClientService';
 import { timeshiftService } from '../../api/Iptv/timeshiftService';
 import { passthroughService } from '../../api/Iptv/passthroughService';
 import { podcastService } from '../../api/Podcasts/podcastService';
 import { serverVault } from '../../utils/serverVault';
+import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../utils/storageKeys';
 import { PlayPauseButton, SkipButton, VolumeControl, MaximizeButton, CloseButton } from './Controls/PlayerButtons';
 
 export default function LiveRadioPlayer() {
-    const { currentMedia, isPlaying, isMinimized, volume, togglePlayPause, setMinimized, closePlayer, setVolume, videoRef, playMedia, skipForward, skipBackward, currentTime, duration, seek, nextTrack, previousTrack, hasNext, hasPrevious, queue, queueIndex, jumpToQueueIndex, isShuffled, toggleShuffle, repeatMode, cycleRepeatMode, setFullscreen, isFullscreen } = usePlayer();
+    const { currentMedia, isPlaying, isMinimized, volume, togglePlayPause, setMinimized, closePlayer, setVolume, videoRef, playMedia, skipForward, skipBackward, seek, nextTrack, previousTrack, hasNext, hasPrevious, queue, queueIndex, jumpToQueueIndex, isShuffled, toggleShuffle, repeatMode, cycleRepeatMode, setFullscreen, isFullscreen } = usePlayer();
+    const { currentTime, duration } = usePlayerTime();
 
     const [showQueue, setShowQueue] = useState(false);
 
@@ -23,11 +25,11 @@ export default function LiveRadioPlayer() {
     const isAudioOnDemand = isPodcast || isMusic;
 
     const canTimeshift = useMemo(() => {
-        const token = localStorage.getItem('profile_token');
+        const token = localStorage.getItem(StorageKeys.profileToken);
         if (!token) return false;
         try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            return payload.canTimeshiftIptv === 'True';
+            const payload = decodeJwtPayload(token);
+            return payload?.canTimeshiftIptv === 'True';
         } catch {
             return false;
         }
@@ -45,9 +47,9 @@ export default function LiveRadioPlayer() {
                 const activeServer = serverVault.getActiveServer();
                 if (!activeServer) return;
 
-                const profileToken = localStorage.getItem('profile_token');
-                const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : activeServer.profileId;
-                const userId = localStorage.getItem('user_id') || activeProfileId;
+                const profileToken = localStorage.getItem(StorageKeys.profileToken);
+                const activeProfileId = getProfileIdFromToken(profileToken) ?? activeServer.profileId;
+                const userId = localStorage.getItem(StorageKeys.userId) || activeProfileId;
 
                 const allProviders = await iptvClientService.getPlaylists(userId, activeProfileId, activeServer.id);
                 if (cancelled) return;
@@ -460,6 +462,7 @@ export default function LiveRadioPlayer() {
                                 max={duration || 100}
                                 value={currentTime}
                                 onChange={e => seek(Number(e.target.value))}
+                                aria-label="Playback position"
                                 className="h-1 w-full cursor-pointer appearance-none rounded-lg accent-[var(--vora-accent-500)]"
                                 style={{ background: 'rgba(255, 255, 255, 0.14)' }}
                             />

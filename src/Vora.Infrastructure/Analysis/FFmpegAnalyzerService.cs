@@ -5,11 +5,13 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Vora.Application.Analysis;
 using Vora.Application.Analysis.Results;
+using Vora.Infrastructure.Processes;
 
 namespace Vora.Infrastructure.Analysis;
 
 public class FFmpegAnalyzerService : IMediaAnalyzerService
 {
+    private static readonly TimeSpan ProcessTimeout = TimeSpan.FromHours(2);
     private static readonly Regex SilenceStartRegex = new(@"silence_start:\s*(?<Time>-?\d+(\.\d+)?)", RegexOptions.Compiled);
     private static readonly Regex SilenceEndRegex = new(@"silence_end:\s*(?<Time>-?\d+(\.\d+)?)", RegexOptions.Compiled);
     private static readonly Regex BlackStartRegex = new(@"black_start[:=]\s*(?<Time>\d+(\.\d+)?)", RegexOptions.Compiled);
@@ -37,11 +39,19 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         var processInfo = new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            Arguments = $"-i \"{filePath}\" -af volumedetect -vn -sn -f null -",
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        processInfo.ArgumentList.Add("-i");
+        processInfo.ArgumentList.Add(filePath);
+        processInfo.ArgumentList.Add("-af");
+        processInfo.ArgumentList.Add("volumedetect");
+        processInfo.ArgumentList.Add("-vn");
+        processInfo.ArgumentList.Add("-sn");
+        processInfo.ArgumentList.Add("-f");
+        processInfo.ArgumentList.Add("null");
+        processInfo.ArgumentList.Add("-");
 
         double? meanDb = null;
 
@@ -59,7 +69,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
 
         process.Start();
         process.BeginErrorReadLine();
-        await process.WaitForExitAsync();
+        await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger);
 
         return meanDb;
     }
@@ -116,11 +126,17 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         var processInfo = new ProcessStartInfo
         {
             FileName = "ffprobe",
-            Arguments = $"-v quiet -print_format json -show_streams -show_format \"{filePath}\"",
             RedirectStandardOutput = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        processInfo.ArgumentList.Add("-v");
+        processInfo.ArgumentList.Add("quiet");
+        processInfo.ArgumentList.Add("-print_format");
+        processInfo.ArgumentList.Add("json");
+        processInfo.ArgumentList.Add("-show_streams");
+        processInfo.ArgumentList.Add("-show_format");
+        processInfo.ArgumentList.Add(filePath);
 
         try
         {
@@ -128,7 +144,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             if (process == null) throw new InvalidOperationException("Failed to start FFprobe process.");
 
             string jsonOutput = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
+            await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger);
 
             if (string.IsNullOrWhiteSpace(jsonOutput)) return;
 
@@ -285,11 +301,19 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         var processInfo = new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            Arguments = $"-i \"{filePath}\" -af \"silencedetect=noise={noiseArg}dB:d={silenceMin}\" -vf \"blackdetect=d={blackMin}:pix_th=0.10\" -f null -",
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        processInfo.ArgumentList.Add("-i");
+        processInfo.ArgumentList.Add(filePath);
+        processInfo.ArgumentList.Add("-af");
+        processInfo.ArgumentList.Add($"silencedetect=noise={noiseArg}dB:d={silenceMin}");
+        processInfo.ArgumentList.Add("-vf");
+        processInfo.ArgumentList.Add($"blackdetect=d={blackMin}:pix_th=0.10");
+        processInfo.ArgumentList.Add("-f");
+        processInfo.ArgumentList.Add("null");
+        processInfo.ArgumentList.Add("-");
 
         using var process = new Process { StartInfo = processInfo };
 
@@ -316,7 +340,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
 
         process.Start();
         process.BeginErrorReadLine();
-        await process.WaitForExitAsync();
+        await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger);
 
         result.SilenceIntervals = ZipIntervals(silenceStarts, silenceEnds);
         result.BlackIntervals = ZipIntervals(blackStarts, blackEnds);

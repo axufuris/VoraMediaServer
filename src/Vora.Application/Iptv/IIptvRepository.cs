@@ -26,7 +26,6 @@ public interface IIptvRepository
     Task UpdateEpgSourceAsync(IptvEpgSource source);
     Task DeleteEpgSourceAsync(Guid id);
 
-    Task<bool> ProfileHasDvrPermissionAsync(Guid profileId);
     Task<IptvRecordingSchedule> CreateRecordingScheduleAsync(IptvRecordingSchedule schedule);
     Task<IptvTunerProfile?> GetTunerProfileByPlaylistIdAsync(Guid playlistId);
     Task<int> GetActiveRecordingCountForPlaylistAsync(Guid playlistId);

@@ -18,7 +18,7 @@ public class TmdbArtworkProvider : IArtworkProvider
     public bool IsSystemPlugin => true;
     public string Type => "Artwork";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Movie", "TvShow" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public TmdbArtworkProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory)
     {
@@ -32,7 +32,7 @@ public class TmdbArtworkProvider : IArtworkProvider
         return new List<PluginSettingDefinitionDto>();
     }
 
-    public async Task<IEnumerable<ArtworkResult>> GetArtworkAsync(string? tmdbId, string? tvdbId, string? imdbId, string mediaType, string? localPath = null, string? title = null)
+    public async Task<IEnumerable<ArtworkResult>> GetArtworkAsync(string? tmdbId, string? tvdbId, string? imdbId, string mediaType, string? localPath = null, string? title = null, CancellationToken cancellationToken = default)
     {
         using var scope = _scopeFactory.CreateScope();
         var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();

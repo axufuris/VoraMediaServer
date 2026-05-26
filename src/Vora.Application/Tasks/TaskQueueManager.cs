@@ -27,7 +27,6 @@ public interface ITaskQueueManager
     void QueueAnalyzeMediaItemContent(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueArtworkProviderSwap(Guid libraryId, string libraryName);
     void QueueRefreshLibraryRatings(Guid libraryId, bool forceOverride = false);
-    void QueueRefreshLibraryArtwork(Guid libraryId, bool forceOverride = false);
     void QueueRefreshMediaItemArtwork(Guid mediaItemId, bool forceOverride = false);
     void QueueRefreshArtistArtwork(Guid artistId, string? artistName = null, bool forceOverride = false);
     void QueueRefreshAlbumArtwork(Guid albumId, string? albumName = null, bool forceOverride = false);
@@ -180,19 +179,6 @@ public class TaskQueueManager : ITaskQueueManager
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
             await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, null, forceOverride);
-
-            await overlayManager.RunLibraryOverlaySyncAsync(libraryId);
-        });
-    }
-
-    public void QueueRefreshLibraryArtwork(Guid libraryId, bool forceOverride = false)
-    {
-        EnqueueTask($"Refresh Artwork for Library: {libraryId}", async (ct, sp) =>
-        {
-            var metadataManager = sp.GetRequiredService<IMetadataManager>();
-            var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
-
-            await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, forceOverride);
 
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId);
         });

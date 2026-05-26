@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { libraryService, type MediaLibrary } from '../../../api/Media/libraryService';
 import { libraryAdminService, type MarkerCoverageVM, type ThumbnailCoverageVM } from '../../../api/Media/libraryAdminService';
@@ -45,8 +45,13 @@ function MarkerCoverageCard({ libraryId, serverId }: { libraryId: string, server
         }
     };
 
+    const loadRef = useRef(load);
     useEffect(() => {
-        load();
+        loadRef.current = load;
+    });
+
+    useEffect(() => {
+        void loadRef.current();
     }, [libraryId, serverId]);
 
     if (!coverage && !loading) return null;
@@ -112,8 +117,13 @@ function ThumbnailCoverageCard({ libraryId, libraryType, enabled, serverId }: { 
         }
     };
 
+    const loadRef = useRef(load);
     useEffect(() => {
-        void load();
+        loadRef.current = load;
+    });
+
+    useEffect(() => {
+        void loadRef.current();
     }, [libraryId, serverId, isVideoType]);
 
     const regenerate = async () => {

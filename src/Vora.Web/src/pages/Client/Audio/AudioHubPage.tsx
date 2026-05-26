@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { iptvClientService } from '../../../api/Iptv/iptvClientService';
 import { type IptvChannelVM } from '../../../api/Iptv/iptvAdminService';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
@@ -70,20 +71,20 @@ export default function AudioHubPage() {
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, channelId: string } | null>(null);
 
     const profileId = useMemo(() => {
-        const token = localStorage.getItem('profile_token');
+        const token = localStorage.getItem(StorageKeys.profileToken);
         if (!token) return '';
         try {
-            return JSON.parse(atob(token.split('.')[1])).sub as string;
+            return getProfileIdFromToken(token) ?? '';
         } catch {
             return '';
         }
     }, []);
-    const deviceId = useMemo(() => localStorage.getItem('device_id') || 'unknown', []);
+    const deviceId = useMemo(() => localStorage.getItem(StorageKeys.deviceId) || 'unknown', []);
 
     useEffect(() => {
         const load = async () => {
             try {
-                const userId = localStorage.getItem('user_id') || profileId;
+                const userId = localStorage.getItem(StorageKeys.userId) || profileId;
                 if (!userId || !profileId) return;
 
                 const cacheKey = radioPrefsCacheKey(profileId, deviceId);

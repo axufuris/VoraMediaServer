@@ -45,11 +45,4 @@ public class AdminNotificationRepository : IAdminNotificationRepository
             .Where(n => !n.IsRead)
             .ExecuteUpdateAsync(setters => setters.SetProperty(n => n.IsRead, true));
     }
-
-    public async Task DeleteOlderThanAsync(DateTime threshold)
-    {
-        await _context.AdminNotifications
-            .Where(n => n.CreatedAt < threshold)
-            .ExecuteDeleteAsync();
-    }
 }

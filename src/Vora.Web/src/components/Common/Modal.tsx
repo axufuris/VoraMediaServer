@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect } from 'react';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
-export type ModalZIndex = 'z-50' | 'z-[60]' | 'z-[100]' | 'z-[200]' | 'z-[210]';
+export type ModalZIndex = 'z-[200]' | 'z-[210]';
 export type ModalPosition = 'fixed' | 'absolute';
 /**
  * Surface variants:
@@ -35,8 +35,8 @@ const SIZE_CLASS: Record<ModalSize, string> = {
 };
 
 const SURFACE_CLASS: Record<ModalSurface, string> = {
-    'gray-950': 'bg-gray-950 border-gray-800',
-    'gray-900': 'bg-gray-900 border-gray-700',
+    'gray-950': 'bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)]',
+    'gray-900': 'bg-[var(--vora-bg-sunken)] border-[var(--vora-border-strong)] text-[var(--vora-text-primary)]',
     'light': 'bg-[var(--vora-bg-surface)] border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)]',
 };
 
@@ -64,8 +64,8 @@ export function Modal({
 
     if (!isOpen) return null;
 
-    const overlayBg = surface === 'light' ? 'bg-[var(--vora-bg-overlay)]' : 'bg-black/80';
-    const shadowClass = surface === 'light' ? 'shadow-[var(--vora-shadow-overlay)]' : 'shadow-2xl';
+    const overlayBg = 'bg-[var(--vora-bg-overlay)]';
+    const shadowClass = 'shadow-[var(--vora-shadow-overlay)]';
     const overlayClass = `${position} inset-0 ${zIndex} flex items-center justify-center ${overlayBg} backdrop-blur-sm ${overlayPadding}`;
     const cardClass = `${SURFACE_CLASS[surface]} rounded-xl border ${shadowClass} w-full ${SIZE_CLASS[size]} ${cardClassName}`;
 
@@ -77,6 +77,8 @@ export function Modal({
             <div
                 className={cardClass}
                 onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
             >
                 {children}
             </div>
@@ -106,16 +108,16 @@ export function ModalHeader({
     surface = 'gray-950',
 }: ModalHeaderProps) {
     const isLight = surface === 'light';
-    const borderClass = bordered ? (isLight ? 'border-b border-[var(--vora-border-subtle)]' : 'border-b border-gray-800') : '';
+    const borderClass = bordered ? 'border-b border-[var(--vora-border-subtle)]' : '';
     const wrapperClass = accent === 'background'
-        ? `px-6 pt-6 ${borderClass} ${isLight ? 'bg-[var(--vora-bg-sunken)]' : 'bg-gray-950'}`
+        ? `px-6 pt-6 ${borderClass} bg-[var(--vora-bg-sunken)]`
         : `p-5 ${borderClass}`;
-    const titleClass = isLight ? 'text-base font-semibold text-[var(--vora-text-primary)]' : 'text-xl font-bold text-white';
-    const subtitleClass = isLight ? 'text-xs text-[var(--vora-text-muted)] mt-1' : 'text-xs text-gray-400 mt-1';
-    const closeClass = isLight
-        ? 'text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] text-2xl leading-none cursor-pointer disabled:opacity-50'
-        : 'text-gray-500 hover:text-white text-2xl leading-none cursor-pointer disabled:opacity-50';
-    const tabsClass = isLight ? 'text-[var(--vora-text-muted)]' : 'text-gray-400';
+    const titleClass = isLight
+        ? 'text-base font-semibold text-[var(--vora-text-primary)]'
+        : 'text-xl font-bold text-[var(--vora-text-primary)]';
+    const subtitleClass = 'text-xs text-[var(--vora-text-muted)] mt-1';
+    const closeClass = 'text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] text-2xl leading-none cursor-pointer disabled:opacity-50';
+    const tabsClass = 'text-[var(--vora-text-muted)]';
 
     return (
         <div className={wrapperClass}>
@@ -161,10 +163,7 @@ interface ModalFooterProps {
     surface?: ModalSurface;
 }
 
-export function ModalFooter({ children, className = '', surface = 'gray-950' }: ModalFooterProps) {
-    const isLight = surface === 'light';
-    const baseClass = isLight
-        ? 'p-5 border-t border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] rounded-b-xl'
-        : 'p-5 border-t border-gray-800 bg-gray-900 rounded-b-xl';
+export function ModalFooter({ children, className = '' }: ModalFooterProps) {
+    const baseClass = 'p-5 border-t border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] rounded-b-xl';
     return <div className={`${baseClass} ${className}`}>{children}</div>;
 }

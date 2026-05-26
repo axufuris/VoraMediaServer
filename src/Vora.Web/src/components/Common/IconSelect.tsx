@@ -43,17 +43,17 @@ export default function IconSelect<T extends string | number>({ value, options, 
             <button
                 type="button"
                 onClick={() => setIsOpen(o => !o)}
-                className={`w-full p-2 bg-gray-900 rounded border ${isOpen ? 'border-blue-500' : 'border-gray-600'} text-white text-left flex items-center justify-between gap-2 cursor-pointer hover:border-gray-500 transition-colors`}
+                className={`w-full p-2 bg-[var(--vora-bg-raised)] rounded border ${isOpen ? 'border-blue-500' : 'border-[var(--vora-border-subtle)]'} text-[var(--vora-text-primary)] text-left flex items-center justify-between gap-2 cursor-pointer hover:border-gray-500 transition-colors`}
             >
                 <span className="flex items-center gap-2 min-w-0">
-                    {selected?.icon && <span className="shrink-0 text-gray-300">{selected.icon}</span>}
+                    {selected?.icon && <span className="shrink-0 text-[var(--vora-text-secondary)]">{selected.icon}</span>}
                     <span className="truncate">{selected?.label ?? placeholder ?? 'Select...'}</span>
                 </span>
-                <svg className={`w-4 h-4 shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                <svg className={`w-4 h-4 shrink-0 text-[var(--vora-text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
 
             {isOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded shadow-2xl z-50 overflow-hidden">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded shadow-2xl z-50 overflow-hidden">
                     <ul className="max-h-72 overflow-y-auto custom-scrollbar py-1">
                         {options.map(option => {
                             const isSelected = option.value === value;
@@ -61,9 +61,9 @@ export default function IconSelect<T extends string | number>({ value, options, 
                                 <li
                                     key={String(option.value)}
                                     onClick={() => { onChange(option.value); setIsOpen(false); }}
-                                    className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${isSelected ? 'bg-blue-600/20 text-white' : 'text-gray-200 hover:bg-gray-800'}`}
+                                    className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${isSelected ? 'bg-blue-600/20 text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                                 >
-                                    {option.icon && <span className="shrink-0 text-gray-300">{option.icon}</span>}
+                                    {option.icon && <span className="shrink-0 text-[var(--vora-text-secondary)]">{option.icon}</span>}
                                     <span className="truncate">{option.label}</span>
                                 </li>
                             );

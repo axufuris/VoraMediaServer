@@ -26,7 +26,7 @@ public class MusicBrainzArtworkProvider : IMusicArtworkProvider
     public bool IsSystemPlugin => true;
     public string Type => "Artwork";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Music" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Music };
 
     public MusicBrainzArtworkProvider(IHttpClientFactory httpClientFactory, ILogger<MusicBrainzArtworkProvider> logger)
     {

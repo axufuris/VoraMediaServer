@@ -499,7 +499,7 @@ export default function OverlayEditor() {
                 <div className="flex-1 min-h-0 w-full flex items-center justify-center">
                 <div
                     ref={canvasRef}
-                    className={`relative bg-gray-900 border-2 border-gray-700 rounded-lg shadow-2xl
+                    className={`relative bg-[var(--vora-bg-raised)] border-2 border-[var(--vora-border-subtle)] rounded-lg shadow-2xl
                         ${mediaType === 'Episode' ? 'aspect-video w-full max-w-4xl max-h-full' : 'aspect-[2/3] h-full max-h-full max-w-full'}`}
                 >
                     <img src={BACKGROUNDS[mediaType]} className="absolute inset-0 w-full h-full object-cover rounded-md" alt="Canvas Mockup" />
@@ -507,11 +507,11 @@ export default function OverlayEditor() {
 
                     {mockUI === 'watched' && (
                         <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full p-1 shadow-lg border border-white/10 z-10 pointer-events-none">
-                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                            <svg className="w-6 h-6 text-[var(--vora-text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                         </div>
                     )}
                     {mockUI === 'unplayed' && (
-                        <div className="absolute top-2 right-2 bg-orange-600 rounded-full w-9 h-9 flex items-center justify-center text-white font-bold text-base shadow-lg border border-orange-400/50 z-10 pointer-events-none">
+                        <div className="absolute top-2 right-2 bg-[var(--vora-accent-500)] rounded-full w-9 h-9 flex items-center justify-center text-[var(--vora-text-primary)] font-bold text-base shadow-lg border border-orange-400/50 z-10 pointer-events-none">
                             3
                         </div>
                     )}
@@ -551,7 +551,7 @@ export default function OverlayEditor() {
                                                     <img src={img} className="max-h-full max-w-full object-contain" alt={`Slot ${i}`} />
                                                 </div>
                                                 <div className="h-1/2 w-full flex items-center justify-center">
-                                                    <span className="text-white font-bold leading-tight drop-shadow-md text-sm sm:text-base md:text-xl">
+                                                    <span className="text-[var(--vora-text-primary)] font-bold leading-tight drop-shadow-md text-sm sm:text-base md:text-xl">
                                                         {dummyLabel}
                                                     </span>
                                                 </div>
@@ -579,7 +579,7 @@ export default function OverlayEditor() {
                             <button
                                 type="button"
                                 onClick={handleDelete}
-                                className="px-8 py-2 rounded-[var(--vora-radius-md)] text-sm font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-white transition-colors cursor-pointer"
+                                className="px-8 py-2 rounded-[var(--vora-radius-md)] text-sm font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer"
                             >
                                 Delete & Revert
                             </button>

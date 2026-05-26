@@ -4,8 +4,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Vora.Application.Auth.Dtos;
 using Vora.Application.Email;
@@ -38,7 +38,7 @@ public interface IAuthManager
 public class AuthManager(
     IUserRepository repository,
     ISystemSettingsRepository settingsRepo,
-    IConfiguration configuration,
+    IOptions<JwtOptions> jwtOptions,
     IEmailService emailService,
     IInvitationManager invitationManager,
     IMemoryCache memoryCache,
@@ -49,7 +49,7 @@ public class AuthManager(
     private const int InviteCodeLifetimeMinutes = 30;
     private const int PasswordResetTicketLifetimeMinutes = 60;
     private const int PasswordResetRequestsPerHour = 3;
-    private const int MinPasswordLength = 6;
+    private const int MinPasswordLength = 8;
     private const string PasswordResetThrottlePrefix = "pwreset:throttle:";
 
     private const int InvitePinLength = 4;
@@ -85,6 +85,7 @@ public class AuthManager(
 
     public async Task<AuthResponseDto> RegisterAsync(string email, string password, string displayName, string? secretCode, string? inviteToken = null)
     {
+        EnsurePasswordMeetsPolicy(password);
         var normalizedEmail = email.Trim().ToLowerInvariant();
 
         if (!string.IsNullOrWhiteSpace(inviteToken))
@@ -171,6 +172,7 @@ public class AuthManager(
 
     public async Task<AuthResponseDto> ClaimServerAsync(string email, string password, string displayName)
     {
+        EnsurePasswordMeetsPolicy(password);
         var status = await GetSetupStatusAsync();
         if (status.IsClaimed)
         {
@@ -228,6 +230,8 @@ public class AuthManager(
             new(JwtRegisteredClaimNames.Sub, profile.Id.ToString()),
             new("accountId", accountId.ToString()),
             new("isAdmin", userAccount.IsAdmin.ToString()),
+            new("stamp", userAccount.SecurityStamp),
+            new("profileStamp", profile.SecurityStamp),
             new("hasAllLibraryAccess", effectiveHasAllAccess.ToString()),
             new("accessSchedules", schedulesJson),
             new("hasAllRatings", hasAllRatings.ToString()),
@@ -257,6 +261,8 @@ public class AuthManager(
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim("accountId", user.Id.ToString()),
+            new Claim("stamp", user.SecurityStamp),
             new Claim("type", "account_level")
         };
         return CreateToken(claims, TimeSpan.FromHours(AccountTokenLifetimeHours));
@@ -264,13 +270,20 @@ public class AuthManager(
 
     private string CreateToken(IEnumerable<Claim> claims, TimeSpan lifetime)
     {
-        var secret = configuration["Jwt:SecretKey"]
+        var jwt = jwtOptions.Value;
+        var secret = jwt.SecretKey
             ?? throw new InvalidOperationException("JWT Secret Key is missing from configuration.");
-        var key = Encoding.ASCII.GetBytes(secret);
+        var issuer = jwt.Issuer
+            ?? throw new InvalidOperationException("JWT Issuer is missing from configuration.");
+        var audience = jwt.Audience
+            ?? throw new InvalidOperationException("JWT Audience is missing from configuration.");
+        var key = Encoding.UTF8.GetBytes(secret);
         var descriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
             Expires = DateTime.UtcNow.Add(lifetime),
+            Issuer = issuer,
+            Audience = audience,
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
         };
 
@@ -418,6 +431,7 @@ public class AuthManager(
         }
 
         user.PasswordHash = HashPassword(newPassword);
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
         await repository.UpdateUserAsync(user);
 
         await repository.InvalidateOutstandingPasswordResetTicketsForUserAsync(user.Id);
@@ -487,4 +501,12 @@ public class AuthManager(
     }
     private static string HashPassword(string password) => BCrypt.Net.BCrypt.HashPassword(password);
     private static bool VerifyPassword(string password, string hash) => BCrypt.Net.BCrypt.Verify(password, hash);
+
+    private static void EnsurePasswordMeetsPolicy(string password)
+    {
+        if (string.IsNullOrWhiteSpace(password) || password.Length < MinPasswordLength)
+        {
+            throw new InvalidOperationException($"Password must be at least {MinPasswordLength} characters.");
+        }
+    }
 }

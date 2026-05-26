@@ -39,8 +39,6 @@ export interface PlayerContextType {
     currentMedia: PlayableMedia | null;
     isPlaying: boolean;
     isMinimized: boolean;
-    currentTime: number;
-    duration: number;
     volume: number;
     sessionId: string | null;
     playMedia: (media: PlayableMedia) => void;
@@ -60,8 +58,8 @@ export interface PlayerContextType {
     cycleRepeatMode: () => void;
     togglePlayPause: () => void;
     seek: (time: number) => void;
-    skipForward: (seconds: number) => void;
-    skipBackward: (seconds: number) => void;
+    skipForward: (seconds?: number) => void;
+    skipBackward: (seconds?: number) => void;
     setMinimized: (min: boolean) => void;
     isFullscreen: boolean;
     toggleFullscreen: () => void;
@@ -75,10 +73,22 @@ export interface PlayerContextType {
     startRadio: (seed: RadioSeed, label: string, items: PlayableMedia[]) => void;
 }
 
+export interface PlayerTimeContextType {
+    currentTime: number;
+    duration: number;
+}
+
 export const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
+export const PlayerTimeContext = createContext<PlayerTimeContextType | undefined>(undefined);
 
 export const usePlayer = (): PlayerContextType => {
     const context = useContext(PlayerContext);
     if (!context) throw new Error("usePlayer must be used within a PlayerProvider");
+    return context;
+};
+
+export const usePlayerTime = (): PlayerTimeContextType => {
+    const context = useContext(PlayerTimeContext);
+    if (!context) throw new Error("usePlayerTime must be used within a PlayerProvider");
     return context;
 };

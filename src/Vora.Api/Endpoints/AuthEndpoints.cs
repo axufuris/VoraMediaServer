@@ -44,13 +44,19 @@ public static class AuthEndpoints
 
         group.MapGet("/setup-status", GetSetupStatusAsync);
         group.MapPost("/setup", ClaimServerAsync);
-        group.MapPost("/login", LoginAsync);
-        group.MapPost("/register", RegisterAsync);
-        group.MapPost("/exchange-profile-token", ExchangeProfileTokenAsync);
-        group.MapPost("/forgot-password", RequestPasswordResetAsync);
-        group.MapPost("/reset-password", ConfirmPasswordResetAsync);
+        group.MapPost("/login", LoginAsync)
+            .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
+        group.MapPost("/register", RegisterAsync)
+            .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
+        group.MapPost("/exchange-profile-token", ExchangeProfileTokenAsync)
+            .RequireRateLimiting(VoraRateLimitPolicies.AuthBurst);
+        group.MapPost("/forgot-password", RequestPasswordResetAsync)
+            .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
+        group.MapPost("/reset-password", ConfirmPasswordResetAsync)
+            .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
 
-        group.MapPost("/invitations/validate", ValidateInvitationAsync);
+        group.MapPost("/invitations/validate", ValidateInvitationAsync)
+            .RequireRateLimiting(VoraRateLimitPolicies.AuthBurst);
 
         group.MapPost("/invite-code", GenerateInviteCodeAsync)
             .RequireAuthorization("AdminOnly");
@@ -136,7 +142,7 @@ public static class AuthEndpoints
         return result switch
         {
             PasswordResetResult.Success => Results.NoContent(),
-            PasswordResetResult.PasswordRejected => Results.BadRequest(new { Message = "Password must be at least 6 characters." }),
+            PasswordResetResult.PasswordRejected => Results.BadRequest(new { Message = "Password must be at least 8 characters." }),
             _ => Results.BadRequest(new { Message = "Invalid or expired reset token." })
         };
     }

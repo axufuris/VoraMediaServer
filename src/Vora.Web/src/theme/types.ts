@@ -1,15 +1,3 @@
-/**
- * Vora theme manifest schema.
- *
- * Phase 2 keeps this schema in-repo with two built-in manifests (vora-default,
- * vora-dark). Phase 3 will:
- *   - Load additional manifests from theme plugins (server-side registry).
- *   - Persist the active theme id on ServerSettings.AdminThemeId.
- *   - Add an Appearance picker under Admin → Server.
- *
- * See: docs/admin-design-spec.md
- */
-
 export interface TokenColors {
     bgCanvas: string;
     bgSurface: string;

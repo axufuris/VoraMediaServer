@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { authService } from '../../api/Auth/authService';
+import { StorageKeys, SessionKeys } from '../../utils/storageKeys';
 import AuthLayout from '../../layouts/AuthLayout';
 
 function resolveServerUrl(): string {
@@ -36,7 +37,7 @@ export default function RegisterPage() {
             try {
                 const status = await authService.probeServer(serverUrl);
                 setRegistrationMode(status.registrationMode);
-                sessionStorage.setItem('pending_server_url', serverUrl);
+                sessionStorage.setItem(SessionKeys.pendingServerUrl, serverUrl);
 
                 if (inviteToken) {
                     try {
@@ -62,8 +63,8 @@ export default function RegisterPage() {
         try {
             const res = await authService.register(email, password, displayName, secretCode || undefined, inviteToken || undefined);
 
-            localStorage.setItem('account_token', res.accessToken);
-            localStorage.setItem('user_id', res.userId);
+            localStorage.setItem(StorageKeys.accountToken, res.accessToken);
+            localStorage.setItem(StorageKeys.userId, res.userId);
 
             navigate('/profiles');
         } catch (err: unknown) {

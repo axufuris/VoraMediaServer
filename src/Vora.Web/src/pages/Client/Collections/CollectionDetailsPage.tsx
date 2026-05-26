@@ -8,6 +8,7 @@ import MediaCard from '../../../components/Media/MediaCard';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { useDialog } from '../../../dialogs';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
+import { StorageKeys } from '../../../utils/storageKeys';
 
 export default function CollectionDetailsPage() {
     const dialog = useDialog();
@@ -19,7 +20,7 @@ export default function CollectionDetailsPage() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
-    const isAdmin = localStorage.getItem('is_server_admin') === 'true';
+    const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
 
     const fetchCollection = useCallback((silent = false) => {
         if (!id) return;
@@ -72,8 +73,8 @@ export default function CollectionDetailsPage() {
         }
     };
 
-    if (loading) return <div className="p-12 text-center text-gray-500 mt-16">Loading collection...</div>;
-    if (!collection) return <div className="p-12 text-center text-red-500 mt-16">Collection not found.</div>;
+    if (loading) return <div className="p-12 text-center text-[var(--vora-text-muted)] mt-16">Loading collection...</div>;
+    if (!collection) return <div className="p-12 text-center text-[var(--vora-danger-500)] mt-16">Collection not found.</div>;
 
     return (
         <div className="relative min-h-full pb-16">
@@ -114,24 +115,24 @@ export default function CollectionDetailsPage() {
 
                 <div className="flex flex-col md:flex-row gap-10 mb-16">
                     <div className="w-64 shrink-0">
-                        <div className="aspect-[2/3] rounded-lg overflow-hidden shadow-2xl border border-gray-700 bg-gray-800">
+                        <div className="aspect-[2/3] rounded-lg overflow-hidden shadow-2xl border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)]">
                             {collection.posterUrl ? (
                                 <img src={collection.posterUrl} alt={collection.title} className="w-full h-full object-cover" />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-500">No Image</div>
+                                <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-muted)]">No Image</div>
                             )}
                         </div>
                     </div>
 
                     <div className="flex-1 pt-4">
                         <div className="flex items-center gap-4 mb-4">
-                            <h1 className="text-5xl font-bold text-white drop-shadow-lg">{collection.title}</h1>
+                            <h1 className="text-5xl font-bold text-[var(--vora-text-primary)] drop-shadow-lg">{collection.title}</h1>
 
                             {isAdmin && (
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setIsEditModalOpen(true)}
-                                        className="p-2 bg-gray-800 hover:bg-orange-600 rounded-full text-gray-400 hover:text-white transition-colors shadow-lg cursor-pointer"
+                                        className="p-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-accent-hover)] rounded-full text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors shadow-lg cursor-pointer"
                                         title="Edit Metadata"
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
@@ -140,7 +141,7 @@ export default function CollectionDetailsPage() {
                                     {isAdmin && collection.defaultSort === 4 && (
                                         <button
                                             onClick={() => setIsReorderModalOpen(true)}
-                                            className="p-2 bg-gray-800 hover:bg-orange-600 rounded-full text-gray-400 hover:text-white transition-colors shadow-lg cursor-pointer"
+                                            className="p-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-accent-hover)] rounded-full text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors shadow-lg cursor-pointer"
                                             title="Manual Sort Order"
                                         >
                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" /></svg>
@@ -151,7 +152,7 @@ export default function CollectionDetailsPage() {
                                         <button
                                             onClick={handleSyncTimeline}
                                             disabled={isSyncing}
-                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-full text-sm font-bold text-white transition-colors shadow-lg flex items-center gap-2 cursor-pointer"
+                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-full text-sm font-bold text-[var(--vora-text-primary)] transition-colors shadow-lg flex items-center gap-2 cursor-pointer"
                                         >
                                             {isSyncing ? (
                                                 <span className="animate-pulse">Syncing...</span>
@@ -167,14 +168,14 @@ export default function CollectionDetailsPage() {
                             )}
                         </div>
 
-                        <p className="text-lg text-gray-300 leading-relaxed max-w-4xl shadow-sm">
+                        <p className="text-lg text-[var(--vora-text-secondary)] leading-relaxed max-w-4xl shadow-sm">
                             {collection.description || "No description available."}
                         </p>
                     </div>
                 </div>
 
                 <div>
-                    <h2 className="text-2xl font-bold mb-6 text-gray-100 border-b border-gray-800 pb-2">
+                    <h2 className="text-2xl font-bold mb-6 text-[var(--vora-text-primary)] border-b border-[var(--vora-border-subtle)] pb-2">
                         Items in Collection ({collection.itemCount})
                     </h2>
 

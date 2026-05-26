@@ -66,7 +66,7 @@ public class ServerPlaybackTracker : IServerPlaybackTracker
             .ToList();
     }
 
-    public int PruneExpired()
+    private int PruneExpired()
     {
         var cutoff = DateTime.UtcNow - SessionTtl;
         var removed = 0;

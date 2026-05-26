@@ -84,14 +84,6 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
         return ids.ToHashSet();
     }
 
-    public Task<decimal> GetMaxSortOrderAsync(Guid collectionId) =>
-        context.Set<CollectionItem>()
-            .AsNoTracking()
-            .Where(ci => ci.CollectionId == collectionId)
-            .Select(ci => ci.SortOrder)
-            .DefaultIfEmpty(0)
-            .MaxAsync();
-
     public async Task<List<CollectionItem>> GetCollectionItemsWithMediaAsync(Guid collectionId) =>
         await context.Set<CollectionItem>()
             .Include(ci => ci.MediaItem)

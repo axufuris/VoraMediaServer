@@ -1,9 +1,12 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Vora.Api.Extensions;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
 using Vora.Application.Media.Requests;
+using Vora.Application.Streaming;
+using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
 
 namespace Vora.Api.Endpoints;
@@ -477,18 +480,27 @@ public static class MusicEndpoints
         return Results.Ok(rows);
     }
 
-    private static async Task<IResult> RefreshRecommendationsAsync(ClaimsPrincipal user, IMusicRecommendationManager manager, CancellationToken cancellationToken)
+    private static IResult RefreshRecommendationsAsync(ClaimsPrincipal user, ITaskQueueManager taskQueue)
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
 
         if (user.IsAdmin())
         {
-            _ = Task.Run(() => manager.RefreshAllActiveProfilesAsync(cancellationToken));
+            taskQueue.EnqueueTask("Refresh Music Recommendations (All Profiles)", async (ct, sp) =>
+            {
+                var manager = sp.GetRequiredService<IMusicRecommendationManager>();
+                await manager.RefreshAllActiveProfilesAsync(ct);
+            });
             return Results.Accepted();
         }
 
-        _ = Task.Run(() => manager.RefreshMixesForProfileAsync(profileId.Value));
+        var pid = profileId.Value;
+        taskQueue.EnqueueTask($"Refresh Music Recommendations: {pid}", async (ct, sp) =>
+        {
+            var manager = sp.GetRequiredService<IMusicRecommendationManager>();
+            await manager.RefreshMixesForProfileAsync(pid);
+        });
         return Results.Accepted();
     }
 
@@ -695,7 +707,7 @@ public static class MusicEndpoints
         public string? SeedGenre { get; set; }
     }
 
-    private static async Task<IResult> StreamTrackAsync(Guid trackId, [FromQuery] string? quality, IMusicManager manager, HttpContext httpContext)
+    private static async Task<IResult> StreamTrackAsync(Guid trackId, [FromQuery] string? quality, IMusicManager manager, IAudioTranscodeService audioTranscodeService, HttpContext httpContext)
     {
         var path = await manager.GetTrackFilePathAsync(trackId, MusicAccessFilter.Unrestricted);
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return Results.NotFound();
@@ -718,38 +730,10 @@ public static class MusicEndpoints
             return Results.File(path, directContentType, enableRangeProcessing: true);
         }
 
+        const string targetCodec = "mp3";
+        var contentType = audioTranscodeService.ResolveContentType(targetCodec);
         var ct = httpContext.RequestAborted;
-        return Results.Stream(async output =>
-        {
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "ffmpeg",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            psi.ArgumentList.Add("-hide_banner");
-            psi.ArgumentList.Add("-loglevel"); psi.ArgumentList.Add("error");
-            psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(path);
-            psi.ArgumentList.Add("-vn");
-            psi.ArgumentList.Add("-c:a"); psi.ArgumentList.Add("libmp3lame");
-            psi.ArgumentList.Add("-b:a"); psi.ArgumentList.Add($"{bitrate}k");
-            psi.ArgumentList.Add("-f"); psi.ArgumentList.Add("mp3");
-            psi.ArgumentList.Add("pipe:1");
-
-            using var process = System.Diagnostics.Process.Start(psi);
-            if (process == null) return;
-            try
-            {
-                await process.StandardOutput.BaseStream.CopyToAsync(output, 81920, ct);
-            }
-            catch (OperationCanceledException) { /* client disconnected */ }
-            finally
-            {
-                try { if (!process.HasExited) process.Kill(); } catch { /* ignore */ }
-            }
-        }, contentType: "audio/mpeg");
+        return Results.Stream(output => audioTranscodeService.WriteTranscodedAudioAsync(path, bitrate, targetCodec, output, ct), contentType: contentType);
     }
 
     private static int ResolveAudioBitrate(string? quality)

@@ -28,7 +28,7 @@ public class RadarrCalendarProvider : ICalendarProvider
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() =>
         new List<PluginSettingDefinitionDto>();
 
-    public async Task<IEnumerable<CalendarEventDto>> GetEventsAsync(DateTime startDate, DateTime endDate)
+    public async Task<IEnumerable<CalendarEventDto>> GetEventsAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
     {
         using var scope = _scopeFactory.CreateScope();
         var lookup = scope.ServiceProvider.GetRequiredService<IRequestServerLookup>();
@@ -51,11 +51,11 @@ public class RadarrCalendarProvider : ICalendarProvider
 
             try
             {
-                var response = await _httpClient.SendAsync(request);
+                var response = await _httpClient.SendAsync(request, cancellationToken);
                 if (!response.IsSuccessStatusCode) continue;
 
-                using var stream = await response.Content.ReadAsStreamAsync();
-                using var doc = await JsonDocument.ParseAsync(stream);
+                using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
 
                 foreach (var movie in doc.RootElement.EnumerateArray())
                 {

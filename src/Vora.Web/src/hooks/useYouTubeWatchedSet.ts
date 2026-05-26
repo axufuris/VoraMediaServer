@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { youtubeService } from '../api/YouTube/youtubeService';
 import { useSignalREvent } from './useSignalREvent';
 
@@ -23,13 +23,18 @@ export function useYouTubeWatchedSet(serverId?: string): YouTubeWatchedSet {
         }
     }, [serverId]);
 
+    const refreshRef = useRef(refresh);
     useEffect(() => {
-        void refresh();
-    }, [refresh]);
+        refreshRef.current = refresh;
+    });
+
+    useEffect(() => {
+        void refreshRef.current();
+    }, [serverId]);
 
     useSignalREvent<string>('YouTubeAccessChanged', useCallback(() => {
-        void refresh();
-    }, [refresh]));
+        void refreshRef.current();
+    }, []));
 
     return {
         has: (videoId: string) => watched.has(videoId),

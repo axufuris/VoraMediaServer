@@ -9,9 +9,9 @@ public interface IMetadataFetchService
 {
     Task<(MetadataResult? Metadata, string ProviderId, string ProviderName)> GetTextMetadataAsync(MediaItem item);
     Task<ActorMetadataResult?> GetActorMetadataAsync(int tmdbId);
-    Task<((decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) Ratings, List<MediaArtwork> Artwork)> GetSecondaryDataAsync(MediaItem item, bool forceOverride);
+    Task<((decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) Ratings, List<MediaArtwork> Artwork)> GetSecondaryDataAsync(MediaItem item, bool forceOverride, CancellationToken cancellationToken = default);
     Task<List<MediaArtwork>> GetArtworkAsync(MediaItem item);
-    Task<(decimal? Rating1, string? Name1, decimal? Rating2, string? Name2)> GetRatingsAsync(MediaItem item);
+    Task<(decimal? Rating1, string? Name1, decimal? Rating2, string? Name2)> GetRatingsAsync(MediaItem item, CancellationToken cancellationToken = default);
 }
 
 public class MetadataFetchService : IMetadataFetchService
@@ -49,9 +49,9 @@ public class MetadataFetchService : IMetadataFetchService
         return await primaryProvider.FetchActorMetadataAsync(tmdbId);
     }
 
-    public async Task<((decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) Ratings, List<MediaArtwork> Artwork)> GetSecondaryDataAsync(MediaItem item, bool forceOverride)
+    public async Task<((decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) Ratings, List<MediaArtwork> Artwork)> GetSecondaryDataAsync(MediaItem item, bool forceOverride, CancellationToken cancellationToken = default)
     {
-        var ratingsTask = FetchRatingsDataAsync(item);
+        var ratingsTask = FetchRatingsDataAsync(item, cancellationToken);
 
         var artworkProviderIdToUse = item.Library?.ArtworkProviderId ?? "tmdb_artwork";
         var needsArtworkRefresh = forceOverride || item.Artwork == null || !item.Artwork.Any() || !item.Artwork.Any(a => a.ProviderId == artworkProviderIdToUse);
@@ -62,7 +62,7 @@ public class MetadataFetchService : IMetadataFetchService
 
         await Task.WhenAll(ratingsTask, artworkTask);
 
-        return (ratingsTask.Result, artworkTask.Result);
+        return (await ratingsTask, await artworkTask);
     }
 
     public async Task<List<MediaArtwork>> GetArtworkAsync(MediaItem item)
@@ -70,9 +70,9 @@ public class MetadataFetchService : IMetadataFetchService
         return await FetchArtworkDataAsync(item);
     }
 
-    public async Task<(decimal? Rating1, string? Name1, decimal? Rating2, string? Name2)> GetRatingsAsync(MediaItem item)
+    public async Task<(decimal? Rating1, string? Name1, decimal? Rating2, string? Name2)> GetRatingsAsync(MediaItem item, CancellationToken cancellationToken = default)
     {
-        return await FetchRatingsDataAsync(item);
+        return await FetchRatingsDataAsync(item, cancellationToken);
     }
 
     private async Task<MetadataResult?> FetchMetadataForItemAsync(MediaItem item, IMetadataProvider provider)
@@ -168,7 +168,7 @@ public class MetadataFetchService : IMetadataFetchService
         return null;
     }
 
-    private async Task<(decimal? Rating1, string? Name1, decimal? Rating2, string? Name2)> FetchRatingsDataAsync(MediaItem item)
+    private async Task<(decimal? Rating1, string? Name1, decimal? Rating2, string? Name2)> FetchRatingsDataAsync(MediaItem item, CancellationToken cancellationToken = default)
     {
         if (item.Library == null) return (null, null, null, null);
 
@@ -179,16 +179,16 @@ public class MetadataFetchService : IMetadataFetchService
             ? _ratingsProviders.FirstOrDefault(p => p.Id == item.Library.ThirdPartyRating2ProviderId) : null;
 
         Task<decimal?> task1 = provider1 != null
-            ? provider1.FetchRatingAsync(item.ImdbId, item.TmdbId, item.TvdbId, item.GetType().Name)
+            ? provider1.FetchRatingAsync(item.ImdbId, item.TmdbId, item.TvdbId, item.GetType().Name, cancellationToken)
             : Task.FromResult<decimal?>(null);
 
         Task<decimal?> task2 = provider2 != null
-            ? provider2.FetchRatingAsync(item.ImdbId, item.TmdbId, item.TvdbId, item.GetType().Name)
+            ? provider2.FetchRatingAsync(item.ImdbId, item.TmdbId, item.TvdbId, item.GetType().Name, cancellationToken)
             : Task.FromResult<decimal?>(null);
 
         await Task.WhenAll(task1, task2);
 
-        return (task1.Result, provider1?.RatingSourceName, task2.Result, provider2?.RatingSourceName);
+        return (await task1, provider1?.RatingSourceName, await task2, provider2?.RatingSourceName);
     }
 
     private async Task<List<MediaArtwork>> FetchArtworkDataAsync(MediaItem item)
@@ -212,10 +212,12 @@ public class MetadataFetchService : IMetadataFetchService
             : Task.FromResult(Enumerable.Empty<ArtworkResult>());
 
         await Task.WhenAll(localTask, remoteTask);
+        var localResults = await localTask;
+        var remoteResults = await remoteTask;
 
         if (localProvider != null)
         {
-            artworkEntities.AddRange(localTask.Result.Select(r => new MediaArtwork
+            artworkEntities.AddRange(localResults.Select(r => new MediaArtwork
             {
                 MediaItemId = item.Id,
                 Url = r.Url,
@@ -230,7 +232,7 @@ public class MetadataFetchService : IMetadataFetchService
 
         if (remoteProvider != null && remoteProvider.Id != "local_artwork")
         {
-            artworkEntities.AddRange(remoteTask.Result.Select(r => new MediaArtwork
+            artworkEntities.AddRange(remoteResults.Select(r => new MediaArtwork
             {
                 MediaItemId = item.Id,
                 Url = r.Url,

@@ -20,7 +20,7 @@ public class LocalRecommendationProvider(IRecommendationRepository repository) :
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() =>
         new List<PluginSettingDefinitionDto>();
 
-    public async Task<IEnumerable<RecommendationListDto>> GetRecommendationsAsync(Guid profileId, Guid? libraryId)
+    public async Task<IEnumerable<RecommendationListDto>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, CancellationToken cancellationToken = default)
     {
         var lists = new List<RecommendationListDto>();
 

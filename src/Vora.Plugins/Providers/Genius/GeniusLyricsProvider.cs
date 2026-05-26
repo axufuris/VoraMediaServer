@@ -27,7 +27,7 @@ public class GeniusLyricsProvider : ILyricsProvider
     public bool IsSystemPlugin => true;
     public string Type => "Lyrics";
     public string DeveloperName => "Andy Xufuris";
-    public IEnumerable<string> SupportedLibraryTypes => new[] { "Music" };
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Music };
 
     public GeniusLyricsProvider(IHttpClientFactory httpClientFactory, IServiceScopeFactory scopeFactory, ILogger<GeniusLyricsProvider> logger)
     {

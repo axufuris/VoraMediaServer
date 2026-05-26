@@ -17,7 +17,6 @@ public interface ICollectionRepository
     Task<IEnumerable<CollectionArtwork>> GetCollectionArtworkAsync(Guid collectionId);
     Task<CollectionArtwork?> GetCollectionArtworkByIdAsync(Guid id);
     Task<HashSet<Guid>> GetCollectionMediaIdsAsync(Guid collectionId);
-    Task<decimal> GetMaxSortOrderAsync(Guid collectionId);
     Task<List<CollectionItem>> GetCollectionItemsWithMediaAsync(Guid collectionId);
     Task<Dictionary<Guid, decimal>> GetCollectionItemSortOrdersAsync(Guid collectionId);
     Task<int> GetLibraryMinimumCollectionSizeAsync(Guid libraryId);

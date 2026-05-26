@@ -23,7 +23,7 @@ public class FFmpegTranscodeService : ITranscodeService
         _logger = logger;
     }
 
-    public async Task<string> StartTranscodeSessionAsync(string sourceFilePath, string outputDirectory, PlaybackDecisionVM decision)
+    public async Task<string> StartTranscodeSessionAsync(string sourceFilePath, string outputDirectory, PlaybackDecisionVM decision, CancellationToken cancellationToken = default)
     {
         using var scope = _serviceProvider.CreateScope();
         var settingsRepo = scope.ServiceProvider.GetRequiredService<ISystemSettingsRepository>();
@@ -97,12 +97,12 @@ public class FFmpegTranscodeService : ITranscodeService
             _transcodeLock.Release();
         }
 
-        await Task.Delay(3000);
+        await Task.Delay(3000, cancellationToken);
 
         return Path.Combine(targetDir, $"{decision.MediaItemId}.m3u8");
     }
 
-    public Task StopTranscodeSessionAsync(Guid mediaItemId)
+    private Task StopTranscodeSessionAsync(Guid mediaItemId)
     {
         if (_activeTranscodes.TryRemove(mediaItemId, out var entry))
         {

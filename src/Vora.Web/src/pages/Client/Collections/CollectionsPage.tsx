@@ -6,6 +6,7 @@ import CreateCollectionModal from '../../../components/Collections/CreateCollect
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import { StorageKeys } from '../../../utils/storageKeys';
 
 export default function CollectionsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -17,7 +18,7 @@ export default function CollectionsPage() {
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-    const isAdmin = localStorage.getItem('is_server_admin') === 'true';
+    const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
 
     useEffect(() => {
         libraryService.getLibraries(serverId).then(setLibraries).catch(console.error);

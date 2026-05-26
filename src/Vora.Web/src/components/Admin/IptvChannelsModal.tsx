@@ -84,7 +84,7 @@ export default function IptvChannelsModal({ isOpen, onClose, playlistName, chann
                                 key={k}
                                 type="button"
                                 onClick={() => setKindFilter(k)}
-                                className={`px-4 text-xs font-semibold transition-colors cursor-pointer ${isActive ? 'bg-[var(--vora-accent-500)] text-white' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
+                                className={`px-4 text-xs font-semibold transition-colors cursor-pointer ${isActive ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                             >
                                 {k === 'Tv' ? 'TV' : k}
                             </button>
@@ -109,7 +109,7 @@ export default function IptvChannelsModal({ isOpen, onClose, playlistName, chann
                             <button
                                 type="button"
                                 onClick={() => handleKindToggle(c.id, c.kind)}
-                                className={`px-3 py-1.5 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer border ${c.kind === 'Radio' ? 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-600 hover:text-white hover:border-purple-600' : 'bg-[var(--vora-info-soft)] text-[var(--vora-info-text)] border-[var(--vora-info-500)]/20 hover:bg-[var(--vora-info-500)] hover:text-white hover:border-[var(--vora-info-500)]'}`}
+                                className={`px-3 py-1.5 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer border ${c.kind === 'Radio' ? 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-600 hover:text-[var(--vora-text-primary)] hover:border-purple-600' : 'bg-[var(--vora-info-soft)] text-[var(--vora-info-text)] border-[var(--vora-info-500)]/20 hover:bg-[var(--vora-info-500)] hover:text-[var(--vora-text-primary)] hover:border-[var(--vora-info-500)]'}`}
                                 title="Click to flip between TV and Radio"
                             >
                                 {c.kind === 'Radio' ? 'Radio' : 'TV'}
@@ -117,7 +117,7 @@ export default function IptvChannelsModal({ isOpen, onClose, playlistName, chann
                             <button
                                 type="button"
                                 onClick={() => handleToggle(c.id, c.isHiddenByAdmin)}
-                                className={`px-4 py-1.5 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer ${c.isHiddenByAdmin ? 'bg-[var(--vora-bg-sunken)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-border-strong)]' : 'bg-[var(--vora-accent-soft)] text-[var(--vora-accent-text)] border border-[var(--vora-accent-500)]/30 hover:bg-[var(--vora-accent-500)] hover:text-white hover:border-[var(--vora-accent-500)]'}`}
+                                className={`px-4 py-1.5 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer ${c.isHiddenByAdmin ? 'bg-[var(--vora-bg-sunken)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-border-strong)]' : 'bg-[var(--vora-accent-soft)] text-[var(--vora-accent-text)] border border-[var(--vora-accent-500)]/30 hover:bg-[var(--vora-accent-500)] hover:text-[var(--vora-text-primary)] hover:border-[var(--vora-accent-500)]'}`}
                             >
                                 {c.isHiddenByAdmin ? 'Hidden (click to show)' : 'Visible (click to hide)'}
                             </button>

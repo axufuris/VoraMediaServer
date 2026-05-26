@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
+using Vora.Application.Ai;
 using Vora.Application.Recommendations;
 using Vora.Application.Recommendations.ViewModels;
 using Vora.Application.Ai.ViewModels;
@@ -114,12 +115,9 @@ public static class RecommendationEndpoints
         DateTime? endDate,
         int page,
         int pageSize,
-        IOpenAiRecommendationRepository repo)
+        IAiStatsManager manager)
     {
-        page = page < 1 ? 1 : page;
-        pageSize = pageSize < 1 ? 50 : pageSize;
-
-        var dashboard = await repo.GetAiStatsDashboardAsync(startDate, endDate, page, pageSize);
+        var dashboard = await manager.GetDashboardAsync(startDate, endDate, page, pageSize);
         return Results.Ok(dashboard);
     }
 

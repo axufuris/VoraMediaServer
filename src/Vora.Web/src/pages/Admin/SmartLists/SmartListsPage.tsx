@@ -239,7 +239,7 @@ export default function SmartListsPage() {
             </div>
 
             {isModalOpen && (
-                <div className="fixed inset-0 bg-[var(--vora-bg-overlay)] backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
+                <div className="fixed inset-0 bg-[var(--vora-bg-overlay)] backdrop-blur-sm flex items-center justify-center z-[200] p-4" onClick={() => setIsModalOpen(false)}>
                     <div className="vora-card shadow-[var(--vora-shadow-overlay)] p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
                         <h2 className="text-base font-semibold text-[var(--vora-text-primary)] mb-4">
                             {editingId ? (isSystemList ? 'Edit system list' : 'Edit smart list') : 'Create smart list'}
@@ -269,14 +269,14 @@ export default function SmartListsPage() {
                                     <button
                                         type="button"
                                         onClick={() => setListMode('rules')}
-                                        className={`py-1.5 text-sm font-semibold rounded-[var(--vora-radius-sm)] cursor-pointer transition-colors ${listMode === 'rules' ? 'bg-[var(--vora-accent-500)] text-white' : 'text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)]'}`}
+                                        className={`py-1.5 text-sm font-semibold rounded-[var(--vora-radius-sm)] cursor-pointer transition-colors ${listMode === 'rules' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)]'}`}
                                     >
                                         Rule-based
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setListMode('collection')}
-                                        className={`py-1.5 text-sm font-semibold rounded-[var(--vora-radius-sm)] cursor-pointer transition-colors ${listMode === 'collection' ? 'bg-[var(--vora-accent-500)] text-white' : 'text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)]'}`}
+                                        className={`py-1.5 text-sm font-semibold rounded-[var(--vora-radius-sm)] cursor-pointer transition-colors ${listMode === 'collection' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)]'}`}
                                     >
                                         Collection-based
                                     </button>

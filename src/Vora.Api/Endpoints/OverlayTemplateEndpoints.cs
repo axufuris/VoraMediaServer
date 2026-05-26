@@ -1,7 +1,6 @@
-﻿using Vora.Application.Posters;
+using Vora.Application.Posters;
 using Vora.Application.Posters.Dtos;
 using Vora.Application.Tasks;
-using Vora.Domain.Entities.Posters;
 
 namespace Vora.Api.Endpoints;
 
@@ -21,58 +20,27 @@ public static class OverlayTemplateEndpoints
         return group;
     }
 
-    private static async Task<IResult> GetTemplatesAsync(Guid? libraryId, IOverlayTemplateRepository repo)
+    private static async Task<IResult> GetTemplatesAsync(Guid? libraryId, IOverlayTemplateManager manager)
     {
-        var templates = await repo.GetTemplatesForLibraryAsync(libraryId ?? Guid.Empty);
-        var dtos = templates.Select(t => new OverlayTemplateDto
-        {
-            Id = t.Id,
-            Name = t.Name,
-            TargetMediaType = t.TargetMediaType,
-            TargetLibraryId = t.TargetLibraryId,
-            ConfigurationJson = t.ConfigurationJson
-        });
+        var dtos = await manager.GetTemplatesAsync(libraryId);
         return Results.Ok(dtos);
     }
 
-    private static async Task<IResult> CreateTemplateAsync(OverlayTemplateDto dto, IOverlayTemplateRepository repo)
+    private static async Task<IResult> CreateTemplateAsync(OverlayTemplateDto dto, IOverlayTemplateManager manager)
     {
-        var template = new OverlayTemplate
-        {
-            Name = string.IsNullOrWhiteSpace(dto.Name) ? $"{dto.TargetMediaType} Template" : dto.Name,
-            TargetMediaType = dto.TargetMediaType,
-            TargetLibraryId = dto.TargetLibraryId,
-            ConfigurationJson = dto.ConfigurationJson,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        await repo.AddTemplateAsync(template);
-        dto.Id = template.Id;
-
-        return Results.Created($"/api/overlays/templates/{template.Id}", dto);
+        var created = await manager.CreateTemplateAsync(dto);
+        return Results.Created($"/api/overlays/templates/{created.Id}", created);
     }
 
-    private static async Task<IResult> UpdateTemplateAsync(Guid id, OverlayTemplateDto dto, IOverlayTemplateRepository repo)
+    private static async Task<IResult> UpdateTemplateAsync(Guid id, OverlayTemplateDto dto, IOverlayTemplateManager manager)
     {
-        var existing = await repo.GetTemplateByIdAsync(id);
-        if (existing == null)
-        {
-            return Results.NotFound();
-        }
-
-        existing.Name = string.IsNullOrWhiteSpace(dto.Name) ? existing.Name : dto.Name;
-        existing.TargetMediaType = dto.TargetMediaType;
-        existing.TargetLibraryId = dto.TargetLibraryId;
-        existing.ConfigurationJson = dto.ConfigurationJson;
-        existing.UpdatedAt = DateTime.UtcNow;
-
-        await repo.UpdateTemplateAsync(existing);
-        return Results.NoContent();
+        var updated = await manager.UpdateTemplateAsync(id, dto);
+        return updated == null ? Results.NotFound() : Results.NoContent();
     }
 
-    private static async Task<IResult> DeleteTemplateAsync(Guid id, IOverlayTemplateRepository repo)
+    private static async Task<IResult> DeleteTemplateAsync(Guid id, IOverlayTemplateManager manager)
     {
-        await repo.DeleteTemplateAsync(id);
+        await manager.DeleteTemplateAsync(id);
         return Results.NoContent();
     }
 

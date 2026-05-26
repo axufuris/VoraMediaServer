@@ -226,6 +226,9 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.PosterUrl).HasMaxLength(1024);
             entity.Property(e => e.OriginalPosterUrl).HasMaxLength(1024);
             entity.Property(e => e.BackgroundUrl).HasMaxLength(1024);
+            entity.HasIndex(e => e.TmdbId).HasFilter("\"TmdbId\" IS NOT NULL");
+            entity.HasIndex(e => e.ImdbId).HasFilter("\"ImdbId\" IS NOT NULL");
+            entity.HasIndex(e => e.TvdbId).HasFilter("\"TvdbId\" IS NOT NULL");
         });
 
         modelBuilder.Entity<TvShow>(entity =>
@@ -665,9 +668,11 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(128);
             entity.Property(e => e.Nickname).HasMaxLength(64);
             entity.Property(e => e.PasswordHash).HasMaxLength(256);
+            entity.Property(e => e.SecurityStamp).IsRequired().HasMaxLength(32);
             entity.Property(e => e.EmailNotifyOnRequestAvailable).HasDefaultValue(true);
 
             entity.HasIndex(u => u.Email).IsUnique();
+            entity.HasIndex(u => u.SecurityStamp);
 
             entity.Property(e => e.AllowedLibraryIds)
                   .HasConversion(converters.GuidList)
@@ -740,8 +745,11 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.Name).IsRequired().HasMaxLength(64);
             entity.Property(e => e.ProfileImageUrl).HasMaxLength(1024);
             entity.Property(e => e.PinHash).HasMaxLength(256);
+            entity.Property(e => e.SecurityStamp).IsRequired().HasMaxLength(32);
             entity.Property(e => e.LastFmSessionKey).HasMaxLength(128);
             entity.Property(e => e.LastFmUsername).HasMaxLength(128);
+
+            entity.HasIndex(e => e.SecurityStamp);
 
             entity.Property(e => e.AllowedLibraryIds)
                   .HasConversion(converters.GuidList)
@@ -956,7 +964,7 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.Resolution).HasMaxLength(16);
             entity.Property(e => e.CountryCode).HasMaxLength(8);
 
-            entity.HasIndex(e => e.ExternalChannelId);
+            entity.HasIndex(e => new { e.PlaylistId, e.ExternalChannelId }).IsUnique();
 
             entity.HasOne(e => e.Playlist)
                   .WithMany(p => p.Channels)
@@ -987,6 +995,10 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.EpisodeTitle).HasMaxLength(500);
             entity.Property(e => e.ExternalProgramId).HasMaxLength(128);
             entity.Property(e => e.OutputFilePath).HasMaxLength(1024);
+
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => new { e.Status, e.StartTime });
+            entity.HasIndex(e => e.EndTime);
 
             entity.HasOne(e => e.Schedule)
                   .WithMany(s => s.Sessions)
@@ -1080,6 +1092,8 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.Resolution).HasMaxLength(16);
             entity.Property(e => e.HdrType).HasMaxLength(32);
             entity.Property(e => e.Quality).HasMaxLength(64);
+
+            entity.HasIndex(e => new { e.UserId, e.StartedAt }).HasFilter("\"EndedAt\" IS NULL");
         });
     }
 
@@ -1175,6 +1189,7 @@ public class VoraDbContext : DbContext
 
             entity.HasIndex(e => e.CreatedAt);
             entity.HasIndex(e => new { e.TemplateKey, e.CreatedAt });
+            entity.HasIndex(e => new { e.Status, e.CreatedAt });
         });
     }
 
@@ -1262,10 +1277,24 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.PluginId).IsRequired().HasMaxLength(64);
             entity.Property(e => e.ModelUsed).HasMaxLength(64);
 
+            entity.HasIndex(e => e.Timestamp);
+
             entity.HasOne(e => e.Profile)
                   .WithMany()
                   .HasForeignKey(e => e.ProfileId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Vora.Domain.Entities.Notifications.AdminNotification>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.IsRead, e.CreatedAt });
+        });
+
+        modelBuilder.Entity<SystemMetric>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Timestamp);
         });
     }
 
@@ -1276,6 +1305,10 @@ public class VoraDbContext : DbContext
             entity.HasKey(e => e.MediaItemId);
 
             entity.Property(e => e.Embedding).HasColumnType("vector(1536)");
+
+            entity.HasIndex(e => e.Embedding)
+                  .HasMethod("hnsw")
+                  .HasOperators("vector_cosine_ops");
 
             entity.HasOne(e => e.MediaItem)
                   .WithOne()

@@ -10,7 +10,6 @@ public interface IMusicRepository
     Task<bool> SetTrackLikedAsync(Guid profileId, Guid trackId, bool liked);
     Task<HashSet<Guid>> GetLikedTrackIdsAsync(Guid profileId, IEnumerable<Guid> trackIds);
     Task<List<Track>> GetLikedTracksAsync(Guid profileId, MusicAccessFilter access);
-    Task<int> GetLikedTrackCountAsync(Guid profileId);
 
     Task<Dictionary<Guid, decimal>> GetAlbumRatingsAsync(Guid profileId, IEnumerable<Guid> albumIds);
     Task<Dictionary<Guid, decimal>> GetArtistRatingsAsync(Guid profileId, IEnumerable<Guid> artistIds);

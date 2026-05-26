@@ -58,9 +58,9 @@ function DialogShell({ dialog, onClose, isTop }: DialogShellProps) {
 
     const tone = dialog.options.tone ?? 'default';
     const confirmClass =
-        tone === 'danger' ? 'bg-red-600 hover:bg-red-500'
-            : tone === 'success' ? 'bg-emerald-600 hover:bg-emerald-500'
-                : 'bg-orange-600 hover:bg-orange-500';
+        tone === 'danger' ? 'bg-[var(--vora-danger-500)] hover:bg-[var(--vora-danger-text)]'
+            : tone === 'success' ? 'bg-[var(--vora-success-500)] hover:bg-[var(--vora-success-text)]'
+                : 'bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)]';
 
     const handleCancel = useCallback(() => {
         if (dialog.kind === 'confirm') dialog.resolve(false);
@@ -106,14 +106,14 @@ function DialogShell({ dialog, onClose, isTop }: DialogShellProps) {
             role="dialog"
             aria-modal="true"
             aria-label={dialog.options.title ?? 'Dialog'}
-            className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4"
+            className="fixed inset-0 z-[1000] flex items-center justify-center bg-[var(--vora-bg-overlay)] p-4"
             onClick={(e) => { if (e.target === e.currentTarget) handleCancel(); }}
         >
-            <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl max-w-md w-full p-6">
+            <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-lg shadow-[var(--vora-shadow-overlay)] max-w-md w-full p-6">
                 {dialog.options.title && (
-                    <h2 className="text-lg font-semibold text-white mb-2">{dialog.options.title}</h2>
+                    <h2 className="text-lg font-semibold text-[var(--vora-text-primary)] mb-2">{dialog.options.title}</h2>
                 )}
-                <p className="text-gray-300 whitespace-pre-line">{dialog.options.message}</p>
+                <p className="text-[var(--vora-text-secondary)] whitespace-pre-line">{dialog.options.message}</p>
 
                 {dialog.kind === 'prompt' && (
                     dialog.options.multiline ? (
@@ -123,7 +123,7 @@ function DialogShell({ dialog, onClose, isTop }: DialogShellProps) {
                             onChange={(e) => setPromptValue(e.target.value)}
                             placeholder={dialog.options.placeholder}
                             rows={4}
-                            className="mt-4 w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-orange-500"
+                            className="mt-4 w-full bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded px-3 py-2 text-[var(--vora-text-primary)] focus:outline-none focus:border-[var(--vora-accent-500)]"
                         />
                     ) : (
                         <input
@@ -133,7 +133,7 @@ function DialogShell({ dialog, onClose, isTop }: DialogShellProps) {
                             onChange={(e) => setPromptValue(e.target.value)}
                             placeholder={dialog.options.placeholder}
                             onKeyDown={(e) => { if (e.key === 'Enter') handleConfirm(); }}
-                            className="mt-4 w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-orange-500"
+                            className="mt-4 w-full bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded px-3 py-2 text-[var(--vora-text-primary)] focus:outline-none focus:border-[var(--vora-accent-500)]"
                         />
                     )
                 )}
@@ -143,7 +143,7 @@ function DialogShell({ dialog, onClose, isTop }: DialogShellProps) {
                         <button
                             type="button"
                             onClick={handleCancel}
-                            className="px-4 py-2 rounded text-gray-300 hover:bg-gray-800"
+                            className="px-4 py-2 rounded text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]"
                         >
                             {dialog.options.cancelText ?? 'Cancel'}
                         </button>
@@ -152,7 +152,7 @@ function DialogShell({ dialog, onClose, isTop }: DialogShellProps) {
                         ref={confirmButtonRef}
                         type="button"
                         onClick={handleConfirm}
-                        className={`px-4 py-2 rounded text-white ${confirmClass}`}
+                        className={`px-4 py-2 rounded text-[var(--vora-accent-contrast)] ${confirmClass}`}
                     >
                         {dialog.options.confirmText ?? (dialog.kind === 'alert' ? 'OK' : 'Confirm')}
                     </button>

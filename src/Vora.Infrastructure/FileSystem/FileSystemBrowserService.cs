@@ -113,7 +113,8 @@ public class FileSystemBrowserService : IFileSystemBrowserService
 
         if (configured == null || configured.Count == 0)
         {
-            configured = BuildDefaultRoots();
+            _logger.LogWarning("FileSystemBrowser:AllowedRoots is not configured. Filesystem browsing is disabled — set the config to enable.");
+            return new List<FileSystemRootVM>();
         }
 
         var resolved = new List<FileSystemRootVM>();
@@ -125,6 +126,12 @@ public class FileSystemBrowserService : IFileSystemBrowserService
             }
 
             var normalized = NormalizePath(root.Path);
+            if (IsDriveRoot(normalized))
+            {
+                _logger.LogWarning("Refusing to allow drive root {Path} as a filesystem browser root. Configure a specific media folder instead.", normalized);
+                continue;
+            }
+
             if (!Directory.Exists(normalized))
             {
                 _logger.LogDebug("Allowed root {Path} does not exist; skipping", normalized);
@@ -141,28 +148,13 @@ public class FileSystemBrowserService : IFileSystemBrowserService
         return resolved;
     }
 
-    private static List<FileSystemRootVM> BuildDefaultRoots()
+    private static bool IsDriveRoot(string normalizedPath)
     {
-        var defaults = new List<FileSystemRootVM>();
-
-        if (OperatingSystem.IsWindows())
-        {
-            foreach (var drive in DriveInfo.GetDrives())
-            {
-                if (!drive.IsReady) continue;
-                defaults.Add(new FileSystemRootVM
-                {
-                    Label = drive.Name.TrimEnd(Path.DirectorySeparatorChar),
-                    Path = drive.RootDirectory.FullName
-                });
-            }
-        }
-        else
-        {
-            defaults.Add(new FileSystemRootVM { Label = "Filesystem", Path = "/" });
-        }
-
-        return defaults;
+        if (string.IsNullOrEmpty(normalizedPath)) return true;
+        if (normalizedPath == "/") return true;
+        if (normalizedPath.Length == 3 && normalizedPath[1] == ':' && normalizedPath[2] == Path.DirectorySeparatorChar) return true;
+        if (normalizedPath.Length == 2 && normalizedPath[1] == ':') return true;
+        return false;
     }
 
     private static string DeriveRootLabel(string normalizedPath)

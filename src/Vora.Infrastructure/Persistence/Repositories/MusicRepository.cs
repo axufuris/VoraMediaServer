@@ -234,9 +234,6 @@ public class MusicRepository : IMusicRepository
         return await ordered.ToListAsync();
     }
 
-    public Task<int> GetLikedTrackCountAsync(Guid profileId) =>
-        _context.TrackLikes.CountAsync(l => l.ProfileId == profileId);
-
     public async Task RecordPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed)
     {
         var entry = new TrackPlayHistory
@@ -336,11 +333,11 @@ public class MusicRepository : IMusicRepository
 
     public async Task<List<MusicSearchResultVM>> SearchAsync(string query, MusicAccessFilter access, int limit)
     {
-        var searchLower = query.ToLower();
+        var searchPattern = $"%{query}%";
         var perTypeLimit = Math.Max(1, limit);
 
         var artistsQuery = ApplyLibraryFilter(_context.Artists.AsNoTracking(), access)
-            .Where(a => a.Name.ToLower().Contains(searchLower));
+            .Where(a => EF.Functions.ILike(a.Name, searchPattern));
 
         var artistResults = await artistsQuery
             .OrderBy(a => a.SortName ?? a.Name)
@@ -358,7 +355,7 @@ public class MusicRepository : IMusicRepository
             .ToListAsync();
 
         var albumsQuery = ApplyLibraryFilter(_context.Albums.AsNoTracking().Include(a => a.Artist), access)
-            .Where(a => a.Title.ToLower().Contains(searchLower));
+            .Where(a => EF.Functions.ILike(a.Title, searchPattern));
 
         var albumResults = await albumsQuery
             .OrderBy(a => a.SortTitle ?? a.Title)
@@ -378,7 +375,7 @@ public class MusicRepository : IMusicRepository
         var tracksQuery = _context.Tracks.AsNoTracking().Include(t => t.Album).ThenInclude(a => a!.Artist).AsQueryable();
         tracksQuery = ApplyLibraryFilter(tracksQuery, access);
         tracksQuery = ApplyRatingFilterToTracks(tracksQuery, access);
-        tracksQuery = tracksQuery.Where(t => t.Title.ToLower().Contains(searchLower));
+        tracksQuery = tracksQuery.Where(t => EF.Functions.ILike(t.Title, searchPattern));
 
         var trackResults = await tracksQuery
             .OrderBy(t => t.SortTitle ?? t.Title)
@@ -455,13 +452,13 @@ public class MusicRepository : IMusicRepository
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var s = search.ToLower();
+            var pattern = $"%{search}%";
             joined = joined.Where(j =>
-                j.x.Track.Title.ToLower().Contains(s)
-                || (j.Album != null && j.Album.Title.ToLower().Contains(s))
-                || (j.Artist != null && j.Artist.Name.ToLower().Contains(s))
-                || (j.x.Track.Artist != null && j.x.Track.Artist.ToLower().Contains(s))
-                || j.ProfileName.ToLower().Contains(s));
+                EF.Functions.ILike(j.x.Track.Title, pattern)
+                || (j.Album != null && EF.Functions.ILike(j.Album.Title, pattern))
+                || (j.Artist != null && EF.Functions.ILike(j.Artist.Name, pattern))
+                || (j.x.Track.Artist != null && EF.Functions.ILike(j.x.Track.Artist, pattern))
+                || EF.Functions.ILike(j.ProfileName, pattern));
         }
 
         var total = await joined.CountAsync();
@@ -587,7 +584,7 @@ public class MusicRepository : IMusicRepository
 
     public async Task<GenreContent> GetGenreContentAsync(string genre, MusicAccessFilter access)
     {
-        var albumQuery = _context.Albums.AsNoTracking().Include(a => a.Artist).Where(a => a.Genre != null && a.Genre.ToLower() == genre.ToLower());
+        var albumQuery = _context.Albums.AsNoTracking().Include(a => a.Artist).Where(a => a.Genre != null && EF.Functions.ILike(a.Genre, genre));
         albumQuery = ApplyLibraryFilter(albumQuery, access);
         var albums = await albumQuery.OrderByDescending(a => a.AddedAt).Take(60).ToListAsync();
 
@@ -599,7 +596,7 @@ public class MusicRepository : IMusicRepository
             .ToListAsync();
 
         var trackQuery = _context.Tracks.AsNoTracking().Include(t => t.Album)
-            .Where(t => t.Album != null && t.Album.Genre != null && t.Album.Genre.ToLower() == genre.ToLower());
+            .Where(t => t.Album != null && t.Album.Genre != null && EF.Functions.ILike(t.Album.Genre, genre));
         trackQuery = ApplyLibraryFilter(trackQuery, access);
         trackQuery = ApplyRatingFilterToTracks(trackQuery, access);
         var tracks = await trackQuery.Take(50).ToListAsync();

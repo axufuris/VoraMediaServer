@@ -67,8 +67,8 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
                 l.ActiveEndMonth,
                 l.ActiveEndDay,
                 l.CollectionId,
-                CollectionStartDate = l.Collection.VisibleStartDate,
-                CollectionEndDate = l.Collection.VisibleEndDate
+                CollectionStartDate = l.Collection != null ? l.Collection.VisibleStartDate : null,
+                CollectionEndDate = l.Collection != null ? l.Collection.VisibleEndDate : null
             })
             .ToListAsync();
 
@@ -225,19 +225,30 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
             context.Set<Episode>().Any(e => e.Season.TvShowId == m.Id && userSessions.Any(s => s.MediaItemId == e.Id)));
     }
 
-    private IQueryable<MediaItem> ApplySortOrder(IQueryable<MediaItem> query, SmartListSortBy sortBy, Guid? profileId) => sortBy switch
+    private IQueryable<MediaItem> ApplySortOrder(IQueryable<MediaItem> query, SmartListSortBy sortBy, Guid? profileId)
     {
-        SmartListSortBy.ReleaseDateDesc => query.OrderByDescending(m => m.ReleaseDate),
-        SmartListSortBy.ReleaseDateAsc => query.OrderBy(m => m.ReleaseDate),
-        SmartListSortBy.TopRated => query.OrderByDescending(m => m.ThirdPartyRating1),
-        SmartListSortBy.Random => query.OrderBy(m => EF.Functions.Random()),
-        SmartListSortBy.MostWatched => query.OrderByDescending(m =>
-            context.StreamSessions.Count(s => s.UserProfileId == profileId!.Value && s.MediaItemId == m.Id) +
-            context.Set<Episode>().Where(e => e.Season.TvShowId == m.Id)
-                .SelectMany(e => context.StreamSessions.Where(s => s.UserProfileId == profileId.Value && s.MediaItemId == e.Id))
-                .Count()),
-        _ => query.OrderByDescending(m => m.AddedAt)
-    };
+        switch (sortBy)
+        {
+            case SmartListSortBy.ReleaseDateDesc:
+                return query.OrderByDescending(m => m.ReleaseDate);
+            case SmartListSortBy.ReleaseDateAsc:
+                return query.OrderBy(m => m.ReleaseDate);
+            case SmartListSortBy.TopRated:
+                return query.OrderByDescending(m => m.ThirdPartyRating1);
+            case SmartListSortBy.Random:
+                return query.OrderBy(m => EF.Functions.Random());
+            case SmartListSortBy.MostWatched:
+                if (!profileId.HasValue) return query.OrderByDescending(m => m.AddedAt);
+                var pid = profileId.Value;
+                return query.OrderByDescending(m =>
+                    context.StreamSessions.Count(s => s.UserProfileId == pid && s.MediaItemId == m.Id) +
+                    context.Set<Episode>().Where(e => e.Season.TvShowId == m.Id)
+                        .SelectMany(e => context.StreamSessions.Where(s => s.UserProfileId == pid && s.MediaItemId == e.Id))
+                        .Count());
+            default:
+                return query.OrderByDescending(m => m.AddedAt);
+        }
+    }
 
     private async Task<Dictionary<Guid, (int Total, int Played)>> ResolveTvShowPlayStatsAsync(List<Guid> tvShowIds, Guid profileId)
     {
