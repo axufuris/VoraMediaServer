@@ -66,7 +66,9 @@ export default function ProfileSelectionPage() {
             const pendingServerName = sessionStorage.getItem('pending_server_name') || 'Vora Server'; // <-- Pull the real name
 
             if (pendingUrl) {
-                const decodedToken = decodeJwtPayload(profileToken) ?? {};
+                const decodedToken = decodeJwtPayload(profileToken);
+                const tokenProfileId = typeof decodedToken?.sub === 'string' ? decodedToken.sub : null;
+                if (!tokenProfileId) throw new Error('Profile token missing sub claim');
                 const newServerId = `server_${Date.now()}`;
 
                 serverVault.addOrUpdateServer({
@@ -74,7 +76,7 @@ export default function ProfileSelectionPage() {
                     name: pendingServerName, // <-- USE IT HERE INSTEAD OF THE HARDCODED STRING!
                     url: pendingUrl,
                     token: profileToken,
-                    profileId: decodedToken.sub,
+                    profileId: tokenProfileId,
                     isAdmin: fullUser.isAdmin
                 });
 
@@ -96,12 +98,14 @@ export default function ProfileSelectionPage() {
                     console.debug("Could not fetch server name during auto-login bypass", err);
                 }
 
+                const legacyProfileId = getProfileIdFromToken(profileToken);
+                if (!legacyProfileId) throw new Error('Profile token missing sub claim');
                 serverVault.addOrUpdateServer({
                     id: newServerId,
                     name: sName, // <-- USE IT HERE
                     url: localUrl,
                     token: profileToken,
-                    profileId: getProfileIdFromToken(profileToken),
+                    profileId: legacyProfileId,
                     isAdmin: fullUser.isAdmin
                 });
                 serverVault.setActiveServerId(newServerId);

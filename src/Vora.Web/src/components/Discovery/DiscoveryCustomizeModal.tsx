@@ -79,7 +79,7 @@ export default function DiscoveryCustomizeModal({ isOpen, onClose, configs, save
             isOpen={isOpen}
             onClose={onClose}
             size="lg"
-            zIndex="z-[60]"
+            zIndex="z-[200]"
             position="absolute"
             surface="gray-900"
             closeOnBackdropClick

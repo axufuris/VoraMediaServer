@@ -1,4 +1,4 @@
-import { usePlayer } from '../../contexts/usePlayer';
+import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { mediaService, type MediaItem, type MediaPart, type UpNextItemVM, type UpNextResultVM, type MediaMarker } from '../../api/Media/mediaService';
@@ -76,9 +76,10 @@ export default function GlobalVideoPlayer() {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const {
-        currentMedia, isPlaying, isMinimized, currentTime, duration, volume, sessionId,
+        currentMedia, isPlaying, isMinimized, volume, sessionId,
         togglePlayPause, seek, skipForward, skipBackward, setMinimized, closePlayer, setVolume, changeStreams, videoRef, playMedia,
     } = usePlayer();
+    const { currentTime, duration } = usePlayerTime();
 
     const playerContainerRef = useRef<HTMLDivElement>(null);
 

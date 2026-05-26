@@ -533,7 +533,7 @@ export default function NowPlayingFullscreen() {
                 onClose={() => { if (!savingStation) setStationDialogOpen(false); }}
                 size="md"
                 surface="gray-900"
-                zIndex="z-[100]"
+                zIndex="z-[210]"
                 closeOnBackdropClick={!savingStation}
             >
                 <div className="p-6">

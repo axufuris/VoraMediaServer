@@ -680,6 +680,7 @@ export default function LiveTvPlayer() {
                     onRecordEpisode={async () => {
                         const activeServer = serverVault.getActiveServer();
                         const profileId = getProfileIdFromToken(localStorage.getItem(StorageKeys.profileToken));
+                        if (!profileId) { await dialog.alert("No active profile. Re-select a profile to schedule recordings."); return; }
                         await dvrService.scheduleRecording(profileId, currentChannel.id, activeProgram.title, activeProgram.id, false, 0, activeServer?.id);
                         const newSessions = await dvrService.getRecordingSessions(profileId, activeServer?.id);
                         setRecordingSessions(newSessions);
@@ -689,6 +690,7 @@ export default function LiveTvPlayer() {
                     onRecordSeries={async () => {
                         const activeServer = serverVault.getActiveServer();
                         const profileId = getProfileIdFromToken(localStorage.getItem(StorageKeys.profileToken));
+                        if (!profileId) { await dialog.alert("No active profile. Re-select a profile to schedule recordings."); return; }
                         await dvrService.scheduleRecording(profileId, currentChannel.id, activeProgram.title, activeProgram.id, true, recordRetention, activeServer?.id);
                         const newSessions = await dvrService.getRecordingSessions(profileId, activeServer?.id);
                         setRecordingSessions(newSessions);

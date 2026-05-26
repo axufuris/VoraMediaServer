@@ -120,7 +120,7 @@ export default function FolderBrowserModal({
             size="2xl"
             surface="light"
             closeOnBackdropClick
-            zIndex="z-[60]"
+            zIndex="z-[210]"
         >
             <ModalHeader
                 title={title}

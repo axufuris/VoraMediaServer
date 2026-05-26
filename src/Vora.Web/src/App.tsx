@@ -83,8 +83,9 @@ if (!localStorage.getItem(StorageKeys.deviceId)) {
 
 if (serverVault.getServers().length === 0 && localStorage.getItem(StorageKeys.profileToken)) {
     try {
-        const token = localStorage.getItem(StorageKeys.profileToken)!;
-        const profileId = getProfileIdFromToken(token);
+        const token = localStorage.getItem(StorageKeys.profileToken);
+        const profileId = token ? getProfileIdFromToken(token) : null;
+        if (!token || !profileId) throw new Error('Missing profile token for legacy migration');
         const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
 
         const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';

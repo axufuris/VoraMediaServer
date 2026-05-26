@@ -7,7 +7,8 @@ export type SmartPlaylistField =
     | 'Title' | 'Artist' | 'AlbumTitle' | 'AlbumArtist' | 'Genre' | 'Year'
     | 'DurationSeconds' | 'ContentRating' | 'PlayCount' | 'LastPlayedAt'
     | 'DateAdded' | 'Liked' | 'TrackNumber' | 'DiscNumber' | 'LibraryId' | 'IsCompilation'
-    | 'ReleaseYear' | 'ShowTitle' | 'SeasonNumber' | 'EpisodeNumber' | 'IsWatched' | 'Rating';
+    | 'ReleaseYear' | 'ShowTitle' | 'SeasonNumber' | 'EpisodeNumber' | 'IsWatched' | 'Rating'
+    | 'ServerAdminRating' | 'MyRating' | 'AudienceRating';
 
 export type SmartPlaylistOperator =
     | 'Equals' | 'NotEquals' | 'Contains' | 'NotContains' | 'StartsWith' | 'EndsWith'

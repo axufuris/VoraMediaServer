@@ -8,6 +8,16 @@ import { StorageKeys, decodeJwtPayload } from '../../utils/storageKeys';
 
 import { profileService, type UserProfileVM } from '../../api/Users/profileService';
 import { type UserVM, userService } from '../../api/Users/userService';
+
+const resolveUserIdFromPayload = (payload: ReturnType<typeof decodeJwtPayload>): string | null => {
+    if (!payload) return null;
+    for (const key of ['accountId', 'UserId', 'userId', 'nameid'] as const) {
+        const v = payload[key];
+        if (typeof v === 'string' && v.length > 0) return v;
+    }
+    return null;
+};
+
 interface Props {
     isOpen: boolean;
     onClose: () => void;
@@ -47,8 +57,8 @@ export default function ServerManagerModal({
 
                 const fetchPromises = s.map(async (server) => {
                     try {
-                        const decoded = decodeJwtPayload(server.token) ?? {};
-                        const userId = decoded.accountId || decoded.UserId || decoded.userId || decoded.nameid || localStorage.getItem(StorageKeys.userId);
+                        const decoded = decodeJwtPayload(server.token);
+                        const userId = resolveUserIdFromPayload(decoded) ?? localStorage.getItem(StorageKeys.userId);
 
                         if (userId) {
                             const account = await userService.getUserAccountWithToken(server.url, server.token, userId);
@@ -87,8 +97,8 @@ export default function ServerManagerModal({
         setIsLoading(true);
         setError('');
         try {
-            const decoded = decodeJwtPayload(server.token) ?? {};
-            const userId = decoded.accountId || decoded.UserId || decoded.userId || decoded.nameid || localStorage.getItem(StorageKeys.userId);
+            const decoded = decodeJwtPayload(server.token);
+            const userId = resolveUserIdFromPayload(decoded) ?? localStorage.getItem(StorageKeys.userId);
 
             if (!userId) throw new Error("Could not determine User ID for this server.");
 
@@ -177,7 +187,8 @@ export default function ServerManagerModal({
                 profileId
             );
 
-            const decodedToken = decodeJwtPayload(profileToken) ?? {};
+            const decodedToken = decodeJwtPayload(profileToken);
+            const profileIdFromToken = typeof decodedToken?.sub === 'string' ? decodedToken.sub : profileId;
             const targetServerId = tempAccountData.serverId || `server_${Date.now()}`;
             const pName = userAccount.profiles.find(p => p.id === profileId)?.name || 'User';
 
@@ -194,7 +205,7 @@ export default function ServerManagerModal({
                 name: serverName,
                 url: tempAccountData.url,
                 token: profileToken,
-                profileId: decodedToken.sub,
+                profileId: profileIdFromToken,
                 isAdmin: userAccount.isAdmin
             });
 
