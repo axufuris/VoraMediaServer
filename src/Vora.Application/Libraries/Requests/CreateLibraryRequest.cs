@@ -8,13 +8,10 @@ public class CreateLibraryRequest
     public string? ScannerRegex { get; set; }
 
     public bool EnableRealTimeWatching { get; set; }
-    public bool UseLocalAssets { get; set; }
     public bool FindExtras { get; set; }
     public bool OnlyShowTrailers { get; set; }
     public bool EnableVideoPreviewThumbnails { get; set; }
-    public int CollectionDisplay { get; set; }
     public bool EnableCreditsDetection { get; set; }
-    public bool EnableVoiceActivityDetection { get; set; }
     public int MinimumCollectionSize { get; set; }
 
     public string MetadataProviderId { get; set; } = string.Empty;

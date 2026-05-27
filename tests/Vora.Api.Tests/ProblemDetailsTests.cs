@@ -19,7 +19,7 @@ public class ProblemDetailsTests : IClassFixture<VoraApiTestFactory>
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/libraries");
+        var response = await client.GetAsync("/api/libraries", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         // JwtBearer challenges via WWW-Authenticate; body is typically empty
@@ -33,12 +33,12 @@ public class ProblemDetailsTests : IClassFixture<VoraApiTestFactory>
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var response = await client.GetAsync($"/api/libraries/{Guid.NewGuid()}");
+        var response = await client.GetAsync($"/api/libraries/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         // Endpoint may return either a ProblemDetails body or an empty 404; both are valid
         // depending on whether the handler returned Results.NotFound() vs Results.NotFound(value).
-        var body = await response.Content.ReadAsStringAsync();
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         if (!string.IsNullOrWhiteSpace(body))
         {
             // If we got a body it should be JSON shaped like ProblemDetails (RFC 7807)
@@ -59,10 +59,11 @@ public class ProblemDetailsTests : IClassFixture<VoraApiTestFactory>
             name = "x",
             type = "Movie",
             folderPaths = new[] { "/m" }
-        }));
+        }),
+        TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        var body = await response.Content.ReadAsStringAsync();
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         // Should not contain stack traces or anything sensitive
         body.Should().NotContain("Vora.Application");
         body.Should().NotContain("Exception");

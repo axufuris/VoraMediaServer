@@ -1,5 +1,8 @@
 ﻿using Microsoft.Extensions.Logging;
 using Vora.Application.Discovery.Requests;
+using Vora.Application.Discovery.ViewModels;
+using Vora.Application.Media;
+using Vora.Application.Requests;
 using Vora.Plugins.Dtos;
 using Vora.Domain.Entities.Discovery;
 using Vora.Plugins.Interfaces;
@@ -10,13 +13,13 @@ public interface IDiscoveryManager
 {
     Task<List<DiscoveryRowConfig>> GetAdminRowConfigsAsync(CancellationToken cancellationToken = default);
     Task UpdateAdminRowConfigsAsync(List<DiscoveryRowConfigRequest> configs);
-    Task<IEnumerable<DiscoveryItemDto>> GetRowItemsAsync(string providerId, string rowId, int page = 1, CancellationToken cancellationToken = default);
+    Task<IEnumerable<DiscoveryItemVM>> GetRowItemsAsync(string providerId, string rowId, int page = 1, CancellationToken cancellationToken = default);
     Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string providerId, string externalId, string type, CancellationToken cancellationToken = default);
     Task<List<UserWatchlistItem>> GetWatchlistAsync(Guid profileId);
     Task ToggleWatchlistAsync(Guid profileId, string externalId, string providerId, string type, string title, string? posterUrl, DateTime? expectedReleaseDate);
     Task<bool> CheckWatchlistStatusAsync(Guid profileId, string externalId, string providerId);
     Task<DiscoveryActorDto?> GetActorDetailsAsync(string providerId, string externalId, CancellationToken cancellationToken = default);
-    Task<IEnumerable<DiscoveryItemDto>> SearchAsync(string query, CancellationToken cancellationToken = default);
+    Task<IEnumerable<DiscoveryItemVM>> SearchAsync(string query, CancellationToken cancellationToken = default);
     Task<IEnumerable<TheaterDto>> GetShowtimesAsync(string movieTitle, string location, DateTime date, int? maxTheaters);
     Task<bool> IsTheaterAutoLoadEnabledAsync();
 }
@@ -25,6 +28,8 @@ public class DiscoveryManager(
     IEnumerable<IDiscoveryProvider> plugins,
     IEnumerable<IDiscoveryTheaterProvider> theaterPlugins,
     IDiscoveryRepository repository,
+    IMediaRepository mediaRepository,
+    IRequestRepository requestRepository,
     ILogger<DiscoveryManager> logger) : IDiscoveryManager
 {
     public async Task<List<DiscoveryRowConfig>> GetAdminRowConfigsAsync(CancellationToken cancellationToken = default)
@@ -102,7 +107,7 @@ public class DiscoveryManager(
         }
     }
 
-    public async Task<IEnumerable<DiscoveryItemDto>> GetRowItemsAsync(string providerId, string rowId, int page = 1, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<DiscoveryItemVM>> GetRowItemsAsync(string providerId, string rowId, int page = 1, CancellationToken cancellationToken = default)
     {
         var dbConfigs = await repository.GetRowConfigsAsync();
         var rowConfig = dbConfigs.FirstOrDefault(c => c.ProviderId == providerId && c.RowId == rowId);
@@ -121,13 +126,43 @@ public class DiscoveryManager(
 
         try
         {
-            return await plugin.GetRowItemsAsync(rowId, page, cancellationToken);
+            var items = await plugin.GetRowItemsAsync(rowId, page, cancellationToken);
+            return await EnrichWithStatusAsync(items);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Discovery provider {ProviderId} failed to load row {RowId} (page {Page}).", providerId, rowId, page);
             throw;
         }
+    }
+
+    private async Task<List<DiscoveryItemVM>> EnrichWithStatusAsync(IEnumerable<DiscoveryItemDto> items)
+    {
+        var result = new List<DiscoveryItemVM>();
+        foreach (var item in items)
+        {
+            var inLibrary = !string.IsNullOrWhiteSpace(item.ExternalId)
+                && await mediaRepository.MediaExistsByExternalIdAsync(item.ExternalId, item.Type);
+
+            var request = !string.IsNullOrWhiteSpace(item.ExternalId)
+                ? await requestRepository.GetRequestAsync(item.ExternalId, item.Type)
+                : null;
+
+            result.Add(new DiscoveryItemVM
+            {
+                ExternalId = item.ExternalId,
+                ProviderId = item.ProviderId,
+                Title = item.Title,
+                Type = item.Type,
+                Year = item.Year,
+                ReleaseDate = item.ReleaseDate,
+                PosterUrl = item.PosterUrl,
+                ContentRating = item.ContentRating,
+                InLibrary = inLibrary,
+                RequestStatus = request?.Status
+            });
+        }
+        return result;
     }
 
     public async Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string providerId, string externalId, string type, CancellationToken cancellationToken = default)
@@ -202,7 +237,7 @@ public class DiscoveryManager(
         }
     }
 
-    public async Task<IEnumerable<DiscoveryItemDto>> SearchAsync(string query, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<DiscoveryItemVM>> SearchAsync(string query, CancellationToken cancellationToken = default)
     {
         var results = new List<DiscoveryItemDto>();
         foreach (var plugin in plugins)
@@ -216,7 +251,7 @@ public class DiscoveryManager(
                 logger.LogError(ex, "Discovery provider {ProviderId} failed search for '{Query}'.", plugin.Id, query);
             }
         }
-        return results;
+        return await EnrichWithStatusAsync(results);
     }
 
     public async Task<IEnumerable<TheaterDto>> GetShowtimesAsync(string movieTitle, string location, DateTime date, int? maxTheaters)

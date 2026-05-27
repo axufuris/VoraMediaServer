@@ -26,7 +26,8 @@ public class EmailTemplateRendererTests
             ["serverName"] = "Vora-One",
             ["userName"] = "Andy",
             ["resetLink"] = "https://example.com/reset?token=abc"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         rendered.Subject.Should().Contain("Vora-One");
         rendered.TextBody.Should().Contain("Andy");
@@ -43,7 +44,8 @@ public class EmailTemplateRendererTests
         var rendered = await _renderer.RenderAsync(EmailTemplateKey.PasswordReset, new Dictionary<string, string>
         {
             ["serverName"] = "Vora-One"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         rendered.TextBody.Should().NotContain("{{userName}}");
         rendered.TextBody.Should().NotContain("{{resetLink}}");
@@ -60,7 +62,8 @@ public class EmailTemplateRendererTests
             ["serverName"] = "Vora",
             ["userName"] = "<script>alert('xss')</script>",
             ["resetLink"] = "https://example.com/reset"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         rendered.HtmlBody.Should().Contain("&lt;script&gt;");
         rendered.HtmlBody.Should().NotContain("<script>");
@@ -82,7 +85,8 @@ public class EmailTemplateRendererTests
         var rendered = await _renderer.RenderAsync(EmailTemplateKey.AdminInvite, new Dictionary<string, string>
         {
             ["userName"] = "Andy"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         rendered.Subject.Should().NotContain("\r");
         rendered.Subject.Should().NotContain("\n");
@@ -102,7 +106,7 @@ public class EmailTemplateRendererTests
                 TextBodyOverride = "body"
             });
 
-        var rendered = await _renderer.RenderAsync(EmailTemplateKey.AdminInvite, new Dictionary<string, string>());
+        var rendered = await _renderer.RenderAsync(EmailTemplateKey.AdminInvite, new Dictionary<string, string>(), TestContext.Current.CancellationToken);
 
         rendered.Subject.Length.Should().Be(256);
     }
@@ -124,7 +128,8 @@ public class EmailTemplateRendererTests
             ["serverName"] = "MyServer",
             ["userName"] = "Andy",
             ["resetLink"] = "https://example.com"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         rendered.Subject.Should().Be("Custom subject for MyServer");
         rendered.TextBody.Should().Contain("Andy");
@@ -147,7 +152,8 @@ public class EmailTemplateRendererTests
             ["serverName"] = "MyServer",
             ["userName"] = "Andy",
             ["resetLink"] = "https://example.com"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         rendered.Subject.Should().Contain("MyServer");
         rendered.TextBody.Should().Contain("Andy");
@@ -170,7 +176,8 @@ public class EmailTemplateRendererTests
             ["mediaTitle"] = "The Matrix",
             ["serverName"] = "Vora",
             ["mediaUrl"] = "https://example.com/m/1"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         rendered.HtmlBody.Should().Be("<p>Custom HTML for Andy</p>");
     }
@@ -180,7 +187,7 @@ public class EmailTemplateRendererTests
     {
         foreach (var key in Enum.GetValues<EmailTemplateKey>())
         {
-            var content = await _renderer.GetBuiltInAsync(key);
+            var content = await _renderer.GetBuiltInAsync(key, TestContext.Current.CancellationToken);
 
             content.Subject.Should().NotBeNullOrWhiteSpace($"key {key} subject");
             content.HtmlBody.Should().NotBeNullOrWhiteSpace($"key {key} html");
@@ -191,9 +198,9 @@ public class EmailTemplateRendererTests
     [Fact]
     public async Task GetBuiltInAsync_does_not_consult_repository()
     {
-        await _renderer.GetBuiltInAsync(EmailTemplateKey.PasswordReset);
+        await _renderer.GetBuiltInAsync(EmailTemplateKey.PasswordReset, TestContext.Current.CancellationToken);
 
-        await _repo.DidNotReceiveWithAnyArgs().GetOverrideAsync(default, default);
+        await _repo.DidNotReceiveWithAnyArgs().GetOverrideAsync(default, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -211,7 +218,8 @@ public class EmailTemplateRendererTests
         var rendered = await _renderer.RenderAsync(EmailTemplateKey.AdminInvite, new Dictionary<string, string>
         {
             ["userName"] = "Andy"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         // Subject sanitization trims trailing whitespace after substitution.
         rendered.Subject.Should().Be("Hi Andy from");
@@ -234,7 +242,8 @@ public class EmailTemplateRendererTests
         var rendered = await _renderer.RenderAsync(EmailTemplateKey.AdminInvite, new Dictionary<string, string>
         {
             ["userName"] = "Andy"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         rendered.Subject.Should().Be("Hello Andy and Andy");
     }

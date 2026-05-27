@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, waitFor, cleanup, renderHook, act } from '@testing-library/react';
+import { waitFor, cleanup, renderHook, act } from '@testing-library/react';
 
 // vi.mock factory hoists above local consts; declare mocks via vi.hoisted.
 const mocks = vi.hoisted(() => ({

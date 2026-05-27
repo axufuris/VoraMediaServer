@@ -2,9 +2,9 @@
 using Vora.Api.Extensions;
 using Vora.Application.Discovery;
 using Vora.Application.Discovery.Requests;
+using Vora.Application.Discovery.ViewModels;
 using Vora.Application.Requests;
 using Vora.Application.Users;
-using Vora.Plugins.Dtos;
 
 namespace Vora.Api.Endpoints;
 
@@ -90,7 +90,7 @@ public static class DiscoveryEndpoints
     {
         if (string.IsNullOrWhiteSpace(q) || q.Length < 3)
         {
-            return Results.Ok(new List<DiscoveryItemDto>());
+            return Results.Ok(new List<DiscoveryItemVM>());
         }
         cancellationToken.ThrowIfCancellationRequested();
         return Results.Ok(await manager.SearchAsync(q, cancellationToken));

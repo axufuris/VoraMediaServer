@@ -50,7 +50,7 @@ public class PluginSettingsEnvSeederTests
         });
         _settingsRepo.GetPluginSettingAsync("plugin_a", "api_key").Returns((string?)null);
 
-        await BuildSeeder(config).SeedAsync();
+        await BuildSeeder(config).SeedAsync(TestContext.Current.CancellationToken);
 
         await _settingsRepo.Received(1).SetPluginSettingAsync("plugin_a", "api_key", "secret-key");
     }
@@ -64,7 +64,7 @@ public class PluginSettingsEnvSeederTests
         });
         _settingsRepo.GetPluginSettingAsync("plugin_a", "api_key").Returns("db-key");
 
-        await BuildSeeder(config).SeedAsync();
+        await BuildSeeder(config).SeedAsync(TestContext.Current.CancellationToken);
 
         await _settingsRepo.DidNotReceive().SetPluginSettingAsync("plugin_a", "api_key", Arg.Any<string>());
     }
@@ -77,7 +77,7 @@ public class PluginSettingsEnvSeederTests
             ["Vora:PluginSettings:not_installed:api_key"] = "value"
         });
 
-        await BuildSeeder(config).SeedAsync();
+        await BuildSeeder(config).SeedAsync(TestContext.Current.CancellationToken);
 
         await _settingsRepo.DidNotReceiveWithAnyArgs().SetPluginSettingAsync(string.Empty, string.Empty, string.Empty);
     }
@@ -90,7 +90,7 @@ public class PluginSettingsEnvSeederTests
             ["Vora:PluginSettings:plugin_a:bogus_key"] = "value"
         });
 
-        await BuildSeeder(config).SeedAsync();
+        await BuildSeeder(config).SeedAsync(TestContext.Current.CancellationToken);
 
         await _settingsRepo.DidNotReceiveWithAnyArgs().SetPluginSettingAsync(string.Empty, string.Empty, string.Empty);
     }
@@ -104,7 +104,7 @@ public class PluginSettingsEnvSeederTests
         });
         _settingsRepo.GetPluginSettingAsync("plugin_a", "is_enabled").Returns((string?)null);
 
-        await BuildSeeder(config).SeedAsync();
+        await BuildSeeder(config).SeedAsync(TestContext.Current.CancellationToken);
 
         await _settingsRepo.Received(1).SetPluginSettingAsync("plugin_a", "is_enabled", "true");
     }
@@ -120,7 +120,7 @@ public class PluginSettingsEnvSeederTests
         });
         _settingsRepo.GetPluginSettingAsync(Arg.Any<string>(), Arg.Any<string>()).Returns((string?)null);
 
-        await BuildSeeder(config).SeedAsync();
+        await BuildSeeder(config).SeedAsync(TestContext.Current.CancellationToken);
 
         await _settingsRepo.Received(1).SetPluginSettingAsync("plugin_a", "api_key", "key-a");
         await _settingsRepo.Received(1).SetPluginSettingAsync("plugin_a", "region", "us");
@@ -136,7 +136,7 @@ public class PluginSettingsEnvSeederTests
         });
         _settingsRepo.GetPluginSettingAsync(Arg.Any<string>(), Arg.Any<string>()).Returns((string?)null);
 
-        await BuildSeeder(config).SeedAsync();
+        await BuildSeeder(config).SeedAsync(TestContext.Current.CancellationToken);
 
         await _settingsRepo.Received(1).SetPluginSettingAsync("PLUGIN_A", "api_key", "key");
     }
@@ -150,7 +150,7 @@ public class PluginSettingsEnvSeederTests
         });
         _settingsRepo.GetPluginSettingAsync(Arg.Any<string>(), Arg.Any<string>()).Returns((string?)null);
 
-        await BuildSeeder(config).SeedAsync();
+        await BuildSeeder(config).SeedAsync(TestContext.Current.CancellationToken);
 
         await _settingsRepo.Received(1).SetPluginSettingAsync("plugin_a", "API_KEY", "key");
     }
@@ -160,7 +160,7 @@ public class PluginSettingsEnvSeederTests
     {
         var config = BuildConfig(new Dictionary<string, string?>());
 
-        await BuildSeeder(config).SeedAsync();
+        await BuildSeeder(config).SeedAsync(TestContext.Current.CancellationToken);
 
         await _settingsRepo.DidNotReceiveWithAnyArgs().GetPluginSettingAsync(string.Empty, string.Empty);
         await _settingsRepo.DidNotReceiveWithAnyArgs().SetPluginSettingAsync(string.Empty, string.Empty, string.Empty);
@@ -174,7 +174,7 @@ public class PluginSettingsEnvSeederTests
             ["Vora:PluginSettings:plugin_a:api_key"] = ""
         });
 
-        await BuildSeeder(config).SeedAsync();
+        await BuildSeeder(config).SeedAsync(TestContext.Current.CancellationToken);
 
         await _settingsRepo.DidNotReceiveWithAnyArgs().SetPluginSettingAsync(string.Empty, string.Empty, string.Empty);
     }
@@ -190,7 +190,7 @@ public class PluginSettingsEnvSeederTests
         _settingsRepo.GetPluginSettingAsync("plugin_a", "api_key").Returns("db-existing");
         _settingsRepo.GetPluginSettingAsync("plugin_a", "region").Returns((string?)null);
 
-        await BuildSeeder(config).SeedAsync();
+        await BuildSeeder(config).SeedAsync(TestContext.Current.CancellationToken);
 
         await _settingsRepo.DidNotReceive().SetPluginSettingAsync("plugin_a", "api_key", Arg.Any<string>());
         await _settingsRepo.Received(1).SetPluginSettingAsync("plugin_a", "region", "us");

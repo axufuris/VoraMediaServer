@@ -57,7 +57,7 @@ public class AuthManagerPasswordResetTests
     [InlineData("\t")]
     public async Task ConfirmPasswordResetAsync_returns_InvalidToken_when_token_empty(string token)
     {
-        var result = await _manager.ConfirmPasswordResetAsync(token, "ValidPassword123");
+        var result = await _manager.ConfirmPasswordResetAsync(token, "ValidPassword123", TestContext.Current.CancellationToken);
 
         result.Should().Be(PasswordResetResult.InvalidToken);
         await _users.DidNotReceive().UpdateUserAsync(Arg.Any<User>());
@@ -70,7 +70,7 @@ public class AuthManagerPasswordResetTests
     [InlineData("1234567")]
     public async Task ConfirmPasswordResetAsync_returns_PasswordRejected_for_invalid_password(string password)
     {
-        var result = await _manager.ConfirmPasswordResetAsync("valid-token", password);
+        var result = await _manager.ConfirmPasswordResetAsync("valid-token", password, TestContext.Current.CancellationToken);
 
         result.Should().Be(PasswordResetResult.PasswordRejected);
         await _users.DidNotReceive().UpdateUserAsync(Arg.Any<User>());
@@ -86,7 +86,7 @@ public class AuthManagerPasswordResetTests
             .Returns(new PasswordResetTicket { UserId = user.Id, TokenHash = hash, ExpiresAt = DateTime.UtcNow.AddMinutes(30) });
         _users.GetUserByIdAsync(user.Id).Returns(user);
 
-        var result = await _manager.ConfirmPasswordResetAsync(token, "12345678");
+        var result = await _manager.ConfirmPasswordResetAsync(token, "12345678", TestContext.Current.CancellationToken);
 
         result.Should().Be(PasswordResetResult.Success);
     }
@@ -97,7 +97,7 @@ public class AuthManagerPasswordResetTests
         _users.GetActivePasswordResetTicketByHashAsync(Arg.Any<string>())
             .Returns((PasswordResetTicket?)null);
 
-        var result = await _manager.ConfirmPasswordResetAsync("missing-token", "ValidPassword123");
+        var result = await _manager.ConfirmPasswordResetAsync("missing-token", "ValidPassword123", TestContext.Current.CancellationToken);
 
         result.Should().Be(PasswordResetResult.InvalidToken);
         await _users.DidNotReceive().UpdateUserAsync(Arg.Any<User>());
@@ -117,7 +117,7 @@ public class AuthManagerPasswordResetTests
         _users.GetActivePasswordResetTicketByHashAsync(hash).Returns(ticket);
         _users.GetUserByIdAsync(ticket.UserId).Returns((User?)null);
 
-        var result = await _manager.ConfirmPasswordResetAsync(token, "ValidPassword123");
+        var result = await _manager.ConfirmPasswordResetAsync(token, "ValidPassword123", TestContext.Current.CancellationToken);
 
         result.Should().Be(PasswordResetResult.InvalidToken);
         await _users.Received(1).DeletePasswordResetTicketAsync(ticket);
@@ -137,7 +137,7 @@ public class AuthManagerPasswordResetTests
             .Returns(new PasswordResetTicket { UserId = user.Id, TokenHash = hash, ExpiresAt = DateTime.UtcNow.AddMinutes(30) });
         _users.GetUserByIdAsync(user.Id).Returns(user);
 
-        var result = await _manager.ConfirmPasswordResetAsync(token, "BrandNewPassword99");
+        var result = await _manager.ConfirmPasswordResetAsync(token, "BrandNewPassword99", TestContext.Current.CancellationToken);
 
         result.Should().Be(PasswordResetResult.Success);
         user.PasswordHash.Should().NotBe(originalHash);

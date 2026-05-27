@@ -92,7 +92,7 @@ public class VideoThumbnailManagerTests
         await _manager.TriggerMediaItemThumbnailGenerationAsync(id);
 
         await _media.DidNotReceive().GetMediaFilePathsAsync(Arg.Any<Guid>());
-        await _generator.DidNotReceiveWithAnyArgs().GenerateAsync(default!, default!, default!);
+        await _generator.DidNotReceiveWithAnyArgs().GenerateAsync(default!, default!, default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]

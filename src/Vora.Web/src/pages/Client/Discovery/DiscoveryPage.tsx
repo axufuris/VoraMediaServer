@@ -8,6 +8,7 @@ import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import MediaRail from '../../../components/Client/Primitives/MediaRail';
 import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 
 export default function DiscoveryPage() {
@@ -242,6 +243,9 @@ function DiscoveryRow({ config, serverId, watchlistIds }: { config: DiscoveryRow
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
                     </span>
                 ) : undefined;
+                const statusBadge = (item.inLibrary || item.requestStatus)
+                    ? <DiscoveryStatusBadge inLibrary={item.inLibrary} requestStatus={item.requestStatus} />
+                    : undefined;
                 return (
                     <div key={item.externalId} style={{ scrollSnapAlign: 'start', flex: 'none' }}>
                         <MediaPoster
@@ -250,6 +254,7 @@ function DiscoveryRow({ config, serverId, watchlistIds }: { config: DiscoveryRow
                             subtitle={item.year?.toString()}
                             onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${config.providerId}/${item.type}/${item.externalId}` : `/discovery/${config.providerId}/${item.type}/${item.externalId}`)}
                             badge={badge}
+                            bottomLeftBadge={statusBadge}
                         />
                     </div>
                 );

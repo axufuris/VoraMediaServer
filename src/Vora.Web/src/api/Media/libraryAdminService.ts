@@ -27,13 +27,10 @@ export interface CreateLibraryRequest {
     type: number;
     folderPaths: string[];
     enableRealTimeWatching: boolean;
-    useLocalAssets: boolean;
     findExtras: boolean;
     onlyShowTrailers: boolean;
     enableVideoPreviewThumbnails: boolean;
-    collectionDisplay: number;
     enableCreditsDetection: boolean;
-    enableVoiceActivityDetection: boolean;
     minimumCollectionSize: number;
     metadataProviderId: string;
     thirdPartyRating1ProviderId?: string;

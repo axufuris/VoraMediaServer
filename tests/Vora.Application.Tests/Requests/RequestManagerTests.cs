@@ -200,7 +200,7 @@ public class RequestManagerTests
         await _manager.ResolveRequestAsync("   ", "Movie");
 
         await _requests.DidNotReceive().GetRequestAsync(Arg.Any<string>(), Arg.Any<string>());
-        await _notifier.DidNotReceiveWithAnyArgs().NotifyRequestAvailableAsync(default!, default);
+        await _notifier.DidNotReceiveWithAnyArgs().NotifyRequestAvailableAsync(default!, default, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -211,7 +211,7 @@ public class RequestManagerTests
         await _manager.ResolveRequestAsync("603", "Movie");
 
         await _requests.DidNotReceive().UpdateRequestAsync(Arg.Any<MediaRequest>());
-        await _notifier.DidNotReceiveWithAnyArgs().NotifyRequestAvailableAsync(default!, default);
+        await _notifier.DidNotReceiveWithAnyArgs().NotifyRequestAvailableAsync(default!, default, TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -228,7 +228,7 @@ public class RequestManagerTests
 
         request.Status.Should().Be(startingStatus);
         await _requests.DidNotReceive().UpdateRequestAsync(Arg.Any<MediaRequest>());
-        await _notifier.DidNotReceiveWithAnyArgs().NotifyRequestAvailableAsync(default!, default);
+        await _notifier.DidNotReceiveWithAnyArgs().NotifyRequestAvailableAsync(default!, default, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -243,7 +243,7 @@ public class RequestManagerTests
         request.Status.Should().Be(RequestStatus.Available);
         request.UpdatedAt.Should().NotBeNull();
         await _requests.Received(1).UpdateRequestAsync(request);
-        await _notifier.Received(1).NotifyRequestAvailableAsync(request, mediaItemId);
+        await _notifier.Received(1).NotifyRequestAvailableAsync(request, mediaItemId, Arg.Any<CancellationToken>());
     }
 
     [Fact]

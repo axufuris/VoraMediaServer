@@ -66,7 +66,7 @@ export function PluginSection({ serverId, plugin, showModal, onAfterChange }: { 
         loadPluginSettings();
     }, [loadPluginSettings]);
 
-    const configurableFields = pluginFields.filter(f => f.key !== 'is_enabled');
+    const configurableFields = pluginFields.filter(f => f.key.trim().toLowerCase() !== 'is_enabled');
     const isEnabled = pluginValues['is_enabled'] !== 'false';
     const hasMoreSettings = configurableFields.length > 0;
 
@@ -148,7 +148,7 @@ export function PluginSection({ serverId, plugin, showModal, onAfterChange }: { 
                                         onChange={e => handlePluginValueChange(field.key, e.target.checked ? 'true' : 'false')}
                                         className="w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer"
                                     />
-                                    <span className="text-xs text-[var(--vora-text-secondary)] font-medium">{pluginValues[field.key] === 'true' ? 'Enabled' : 'Disabled'}</span>
+                                    <span className="text-xs text-[var(--vora-text-secondary)] font-medium">{pluginValues[field.key] === 'true' ? 'On' : 'Off'}</span>
                                 </label>
                             ) : field.type === 'folder' || field.type === 'directory' || field.type === 'path' ? (
                                 <FolderPathInput

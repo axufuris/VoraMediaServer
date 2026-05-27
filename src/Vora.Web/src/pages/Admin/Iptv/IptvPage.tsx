@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { iptvAdminService, type IptvPlaylistVM, type IptvChannelKind } from '../../../api/Iptv/iptvAdminService';
 import { iptvEpgAdminService, type IptvEpgSourceVM } from '../../../api/Iptv/iptvEpgAdminService';
@@ -119,6 +119,16 @@ export default function IptvPage({ kind }: IptvPageProps) {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    const sortedPlaylists = useMemo(
+        () => [...playlists].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+        [playlists]
+    );
+
+    const sortedEpgSources = useMemo(
+        () => [...epgSources].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+        [epgSources]
+    );
 
     const handlePlaylistQuickSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const val = e.target.value;
@@ -436,7 +446,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--vora-border-subtle)]">
-                                {playlists.map(p => (
+                                {sortedPlaylists.map(p => (
                                     <tr key={p.id} className="hover:bg-[var(--vora-bg-sunken)]/40 transition-colors">
                                         <td className="px-4 py-3 align-top">
                                             <div className="flex items-center gap-2 font-semibold text-[var(--vora-text-primary)]">
@@ -576,7 +586,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--vora-border-subtle)]">
-                                {epgSources.map(s => (
+                                {sortedEpgSources.map(s => (
                                     <tr key={s.id} className="hover:bg-[var(--vora-bg-sunken)]/40 transition-colors">
                                         <td className="px-4 py-3 align-top">
                                             <div className="flex items-center gap-2 font-semibold text-[var(--vora-text-primary)]">

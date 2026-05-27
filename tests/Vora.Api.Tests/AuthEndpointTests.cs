@@ -18,10 +18,10 @@ public class AuthEndpointTests : IClassFixture<VoraApiTestFactory>
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/auth/setup-status");
+        var response = await client.GetAsync("/api/auth/setup-status", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var payload = await response.Content.ReadFromJsonAsync<SetupStatusResponse>();
+        var payload = await response.Content.ReadFromJsonAsync<SetupStatusResponse>(TestContext.Current.CancellationToken);
         payload.Should().NotBeNull();
         payload!.IsClaimed.Should().BeFalse();
     }
@@ -31,7 +31,7 @@ public class AuthEndpointTests : IClassFixture<VoraApiTestFactory>
     {
         var client = _factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { email = "", password = "" });
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { email = "", password = "" }, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);
     }
@@ -41,7 +41,7 @@ public class AuthEndpointTests : IClassFixture<VoraApiTestFactory>
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/libraries");
+        var response = await client.GetAsync("/api/libraries", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }

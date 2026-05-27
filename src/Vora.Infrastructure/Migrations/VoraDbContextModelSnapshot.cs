@@ -797,9 +797,6 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<int>("CollectionDisplay")
-                        .HasColumnType("integer");
-
                     b.Property<bool>("EnableCreditsDetection")
                         .HasColumnType("boolean");
 
@@ -810,9 +807,6 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("EnableVideoPreviewThumbnails")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("EnableVoiceActivityDetection")
                         .HasColumnType("boolean");
 
                     b.Property<int>("EpisodeOrder")
@@ -861,9 +855,6 @@ namespace Vora.Infrastructure.Migrations
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");
-
-                    b.Property<bool>("UseLocalAssets")
-                        .HasColumnType("boolean");
 
                     b.Property<bool>("UseSeasonTitles")
                         .HasColumnType("boolean");

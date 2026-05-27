@@ -64,11 +64,11 @@ public class EmailDispatchWorkerTests
 
         using var cts = new CancellationTokenSource();
         await worker.StartAsync(cts.Token);
-        await queue.EnqueueAsync(email);
+        await queue.EnqueueAsync(email, TestContext.Current.CancellationToken);
         queue.Complete();
 
-        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5));
-        await worker.StopAsync(CancellationToken.None);
+        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await worker.StopAsync(TestContext.Current.CancellationToken);
 
         await transport.Received(1).SendAsync(Arg.Is<QueuedEmail>(e => e.LogId == email.LogId), Arg.Any<CancellationToken>());
         await logRepo.Received(1).UpdateAsync(
@@ -96,11 +96,11 @@ public class EmailDispatchWorkerTests
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         await worker.StartAsync(cts.Token);
-        await queue.EnqueueAsync(email);
+        await queue.EnqueueAsync(email, TestContext.Current.CancellationToken);
         queue.Complete();
 
-        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(15));
-        await worker.StopAsync(CancellationToken.None);
+        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
+        await worker.StopAsync(TestContext.Current.CancellationToken);
 
         calls.Should().Be(2);
         await logRepo.Received(1).UpdateAsync(
@@ -123,14 +123,14 @@ public class EmailDispatchWorkerTests
 
         using var cts = new CancellationTokenSource();
         await worker.StartAsync(cts.Token);
-        await queue.EnqueueAsync(email);
+        await queue.EnqueueAsync(email, TestContext.Current.CancellationToken);
 
         // Wait for the first attempt to fail and the worker to enter Task.Delay
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
         cts.Cancel();
 
-        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5));
-        await worker.StopAsync(CancellationToken.None);
+        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await worker.StopAsync(TestContext.Current.CancellationToken);
 
         // Cancellation during retry escapes through the inner OperationCanceledException rethrow,
         // so the final Failed log write does NOT happen — by design (clean shutdown).
@@ -155,13 +155,13 @@ public class EmailDispatchWorkerTests
 
         using var cts = new CancellationTokenSource();
         await worker.StartAsync(cts.Token);
-        await queue.EnqueueAsync(a);
-        await queue.EnqueueAsync(b);
-        await queue.EnqueueAsync(c);
+        await queue.EnqueueAsync(a, TestContext.Current.CancellationToken);
+        await queue.EnqueueAsync(b, TestContext.Current.CancellationToken);
+        await queue.EnqueueAsync(c, TestContext.Current.CancellationToken);
         queue.Complete();
 
-        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5));
-        await worker.StopAsync(CancellationToken.None);
+        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await worker.StopAsync(TestContext.Current.CancellationToken);
 
         await transport.Received(3).SendAsync(Arg.Any<QueuedEmail>(), Arg.Any<CancellationToken>());
         await logRepo.Received(1).UpdateAsync(a.LogId, EmailDeliveryStatus.Sent, 1, null, Arg.Any<DateTime?>(), Arg.Any<CancellationToken>());

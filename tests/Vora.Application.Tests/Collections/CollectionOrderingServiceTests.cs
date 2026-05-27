@@ -36,7 +36,7 @@ public class CollectionOrderingServiceTests
         // The anonymous-type projection returns null by default from NSubstitute.
         var collectionId = Guid.NewGuid();
 
-        await _service.ApplyChronologicalOrderAsync(collectionId);
+        await _service.ApplyChronologicalOrderAsync(collectionId, TestContext.Current.CancellationToken);
 
         await _repo.DidNotReceive().GetCollectionItemsWithMediaAsync(Arg.Any<Guid>());
         await _repo.DidNotReceive().UpdateCollectionItemsAsync(Arg.Any<IEnumerable<CollectionItem>>());
@@ -53,7 +53,7 @@ public class CollectionOrderingServiceTests
             Arg.Any<List<Guid>?>())
             .Returns(CollectionSortOrder.ReleaseDateAsc);
 
-        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: "tmdb-collections");
+        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: "tmdb-collections", TestContext.Current.CancellationToken);
 
         await _notifier.DidNotReceiveWithAnyArgs().NotifyCollectionUpdatedAsync(default);
         await _repo.DidNotReceive().GetCollectionItemsWithMediaAsync(Arg.Any<Guid>());
@@ -73,7 +73,7 @@ public class CollectionOrderingServiceTests
             Arg.Any<List<Guid>?>())
             .Returns(sort);
 
-        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: "p");
+        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: "p", TestContext.Current.CancellationToken);
 
         await _notifier.DidNotReceiveWithAnyArgs().NotifyCollectionUpdatedAsync(default);
     }
@@ -89,7 +89,7 @@ public class CollectionOrderingServiceTests
             Arg.Any<List<Guid>?>())
             .Returns(CollectionSortOrder.Chronological);
 
-        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: false, providerId: "p");
+        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: false, providerId: "p", TestContext.Current.CancellationToken);
 
         await _notifier.DidNotReceiveWithAnyArgs().NotifyCollectionUpdatedAsync(default);
     }
@@ -105,7 +105,7 @@ public class CollectionOrderingServiceTests
             Arg.Any<List<Guid>?>())
             .Returns(CollectionSortOrder.Chronological);
 
-        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: null);
+        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: null, TestContext.Current.CancellationToken);
 
         await _notifier.DidNotReceiveWithAnyArgs().NotifyCollectionUpdatedAsync(default);
     }
@@ -123,7 +123,7 @@ public class CollectionOrderingServiceTests
             Arg.Any<List<Guid>?>())
             .Returns(CollectionSortOrder.Chronological);
 
-        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: "tmdb-collections");
+        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: "tmdb-collections", TestContext.Current.CancellationToken);
 
         await _notifier.Received(1).NotifyCollectionUpdatedAsync(collectionId);
     }

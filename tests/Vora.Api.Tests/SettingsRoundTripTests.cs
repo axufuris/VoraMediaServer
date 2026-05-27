@@ -28,10 +28,10 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var response = await client.GetAsync("/api/settings/server");
+        var response = await client.GetAsync("/api/settings/server", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var settings = await response.Content.ReadFromJsonAsync<ServerSettingsVM>();
+        var settings = await response.Content.ReadFromJsonAsync<ServerSettingsVM>(TestContext.Current.CancellationToken);
         settings.Should().NotBeNull();
         settings!.ServerName.Should().NotBeNullOrEmpty();
         settings.NightlyScanTime.Should().MatchRegex(@"^\d{2}:\d{2}$");
@@ -42,7 +42,7 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server");
+        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
         current.Should().NotBeNull();
 
         current!.ServerName = "Round-Trip Server";
@@ -50,10 +50,10 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
         current.DvrPreRollSeconds = 90;
         current.DailyMixCount = 8;
 
-        var put = await client.PutAsJsonAsync("/api/settings/server", current);
+        var put = await client.PutAsJsonAsync("/api/settings/server", current, TestContext.Current.CancellationToken);
         put.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server");
+        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
         refreshed!.ServerName.Should().Be("Round-Trip Server");
         refreshed.NightlyScanTime.Should().Be("03:30");
         refreshed.DvrPreRollSeconds.Should().Be(90);
@@ -65,11 +65,11 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server");
+        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
         current!.VideoThumbnailWidth = 9999;
 
-        await client.PutAsJsonAsync("/api/settings/server", current);
-        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server");
+        await client.PutAsJsonAsync("/api/settings/server", current, TestContext.Current.CancellationToken);
+        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
 
         refreshed!.VideoThumbnailWidth.Should().Be(1280);
     }
@@ -79,11 +79,11 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server");
+        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
         current!.SilenceThresholdOffsetDb = -999;
 
-        await client.PutAsJsonAsync("/api/settings/server", current);
-        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server");
+        await client.PutAsJsonAsync("/api/settings/server", current, TestContext.Current.CancellationToken);
+        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
 
         refreshed!.SilenceThresholdOffsetDb.Should().Be(-40);
     }
@@ -93,11 +93,11 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server");
+        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
         current!.DailyMixDriftPercent = 250;
 
-        await client.PutAsJsonAsync("/api/settings/server", current);
-        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server");
+        await client.PutAsJsonAsync("/api/settings/server", current, TestContext.Current.CancellationToken);
+        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
 
         refreshed!.DailyMixDriftPercent.Should().Be(100);
     }
@@ -107,11 +107,11 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server");
+        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
         current!.TranscoderTempDirectory = "   ";
 
-        await client.PutAsJsonAsync("/api/settings/server", current);
-        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server");
+        await client.PutAsJsonAsync("/api/settings/server", current, TestContext.Current.CancellationToken);
+        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
 
         refreshed!.TranscoderTempDirectory.Should().Be("/transcode");
     }
@@ -130,10 +130,11 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
             Dvr = false,
             InternetRadio = true,
             Podcasts = false
-        });
+        },
+        TestContext.Current.CancellationToken);
         put.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var flags = await client.GetFromJsonAsync<FeatureFlagsVM>("/api/server/features");
+        var flags = await client.GetFromJsonAsync<FeatureFlagsVM>("/api/server/features", TestContext.Current.CancellationToken);
         flags.Should().NotBeNull();
         flags!.Discover.Should().BeFalse();
         flags.ForYou.Should().BeFalse();
@@ -151,7 +152,7 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", profileToken);
 
-        var response = await client.GetAsync("/api/settings/server");
+        var response = await client.GetAsync("/api/settings/server", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }

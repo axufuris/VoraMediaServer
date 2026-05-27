@@ -22,6 +22,8 @@ export interface DiscoveryRowConfig {
     isEnabled: boolean;
 }
 
+export type DiscoveryRequestStatus = 'Pending' | 'Approved' | 'Denied' | 'Processing' | 'Available';
+
 export interface DiscoveryItem {
     externalId: string;
     providerId: string;
@@ -31,6 +33,8 @@ export interface DiscoveryItem {
     releaseDate?: string;
     posterUrl?: string;
     contentRating?: string;
+    inLibrary?: boolean;
+    requestStatus?: DiscoveryRequestStatus | null;
 }
 
 export interface CastMember {

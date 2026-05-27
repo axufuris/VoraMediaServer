@@ -37,24 +37,25 @@ public class LibraryCrudFlowTests : IClassFixture<VoraApiTestFactory>
             name = "Round Trip Library " + Guid.NewGuid().ToString("N")[..8],
             type = "Movie",
             folderPaths = new[] { "/media/round-trip" }
-        });
+        },
+        TestContext.Current.CancellationToken);
         create.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var created = await create.Content.ReadFromJsonAsync<CreatedLibrary>();
+        var created = await create.Content.ReadFromJsonAsync<CreatedLibrary>(TestContext.Current.CancellationToken);
         created.Should().NotBeNull();
         created!.Id.Should().NotBe(Guid.Empty);
 
         // LIST should contain the new id
-        var list = await client.GetAsync("/api/libraries");
+        var list = await client.GetAsync("/api/libraries", TestContext.Current.CancellationToken);
         list.StatusCode.Should().Be(HttpStatusCode.OK);
-        var libraries = await list.Content.ReadFromJsonAsync<List<LibrarySummary>>();
+        var libraries = await list.Content.ReadFromJsonAsync<List<LibrarySummary>>(TestContext.Current.CancellationToken);
         libraries.Should().NotBeNull();
         libraries!.Should().Contain(l => l.Id == created.Id);
 
         // GET by id
-        var get = await client.GetAsync($"/api/libraries/{created.Id}");
+        var get = await client.GetAsync($"/api/libraries/{created.Id}", TestContext.Current.CancellationToken);
         get.StatusCode.Should().Be(HttpStatusCode.OK);
-        var details = await get.Content.ReadFromJsonAsync<LibraryDetails>();
+        var details = await get.Content.ReadFromJsonAsync<LibraryDetails>(TestContext.Current.CancellationToken);
         details.Should().NotBeNull();
         details!.Id.Should().Be(created.Id);
         details.FolderPaths.Should().Contain("/media/round-trip");
@@ -65,7 +66,7 @@ public class LibraryCrudFlowTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var response = await client.GetAsync($"/api/libraries/{Guid.NewGuid()}");
+        var response = await client.GetAsync($"/api/libraries/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

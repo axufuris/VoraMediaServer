@@ -1,12 +1,5 @@
 namespace Vora.Domain.Enums;
 
-public enum CollectionDisplayMode
-{
-    ShowCollectionsAndItems,
-    HideItemsInCollections,
-    HideCollectionsShowItems
-}
-
 public enum EpisodeSortOrder
 {
     OldestFirst,

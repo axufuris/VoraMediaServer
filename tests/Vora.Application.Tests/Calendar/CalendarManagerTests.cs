@@ -62,7 +62,8 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = await Build(p1, p2).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false);
+            start, end, true, new List<Guid>(), true, All(), All(), false,
+            TestContext.Current.CancellationToken);
 
         result.Should().HaveCount(2);
         await p1.Received(1).GetEventsAsync(start, end, Arg.Any<CancellationToken>());
@@ -78,7 +79,8 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = await Build(enabled, disabled).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false);
+            start, end, true, new List<Guid>(), true, All(), All(), false,
+            TestContext.Current.CancellationToken);
 
         result.Should().ContainSingle();
         await disabled.DidNotReceive().GetEventsAsync(Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
@@ -92,7 +94,8 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = await Build(p).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false);
+            start, end, true, new List<Guid>(), true, All(), All(), false,
+            TestContext.Current.CancellationToken);
 
         result.Should().ContainSingle();
     }
@@ -108,7 +111,8 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = await Build(failing, good).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false);
+            start, end, true, new List<Guid>(), true, All(), All(), false,
+            TestContext.Current.CancellationToken);
 
         result.Should().ContainSingle();
     }
@@ -131,7 +135,8 @@ public class CalendarManagerTests
             hasAllRatings: false,
             allowedMovieRatings: new List<string> { "G", "PG" },
             allowedTvRatings: new List<string>(),
-            blockUnrated: false)).ToList();
+            blockUnrated: false,
+            TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
         result[0].Title.Should().Be("Family");
@@ -153,7 +158,8 @@ public class CalendarManagerTests
             hasAllRatings: false,
             allowedMovieRatings: new List<string>(),
             allowedTvRatings: new List<string> { "TV-Y", "TV-PG" },
-            blockUnrated: false)).ToList();
+            blockUnrated: false,
+            TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
         result[0].Title.Should().Be("Kids Show");
@@ -173,7 +179,8 @@ public class CalendarManagerTests
             hasAllRatings: false,
             allowedMovieRatings: new List<string> { "G" },
             allowedTvRatings: new List<string>(),
-            blockUnrated: false);
+            blockUnrated: false,
+            TestContext.Current.CancellationToken);
 
         result.Should().ContainSingle();
     }
@@ -192,7 +199,8 @@ public class CalendarManagerTests
             hasAllRatings: false,
             allowedMovieRatings: new List<string> { "G" },
             allowedTvRatings: new List<string>(),
-            blockUnrated: true);
+            blockUnrated: true,
+            TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -211,7 +219,8 @@ public class CalendarManagerTests
             hasAllRatings: true,
             allowedMovieRatings: new List<string>(),
             allowedTvRatings: new List<string>(),
-            blockUnrated: true);
+            blockUnrated: true,
+            TestContext.Current.CancellationToken);
 
         result.Should().ContainSingle();
     }
@@ -234,7 +243,8 @@ public class CalendarManagerTests
             start, end,
             hasAllAccess: false,
             allowedLibs: new List<Guid> { allowedLib },
-            true, All(), All(), false)).ToList();
+            true, All(), All(), false,
+            TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
         result[0].Title.Should().Be("Allowed");
@@ -257,7 +267,8 @@ public class CalendarManagerTests
             start, end,
             hasAllAccess: false,
             allowedLibs: new List<Guid> { libraryId },
-            true, All(), All(), false)).ToList();
+            true, All(), All(), false,
+            TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
         result[0].LibraryId.Should().Be(libraryId);
@@ -282,7 +293,8 @@ public class CalendarManagerTests
             start, end,
             hasAllAccess: false,
             allowedLibs: new List<Guid> { otherLib },
-            true, All(), All(), false);
+            true, All(), All(), false,
+            TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -305,7 +317,8 @@ public class CalendarManagerTests
             start, end,
             hasAllAccess: false,
             allowedLibs: new List<Guid> { Guid.NewGuid() },
-            true, All(), All(), false)).ToList();
+            true, All(), All(), false,
+            TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
     }
@@ -327,7 +340,8 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p1, p2).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false)).ToList();
+            start, end, true, new List<Guid>(), true, All(), All(), false,
+            TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
         result[0].IsInLibrary.Should().BeTrue();
@@ -345,7 +359,8 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p1).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false)).ToList();
+            start, end, true, new List<Guid>(), true, All(), All(), false,
+            TestContext.Current.CancellationToken)).ToList();
 
         result.Should().HaveCount(2);
     }
@@ -363,7 +378,8 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false)).ToList();
+            start, end, true, new List<Guid>(), true, All(), All(), false,
+            TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
         result[0].IsWatchlisted.Should().BeTrue();
@@ -382,7 +398,8 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false)).ToList();
+            start, end, true, new List<Guid>(), true, All(), All(), false,
+            TestContext.Current.CancellationToken)).ToList();
 
         result.Should().HaveCount(2);
     }
@@ -397,7 +414,8 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false)).ToList();
+            start, end, true, new List<Guid>(), true, All(), All(), false,
+            TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
         result[0].IsWatchlisted.Should().BeTrue();
@@ -415,7 +433,8 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false)).ToList();
+            start, end, true, new List<Guid>(), true, All(), All(), false,
+            TestContext.Current.CancellationToken)).ToList();
 
         result.Select(r => r.Title).Should().Equal("First", "Second", "Third");
     }

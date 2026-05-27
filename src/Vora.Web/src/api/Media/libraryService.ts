@@ -6,13 +6,10 @@ export interface MediaLibrary {
     type: string;
     folderPaths: string[];
     scanner: string;
-    useLocalAssets: boolean;
     findExtras: boolean;
     onlyShowTrailers: boolean;
     enableVideoPreviewThumbnails: boolean;
-    collectionDisplay: number;
     enableCreditsDetection: boolean;
-    enableVoiceActivityDetection: boolean;
     episodeSorting: number;
     episodeOrder: number;
     useSeasonTitles: boolean;

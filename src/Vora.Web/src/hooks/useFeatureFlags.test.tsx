@@ -1,5 +1,6 @@
+import type { ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, waitFor, cleanup } from '@testing-library/react';
+import { renderHook, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { DEFAULT_FEATURE_FLAGS, type FeatureFlagsVM } from '../api/System/featureFlagsService';
 
@@ -31,29 +32,22 @@ vi.mock('../utils/serverVault', () => ({
 // Renders the hook inside a route so useParams resolves.
 async function renderHookWith(serverId?: string) {
     const { useFeatureFlags } = await import('./useFeatureFlags');
-    let captured: FeatureFlagsVM | null = null;
-    function Probe() {
-        captured = useFeatureFlags();
-        return null;
-    }
 
-    if (serverId) {
-        render(
+    const wrapper = serverId
+        ? ({ children }: { children: ReactNode }) => (
             <MemoryRouter initialEntries={[`/server/${serverId}`]}>
                 <Routes>
-                    <Route path="/server/:serverId" element={<Probe />} />
+                    <Route path="/server/:serverId" element={children} />
                 </Routes>
             </MemoryRouter>
+        )
+        : ({ children }: { children: ReactNode }) => (
+            <MemoryRouter>{children}</MemoryRouter>
         );
-    } else {
-        render(
-            <MemoryRouter>
-                <Probe />
-            </MemoryRouter>
-        );
-    }
 
-    return () => captured;
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
+
+    return () => result.current;
 }
 
 describe('useFeatureFlags', () => {

@@ -47,7 +47,11 @@ public sealed class LogFileSink : IHostedService, IDisposable
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         _channel.Writer.TryComplete();
-        if (_cts != null) await _cts.CancelAsync();
+        if (_cts != null)
+        {
+            try { await _cts.CancelAsync(); }
+            catch (ObjectDisposedException) { }
+        }
         if (_worker != null)
         {
             try { await _worker; } catch { }

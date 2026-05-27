@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+using System.Linq.Expressions;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Enums;
 
@@ -16,13 +16,10 @@ public class MediaLibraryVM
     public int MinimumCollectionSize { get; set; }
 
     public string MetadataProviderId { get; set; } = string.Empty;
-    public bool UseLocalAssets { get; set; }
     public bool FindExtras { get; set; }
     public bool OnlyShowTrailers { get; set; }
     public bool EnableVideoPreviewThumbnails { get; set; }
-    public int CollectionDisplay { get; set; }
     public bool EnableCreditsDetection { get; set; }
-    public bool EnableVoiceActivityDetection { get; set; }
     public string? ThirdPartyRating1ProviderId { get; set; }
     public string? ThirdPartyRating2ProviderId { get; set; }
     public string? ArtworkProviderId { get; set; }
@@ -47,13 +44,10 @@ public class MediaLibraryVM
             FolderPaths = l.FolderPaths,
             ScannerRegex = l.ScannerRegex,
             MetadataProviderId = l.MetadataProviderId,
-            UseLocalAssets = l.UseLocalAssets,
             FindExtras = l.FindExtras,
             OnlyShowTrailers = l.OnlyShowTrailers,
             EnableVideoPreviewThumbnails = l.EnableVideoPreviewThumbnails,
-            CollectionDisplay = (int)l.CollectionDisplay,
             EnableCreditsDetection = l.EnableCreditsDetection,
-            EnableVoiceActivityDetection = l.EnableVoiceActivityDetection,
             EpisodeSorting = (int)l.EpisodeSorting,
             EpisodeOrder = (int)l.EpisodeOrder,
             UseSeasonTitles = l.UseSeasonTitles,

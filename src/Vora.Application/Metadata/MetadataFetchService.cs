@@ -197,53 +197,25 @@ public class MetadataFetchService : IMetadataFetchService
         if (item?.Library == null) return artworkEntities;
 
         var providerIdToUse = item.Library.ArtworkProviderId ?? "tmdb_artwork";
-        var remoteProvider = _artworkProviders.FirstOrDefault(p => p.Id == providerIdToUse) ?? _artworkProviders.FirstOrDefault(p => p.Id == "tmdb_artwork");
-        var localProvider = item.Library.UseLocalAssets ? _artworkProviders.FirstOrDefault(p => p.Id == "local_artwork") : null;
+        var provider = _artworkProviders.FirstOrDefault(p => p.Id == providerIdToUse) ?? _artworkProviders.FirstOrDefault(p => p.Id == "tmdb_artwork");
+        if (provider == null) return artworkEntities;
 
         var localPath = item.MediaParts.FirstOrDefault()?.FilePath;
         if (!string.IsNullOrEmpty(localPath)) localPath = Path.GetDirectoryName(localPath);
 
-        var localTask = localProvider != null
-            ? localProvider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name, localPath, item.Title)
-            : Task.FromResult(Enumerable.Empty<ArtworkResult>());
+        var results = await provider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name, localPath, item.Title);
 
-        var remoteTask = remoteProvider != null && remoteProvider.Id != "local_artwork"
-            ? remoteProvider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name, localPath, item.Title)
-            : Task.FromResult(Enumerable.Empty<ArtworkResult>());
-
-        await Task.WhenAll(localTask, remoteTask);
-        var localResults = await localTask;
-        var remoteResults = await remoteTask;
-
-        if (localProvider != null)
+        artworkEntities.AddRange(results.Select(r => new MediaArtwork
         {
-            artworkEntities.AddRange(localResults.Select(r => new MediaArtwork
-            {
-                MediaItemId = item.Id,
-                Url = r.Url,
-                Kind = (Vora.Domain.Enums.ArtworkKind)r.Kind,
-                Language = r.Language,
-                Width = r.Width,
-                Height = r.Height,
-                VoteAverage = r.VoteAverage,
-                ProviderId = localProvider.Id
-            }));
-        }
-
-        if (remoteProvider != null && remoteProvider.Id != "local_artwork")
-        {
-            artworkEntities.AddRange(remoteResults.Select(r => new MediaArtwork
-            {
-                MediaItemId = item.Id,
-                Url = r.Url,
-                Kind = (Vora.Domain.Enums.ArtworkKind)r.Kind,
-                Language = r.Language,
-                Width = r.Width,
-                Height = r.Height,
-                VoteAverage = r.VoteAverage,
-                ProviderId = remoteProvider.Id
-            }));
-        }
+            MediaItemId = item.Id,
+            Url = r.Url,
+            Kind = (Vora.Domain.Enums.ArtworkKind)r.Kind,
+            Language = r.Language,
+            Width = r.Width,
+            Height = r.Height,
+            VoteAverage = r.VoteAverage,
+            ProviderId = provider.Id
+        }));
 
         return artworkEntities;
     }

@@ -32,10 +32,10 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
         // default IsEnabled state here because the toggle test may have already run.
         var client = AdminClient();
 
-        var response = await client.GetAsync("/api/plugins");
+        var response = await client.GetAsync("/api/plugins", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var plugins = await response.Content.ReadFromJsonAsync<List<PluginVM>>();
+        var plugins = await response.Content.ReadFromJsonAsync<List<PluginVM>>(TestContext.Current.CancellationToken);
         plugins.Should().NotBeNull();
         var yt = plugins!.FirstOrDefault(p => p.Id == YouTubePlugin.PluginId);
         yt.Should().NotBeNull("YouTube is a built-in plugin and should always be present");
@@ -52,17 +52,18 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
         var put = await client.PutAsJsonAsync($"/api/settings/plugins/{YouTubePlugin.PluginId}", new Dictionary<string, string>
         {
             ["is_enabled"] = "false"
-        });
+        },
+        TestContext.Current.CancellationToken);
         put.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify via plugin listing
-        var get = await client.GetAsync("/api/plugins");
-        var plugins = await get.Content.ReadFromJsonAsync<List<PluginVM>>();
+        var get = await client.GetAsync("/api/plugins", TestContext.Current.CancellationToken);
+        var plugins = await get.Content.ReadFromJsonAsync<List<PluginVM>>(TestContext.Current.CancellationToken);
         var yt = plugins!.Single(p => p.Id == YouTubePlugin.PluginId);
         yt.IsEnabled.Should().BeFalse();
 
         // Verify via per-plugin settings endpoint
-        var settings = await client.GetFromJsonAsync<List<PluginSettingFieldVM>>($"/api/settings/plugins/{YouTubePlugin.PluginId}");
+        var settings = await client.GetFromJsonAsync<List<PluginSettingFieldVM>>($"/api/settings/plugins/{YouTubePlugin.PluginId}", TestContext.Current.CancellationToken);
         var enabledField = settings!.Single(f => f.Key == "is_enabled");
         enabledField.Value.Should().Be("false");
     }
@@ -75,14 +76,16 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
         await client.PutAsJsonAsync($"/api/settings/plugins/{YouTubePlugin.PluginId}", new Dictionary<string, string>
         {
             ["is_enabled"] = "false"
-        });
+        },
+        TestContext.Current.CancellationToken);
         await client.PutAsJsonAsync($"/api/settings/plugins/{YouTubePlugin.PluginId}", new Dictionary<string, string>
         {
             ["is_enabled"] = "true"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
-        var get = await client.GetAsync("/api/plugins");
-        var plugins = await get.Content.ReadFromJsonAsync<List<PluginVM>>();
+        var get = await client.GetAsync("/api/plugins", TestContext.Current.CancellationToken);
+        var plugins = await get.Content.ReadFromJsonAsync<List<PluginVM>>(TestContext.Current.CancellationToken);
         var yt = plugins!.Single(p => p.Id == YouTubePlugin.PluginId);
         yt.IsEnabled.Should().BeTrue();
     }
@@ -94,7 +97,7 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", profileToken);
 
-        var response = await client.GetAsync("/api/plugins");
+        var response = await client.GetAsync("/api/plugins", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -109,7 +112,8 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
         var response = await client.PutAsJsonAsync($"/api/settings/plugins/{YouTubePlugin.PluginId}", new Dictionary<string, string>
         {
             ["is_enabled"] = "false"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }

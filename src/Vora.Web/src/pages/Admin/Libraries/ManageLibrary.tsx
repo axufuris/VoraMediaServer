@@ -501,27 +501,13 @@ export default function ManageLibrary() {
                     </label>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <Checkbox checked={library.useLocalAssets} onChange={v => handleChange('useLocalAssets', v)} label="Use local assets" />
                         {showVideoOptions && <Checkbox checked={library.findExtras} onChange={v => handleChange('findExtras', v)} label="Find extras" />}
                         {showVideoOptions && <Checkbox checked={library.onlyShowTrailers} onChange={v => handleChange('onlyShowTrailers', v)} label="Only show trailers" />}
                         {showVideoPreviewThumbnails && <Checkbox checked={library.enableVideoPreviewThumbnails} onChange={v => handleChange('enableVideoPreviewThumbnails', v)} label="Enable video preview thumbnails" />}
                         {showVideoOptions && <Checkbox checked={library.enableCreditsDetection} onChange={v => handleChange('enableCreditsDetection', v)} label="Enable credits detection" />}
-                        {showVideoOptions && <Checkbox checked={library.enableVoiceActivityDetection} onChange={v => handleChange('enableVoiceActivityDetection', v)} label="Enable voice activity detection" />}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <FieldLabel>Collections Display</FieldLabel>
-                            <select
-                                value={library.collectionDisplay}
-                                onChange={e => handleChange('collectionDisplay', Number(e.target.value))}
-                                className="vora-input cursor-pointer"
-                            >
-                                <option value={0}>Show collections and their items</option>
-                                <option value={1}>Hide items which are in collections</option>
-                                <option value={2}>Hide collections but show their items</option>
-                            </select>
-                        </div>
                         <div>
                             <FieldLabel>Minimum Collection Size</FieldLabel>
                             <select

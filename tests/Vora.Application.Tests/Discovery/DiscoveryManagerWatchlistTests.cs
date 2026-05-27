@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Discovery;
+using Vora.Application.Media;
+using Vora.Application.Requests;
 using Vora.Domain.Entities.Discovery;
 using Vora.Plugins.Interfaces;
 
@@ -17,6 +19,8 @@ public class DiscoveryManagerWatchlistTests
             Array.Empty<IDiscoveryProvider>(),
             Array.Empty<IDiscoveryTheaterProvider>(),
             _repo,
+            Substitute.For<IMediaRepository>(),
+            Substitute.For<IRequestRepository>(),
             NullLogger<DiscoveryManager>.Instance);
     }
 

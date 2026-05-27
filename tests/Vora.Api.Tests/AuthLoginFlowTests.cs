@@ -31,7 +31,7 @@ public class AuthLoginFlowTests : IClassFixture<VoraApiTestFactory>
         };
 
         db.Users.Add(user);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         return user;
     }
 
@@ -43,10 +43,10 @@ public class AuthLoginFlowTests : IClassFixture<VoraApiTestFactory>
         await SeedUserAsync(email, password);
 
         var client = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password }, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        var body = await response.Content.ReadFromJsonAsync<LoginResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
         body!.AccessToken.Should().NotBeNullOrWhiteSpace();
         body.DisplayName.Should().Be("Test User");
@@ -59,7 +59,7 @@ public class AuthLoginFlowTests : IClassFixture<VoraApiTestFactory>
         await SeedUserAsync(email, "CorrectPassword");
 
         var client = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPassword" });
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPassword" }, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -72,7 +72,8 @@ public class AuthLoginFlowTests : IClassFixture<VoraApiTestFactory>
         {
             email = "nobody@example.com",
             password = "AnyPassword123"
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -85,15 +86,15 @@ public class AuthLoginFlowTests : IClassFixture<VoraApiTestFactory>
         await SeedUserAsync(email, password);
 
         var client = _factory.CreateClient();
-        var login = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+        var login = await client.PostAsJsonAsync("/api/auth/login", new { email, password }, TestContext.Current.CancellationToken);
         login.EnsureSuccessStatusCode();
-        var body = await login.Content.ReadFromJsonAsync<LoginResponse>();
+        var body = await login.Content.ReadFromJsonAsync<LoginResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
 
         var authedClient = _factory.CreateClient();
         authedClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
 
-        var libraries = await authedClient.GetAsync("/api/libraries");
+        var libraries = await authedClient.GetAsync("/api/libraries", TestContext.Current.CancellationToken);
         libraries.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -109,9 +110,9 @@ public class AuthLoginFlowTests : IClassFixture<VoraApiTestFactory>
         await SeedUserAsync(email, password, isAdmin: true);
 
         var client = _factory.CreateClient();
-        var login = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+        var login = await client.PostAsJsonAsync("/api/auth/login", new { email, password }, TestContext.Current.CancellationToken);
         login.EnsureSuccessStatusCode();
-        var body = await login.Content.ReadFromJsonAsync<LoginResponse>();
+        var body = await login.Content.ReadFromJsonAsync<LoginResponse>(TestContext.Current.CancellationToken);
 
         body.Should().NotBeNull();
         body!.IsAdmin.Should().BeTrue();

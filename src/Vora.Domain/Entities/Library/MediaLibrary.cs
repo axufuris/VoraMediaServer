@@ -18,16 +18,13 @@ public class MediaLibrary
     public string? ThirdPartyRating2ProviderId { get; set; }
 
     public bool EnableRealTimeWatching { get; set; } = true;
-    public bool UseLocalAssets { get; set; }
     public bool FindExtras { get; set; } = true;
     public bool OnlyShowTrailers { get; set; }
     public bool EnableVideoPreviewThumbnails { get; set; }
 
-    public CollectionDisplayMode CollectionDisplay { get; set; } = CollectionDisplayMode.ShowCollectionsAndItems;
     public int MinimumCollectionSize { get; set; } = 1;
 
     public bool EnableCreditsDetection { get; set; }
-    public bool EnableVoiceActivityDetection { get; set; }
     public bool EnableIntroDetection { get; set; } = true;
 
     public EpisodeSortOrder EpisodeSorting { get; set; } = EpisodeSortOrder.OldestFirst;

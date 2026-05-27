@@ -4,6 +4,7 @@ import { discoveryService, type DiscoveryItem, type DiscoveryRowConfig } from '.
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
+import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 
 export default function DiscoveryViewAllPage() {
@@ -141,6 +142,9 @@ export default function DiscoveryViewAllPage() {
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
                             </span>
                         ) : undefined;
+                        const statusBadge = (item.inLibrary || item.requestStatus)
+                            ? <DiscoveryStatusBadge inLibrary={item.inLibrary} requestStatus={item.requestStatus} />
+                            : undefined;
                         return (
                             <MediaPoster
                                 key={item.externalId}
@@ -149,6 +153,7 @@ export default function DiscoveryViewAllPage() {
                                 subtitle={item.year?.toString()}
                                 onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${providerId}/${item.type}/${item.externalId}` : `/discovery/${providerId}/${item.type}/${item.externalId}`)}
                                 badge={badge}
+                                bottomLeftBadge={statusBadge}
                                 fill
                             />
                         );

@@ -39,7 +39,7 @@ public class TaskProcessingWorkerTests
         }
 
         public void Complete() => Channel.Writer.TryComplete();
-        public ValueTask EnqueueAsync(QueuedTaskDto task) => Channel.Writer.WriteAsync(task);
+        public ValueTask EnqueueAsync(QueuedTaskDto task) => Channel.Writer.WriteAsync(task, TestContext.Current.CancellationToken);
     }
 
     private static (TaskProcessingWorker worker, ITaskQueueManager queue, FakeScopeFactory scopes, ControlledQueue controlled) Build()
@@ -73,11 +73,11 @@ public class TaskProcessingWorkerTests
         await worker.StartAsync(cts.Token);
         await controlled.EnqueueAsync(task);
 
-        await workItemRan.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await workItemRan.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         controlled.Complete();
-        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5));
-        await worker.StopAsync(CancellationToken.None);
+        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await worker.StopAsync(TestContext.Current.CancellationToken);
 
         queue.Received(1).MarkTaskAsRunning(task.Id);
         queue.Received(1).RemoveTask(task.Id);
@@ -104,11 +104,11 @@ public class TaskProcessingWorkerTests
         await worker.StartAsync(cts.Token);
         await controlled.EnqueueAsync(task);
 
-        await taskStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await taskStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         controlled.Complete();
-        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5));
-        await worker.StopAsync(CancellationToken.None);
+        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await worker.StopAsync(TestContext.Current.CancellationToken);
 
         queue.Received(1).RemoveTask(task.Id);
     }
@@ -133,11 +133,11 @@ public class TaskProcessingWorkerTests
         await worker.StartAsync(cts.Token);
         await controlled.EnqueueAsync(task);
 
-        await taskStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await taskStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         cts.Cancel();
-        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5));
-        await worker.StopAsync(CancellationToken.None);
+        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await worker.StopAsync(TestContext.Current.CancellationToken);
 
         queue.Received(1).RemoveTask(task.Id);
     }
@@ -180,11 +180,11 @@ public class TaskProcessingWorkerTests
         }
 
         await worker.StartAsync(cts.Token);
-        await allDone.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await allDone.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         controlled.Complete();
-        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5));
-        await worker.StopAsync(CancellationToken.None);
+        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await worker.StopAsync(TestContext.Current.CancellationToken);
 
         processedIds.Should().HaveCount(totalTasks);
         scopes.CreatedScopes.Should().Be(totalTasks);

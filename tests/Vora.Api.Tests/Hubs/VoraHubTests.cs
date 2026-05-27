@@ -145,7 +145,7 @@ public class VoraHubTests
 
         await _hub.OnConnectedAsync();
 
-        await _groups.DidNotReceiveWithAnyArgs().AddToGroupAsync(default!, default!, default);
+        await _groups.DidNotReceiveWithAnyArgs().AddToGroupAsync(default!, default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -179,6 +179,6 @@ public class VoraHubTests
 
         await _hub.OnDisconnectedAsync(exception: null);
 
-        await _groups.DidNotReceiveWithAnyArgs().RemoveFromGroupAsync(default!, default!, default);
+        await _groups.DidNotReceiveWithAnyArgs().RemoveFromGroupAsync(default!, default!, TestContext.Current.CancellationToken);
     }
 }

@@ -65,13 +65,10 @@ public class LibraryManager : ILibraryManager
             ThirdPartyRating2ProviderId = request.ThirdPartyRating2ProviderId,
             ArtworkProviderId = request.ArtworkProviderId,
 
-            UseLocalAssets = request.UseLocalAssets,
             FindExtras = request.FindExtras,
             OnlyShowTrailers = request.OnlyShowTrailers,
             EnableVideoPreviewThumbnails = request.EnableVideoPreviewThumbnails && Vora.Application.Thumbnails.VideoThumbnailManager.IsVideoBearingLibrary(request.Type),
-            CollectionDisplay = (Domain.Enums.CollectionDisplayMode)request.CollectionDisplay,
             EnableCreditsDetection = request.EnableCreditsDetection,
-            EnableVoiceActivityDetection = request.EnableVoiceActivityDetection,
             MinimumCollectionSize = request.MinimumCollectionSize,
             EnableRealTimeWatching = request.EnableRealTimeWatching,
 
@@ -134,13 +131,10 @@ public class LibraryManager : ILibraryManager
         library.Name = request.Name;
         library.FolderPaths = newPaths;
         library.MetadataProviderId = request.MetadataProviderId;
-        library.UseLocalAssets = request.UseLocalAssets;
         library.FindExtras = request.FindExtras;
         library.OnlyShowTrailers = request.OnlyShowTrailers;
         library.EnableVideoPreviewThumbnails = requestedThumbnails;
-        library.CollectionDisplay = (Domain.Enums.CollectionDisplayMode)request.CollectionDisplay;
         library.EnableCreditsDetection = request.EnableCreditsDetection;
-        library.EnableVoiceActivityDetection = request.EnableVoiceActivityDetection;
         library.MinimumCollectionSize = request.MinimumCollectionSize;
 
         library.EpisodeSorting = (Domain.Enums.EpisodeSortOrder)request.EpisodeSorting;

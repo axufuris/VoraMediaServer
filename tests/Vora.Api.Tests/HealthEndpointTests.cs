@@ -17,10 +17,10 @@ public class HealthEndpointTests : IClassFixture<VoraApiTestFactory>
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/health");
+        var response = await client.GetAsync("/health", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadAsStringAsync();
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         body.Should().NotBeNullOrWhiteSpace();
         body.Should().ContainAny("Healthy", "Degraded");
     }

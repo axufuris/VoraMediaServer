@@ -27,7 +27,7 @@ public class LibraryEndpointAuthTests : IClassFixture<VoraApiTestFactory>
         var token = JwtTestHelpers.IssueProfileToken(Guid.NewGuid(), Guid.NewGuid());
         var client = ClientWithToken(token);
 
-        var response = await client.GetAsync("/api/libraries");
+        var response = await client.GetAsync("/api/libraries", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -51,7 +51,7 @@ public class LibraryEndpointAuthTests : IClassFixture<VoraApiTestFactory>
 
         var client = ClientWithToken(token);
 
-        var response = await client.GetAsync("/api/libraries");
+        var response = await client.GetAsync("/api/libraries", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -67,7 +67,8 @@ public class LibraryEndpointAuthTests : IClassFixture<VoraApiTestFactory>
             name = "Test Movies",
             type = "Movie",
             folderPaths = new[] { "/media/movies" }
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -83,10 +84,11 @@ public class LibraryEndpointAuthTests : IClassFixture<VoraApiTestFactory>
             name = "Test Movies " + Guid.NewGuid().ToString("N").Substring(0, 8),
             type = "Movie",
             folderPaths = new[] { "/media/movies" }
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var body = await response.Content.ReadAsStringAsync();
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         body.Should().Contain("id", "the create endpoint returns the new library id");
     }
 
@@ -100,7 +102,8 @@ public class LibraryEndpointAuthTests : IClassFixture<VoraApiTestFactory>
             name = "Anonymous",
             type = "Movie",
             folderPaths = new[] { "/media/movies" }
-        });
+        },
+        TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
