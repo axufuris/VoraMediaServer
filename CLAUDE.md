@@ -40,6 +40,10 @@ Read the doc that matches what you're doing. Each file is kept short (≤200 lin
 - [`docs/redesign/template-scheduling.md`](docs/redesign/template-scheduling.md) — `ClientTemplateSchedule` entity, resolution chain (schedule → profile override → profile default → server default), seasonal template windows
 - [`docs/redesign/design-language.md`](docs/redesign/design-language.md) — cinematic design language: client primitives (`Hero`, `CinematicBackdrop`, `MediaPoster`, `MediaRail`, `LetterRail`, `QualityPanel`, `Glass`, etc.), modal stacking, brand assets
 - [`docs/adr/0001-split-iptv-playlist-from-epg-source.md`](docs/adr/0001-split-iptv-playlist-from-epg-source.md) — ADR: why playlists and EPG sources are independent aggregates and how matching/merging works
+- [`docs/adr/0002-client-platform-strategy.md`](docs/adr/0002-client-platform-strategy.md) — ADR: native clients per ecosystem (Swift/SwiftUI for Apple, Kotlin/Compose for Android, BrightScript for Roku later); shared contract layer (OpenAPI codegen + emitted design tokens) rather than shared renderer
+- [`docs/clients/design-tokens.md`](docs/clients/design-tokens.md) — token source of truth (`ThemeManifest` TS type), `emit-tokens.ts` script, Swift + Kotlin emitter outputs at `dist/tokens/<themeId>/`, web vs native consumption models
+- [`docs/clients/primitive-specs.md`](docs/clients/primitive-specs.md) — cross-platform contract for cinematic primitives (`Hero`, `CinematicBackdrop`, `MediaPoster`, `MediaRail`, `Glass`, `QualityPanel`, `NowPlayingBar`, …); prop shapes, observable behavior, TV focus rules
+- [`docs/clients/openapi-codegen.md`](docs/clients/openapi-codegen.md) — generating Swift (`swift-openapi-generator`) and Kotlin (`openapi-generator` + Retrofit) clients from `Vora.Api`'s OpenAPI doc; Swashbuckle hardening, auth middleware, regeneration workflow
 
 ## Golden rules — apply on every change
 
