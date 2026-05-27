@@ -111,13 +111,22 @@ public class TaskQueueManagerTests
     }
 
     [Fact]
-    public void EnqueueTask_notifies_clients_tasks_updated()
+    public async Task EnqueueTask_notifies_clients_tasks_updated()
     {
+        // Wire a TaskCompletionSource into the substitute so we can wait deterministically
+        // instead of sleeping. EnqueueTask fires NotifyTasksUpdatedAsync on a background task.
+        var notified = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _notifier.NotifyTasksUpdatedAsync().Returns(_ =>
+        {
+            notified.TrySetResult(true);
+            return Task.CompletedTask;
+        });
+
         _queue.EnqueueTask("alpha", (ct, sp) => Task.CompletedTask);
 
-        // Notification is fire-and-forget; wait briefly for the background task.
-        Thread.Sleep(50);
-        _notifier.Received().NotifyTasksUpdatedAsync();
+        var completed = await Task.WhenAny(notified.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        completed.Should().BeSameAs(notified.Task, "NotifyTasksUpdatedAsync should fire after EnqueueTask");
+        await _notifier.Received().NotifyTasksUpdatedAsync();
     }
 
     [Fact]

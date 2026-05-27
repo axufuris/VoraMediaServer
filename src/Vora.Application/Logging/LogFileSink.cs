@@ -102,6 +102,8 @@ public sealed class LogFileSink : IHostedService, IDisposable
         _writer?.Flush();
         _writer?.Dispose();
 
+        Directory.CreateDirectory(_options.Directory);
+
         _currentDate = date;
         _currentFile = Path.Combine(_options.Directory, $"vora-{date:yyyyMMdd}.log");
         var stream = new FileStream(_currentFile, FileMode.Append, FileAccess.Write, FileShare.Read);
