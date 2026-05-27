@@ -51,36 +51,43 @@ function AsyncLibraryProviderBlock({ providerId, libraryId, serverId }: { provid
     );
 }
 
-function LibraryHero({ library, totalItems, totalCollections, samplePosters }: { library: MediaLibrary, totalItems: number, totalCollections: number, samplePosters: string[] }) {
+function LibraryHero({ library, totalItems, totalCollections, samplePosters, actions }: { library: MediaLibrary, totalItems: number, totalCollections: number, samplePosters: string[], actions?: React.ReactNode }) {
     return (
-        <header className="relative isolate overflow-hidden" style={{ minHeight: 280 }}>
-            <div className="absolute inset-0 flex">
-                {samplePosters.length === 0 && <div className="flex-1" style={{ background: 'var(--vora-bg-sunken)' }} />}
-                {samplePosters.slice(0, 6).map((url, i) => (
-                    <div
-                        key={`${url}-${i}`}
-                        className="flex-1"
-                        style={{
-                            backgroundImage: `url("${url}")`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            opacity: 0.55,
-                        }}
-                    />
-                ))}
+        <header className="relative" style={{ minHeight: 280 }}>
+            {/* Backdrop and gradient layers are wrapped in their own overflow-hidden box so
+                the actions dropdown can escape the header bounds without being clipped. */}
+            <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute inset-0 flex">
+                    {samplePosters.length === 0 && <div className="flex-1" style={{ background: 'var(--vora-bg-sunken)' }} />}
+                    {samplePosters.slice(0, 6).map((url, i) => (
+                        <div
+                            key={`${url}-${i}`}
+                            className="flex-1"
+                            style={{
+                                backgroundImage: `url("${url}")`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                                opacity: 0.55,
+                            }}
+                        />
+                    ))}
+                </div>
+                <div
+                    className="absolute inset-0"
+                    style={{
+                        backgroundImage: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0) 35%, var(--vora-bg-canvas) 96%), linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 70%)',
+                    }}
+                />
             </div>
-            <div
-                className="absolute inset-0"
-                style={{
-                    backgroundImage: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0) 35%, var(--vora-bg-canvas) 96%), linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 70%)',
-                }}
-            />
             <div className="relative px-8 pt-16 pb-14">
                 <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-secondary)' }}>
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--vora-accent-500)' }} />
                     Library · {library.type}
                 </div>
-                <h1 className="mt-3 m-0 text-5xl font-semibold" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.02em' }}>{library.name}</h1>
+                <div className="mt-3 flex items-center gap-4">
+                    <h1 className="m-0 text-5xl font-semibold" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.02em' }}>{library.name}</h1>
+                    {actions}
+                </div>
                 <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm" style={{ color: 'var(--vora-text-secondary)' }}>
                     <span>{totalItems.toLocaleString()} {totalItems === 1 ? 'item' : 'items'}</span>
                     {totalCollections > 0 && <span>·</span>}
@@ -186,11 +193,16 @@ export default function LibraryPage() {
 
     const availableLetters = useMemo(() => Object.keys(groupedItems).sort(), [groupedItems]);
 
+    // For the hero we prefer backdrops (item.backgroundUrl) since posters carry overlay
+    // badges that look bad as a wash. Fall back to posterUrl only when no backdrop exists.
     const samplePosters = useMemo(() => {
-        const withPoster = items.filter(i => !!i.posterUrl);
-        if (withPoster.length <= 6) return withPoster.map(i => i.posterUrl!);
-        const step = Math.floor(withPoster.length / 6);
-        return Array.from({ length: 6 }, (_, i) => withPoster[i * step].posterUrl!);
+        const backdropItems = items.filter(i => !!i.backgroundUrl);
+        const pool = backdropItems.length > 0
+            ? backdropItems.map(i => i.backgroundUrl!)
+            : items.filter(i => !!i.posterUrl).map(i => i.posterUrl!);
+        if (pool.length <= 6) return pool;
+        const step = Math.floor(pool.length / 6);
+        return Array.from({ length: 6 }, (_, i) => pool[i * step]);
     }, [items]);
 
     const scrollToLetter = (letter: string) => {
@@ -274,9 +286,9 @@ export default function LibraryPage() {
             </button>
             {showMenu && (
                 <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                    <div className="fixed inset-0 z-[150]" onClick={() => setShowMenu(false)} />
                     <div
-                        className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl z-50"
+                        className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl z-[200]"
                         style={{
                             background: 'var(--vora-bg-raised)',
                             border: '1px solid var(--vora-border-strong)',
@@ -300,9 +312,15 @@ export default function LibraryPage() {
 
     return (
         <div className="min-h-full pb-20">
-            <LibraryHero library={library} totalItems={items.length} totalCollections={collections.length} samplePosters={samplePosters} />
+            <LibraryHero
+                library={library}
+                totalItems={items.length}
+                totalCollections={collections.length}
+                samplePosters={samplePosters}
+                actions={adminMenu}
+            />
 
-            <div className="-mt-2 flex items-center justify-between gap-4 px-8">
+            <div className="-mt-2 px-8">
                 <Tabs<LibraryTabKey>
                     tabs={[
                         { key: 'library', label: 'Library' },
@@ -312,7 +330,6 @@ export default function LibraryPage() {
                     active={activeTab}
                     onChange={setActiveTab}
                 />
-                {adminMenu}
             </div>
 
             {activeTab === 'library' && (

@@ -149,7 +149,15 @@ export default function MainLayout() {
     }, [activeProfileId, navigate, dialog]));
 
     const loadNav = useCallback(async () => {
-        const connectedServers = serverVault.getServers();
+        // Defensive dedupe: legacy vault entries may include multiple rows pointing at
+        // the same URL (one per login session before the dedupe fix). Without this,
+        // every duplicate server contributes its libraries again.
+        const seenUrls = new Set<string>();
+        const connectedServers = serverVault.getServers().filter(s => {
+            if (seenUrls.has(s.url)) return false;
+            seenUrls.add(s.url);
+            return true;
+        });
         if (connectedServers.length === 0) return;
 
         try {

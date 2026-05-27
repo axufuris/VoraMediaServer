@@ -214,30 +214,32 @@ export default function CreateLibrary() {
                         </select>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <FieldLabel>Third Party Rating 1</FieldLabel>
-                            <select
-                                value={library.thirdPartyRating1ProviderId || ''}
-                                onChange={e => handleChange('thirdPartyRating1ProviderId', e.target.value)}
-                                className="vora-input cursor-pointer"
-                            >
-                                <option value="">None</option>
-                                {availableRatingProviders.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
+                    {showVideoOptions && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <FieldLabel>Third Party Rating 1</FieldLabel>
+                                <select
+                                    value={library.thirdPartyRating1ProviderId || ''}
+                                    onChange={e => handleChange('thirdPartyRating1ProviderId', e.target.value)}
+                                    className="vora-input cursor-pointer"
+                                >
+                                    <option value="">None</option>
+                                    {availableRatingProviders.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <FieldLabel>Third Party Rating 2</FieldLabel>
+                                <select
+                                    value={library.thirdPartyRating2ProviderId || ''}
+                                    onChange={e => handleChange('thirdPartyRating2ProviderId', e.target.value)}
+                                    className="vora-input cursor-pointer"
+                                >
+                                    <option value="">None</option>
+                                    {availableRatingProviders.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <FieldLabel>Third Party Rating 2</FieldLabel>
-                            <select
-                                value={library.thirdPartyRating2ProviderId || ''}
-                                onChange={e => handleChange('thirdPartyRating2ProviderId', e.target.value)}
-                                className="vora-input cursor-pointer"
-                            >
-                                <option value="">None</option>
-                                {availableRatingProviders.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                        </div>
-                    </div>
+                    )}
 
                     <div>
                         <FieldLabel>Artwork Provider</FieldLabel>
@@ -303,21 +305,23 @@ export default function CreateLibrary() {
                         {showVideoOptions && <Checkbox checked={library.enableCreditsDetection} onChange={v => handleChange('enableCreditsDetection', v)} label="Enable credits detection" />}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <FieldLabel>Minimum Collection Size</FieldLabel>
-                            <select
-                                value={library.minimumCollectionSize}
-                                onChange={e => handleChange('minimumCollectionSize', Number(e.target.value))}
-                                className="vora-input cursor-pointer"
-                            >
-                                {Array.from({ length: 25 }, (_, i) => i + 1).map(num => (
-                                    <option key={num} value={num}>{num}</option>
-                                ))}
-                            </select>
-                            <p className="text-xs text-[var(--vora-text-muted)] mt-1.5">Collections with fewer items than this will be hidden.</p>
+                    {showVideoOptions && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <FieldLabel>Minimum Collection Size</FieldLabel>
+                                <select
+                                    value={library.minimumCollectionSize}
+                                    onChange={e => handleChange('minimumCollectionSize', Number(e.target.value))}
+                                    className="vora-input cursor-pointer"
+                                >
+                                    {Array.from({ length: 25 }, (_, i) => i + 1).map(num => (
+                                        <option key={num} value={num}>{num}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-[var(--vora-text-muted)] mt-1.5">Collections with fewer items than this will be hidden.</p>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {isTvShow && (
                         <>

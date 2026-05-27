@@ -69,7 +69,12 @@ export default function ProfileSelectionPage() {
                 const decodedToken = decodeJwtPayload(profileToken);
                 const tokenProfileId = typeof decodedToken?.sub === 'string' ? decodedToken.sub : null;
                 if (!tokenProfileId) throw new Error('Profile token missing sub claim');
-                const newServerId = `server_${Date.now()}`;
+
+                // Reuse the existing vault entry for this URL if one exists. Otherwise we'd
+                // accumulate a new server_<timestamp> row on every login, which then renders
+                // each library multiple times in the nav.
+                const existing = serverVault.getServers().find(s => s.url === pendingUrl);
+                const newServerId = existing?.id ?? `server_${Date.now()}`;
 
                 serverVault.addOrUpdateServer({
                     id: newServerId,
