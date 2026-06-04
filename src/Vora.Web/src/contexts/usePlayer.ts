@@ -12,8 +12,14 @@ export interface PlayableMedia {
     serverId?: string;
     sessionId?: string;
     startPosition?: number;
+    // Source resolution / HDR (from media-detail VM, what the file actually is)
     resolution?: string;
     hdrType?: string;
+    // Output resolution / HDR (from StartStreamResponse, what's actually
+    // delivered to the player after transcoding). Used by the badge bar
+    // so it doesn't lie about an HDR→SDR or 4K→1080p transcode.
+    outputResolution?: string;
+    outputHdrType?: string;
     audioChannels?: number;
     videoTrackId?: string;
     audioTrackId?: string;

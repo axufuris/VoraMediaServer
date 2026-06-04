@@ -31,6 +31,9 @@ public interface IUserManager
     Task<string?> GetProfileDeviceRadioPrefsAsync(Guid profileId, string deviceId);
     Task SaveProfileDeviceRadioPrefsAsync(Guid profileId, string deviceId, string radioPrefsJson);
 
+    Task<string?> GetProfileRadioPrefsAsync(Guid profileId);
+    Task SaveProfileRadioPrefsAsync(Guid profileId, string radioPrefsJson);
+
     Task<string?> GetShowtimesLocationAsync(Guid profileId);
     Task SaveShowtimesLocationAsync(Guid profileId, string? location);
 
@@ -299,6 +302,21 @@ public class UserManager(
 
     public Task SaveProfileDeviceRadioPrefsAsync(Guid profileId, string deviceId, string radioPrefsJson) =>
         repository.SaveProfileDeviceRadioPrefsAsync(profileId, deviceId, radioPrefsJson);
+
+    public async Task<string?> GetProfileRadioPrefsAsync(Guid profileId)
+    {
+        var profile = await repository.GetProfileByIdAsync(profileId);
+        return profile?.RadioPrefsJson;
+    }
+
+    public async Task SaveProfileRadioPrefsAsync(Guid profileId, string radioPrefsJson)
+    {
+        var profile = await repository.GetProfileByIdAsync(profileId)
+            ?? throw new InvalidOperationException("Profile not found.");
+        profile.RadioPrefsJson = radioPrefsJson;
+        await repository.UpdateProfileAsync(profile);
+        await notifier.NotifyRadioPrefsUpdatedAsync(profileId);
+    }
 
     private static void ApplyProfileUpdates(
         UserProfile profile,

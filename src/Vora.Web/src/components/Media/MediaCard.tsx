@@ -30,13 +30,29 @@ export default function MediaCard({
         <div className="flex flex-col group cursor-pointer w-full" onClick={onClick}>
             <div className={`relative ${aspectClass} rounded-md overflow-hidden bg-[var(--vora-bg-sunken)] mb-2 border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-colors shadow-[var(--vora-shadow-md)]`}>
 
-                {/* Images */}
+                {/* Images — Plex-style adaptive mosaic. Never duplicates a tile
+                    to fill empty slots: 2 → side-by-side, 3 → 1 large + 2 stacked,
+                    4+ → 2×2 grid. Falls through to single imageUrl below for 1
+                    item or when multiPosters is empty. */}
                 {multiPosters && multiPosters.length >= 4 ? (
                     <div className="grid grid-cols-2 grid-rows-2 w-full h-full opacity-80 group-hover:opacity-100 transition-opacity">
                         <img src={multiPosters[0]} className="w-full h-full object-cover border-r border-b border-[var(--vora-bg-raised)]" alt="" />
                         <img src={multiPosters[1]} className="w-full h-full object-cover border-l border-b border-[var(--vora-bg-raised)]" alt="" />
                         <img src={multiPosters[2]} className="w-full h-full object-cover border-r border-t border-[var(--vora-bg-raised)]" alt="" />
                         <img src={multiPosters[3]} className="w-full h-full object-cover border-l border-t border-[var(--vora-bg-raised)]" alt="" />
+                    </div>
+                ) : multiPosters && multiPosters.length === 3 ? (
+                    <div className="flex w-full h-full opacity-80 group-hover:opacity-100 transition-opacity">
+                        <img src={multiPosters[0]} className="w-1/2 h-full object-cover border-r border-[var(--vora-bg-raised)]" alt="" />
+                        <div className="flex flex-col w-1/2 h-full">
+                            <img src={multiPosters[1]} className="w-full h-1/2 object-cover border-b border-[var(--vora-bg-raised)]" alt="" />
+                            <img src={multiPosters[2]} className="w-full h-1/2 object-cover border-t border-[var(--vora-bg-raised)]" alt="" />
+                        </div>
+                    </div>
+                ) : multiPosters && multiPosters.length === 2 ? (
+                    <div className="flex w-full h-full opacity-80 group-hover:opacity-100 transition-opacity">
+                        <img src={multiPosters[0]} className="w-1/2 h-full object-cover border-r border-[var(--vora-bg-raised)]" alt="" />
+                        <img src={multiPosters[1]} className="w-1/2 h-full object-cover border-l border-[var(--vora-bg-raised)]" alt="" />
                     </div>
                 ) : imageUrl ? (
                     <img src={imageUrl} alt={title} className={`w-full h-full ${type === 'Episode' ? 'object-contain bg-black' : 'object-cover'} ${type === 'Playlist' ? 'opacity-80 group-hover:opacity-100 transition-opacity' : ''}`} />

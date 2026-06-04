@@ -34,7 +34,18 @@ services:
           devices:
             - driver: nvidia
               count: 1
-              capabilities: [gpu, video]
+              # Capability map for the NVIDIA Container Toolkit:
+              #   gpu, video: NVDEC + NVENC + basic CUDA (hardware decode
+              #     + encode for h264_nvenc / hevc_nvenc).
+              #   compute: required for OpenCL on hosts that expose it
+              #     (Linux/Unraid). Not exposed on WSL2-on-Docker, so
+              #     it's a no-op there but harmless.
+              #   graphics: required for Vulkan. The toolkit mounts the
+              #     NVIDIA Vulkan ICD (libGLX_nvidia.so.0) only when
+              #     this capability is set. This is what enables
+              #     ffmpeg's libplacebo HDR tonemap filter on the GPU
+              #     across both Linux and WSL2.
+              capabilities: [gpu, video, compute, graphics]
 
 # Must add this to the Extra Parameters in Unraid: --runtime=nvidia
 # Then you must add a new variable: Key - NVIDIA_VISIBLE_DEVICES, Value - all

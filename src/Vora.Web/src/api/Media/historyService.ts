@@ -26,6 +26,10 @@ export interface HistorySessionDto {
     subtitleStrategy?: string;
     originalSubtitleCodec?: string;
     bandwidthKbps: number;
+    sourceResolution?: string;
+    sourceHdrType?: string;
+    outputResolution?: string;
+    outputHdrType?: string;
     decisionLog?: string;
 
     startedAt: string;

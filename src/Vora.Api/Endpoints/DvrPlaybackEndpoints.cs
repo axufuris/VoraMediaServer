@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.FileSystem;
 using Vora.Application.Iptv;
+using Vora.Application.Iptv.ViewModels;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
 
@@ -18,7 +19,11 @@ public static class DvrPlaybackEndpoints
     {
         var group = routes.MapGroup("/api/streaming").WithTags("DVR Playback");
 
-        group.MapPost("/dvr/play/{sessionId:guid}", GetPlaybackUrlAsync).RequireAuthorization().RequireFeature(FeatureGate.Dvr);
+        group.MapPost("/dvr/play/{sessionId:guid}", GetPlaybackUrlAsync)
+            .RequireAuthorization()
+            .RequireFeature(FeatureGate.Dvr)
+            .WithName("PlayDvrSession")
+            .Produces<DvrPlaybackUrlResponse>(StatusCodes.Status200OK);
         group.MapGet("/dvr/file/{sessionId:guid}", ServeRecordingFileAsync);
         group.MapGet("/hls/timeshift/{token}/{profileId:guid}/{sessionId}/{fileName}", ServeTimeshiftHlsAsync);
 
@@ -34,7 +39,10 @@ public static class DvrPlaybackEndpoints
         }
 
         var token = signer.Sign(DvrTokenScope, sessionId.ToString(), DvrTokenTtl);
-        return Results.Ok(new { url = $"/api/streaming/dvr/file/{sessionId}?t={token}" });
+        return Results.Ok(new DvrPlaybackUrlResponse
+        {
+            Url = $"/api/streaming/dvr/file/{sessionId}?t={token}",
+        });
     }
 
     private static async Task<IResult> ServeRecordingFileAsync(

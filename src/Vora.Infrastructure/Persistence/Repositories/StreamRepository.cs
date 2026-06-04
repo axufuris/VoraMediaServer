@@ -89,6 +89,8 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                 BandwidthKbps = s.BandwidthKbps,
                 Resolution = s.Resolution,
                 HdrType = s.HdrType,
+                OutputResolution = s.OutputResolution,
+                OutputHdrType = s.OutputHdrType,
                 DecisionLog = s.DecisionLog,
 
                 CurrentPosition = s.CurrentPosition,
@@ -165,7 +167,24 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
             return null;
         }
 
-        return await context.MediaParts.FirstOrDefaultAsync(p => p.MediaItemId == session.MediaItemId);
+        // Resolve the actual selected part by session.MediaPartId — falling
+        // back to the first-by-MediaItemId only when MediaPartId is empty
+        // (e.g. legacy sessions). Include the track lists so the play
+        // handler can look up StreamIndex by Track Guid for FFmpeg's `-map`
+        // flags. Without this, FFmpeg's auto-selection grabbed the file's
+        // default-flagged stream regardless of which one the user picked
+        // in the Quality panel.
+        var query = context.MediaParts
+            .Include(p => p.VideoTracks)
+            .Include(p => p.AudioTracks)
+            .Include(p => p.SubtitleTracks)
+            .AsQueryable();
+
+        if (session.MediaPartId != Guid.Empty)
+        {
+            return await query.FirstOrDefaultAsync(p => p.Id == session.MediaPartId);
+        }
+        return await query.FirstOrDefaultAsync(p => p.MediaItemId == session.MediaItemId);
     }
 
     public Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search) =>

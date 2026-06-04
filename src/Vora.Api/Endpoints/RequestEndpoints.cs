@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Vora.Application.Requests;
 using Vora.Application.Requests.Dtos;
+using Vora.Application.Requests.ViewModels;
 
 namespace Vora.Api.Endpoints;
 
@@ -28,7 +29,9 @@ public static class RequestEndpoints
     {
         var group = routes.MapGroup("/api/requests").WithTags("Requests").RequireAuthorization();
 
-        group.MapGet("/status", GetRequestStatusAsync);
+        group.MapGet("/status", GetRequestStatusAsync)
+            .WithName("GetRequestStatus")
+            .Produces<RequestStatusVM>(StatusCodes.Status200OK);
     }
 
     private static void MapAdminEndpoints(IEndpointRouteBuilder routes)
@@ -53,7 +56,7 @@ public static class RequestEndpoints
     private static async Task<IResult> GetRequestStatusAsync([FromQuery] string externalId, [FromQuery] string type, IRequestManager manager)
     {
         var status = await manager.GetRequestStatusAsync(externalId, type);
-        return Results.Ok(new { Status = status ?? -1 });
+        return Results.Ok(new RequestStatusVM { Status = status ?? -1 });
     }
 
     private static async Task<IResult> ApproveRequestAsync(Guid id, [FromQuery] int? profileId, IRequestManager manager)

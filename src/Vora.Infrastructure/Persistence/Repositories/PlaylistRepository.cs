@@ -35,6 +35,12 @@ public class PlaylistRepository : IPlaylistRepository
                                     .Where(u => u != null)
                                     .Select(u => u!)
                                     .Take(4)
+                                    .ToList(),
+                BackdropUrls = p.Items.OrderBy(i => i.Order)
+                                    .Select(i => i.MediaItem.BackgroundUrl)
+                                    .Where(u => u != null)
+                                    .Select(u => u!)
+                                    .Take(4)
                                     .ToList()
             })
             .ToListAsync();
@@ -56,6 +62,12 @@ public class PlaylistRepository : IPlaylistRepository
                                         ?? (i.MediaItem is Vora.Domain.Entities.Media.Track
                                             ? ((Vora.Domain.Entities.Media.Track)i.MediaItem).Album!.ArtworkUrl
                                             : null))
+                                    .Where(u => u != null)
+                                    .Select(u => u!)
+                                    .Take(4)
+                                    .ToList(),
+                BackdropUrls = p.Items.OrderBy(i => i.Order)
+                                    .Select(i => i.MediaItem.BackgroundUrl)
                                     .Where(u => u != null)
                                     .Select(u => u!)
                                     .Take(4)

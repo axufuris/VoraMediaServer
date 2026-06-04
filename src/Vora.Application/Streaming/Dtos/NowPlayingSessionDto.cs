@@ -30,6 +30,12 @@ public class NowPlayingSessionDto
     public int BandwidthKbps { get; set; }
     public string? Resolution { get; set; }
     public string? HdrType { get; set; }
+    // Delivered output (post-transcode): on a 4K HDR source being
+    // downscaled + tonemapped to 1080p SDR, OutputResolution="1080p"
+    // and OutputHdrType="SDR". Resolution/HdrType above remain the
+    // source values so admins can still see what came in.
+    public string? OutputResolution { get; set; }
+    public string? OutputHdrType { get; set; }
     public string? DecisionLog { get; set; }
 
     public string? OriginalContainer { get; set; }

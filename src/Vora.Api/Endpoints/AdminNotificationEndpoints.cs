@@ -10,10 +10,10 @@ public static class AdminNotificationEndpoints
     {
         var group = routes.MapGroup("/api/admin/notifications").WithTags("Admin Notifications").RequireAuthorization("AdminOnly");
 
-        group.MapGet("/", GetRecentAsync).Produces<List<AdminNotificationVM>>();
-        group.MapGet("/unread-count", GetUnreadCountAsync).Produces<int>();
-        group.MapPut("/{id:guid}/read", MarkReadAsync).Produces(StatusCodes.Status204NoContent);
-        group.MapPost("/mark-all-read", MarkAllReadAsync).Produces(StatusCodes.Status204NoContent);
+        group.MapGet("/", GetRecentAsync).WithName("ListAdminNotifications").Produces<List<AdminNotificationVM>>();
+        group.MapGet("/unread-count", GetUnreadCountAsync).WithName("GetAdminNotificationUnreadCount").Produces<int>();
+        group.MapPut("/{id:guid}/read", MarkReadAsync).WithName("MarkAdminNotificationRead").Produces(StatusCodes.Status204NoContent);
+        group.MapPost("/mark-all-read", MarkAllReadAsync).WithName("MarkAllAdminNotificationsRead").Produces(StatusCodes.Status204NoContent);
 
         return group;
     }

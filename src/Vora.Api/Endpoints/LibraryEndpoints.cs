@@ -23,13 +23,16 @@ public static class LibraryEndpoints
         var group = routes.MapGroup("/api/libraries").WithTags("Libraries").RequireAuthorization();
 
         group.MapGet("/", GetLibrariesAsync)
+            .WithName("ListLibraries")
             .Produces<IEnumerable<MediaLibraryVM>>(StatusCodes.Status200OK);
 
         group.MapGet("/{id:guid}", GetLibraryAsync)
+            .WithName("GetLibrary")
             .Produces<MediaLibraryVM>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/{libraryId:guid}/media", GetLibraryContentAsync)
+            .WithName("ListLibraryItems")
             .Produces<IEnumerable<LibraryItemVM>>(StatusCodes.Status200OK);
     }
 

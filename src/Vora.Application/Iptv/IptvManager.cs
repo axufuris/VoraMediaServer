@@ -38,7 +38,7 @@ public class IptvManager : IIptvManager
     public const string HttpClientName = "IptvHttpClient";
 
     private const string DefaultTranscodeDirectory = "/transcode";
-    private const string TimeshiftSubdirectory = "timeshift";
+    private const string TimeshiftSubdirectory = TimeshiftCoordinator.TimeshiftSubdirectory;
     private const string PlaylistFileName = "index.m3u8";
     private const string SegmentFilePattern = "seg_%03d.ts";
     private const string SecondSegmentFileName = "seg_001.ts";
@@ -319,7 +319,7 @@ public class IptvManager : IIptvManager
         var process = BuildTimeshiftProcess(channel.StreamUrl, outputPath, segmentPath);
 
         await StopTimeshiftSessionAsync(profileId);
-        _timeshiftCoordinator.TryRegister(profileId, process);
+        _timeshiftCoordinator.TryRegister(profileId, process, sessionPath);
         process.Start();
 
         await WaitForBufferAsync(profileId, sessionPath);

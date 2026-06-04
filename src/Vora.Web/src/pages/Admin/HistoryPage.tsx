@@ -25,6 +25,27 @@ function StrategyTag({ strategy }: { strategy: string }) {
     );
 }
 
+// Format the row's resolution / HDR for the watch-history Player
+// column. Shows "4K HDR10 → 1080p SDR" when transcoding changed the
+// output, or just the active form when it matched (or only one side
+// is known). Returns "" when there's nothing meaningful to render.
+function formatHistoryResolution(row: HistorySessionDto): string {
+    const fmt = (res: string | undefined, hdr: string | undefined) => {
+        const r = res === '2160p' ? '4K' : res ?? '';
+        const h = hdr && hdr.toLowerCase() !== 'sdr' && hdr.toLowerCase() !== 'none' ? hdr : '';
+        if (!r && !h) return '';
+        return [r, h].filter(Boolean).join(' ');
+    };
+    const source = fmt(row.sourceResolution, row.sourceHdrType);
+    const output = fmt(row.outputResolution, row.outputHdrType);
+    const isTranscoding = row.videoStrategy?.toLowerCase().includes('transcode')
+        || row.audioStrategy?.toLowerCase().includes('transcode');
+    if (isTranscoding && source && output && source !== output) {
+        return `${source} → ${output}`;
+    }
+    return output || source;
+}
+
 function CompletionIcon({ percent }: { percent: number }) {
     if (percent >= 90) {
         return <div className="w-3.5 h-3.5 rounded-full bg-[var(--vora-success-500)] mx-auto" title="Completed" />;
@@ -343,6 +364,9 @@ export default function HistoryPage() {
                                                     <div className="flex flex-col">
                                                         <span className="text-[var(--vora-text-secondary)]">{row.player}</span>
                                                         <span className="text-[var(--vora-text-muted)] text-[10px] tabular-nums">{(row.bandwidthKbps / 1000).toFixed(1)} Mbps</span>
+                                                        {formatHistoryResolution(row) && (
+                                                            <span className="text-[var(--vora-text-muted)] text-[10px]">{formatHistoryResolution(row)}</span>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-2.5 font-medium">
@@ -373,6 +397,9 @@ export default function HistoryPage() {
                                                         <div className="flex flex-col">
                                                             <span className="text-[var(--vora-text-secondary)]">{sub.player}</span>
                                                             <span className="text-[var(--vora-text-muted)] text-[10px] tabular-nums">{(sub.bandwidthKbps / 1000).toFixed(1)} Mbps</span>
+                                                            {formatHistoryResolution(sub) && (
+                                                                <span className="text-[var(--vora-text-muted)] text-[10px]">{formatHistoryResolution(sub)}</span>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2 text-[var(--vora-text-secondary)]">

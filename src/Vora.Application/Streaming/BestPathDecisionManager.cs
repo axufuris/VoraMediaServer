@@ -43,9 +43,25 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             var videoCodec = videoTrack.Codec?.ToLower() ?? "";
             var container = part.Container?.ToLower() ?? "";
 
-            bool is4k = part.Resolution?.Contains("4k", StringComparison.OrdinalIgnoreCase) == true || part.Resolution?.Contains("2160") == true;
-            int trackHeight = is4k ? 2160 : part.Resolution?.Contains("1080") == true ? 1080 : part.Resolution?.Contains("720") == true ? 720 : 480;
+            int trackHeight = ParseHeightFromResolution(part.Resolution);
+            bool is4k = trackHeight >= 2160;
             int clientMaxRes = requestedMaxResolution > 0 ? requestedMaxResolution : 2160;
+
+            // Effective output height for THIS part once any auto-downscale
+            // rules fire. Used by the resolution-fit penalty below so the
+            // scorer can compare "what does the user actually see if we
+            // pick this part?" across all candidates. We compute it now
+            // because the HDR auto-downscale check needs the video
+            // track's HdrType + the admin setting.
+            bool isHdrPart = !string.IsNullOrWhiteSpace(videoTrack.HdrType)
+                && !string.Equals(videoTrack.HdrType, "SDR", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(videoTrack.HdrType, "None", StringComparison.OrdinalIgnoreCase);
+            int effectiveTargetHeight = clientMaxRes;
+            if (isHdrPart && string.Equals(settings.HdrTranscodeDownscale, "Always", StringComparison.OrdinalIgnoreCase))
+            {
+                effectiveTargetHeight = Math.Min(effectiveTargetHeight, 1080);
+            }
+            int outputHeight = Math.Min(trackHeight, effectiveTargetHeight);
 
             SubtitleStreamInfoDto? subTrack = null;
             if (requestedSubtitleId.HasValue)
@@ -197,6 +213,33 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     currentScore += 20000;
                 }
 
+                // Resolution-fit penalty. Two components added to the
+                // score so the lowest-penalty option wins:
+                //
+                //   qualityLossPenalty (heavy, weight 10):
+                //     punishes parts whose output is below what the
+                //     user/client asked for. clientMaxRes is the
+                //     ceiling (RequestedMaxResolution or 2160 default);
+                //     outputHeight is what this part can actually
+                //     deliver under the current HDR-downscale rules.
+                //     Heavy weight ensures a 4K source downscaled to
+                //     1080p still wins over a 720p source when the
+                //     target is 1080p — the user gets the quality they
+                //     asked for, not a smaller file.
+                //
+                //   downscaleWorkPenalty (light, weight 1):
+                //     small tiebreaker that prefers the closest-fit
+                //     part when multiple parts can hit the same
+                //     output. With a 4K HDR + 1080p SDR pair targeted
+                //     at 1080p, both produce 1080p output — but the
+                //     1080p SDR part needs zero downscale work, so
+                //     it wins on the work penalty. Same idea for
+                //     1440p + 4K when target is 1080p: 1440p wins
+                //     because it's closer to the target source-side.
+                int qualityLossPenalty = Math.Max(0, clientMaxRes - outputHeight) * 10;
+                int downscaleWorkPenalty = Math.Max(0, trackHeight - outputHeight);
+                currentScore += qualityLossPenalty + downscaleWorkPenalty;
+
                 if (audioTrack.IsDefault) currentScore -= 2;
 
                 if (!needsAudioDownmix && trackChannels < client.MaxAudioChannels)
@@ -216,6 +259,23 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 option.Decision.Reason = string.Join(" ", reasons);
                 option.Decision.BandwidthKbps = finalBandwidthKbps;
                 option.Decision.Quality = (needsVideoTranscode || needsAudioTranscode) ? $"Transcode ({finalMbps:F1} Mbps)" : $"Original ({finalMbps:F1} Mbps)";
+
+                // Resolve the actual delivered resolution + HDR type for
+                // this option. For Transcode the encoder is going to emit
+                // outputHeight pixels of SDR (we always tonemap HDR sources
+                // during transcode). For Remux and DirectPlay the source's
+                // resolution and HDR characteristics pass straight through.
+                if (needsVideoTranscode)
+                {
+                    option.Decision.OutputResolution = FormatHeightAsResolution(outputHeight);
+                    option.Decision.OutputHdrType = "SDR";
+                }
+                else
+                {
+                    option.Decision.OutputResolution = part.Resolution ?? string.Empty;
+                    option.Decision.OutputHdrType = string.IsNullOrWhiteSpace(videoTrack.HdrType) ? "SDR" : videoTrack.HdrType;
+                }
+
                 option.PenaltyScore = currentScore;
 
                 options.Add(option);
@@ -238,5 +298,47 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         var bestOption = options.OrderBy(o => o.PenaltyScore).First();
         bestOption.Decision.EvaluatedOptions = decisionLogs;
         return bestOption.Decision;
+    }
+
+    // Parse a video height from MediaPart.Resolution, which is a
+    // freeform string that the analyzer produces. Supports common
+    // forms: "4K", "UHD", "2160p", "3840x2160", "1440p", "1080p",
+    // "1920x1080", "720p", "540p", "480p", "360p", "240p". Matches
+    // are substring-based and ordered highest-first so e.g. "1440"
+    // can't accidentally hit the "1080" branch on a string like
+    // "1440p". Unknown formats fall through to 480 as a conservative
+    // baseline (matches the prior implementation's default).
+    // Format a height value as the resolution string we surface to
+    // clients in the badges / now-playing / watch-history rows. Matches
+    // the labels the existing source-side `Resolution` strings use so
+    // the web's `'2160p' → '4K'` translation in GlobalVideoPlayer keeps
+    // working when reading from `OutputResolution`.
+    private static string FormatHeightAsResolution(int height)
+    {
+        if (height >= 2160) return "2160p";
+        if (height >= 1440) return "1440p";
+        if (height >= 1080) return "1080p";
+        if (height >= 720) return "720p";
+        if (height >= 540) return "540p";
+        if (height >= 480) return "480p";
+        if (height >= 360) return "360p";
+        if (height >= 240) return "240p";
+        return $"{height}p";
+    }
+
+    private static int ParseHeightFromResolution(string? resolution)
+    {
+        if (string.IsNullOrWhiteSpace(resolution)) return 480;
+        if (resolution.Contains("4k", StringComparison.OrdinalIgnoreCase)
+            || resolution.Contains("uhd", StringComparison.OrdinalIgnoreCase)
+            || resolution.Contains("2160", StringComparison.Ordinal)) return 2160;
+        if (resolution.Contains("1440", StringComparison.Ordinal)) return 1440;
+        if (resolution.Contains("1080", StringComparison.Ordinal)) return 1080;
+        if (resolution.Contains("720", StringComparison.Ordinal)) return 720;
+        if (resolution.Contains("540", StringComparison.Ordinal)) return 540;
+        if (resolution.Contains("480", StringComparison.Ordinal)) return 480;
+        if (resolution.Contains("360", StringComparison.Ordinal)) return 360;
+        if (resolution.Contains("240", StringComparison.Ordinal)) return 240;
+        return 480;
     }
 }

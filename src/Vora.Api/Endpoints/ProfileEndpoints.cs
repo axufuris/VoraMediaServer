@@ -48,9 +48,24 @@ public class UpdateIptvPrefsDto
     public required string IptvPrefsJson { get; set; }
 }
 
+public class IptvPrefsResponse
+{
+    public string? IptvPrefsJson { get; set; }
+}
+
 public class UpdateRadioPrefsDto
 {
     public required string RadioPrefsJson { get; set; }
+}
+
+public class RadioPrefsResponse
+{
+    public string? RadioPrefsJson { get; set; }
+}
+
+public class NavPrefsResponse
+{
+    public string? NavPrefsJson { get; set; }
 }
 
 public class UpdateNavPrefsDto
@@ -61,6 +76,11 @@ public class UpdateNavPrefsDto
 public class UpdateDiscoveryLayoutDto
 {
     public required string DiscoveryLayoutJson { get; set; }
+}
+
+public class DiscoveryLayoutResponse
+{
+    public string? DiscoveryLayoutJson { get; set; }
 }
 
 public class UpdateHomeLayoutDto
@@ -82,18 +102,26 @@ public static class ProfileEndpoints
         var group = routes.MapGroup("/api/users").WithTags("Profiles").RequireAuthorization();
 
         group.MapPost("/{userId:guid}/profiles", CreateProfileAsync)
+            .WithName("CreateProfile")
             .Produces(StatusCodes.Status201Created);
 
         group.MapPost("/profiles/{profileId:guid}/validate-pin", ValidatePinAsync)
+            .WithName("ValidateProfilePin")
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized);
 
-        group.MapPut("/profiles/{profileId:guid}", UpdateProfileAsync);
-        group.MapDelete("/profiles/{profileId:guid}", DeleteProfileAsync);
+        group.MapPut("/profiles/{profileId:guid}", UpdateProfileAsync)
+            .WithName("UpdateProfile")
+            .Produces(StatusCodes.Status204NoContent);
+        group.MapDelete("/profiles/{profileId:guid}", DeleteProfileAsync)
+            .WithName("DeleteProfile")
+            .Produces(StatusCodes.Status204NoContent);
 
         group.MapGet("/profiles/me/showtimes-location", GetMyShowtimesLocationAsync)
+            .WithName("GetMyShowtimesLocation")
             .Produces<ShowtimesLocationDto>(StatusCodes.Status200OK);
         group.MapPut("/profiles/me/showtimes-location", SaveMyShowtimesLocationAsync)
+            .WithName("SaveMyShowtimesLocation")
             .Produces<ShowtimesLocationDto>(StatusCodes.Status200OK);
 
         group.MapPut("/profiles/{profileId:guid}/showtimes-location", AdminSetShowtimesLocationAsync)
@@ -101,9 +129,18 @@ public static class ProfileEndpoints
             .Produces<ShowtimesLocationDto>(StatusCodes.Status200OK);
 
         group.MapGet("/profiles/me/playback-preferences", GetMyPlaybackPreferencesAsync)
+            .WithName("GetMyPlaybackPreferences")
             .Produces<PlaybackPreferencesVM>(StatusCodes.Status200OK);
         group.MapPut("/profiles/me/playback-preferences", SaveMyPlaybackPreferencesAsync)
+            .WithName("SaveMyPlaybackPreferences")
             .Produces<PlaybackPreferencesVM>(StatusCodes.Status200OK);
+
+        group.MapGet("/profiles/{profileId:guid}/radio-prefs", GetProfileRadioPrefsAsync)
+            .WithName("GetProfileRadioPrefs")
+            .Produces<RadioPrefsResponse>(StatusCodes.Status200OK);
+        group.MapPut("/profiles/{profileId:guid}/radio-prefs", SaveProfileRadioPrefsAsync)
+            .WithName("SaveProfileRadioPrefs")
+            .Produces(StatusCodes.Status204NoContent);
     }
 
     private static void MapDevicePreferenceEndpoints(IEndpointRouteBuilder routes)
@@ -112,24 +149,41 @@ public static class ProfileEndpoints
             .WithTags("Profile Device Preferences")
             .RequireAuthorization();
 
-        group.MapGet("/nav", GetNavPrefsAsync);
-        group.MapPut("/nav", SaveNavPrefsAsync);
+        group.MapGet("/nav", GetNavPrefsAsync)
+            .WithName("GetNavPrefs")
+            .Produces<NavPrefsResponse>(StatusCodes.Status200OK);
+        group.MapPut("/nav", SaveNavPrefsAsync)
+            .WithName("SaveNavPrefs")
+            .Produces(StatusCodes.Status204NoContent);
 
-        group.MapGet("/iptv", GetIptvPrefsAsync);
-        group.MapPut("/iptv", SaveIptvPrefsAsync);
+        group.MapGet("/iptv", GetIptvPrefsAsync)
+            .WithName("GetIptvPrefs")
+            .Produces<IptvPrefsResponse>(StatusCodes.Status200OK);
+        group.MapPut("/iptv", SaveIptvPrefsAsync)
+            .WithName("SaveIptvPrefs")
+            .Produces(StatusCodes.Status204NoContent);
 
-        group.MapGet("/radio", GetRadioPrefsAsync);
-        group.MapPut("/radio", SaveRadioPrefsAsync);
+        group.MapGet("/radio", GetRadioPrefsAsync)
+            .WithName("GetRadioPrefs")
+            .Produces<RadioPrefsResponse>(StatusCodes.Status200OK);
+        group.MapPut("/radio", SaveRadioPrefsAsync)
+            .WithName("SaveRadioPrefs")
+            .Produces(StatusCodes.Status204NoContent);
 
         group.MapGet("/playback", GetPlaybackPrefsAsync);
 
-        group.MapGet("/discovery-layout", GetDiscoveryLayoutAsync);
-        group.MapPut("/discovery-layout", SaveDiscoveryLayoutAsync);
+        group.MapGet("/discovery-layout", GetDiscoveryLayoutAsync)
+            .WithName("GetDiscoveryLayout")
+            .Produces<DiscoveryLayoutResponse>(StatusCodes.Status200OK);
+        group.MapPut("/discovery-layout", SaveDiscoveryLayoutAsync)
+            .WithName("SaveDiscoveryLayout")
+            .Produces(StatusCodes.Status204NoContent);
 
         group.MapGet("/home-layout", GetHomeLayoutAsync);
         group.MapPut("/home-layout", SaveHomeLayoutAsync);
 
-        group.MapPut("/settings", SaveClientSettingsAsync);
+        group.MapPut("/settings", SaveClientSettingsAsync)
+            .WithName("SaveClientSettings");
     }
 
     private static async Task<IResult> CreateProfileAsync(Guid userId, [FromBody] CreateProfileDto request, IUserManager manager)
@@ -235,7 +289,7 @@ public static class ProfileEndpoints
     private static async Task<IResult> GetNavPrefsAsync(Guid profileId, string deviceId, IUserManager manager)
     {
         var json = await manager.GetProfileDeviceNavPrefsAsync(profileId, deviceId);
-        return Results.Ok(new { NavPrefsJson = json });
+        return Results.Ok(new NavPrefsResponse { NavPrefsJson = json });
     }
 
     private static async Task<IResult> SaveNavPrefsAsync(Guid profileId, string deviceId, [FromBody] UpdateNavPrefsDto request, IUserManager manager)
@@ -247,7 +301,7 @@ public static class ProfileEndpoints
     private static async Task<IResult> GetIptvPrefsAsync(Guid profileId, string deviceId, IUserManager manager)
     {
         var json = await manager.GetProfileDeviceIptvPrefsAsync(profileId, deviceId);
-        return Results.Ok(new { IptvPrefsJson = json });
+        return Results.Ok(new IptvPrefsResponse { IptvPrefsJson = json });
     }
 
     private static async Task<IResult> SaveIptvPrefsAsync(Guid profileId, string deviceId, [FromBody] UpdateIptvPrefsDto request, IUserManager manager)
@@ -260,7 +314,26 @@ public static class ProfileEndpoints
     private static async Task<IResult> GetRadioPrefsAsync(Guid profileId, string deviceId, IUserManager manager)
     {
         var json = await manager.GetProfileDeviceRadioPrefsAsync(profileId, deviceId);
-        return Results.Ok(new { RadioPrefsJson = json });
+        return Results.Ok(new RadioPrefsResponse { RadioPrefsJson = json });
+    }
+
+    private static async Task<IResult> GetProfileRadioPrefsAsync(Guid profileId, IUserManager manager)
+    {
+        var json = await manager.GetProfileRadioPrefsAsync(profileId);
+        return Results.Ok(new RadioPrefsResponse { RadioPrefsJson = json });
+    }
+
+    private static async Task<IResult> SaveProfileRadioPrefsAsync(Guid profileId, [FromBody] UpdateRadioPrefsDto request, IUserManager manager)
+    {
+        try
+        {
+            await manager.SaveProfileRadioPrefsAsync(profileId, request.RadioPrefsJson);
+            return Results.NoContent();
+        }
+        catch (InvalidOperationException)
+        {
+            return Results.NotFound();
+        }
     }
 
     private static async Task<IResult> SaveRadioPrefsAsync(Guid profileId, string deviceId, [FromBody] UpdateRadioPrefsDto request, IUserManager manager)
@@ -278,7 +351,7 @@ public static class ProfileEndpoints
     private static async Task<IResult> GetDiscoveryLayoutAsync(Guid profileId, string deviceId, IUserManager manager)
     {
         var json = await manager.GetProfileDeviceDiscoveryLayoutAsync(profileId, deviceId);
-        return Results.Ok(new { DiscoveryLayoutJson = json });
+        return Results.Ok(new DiscoveryLayoutResponse { DiscoveryLayoutJson = json });
     }
 
     private static async Task<IResult> SaveDiscoveryLayoutAsync(Guid profileId, string deviceId, [FromBody] UpdateDiscoveryLayoutDto request, IUserManager manager)

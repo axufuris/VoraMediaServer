@@ -29,6 +29,8 @@ public class UserProfile
 
     public string? ShowtimesLocation { get; set; }
 
+    public string? RadioPrefsJson { get; set; }
+
     public bool AutoSkipIntro { get; set; }
     public bool AutoSkipCredits { get; set; }
     public int MinimumCreditsSceneSeconds { get; set; } = 15;

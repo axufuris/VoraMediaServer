@@ -28,7 +28,8 @@ public static class MediaEndpoints
         var readGroup = routes.MapGroup("/api/media").WithTags("Media").RequireAuthorization();
 
         readGroup.MapGet("/{id:guid}", GetMediaItemAsync)
-            .Produces<MediaItemVM>(StatusCodes.Status200OK)
+            .WithName("GetMediaItem")
+            .Produces<MediaDetailsVM>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         readGroup.MapGet("/{id:guid}/up-next", GetUpNextAsync);
@@ -42,8 +43,12 @@ public static class MediaEndpoints
             .Produces<MarkersLockDto>(StatusCodes.Status200OK);
         markerAdminGroup.MapPut("/{id:guid}/markers/lock", SetMarkersLockedAsync)
             .Produces<MarkersLockDto>(StatusCodes.Status200OK);
-        readGroup.MapPost("/{id:guid}/played", SetPlayedAsync);
+        readGroup.MapPost("/{id:guid}/played", SetPlayedAsync)
+            .WithName("SetMediaPlayed")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
         readGroup.MapPut("/{id:guid}/rating", SetRatingAsync)
+            .WithName("SetMediaRating")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);

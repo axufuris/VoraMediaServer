@@ -48,6 +48,37 @@ const LIBRARY_TYPE_LABEL: Record<string, string> = {
     Photo: 'Photos',
 };
 
+// Render a compact "source → output" chip showing what's actually
+// being delivered. When the session is transcoding and the output
+// differs from source, show "4K HDR10 → 1080p SDR"; otherwise just
+// the single representation. Only renders if we have something
+// meaningful to show.
+function renderResolutionChip(
+    sourceRes: string | undefined,
+    sourceHdr: string | undefined,
+    outputRes: string | undefined,
+    outputHdr: string | undefined,
+    isTranscoding: boolean,
+) {
+    const fmt = (res: string | undefined, hdr: string | undefined) => {
+        const r = res === '2160p' ? '4K' : res ?? '';
+        const h = hdr && hdr.toLowerCase() !== 'sdr' && hdr.toLowerCase() !== 'none' ? hdr : '';
+        if (!r && !h) return '';
+        return [r, h].filter(Boolean).join(' ');
+    };
+    const sourceText = fmt(sourceRes, sourceHdr);
+    const outputText = fmt(outputRes, outputHdr);
+    const changed = isTranscoding && outputText && sourceText && outputText !== sourceText;
+    const label = changed ? `${sourceText} → ${outputText}` : (outputText || sourceText);
+    if (!label) return null;
+    return (
+        <>
+            <span>·</span>
+            <span className="font-medium text-[var(--vora-text-secondary)]">{label}</span>
+        </>
+    );
+}
+
 function NowPlayingRow({ session, onPlay, onPause, onStop }: { session: NowPlayingSession, onPlay: () => void, onPause: () => void, onStop: () => void }) {
     const percent = session.durationSeconds > 0 ? (session.currentPosition / session.durationSeconds) * 100 : 0;
     const isTranscoding = session.videoStrategy?.toLowerCase().includes('transcode') || session.audioStrategy?.toLowerCase().includes('transcode');
@@ -77,13 +108,14 @@ function NowPlayingRow({ session, onPlay, onPause, onStop }: { session: NowPlayi
                         <HealthBadge tone="neutral" showDot={false}>Paused</HealthBadge>
                     )}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-[var(--vora-text-muted)] mb-2">
+                <div className="flex items-center gap-2 text-xs text-[var(--vora-text-muted)] mb-2 flex-wrap">
                     {subtitle && <><span>{subtitle}</span><span>·</span></>}
                     <span className="font-medium text-[var(--vora-text-secondary)]">{session.userName}</span>
                     <span>·</span>
                     <span className="truncate">{session.deviceName}</span>
                     <span>·</span>
                     <span className="tabular-nums">{(session.bandwidthKbps / 1000).toFixed(1)} Mbps</span>
+                    {renderResolutionChip(session.resolution, session.hdrType, session.outputResolution, session.outputHdrType, isTranscoding)}
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="flex-1 h-1 bg-[var(--vora-bg-sunken)] rounded-full overflow-hidden">

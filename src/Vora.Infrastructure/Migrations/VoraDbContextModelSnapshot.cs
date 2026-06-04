@@ -2691,6 +2691,14 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("HdrTonemapQuality")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("HdrTranscodeDownscale")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<int>("InternetUploadSpeedMbps")
                         .HasColumnType("integer");
 
@@ -2877,6 +2885,8 @@ namespace Vora.Infrastructure.Migrations
                             FolderWatcherPollingInterval = 30,
                             FolderWatcherProviderId = "polling_watcher",
                             HardwareTranscodingDevice = "Auto",
+                            HdrTonemapQuality = "Auto",
+                            HdrTranscodeDownscale = "Auto",
                             InternetUploadSpeedMbps = 1000,
                             IptvSyncTime = new TimeSpan(0, 4, 0, 0, 0),
                             LocalMediaScannerProviderId = "Vora_scanner",
@@ -3117,6 +3127,12 @@ namespace Vora.Infrastructure.Migrations
 
                     b.Property<Guid>("MediaPartId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("OutputHdrType")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OutputResolution")
+                        .HasColumnType("text");
 
                     b.Property<string>("Quality")
                         .IsRequired()
@@ -3771,6 +3787,9 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<string>("ProfileImageUrl")
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("RadioPrefsJson")
+                        .HasColumnType("text");
 
                     b.Property<Guid?>("ScheduleOverrideScheduleId")
                         .HasColumnType("uuid");

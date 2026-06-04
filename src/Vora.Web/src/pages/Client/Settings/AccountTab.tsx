@@ -91,15 +91,31 @@ function YouTubeToggleSection({ serverId }: { serverId?: string }) {
                         </p>
                     )}
                 </div>
-                <button
-                    type="button"
-                    onClick={handleToggle}
-                    disabled={loading || saving}
-                    className={isEnabled ? 'vora-button-primary cursor-pointer' : 'vora-button-secondary cursor-pointer'}
-                    style={{ minWidth: 120 }}
+                <label
+                    className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors"
+                    style={{
+                        background: isEnabled ? 'var(--vora-accent-500)' : 'var(--vora-bg-raised)',
+                        border: '1px solid var(--vora-border-subtle)',
+                        opacity: loading || saving ? 0.5 : 1,
+                        cursor: loading || saving ? 'wait' : 'pointer',
+                    }}
+                    aria-label={`YouTube tab is ${isEnabled ? 'enabled' : 'disabled'}`}
                 >
-                    {loading ? '…' : isEnabled ? 'Enabled' : 'Disabled'}
-                </button>
+                    <input
+                        type="checkbox"
+                        checked={isEnabled}
+                        disabled={loading || saving}
+                        onChange={handleToggle}
+                        className="absolute inset-0 cursor-pointer opacity-0"
+                    />
+                    <span
+                        className="inline-block h-4 w-4 transform rounded-full shadow-sm transition-transform"
+                        style={{
+                            background: 'var(--vora-text-primary)',
+                            transform: `translateX(${isEnabled ? '22px' : '4px'})`,
+                        }}
+                    />
+                </label>
             </div>
         </section>
     );

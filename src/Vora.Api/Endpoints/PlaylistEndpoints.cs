@@ -12,12 +12,24 @@ public static class PlaylistEndpoints
     {
         var group = routes.MapGroup("/api/playlists").WithTags("Playlists").RequireAuthorization();
 
-        group.MapGet("/", GetPlaylistsAsync);
-        group.MapGet("/{id:guid}", GetPlaylistAsync);
-        group.MapGet("/contains/{mediaId:guid}", GetPlaylistsContainingAsync);
+        group.MapGet("/", GetPlaylistsAsync)
+            .WithName("ListPlaylists")
+            .Produces<IEnumerable<PlaylistSummaryVM>>(StatusCodes.Status200OK);
+        group.MapGet("/{id:guid}", GetPlaylistAsync)
+            .WithName("GetPlaylistDetails")
+            .Produces<PlaylistDetailsVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapGet("/contains/{mediaId:guid}", GetPlaylistsContainingAsync)
+            .WithName("ListPlaylistsContainingMedia")
+            .Produces<IEnumerable<Guid>>(StatusCodes.Status200OK);
 
-        group.MapPost("/", CreatePlaylistAsync);
-        group.MapPost("/{id:guid}/items/{mediaId:guid}", AddItemAsync);
+        group.MapPost("/", CreatePlaylistAsync)
+            .WithName("CreatePlaylist")
+            .Produces<CreatePlaylistResponse>(StatusCodes.Status200OK);
+        group.MapPost("/{id:guid}/items/{mediaId:guid}", AddItemAsync)
+            .WithName("AddPlaylistItem")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
         group.MapPost("/{id:guid}/unwatch-all", MarkAllUnplayedAsync);
 
         group.MapPut("/{id:guid}", UpdatePlaylistAsync);
@@ -25,7 +37,10 @@ public static class PlaylistEndpoints
 
         group.MapDelete("/{id:guid}", DeletePlaylistAsync);
         group.MapDelete("/{id:guid}/items/{itemId:guid}", RemoveItemAsync);
-        group.MapDelete("/{id:guid}/media/{mediaId:guid}", RemoveMediaAsync);
+        group.MapDelete("/{id:guid}/media/{mediaId:guid}", RemoveMediaAsync)
+            .WithName("RemovePlaylistMedia")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
 
         return group;
     }
@@ -45,7 +60,7 @@ public static class PlaylistEndpoints
         Results.Ok(await manager.GetPlaylistsContainingItemAsync(RequireProfileId(user), mediaId));
 
     private static async Task<IResult> CreatePlaylistAsync([FromBody] CreatePlaylistRequest req, ClaimsPrincipal user, IPlaylistManager manager) =>
-        Results.Ok(new { Id = await manager.CreatePlaylistAsync(RequireProfileId(user), req.Name, req.Description, req.MediaType) });
+        Results.Ok(new CreatePlaylistResponse { Id = await manager.CreatePlaylistAsync(RequireProfileId(user), req.Name, req.Description, req.MediaType) });
 
     private static async Task<IResult> AddItemAsync(Guid id, Guid mediaId, ClaimsPrincipal user, IPlaylistManager manager)
     {

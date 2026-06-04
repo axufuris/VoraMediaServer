@@ -303,7 +303,12 @@ public static class ServiceRegistrationExtensions
     private static IServiceCollection AddVoraSwagger(this IServiceCollection services)
     {
         services.AddEndpointsApiExplorer();
-        services.AddSwaggerGen();
+        services.AddSwaggerGen(options =>
+        {
+            options.CustomOperationIds(SwaggerOperationIds.Build);
+            options.SupportNonNullableReferenceTypes();
+            options.UseAllOfToExtendReferenceSchemas();
+        });
         return services;
     }
 
@@ -787,6 +792,13 @@ public static class ServiceRegistrationExtensions
             options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
             options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
         });
+
+        services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options =>
+        {
+            options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+            options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        });
+
         return services;
     }
 

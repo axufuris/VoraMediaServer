@@ -33,8 +33,12 @@ public static class YouTubeEndpoints
         group.MapPost("/history", RecordHistoryAsync);
         group.MapDelete("/history", ClearHistoryAsync);
 
-        group.MapGet("/settings", GetProfileSettingsAsync);
-        group.MapPut("/settings", UpdateProfileSettingsAsync);
+        group.MapGet("/settings", GetProfileSettingsAsync)
+            .WithName("GetYouTubeProfileSettings")
+            .Produces<Vora.Application.YouTube.ViewModels.YouTubeProfileSettingsVM>(StatusCodes.Status200OK);
+        group.MapPut("/settings", UpdateProfileSettingsAsync)
+            .WithName("UpdateYouTubeProfileSettings")
+            .Produces<Vora.Application.YouTube.ViewModels.YouTubeProfileSettingsVM>(StatusCodes.Status200OK);
 
         return group;
     }

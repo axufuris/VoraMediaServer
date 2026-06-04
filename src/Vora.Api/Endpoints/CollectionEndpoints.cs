@@ -14,15 +14,19 @@ public static class CollectionEndpoints
         var group = routes.MapGroup("/api/collections").WithTags("Collections").RequireAuthorization();
 
         group.MapGet("/", GetAllCollectionsAsync)
+            .WithName("ListAllCollections")
             .Produces<IEnumerable<CollectionSummaryVM>>(StatusCodes.Status200OK);
 
         group.MapGet("/global", GetGlobalCollectionsAsync)
+            .WithName("ListGlobalCollections")
             .Produces<IEnumerable<CollectionSummaryVM>>(StatusCodes.Status200OK);
 
         group.MapGet("/library/{libraryId:guid}", GetLibraryCollectionsAsync)
+            .WithName("ListLibraryCollections")
             .Produces<IEnumerable<CollectionSummaryVM>>(StatusCodes.Status200OK);
 
         group.MapGet("/{id:guid}", GetCollectionAsync)
+            .WithName("GetCollectionDetails")
             .Produces<CollectionDetailsVM>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 

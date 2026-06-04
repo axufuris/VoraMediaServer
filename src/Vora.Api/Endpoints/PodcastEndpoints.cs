@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.Podcasts;
+using Vora.Application.Podcasts.ViewModels;
 
 namespace Vora.Api.Endpoints;
 
@@ -22,16 +23,35 @@ public static class PodcastEndpoints
     {
         var group = routes.MapGroup("/api/podcasts").WithTags("Podcasts").RequireAuthorization().RequireFeature(FeatureGate.Podcasts);
 
-        group.MapGet("/subscriptions", GetSubscriptionsAsync);
-        group.MapPost("/subscriptions", SubscribeAsync);
-        group.MapDelete("/subscriptions/{subscriptionId:guid}", UnsubscribeAsync);
-        group.MapPost("/subscriptions/{subscriptionId:guid}/refresh", RefreshSubscriptionAsync);
-        group.MapGet("/subscriptions/{subscriptionId:guid}/episodes", GetEpisodesAsync);
-        group.MapPost("/episodes/{episodeId:guid}/state", SaveEpisodeStateAsync);
-        group.MapGet("/episodes/recent", GetRecentEpisodesAsync);
-        group.MapGet("/search", SearchAsync);
+        group.MapGet("/subscriptions", GetSubscriptionsAsync)
+            .WithName("ListPodcastSubscriptions")
+            .Produces<IEnumerable<PodcastSubscriptionVM>>(StatusCodes.Status200OK);
+        group.MapPost("/subscriptions", SubscribeAsync)
+            .WithName("SubscribeToPodcast")
+            .Produces<PodcastSubscriptionVM>(StatusCodes.Status200OK);
+        group.MapDelete("/subscriptions/{subscriptionId:guid}", UnsubscribeAsync)
+            .WithName("UnsubscribeFromPodcast")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapPost("/subscriptions/{subscriptionId:guid}/refresh", RefreshSubscriptionAsync)
+            .WithName("RefreshPodcastSubscription")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapGet("/subscriptions/{subscriptionId:guid}/episodes", GetEpisodesAsync)
+            .WithName("ListSubscriptionEpisodes")
+            .Produces<IEnumerable<PodcastEpisodeVM>>(StatusCodes.Status200OK);
+        group.MapPost("/episodes/{episodeId:guid}/state", SaveEpisodeStateAsync)
+            .WithName("SavePodcastEpisodeState");
+        group.MapGet("/episodes/recent", GetRecentEpisodesAsync)
+            .WithName("ListRecentPodcastEpisodes")
+            .Produces<IEnumerable<PodcastFeedEpisodeVM>>(StatusCodes.Status200OK);
+        group.MapGet("/search", SearchAsync)
+            .WithName("SearchPodcasts")
+            .Produces<IEnumerable<DiscoveredPodcastVM>>(StatusCodes.Status200OK);
 
-        group.MapGet("/catalog", GetCatalogAsync);
+        group.MapGet("/catalog", GetCatalogAsync)
+            .WithName("GetPodcastCatalog")
+            .Produces<IEnumerable<CatalogPodcastVM>>(StatusCodes.Status200OK);
         group.MapPost("/admin/catalog", AddCatalogPodcastAsync);
         group.MapDelete("/admin/catalog/{showId:guid}", RemoveCatalogPodcastAsync);
 

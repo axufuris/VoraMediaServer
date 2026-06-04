@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.Calendar;
+using Vora.Plugins.Dtos;
 
 namespace Vora.Api.Endpoints;
 
@@ -11,7 +12,9 @@ public static class CalendarEndpoints
     {
         var group = routes.MapGroup("/api/calendar").WithTags("Calendar").RequireAuthorization().RequireFeature(FeatureGate.ReleaseCalendar);
 
-        group.MapGet("/", GetCalendarEventsAsync);
+        group.MapGet("/", GetCalendarEventsAsync)
+            .WithName("ListCalendarEvents")
+            .Produces<IEnumerable<CalendarEventDto>>(StatusCodes.Status200OK);
 
         return group;
     }

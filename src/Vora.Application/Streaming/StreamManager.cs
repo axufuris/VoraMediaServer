@@ -127,6 +127,8 @@ public class StreamManager : IStreamManager
             Container = decision.TargetContainer,
             Resolution = selectedPart?.Resolution,
             HdrType = selectedVideo?.HdrType,
+            OutputResolution = decision.OutputResolution,
+            OutputHdrType = decision.OutputHdrType,
             StartPosition = startPosition,
             CurrentPosition = startPosition,
             MediaPartId = decision.SelectedMediaPartId,

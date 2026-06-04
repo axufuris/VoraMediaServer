@@ -15,24 +15,29 @@ public static class TemplateEndpoints
 
         profileGroup.MapGet("/active", GetActiveAsync)
             .RequireAuthorization()
+            .WithName("GetActiveClientTemplate")
             .Produces<ActiveTemplateVM>();
 
         profileGroup.MapGet("/", GetAllAsync)
             .RequireAuthorization()
+            .WithName("GetClientTemplates")
             .Produces<List<TemplateMetaVM>>();
 
         profileGroup.MapPut("/active", SetActiveAsync)
             .RequireAuthorization()
+            .WithName("SetActiveClientTemplate")
             .Produces<SetActiveTemplateResponse>()
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
         profileGroup.MapDelete("/active", ClearActiveAsync)
             .RequireAuthorization()
+            .WithName("ClearActiveClientTemplate")
             .Produces(StatusCodes.Status204NoContent);
 
         profileGroup.MapGet("/{templateId}/manifest", GetManifestAsync)
             .RequireAuthorization()
+            .WithName("GetClientTemplateManifest")
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 

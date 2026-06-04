@@ -16,6 +16,8 @@ export interface StartSessionResponse {
     targetAudioChannels: number;
     container: string;
     bandwidthKbps: number;
+    outputResolution?: string | null;
+    outputHdrType?: string | null;
 }
 
 export const streamingService = {

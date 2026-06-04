@@ -23,9 +23,11 @@ public static class RecommendationEndpoints
         var group = routes.MapGroup("/api/recommendations").WithTags("Recommendations").RequireAuthorization().RequireFeature(FeatureGate.ForYou);
 
         group.MapGet("/providers", GetProvidersAsync)
+            .WithName("ListRecommendationProviders")
             .Produces<List<string>>(StatusCodes.Status200OK);
 
         group.MapGet("/global", GetGlobalAsync)
+            .WithName("GetGlobalRecommendations")
             .Produces<List<RecommendationListVM>>(StatusCodes.Status200OK);
 
         var libraryGroup = routes.MapGroup("/api/libraries/{libraryId:guid}/recommendations")
@@ -34,6 +36,7 @@ public static class RecommendationEndpoints
             .RequireFeature(FeatureGate.ForYou);
 
         libraryGroup.MapGet("/", GetForLibraryAsync)
+            .WithName("GetLibraryRecommendations")
             .Produces<List<RecommendationListVM>>(StatusCodes.Status200OK);
     }
 

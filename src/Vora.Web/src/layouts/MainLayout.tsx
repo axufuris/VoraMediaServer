@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { libraryService } from '../api/Media/libraryService';
 import { authService } from '../api/Auth/authService';
-import { useSignalREvent } from '../hooks/useSignalREvent';
+import { useSignalREvent, disconnectSignalR } from '../hooks/useSignalREvent';
 import GlobalVideoPlayer from '../components/Player/GlobalVideoPlayer';
 import { scanDeviceCapabilities } from '../utils/hardwareScanner';
 import { deviceService } from '../api/Users/deviceService';
@@ -347,6 +347,10 @@ export default function MainLayout() {
     const handleSwitchProfile = () => {
         localStorage.removeItem('profile_token');
         localStorage.removeItem('auto_login_profile_id');
+        // Tear down the shared SignalR connection — otherwise it keeps the
+        // outgoing profile's token and fires events for the wrong identity
+        // until the next full page reload.
+        disconnectSignalR();
         navigate('/profiles', { state: { manualSwitch: true } });
     };
 

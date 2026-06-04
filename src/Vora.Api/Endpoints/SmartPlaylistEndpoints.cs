@@ -13,12 +13,22 @@ public static class SmartPlaylistEndpoints
     {
         var group = routes.MapGroup("/api/smart-playlists").WithTags("SmartPlaylists");
 
-        group.MapGet("/", ListAsync).RequireAuthorization();
-        group.MapGet("/{id:guid}", GetAsync).RequireAuthorization();
+        group.MapGet("/", ListAsync)
+            .RequireAuthorization()
+            .WithName("ListSmartPlaylists")
+            .Produces<IEnumerable<SmartPlaylistSummaryVM>>(StatusCodes.Status200OK);
+        group.MapGet("/{id:guid}", GetAsync)
+            .RequireAuthorization()
+            .WithName("GetSmartPlaylist")
+            .Produces<SmartPlaylistDetailVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
         group.MapPost("/", CreateAsync).RequireAuthorization();
         group.MapPut("/{id:guid}", UpdateAsync).RequireAuthorization();
         group.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization();
-        group.MapGet("/{id:guid}/items", GetTracksAsync).RequireAuthorization();
+        group.MapGet("/{id:guid}/items", GetTracksAsync)
+            .RequireAuthorization()
+            .WithName("ListSmartPlaylistItems")
+            .Produces<SmartPlaylistItemsVM>(StatusCodes.Status200OK);
         group.MapPost("/preview", PreviewAsync).RequireAuthorization();
 
         return routes;

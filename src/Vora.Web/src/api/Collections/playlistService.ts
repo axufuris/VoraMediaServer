@@ -8,6 +8,7 @@ export interface PlaylistSummaryVM {
     mediaType: PlaylistMediaType;
     itemCount: number;
     posterUrls: string[];
+    backdropUrls: string[];
 }
 
 export interface PlaylistItemVM {

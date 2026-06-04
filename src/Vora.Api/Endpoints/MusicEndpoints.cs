@@ -5,6 +5,8 @@ using Vora.Api.Extensions;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
 using Vora.Application.Media.Requests;
+using Vora.Application.Media.ViewModels;
+using Vora.Application.Search.ViewModels;
 using Vora.Application.Streaming;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
@@ -17,10 +19,24 @@ public static class MusicEndpoints
     {
         var group = routes.MapGroup("/api/music").WithTags("Music");
 
-        group.MapGet("/artists", GetArtistsAsync).RequireAuthorization();
-        group.MapGet("/artists/{artistId:guid}", GetArtistDetailAsync).RequireAuthorization();
-        group.MapGet("/artists/{artistId:guid}/tracks", GetArtistTracksAsync).RequireAuthorization();
-        group.MapGet("/albums/{albumId:guid}", GetAlbumDetailAsync).RequireAuthorization();
+        group.MapGet("/artists", GetArtistsAsync)
+            .RequireAuthorization()
+            .WithName("ListArtists")
+            .Produces<IEnumerable<ArtistVM>>(StatusCodes.Status200OK);
+        group.MapGet("/artists/{artistId:guid}", GetArtistDetailAsync)
+            .RequireAuthorization()
+            .WithName("GetArtistDetail")
+            .Produces<ArtistDetailVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapGet("/artists/{artistId:guid}/tracks", GetArtistTracksAsync)
+            .RequireAuthorization()
+            .WithName("ListArtistTracks")
+            .Produces<IEnumerable<ArtistTrackVM>>(StatusCodes.Status200OK);
+        group.MapGet("/albums/{albumId:guid}", GetAlbumDetailAsync)
+            .RequireAuthorization()
+            .WithName("GetAlbumDetail")
+            .Produces<AlbumDetailVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
 
         group.MapPut("/artists/{artistId:guid}", UpdateArtistAsync).RequireAuthorization();
         group.MapPut("/albums/{albumId:guid}", UpdateAlbumAsync).RequireAuthorization();
@@ -42,31 +58,76 @@ public static class MusicEndpoints
 
         group.MapGet("/tracks/{trackId:guid}/stream", StreamTrackAsync).AllowAnonymous();
 
-        group.MapGet("/search", SearchMusicAsync).RequireAuthorization();
+        group.MapGet("/search", SearchMusicAsync)
+            .RequireAuthorization()
+            .WithName("SearchMusic")
+            .Produces<IEnumerable<MusicSearchResultVM>>(StatusCodes.Status200OK);
 
-        group.MapPost("/tracks/{trackId:guid}/like", LikeTrackAsync).RequireAuthorization();
-        group.MapDelete("/tracks/{trackId:guid}/like", UnlikeTrackAsync).RequireAuthorization();
-        group.MapGet("/likes", GetLikedTracksAsync).RequireAuthorization();
+        group.MapPost("/tracks/{trackId:guid}/like", LikeTrackAsync)
+            .RequireAuthorization()
+            .WithName("LikeTrack")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapDelete("/tracks/{trackId:guid}/like", UnlikeTrackAsync)
+            .RequireAuthorization()
+            .WithName("UnlikeTrack")
+            .Produces(StatusCodes.Status204NoContent);
+        group.MapGet("/likes", GetLikedTracksAsync)
+            .RequireAuthorization()
+            .WithName("GetLikedTracks")
+            .Produces<LikedTracksVM>(StatusCodes.Status200OK);
 
-        group.MapPut("/albums/{albumId:guid}/rating", SetAlbumRatingAsync).RequireAuthorization();
-        group.MapPut("/artists/{artistId:guid}/rating", SetArtistRatingAsync).RequireAuthorization();
+        group.MapPut("/albums/{albumId:guid}/rating", SetAlbumRatingAsync)
+            .RequireAuthorization()
+            .WithName("SetAlbumRating")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapPut("/artists/{artistId:guid}/rating", SetArtistRatingAsync)
+            .RequireAuthorization()
+            .WithName("SetArtistRating")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/tracks/{trackId:guid}/lyrics", GetTrackLyricsAsync).RequireAuthorization();
 
         group.MapPost("/tracks/{trackId:guid}/played", RecordTrackPlayAsync).RequireAuthorization();
         group.MapPost("/tracks/{trackId:guid}/now-playing", UpdateNowPlayingAsync).RequireAuthorization();
-        group.MapGet("/history/recent", GetRecentlyPlayedAsync).RequireAuthorization();
-        group.MapGet("/history/top-tracks", GetTopTracksAsync).RequireAuthorization();
-        group.MapGet("/history/top-artists", GetTopArtistsAsync).RequireAuthorization();
-        group.MapGet("/albums/recent", GetRecentlyAddedAlbumsAsync).RequireAuthorization();
+        group.MapGet("/history/recent", GetRecentlyPlayedAsync)
+            .RequireAuthorization()
+            .WithName("ListRecentlyPlayedTracks")
+            .Produces<IEnumerable<ArtistTrackVM>>(StatusCodes.Status200OK);
+        group.MapGet("/history/top-tracks", GetTopTracksAsync)
+            .RequireAuthorization()
+            .WithName("ListTopTracks")
+            .Produces<IEnumerable<ArtistTrackVM>>(StatusCodes.Status200OK);
+        group.MapGet("/history/top-artists", GetTopArtistsAsync)
+            .RequireAuthorization()
+            .WithName("ListTopArtists")
+            .Produces<IEnumerable<ArtistVM>>(StatusCodes.Status200OK);
+        group.MapGet("/albums/recent", GetRecentlyAddedAlbumsAsync)
+            .RequireAuthorization()
+            .WithName("ListRecentAlbums")
+            .Produces<IEnumerable<AlbumVM>>(StatusCodes.Status200OK);
 
         group.MapPost("/lastfm/auth/start", StartLastFmAuthAsync).RequireAuthorization();
         group.MapPost("/lastfm/auth/complete", CompleteLastFmAuthAsync).RequireAuthorization();
         group.MapDelete("/lastfm/auth", DisconnectLastFmAsync).RequireAuthorization();
 
-        group.MapGet("/recommendations/mixes", GetMixesAsync).RequireAuthorization();
-        group.MapGet("/recommendations/mixes/{mixId:guid}", GetMixDetailAsync).RequireAuthorization();
-        group.MapGet("/recommendations/because-you-played", GetBecauseYouPlayedAsync).RequireAuthorization();
+        group.MapGet("/recommendations/mixes", GetMixesAsync)
+            .RequireAuthorization()
+            .WithName("ListProfileMixes")
+            .Produces<IEnumerable<GeneratedMixSummaryVM>>(StatusCodes.Status200OK);
+        group.MapGet("/recommendations/mixes/{mixId:guid}", GetMixDetailAsync)
+            .RequireAuthorization()
+            .WithName("GetMixDetail")
+            .Produces<GeneratedMixDetailVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapGet("/recommendations/because-you-played", GetBecauseYouPlayedAsync)
+            .RequireAuthorization()
+            .WithName("ListBecauseYouPlayed")
+            .Produces<IEnumerable<BecauseYouPlayedRowVM>>(StatusCodes.Status200OK);
         group.MapPost("/recommendations/refresh", RefreshRecommendationsAsync).RequireAuthorization();
 
         group.MapPost("/recommendations/radio", StartRadioAsync).RequireAuthorization();
@@ -77,13 +138,26 @@ public static class MusicEndpoints
         group.MapDelete("/stations/{stationId:guid}", DeleteStationAsync).RequireAuthorization();
         group.MapPost("/stations/{stationId:guid}/play", TouchStationAsync).RequireAuthorization();
 
-        group.MapGet("/recommendations/year-recap", GetYearRecapAsync).RequireAuthorization();
-        group.MapGet("/recommendations/years", GetYearsWithHistoryAsync).RequireAuthorization();
+        group.MapGet("/recommendations/year-recap", GetYearRecapAsync)
+            .RequireAuthorization()
+            .WithName("GetYearRecap")
+            .Produces<YearRecapVM>(StatusCodes.Status200OK);
+        group.MapGet("/recommendations/years", GetYearsWithHistoryAsync)
+            .RequireAuthorization()
+            .WithName("ListYearsWithHistory")
+            .Produces<IEnumerable<int>>(StatusCodes.Status200OK);
 
         group.MapGet("/artists/{artistId:guid}/similar", GetSimilarArtistsAsync).RequireAuthorization();
 
-        group.MapGet("/genres", GetGenresAsync).RequireAuthorization();
-        group.MapGet("/genres/{genre}", GetGenreContentAsync).RequireAuthorization();
+        group.MapGet("/genres", GetGenresAsync)
+            .RequireAuthorization()
+            .WithName("ListGenres")
+            .Produces<IEnumerable<GenreSummaryVM>>(StatusCodes.Status200OK);
+        group.MapGet("/genres/{genre}", GetGenreContentAsync)
+            .RequireAuthorization()
+            .WithName("GetGenreContent")
+            .Produces<GenreContentVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
 
         group.MapPost("/playback/heartbeat", HeartbeatAsync).RequireAuthorization();
         group.MapPost("/playback/stop", StopPlaybackAsync).RequireAuthorization();
@@ -173,7 +247,7 @@ public static class MusicEndpoints
         return ok ? Results.NoContent() : Results.NotFound();
     }
 
-    private static async Task<IResult> UploadArtistArtworkAsync(Guid artistId, [FromForm] IFormFile file, ClaimsPrincipal user, IMusicManager manager)
+    private static async Task<IResult> UploadArtistArtworkAsync(Guid artistId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
     {
         if (!user.IsAdmin()) return Results.Forbid();
         if (file == null || file.Length == 0) return Results.BadRequest(new { error = "No file uploaded." });
@@ -184,7 +258,7 @@ public static class MusicEndpoints
         return url == null ? Results.NotFound() : Results.Ok(new { url });
     }
 
-    private static async Task<IResult> UploadAlbumArtworkAsync(Guid albumId, [FromForm] IFormFile file, ClaimsPrincipal user, IMusicManager manager)
+    private static async Task<IResult> UploadAlbumArtworkAsync(Guid albumId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
     {
         if (!user.IsAdmin()) return Results.Forbid();
         if (file == null || file.Length == 0) return Results.BadRequest(new { error = "No file uploaded." });
@@ -195,7 +269,7 @@ public static class MusicEndpoints
         return url == null ? Results.NotFound() : Results.Ok(new { url });
     }
 
-    private static async Task<IResult> UploadArtistBackgroundAsync(Guid artistId, [FromForm] IFormFile file, ClaimsPrincipal user, IMusicManager manager)
+    private static async Task<IResult> UploadArtistBackgroundAsync(Guid artistId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
     {
         if (!user.IsAdmin()) return Results.Forbid();
         if (file == null || file.Length == 0) return Results.BadRequest(new { error = "No file uploaded." });
@@ -206,7 +280,7 @@ public static class MusicEndpoints
         return url == null ? Results.NotFound() : Results.Ok(new { url });
     }
 
-    private static async Task<IResult> UploadAlbumBackgroundAsync(Guid albumId, [FromForm] IFormFile file, ClaimsPrincipal user, IMusicManager manager)
+    private static async Task<IResult> UploadAlbumBackgroundAsync(Guid albumId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
     {
         if (!user.IsAdmin()) return Results.Forbid();
         if (file == null || file.Length == 0) return Results.BadRequest(new { error = "No file uploaded." });
@@ -217,7 +291,7 @@ public static class MusicEndpoints
         return url == null ? Results.NotFound() : Results.Ok(new { url });
     }
 
-    private static async Task<IResult> UploadArtistBannerAsync(Guid artistId, [FromForm] IFormFile file, ClaimsPrincipal user, IMusicManager manager)
+    private static async Task<IResult> UploadArtistBannerAsync(Guid artistId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
     {
         if (!user.IsAdmin()) return Results.Forbid();
         if (file == null || file.Length == 0) return Results.BadRequest(new { error = "No file uploaded." });
@@ -228,7 +302,7 @@ public static class MusicEndpoints
         return url == null ? Results.NotFound() : Results.Ok(new { url });
     }
 
-    private static async Task<IResult> UploadArtistClearLogoAsync(Guid artistId, [FromForm] IFormFile file, ClaimsPrincipal user, IMusicManager manager)
+    private static async Task<IResult> UploadArtistClearLogoAsync(Guid artistId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
     {
         if (!user.IsAdmin()) return Results.Forbid();
         if (file == null || file.Length == 0) return Results.BadRequest(new { error = "No file uploaded." });
@@ -239,7 +313,7 @@ public static class MusicEndpoints
         return url == null ? Results.NotFound() : Results.Ok(new { url });
     }
 
-    private static async Task<IResult> UploadAlbumDiscArtAsync(Guid albumId, [FromForm] IFormFile file, ClaimsPrincipal user, IMusicManager manager)
+    private static async Task<IResult> UploadAlbumDiscArtAsync(Guid albumId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
     {
         if (!user.IsAdmin()) return Results.Forbid();
         if (file == null || file.Length == 0) return Results.BadRequest(new { error = "No file uploaded." });
@@ -283,14 +357,14 @@ public static class MusicEndpoints
     {
         var (artist, albums) = await manager.GetArtistDetailAsync(artistId, user.GetProfileId(), BuildFilter(user));
         if (artist == null) return Results.NotFound();
-        return Results.Ok(new { artist, albums });
+        return Results.Ok(new ArtistDetailVM { Artist = artist, Albums = albums });
     }
 
     private static async Task<IResult> GetAlbumDetailAsync(Guid albumId, ClaimsPrincipal user, IMusicManager manager)
     {
         var (album, tracks) = await manager.GetAlbumDetailAsync(albumId, user.GetProfileId(), BuildFilter(user));
         if (album == null) return Results.NotFound();
-        return Results.Ok(new { album, tracks });
+        return Results.Ok(new Vora.Application.Media.ViewModels.AlbumDetailVM { Album = album, Tracks = tracks });
     }
 
     private static async Task<IResult> GetArtistTracksAsync(Guid artistId, ClaimsPrincipal user, IMusicManager manager)
@@ -320,7 +394,7 @@ public static class MusicEndpoints
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
         var tracks = await manager.GetLikedTracksAsync(profileId.Value, BuildFilter(user));
-        return Results.Ok(new { count = tracks.Count, tracks });
+        return Results.Ok(new LikedTracksVM { Count = tracks.Count, Tracks = tracks });
     }
 
     public sealed class SetMusicRatingRequest

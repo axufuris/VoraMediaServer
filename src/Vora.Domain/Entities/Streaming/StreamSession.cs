@@ -15,8 +15,18 @@ public class StreamSession
     public string VideoCodec { get; set; } = string.Empty;
     public string AudioCodec { get; set; } = string.Empty;
     public string Container { get; set; } = string.Empty;
+    // Source resolution + HDR of the selected MediaPart. Kept around for
+    // admin debugging — useful to compare source vs output (e.g. when
+    // HdrTranscodeDownscale=Always silently rewrites a 4K HDR source to
+    // 1080p SDR output).
     public string? Resolution { get; set; }
     public string? HdrType { get; set; }
+    // What the user is actually getting delivered. Set from the
+    // decision (BestPathDecisionManager fills it on each option). The
+    // player badge bar, admin Now Playing row, and Watch History row
+    // all read from these so the UI tells the truth about the stream.
+    public string? OutputResolution { get; set; }
+    public string? OutputHdrType { get; set; }
 
     public int TargetAudioChannels { get; set; }
     public bool IsSubtitleBurnIn { get; set; }

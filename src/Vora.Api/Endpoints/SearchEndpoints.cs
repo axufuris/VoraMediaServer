@@ -12,6 +12,7 @@ public static class SearchEndpoints
         var group = routes.MapGroup("/api/search").WithTags("Global Search").RequireAuthorization();
 
         group.MapGet("/", SearchAllAsync)
+            .WithName("SearchAll")
             .Produces<GlobalSearchVM>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest);
 

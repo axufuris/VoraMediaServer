@@ -16,6 +16,11 @@ Documentation.txt
 [Vv]ora-data/
 [Vv]ora-transcode/
 
+# Generated cross-client design-token artifacts. Emitter is in
+# src/Vora.Web/scripts/emit-tokens.ts; output is regenerated on demand by
+# each native client's build. See docs/clients/design-tokens.md.
+/dist/
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

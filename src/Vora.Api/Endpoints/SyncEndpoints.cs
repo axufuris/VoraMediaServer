@@ -10,9 +10,11 @@ public static class SyncEndpoints
         var group = routes.MapGroup("/api/sync").WithTags("Sync & State").RequireAuthorization();
 
         group.MapGet("/profiles/{profileId:guid}/continue-watching", GetContinueWatchingAsync)
+            .WithName("ListContinueWatching")
             .Produces<IEnumerable<ContinueWatchingVM>>(StatusCodes.Status200OK);
 
-        group.MapPut("/profiles/{profileId:guid}/continue-watching/{mediaItemId:guid}/hide", HideFromContinueWatchingAsync);
+        group.MapPut("/profiles/{profileId:guid}/continue-watching/{mediaItemId:guid}/hide", HideFromContinueWatchingAsync)
+            .WithName("HideFromContinueWatching");
 
         return group;
     }

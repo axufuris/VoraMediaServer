@@ -43,11 +43,14 @@ public static class UserEndpoints
         var group = routes.MapGroup("/api/users").WithTags("Users").RequireAuthorization();
 
         group.MapGet("/{userId:guid}", GetUserAsync)
+            .WithName("GetUserAccount")
             .Produces<UserVM>(StatusCodes.Status200OK);
 
         group.MapGet("/{userId:guid}/play-history", GetPlayHistoryAsync);
 
-        group.MapPut("/{userId:guid}", UpdateUserAsync);
+        group.MapPut("/{userId:guid}", UpdateUserAsync)
+            .WithName("UpdateUserAccount")
+            .Produces(StatusCodes.Status204NoContent);
     }
 
     private static void MapAdminEndpoints(IEndpointRouteBuilder routes)

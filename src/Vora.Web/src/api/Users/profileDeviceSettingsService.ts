@@ -46,13 +46,16 @@ export const profileDeviceSettingsService = {
         await apiClient.put(`/users/profiles/${profileId}/devices/${deviceId}/iptv`, { iptvPrefsJson }, { serverId });
     },
 
-    getRadioPrefs: async (profileId: string, deviceId: string, serverId?: string): Promise<string | null> => {
-        const response = await apiClient.get<{ radioPrefsJson: string | null }>(`/users/profiles/${profileId}/devices/${deviceId}/radio`, { serverId });
+    // Radio prefs are profile-scoped (favorites + hidden + country filter)
+    // — `deviceId` is accepted for backwards compatibility with existing
+    // call sites but is ignored on the wire. See ProfileEndpoints.cs.
+    getRadioPrefs: async (profileId: string, _deviceId: string, serverId?: string): Promise<string | null> => {
+        const response = await apiClient.get<{ radioPrefsJson: string | null }>(`/users/profiles/${profileId}/radio-prefs`, { serverId });
         return response.data.radioPrefsJson;
     },
 
-    saveRadioPrefs: async (profileId: string, deviceId: string, radioPrefsJson: string, serverId?: string): Promise<void> => {
-        await apiClient.put(`/users/profiles/${profileId}/devices/${deviceId}/radio`, { radioPrefsJson }, { serverId });
+    saveRadioPrefs: async (profileId: string, _deviceId: string, radioPrefsJson: string, serverId?: string): Promise<void> => {
+        await apiClient.put(`/users/profiles/${profileId}/radio-prefs`, { radioPrefsJson }, { serverId });
     },
 
     saveClientSettings: async (profileId: string, deviceId: string, playbackPrefs: string, iptvPrefsJson: string, serverId?: string): Promise<void> => {

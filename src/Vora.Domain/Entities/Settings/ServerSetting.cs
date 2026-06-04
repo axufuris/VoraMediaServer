@@ -60,6 +60,34 @@ public class ServerSetting
     public bool EnableHdrToneMapping { get; set; } = true;
     public string TonemappingAlgorithm { get; set; } = "hable";
 
+    // HDR tonemap quality / downscale resolution mode.
+    //
+    // Both default to "Auto", which means the FFmpeg layer picks based
+    // on detected host environment at startup:
+    //   - WSL2/Docker Desktop on Windows: Vulkan + OpenCL aren't
+    //     exposed through to the container, so GPU HDR tonemap is
+    //     impossible. Auto → Fast tonemap + downscale 4K HDR sources
+    //     to 1080p on the GPU before tonemap so the CPU work stays
+    //     real-time.
+    //   - Native Linux / Unraid: GPU HDR tonemap is available (and
+    //     will become first-class once we move to jellyfin-ffmpeg per
+    //     task #242). Auto → Quality tonemap, no automatic downscale.
+    //
+    // Users can lock either to a specific value via the admin UI:
+    //   HdrTonemapQuality: Auto | Quality | Fast | Off
+    //     Quality = full zscale + hable chain (most accurate, slow on CPU)
+    //     Fast    = single-pass colorspace conversion (washes HDR
+    //               highlights but real-time on CPU at 4K)
+    //     Off     = bit-depth reduction only, no colorspace conversion
+    //               (HDR values interpreted as SDR, looks wrong but
+    //               very fast)
+    //   HdrTranscodeDownscale: Auto | Always | Never
+    //     Always = downscale 4K HDR sources to 1080p before tonemap
+    //               regardless of the user's quality pick
+    //     Never  = preserve source resolution end-to-end
+    public string HdrTonemapQuality { get; set; } = "Auto";
+    public string HdrTranscodeDownscale { get; set; } = "Auto";
+
     public string TranscoderTempDirectory { get; set; } = "/transcode";
     public int TranscoderThrottleBuffer { get; set; } = 60;
 

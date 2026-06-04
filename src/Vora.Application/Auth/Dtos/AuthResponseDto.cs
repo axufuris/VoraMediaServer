@@ -1,9 +1,9 @@
-﻿namespace Vora.Application.Auth.Dtos;
+namespace Vora.Application.Auth.Dtos;
 
 public class AuthResponseDto
 {
-    public string AccessToken { get; set; } = string.Empty;
-    public Guid UserId { get; set; }
-    public string DisplayName { get; set; } = string.Empty;
-    public bool IsAdmin { get; set; }
+    public required string AccessToken { get; set; }
+    public required Guid UserId { get; set; }
+    public required string DisplayName { get; set; }
+    public required bool IsAdmin { get; set; }
 }

@@ -219,6 +219,8 @@ export default function MediaDetailsPage() {
                 ...sessionInfo, startPosition: startPos,
                 serverId: serverId ?? undefined,
                 resolution: activePart?.resolution, hdrType: activeVideoTrack?.hdrType,
+                outputResolution: sessionInfo.outputResolution ?? undefined,
+                outputHdrType: sessionInfo.outputHdrType ?? undefined,
                 audioCodec: activeAudioTrack?.codec, audioChannels: activeAudioTrack?.channels,
                 playbackContextType: media.type === 'Episode' ? 'tvshow' : 'movie'
             });

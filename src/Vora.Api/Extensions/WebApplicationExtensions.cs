@@ -15,15 +15,13 @@ public static class WebApplicationExtensions
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 
-        if (app.Environment.IsDevelopment())
+        app.UseSwagger();
+        app.UseSwaggerUI(options =>
         {
-            app.UseSwagger();
-            app.UseSwaggerUI(options =>
-            {
-                options.SwaggerEndpoint("/swagger/v1/swagger.json", "Vora Media Server API v1");
-                options.RoutePrefix = string.Empty;
-            });
-        }
+            options.SwaggerEndpoint("/swagger/v1/swagger.json", "Vora Media Server API v1");
+            options.RoutePrefix = "swagger";
+            options.DocumentTitle = "Vora Media Server API";
+        });
 
         app.UseVoraForwardedHeaders();
 

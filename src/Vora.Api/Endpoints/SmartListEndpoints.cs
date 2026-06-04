@@ -27,9 +27,11 @@ public static class SmartListEndpoints
         var group = routes.MapGroup("/api/smartlists").WithTags("Smart Lists").RequireAuthorization();
 
         group.MapGet("/active", GetActiveListsAsync)
+            .WithName("ListActiveSmartLists")
             .Produces<IEnumerable<SmartListClientVM>>(StatusCodes.Status200OK);
 
         group.MapGet("/{id:guid}/items", GetListItemsAsync)
+            .WithName("GetSmartListItems")
             .Produces<IEnumerable<LibraryItemVM>>(StatusCodes.Status200OK);
     }
 

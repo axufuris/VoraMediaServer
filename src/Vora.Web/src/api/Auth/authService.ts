@@ -1,5 +1,6 @@
 import { apiClient, createDirectClient, clearApiClientCache } from '../client';
 import { StorageKeys } from '../../utils/storageKeys';
+import { disconnectSignalR } from '../../hooks/useSignalREvent';
 
 export interface AuthResponse {
     accessToken: string;
@@ -102,6 +103,7 @@ export const authService = {
 
         sessionStorage.clear();
         clearApiClientCache();
+        disconnectSignalR();
 
         window.location.href = '/login';
     }

@@ -50,6 +50,27 @@ public static class MyEndpoints
 
 When one file needs to mix client and admin concerns, split into two top-level helpers (`MapClientEndpoints`, `MapAdminEndpoints`) each with its own `RouteGroupBuilder` and auth policy. See `LibraryEndpoints`, `MediaEndpoints`, `RequestEndpoints`, `SmartListEndpoints`, `UserEndpoints` for the pattern.
 
+#### Operation IDs (OpenAPI / client codegen)
+
+Every endpoint must produce a **stable, readable operation ID** in the generated OpenAPI document because that becomes the method name on the generated Swift and Kotlin clients (see `docs/clients/openapi-codegen.md`).
+
+Resolution order (built into `SwaggerOperationIds.Build`):
+
+1. **Explicit `.WithName("…")`** wins. Use PascalCase verb + noun: `Login`, `ListUsers`, `GetUserById`, `CreateInvitation`, `MarkAllNotificationsRead`, `StartPlaybackSession`.
+2. **Auto-derived from method + route** as a fallback. Verbs: `GET` (with route params) → `Get`, `GET` (no params) → `List`, `POST` → `Create`, `PUT` → `Update`, `PATCH` → `Patch`, `DELETE` → `Delete`. Path noun segments are PascalCased, kebab/snake stripped (`/play-history` → `PlayHistory`). Route parameters become `ByXxxx` suffixes (`{userId:guid}` → `ByUserId`). Examples: `GET /api/users` → `ListUsers`; `GET /api/users/{userId:guid}` → `GetUsersByUserId`; `POST /api/library-items/{itemId:guid}/mark-watched` → `CreateLibraryItemsMarkWatchedByItemId`.
+
+The auto-derive is best-effort. It produces sensible names for resource-style CRUD routes and ugly ones for action-style routes (`POST /api/auth/login` derives to `CreateAuthLogin`, which is wrong). Reach for `.WithName("Login")` whenever the derived name reads badly.
+
+**Pattern:** add `.WithName("…")` chained after the existing fluent builder calls, before `.Produces<...>()`:
+
+```csharp
+group.MapPost("/login", LoginAsync)
+    .WithName("Login")
+    .AllowAnonymous();
+```
+
+Operation IDs must be **unique within the whole document** — Swashbuckle will throw if two endpoints resolve to the same ID. The auto-derive includes both nouns and `By…` params, which makes collisions rare in practice. If a collision happens, the fix is `.WithName("…")` on at least one of the colliding endpoints.
+
 ### `Vora.Api/Hubs/`
 
 - **`VoraHub.cs`** — the `Hub` itself. Mapped at `/hubs/Vora`.

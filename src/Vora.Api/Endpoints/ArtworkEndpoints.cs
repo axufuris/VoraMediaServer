@@ -65,7 +65,7 @@ public static partial class ArtworkEndpoints
         return Results.Ok(artwork);
     }
 
-    private static async Task<IResult> UploadMediaArtworkAsync(Guid id, [FromForm] IFormFile file, [FromQuery] ArtworkKind kind, IArtworkService service)
+    private static async Task<IResult> UploadMediaArtworkAsync(Guid id, IFormFile file, [FromQuery] ArtworkKind kind, IArtworkService service)
     {
         await using var stream = file.OpenReadStream();
         var url = await service.UploadAsync(id, new UploadedFile(stream, file.FileName, file.ContentType), kind);

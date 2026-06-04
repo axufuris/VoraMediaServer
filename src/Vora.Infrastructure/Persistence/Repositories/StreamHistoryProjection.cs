@@ -179,6 +179,10 @@ internal static class StreamHistoryProjection
             OriginalAudioChannels = originalAudioTrack?.Channels,
             TargetAudioChannels = session.TargetAudioChannels,
             BandwidthKbps = session.BandwidthKbps,
+            SourceResolution = session.Resolution,
+            SourceHdrType = session.HdrType,
+            OutputResolution = session.OutputResolution,
+            OutputHdrType = session.OutputHdrType,
             DecisionLog = session.DecisionLog,
 
             SubtitleStrategy = session.SubtitleStrategy ?? "None",

@@ -6,6 +6,25 @@ import { StorageKeys } from '../utils/storageKeys';
 let sharedConnection: HubConnection | null = null;
 let currentConnectionUrl: string | null = null;
 
+/**
+ * Tear down the shared SignalR hub connection. Call from sign-out and
+ * switch-profile paths so the next `useSignalREvent` mount rebuilds the
+ * connection with the fresh token. Without this, soft navigations (no full
+ * page reload) leak the old profile's hub connection — it keeps receiving
+ * events authenticated as the previous identity until the tab is closed.
+ */
+export function disconnectSignalR(): void {
+    if (sharedConnection) {
+        try {
+            sharedConnection.stop();
+        } catch {
+            // Ignore — stop() can throw if already disconnected.
+        }
+    }
+    sharedConnection = null;
+    currentConnectionUrl = null;
+}
+
 export const VORA_EVENTS = {
     LogEntryBatch: 'LogEntryBatch',
     CollectionUpdated: 'CollectionUpdated',

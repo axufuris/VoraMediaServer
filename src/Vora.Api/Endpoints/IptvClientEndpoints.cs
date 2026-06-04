@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.Iptv;
+using Vora.Application.Iptv.Dtos;
 using Vora.Application.Settings;
 
 namespace Vora.Api.Endpoints;
@@ -21,8 +22,13 @@ public static class IptvClientEndpoints
     {
         var group = routes.MapGroup("/api/iptv").WithTags("IPTV (Client)").RequireAuthorization();
 
-        group.MapGet("/client/playlists/{userId:guid}", GetClientPlaylistsAsync);
-        group.MapPost("/guide", GetGuideAsync).RequireFeature(FeatureGate.LiveTv);
+        group.MapGet("/client/playlists/{userId:guid}", GetClientPlaylistsAsync)
+            .WithName("ListClientIptvPlaylists")
+            .Produces<IEnumerable<Vora.Application.Iptv.ViewModels.IptvPlaylistVM>>(StatusCodes.Status200OK);
+        group.MapPost("/guide", GetGuideAsync)
+            .RequireFeature(FeatureGate.LiveTv)
+            .WithName("GetIptvGuide")
+            .Produces<Dictionary<string, List<IptvProgramDto>>>(StatusCodes.Status200OK);
 
         return group;
     }

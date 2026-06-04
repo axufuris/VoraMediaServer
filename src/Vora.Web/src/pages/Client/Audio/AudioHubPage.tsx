@@ -6,6 +6,7 @@ import { type IptvChannelVM } from '../../../api/Iptv/iptvAdminService';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { useFeatureFlags } from '../../../hooks/useFeatureFlags';
+import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import PodcastsTab from './PodcastsTab';
 import MusicTab from './MusicTab';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
@@ -143,12 +144,18 @@ export default function AudioHubPage() {
     }, []);
 
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Skip-window for SignalR echoes: when we've just sent our own save, the
+    // server fires RadioPrefsUpdated back to all of this profile's sessions
+    // including ours. Within 2s of a local save we ignore the event to avoid
+    // a refetch that would race with our in-flight optimistic state.
+    const lastLocalSaveAt = useRef<number>(0);
     useEffect(() => {
         if (!prefsLoaded || !profileId) return;
         const serialized = JSON.stringify(prefs);
         localStorage.setItem(radioPrefsCacheKey(profileId, deviceId), serialized);
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = setTimeout(() => {
+            lastLocalSaveAt.current = Date.now();
             profileDeviceSettingsService
                 .saveRadioPrefs(profileId, deviceId, serialized, serverId)
                 .catch(err => console.error('Failed to save radio prefs', err));
@@ -157,6 +164,28 @@ export default function AudioHubPage() {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         };
     }, [prefs, prefsLoaded, profileId, deviceId, serverId]);
+
+    // Cross-device sync: another session (Android, second browser, etc.)
+    // saved radio prefs for this profile, so refetch and replace local
+    // state. The 2s skip-window guards against echoing our own save.
+    useSignalREvent("RadioPrefsUpdated", useCallback((eventProfileId: string) => {
+        if (!profileId || eventProfileId.toLowerCase() !== profileId.toLowerCase()) return;
+        if (Date.now() - lastLocalSaveAt.current < 2000) return;
+        profileDeviceSettingsService
+            .getRadioPrefs(profileId, deviceId, serverId)
+            .then(json => {
+                if (!json) return;
+                try {
+                    const parsed = JSON.parse(json) as Partial<RadioPrefs>;
+                    setPrefs({
+                        favoriteIds: parsed.favoriteIds ?? [],
+                        hiddenIds: parsed.hiddenIds ?? [],
+                        countryFilter: parsed.countryFilter ?? 'All',
+                    });
+                } catch { /* ignore malformed payload */ }
+            })
+            .catch(err => console.error('Failed to refresh radio prefs after SignalR', err));
+    }, [profileId, deviceId, serverId]));
 
     const dedupedChannels = useMemo(() => {
         const seen = new Set<string>();

@@ -146,7 +146,7 @@ export default function PlaylistsPage() {
                 {visibleMixes.length > 0 && (
                     <div className="mb-10">
                         <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4">For You</h2>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                        <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-4">
                             {visibleMixes.map(mix => (
                                 <button
                                     key={mix.id}
@@ -175,7 +175,7 @@ export default function PlaylistsPage() {
                         <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4 flex items-center gap-2">
                             <span className="text-fuchsia-400">⚙</span> Smart Playlists
                         </h2>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                        <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-4">
                             {visibleSmart.map(sp => {
                                 const grad = sp.mediaType === 'Music'
                                     ? 'from-fuchsia-700 via-violet-900 to-indigo-900'
@@ -222,7 +222,7 @@ export default function PlaylistsPage() {
                 ) : visiblePlaylists.length === 0 ? null : (
                     <>
                         {(visibleMixes.length > 0 || visibleSmart.length > 0) && <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4">Your Playlists</h2>}
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                        <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-4">
                             {visiblePlaylists.map(p => (
                                 <MediaCard
                                     key={p.id}
@@ -231,8 +231,15 @@ export default function PlaylistsPage() {
                                     subtitle={`${p.itemCount} Items${p.mediaType !== 'Mixed' ? ` · ${p.mediaType}` : ''}`}
                                     type="Playlist"
                                     aspectRatio="square"
-                                    multiPosters={p.posterUrls}
-                                    imageUrl={p.posterUrls && p.posterUrls.length > 0 ? p.posterUrls[0] : undefined}
+                                    // Prefer backdrops for the cinematic mosaic. Falls back to
+                                    // posters for playlists where items have no backdrop art
+                                    // (e.g. music tracks — albums never carry backgrounds).
+                                    multiPosters={p.backdropUrls && p.backdropUrls.length > 0 ? p.backdropUrls : p.posterUrls}
+                                    imageUrl={
+                                        p.backdropUrls && p.backdropUrls.length > 0
+                                            ? p.backdropUrls[0]
+                                            : (p.posterUrls && p.posterUrls.length > 0 ? p.posterUrls[0] : undefined)
+                                    }
                                     onClick={() => navigate(serverId ? `/server/${serverId}/playlist/${p.id}` : `/playlist/${p.id}`)}
                                     onDelete={(e) => handleDelete(e, p.id, p.name)}
                                     isAdmin={true}

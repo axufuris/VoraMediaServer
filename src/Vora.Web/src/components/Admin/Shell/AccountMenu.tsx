@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { serverVault } from '../../../utils/serverVault';
 import { StorageKeys } from '../../../utils/storageKeys';
+import { disconnectSignalR } from '../../../hooks/useSignalREvent';
 
 export default function AccountMenu() {
     const navigate = useNavigate();
@@ -25,6 +26,7 @@ export default function AccountMenu() {
     const signOut = () => {
         serverVault.clearVault();
         localStorage.removeItem(StorageKeys.profileToken);
+        disconnectSignalR();
         navigate('/');
         window.location.reload();
     };

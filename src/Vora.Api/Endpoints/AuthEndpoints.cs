@@ -42,30 +42,51 @@ public static class AuthEndpoints
     {
         var group = routes.MapGroup("/api/auth").WithTags("Authentication");
 
-        group.MapGet("/setup-status", GetSetupStatusAsync);
-        group.MapPost("/setup", ClaimServerAsync);
+        group.MapGet("/setup-status", GetSetupStatusAsync)
+            .WithName("GetSetupStatus")
+            .Produces<SetupStatusVM>(StatusCodes.Status200OK);
+        group.MapPost("/setup", ClaimServerAsync)
+            .WithName("ClaimServer")
+            .Produces<Vora.Application.Auth.Dtos.AuthResponseDto>(StatusCodes.Status200OK);
         group.MapPost("/login", LoginAsync)
+            .WithName("Login")
+            .Produces<Vora.Application.Auth.Dtos.AuthResponseDto>(StatusCodes.Status200OK)
             .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
         group.MapPost("/register", RegisterAsync)
+            .WithName("Register")
+            .Produces<Vora.Application.Auth.Dtos.AuthResponseDto>(StatusCodes.Status200OK)
             .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
         group.MapPost("/exchange-profile-token", ExchangeProfileTokenAsync)
+            .WithName("ExchangeProfileToken")
+            .Produces<ExchangeProfileTokenResponse>(StatusCodes.Status200OK)
             .RequireRateLimiting(VoraRateLimitPolicies.AuthBurst);
         group.MapPost("/forgot-password", RequestPasswordResetAsync)
+            .WithName("RequestPasswordReset")
+            .Produces(StatusCodes.Status204NoContent)
             .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
         group.MapPost("/reset-password", ConfirmPasswordResetAsync)
+            .WithName("ConfirmPasswordReset")
+            .Produces(StatusCodes.Status204NoContent)
             .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
 
         group.MapPost("/invitations/validate", ValidateInvitationAsync)
+            .WithName("ValidateInvitation")
+            .Produces<ValidateInvitationResponse>(StatusCodes.Status200OK)
             .RequireRateLimiting(VoraRateLimitPolicies.AuthBurst);
 
         group.MapPost("/invite-code", GenerateInviteCodeAsync)
+            .WithName("GenerateInviteCode")
+            .Produces<GenerateInviteCodeResponse>(StatusCodes.Status200OK)
             .RequireAuthorization("AdminOnly");
 
         group.MapGet("/invitations", ListInvitationsAsync)
+            .WithName("ListInvitations")
             .RequireAuthorization("AdminOnly");
         group.MapPost("/invitations", CreateInvitationAsync)
+            .WithName("CreateInvitation")
             .RequireAuthorization("AdminOnly");
         group.MapDelete("/invitations/{id:guid}", RevokeInvitationAsync)
+            .WithName("RevokeInvitation")
             .RequireAuthorization("AdminOnly");
 
         return group;
@@ -76,11 +97,11 @@ public static class AuthEndpoints
         var status = await authManager.GetSetupStatusAsync();
         var settings = await settingsManager.GetServerSettingsAsync();
         var serverSettings = await settingsRepo.GetSettingsAsync();
-        return Results.Ok(new
+        return Results.Ok(new SetupStatusVM
         {
-            status.IsClaimed,
+            IsClaimed = status.IsClaimed,
             RegistrationMode = (int)status.Mode,
-            settings.ServerName,
+            ServerName = settings.ServerName,
             EmailEnabled = serverSettings.EmailEnabled
         });
     }
@@ -94,7 +115,7 @@ public static class AuthEndpoints
         }
         catch (InvalidOperationException ex)
         {
-            return Results.BadRequest(new { ex.Message });
+            return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
     }
 
@@ -113,20 +134,23 @@ public static class AuthEndpoints
         }
         catch (InvalidOperationException ex)
         {
-            return Results.BadRequest(new { ex.Message });
+            return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
     }
 
     private static async Task<IResult> ExchangeProfileTokenAsync([FromQuery] Guid accountId, [FromQuery] Guid profileId, IAuthManager manager)
     {
         var token = await manager.GenerateProfileTokenAsync(accountId, profileId);
-        return token != null ? Results.Ok(new { Token = token }) : Results.Unauthorized();
+        return token != null
+            ? Results.Ok(new ExchangeProfileTokenResponse { Token = token })
+            : Results.Unauthorized();
     }
+
 
     private static async Task<IResult> GenerateInviteCodeAsync(IAuthManager manager)
     {
         var code = await manager.GenerateInviteCodeAsync();
-        return Results.Ok(new { Code = code });
+        return Results.Ok(new GenerateInviteCodeResponse { Code = code });
     }
 
     private static async Task<IResult> RequestPasswordResetAsync([FromBody] ForgotPasswordRequestDto request, IAuthManager manager, HttpContext httpContext, CancellationToken cancellationToken)

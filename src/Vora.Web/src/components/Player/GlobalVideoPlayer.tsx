@@ -420,9 +420,22 @@ export default function GlobalVideoPlayer() {
     const activeAudioTrack = activeStreamPart?.audioTracks?.find((at: AudioTrackType) => at.id === currentMedia.audioTrackId);
     const activeSubtitleTrack = activeStreamPart?.subtitleTracks?.find((st: SubtitleTrackType) => st.id === currentMedia.subtitleTrackId);
 
-    const displayRes = activeStreamPart ? (activeStreamPart.resolution === '2160p' ? '4K' : activeStreamPart.resolution) : (currentMedia.resolution === '2160p' ? '4K' : currentMedia.resolution);
+    // When a transcode is in play, the player gets WHAT THE SERVER
+    // DELIVERS, not the source. The badge has to reflect the output —
+    // otherwise it lies about a 4K HDR → 1080p SDR transcode. Prefer
+    // the session's outputResolution / outputHdrType (set from the
+    // StartStream response) when the video is being transcoded; fall
+    // back to source-side fields only when video strategy is
+    // DirectPlay / DirectStream (source flows through unchanged).
+    const isVideoTranscoded = currentMedia.videoStrategy === 'Transcode';
+    const rawDisplayRes = isVideoTranscoded && currentMedia.outputResolution
+        ? currentMedia.outputResolution
+        : (activeStreamPart ? activeStreamPart.resolution : currentMedia.resolution);
+    const displayRes = rawDisplayRes === '2160p' ? '4K' : rawDisplayRes;
 
-    const displayHdr = activeStreamPart ? activeVideoTrack?.hdrType : currentMedia.hdrType;
+    const displayHdr = isVideoTranscoded && currentMedia.outputHdrType
+        ? currentMedia.outputHdrType
+        : (activeStreamPart ? activeVideoTrack?.hdrType : currentMedia.hdrType);
 
     const displayVideoCodec = currentMedia.videoStrategy === 'Transcode' ? currentMedia.videoCodec : (activeVideoTrack?.codec || currentMedia.videoCodec);
     const displayAudioCodec = currentMedia.audioStrategy === 'Transcode' ? currentMedia.audioCodec : (activeAudioTrack?.codec || currentMedia.audioCodec);

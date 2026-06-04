@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.Iptv;
+using Vora.Application.Iptv.ViewModels;
 
 namespace Vora.Api.Endpoints;
 
@@ -21,10 +22,16 @@ public static class DvrEndpoints
     {
         var group = routes.MapGroup("/api/iptv/dvr").WithTags("DVR").RequireAuthorization().RequireFeature(FeatureGate.Dvr);
 
-        group.MapGet("/sessions/{profileId:guid}", GetSessionsAsync);
-        group.MapPost("/schedule", ScheduleRecordingAsync);
-        group.MapDelete("/sessions/{sessionId:guid}", DeleteSessionAsync);
-        group.MapDelete("/series/{sessionId:guid}", CancelSeriesAsync);
+        group.MapGet("/sessions/{profileId:guid}", GetSessionsAsync)
+            .WithName("GetDvrSessions")
+            .Produces<IEnumerable<IptvRecordingSessionVM>>(StatusCodes.Status200OK);
+        group.MapPost("/schedule", ScheduleRecordingAsync)
+            .WithName("ScheduleDvrRecording")
+            .Produces<ScheduleRecordingResponse>(StatusCodes.Status200OK);
+        group.MapDelete("/sessions/{sessionId:guid}", DeleteSessionAsync)
+            .WithName("DeleteDvrSession");
+        group.MapDelete("/series/{sessionId:guid}", CancelSeriesAsync)
+            .WithName("CancelDvrSeries");
 
         return group;
     }
@@ -33,30 +40,30 @@ public static class DvrEndpoints
     {
         var sessions = await repo.GetSessionsForProfileAsync(profileId);
 
-        var viewModels = sessions.Select(s => new
+        var viewModels = sessions.Select(s => new IptvRecordingSessionVM
         {
-            id = s.Id,
-            title = s.Title,
-            episodeTitle = s.EpisodeTitle,
-            seasonNumber = s.SeasonNumber,
-            episodeNumber = s.EpisodeNumber,
-            startTime = s.StartTime,
-            endTime = s.EndTime,
-            status = s.Status,
-            outputFilePath = s.OutputFilePath,
-            errorMessage = s.ErrorMessage,
-            commercialMarkersJson = s.CommercialMarkersJson,
-            fileSizeBytes = s.FileSizeBytes,
-            externalProgramId = s.ExternalProgramId,
-            schedule = new
+            Id = s.Id,
+            Title = s.Title,
+            EpisodeTitle = s.EpisodeTitle,
+            SeasonNumber = s.SeasonNumber,
+            EpisodeNumber = s.EpisodeNumber,
+            StartTime = s.StartTime,
+            EndTime = s.EndTime,
+            Status = s.Status.ToString(),
+            OutputFilePath = s.OutputFilePath,
+            ErrorMessage = s.ErrorMessage,
+            CommercialMarkersJson = s.CommercialMarkersJson,
+            FileSizeBytes = s.FileSizeBytes,
+            ExternalProgramId = s.ExternalProgramId,
+            Schedule = new IptvRecordingScheduleVM
             {
-                isSeries = s.Schedule?.IsSeriesRecording ?? false,
-                channel = new
+                IsSeries = s.Schedule?.IsSeriesRecording ?? false,
+                Channel = new IptvRecordingChannelVM
                 {
-                    name = s.Schedule?.Channel?.Name ?? "Unknown Channel",
-                    logoUrl = s.Schedule?.Channel?.LogoUrl
-                }
-            }
+                    Name = s.Schedule?.Channel?.Name ?? "Unknown Channel",
+                    LogoUrl = s.Schedule?.Channel?.LogoUrl,
+                },
+            },
         });
 
         return Results.Ok(viewModels);
@@ -89,11 +96,11 @@ public static class DvrEndpoints
                 request.IsSeries,
                 request.KeepMaxEpisodes);
 
-            return Results.Ok(new
+            return Results.Ok(new ScheduleRecordingResponse
             {
-                id = schedule.Id,
-                title = schedule.Title,
-                channelId = schedule.ChannelId
+                Id = schedule.Id,
+                Title = schedule.Title,
+                ChannelId = schedule.ChannelId,
             });
         }
         catch (UnauthorizedAccessException)

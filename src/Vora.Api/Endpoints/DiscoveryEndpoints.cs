@@ -5,6 +5,7 @@ using Vora.Application.Discovery.Requests;
 using Vora.Application.Discovery.ViewModels;
 using Vora.Application.Requests;
 using Vora.Application.Users;
+using Vora.Plugins.Dtos;
 
 namespace Vora.Api.Endpoints;
 
@@ -24,26 +25,60 @@ public static class DiscoveryEndpoints
     {
         var group = routes.MapGroup("/api/discovery").WithTags("Discovery").RequireAuthorization().RequireFeature(FeatureGate.Discover);
 
-        group.MapGet("/config", GetAdminConfigsAsync);
+        group.MapGet("/config", GetAdminConfigsAsync)
+            .WithName("ListDiscoveryConfigs")
+            .Produces<List<DiscoveryRowConfigVM>>(StatusCodes.Status200OK);
         group.MapPut("/config", UpdateAdminConfigsAsync).RequireAuthorization("AdminOnly");
 
-        group.MapGet("/rows/{providerId}/{rowId}/items", GetRowItemsAsync);
-        group.MapGet("/details/{providerId}/{type}/{externalId}", GetItemDetailsAsync);
-        group.MapGet("/actor/{providerId}/{externalId}", GetActorAsync);
-        group.MapGet("/search", SearchAsync);
+        group.MapGet("/rows/{providerId}/{rowId}/items", GetRowItemsAsync)
+            .WithName("ListDiscoveryRowItems")
+            .Produces<IEnumerable<DiscoveryItemVM>>(StatusCodes.Status200OK);
+        group.MapGet("/details/{providerId}/{type}/{externalId}", GetItemDetailsAsync)
+            .WithName("GetDiscoveryItemDetails")
+            .Produces<DiscoveryItemDetailsDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapGet("/actor/{providerId}/{externalId}", GetActorAsync)
+            .WithName("GetDiscoveryActor")
+            .Produces<DiscoveryActorDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapGet("/search", SearchAsync)
+            .WithName("SearchDiscovery")
+            .Produces<IEnumerable<DiscoveryItemVM>>(StatusCodes.Status200OK);
 
-        group.MapGet("/profiles/{profileId:guid}/watchlist", GetWatchlistAsync);
-        group.MapGet("/profiles/{profileId:guid}/watchlist/check", CheckWatchlistAsync);
-        group.MapPost("/profiles/{profileId:guid}/watchlist/toggle", ToggleWatchlistAsync);
+        group.MapGet("/profiles/{profileId:guid}/watchlist", GetWatchlistAsync)
+            .WithName("ListProfileWatchlist")
+            .Produces<IEnumerable<WatchlistItemVM>>(StatusCodes.Status200OK);
+        group.MapGet("/profiles/{profileId:guid}/watchlist/check", CheckWatchlistAsync)
+            .WithName("CheckProfileWatchlist")
+            .Produces<WatchlistStatusVM>(StatusCodes.Status200OK);
+        group.MapPost("/profiles/{profileId:guid}/watchlist/toggle", ToggleWatchlistAsync)
+            .WithName("ToggleProfileWatchlist");
 
-        group.MapGet("/theater/showtimes", GetShowtimesAsync);
-        group.MapGet("/theater/auto-load", IsTheaterAutoLoadEnabledAsync);
+        group.MapGet("/theater/showtimes", GetShowtimesAsync)
+            .WithName("ListMovieShowtimes")
+            .Produces<IEnumerable<TheaterDto>>(StatusCodes.Status200OK);
+        group.MapGet("/theater/auto-load", IsTheaterAutoLoadEnabledAsync)
+            .WithName("GetTheaterAutoLoad")
+            .Produces<bool>(StatusCodes.Status200OK);
 
         return group;
     }
 
-    private static async Task<IResult> GetAdminConfigsAsync(IDiscoveryManager manager) =>
-        Results.Ok(await manager.GetAdminRowConfigsAsync());
+    private static async Task<IResult> GetAdminConfigsAsync(IDiscoveryManager manager)
+    {
+        var configs = await manager.GetAdminRowConfigsAsync();
+        var vms = configs.Select(c => new DiscoveryRowConfigVM
+        {
+            Id = c.Id,
+            RowId = c.RowId,
+            ProviderId = c.ProviderId,
+            Name = c.Name,
+            OrderIndex = c.OrderIndex,
+            IsEnabled = c.IsEnabled,
+            ProviderName = c.ProviderName,
+        }).ToList();
+        return Results.Ok(vms);
+    }
 
     private static async Task<IResult> UpdateAdminConfigsAsync([FromBody] List<DiscoveryRowConfigRequest> configs, IDiscoveryManager manager)
     {
@@ -96,15 +131,29 @@ public static class DiscoveryEndpoints
         return Results.Ok(await manager.SearchAsync(q, cancellationToken));
     }
 
-    private static async Task<IResult> GetWatchlistAsync(Guid profileId, IDiscoveryManager manager) =>
-        Results.Ok(await manager.GetWatchlistAsync(profileId));
+    private static async Task<IResult> GetWatchlistAsync(Guid profileId, IDiscoveryManager manager)
+    {
+        var items = await manager.GetWatchlistAsync(profileId);
+        var vms = items.Select(w => new WatchlistItemVM
+        {
+            Id = w.Id,
+            ProfileId = w.ProfileId,
+            ExternalId = w.ExternalId,
+            ProviderId = w.ProviderId,
+            Type = w.Type,
+            Title = w.Title,
+            PosterUrl = w.PosterUrl,
+            AddedAt = w.AddedAt,
+        }).ToList();
+        return Results.Ok(vms);
+    }
 
     private static async Task<IResult> CheckWatchlistAsync(
         Guid profileId,
         [FromQuery] string externalId,
         [FromQuery] string providerId,
         IDiscoveryManager manager) =>
-        Results.Ok(new { inWatchlist = await manager.CheckWatchlistStatusAsync(profileId, externalId, providerId) });
+        Results.Ok(new WatchlistStatusVM { InWatchlist = await manager.CheckWatchlistStatusAsync(profileId, externalId, providerId) });
 
     private static async Task<IResult> ToggleWatchlistAsync(
         Guid profileId,

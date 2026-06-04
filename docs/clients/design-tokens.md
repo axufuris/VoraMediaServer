@@ -29,20 +29,15 @@ The emitter is `Vora.Web/scripts/emit-tokens.ts`. Run it from `src/Vora.Web/`:
 npm run emit-tokens
 ```
 
-For each theme manifest, the emitter writes two files under `<repo>/dist/tokens/<themeId>/`:
+The emitter writes one combined file per language under `<repo>/dist/tokens/`:
 
 ```
 dist/tokens/
-  vora-default/
-    VoraTokens.swift
-    VoraTokens.kt
-  vora-dark/
-    VoraTokens.swift
-    VoraTokens.kt
-  vora-ocean/
-    VoraTokens.swift
-    VoraTokens.kt
+  VoraTokens.swift   # All themes as members of `enum VoraTheme`
+  VoraTokens.kt      # All themes as members of `object VoraTheme`
 ```
+
+A single file per language (rather than one per theme) avoids container-collision when multiple themes coexist in the same Kotlin/Swift source set. The generated file declares a catalog object — `object VoraThemes` (Kotlin) / `enum VoraThemes` (Swift) — with one static member per theme. Consumers pick a preset via `VoraThemes.VoraDefault` (Kotlin) or `VoraThemes.voraDefault` (Swift), and read the active theme inside a UI tree via the hand-written `VoraTheme.tokens` accessor (Kotlin's `CompositionLocal`, Swift's `EnvironmentValues`).
 
 What the emitter does:
 
@@ -56,15 +51,51 @@ The emitter is self-contained: no external dependencies beyond `tsx` (a Node Typ
 
 ## Workflow
 
-Two reasonable patterns for getting the emitted files into the native repos. Pick one per native repo and stick with it.
+`dist/tokens/` is **gitignored**. Emitted files are build artifacts, not source. Each native client regenerates them on demand from the `ThemeManifest` source in `Vora.Web/src/theme/themes/`.
 
-**Pattern A: commit `dist/tokens/` and have native repos pull this repo as a git source.** Lower friction for the native repos — they grab the latest emitted file and paste it into their tree (or symlink, or copy in their build). Means this repo carries generated files in git history.
+The expected consumption model for each native repo:
 
-**Pattern B: gitignore `dist/tokens/` and have native repos run the emitter themselves.** Cleaner git history here. Native repos need Node + tsx + the `Vora.Web` source tree available at build time. Heavier for the native build pipelines.
+1. The native repo pulls this repo as a **git submodule** (e.g. `submodules/Vora`) — or, for a looser coupling, clones it as a sibling directory and references it via a relative path.
+2. The native repo's build runs `npm install && npm run emit-tokens` inside `submodules/Vora/src/Vora.Web/` (or wherever it lives) as a pre-build step. This produces `submodules/Vora/dist/tokens/<themeId>/VoraTokens.{swift,kt}`.
+3. The native build copies (or symlinks, or includes-by-path) the relevant emitted file into its source tree at the location the rest of the build expects.
 
-Default recommendation is **Pattern A** while there are only one or two consumers — the friction tradeoff favors committing the artifact. Switch to B once a third client appears or CI starts running the emitter as a verification step.
+The build pipeline integration looks roughly like this:
 
-`dist/tokens/` is currently not in the root `.gitignore`. Add it if you switch to Pattern B.
+**Android (Gradle):**
+
+```kotlin
+tasks.register<Exec>("emitTokens") {
+    workingDir = file("$rootDir/submodules/Vora/src/Vora.Web")
+    commandLine("npm", "run", "emit-tokens")
+}
+
+tasks.register<Copy>("syncTokens") {
+    dependsOn("emitTokens")
+    from("$rootDir/submodules/Vora/dist/tokens/VoraTokens.kt")
+    into("$projectDir/src/main/kotlin/com/vora/tokens/")
+}
+
+tasks.compileKotlin {
+    dependsOn("syncTokens")
+}
+```
+
+**Apple (Swift Package Manager build plugin or Run Script Phase):**
+
+A Run Script Phase in Xcode (Build Phases → New Run Script Phase) that executes:
+
+```bash
+pushd "${SRCROOT}/submodules/Vora/src/Vora.Web"
+npm install --silent
+npm run emit-tokens
+popd
+cp "${SRCROOT}/submodules/Vora/dist/tokens/VoraTokens.swift" \
+   "${SRCROOT}/VoraCore/Sources/VoraCore/Tokens/"
+```
+
+Why a submodule rather than copying the manifest into each native repo: drift. If three repos each maintain their own copy of `voraDefault.ts`, they will diverge over time. The submodule means there's exactly one source of truth and every native build pulls from it. The cost is `git submodule update --remote submodules/Vora` as a sync step — small.
+
+Why regenerate on every build rather than committing the output: with three or more consumers, committing generated files becomes constant churn. Every token tweak in `voraDefault.ts` means a commit in the Vora repo *plus* a sync commit in every native repo. With Pattern B, the token change is a one-line commit in the Vora repo and the native repos pick it up on their next build automatically.
 
 ## Consumption — web
 

@@ -39,7 +39,7 @@ public static class CollectionArtworkEndpoints
         return Results.Ok(dto);
     }
 
-    private static async Task<IResult> UploadArtworkAsync(Guid id, [FromForm] IFormFile file, [FromQuery] ArtworkKind kind, ICollectionArtworkService service)
+    private static async Task<IResult> UploadArtworkAsync(Guid id, IFormFile file, [FromQuery] ArtworkKind kind, ICollectionArtworkService service)
     {
         await using var stream = file.OpenReadStream();
         var url = await service.UploadAsync(id, new UploadedFile(stream, file.FileName, file.ContentType), kind);

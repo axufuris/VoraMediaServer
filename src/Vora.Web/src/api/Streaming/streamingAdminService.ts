@@ -28,6 +28,8 @@ export interface NowPlayingSession {
     userName: string;
     resolution?: string;
     hdrType?: string;
+    outputResolution?: string;
+    outputHdrType?: string;
     originalContainer?: string;
     originalVideoCodec?: string;
     originalAudioCodec?: string;

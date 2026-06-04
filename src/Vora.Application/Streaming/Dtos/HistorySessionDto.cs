@@ -35,6 +35,14 @@ public class HistorySessionDto
     public string? OriginalSubtitleCodec { get; set; }
 
     public int BandwidthKbps { get; set; }
+    // Resolution + HDR. The "Source*" variants are the original media
+    // and the "Output*" variants are what was delivered after any
+    // transcode (downscale + tonemap). Both are exposed so the admin
+    // Watch History row can show "4K HDR10 → 1080p SDR" for transcodes.
+    public string? SourceResolution { get; set; }
+    public string? SourceHdrType { get; set; }
+    public string? OutputResolution { get; set; }
+    public string? OutputHdrType { get; set; }
     public string? DecisionLog { get; set; }
 
     public bool IsGrouped { get; set; }

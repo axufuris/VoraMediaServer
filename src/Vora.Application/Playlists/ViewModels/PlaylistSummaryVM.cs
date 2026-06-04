@@ -10,4 +10,5 @@ public class PlaylistSummaryVM
     public int ItemCount { get; set; }
     public PlaylistMediaType MediaType { get; set; } = PlaylistMediaType.Mixed;
     public List<string> PosterUrls { get; set; } = new();
+    public List<string> BackdropUrls { get; set; } = new();
 }
