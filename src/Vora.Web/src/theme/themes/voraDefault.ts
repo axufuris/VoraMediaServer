@@ -37,7 +37,7 @@ export const voraDefault: ThemeManifest = {
             accentSoft: '#fef3c7',
             accentSoftHover: '#fde68a',
             accentText: '#92400e',
-            accentContrast: '#ffffff',
+            accentContrast: '#1c1917',
 
             success500: '#16a34a',
             successSoft: '#dcfce7',

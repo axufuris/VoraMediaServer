@@ -8,6 +8,7 @@ public class LibraryItemVM
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? SortTitle { get; set; }
+    public string? Overview { get; set; }
     public DateTime? ReleaseDate { get; set; }
     public DateTime AddedAt { get; set; }
     public string Type { get; set; } = string.Empty;
@@ -17,6 +18,7 @@ public class LibraryItemVM
     public string? Resolution { get; set; }
     public int? DurationSeconds { get; set; }
     public int? NumberOfSeasons { get; set; }
+    public string? TvShowTitle { get; set; }
     public Guid LibraryId { get; set; }
     public decimal? TimelineOrder { get; set; }
     public bool IsPlayed { get; set; }
@@ -35,8 +37,10 @@ public class LibraryItemVM
             Id = item.Id,
             Title = item.Title,
             SortTitle = item.SortTitle,
+            Overview = item.Overview,
             Type = item is Movie ? "Movie"
                 : item is TvShow ? "TvShow"
+                : item is Season ? "Season"
                 : item is Episode ? "Episode"
                 : "Unknown",
             PosterUrl = item.PosterUrl,
@@ -58,6 +62,7 @@ public class LibraryItemVM
             ThirdPartyRating2 = item.ThirdPartyRating2,
             ThirdPartyRating2Name = item.ThirdPartyRating2Name,
             NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count : (int?)null,
+            TvShowTitle = item is Season ? ((Season)item).TvShow.Title : null,
             Genres = item.Genres.Select(g => g.Name).ToList()
         };
 }

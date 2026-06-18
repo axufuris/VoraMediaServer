@@ -116,119 +116,172 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         await ProcessTvDirectoriesAsync(library.Value, directories, details.ScannerRegex);
     }
 
-    private async Task ProcessMovieDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex)
+    private (Regex titleRegex, Regex resolutionRegex, Regex editionRegex) BuildMovieRegexes(string? customRegex)
     {
         var regexPattern = customRegex ?? @"^(?<Title>.*?(?=\s*\(\d{4}\)|\s*\{|\s*\[|$))(?:\s*\((?<Year>\d{4})\))?(?:\s*\{(?<Provider>imdb|tmdb|tvdb)-(?<ProviderId>[^}]+)\})?";
         var regex = new Regex(regexPattern, RegexOptions.IgnoreCase);
         var resolutionRegex = new Regex(@"(?<Resolution>480p|720p|1080p|4k|2160p)", RegexOptions.IgnoreCase);
-
         var editionRegex = new Regex(@"(?i)\b(Extended|Director'?s\s*Cut|Unrated|Theatrical|Remastered|Ultimate|Final\s*Cut|Special\s*Edition|Collector'?s\s*Edition|Uncut|IMAX\s*Enhanced|IMAX|Alternate|Criterion|Anniversary|Black\s*Chrome|Coda|Definitive|Diamond|Platinum|Producer'?s\s*Cut|Richard\s*Donner|Ulysses|Open\s*Matte)\b", RegexOptions.IgnoreCase);
+        return (regex, resolutionRegex, editionRegex);
+    }
+
+    private async Task ProcessMovieDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex)
+    {
+        var (regex, resolutionRegex, editionRegex) = BuildMovieRegexes(customRegex);
 
         var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
         var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet);
 
         foreach (var filePath in filesToProcess)
         {
-            var fileName = Path.GetFileNameWithoutExtension(filePath);
-            var match = regex.Match(fileName);
-
-            string title = fileName;
-            int? year = null;
-            string? provider = null;
-            string? providerId = null;
-
-            if (match.Success)
-            {
-                title = match.Groups["Title"].Success ? match.Groups["Title"].Value.Trim() : fileName;
-                if (match.Groups["Year"].Success && int.TryParse(match.Groups["Year"].Value, out int parsedYear)) year = parsedYear;
-                if (match.Groups["Provider"].Success) provider = match.Groups["Provider"].Value.ToLower();
-                if (match.Groups["ProviderId"].Success) providerId = match.Groups["ProviderId"].Value;
-            }
-
-            var resMatch = resolutionRegex.Match(fileName);
-            string? resolution = resMatch.Success ? resMatch.Groups["Resolution"].Value.ToLower() : null;
-
-            var edMatch = editionRegex.Match(fileName);
-            string? edition = edMatch.Success ? edMatch.Value.Trim() : null;
-
-            string? tmdbId = provider == "tmdb" ? providerId : null;
-            string? imdbId = provider == "imdb" ? providerId : null;
-            string? tvdbId = provider == "tvdb" ? providerId : null;
-
-            var movieId = await _ingestionService.EnsureMovieAsync(library, title, year, tmdbId, imdbId, tvdbId, edition);
-            await _ingestionService.AddMediaPartAsync(movieId, filePath, resolution);
+            await IngestMovieFileAsync(library, filePath, regex, resolutionRegex, editionRegex);
         }
     }
 
-    private async Task ProcessTvDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex)
+    private async Task<Guid> IngestMovieFileAsync(LibraryHandle library, string filePath, Regex regex, Regex resolutionRegex, Regex editionRegex)
+    {
+        var fileName = Path.GetFileNameWithoutExtension(filePath);
+        var match = regex.Match(fileName);
+
+        string title = fileName;
+        int? year = null;
+        string? provider = null;
+        string? providerId = null;
+
+        if (match.Success)
+        {
+            title = match.Groups["Title"].Success ? match.Groups["Title"].Value.Trim() : fileName;
+            if (match.Groups["Year"].Success && int.TryParse(match.Groups["Year"].Value, out int parsedYear)) year = parsedYear;
+            if (match.Groups["Provider"].Success) provider = match.Groups["Provider"].Value.ToLower();
+            if (match.Groups["ProviderId"].Success) providerId = match.Groups["ProviderId"].Value;
+        }
+
+        var resMatch = resolutionRegex.Match(fileName);
+        string? resolution = resMatch.Success ? resMatch.Groups["Resolution"].Value.ToLower() : null;
+
+        var edMatch = editionRegex.Match(fileName);
+        string? edition = edMatch.Success ? edMatch.Value.Trim() : null;
+
+        string? tmdbId = provider == "tmdb" ? providerId : null;
+        string? imdbId = provider == "imdb" ? providerId : null;
+        string? tvdbId = provider == "tvdb" ? providerId : null;
+
+        var movieId = await _ingestionService.EnsureMovieAsync(library, title, year, tmdbId, imdbId, tvdbId, edition);
+        await _ingestionService.AddMediaPartAsync(movieId, filePath, resolution);
+        return movieId.Value;
+    }
+
+    private (Regex episodeRegex, Regex showFolderRegex, Regex resolutionRegex, Regex editionRegex) BuildTvRegexes(string? customRegex)
     {
         var episodeRegexPattern = customRegex ?? @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*(?<Absolute>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$";
         var episodeRegex = new Regex(episodeRegexPattern, RegexOptions.IgnoreCase);
         var showFolderRegex = new Regex(@"^(?<SeriesTitle>.+?)(?:\s*\((?<Year>\d{4})\))?(?:\s*\[(?<Provider>imdb|tmdb|tvdb)-(?<ProviderId>[^\]]+)\])?$", RegexOptions.IgnoreCase);
         var resolutionRegex = new Regex(@"(?<Resolution>480p|720p|1080p|4k|2160p)", RegexOptions.IgnoreCase);
-
         var editionRegex = new Regex(@"(?i)\b(Extended|Director'?s\s*Cut|Unrated|Theatrical|Remastered|Ultimate|Final\s*Cut|Special\s*Edition|Collector'?s\s*Edition|Uncut|IMAX\s*Enhanced|IMAX|Alternate|Criterion|Anniversary|Black\s*Chrome|Coda|Definitive|Diamond|Platinum|Producer'?s\s*Cut|Richard\s*Donner|Ulysses|Open\s*Matte)\b", RegexOptions.IgnoreCase);
+        return (episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
+    }
+
+    private async Task ProcessTvDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex)
+    {
+        var (episodeRegex, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(customRegex);
 
         var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
         var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet);
 
         foreach (var filePath in filesToProcess)
         {
-            var fileName = Path.GetFileNameWithoutExtension(filePath);
-            var directoryInfo = new DirectoryInfo(Path.GetDirectoryName(filePath)!);
+            await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
+        }
+    }
 
-            var seriesFolderName = directoryInfo.Name.StartsWith("Season", StringComparison.OrdinalIgnoreCase)
-                ? directoryInfo.Parent?.Name ?? directoryInfo.Name
-                : directoryInfo.Name;
+    private async Task<ScanFileResult> IngestTvFileAsync(LibraryHandle library, string filePath, Regex episodeRegex, Regex showFolderRegex, Regex resolutionRegex, Regex editionRegex)
+    {
+        var fileName = Path.GetFileNameWithoutExtension(filePath);
+        var directoryInfo = new DirectoryInfo(Path.GetDirectoryName(filePath)!);
 
-            var showMatch = showFolderRegex.Match(seriesFolderName);
-            string showTitle = showMatch.Success && showMatch.Groups["SeriesTitle"].Success ? showMatch.Groups["SeriesTitle"].Value.Trim() : seriesFolderName;
-            int? showYear = showMatch.Groups["Year"].Success && int.TryParse(showMatch.Groups["Year"].Value, out int y) ? y : null;
-            string? provider = showMatch.Groups["Provider"].Success ? showMatch.Groups["Provider"].Value.ToLower() : null;
-            string? providerId = showMatch.Groups["ProviderId"].Success ? showMatch.Groups["ProviderId"].Value : null;
+        var seriesFolderName = directoryInfo.Name.StartsWith("Season", StringComparison.OrdinalIgnoreCase)
+            ? directoryInfo.Parent?.Name ?? directoryInfo.Name
+            : directoryInfo.Name;
 
-            var epMatch = episodeRegex.Match(fileName);
-            int seasonNumber = 1, episodeNumber = 1;
-            string? episodeTitle = null;
-            DateTime? airDate = null;
+        var showMatch = showFolderRegex.Match(seriesFolderName);
+        string showTitle = showMatch.Success && showMatch.Groups["SeriesTitle"].Success ? showMatch.Groups["SeriesTitle"].Value.Trim() : seriesFolderName;
+        int? showYear = showMatch.Groups["Year"].Success && int.TryParse(showMatch.Groups["Year"].Value, out int y) ? y : null;
+        string? provider = showMatch.Groups["Provider"].Success ? showMatch.Groups["Provider"].Value.ToLower() : null;
+        string? providerId = showMatch.Groups["ProviderId"].Success ? showMatch.Groups["ProviderId"].Value : null;
 
-            if (epMatch.Success)
+        var epMatch = episodeRegex.Match(fileName);
+        int seasonNumber = 1, episodeNumber = 1;
+        string? episodeTitle = null;
+        DateTime? airDate = null;
+
+        if (epMatch.Success)
+        {
+            if (epMatch.Groups["Season"].Success && int.TryParse(epMatch.Groups["Season"].Value, out int s)) seasonNumber = s;
+            if (epMatch.Groups["Episode"].Success && int.TryParse(epMatch.Groups["Episode"].Value, out int e)) episodeNumber = e;
+
+            if (epMatch.Groups["EpisodeTitle"].Success && !string.IsNullOrWhiteSpace(epMatch.Groups["EpisodeTitle"].Value))
             {
-                if (epMatch.Groups["Season"].Success && int.TryParse(epMatch.Groups["Season"].Value, out int s)) seasonNumber = s;
-                if (epMatch.Groups["Episode"].Success && int.TryParse(epMatch.Groups["Episode"].Value, out int e)) episodeNumber = e;
-
-                if (epMatch.Groups["EpisodeTitle"].Success && !string.IsNullOrWhiteSpace(epMatch.Groups["EpisodeTitle"].Value))
-                {
-                    episodeTitle = epMatch.Groups["EpisodeTitle"].Value.Trim(' ', '.', '-');
-                }
-
-                if (epMatch.Groups["AirDate"].Success && DateTime.TryParse(epMatch.Groups["AirDate"].Value, out DateTime parsedDate))
-                {
-                    airDate = parsedDate;
-                }
+                episodeTitle = epMatch.Groups["EpisodeTitle"].Value.Trim(' ', '.', '-');
             }
 
-            var resMatch = resolutionRegex.Match(fileName);
-            string? resolution = resMatch.Success ? resMatch.Groups["Resolution"].Value.ToLower() : null;
-
-            var edMatch = editionRegex.Match(fileName);
-            string? edition = edMatch.Success ? edMatch.Value.Trim() : null;
-
-            string? tmdbId = provider == "tmdb" ? providerId : null;
-            string? imdbId = provider == "imdb" ? providerId : null;
-            string? tvdbId = provider == "tvdb" ? providerId : null;
-
-            var showId = await _ingestionService.EnsureTvShowAsync(library, showTitle, showYear, tmdbId, imdbId, tvdbId);
-            var seasonId = await _ingestionService.EnsureSeasonAsync(library, showId, seasonNumber);
-
-            string finalTitle = string.IsNullOrWhiteSpace(episodeTitle)
-                ? $"{showTitle} - S{seasonNumber:D2}E{episodeNumber:D2}"
-                : episodeTitle;
-
-            var episodeId = await _ingestionService.EnsureEpisodeAsync(library, seasonId, episodeNumber, finalTitle, airDate, edition);
-
-            await _ingestionService.AddMediaPartAsync(episodeId, filePath, resolution);
+            if (epMatch.Groups["AirDate"].Success && DateTime.TryParse(epMatch.Groups["AirDate"].Value, out DateTime parsedDate))
+            {
+                airDate = parsedDate;
+            }
         }
+
+        var resMatch = resolutionRegex.Match(fileName);
+        string? resolution = resMatch.Success ? resMatch.Groups["Resolution"].Value.ToLower() : null;
+
+        var edMatch = editionRegex.Match(fileName);
+        string? edition = edMatch.Success ? edMatch.Value.Trim() : null;
+
+        string? tmdbId = provider == "tmdb" ? providerId : null;
+        string? imdbId = provider == "imdb" ? providerId : null;
+        string? tvdbId = provider == "tvdb" ? providerId : null;
+
+        var showId = await _ingestionService.EnsureTvShowAsync(library, showTitle, showYear, tmdbId, imdbId, tvdbId);
+
+        // Detect a genuinely new season BEFORE ensuring it, so the caller can
+        // map the show's metadata exactly once for a new season (no per-file flood).
+        var newSeason = !await _ingestionService.SeasonExistsAsync(showId, seasonNumber);
+        var seasonId = await _ingestionService.EnsureSeasonAsync(library, showId, seasonNumber);
+
+        string finalTitle = string.IsNullOrWhiteSpace(episodeTitle)
+            ? $"{showTitle} - S{seasonNumber:D2}E{episodeNumber:D2}"
+            : episodeTitle;
+
+        var episodeId = await _ingestionService.EnsureEpisodeAsync(library, seasonId, episodeNumber, finalTitle, airDate, edition);
+
+        await _ingestionService.AddMediaPartAsync(episodeId, filePath, resolution);
+
+        return new ScanFileResult(episodeId.Value, showId.Value, newSeason);
+    }
+
+    public async Task<Guid?> ScanMovieFileAsync(Guid libraryId, string filePath)
+    {
+        if (!_supportedExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return null;
+
+        var library = LibraryHandle.FromGuid(libraryId);
+        var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        if (existing.Contains(filePath) || !File.Exists(filePath)) return null;
+
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        var (regex, resolutionRegex, editionRegex) = BuildMovieRegexes(details.ScannerRegex);
+        return await IngestMovieFileAsync(library, filePath, regex, resolutionRegex, editionRegex);
+    }
+
+    public async Task<ScanFileResult> ScanTvFileAsync(Guid libraryId, string filePath)
+    {
+        if (!_supportedExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return ScanFileResult.None;
+
+        var library = LibraryHandle.FromGuid(libraryId);
+        var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        if (existing.Contains(filePath) || !File.Exists(filePath)) return ScanFileResult.None;
+
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        var (episodeRegex, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(details.ScannerRegex);
+        return await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
     }
 
     private IEnumerable<string> GetNewFilesInDirectories(IEnumerable<string> directories, HashSet<string> existingPaths)

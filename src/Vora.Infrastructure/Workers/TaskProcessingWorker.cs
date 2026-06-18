@@ -29,14 +29,44 @@ public class TaskProcessingWorker : BackgroundService
         {
             await foreach (var task in _taskQueue.DequeueAsync(stoppingToken))
             {
-                _logger.LogInformation("Starting Task: {TaskName}", task.Name);
+                // A task cancelled while still queued has no live token (or a
+                // pre-cancelled one) — skip it instead of running it.
+                var taskToken = _taskQueue.GetTaskCancellationToken(task.Id);
+                if (taskToken == null || taskToken.Value.IsCancellationRequested)
+                {
+                    _logger.LogInformation("Skipping cancelled task: {TaskName} ({TaskId})", task.Name, task.Id);
+                    _taskQueue.RemoveTask(task.Id);
+                    continue;
+                }
 
-                _taskQueue.MarkTaskAsRunning(task.Id);
+                // Link the app-lifetime token with the per-task token so
+                // CancelTask(taskId) actually reaches the running work item.
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, taskToken.Value);
 
                 try
                 {
                     using var scope = _scopeFactory.CreateScope();
-                    await task.WorkItem(stoppingToken, scope.ServiceProvider);
+
+                    // Resolve a friendly display name (e.g. library/media title)
+                    // before marking running, so the UI never shows a raw GUID.
+                    var resolver = _taskQueue.GetTaskNameResolver(task.Id);
+                    if (resolver != null)
+                    {
+                        try
+                        {
+                            var resolved = await resolver(scope.ServiceProvider);
+                            if (!string.IsNullOrWhiteSpace(resolved)) _taskQueue.UpdateTaskName(task.Id, resolved);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Task name resolution failed for {TaskId}", task.Id);
+                        }
+                    }
+
+                    _logger.LogInformation("Starting Task: {TaskName}", task.Name);
+                    _taskQueue.MarkTaskAsRunning(task.Id);
+
+                    await task.WorkItem(linkedCts.Token, scope.ServiceProvider);
                 }
                 catch (OperationCanceledException)
                 {

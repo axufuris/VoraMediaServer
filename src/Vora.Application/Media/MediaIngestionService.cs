@@ -127,6 +127,12 @@ public class MediaIngestionService : IMediaIngestionService
         return new MediaItemHandle(show.Id);
     }
 
+    public async Task<bool> SeasonExistsAsync(MediaItemHandle tvShow, int seasonNumber)
+    {
+        var seasonId = await _repository.GetSeasonIdByNumberAsync(tvShow.Value, seasonNumber);
+        return seasonId.HasValue;
+    }
+
     public async Task<SeasonHandle> EnsureSeasonAsync(LibraryHandle library, MediaItemHandle tvShow, int seasonNumber)
     {
         var libraryId = library.Value;

@@ -18,6 +18,7 @@ public interface IMediaIngestionService
     Task<MediaItemHandle> EnsureTvShowAsync(LibraryHandle library, string title, int? year, ExternalIdSet externalIds)
         => EnsureTvShowAsync(library, title, year, externalIds.TmdbId, externalIds.ImdbId, externalIds.TvdbId);
 
+    Task<bool> SeasonExistsAsync(MediaItemHandle tvShow, int seasonNumber);
     Task<SeasonHandle> EnsureSeasonAsync(LibraryHandle library, MediaItemHandle tvShow, int seasonNumber);
     Task<MediaItemHandle> EnsureEpisodeAsync(LibraryHandle library, SeasonHandle season, int episodeNumber, string title, DateTime? airDate, string? edition = null);
 

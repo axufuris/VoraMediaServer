@@ -205,6 +205,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                     Id = s.MediaItem.Id,
                     Title = s.MediaItem.Title,
                     SortTitle = s.MediaItem.SortTitle,
+                    Overview = s.MediaItem.Overview,
                     Type = "Movie",
                     PosterUrl = s.MediaItem.PosterUrl,
                     BackgroundUrl = s.MediaItem.BackgroundUrl,
@@ -252,6 +253,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                     e.EpisodeNumber,
                     TvShowId = e.Season.TvShowId,
                     TvShowTitle = e.Season.TvShow.Title,
+                    ShowOverview = e.Season.TvShow.Overview,
                     ShowPosterUrl = e.Season.TvShow.PosterUrl,
                     ShowBackgroundUrl = e.Season.TvShow.BackgroundUrl,
                     DurationSeconds = e.Analysis != null && e.Analysis.Duration.HasValue ? (double?)e.Analysis.Duration.Value.TotalSeconds : null
@@ -277,6 +279,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                     e.EpisodeNumber,
                     e.TvShowId,
                     e.TvShowTitle,
+                    e.ShowOverview,
                     e.ShowPosterUrl,
                     e.ShowBackgroundUrl,
                     e.DurationSeconds,
@@ -298,6 +301,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                     {
                         Id = ep.Id,
                         Title = ep.Title,
+                        Overview = ep.ShowOverview,
                         Type = "Episode",
                         PosterUrl = ep.ShowPosterUrl ?? ep.EpisodePosterUrl,
                         BackgroundUrl = ep.ShowBackgroundUrl ?? ep.EpisodeBackdrop,

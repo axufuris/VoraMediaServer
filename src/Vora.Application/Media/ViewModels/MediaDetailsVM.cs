@@ -37,6 +37,7 @@ public class MediaDetailsVM
     public int? EpisodeNumber { get; set; }
     public string? TvShowTitle { get; set; }
     public Guid? TvShowId { get; set; }
+    public Guid? SeasonId { get; set; }
     public List<EpisodeVM> Episodes { get; set; } = new();
     public List<SeasonVM> Seasons { get; set; } = new();
     public List<CastMemberVM> Cast { get; set; } = new();
@@ -114,11 +115,13 @@ public class MediaDetailsVM
                 SeasonNumber = s.SeasonNumber,
                 Title = s.Title,
                 PosterUrl = s.PosterUrl,
-                EpisodeCount = s.EpisodeCount,
+                EpisodeCount = s.Episodes.Count,
                 ServerAdminRating = s.ServerAdminRating
             }).ToList() : new List<SeasonVM>(),
             TvShowId = item is Season ? ((Season)item).TvShowId :
                        item is Episode ? ((Episode)item).Season.TvShowId : null,
+            SeasonId = item is Episode ? ((Episode)item).SeasonId :
+                       item is Season ? item.Id : null,
             TvShowTitle = item is Season ? ((Season)item).TvShow.Title :
                           item is Episode ? ((Episode)item).Season.TvShow.Title : null,
             UpcomingEpisodesJson = item is TvShow ? ((TvShow)item).UpcomingEpisodesJson :

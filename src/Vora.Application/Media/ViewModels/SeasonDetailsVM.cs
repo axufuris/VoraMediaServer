@@ -34,7 +34,7 @@ public class SeasonDetailsVM
             Overview = item.Overview,
             PosterUrl = item.PosterUrl,
             ReleaseDate = item.ReleaseDate,
-            EpisodeCount = ((Season)item).EpisodeCount,
+            EpisodeCount = ((Season)item).Episodes.Count,
             LockedFields = item.LockedFields,
 
             TvShowId = ((Season)item).TvShowId,

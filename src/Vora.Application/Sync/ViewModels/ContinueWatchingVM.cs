@@ -5,6 +5,7 @@ public class ContinueWatchingVM
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? SortTitle { get; set; }
+    public string? Overview { get; set; }
     public string Type { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }

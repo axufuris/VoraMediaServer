@@ -7,6 +7,7 @@ using Vora.Application.Tasks;
 using Vora.Application.Watchers;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Enums;
+using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Libraries;
@@ -18,6 +19,7 @@ public interface ILibraryManager
     Task<MediaLibraryVM?> GetLibraryByIdAsync(Guid id);
     Task UpdateLibraryAsync(Guid id, UpdateLibraryRequest request);
     Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId);
+    Task<ScanFileResult> TriggerFileScanAsync(Guid libraryId, string filePath);
     Task DeleteLibraryAsync(Guid id);
     Task ToggleWatchingAsync(Guid libraryId, bool enable);
 }
@@ -218,6 +220,43 @@ public class LibraryManager : ILibraryManager
             await scanner.ScanMusicLibraryAsync(library.Id);
 
         await notifier.NotifyLibraryUpdatedAsync(library.Id);
+    }
+
+    public async Task<ScanFileResult> TriggerFileScanAsync(Guid libraryId, string filePath)
+    {
+        var library = await _repository.GetProjectedByIdAsync(libraryId, l => new { l.Id, l.Type });
+        if (library == null) return ScanFileResult.None;
+
+        using var scope = _serviceProvider.CreateScope();
+        var notifier = scope.ServiceProvider.GetRequiredService<IClientNotifier>();
+        var settingsRepo = scope.ServiceProvider.GetRequiredService<ISystemSettingsRepository>();
+
+        var settings = await settingsRepo.GetSettingsAsync();
+        var activeScannerId = settings.LocalMediaScannerProviderId;
+
+        var scanners = scope.ServiceProvider.GetServices<ILocalMediaScannerProvider>();
+        var scanner = scanners.FirstOrDefault(s => s.Id == activeScannerId) ?? scanners.FirstOrDefault();
+        if (scanner == null) return ScanFileResult.None;
+
+        ScanFileResult result;
+        if (library.Type == LibraryType.Movie)
+        {
+            var movieId = await scanner.ScanMovieFileAsync(libraryId, filePath);
+            result = new ScanFileResult(movieId, null, false);
+        }
+        else if (library.Type == LibraryType.TvShow)
+        {
+            result = await scanner.ScanTvFileAsync(libraryId, filePath);
+        }
+        else
+        {
+            // Music (and anything else) — the watcher only fires for video
+            // files today; nothing to single-file ingest here.
+            result = ScanFileResult.None;
+        }
+
+        if (result.MediaItemId != null) await notifier.NotifyLibraryUpdatedAsync(libraryId);
+        return result;
     }
 
     public async Task ToggleWatchingAsync(Guid libraryId, bool enable)

@@ -23,6 +23,7 @@ public interface ITaskQueueManager
     void QueueRefreshLibraryMetadata(Guid libraryId, string? libraryName = null, bool forceOverride = false);
     void QueueAnalyzeLibraryMediaContent(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false);
     void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
+    void QueueScanNewFile(Guid libraryId, string filePath);
     void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueAnalyzeMediaItemContent(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueArtworkProviderSwap(Guid libraryId, string libraryName);
@@ -37,8 +38,11 @@ public interface ITaskQueueManager
     void QueueGeneratePosterOverlays(Guid mediaItemId);
     void QueueFullCollectionSync(Guid collectionId, string title, bool hasContentSync, bool hasChronologySort);
     void QueueReevaluateCollectionOrder(Guid collectionId, Guid mediaItemId);
-    Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem);
+    Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null);
     bool CancelTask(Guid taskId);
+    CancellationToken? GetTaskCancellationToken(Guid taskId);
+    void UpdateTaskName(Guid taskId, string name);
+    Func<IServiceProvider, Task<string?>>? GetTaskNameResolver(Guid taskId);
     IAsyncEnumerable<QueuedTaskDto> DequeueAsync(CancellationToken cancellationToken);
     void MarkTaskAsRunning(Guid taskId);
     void RemoveTask(Guid taskId);
@@ -68,19 +72,22 @@ public class TaskQueueManager : ITaskQueueManager
     public void QueueLibraryAdded(Guid libraryId, string? libraryName = null, bool forceOverride = false)
     {
         EnqueueTask($"Auto-Ingest Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, isAdditionTrigger: true));
+            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, isAdditionTrigger: true, ct),
+            libraryName == null ? LibraryLabel(libraryId, "Auto-Ingest Library: {0}") : null);
     }
 
     public void QueueLibraryUpdated(Guid libraryId, string? libraryName = null, bool forceOverride = false)
     {
         EnqueueTask($"Update Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, isAdditionTrigger: false));
+            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, isAdditionTrigger: false, ct),
+            libraryName == null ? LibraryLabel(libraryId, "Update Library: {0}") : null);
     }
 
     public void QueueScanLibrary(Guid libraryId, string? libraryName = null, bool forceOverride = false)
     {
         EnqueueTask($"Scan Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, isAdditionTrigger: false));
+            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, isAdditionTrigger: false, ct),
+            libraryName == null ? LibraryLabel(libraryId, "Scan Library: {0}") : null);
     }
 
     public void QueueRefreshLibraryMetadata(Guid libraryId, string? libraryName = null, bool forceOverride = false)
@@ -128,6 +135,40 @@ public class TaskQueueManager : ITaskQueueManager
             await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId);
 
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, isAdditionTrigger: true);
+        });
+    }
+
+    public void QueueScanNewFile(Guid libraryId, string filePath)
+    {
+        EnqueueTask($"Scan File: {Path.GetFileName(filePath)}", async (ct, sp) =>
+        {
+            var libraryManager = sp.GetRequiredService<ILibraryManager>();
+            var result = await libraryManager.TriggerFileScanAsync(libraryId, filePath);
+            if (result.MediaItemId == null) return;
+            var itemId = result.MediaItemId.Value;
+
+            var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
+            var metadataManager = sp.GetRequiredService<IMetadataManager>();
+            var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
+
+            ct.ThrowIfCancellationRequested();
+            await analyzerManager.TriggerMediaItemFileAnalysisAsync(itemId, null);
+
+            await metadataManager.TriggerMediaItemMetadataRefreshAsync(itemId, false);
+            await metadataManager.TriggerMediaItemArtworkRefreshAsync(itemId, false);
+            await metadataManager.TriggerMediaItemRatingsRefreshAsync(itemId, false);
+
+            // A brand-new season's poster/episode-count come from the parent
+            // show's mapping — refresh the show ONCE, only when a new season was
+            // created, so a season-folder copy doesn't trigger a metadata flood.
+            if (result.NewSeasonCreated && result.ParentShowId.HasValue)
+            {
+                await metadataManager.TriggerMediaItemMetadataRefreshAsync(result.ParentShowId.Value, false);
+            }
+
+            await metadataManager.TriggerActorMetadataRefreshAsync();
+            await overlayManager.GenerateOverlaysForMediaAsync(itemId);
+            await analyzerManager.TriggerMediaItemSilenceDetectionAsync(itemId, null, isAdditionTrigger: true);
         });
     }
 
@@ -181,7 +222,7 @@ public class TaskQueueManager : ITaskQueueManager
             await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, null, forceOverride);
 
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId);
-        });
+        }, LibraryLabel(libraryId, "Refresh Ratings for Library: {0}"));
     }
 
     public void QueueRefreshMediaItemArtwork(Guid mediaItemId, bool forceOverride = false)
@@ -194,7 +235,7 @@ public class TaskQueueManager : ITaskQueueManager
             await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, forceOverride);
 
             await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId);
-        });
+        }, MediaLabel(mediaItemId, "Refresh Artwork for Media Item: {0}"));
     }
 
     public void QueueRefreshArtistArtwork(Guid artistId, string? artistName = null, bool forceOverride = false)
@@ -262,7 +303,7 @@ public class TaskQueueManager : ITaskQueueManager
 
             var notifier = sp.GetRequiredService<IClientNotifier>();
             await notifier.NotifyMediaItemUpdatedAsync(mediaItemId);
-        });
+        }, MediaLabel(mediaItemId, "Generate Poster Overlays: {0}"));
     }
 
     public void QueueFullCollectionSync(Guid collectionId, string title, bool hasContentSync, bool hasChronologySort)
@@ -292,9 +333,9 @@ public class TaskQueueManager : ITaskQueueManager
         });
     }
 
-    public Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem)
+    public Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null)
     {
-        var task = new QueuedTaskDto { Name = name, WorkItem = workItem };
+        var task = new QueuedTaskDto { Name = name, WorkItem = workItem, NameResolver = nameResolver };
         var cts = new CancellationTokenSource();
 
         _taskTokens.TryAdd(task.Id, cts);
@@ -306,6 +347,36 @@ public class TaskQueueManager : ITaskQueueManager
 
         return task.Id;
     }
+
+    public Func<IServiceProvider, Task<string?>>? GetTaskNameResolver(Guid taskId)
+    {
+        return _taskStates.TryGetValue(taskId, out var task) ? task.NameResolver : null;
+    }
+
+    public void UpdateTaskName(Guid taskId, string name)
+    {
+        if (_taskStates.TryGetValue(taskId, out var state) && state.Name != name)
+        {
+            state.Name = name;
+            _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
+        }
+    }
+
+    private static Func<IServiceProvider, Task<string?>> LibraryLabel(Guid libraryId, string format) =>
+        async sp =>
+        {
+            var repo = sp.GetRequiredService<ILibraryRepository>();
+            var name = await repo.GetProjectedByIdAsync(libraryId, l => l.Name);
+            return string.IsNullOrWhiteSpace(name) ? null : string.Format(format, name);
+        };
+
+    private static Func<IServiceProvider, Task<string?>> MediaLabel(Guid mediaItemId, string format) =>
+        async sp =>
+        {
+            var repo = sp.GetRequiredService<IMediaRepository>();
+            var title = await repo.GetProjectedAsync(mediaItemId, m => m.Title);
+            return string.IsNullOrWhiteSpace(title) ? null : string.Format(format, title);
+        };
 
     public void MarkTaskAsRunning(Guid taskId)
     {
@@ -320,12 +391,19 @@ public class TaskQueueManager : ITaskQueueManager
     {
         if (_taskTokens.TryGetValue(taskId, out var cts))
         {
+            // Keep the entry so a still-queued task is observed as cancelled
+            // (and skipped) by the worker, and a running task's linked token —
+            // built from this same source — fires. RemoveTask disposes it.
             cts.Cancel();
-            _taskTokens.TryRemove(taskId, out _);
             _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
             return true;
         }
         return false;
+    }
+
+    public CancellationToken? GetTaskCancellationToken(Guid taskId)
+    {
+        return _taskTokens.TryGetValue(taskId, out var cts) ? cts.Token : (CancellationToken?)null;
     }
 
     public IAsyncEnumerable<QueuedTaskDto> DequeueAsync(CancellationToken cancellationToken)
@@ -375,7 +453,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<IPosterOverlayManager>();
             await manager.RunLibraryOverlaySyncAsync(libraryId);
-        });
+        }, LibraryLabel(libraryId, "Generate Library Poster Overlays: {0}"));
     }
 
     public void QueueIptvEpgSync()
@@ -409,23 +487,34 @@ public class TaskQueueManager : ITaskQueueManager
         });
     }
 
-    private static async Task RunFullLibraryWorkflowAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, bool isAdditionTrigger)
+    private static async Task RunFullLibraryWorkflowAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, bool isAdditionTrigger, CancellationToken ct = default)
     {
         var metadataManager = sp.GetRequiredService<IMetadataManager>();
         var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
         var libraryManager = sp.GetRequiredService<ILibraryManager>();
         var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
+        // The individual trigger methods don't yet take a token, so honour
+        // cancellation between the (long) steps — a cancel stops the workflow
+        // at the next boundary instead of running to completion.
+        ct.ThrowIfCancellationRequested();
         await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId);
+        ct.ThrowIfCancellationRequested();
         await analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName);
 
+        ct.ThrowIfCancellationRequested();
         await metadataManager.TriggerLibraryMetadataRefreshAsync(libraryId, forceOverride: forceOverride);
+        ct.ThrowIfCancellationRequested();
         await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, forceOverride: forceOverride);
+        ct.ThrowIfCancellationRequested();
         await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, forceOverride: forceOverride);
+        ct.ThrowIfCancellationRequested();
         await metadataManager.TriggerActorMetadataRefreshAsync();
 
+        ct.ThrowIfCancellationRequested();
         await overlayManager.RunLibraryOverlaySyncAsync(libraryId);
 
+        ct.ThrowIfCancellationRequested();
         await analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: isAdditionTrigger);
     }
 

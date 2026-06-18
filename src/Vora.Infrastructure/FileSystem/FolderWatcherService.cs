@@ -97,11 +97,11 @@ public class FolderWatcherService : IFolderWatcherService
         if (!SupportedExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return;
 
         await Task.Delay(5000);
-        _logger.LogInformation("New media detected: {FilePath}. Triggering ingestion pipeline.", filePath);
+        _logger.LogInformation("New media detected: {FilePath}. Triggering single-file ingestion.", filePath);
 
         using var scope = _serviceProvider.CreateScope();
         var taskQueue = scope.ServiceProvider.GetRequiredService<ITaskQueueManager>();
-        taskQueue.QueueScanLibrary(libraryId);
+        taskQueue.QueueScanNewFile(libraryId, filePath);
     }
 
     private async Task ProcessFileDeletedAsync(string filePath)
