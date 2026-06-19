@@ -10,6 +10,8 @@ public class ContinueWatchingVM
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
     public DateTime? ReleaseDate { get; set; }
+    public string? ContentRating { get; set; }
+    public List<string> Genres { get; set; } = new();
     public double ResumePositionSeconds { get; set; }
     public double? DurationSeconds { get; set; }
     public Guid? TvShowId { get; set; }

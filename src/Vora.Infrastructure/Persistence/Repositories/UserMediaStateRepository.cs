@@ -210,6 +210,8 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                     PosterUrl = s.MediaItem.PosterUrl,
                     BackgroundUrl = s.MediaItem.BackgroundUrl,
                     ReleaseDate = s.MediaItem.ReleaseDate,
+                    ContentRating = s.MediaItem.ContentRating,
+                    Genres = s.MediaItem.Genres.Select(g => g.Name).ToList(),
                     ResumePositionSeconds = s.ResumePositionSeconds,
                     DurationSeconds = s.MediaItem.Analysis != null && s.MediaItem.Analysis.Duration.HasValue ? (double?)s.MediaItem.Analysis.Duration.Value.TotalSeconds : null,
                 },
@@ -256,6 +258,8 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                     ShowOverview = e.Season.TvShow.Overview,
                     ShowPosterUrl = e.Season.TvShow.PosterUrl,
                     ShowBackgroundUrl = e.Season.TvShow.BackgroundUrl,
+                    ShowContentRating = e.Season.TvShow.ContentRating,
+                    ShowGenres = e.Season.TvShow.Genres.Select(g => g.Name).ToList(),
                     DurationSeconds = e.Analysis != null && e.Analysis.Duration.HasValue ? (double?)e.Analysis.Duration.Value.TotalSeconds : null
                 })
                 .ToListAsync();
@@ -282,6 +286,8 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                     e.ShowOverview,
                     e.ShowPosterUrl,
                     e.ShowBackgroundUrl,
+                    e.ShowContentRating,
+                    e.ShowGenres,
                     e.DurationSeconds,
                     ResumePositionSeconds = resumePositions.TryGetValue(e.Id, out var r) ? r : null
                 })
@@ -306,6 +312,8 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                         PosterUrl = ep.ShowPosterUrl ?? ep.EpisodePosterUrl,
                         BackgroundUrl = ep.ShowBackgroundUrl ?? ep.EpisodeBackdrop,
                         ReleaseDate = ep.ReleaseDate,
+                        ContentRating = ep.ShowContentRating,
+                        Genres = ep.ShowGenres,
                         TvShowId = ep.TvShowId,
                         TvShowTitle = ep.TvShowTitle,
                         SeasonNumber = ep.SeasonNumber,
