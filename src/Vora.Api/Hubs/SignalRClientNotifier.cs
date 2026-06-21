@@ -19,6 +19,9 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
     public Task NotifyMediaItemUpdatedAsync(Guid mediaItemId) =>
         hubContext.Clients.All.SendAsync("MediaItemUpdated", mediaItemId);
 
+    public Task NotifyUserMediaStateUpdatedAsync(Guid profileId) =>
+        hubContext.Clients.Group(VoraHub.ProfileGroupName(profileId)).SendAsync("UserMediaStateUpdated", profileId.ToString());
+
     public Task NotifyMediaAnalysisUpdatedAsync(Guid mediaItemId) =>
         hubContext.Clients.All.SendAsync("MediaAnalysisUpdated", mediaItemId);
 
@@ -69,6 +72,9 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
 
     public Task NotifyClientTemplateConfigurationChangedAsync() =>
         hubContext.Clients.All.SendAsync("ClientTemplateConfigurationChanged");
+
+    public Task NotifyClientTemplateChangedForProfileAsync(Guid profileId) =>
+        hubContext.Clients.Group(VoraHub.ProfileGroupName(profileId)).SendAsync("ClientTemplateConfigurationChanged");
 
     public Task NotifyBackupCreatedAsync(string fileName) =>
         hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("BackupCreated", fileName);

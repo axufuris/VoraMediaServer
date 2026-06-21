@@ -88,6 +88,11 @@ public class UpdateHomeLayoutDto
     public string LayoutJson { get; set; } = string.Empty;
 }
 
+public class HomeLayoutResponse
+{
+    public string? HomeLayoutJson { get; set; }
+}
+
 public static class ProfileEndpoints
 {
     public static IEndpointRouteBuilder MapProfileEndpoints(this IEndpointRouteBuilder routes)
@@ -179,8 +184,12 @@ public static class ProfileEndpoints
             .WithName("SaveDiscoveryLayout")
             .Produces(StatusCodes.Status204NoContent);
 
-        group.MapGet("/home-layout", GetHomeLayoutAsync);
-        group.MapPut("/home-layout", SaveHomeLayoutAsync);
+        group.MapGet("/home-layout", GetHomeLayoutAsync)
+            .WithName("GetHomeLayout")
+            .Produces<HomeLayoutResponse>(StatusCodes.Status200OK);
+        group.MapPut("/home-layout", SaveHomeLayoutAsync)
+            .WithName("SaveHomeLayout")
+            .Produces(StatusCodes.Status204NoContent);
 
         group.MapPut("/settings", SaveClientSettingsAsync)
             .WithName("SaveClientSettings");
@@ -363,7 +372,7 @@ public static class ProfileEndpoints
     private static async Task<IResult> GetHomeLayoutAsync(Guid profileId, string deviceId, IUserManager manager)
     {
         var layout = await manager.GetProfileDeviceHomeLayoutAsync(profileId, deviceId);
-        return Results.Ok(new { HomeLayoutJson = layout });
+        return Results.Ok(new HomeLayoutResponse { HomeLayoutJson = layout });
     }
 
     private static async Task<IResult> SaveHomeLayoutAsync(Guid profileId, string deviceId, [FromBody] UpdateHomeLayoutDto request, IUserManager manager)

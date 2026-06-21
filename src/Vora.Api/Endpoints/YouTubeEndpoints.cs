@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.YouTube;
 using Vora.Application.YouTube.Requests;
+using Vora.Application.YouTube.ViewModels;
 
 namespace Vora.Api.Endpoints;
 
@@ -17,19 +18,29 @@ public static class YouTubeEndpoints
     {
         var group = routes.MapGroup("/api/youtube").WithTags("YouTube").RequireAuthorization();
 
-        group.MapGet("/feed", GetFeedAsync);
-        group.MapGet("/trending", GetTrendingAsync);
-        group.MapGet("/search", SearchAsync);
-        group.MapGet("/channel/{channelId}", GetChannelAsync);
-        group.MapGet("/channel/{channelId}/uploads", GetChannelUploadsAsync);
-        group.MapGet("/channel/{channelId}/playlists", GetChannelPlaylistsAsync);
-        group.MapGet("/video/{videoId}", GetVideoAsync);
+        group.MapGet("/feed", GetFeedAsync)
+            .Produces<YouTubeHomeFeedVM>(StatusCodes.Status200OK);
+        group.MapGet("/trending", GetTrendingAsync)
+            .Produces<List<YouTubeVideoVM>>(StatusCodes.Status200OK);
+        group.MapGet("/search", SearchAsync)
+            .Produces<YouTubeSearchPageVM>(StatusCodes.Status200OK);
+        group.MapGet("/channel/{channelId}", GetChannelAsync)
+            .Produces<YouTubeChannelVM>(StatusCodes.Status200OK);
+        group.MapGet("/channel/{channelId}/uploads", GetChannelUploadsAsync)
+            .Produces<YouTubeSearchPageVM>(StatusCodes.Status200OK);
+        group.MapGet("/channel/{channelId}/playlists", GetChannelPlaylistsAsync)
+            .Produces<List<YouTubePlaylistVM>>(StatusCodes.Status200OK);
+        group.MapGet("/video/{videoId}", GetVideoAsync)
+            .Produces<YouTubeVideoVM>(StatusCodes.Status200OK);
 
-        group.MapGet("/subscriptions", GetSubscriptionsAsync);
-        group.MapPost("/subscriptions", SubscribeAsync);
+        group.MapGet("/subscriptions", GetSubscriptionsAsync)
+            .Produces<List<YouTubeSubscriptionVM>>(StatusCodes.Status200OK);
+        group.MapPost("/subscriptions", SubscribeAsync)
+            .Produces<YouTubeSubscriptionVM>(StatusCodes.Status200OK);
         group.MapDelete("/subscriptions/{channelId}", UnsubscribeAsync);
 
-        group.MapGet("/history", GetHistoryAsync);
+        group.MapGet("/history", GetHistoryAsync)
+            .Produces<List<YouTubeWatchHistoryVM>>(StatusCodes.Status200OK);
         group.MapPost("/history", RecordHistoryAsync);
         group.MapDelete("/history", ClearHistoryAsync);
 

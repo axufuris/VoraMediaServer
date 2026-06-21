@@ -34,6 +34,7 @@ public class UserMediaStateManager : IUserMediaStateManager
         await _repository.SetMediaPlayedStateAsync(mediaItemId, profileId, isPlayed);
 
         await _notifier.NotifyMediaItemUpdatedAsync(mediaItemId);
+        await _notifier.NotifyUserMediaStateUpdatedAsync(profileId);
     }
 
     public async Task<SetMediaRatingResult> SetMediaRatingAsync(Guid mediaItemId, Guid profileId, decimal? rating, bool isAdmin)

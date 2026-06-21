@@ -111,7 +111,8 @@ public static class MusicEndpoints
             .WithName("ListRecentAlbums")
             .Produces<IEnumerable<AlbumVM>>(StatusCodes.Status200OK);
 
-        group.MapPost("/lastfm/auth/start", StartLastFmAuthAsync).RequireAuthorization();
+        group.MapPost("/lastfm/auth/start", StartLastFmAuthAsync).RequireAuthorization()
+            .Produces<LastFmAuthStartVM>(StatusCodes.Status200OK);
         group.MapPost("/lastfm/auth/complete", CompleteLastFmAuthAsync).RequireAuthorization();
         group.MapDelete("/lastfm/auth", DisconnectLastFmAsync).RequireAuthorization();
 
@@ -476,7 +477,7 @@ public static class MusicEndpoints
         if (profileId == null) return Results.Forbid();
         var result = await manager.StartLastFmAuthAsync(cancellationToken);
         if (result == null) return Results.BadRequest(new { error = "Last.fm is not configured. An admin needs to set the API key + secret in the plugin settings." });
-        return Results.Ok(new { token = result.Token, authUrl = result.AuthUrl });
+        return Results.Ok(new LastFmAuthStartVM(result.Token, result.AuthUrl));
     }
 
     private static async Task<IResult> CompleteLastFmAuthAsync([FromBody] CompleteLastFmAuthRequest request, ClaimsPrincipal user, IMusicManager manager, CancellationToken cancellationToken)
@@ -498,6 +499,8 @@ public static class MusicEndpoints
     }
 
     public sealed record CompleteLastFmAuthRequest(string Token);
+
+    public sealed record LastFmAuthStartVM(string Token, string AuthUrl);
 
     private static async Task<IResult> GetRecentlyPlayedAsync([FromQuery] int? limit, ClaimsPrincipal user, IMusicManager manager)
     {

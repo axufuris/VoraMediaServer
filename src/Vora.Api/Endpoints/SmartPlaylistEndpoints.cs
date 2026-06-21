@@ -29,7 +29,8 @@ public static class SmartPlaylistEndpoints
             .RequireAuthorization()
             .WithName("ListSmartPlaylistItems")
             .Produces<SmartPlaylistItemsVM>(StatusCodes.Status200OK);
-        group.MapPost("/preview", PreviewAsync).RequireAuthorization();
+        group.MapPost("/preview", PreviewAsync).RequireAuthorization()
+            .Produces<SmartPlaylistPreviewResultVM>(StatusCodes.Status200OK);
 
         return routes;
     }
@@ -100,7 +101,12 @@ public static class SmartPlaylistEndpoints
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
         var count = await manager.PreviewCountAsync(profileId.Value, BuildFilter(user), request.MediaType, request.Definition ?? new SmartPlaylistDefinition());
-        return Results.Ok(new { count });
+        return Results.Ok(new SmartPlaylistPreviewResultVM { Count = count });
+    }
+
+    public sealed class SmartPlaylistPreviewResultVM
+    {
+        public int Count { get; set; }
     }
 
     public sealed class SmartPlaylistPreviewRequest

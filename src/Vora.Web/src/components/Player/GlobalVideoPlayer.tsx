@@ -30,12 +30,6 @@ const chipStyle: React.CSSProperties = {
     WebkitBackdropFilter: 'blur(8px)',
 };
 
-const accentChipStyle: React.CSSProperties = {
-    background: 'var(--vora-accent-500)',
-    border: '1px solid var(--vora-accent-500)',
-    color: 'var(--vora-accent-contrast)',
-};
-
 const markerBandColors: Record<string, string> = {
     Intro: 'rgba(255, 255, 255, 0.22)',
     Recap: 'rgba(255, 255, 255, 0.22)',
@@ -615,7 +609,7 @@ export default function GlobalVideoPlayer() {
                             )}
 
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
-                                {displayRes && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={accentChipStyle}>{displayRes}</span>}
+                                {displayRes && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={chipStyle}>{displayRes}</span>}
                                 {displayHdr && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={{ ...chipStyle, color: '#facc15', borderColor: 'rgba(234, 179, 8, 0.45)' }}>{displayHdr}</span>}
                                 {displayVideoCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{displayVideoCodec}{currentMedia.videoStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}
                                 {displayAudioCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{displayAudioCodec}{currentMedia.audioStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}

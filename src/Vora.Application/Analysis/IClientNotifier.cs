@@ -9,6 +9,7 @@ public interface IClientNotifier
     Task NotifyCollectionUpdatedAsync(Guid collectionId);
     Task NotifyLibraryUpdatedAsync(Guid libraryId);
     Task NotifyMediaItemUpdatedAsync(Guid mediaItemId);
+    Task NotifyUserMediaStateUpdatedAsync(Guid profileId);
     Task NotifySmartListsUpdatedAsync();
     Task NotifyMediaAnalysisUpdatedAsync(Guid mediaItemId);
     Task NotifyVideoThumbnailsReadyAsync(Guid mediaItemId);
@@ -26,6 +27,7 @@ public interface IClientNotifier
     Task NotifyAdminAlertUnreadChangedAsync();
     Task NotifyAdminThemeChangedAsync(string themeId);
     Task NotifyClientTemplateConfigurationChangedAsync();
+    Task NotifyClientTemplateChangedForProfileAsync(Guid profileId);
     Task NotifyBackupCreatedAsync(string fileName);
     Task NotifyBackupRestoredAsync(string fileName, IReadOnlyList<string> restoredSectionKeys);
     Task NotifyLibraryMigrationUpdatedAsync(LibraryMigrationJobVM job);

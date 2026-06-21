@@ -130,6 +130,7 @@ public class ClientTemplateManager : IClientTemplateManager
         }
 
         await _userRepository.UpdateProfileAsync(profile);
+        await _notifier.NotifyClientTemplateChangedForProfileAsync(profileId);
         return new SetActiveTemplateResponse(templateId, source);
     }
 
@@ -142,6 +143,7 @@ public class ClientTemplateManager : IClientTemplateManager
         profile.ScheduleOverrideTemplateId = null;
         profile.ScheduleOverrideScheduleId = null;
         await _userRepository.UpdateProfileAsync(profile);
+        await _notifier.NotifyClientTemplateChangedForProfileAsync(profileId);
         return true;
     }
 

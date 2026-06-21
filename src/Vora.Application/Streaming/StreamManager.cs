@@ -29,13 +29,15 @@ public class StreamManager : IStreamManager
     private readonly IBestPathDecisionManager _decisionManager;
     private readonly ISystemSettingsRepository _settingsRepo;
     private readonly IStreamingTokenSigner _tokenSigner;
+    private readonly IClientNotifier _notifier;
 
-    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner)
+    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier)
     {
         _repository = repository;
         _decisionManager = decisionManager;
         _settingsRepo = settingsRepo;
         _tokenSigner = tokenSigner;
+        _notifier = notifier;
     }
 
     public async Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null)
@@ -186,6 +188,11 @@ public class StreamManager : IStreamManager
         {
             session.EndedAt = DateTime.UtcNow;
             await _repository.UpdateSessionAsync(session);
+
+            if (session.UserProfileId.HasValue)
+            {
+                await _notifier.NotifyUserMediaStateUpdatedAsync(session.UserProfileId.Value);
+            }
         }
     }
 

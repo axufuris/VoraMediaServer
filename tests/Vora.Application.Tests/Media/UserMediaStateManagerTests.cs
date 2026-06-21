@@ -29,6 +29,7 @@ public class UserMediaStateManagerTests
 
         await _repo.Received(1).SetMediaPlayedStateAsync(mediaId, profileId, true);
         await _notifier.Received(1).NotifyMediaItemUpdatedAsync(mediaId);
+        await _notifier.Received(1).NotifyUserMediaStateUpdatedAsync(profileId);
     }
 
     [Theory]

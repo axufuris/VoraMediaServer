@@ -46,7 +46,8 @@ public static class UserEndpoints
             .WithName("GetUserAccount")
             .Produces<UserVM>(StatusCodes.Status200OK);
 
-        group.MapGet("/{userId:guid}/play-history", GetPlayHistoryAsync);
+        group.MapGet("/{userId:guid}/play-history", GetPlayHistoryAsync)
+            .Produces<PlayHistoryPageVM>(StatusCodes.Status200OK);
 
         group.MapPut("/{userId:guid}", UpdateUserAsync)
             .WithName("UpdateUserAccount")
@@ -88,7 +89,7 @@ public static class UserEndpoints
         if (pageSize < 1 || pageSize > 100) pageSize = 25;
 
         var result = await manager.GetUserPlayHistoryAsync(userId, profileId, page, pageSize, search ?? string.Empty, typeFilter ?? "All");
-        return Results.Ok(new { result.Data, result.Total });
+        return Results.Ok(new PlayHistoryPageVM { Data = result.Data, Total = result.Total });
     }
 
     private static async Task<IResult> UpdateUserAsync(Guid userId, [FromBody] UpdateUserDto request, ClaimsPrincipal user, IUserManager manager)
