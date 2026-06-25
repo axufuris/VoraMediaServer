@@ -41,8 +41,10 @@ public class DiscoveryManagerRowEnrichmentTests
             new() { ExternalId = "603", ProviderId = "tmdb", Title = "The Matrix", Type = "Movie" },
             new() { ExternalId = "604", ProviderId = "tmdb", Title = "The Matrix Reloaded", Type = "Movie" }
         });
-        _mediaRepo.MediaExistsByExternalIdAsync("603", "Movie").Returns(true);
-        _mediaRepo.MediaExistsByExternalIdAsync("604", "Movie").Returns(false);
+        _mediaRepo.GetExistingExternalIdsAsync(Arg.Any<IEnumerable<string>>(), "Movie")
+            .Returns(new HashSet<string> { "603" });
+        _requestRepo.GetRequestsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
+            .Returns(new Dictionary<string, MediaRequest>());
 
         var manager = BuildManager();
         var result = (await manager.GetRowItemsAsync("tmdb", "trending", cancellationToken: TestContext.Current.CancellationToken)).ToList();
@@ -59,15 +61,21 @@ public class DiscoveryManagerRowEnrichmentTests
         {
             new() { ExternalId = "603", ProviderId = "tmdb", Title = "The Matrix", Type = "Movie" }
         });
-        _requestRepo.GetRequestAsync("603", "Movie").Returns(new MediaRequest
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = "603",
-            ProviderId = "tmdb",
-            Type = "Movie",
-            Title = "The Matrix",
-            Status = RequestStatus.Approved
-        });
+        _mediaRepo.GetExistingExternalIdsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
+            .Returns(new HashSet<string>());
+        _requestRepo.GetRequestsAsync(Arg.Any<IEnumerable<string>>(), "Movie")
+            .Returns(new Dictionary<string, MediaRequest>
+            {
+                ["603"] = new MediaRequest
+                {
+                    Id = Guid.NewGuid(),
+                    ExternalId = "603",
+                    ProviderId = "tmdb",
+                    Type = "Movie",
+                    Title = "The Matrix",
+                    Status = RequestStatus.Approved
+                }
+            });
 
         var manager = BuildManager();
         var result = (await manager.GetRowItemsAsync("tmdb", "trending", cancellationToken: TestContext.Current.CancellationToken)).ToList();
@@ -82,7 +90,10 @@ public class DiscoveryManagerRowEnrichmentTests
         {
             new() { ExternalId = "999", ProviderId = "tmdb", Title = "Unrequested", Type = "Movie" }
         });
-        _requestRepo.GetRequestAsync(Arg.Any<string>(), Arg.Any<string>()).Returns((MediaRequest?)null);
+        _mediaRepo.GetExistingExternalIdsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
+            .Returns(new HashSet<string>());
+        _requestRepo.GetRequestsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
+            .Returns(new Dictionary<string, MediaRequest>());
 
         var manager = BuildManager();
         var result = (await manager.GetRowItemsAsync("tmdb", "trending", cancellationToken: TestContext.Current.CancellationToken)).ToList();

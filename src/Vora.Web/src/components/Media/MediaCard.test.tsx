@@ -35,8 +35,16 @@ describe('MediaCard', () => {
         expect(imgs[3].src).toContain('d.jpg');
     });
 
-    it('falls back to single image when multiPosters has fewer than 4 entries', () => {
+    it('renders a 2-image split when multiPosters has exactly 2 entries', () => {
         const { container } = render(<MediaCard {...defaults} multiPosters={['a.jpg', 'b.jpg']} imageUrl="/img/p.jpg" />);
+        const imgs = container.querySelectorAll('img');
+        expect(imgs).toHaveLength(2);
+        expect(imgs[0].src).toContain('a.jpg');
+        expect(imgs[1].src).toContain('b.jpg');
+    });
+
+    it('falls back to single image when multiPosters has fewer than 2 entries', () => {
+        const { container } = render(<MediaCard {...defaults} multiPosters={['a.jpg']} imageUrl="/img/p.jpg" />);
         const imgs = container.querySelectorAll('img');
         expect(imgs).toHaveLength(1);
         expect(imgs[0].src).toContain('p.jpg');

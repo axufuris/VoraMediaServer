@@ -201,8 +201,6 @@ export default function ManageLibrary() {
     const [ratingProviders, setRatingProviders] = useState<PluginOptionVM[]>([]);
     const [artworkProviders, setArtworkProviders] = useState<PluginOptionVM[]>([]);
 
-    const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
-    const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
 
     useEffect(() => {
         if (id) {
@@ -229,10 +227,10 @@ export default function ManageLibrary() {
         );
     }
 
-    const showAlert = (title: string, message: string) => setAlertModal({ isOpen: true, title, message });
-    const showConfirm = (title: string, message: string, onConfirm: () => void) => setConfirmModal({ isOpen: true, title, message, onConfirm });
-    const closeAlert = () => setAlertModal({ ...alertModal, isOpen: false });
-    const closeConfirm = () => setConfirmModal({ ...confirmModal, isOpen: false });
+    const showAlert = (title: string, message: string) => { void dialog.alert({ title, message }); };
+    const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+        void dialog.confirm({ title, message, tone: 'danger', confirmText: 'Confirm delete' }).then((ok) => { if (ok) onConfirm(); });
+    };
 
     const handleChange = <K extends keyof MediaLibrary>(field: K, value: MediaLibrary[K]) => {
         setLibrary({ ...library, [field]: value });
@@ -579,36 +577,6 @@ export default function ManageLibrary() {
                 </div>
             </div>
 
-            {alertModal.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--vora-bg-overlay)] backdrop-blur-sm p-4" onClick={closeAlert}>
-                    <div className="vora-card shadow-[var(--vora-shadow-overlay)] p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-base font-semibold text-[var(--vora-text-primary)] mb-2">{alertModal.title}</h3>
-                        <p className="text-sm text-[var(--vora-text-secondary)] mb-6 whitespace-pre-wrap">{alertModal.message}</p>
-                        <div className="flex justify-end">
-                            <button type="button" onClick={closeAlert} className="vora-button-primary">OK</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {confirmModal.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--vora-bg-overlay)] backdrop-blur-sm p-4" onClick={closeConfirm}>
-                    <div className="vora-card shadow-[var(--vora-shadow-overlay)] p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-base font-semibold text-[var(--vora-text-primary)] mb-2">{confirmModal.title}</h3>
-                        <p className="text-sm text-[var(--vora-text-secondary)] mb-6 whitespace-pre-wrap">{confirmModal.message}</p>
-                        <div className="flex justify-end gap-3">
-                            <button type="button" onClick={closeConfirm} className="vora-button-secondary">Cancel</button>
-                            <button
-                                type="button"
-                                onClick={() => { confirmModal.onConfirm(); closeConfirm(); }}
-                                className="px-5 py-2 rounded-[var(--vora-radius-md)] text-sm font-semibold text-white bg-[var(--vora-danger-500)] hover:bg-[var(--vora-danger-text)] transition-colors cursor-pointer"
-                            >
-                                Confirm delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

@@ -31,6 +31,7 @@ export default function RegisterPage() {
     const [displayName, setDisplayName] = useState('');
     const [secretCode, setSecretCode] = useState('');
     const [error, setError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         const probe = async () => {
@@ -59,7 +60,9 @@ export default function RegisterPage() {
 
     const handleRegister = async (e: React.SyntheticEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
         setError('');
+        setIsSubmitting(true);
         try {
             const res = await authService.register(email, password, displayName, secretCode || undefined, inviteToken || undefined);
 
@@ -73,6 +76,7 @@ export default function RegisterPage() {
             } else {
                 setError('An unexpected error occurred.');
             }
+            setIsSubmitting(false);
         }
     };
 
@@ -225,8 +229,8 @@ export default function RegisterPage() {
                     <label className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Password</label>
                     <input required type="password" minLength={6} value={password} onChange={e => setPassword(e.target.value)} className="vora-input w-full" />
                 </div>
-                <button type="submit" className="vora-button-primary w-full cursor-pointer mt-4">
-                    Register
+                <button type="submit" disabled={isSubmitting} className="vora-button-primary w-full cursor-pointer mt-4 disabled:opacity-70 disabled:cursor-not-allowed">
+                    {isSubmitting ? 'Creating account…' : 'Register'}
                 </button>
             </form>
 

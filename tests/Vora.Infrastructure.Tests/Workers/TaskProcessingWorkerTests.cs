@@ -48,6 +48,9 @@ public class TaskProcessingWorkerTests
         var controlled = new ControlledQueue();
         queue.DequeueAsync(Arg.Any<CancellationToken>())
             .Returns(call => controlled.DequeueAsync(call.Arg<CancellationToken>()));
+        // The worker skips tasks whose per-task token is null/cancelled. Hand back
+        // a live (non-cancelled) token so enqueued work items actually run.
+        queue.GetTaskCancellationToken(Arg.Any<Guid>()).Returns(CancellationToken.None);
         var scopes = new FakeScopeFactory();
         var worker = new TaskProcessingWorker(queue, scopes, NullLogger<TaskProcessingWorker>.Instance);
         return (worker, queue, scopes, controlled);

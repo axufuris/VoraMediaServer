@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Podcasts.ViewModels;
@@ -467,6 +469,8 @@ public class PodcastManager : IPodcastManager
 
     private async Task<PodcastFeedResult> FetchAndParseFeedAsync(string feedUrl)
     {
+        await EnsureFeedUrlIsSafeAsync(feedUrl);
+
         var client = _httpClientFactory.CreateClient(HttpClientName);
         using var response = await client.GetAsync(feedUrl);
         response.EnsureSuccessStatusCode();
@@ -478,6 +482,59 @@ public class PodcastManager : IPodcastManager
 
         var xml = await response.Content.ReadAsStringAsync();
         return PodcastFeedParser.Parse(xml);
+    }
+
+    private static async Task EnsureFeedUrlIsSafeAsync(string feedUrl)
+    {
+        if (!Uri.TryCreate(feedUrl, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new InvalidOperationException("The feed URL must be a valid http or https address.");
+        }
+
+        IPAddress[] addresses;
+        try
+        {
+            addresses = await Dns.GetHostAddressesAsync(uri.DnsSafeHost);
+        }
+        catch
+        {
+            throw new InvalidOperationException("The feed URL could not be resolved.");
+        }
+
+        if (addresses.Length == 0 || addresses.Any(IsDisallowedAddress))
+        {
+            throw new InvalidOperationException("The feed URL points to a disallowed address.");
+        }
+    }
+
+    private static bool IsDisallowedAddress(IPAddress address)
+    {
+        var ip = address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
+
+        if (IPAddress.IsLoopback(ip)) return true;
+
+        if (ip.AddressFamily == AddressFamily.InterNetwork)
+        {
+            var b = ip.GetAddressBytes();
+            if (b[0] == 0) return true;
+            if (b[0] == 10) return true;
+            if (b[0] == 127) return true;
+            if (b[0] == 169 && b[1] == 254) return true;
+            if (b[0] == 172 && b[1] >= 16 && b[1] <= 31) return true;
+            if (b[0] == 192 && b[1] == 168) return true;
+            return false;
+        }
+
+        if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            if (ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal) return true;
+            var b = ip.GetAddressBytes();
+            if ((b[0] & 0xFE) == 0xFC) return true;
+            return false;
+        }
+
+        return true;
     }
 
     private async Task<int> UpsertFeedEpisodesAsync(Guid showId, PodcastFeedResult feed)

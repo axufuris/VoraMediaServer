@@ -172,9 +172,9 @@ public static class MusicEndpoints
         group.MapPost("/playback/stop", StopPlaybackAsync).RequireAuthorization();
         group.MapGet("/playback/active", GetActivePlaybackAsync).RequireAuthorization();
 
-        var adminGroup = routes.MapGroup("/api/admin/music").WithTags("AdminMusic");
-        adminGroup.MapGet("/history", GetAdminMusicHistoryAsync).RequireAuthorization();
-        adminGroup.MapGet("/summary", GetAdminMusicSummaryAsync).RequireAuthorization();
+        var adminGroup = routes.MapGroup("/api/admin/music").WithTags("AdminMusic").RequireAuthorization("AdminOnly");
+        adminGroup.MapGet("/history", GetAdminMusicHistoryAsync);
+        adminGroup.MapGet("/summary", GetAdminMusicSummaryAsync);
 
         return routes;
     }

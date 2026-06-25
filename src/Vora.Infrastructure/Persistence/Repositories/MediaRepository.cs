@@ -168,6 +168,7 @@ public partial class MediaRepository : IMediaRepository
             .Include(m => ((TvShow)m).Networks)
             .Include(m => ((TvShow)m).Seasons)
             .Include(m => ((Episode)m).Season).ThenInclude(s => s.TvShow).ThenInclude(t => t.Cast).ThenInclude(c => c.Actor)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id);
     }
 

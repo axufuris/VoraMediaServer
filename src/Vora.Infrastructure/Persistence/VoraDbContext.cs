@@ -241,6 +241,7 @@ public class VoraDbContext : DbContext
             entity.HasIndex(e => e.TmdbId).HasFilter("\"TmdbId\" IS NOT NULL");
             entity.HasIndex(e => e.ImdbId).HasFilter("\"ImdbId\" IS NOT NULL");
             entity.HasIndex(e => e.TvdbId).HasFilter("\"TvdbId\" IS NOT NULL");
+            entity.HasIndex("LibraryId", "MediaType");
         });
 
         modelBuilder.Entity<TvShow>(entity =>
@@ -1106,6 +1107,7 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.Quality).HasMaxLength(64);
 
             entity.HasIndex(e => new { e.UserId, e.StartedAt }).HasFilter("\"EndedAt\" IS NULL");
+            entity.HasIndex(e => e.LastPingAt).HasFilter("\"EndedAt\" IS NULL");
         });
     }
 

@@ -11,6 +11,7 @@ export default function SetupPage() {
     const [password, setPassword] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [error, setError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const getTargetUrl = () => {
         const pending = sessionStorage.getItem(SessionKeys.pendingServerUrl);
@@ -33,7 +34,9 @@ export default function SetupPage() {
 
     const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
         setError('');
+        setIsSubmitting(true);
         try {
             const targetUrl = getTargetUrl();
             const auth = await authService.setupServerAt(targetUrl, email, password, displayName);
@@ -52,6 +55,7 @@ export default function SetupPage() {
             } else {
                 setError('An unexpected error occurred.');
             }
+            setIsSubmitting(false);
         }
     };
 
@@ -83,8 +87,8 @@ export default function SetupPage() {
                     <label className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Password</label>
                     <input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="vora-input w-full" />
                 </div>
-                <button type="submit" className="vora-button-primary w-full cursor-pointer mt-4">
-                    Create Admin Account
+                <button type="submit" disabled={isSubmitting} className="vora-button-primary w-full cursor-pointer mt-4 disabled:opacity-70 disabled:cursor-not-allowed">
+                    {isSubmitting ? 'Claiming server…' : 'Create Admin Account'}
                 </button>
             </form>
         </AuthLayout>

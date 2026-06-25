@@ -79,9 +79,9 @@ public static class PodcastEndpoints
         {
             return Results.BadRequest(new { error = ex.Message });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return Results.BadRequest(new { error = $"Failed to fetch or parse feed: {ex.Message}" });
+            return Results.BadRequest(new { error = "Failed to fetch or parse the podcast feed. Check the URL and try again." });
         }
     }
 
@@ -147,9 +147,9 @@ public static class PodcastEndpoints
         {
             return Results.BadRequest(new { error = ex.Message });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return Results.BadRequest(new { error = $"Failed to fetch or parse feed: {ex.Message}" });
+            return Results.BadRequest(new { error = "Failed to fetch or parse the podcast feed. Check the URL and try again." });
         }
     }
 
@@ -175,9 +175,9 @@ public static class PodcastEndpoints
         {
             return Results.NotFound();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return Results.BadRequest(new { error = $"Refresh failed: {ex.Message}" });
+            return Results.BadRequest(new { error = "Failed to refresh the podcast feed. Please try again later." });
         }
     }
 

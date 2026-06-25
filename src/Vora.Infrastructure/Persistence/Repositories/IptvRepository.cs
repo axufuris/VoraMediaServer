@@ -324,21 +324,10 @@ public class IptvRepository : IIptvRepository
 
     public async Task<long> GetDvrUsageBytesAsync(Guid userId)
     {
-        var paths = await _context.IptvRecordingSessions
+        return await _context.IptvRecordingSessions
             .AsNoTracking()
-            .Where(s => s.Schedule.UserId == userId && s.Status == IptvRecordingSessionStatus.Completed && s.OutputFilePath != null)
-            .Select(s => s.OutputFilePath!)
-            .ToListAsync();
-
-        long totalBytes = 0;
-        foreach (var path in paths)
-        {
-            if (File.Exists(path))
-            {
-                totalBytes += new FileInfo(path).Length;
-            }
-        }
-        return totalBytes;
+            .Where(s => s.Schedule.UserId == userId && s.Status == IptvRecordingSessionStatus.Completed && s.FileSizeBytes > 0)
+            .SumAsync(s => (long?)s.FileSizeBytes) ?? 0;
     }
 
     public async Task<long> GetDvrTotalUsageBytesAsync()

@@ -16,6 +16,7 @@ public interface IUserManager
     Task UpdateUserAccountAsync(Guid userId, Guid callingAccountId, bool callerIsAdmin, string email, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null);
     Task UpdateManagedProfileAsync(Guid profileId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, string? showtimesLocation);
     Task DeleteManagedProfileAsync(Guid profileId);
+    Task<bool> AccountOwnsProfileAsync(Guid accountId, Guid profileId);
     Task UpdateUserAccessAsync(Guid userId, bool hasAllLibraryAccess, List<Guid> allowedLibraries, bool canRequest, bool autoApprove, bool enableAiRecommendations, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, bool canRecordLiveTv, long dvrStorageQuotaBytes, bool canTimeshiftIptv, bool canAddCustomPodcastFeeds);
     Task<(List<UserProfileHistoryDto> Data, int Total)> GetUserPlayHistoryAsync(Guid userId, Guid? profileId, int page, int pageSize, string search, string typeFilter);
 
@@ -52,6 +53,12 @@ public class UserManager(
 
     public Task<UserVM?> GetUserAccountAsync(Guid userId) =>
         repository.GetProjectedUserByIdAsync(userId, UserVM.Projection);
+
+    public async Task<bool> AccountOwnsProfileAsync(Guid accountId, Guid profileId)
+    {
+        var ownerId = await repository.GetProjectedProfileByIdAsync(profileId, p => p.UserId);
+        return ownerId == accountId;
+    }
 
     public async Task<bool> ValidateProfilePinAsync(Guid profileId, string pin)
     {

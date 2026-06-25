@@ -104,7 +104,8 @@ public static class ProfileEndpoints
 
     private static void MapManagedProfileEndpoints(IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/api/users").WithTags("Profiles").RequireAuthorization();
+        var group = routes.MapGroup("/api/users").WithTags("Profiles").RequireAuthorization()
+            .AddEndpointFilter<AccountOwnershipFilter>();
 
         group.MapPost("/{userId:guid}/profiles", CreateProfileAsync)
             .WithName("CreateProfile")
@@ -152,7 +153,8 @@ public static class ProfileEndpoints
     {
         var group = routes.MapGroup("/api/users/profiles/{profileId:guid}/devices/{deviceId}")
             .WithTags("Profile Device Preferences")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<AccountOwnershipFilter>();
 
         group.MapGet("/nav", GetNavPrefsAsync)
             .WithName("GetNavPrefs")

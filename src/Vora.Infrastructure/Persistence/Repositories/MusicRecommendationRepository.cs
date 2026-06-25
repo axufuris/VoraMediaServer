@@ -440,12 +440,13 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
 
     public async Task<List<int>> GetYearsWithHistoryAsync(Guid profileId)
     {
-        var dates = await _context.TrackPlayHistory
+        return await _context.TrackPlayHistory
             .AsNoTracking()
             .Where(p => p.ProfileId == profileId)
-            .Select(p => p.PlayedAt)
+            .Select(p => p.PlayedAt.Year)
+            .Distinct()
+            .OrderByDescending(y => y)
             .ToListAsync();
-        return dates.Select(d => d.Year).Distinct().OrderByDescending(y => y).ToList();
     }
 
     public async Task<List<ArtistSimilarity>> GetSimilaritiesAsync(Guid artistId)

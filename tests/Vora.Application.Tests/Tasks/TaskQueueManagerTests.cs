@@ -148,11 +148,17 @@ public class TaskQueueManagerTests
     }
 
     [Fact]
-    public async Task CancelTask_removes_token_so_a_second_cancel_returns_false()
+    public async Task CancelTask_keeps_token_until_RemoveTask_then_returns_false()
     {
         var id = _queue.EnqueueTask("alpha", (ct, sp) => Task.CompletedTask);
 
+        // CancelTask intentionally keeps the entry so a still-queued task is
+        // observed as cancelled (and skipped) by the worker; a repeat cancel
+        // still finds it. RemoveTask is what disposes and evicts the token.
         _queue.CancelTask(id).Should().BeTrue();
+        _queue.CancelTask(id).Should().BeTrue();
+
+        _queue.RemoveTask(id);
         _queue.CancelTask(id).Should().BeFalse();
 
         await Task.CompletedTask;

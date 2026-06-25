@@ -240,10 +240,21 @@ public class UserMediaStateRepository : IUserMediaStateRepository
 
         if (candidateShowIds.Count > 0)
         {
-            var candidateEpisodes = await _context.Set<Episode>()
+            var unplayedKeys = await _context.Set<Episode>()
                 .AsNoTracking()
                 .Where(e => candidateShowIds.Contains(e.Season.TvShowId))
                 .Where(e => !_context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == e.Id && (s.IsPlayed || s.IsHiddenFromContinueWatching)))
+                .Select(e => new { e.Id, TvShowId = e.Season.TvShowId, SeasonNumber = e.Season.SeasonNumber, e.EpisodeNumber })
+                .ToListAsync();
+
+            var nextEpisodeIds = unplayedKeys
+                .GroupBy(e => e.TvShowId)
+                .Select(g => g.OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).First().Id)
+                .ToList();
+
+            var candidateEpisodes = await _context.Set<Episode>()
+                .AsNoTracking()
+                .Where(e => nextEpisodeIds.Contains(e.Id))
                 .Select(e => new
                 {
                     e.Id,

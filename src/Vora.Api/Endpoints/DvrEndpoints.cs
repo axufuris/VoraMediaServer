@@ -20,7 +20,8 @@ public static class DvrEndpoints
 {
     public static RouteGroupBuilder MapDvrEndpoints(this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/api/iptv/dvr").WithTags("DVR").RequireAuthorization().RequireFeature(FeatureGate.Dvr);
+        var group = routes.MapGroup("/api/iptv/dvr").WithTags("DVR").RequireAuthorization().RequireFeature(FeatureGate.Dvr)
+            .AddEndpointFilter<AccountOwnershipFilter>();
 
         group.MapGet("/sessions/{profileId:guid}", GetSessionsAsync)
             .WithName("GetDvrSessions")
@@ -109,16 +110,27 @@ public static class DvrEndpoints
         }
     }
 
-    private static async Task<IResult> DeleteSessionAsync(Guid sessionId, IDvrManager dvrManager)
+    private static async Task<IResult> DeleteSessionAsync(Guid sessionId, ClaimsPrincipal user, IIptvRepository repo, IDvrManager dvrManager)
     {
+        if (!await CallerOwnsSessionAsync(user, sessionId, repo)) return Results.Forbid();
         await dvrManager.DeleteRecordingAsync(sessionId);
         return Results.NoContent();
     }
 
-    private static async Task<IResult> CancelSeriesAsync(Guid sessionId, IDvrManager dvrManager)
+    private static async Task<IResult> CancelSeriesAsync(Guid sessionId, ClaimsPrincipal user, IIptvRepository repo, IDvrManager dvrManager)
     {
+        if (!await CallerOwnsSessionAsync(user, sessionId, repo)) return Results.Forbid();
         await dvrManager.CancelSeriesAsync(sessionId);
         return Results.NoContent();
+    }
+
+    private static async Task<bool> CallerOwnsSessionAsync(ClaimsPrincipal user, Guid sessionId, IIptvRepository repo)
+    {
+        if (user.IsAdmin()) return true;
+        var accountId = user.GetAccountId();
+        if (accountId == null) return false;
+        var session = await repo.GetSessionByIdAsync(sessionId);
+        return session?.Schedule?.UserId == accountId.Value;
     }
 
     private static async Task<bool> HasDvrQuotaCapacityAsync(Guid profileId, IIptvRepository repo)

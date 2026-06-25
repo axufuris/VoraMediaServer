@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Vora.Api.Extensions;
 using Vora.Application.Providers;
 using Vora.Application.Providers.ViewModels;
 
@@ -16,7 +17,8 @@ public static class ProviderEndpoints
 {
     public static RouteGroupBuilder MapProviderEndpoints(this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/api/users/{userId:guid}/providers").WithTags("External Providers").RequireAuthorization();
+        var group = routes.MapGroup("/api/users/{userId:guid}/providers").WithTags("External Providers").RequireAuthorization()
+            .AddEndpointFilter<AccountOwnershipFilter>();
 
         group.MapGet("/", GetUserConnectionsAsync)
             .Produces<IEnumerable<ProviderConnectionVM>>(StatusCodes.Status200OK);

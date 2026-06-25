@@ -19,6 +19,7 @@ export default function SmartListsPage() {
     const [collections, setCollections] = useState<CollectionSummary[]>([]);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isSystemList, setIsSystemList] = useState(false);
     const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -111,6 +112,7 @@ export default function SmartListsPage() {
 
     const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
+        if (saving) return;
 
         const rules: SmartListRulesDto = {};
         if (mediaTypes.length > 0) rules.mediaTypes = mediaTypes;
@@ -126,11 +128,18 @@ export default function SmartListsPage() {
             displayOrder: existingList ? existingList.displayOrder : lists.length,
         };
 
-        if (editingId) await smartListService.updateList(editingId, payload, serverId);
-        else await smartListService.createList(payload, serverId);
+        setSaving(true);
+        try {
+            if (editingId) await smartListService.updateList(editingId, payload, serverId);
+            else await smartListService.createList(payload, serverId);
 
-        setIsModalOpen(false);
-        refreshLists();
+            setIsModalOpen(false);
+            refreshLists();
+        } catch {
+            await dialog.alert('Failed to save the smart list. Please try again.');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const getListType = (list: SmartListAdminDto) => {
@@ -385,7 +394,7 @@ export default function SmartListsPage() {
 
                             <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-[var(--vora-border-subtle)]">
                                 <button type="button" onClick={() => setIsModalOpen(false)} className="vora-button-secondary">Cancel</button>
-                                <button type="submit" className="vora-button-primary">Save list</button>
+                                <button type="submit" disabled={saving} className="vora-button-primary disabled:opacity-70 disabled:cursor-not-allowed">{saving ? 'Saving…' : 'Save list'}</button>
                             </div>
                         </form>
                     </div>
