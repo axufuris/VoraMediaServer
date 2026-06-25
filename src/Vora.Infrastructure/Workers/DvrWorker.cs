@@ -27,7 +27,14 @@ public class DvrWorker : BackgroundService
         {
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
-                await ProcessRecordingsAsync(stoppingToken);
+                try
+                {
+                    await ProcessRecordingsAsync(stoppingToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError(ex, "[DVR Scheduler] Error during recording scheduler pass.");
+                }
             }
         }
         catch (OperationCanceledException)

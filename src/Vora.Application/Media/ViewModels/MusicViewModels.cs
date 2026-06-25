@@ -1,5 +1,10 @@
 namespace Vora.Application.Media.ViewModels;
 
+public class MusicStreamUrlResponse
+{
+    public string Url { get; set; } = string.Empty;
+}
+
 public class ArtistVM
 {
     public Guid Id { get; set; }

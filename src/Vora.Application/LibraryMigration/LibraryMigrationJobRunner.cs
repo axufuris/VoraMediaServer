@@ -16,6 +16,9 @@ public interface ILibraryMigrationJobRunner
 
 public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
 {
+    private static readonly TimeSpan CompletedJobRetention = TimeSpan.FromHours(1);
+    private static readonly TimeSpan MaxJobAge = TimeSpan.FromHours(24);
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<LibraryMigrationJobRunner> _logger;
     private readonly ConcurrentDictionary<Guid, LibraryMigrationJobVM> _jobs = new();
@@ -29,6 +32,8 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
 
     public LibraryMigrationJobVM StartJob(LibraryMigrationJobInput input)
     {
+        PruneStaleJobs();
+
         var jobId = Guid.NewGuid();
         var users = input.Mappings
             .Select(m => new LibraryMigrationUserStatusVM
@@ -330,6 +335,24 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             if (!string.IsNullOrEmpty(id)) set.Add(id);
         }
         return set.ToList();
+    }
+
+    private void PruneStaleJobs()
+    {
+        var now = DateTime.UtcNow;
+        foreach (var kvp in _jobs)
+        {
+            var job = kvp.Value;
+            var terminal = job.State is LibraryMigrationJobState.Completed or LibraryMigrationJobState.Failed;
+            var retentionExpired = terminal && job.CompletedAt.HasValue && now - job.CompletedAt.Value > CompletedJobRetention;
+            var exceededMaxAge = now - job.StartedAt > MaxJobAge;
+
+            if (retentionExpired || exceededMaxAge)
+            {
+                _jobs.TryRemove(kvp.Key, out _);
+                _jobLocks.TryRemove(kvp.Key, out _);
+            }
+        }
     }
 
     private LibraryMigrationJobVM GetSnapshot(Guid jobId)

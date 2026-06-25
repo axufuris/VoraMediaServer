@@ -107,6 +107,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
     const preloadedUrlRef = useRef<string | null>(null);
+    const preloadedTrackUrlRef = useRef<{ id: string; url: string } | null>(null);
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -246,23 +247,28 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             const q = queueRef.current;
             const item = q[idx];
             if (!item) return;
+            const trackId = media.id;
             const server = media.serverId ? serverVault.getServer(media.serverId) : serverVault.getActiveServer();
             const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
-            const newUrl = musicService.getTrackStreamUrl(media.id, baseUrl, audioQualityStore.get());
-            const newItem = { ...item, streamUrl: newUrl };
-            const updatedQueue = [...q];
-            updatedQueue[idx] = newItem;
-            setQueue(updatedQueue);
-            queueRef.current = updatedQueue;
             const video = videoRef.current;
             const resumeAt = video?.currentTime ?? 0;
-            setCurrentMedia(newItem);
-            setTimeout(() => {
-                const v = videoRef.current;
-                if (v && resumeAt > 0) {
-                    try { v.currentTime = resumeAt; } catch { /* ignore */ }
-                }
-            }, 200);
+            musicService.resolveTrackStreamUrl(trackId, baseUrl, audioQualityStore.get(), media.serverId)
+                .then((newUrl) => {
+                    if (currentMediaRef.current?.id !== trackId) return;
+                    const newItem = { ...item, streamUrl: newUrl };
+                    const updatedQueue = [...queueRef.current];
+                    updatedQueue[idx] = newItem;
+                    setQueue(updatedQueue);
+                    queueRef.current = updatedQueue;
+                    setCurrentMedia(newItem);
+                    setTimeout(() => {
+                        const v = videoRef.current;
+                        if (v && resumeAt > 0) {
+                            try { v.currentTime = resumeAt; } catch { /* ignore */ }
+                        }
+                    }, 200);
+                })
+                .catch(() => { /* ignore */ });
         };
         window.addEventListener('audio-quality-changed', onQualityChange);
         return () => window.removeEventListener('audio-quality-changed', onQualityChange);
@@ -270,6 +276,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         preloadedUrlRef.current = null;
+        preloadedTrackUrlRef.current = null;
         if (preloadAudioRef.current) {
             preloadAudioRef.current.removeAttribute('src');
             preloadAudioRef.current.load();
@@ -283,24 +290,51 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (remaining > 8 || remaining <= 0) return;
         const nextIndex = queueIndex + 1;
         const nextItem = queue[nextIndex];
-        if (!nextItem || !nextItem.streamUrl) return;
-        if (preloadedUrlRef.current === nextItem.streamUrl) return;
+        if (!nextItem || !nextItem.id) return;
+        if (preloadedUrlRef.current === nextItem.id) return;
         const el = preloadAudioRef.current;
         if (!el) return;
-        try {
-            el.src = nextItem.streamUrl;
-            el.load();
-            preloadedUrlRef.current = nextItem.streamUrl;
-        } catch {
-            /* ignore */
-        }
+        preloadedUrlRef.current = nextItem.id;
+        const server = nextItem.serverId ? serverVault.getServer(nextItem.serverId) : serverVault.getActiveServer();
+        const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
+        musicService.resolveTrackStreamUrl(nextItem.id, baseUrl, audioQualityStore.get(), nextItem.serverId)
+            .then((url) => {
+                if (preloadedUrlRef.current !== nextItem.id) return;
+                preloadedTrackUrlRef.current = { id: nextItem.id, url };
+                try {
+                    el.src = url;
+                    el.load();
+                } catch {
+                    /* ignore */
+                }
+            })
+            .catch(() => { /* ignore */ });
     }, [currentTime, duration, queue, queueIndex, currentMedia?.playbackContextType]);
 
     const playMedia = useCallback((media: PlayableMedia) => {
-        setCurrentMedia(media);
         if (media.sessionId) setSessionId(media.sessionId);
         setIsMinimized(false);
         setIsPlaying(true);
+
+        if (media.playbackContextType === 'Music' && media.id) {
+            const preloaded = preloadedTrackUrlRef.current;
+            if (preloaded && preloaded.id === media.id) {
+                preloadedTrackUrlRef.current = null;
+                setCurrentMedia({ ...media, streamUrl: preloaded.url });
+                return;
+            }
+            setCurrentMedia({ ...media, streamUrl: '' });
+            const server = media.serverId ? serverVault.getServer(media.serverId) : serverVault.getActiveServer();
+            const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
+            musicService.resolveTrackStreamUrl(media.id, baseUrl, audioQualityStore.get(), media.serverId)
+                .then((url) => {
+                    setCurrentMedia((cur) => (cur && cur.id === media.id ? { ...cur, streamUrl: url } : cur));
+                })
+                .catch(() => { /* ignore */ });
+            return;
+        }
+
+        setCurrentMedia(media);
     }, []);
 
     const playMediaRef = useRef(playMedia);

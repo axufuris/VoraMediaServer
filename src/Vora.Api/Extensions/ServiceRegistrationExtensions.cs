@@ -474,6 +474,7 @@ public static class ServiceRegistrationExtensions
         services.AddHostedService<StartupWatcherService>();
         services.AddHostedService<TaskProcessingWorker>();
         services.AddHostedService<TimeshiftJanitorWorker>();
+        services.AddHostedService<TranscodeJanitorWorker>();
         return services;
     }
 

@@ -284,7 +284,7 @@ public class MusicManager : IMusicManager
         var artist = await _repository.GetArtistForUpdateAsync(artistId);
         if (artist == null) return null;
 
-        var url = SaveArtworkFile($"artist_{artistId}", bytes, fileName);
+        var url = await SaveArtworkFileAsync($"artist_{artistId}", bytes, fileName);
         if (url == null) return null;
 
         artist.ArtworkUrl = url;
@@ -298,7 +298,7 @@ public class MusicManager : IMusicManager
         var album = await _repository.GetAlbumForUpdateAsync(albumId);
         if (album == null) return null;
 
-        var url = SaveArtworkFile($"album_{albumId}", bytes, fileName);
+        var url = await SaveArtworkFileAsync($"album_{albumId}", bytes, fileName);
         if (url == null) return null;
 
         album.ArtworkUrl = url;
@@ -312,7 +312,7 @@ public class MusicManager : IMusicManager
         var artist = await _repository.GetArtistForUpdateAsync(artistId);
         if (artist == null) return null;
 
-        var url = SaveArtworkFile($"artist_bg_{artistId}", bytes, fileName);
+        var url = await SaveArtworkFileAsync($"artist_bg_{artistId}", bytes, fileName);
         if (url == null) return null;
 
         artist.BackgroundUrl = url;
@@ -326,7 +326,7 @@ public class MusicManager : IMusicManager
         var album = await _repository.GetAlbumForUpdateAsync(albumId);
         if (album == null) return null;
 
-        var url = SaveArtworkFile($"album_bg_{albumId}", bytes, fileName);
+        var url = await SaveArtworkFileAsync($"album_bg_{albumId}", bytes, fileName);
         if (url == null) return null;
 
         album.BackgroundUrl = url;
@@ -340,7 +340,7 @@ public class MusicManager : IMusicManager
         var artist = await _repository.GetArtistForUpdateAsync(artistId);
         if (artist == null) return null;
 
-        var url = SaveArtworkFile($"artist_banner_{artistId}", bytes, fileName);
+        var url = await SaveArtworkFileAsync($"artist_banner_{artistId}", bytes, fileName);
         if (url == null) return null;
 
         artist.BannerUrl = url;
@@ -354,7 +354,7 @@ public class MusicManager : IMusicManager
         var artist = await _repository.GetArtistForUpdateAsync(artistId);
         if (artist == null) return null;
 
-        var url = SaveArtworkFile($"artist_logo_{artistId}", bytes, fileName);
+        var url = await SaveArtworkFileAsync($"artist_logo_{artistId}", bytes, fileName);
         if (url == null) return null;
 
         artist.ClearLogoUrl = url;
@@ -368,7 +368,7 @@ public class MusicManager : IMusicManager
         var album = await _repository.GetAlbumForUpdateAsync(albumId);
         if (album == null) return null;
 
-        var url = SaveArtworkFile($"album_disc_{albumId}", bytes, fileName);
+        var url = await SaveArtworkFileAsync($"album_disc_{albumId}", bytes, fileName);
         if (url == null) return null;
 
         album.DiscArtUrl = url;
@@ -808,7 +808,7 @@ public class MusicManager : IMusicManager
         return merged;
     }
 
-    private string? SaveArtworkFile(string identityKey, byte[] bytes, string? sourceFileName)
+    private async Task<string?> SaveArtworkFileAsync(string identityKey, byte[] bytes, string? sourceFileName)
     {
         try
         {
@@ -820,7 +820,7 @@ public class MusicManager : IMusicManager
             var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes($"{identityKey}_{DateTime.UtcNow.Ticks}"))).ToLowerInvariant()[..16];
             var fileName = $"music_upload_{hash}{ext}";
             var fullPath = Path.Combine(_artworkBasePath, fileName);
-            File.WriteAllBytes(fullPath, bytes);
+            await File.WriteAllBytesAsync(fullPath, bytes);
             return $"{MusicArtworkUrlPrefix}{fileName}";
         }
         catch (Exception ex)

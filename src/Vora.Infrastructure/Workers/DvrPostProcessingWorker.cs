@@ -33,9 +33,23 @@ public class DvrPostProcessingWorker : BackgroundService
 
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
 
-        while (await timer.WaitForNextTickAsync(stoppingToken))
+        try
         {
-            await ProcessCompletedRecordingsAsync();
+            while (await timer.WaitForNextTickAsync(stoppingToken))
+            {
+                try
+                {
+                    await ProcessCompletedRecordingsAsync();
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError(ex, "[DVR] Error during post-processing pass.");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("DVR Post-Processing Worker is stopping.");
         }
     }
 
@@ -248,7 +262,8 @@ public class DvrPostProcessingWorker : BackgroundService
             dbSession.Status = IptvRecordingSessionStatus.Completed;
             dbSession.OutputFilePath = newPath;
             dbSession.CommercialMarkersJson = markersJson;
-            dbSession.FileSizeBytes = new FileInfo(newPath).Length;
+            var fileInfo = new FileInfo(newPath);
+            dbSession.FileSizeBytes = fileInfo.Exists ? fileInfo.Length : 0;
             await repo.UpdateSessionAsync(dbSession);
         }
     }

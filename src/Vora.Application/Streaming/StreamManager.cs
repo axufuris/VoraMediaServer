@@ -30,14 +30,16 @@ public class StreamManager : IStreamManager
     private readonly ISystemSettingsRepository _settingsRepo;
     private readonly IStreamingTokenSigner _tokenSigner;
     private readonly IClientNotifier _notifier;
+    private readonly ITranscodeService _transcodeService;
 
-    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier)
+    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService)
     {
         _repository = repository;
         _decisionManager = decisionManager;
         _settingsRepo = settingsRepo;
         _tokenSigner = tokenSigner;
         _notifier = notifier;
+        _transcodeService = transcodeService;
     }
 
     public async Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null)
@@ -166,6 +168,8 @@ public class StreamManager : IStreamManager
         session.CurrentPosition = currentPosition;
         session.IsPaused = isPaused;
         session.LastPingAt = now;
+
+        _transcodeService.TouchSession(session.MediaItemId);
 
         await _repository.UpdateSessionAsync(session);
 

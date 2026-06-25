@@ -5,6 +5,7 @@ using Vora.Application.Media;
 using Vora.Application.Requests;
 using Vora.Plugins.Dtos;
 using Vora.Domain.Entities.Discovery;
+using Vora.Domain.Entities.Requests;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Discovery;
@@ -138,15 +139,36 @@ public class DiscoveryManager(
 
     private async Task<List<DiscoveryItemVM>> EnrichWithStatusAsync(IEnumerable<DiscoveryItemDto> items)
     {
-        var result = new List<DiscoveryItemVM>();
-        foreach (var item in items)
-        {
-            var inLibrary = !string.IsNullOrWhiteSpace(item.ExternalId)
-                && await mediaRepository.MediaExistsByExternalIdAsync(item.ExternalId, item.Type);
+        var list = items.ToList();
 
-            var request = !string.IsNullOrWhiteSpace(item.ExternalId)
-                ? await requestRepository.GetRequestAsync(item.ExternalId, item.Type)
-                : null;
+        var existing = new HashSet<(string ExternalId, string Type)>();
+        var requestByKey = new Dictionary<(string ExternalId, string Type), MediaRequest>();
+
+        var groups = list
+            .Where(i => !string.IsNullOrWhiteSpace(i.ExternalId))
+            .GroupBy(i => i.Type);
+
+        foreach (var group in groups)
+        {
+            var type = group.Key;
+            var ids = group.Select(i => i.ExternalId).Distinct().ToList();
+
+            foreach (var id in await mediaRepository.GetExistingExternalIdsAsync(ids, type))
+            {
+                existing.Add((id, type));
+            }
+
+            foreach (var pair in await requestRepository.GetRequestsAsync(ids, type))
+            {
+                requestByKey[(pair.Key, type)] = pair.Value;
+            }
+        }
+
+        var result = new List<DiscoveryItemVM>(list.Count);
+        foreach (var item in list)
+        {
+            var hasId = !string.IsNullOrWhiteSpace(item.ExternalId);
+            var key = (item.ExternalId, item.Type);
 
             result.Add(new DiscoveryItemVM
             {
@@ -158,8 +180,8 @@ public class DiscoveryManager(
                 ReleaseDate = item.ReleaseDate,
                 PosterUrl = item.PosterUrl,
                 ContentRating = item.ContentRating,
-                InLibrary = inLibrary,
-                RequestStatus = request?.Status
+                InLibrary = hasId && existing.Contains(key),
+                RequestStatus = hasId && requestByKey.TryGetValue(key, out var request) ? request.Status : null
             });
         }
         return result;

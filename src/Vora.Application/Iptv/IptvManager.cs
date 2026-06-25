@@ -397,27 +397,33 @@ public class IptvManager : IIptvManager
 
     private static Process BuildTimeshiftProcess(string streamUrl, string outputPath, string segmentPath)
     {
-        var args = new[]
-        {
-            "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-            $"-i \"{streamUrl}\"",
-            "-c:v copy -c:a aac -b:a 128k -f hls -hls_time 4 -hls_list_size 0",
-            "-hls_flags append_list+temp_file",
-            $"-hls_segment_filename \"{segmentPath}\"",
-            $"\"{outputPath}\""
-        };
-
-        return new Process
+        var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = "ffmpeg",
-                Arguments = string.Join(" ", args),
                 RedirectStandardInput = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             }
         };
+
+        var args = process.StartInfo.ArgumentList;
+        args.Add("-reconnect"); args.Add("1");
+        args.Add("-reconnect_streamed"); args.Add("1");
+        args.Add("-reconnect_delay_max"); args.Add("5");
+        args.Add("-i"); args.Add(streamUrl);
+        args.Add("-c:v"); args.Add("copy");
+        args.Add("-c:a"); args.Add("aac");
+        args.Add("-b:a"); args.Add("128k");
+        args.Add("-f"); args.Add("hls");
+        args.Add("-hls_time"); args.Add("4");
+        args.Add("-hls_list_size"); args.Add("0");
+        args.Add("-hls_flags"); args.Add("append_list+temp_file");
+        args.Add("-hls_segment_filename"); args.Add(segmentPath);
+        args.Add(outputPath);
+
+        return process;
     }
 
     private async Task WaitForBufferAsync(Guid profileId, string sessionPath)

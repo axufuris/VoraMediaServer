@@ -6,6 +6,7 @@ namespace Vora.Application.Requests;
 public interface IRequestRepository
 {
     Task<MediaRequest?> GetRequestAsync(string externalId, string type);
+    Task<Dictionary<string, MediaRequest>> GetRequestsAsync(IEnumerable<string> externalIds, string type);
     Task<MediaRequest?> GetRequestByIdAsync(Guid id);
     Task AddRequestAsync(MediaRequest request);
     Task UpdateRequestAsync(MediaRequest request);

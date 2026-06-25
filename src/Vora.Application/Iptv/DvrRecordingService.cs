@@ -17,10 +17,71 @@ public interface IDvrRecordingService
 
 public class DvrRecordingService : IDvrRecordingService
 {
-    private class ActiveRecording
+    private sealed class ActiveRecording : IDisposable
     {
-        public CancellationTokenSource Cts { get; set; } = new();
-        public Process? Process { get; set; }
+        private readonly object _gate = new();
+        private readonly ILogger _logger;
+        private Process? _process;
+        private bool _stopRequested;
+
+        public ActiveRecording(ILogger logger) => _logger = logger;
+
+        public CancellationTokenSource Cts { get; } = new();
+
+        public bool StopRequested
+        {
+            get { lock (_gate) { return _stopRequested; } }
+        }
+
+        public void AttachProcess(Process process)
+        {
+            lock (_gate)
+            {
+                _process = process;
+            }
+        }
+
+        public void EndCurrentProcess()
+        {
+            lock (_gate)
+            {
+                KillAndDisposeLocked();
+            }
+        }
+
+        public void RequestStop()
+        {
+            Cts.Cancel();
+            lock (_gate)
+            {
+                _stopRequested = true;
+                KillAndDisposeLocked();
+            }
+        }
+
+        private void KillAndDisposeLocked()
+        {
+            var process = _process;
+            if (process is null) return;
+            _process = null;
+
+            try
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "[DVR] Failed to kill ffmpeg process during teardown.");
+            }
+
+            process.Dispose();
+        }
+
+        public void Dispose()
+        {
+            EndCurrentProcess();
+            Cts.Dispose();
+        }
     }
 
     private readonly ConcurrentDictionary<Guid, ActiveRecording> _activeRecordings = new();
@@ -67,11 +128,16 @@ public class DvrRecordingService : IDvrRecordingService
         if (!Directory.Exists(dvrBaseDir)) Directory.CreateDirectory(dvrBaseDir);
 
         string safeTitle = string.Join("_", session.Title.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_");
-        string fileName = $"{safeTitle}_{DateTime.Now:yyyyMMdd_HHmmss}.ts";
+        string fileName = $"{safeTitle}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.ts";
         string outputPath = Path.Combine(dvrBaseDir, fileName);
 
-        var activeRec = new ActiveRecording();
-        _activeRecordings.TryAdd(sessionId, activeRec);
+        var activeRec = new ActiveRecording(_logger);
+        if (!_activeRecordings.TryAdd(sessionId, activeRec))
+        {
+            activeRec.Dispose();
+            _logger.LogWarning($"[DVR] Recording session {sessionId} is already active.");
+            return;
+        }
 
         _ = Task.Run(() => RecordingLoopAsync(sessionId, session.Schedule.Channel.StreamUrl, outputPath, session.EndTime, activeRec));
 
@@ -82,93 +148,125 @@ public class DvrRecordingService : IDvrRecordingService
 
     private async Task RecordingLoopAsync(Guid sessionId, string streamUrl, string outputPath, DateTime endTime, ActiveRecording activeRec)
     {
-        using var scope = _serviceProvider.CreateScope();
-        var repo = scope.ServiceProvider.GetRequiredService<IIptvRepository>();
-        var dvrManager = scope.ServiceProvider.GetRequiredService<IDvrManager>();
-        var notifier = scope.ServiceProvider.GetRequiredService<IClientNotifier>();
-        var token = activeRec.Cts.Token;
-
         try
         {
-            using var fs = new FileStream(outputPath, FileMode.Append, FileAccess.Write, FileShare.Read);
+            using var scope = _serviceProvider.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IIptvRepository>();
+            var dvrManager = scope.ServiceProvider.GetRequiredService<IDvrManager>();
+            var notifier = scope.ServiceProvider.GetRequiredService<IClientNotifier>();
 
-            while (DateTime.UtcNow < endTime && !token.IsCancellationRequested)
+            try
             {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "ffmpeg",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                psi.ArgumentList.Add("-reconnect");
-                psi.ArgumentList.Add("1");
-                psi.ArgumentList.Add("-reconnect_streamed");
-                psi.ArgumentList.Add("1");
-                psi.ArgumentList.Add("-reconnect_delay_max");
-                psi.ArgumentList.Add("5");
-                psi.ArgumentList.Add("-i");
-                psi.ArgumentList.Add(streamUrl);
-                psi.ArgumentList.Add("-fflags");
-                psi.ArgumentList.Add("+genpts");
-                psi.ArgumentList.Add("-c");
-                psi.ArgumentList.Add("copy");
-                psi.ArgumentList.Add("-f");
-                psi.ArgumentList.Add("mpegts");
-                psi.ArgumentList.Add("pipe:1");
-
-                var process = new Process
-                {
-                    StartInfo = psi
-                };
-
-                activeRec.Process = process;
-                process.Start();
-
-                _ = Task.Run(() => process.StandardError.ReadToEndAsync(), CancellationToken.None);
-
-                try
-                {
-                    await process.StandardOutput.BaseStream.CopyToAsync(fs, token);
-                }
-                catch (OperationCanceledException) { }
-
-                if (!process.HasExited)
-                {
-                    try { process.Kill(); } catch { }
-                }
-
-                if (token.IsCancellationRequested || DateTime.UtcNow >= endTime) break;
-
-                _logger.LogWarning($"[DVR] Stream dropped prematurely for Session {sessionId}. Reconnecting in 3 seconds...");
-                await Task.Delay(3000, token);
+                await RunRecordingAsync(sessionId, streamUrl, outputPath, endTime, activeRec);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation($"[DVR] Recording session {sessionId} was cancelled.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"[DVR] Fatal error in resilient recording loop for Session {sessionId}");
+                await repo.UpdateSessionStatusAsync(sessionId, IptvRecordingSessionStatus.Failed, errorMessage: "Internal recording loop failed.");
+            }
+            finally
+            {
+                await CompleteSessionAsync(sessionId, outputPath, repo, dvrManager, notifier);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"[DVR] Fatal error in resilient recording loop for Session {sessionId}");
-            await repo.UpdateSessionStatusAsync(sessionId, IptvRecordingSessionStatus.Failed, errorMessage: "Internal recording loop failed.");
+            _logger.LogError(ex, $"[DVR] Unexpected failure finalizing recording session {sessionId}");
         }
         finally
         {
             _activeRecordings.TryRemove(sessionId, out _);
-            await CompleteSessionAsync(sessionId, outputPath, repo, dvrManager, notifier);
+            activeRec.Dispose();
         }
     }
 
-    public async Task StopRecordingAsync(Guid sessionId)
+    private async Task RunRecordingAsync(Guid sessionId, string streamUrl, string outputPath, DateTime endTime, ActiveRecording activeRec)
+    {
+        var token = activeRec.Cts.Token;
+        using var fs = new FileStream(outputPath, FileMode.Append, FileAccess.Write, FileShare.Read);
+
+        while (DateTime.UtcNow < endTime && !token.IsCancellationRequested)
+        {
+            var process = new Process { StartInfo = BuildRecordingProcessInfo(streamUrl) };
+            activeRec.AttachProcess(process);
+            process.Start();
+
+            var stderrTask = DrainStandardErrorAsync(process, token);
+
+            try
+            {
+                await process.StandardOutput.BaseStream.CopyToAsync(fs, token);
+            }
+            catch (OperationCanceledException) { }
+
+            activeRec.EndCurrentProcess();
+            var stderr = await stderrTask;
+
+            if (token.IsCancellationRequested || DateTime.UtcNow >= endTime) break;
+
+            if (!string.IsNullOrWhiteSpace(stderr))
+            {
+                _logger.LogDebug($"[DVR] ffmpeg exited for session {sessionId}: {stderr}");
+            }
+
+            _logger.LogWarning($"[DVR] Stream dropped prematurely for Session {sessionId}. Reconnecting in 3 seconds...");
+            await Task.Delay(3000, token);
+        }
+    }
+
+    private static ProcessStartInfo BuildRecordingProcessInfo(string streamUrl)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "ffmpeg",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        psi.ArgumentList.Add("-reconnect");
+        psi.ArgumentList.Add("1");
+        psi.ArgumentList.Add("-reconnect_streamed");
+        psi.ArgumentList.Add("1");
+        psi.ArgumentList.Add("-reconnect_delay_max");
+        psi.ArgumentList.Add("5");
+        psi.ArgumentList.Add("-i");
+        psi.ArgumentList.Add(streamUrl);
+        psi.ArgumentList.Add("-fflags");
+        psi.ArgumentList.Add("+genpts");
+        psi.ArgumentList.Add("-c");
+        psi.ArgumentList.Add("copy");
+        psi.ArgumentList.Add("-f");
+        psi.ArgumentList.Add("mpegts");
+        psi.ArgumentList.Add("pipe:1");
+        return psi;
+    }
+
+    private static async Task<string> DrainStandardErrorAsync(Process process, CancellationToken token)
+    {
+        try
+        {
+            return await process.StandardError.ReadToEndAsync(token);
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+
+    public Task StopRecordingAsync(Guid sessionId)
     {
         if (_activeRecordings.TryGetValue(sessionId, out var activeRec))
         {
             _logger.LogInformation($"[DVR] Manually stopping recording session {sessionId}");
-            activeRec.Cts.Cancel();
-
-            if (activeRec.Process != null && !activeRec.Process.HasExited)
-            {
-                try { activeRec.Process.Kill(); } catch { }
-            }
+            activeRec.RequestStop();
         }
+
+        return Task.CompletedTask;
     }
 
     private async Task CompleteSessionAsync(Guid sessionId, string outputPath, IIptvRepository repo, IDvrManager dvrManager, IClientNotifier notifier)

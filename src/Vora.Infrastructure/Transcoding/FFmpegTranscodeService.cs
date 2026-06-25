@@ -257,11 +257,74 @@ public class FFmpegTranscodeService : ITranscodeService
     {
         if (_transcodeContexts.TryGetValue(mediaItemId, out var ctx))
         {
+            ctx.LastActivityAt = DateTime.UtcNow;
             if (segmentIndex > ctx.HighestServedSegment)
             {
                 ctx.HighestServedSegment = segmentIndex;
             }
         }
+    }
+
+    public void TouchSession(Guid mediaItemId)
+    {
+        if (_transcodeContexts.TryGetValue(mediaItemId, out var ctx))
+        {
+            ctx.LastActivityAt = DateTime.UtcNow;
+        }
+    }
+
+    public async Task EvictIdleSessionsAsync(TimeSpan maxIdle)
+    {
+        var cutoff = DateTime.UtcNow - maxIdle;
+        var stale = _transcodeContexts
+            .Where(kv => kv.Value.LastActivityAt < cutoff)
+            .Select(kv => kv.Key)
+            .ToList();
+
+        foreach (var mediaItemId in stale)
+        {
+            _logger.LogInformation("Evicting idle transcode session {MediaItemId} (no activity since cutoff).", mediaItemId);
+            await StopTranscodeSessionAsync(mediaItemId);
+        }
+    }
+
+    public async Task ReapOrphanedTranscodeFilesAsync(string targetDir, TimeSpan maxAge)
+    {
+        if (string.IsNullOrEmpty(targetDir) || !Directory.Exists(targetDir)) return;
+        var cutoff = DateTime.UtcNow - maxAge;
+
+        await _transcodeLock.WaitAsync();
+        try
+        {
+            var playlists = Directory.EnumerateFiles(targetDir, "*.m3u8").ToList();
+            foreach (var playlist in playlists)
+            {
+                var name = Path.GetFileNameWithoutExtension(playlist);
+                if (name.StartsWith("_ffmpeg_")) continue;
+                if (!Guid.TryParse(name, out var mediaItemId)) continue;
+                if (_transcodeContexts.ContainsKey(mediaItemId) || _activeTranscodes.ContainsKey(mediaItemId)) continue;
+
+                if (GetNewestArtifactWriteTimeUtc(targetDir, mediaItemId, playlist) > cutoff) continue;
+
+                _logger.LogInformation("Reaping orphaned transcode artifacts for {MediaItemId} in {Dir}.", mediaItemId, targetDir);
+                await StopProcessAndCleanFilesAsync(mediaItemId, targetDir);
+            }
+        }
+        finally
+        {
+            _transcodeLock.Release();
+        }
+    }
+
+    private static DateTime GetNewestArtifactWriteTimeUtc(string targetDir, Guid mediaItemId, string playlistPath)
+    {
+        var newest = File.GetLastWriteTimeUtc(playlistPath);
+        foreach (var f in Directory.EnumerateFiles(targetDir, $"{mediaItemId}_*.ts"))
+        {
+            var written = File.GetLastWriteTimeUtc(f);
+            if (written > newest) newest = written;
+        }
+        return newest;
     }
 
     private async Task RelaunchAtSegmentAsync(Guid mediaItemId, int newStartSegment, CancellationToken ct)
@@ -295,6 +358,7 @@ public class FFmpegTranscodeService : ITranscodeService
             var alignedStart = newStartSegment * (double)SegmentSeconds;
             ctx.CurrentStartSegment = newStartSegment;
             ctx.LaunchedAt = DateTime.UtcNow;
+            ctx.LastActivityAt = DateTime.UtcNow;
             await LaunchFFmpegAsync(mediaItemId, newStartSegment, alignedStart, settings, willUseGpu);
         }
         finally
@@ -448,7 +512,6 @@ public class FFmpegTranscodeService : ITranscodeService
             StartInfo = new ProcessStartInfo
             {
                 FileName = "ffmpeg",
-                Arguments = arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -456,6 +519,7 @@ public class FFmpegTranscodeService : ITranscodeService
             },
             EnableRaisingEvents = true
         };
+        foreach (var arg in arguments) process.StartInfo.ArgumentList.Add(arg);
 
         var stderrBuffer = new StringBuilder();
         process.ErrorDataReceived += (_, args) =>
@@ -466,7 +530,7 @@ public class FFmpegTranscodeService : ITranscodeService
             }
         };
         var logger = _logger;
-        var cmdLine = $"ffmpeg {arguments}";
+        var cmdLine = $"ffmpeg {string.Join(" ", arguments)}";
         process.Exited += (_, _) =>
         {
             if (_activeTranscodes.TryRemove(mediaItemId, out var stale))
@@ -493,7 +557,7 @@ public class FFmpegTranscodeService : ITranscodeService
         return Task.CompletedTask;
     }
 
-    private static string BuildFFmpegArguments(
+    private static List<string> BuildFFmpegArguments(
         string sourceFile,
         string segmentPattern,
         string internalPlaylistPath,
@@ -504,6 +568,7 @@ public class FFmpegTranscodeService : ITranscodeService
         double alignedStartSeconds)
     {
         var args = new List<string>();
+        void Flag(string fragment) => args.AddRange(fragment.Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
         // Determine up front whether we'll actually re-encode video. If
         // the strategy is Copy / DirectPlay we just pass-through and
@@ -538,23 +603,23 @@ public class FFmpegTranscodeService : ITranscodeService
 
         if (fullGpuPipeline)
         {
-            args.Add("-hwaccel cuda -hwaccel_output_format cuda");
+            Flag("-hwaccel cuda -hwaccel_output_format cuda");
             if (!string.IsNullOrWhiteSpace(settings.HardwareTranscodingDevice) && settings.HardwareTranscodingDevice != "Auto")
             {
-                args.Add($"-hwaccel_device {settings.HardwareTranscodingDevice}");
+                Flag("-hwaccel_device"); args.Add(settings.HardwareTranscodingDevice);
             }
             // Thread the CPU filter chain across all available cores.
             // Matters most for the Quality HDR tonemap path where the
             // zscale chain runs on system RAM.
-            args.Add("-filter_threads 0");
-            args.Add("-filter_complex_threads 0");
+            Flag("-filter_threads 0");
+            Flag("-filter_complex_threads 0");
         }
         else if (settings.UseHardwareAcceleration)
         {
-            args.Add("-hwaccel auto");
+            Flag("-hwaccel auto");
             if (!string.IsNullOrWhiteSpace(settings.HardwareTranscodingDevice) && settings.HardwareTranscodingDevice != "Auto")
             {
-                args.Add($"-hwaccel_device {settings.HardwareTranscodingDevice}");
+                Flag("-hwaccel_device"); args.Add(settings.HardwareTranscodingDevice);
             }
         }
 
@@ -564,27 +629,27 @@ public class FFmpegTranscodeService : ITranscodeService
         // source-time [N*SegmentSeconds, +SegmentSeconds).
         if (alignedStartSeconds > 0.0)
         {
-            args.Add($"-ss {alignedStartSeconds.ToString("0.000", CultureInfo.InvariantCulture)}");
+            Flag($"-ss {alignedStartSeconds.ToString("0.000", CultureInfo.InvariantCulture)}");
         }
-        args.Add($"-i \"{sourceFile}\"");
+        Flag("-i"); args.Add(sourceFile);
 
         if (decision.SelectedVideoStreamIndex.HasValue)
         {
-            args.Add($"-map 0:{decision.SelectedVideoStreamIndex.Value}");
+            Flag($"-map 0:{decision.SelectedVideoStreamIndex.Value}");
         }
         if (decision.SelectedAudioStreamIndex.HasValue)
         {
-            args.Add($"-map 0:{decision.SelectedAudioStreamIndex.Value}");
+            Flag($"-map 0:{decision.SelectedAudioStreamIndex.Value}");
         }
         // Explicitly drop subtitles from the HLS output. We don't currently
         // generate in-band WebVTT, so mapping an arbitrary subtitle stream
         // into mpegts either errors out or produces unrenderable bytes.
         // Subtitle playback ships as a sidecar VTT in a separate slice.
-        args.Add("-sn");
+        Flag("-sn");
 
         if (decision.Decision == StreamingState.DirectPlay || decision.Decision == StreamingState.Remux || decision.VideoStrategy == "Copy" || decision.VideoStrategy == "DirectStream")
         {
-            args.Add("-c:v copy");
+            Flag("-c:v copy");
         }
         else
         {
@@ -598,14 +663,14 @@ public class FFmpegTranscodeService : ITranscodeService
 
             if (useGpu)
             {
-                args.Add(encodeHevc ? "-c:v hevc_nvenc" : "-c:v h264_nvenc");
-                args.Add($"-preset {gpuPreset} -tune hq");
-                if (settings.EnableHevcOptimization && encodeHevc) args.Add("-rc vbr -cq 28 -qmin 28 -qmax 34");
+                Flag(encodeHevc ? "-c:v hevc_nvenc" : "-c:v h264_nvenc");
+                Flag($"-preset {gpuPreset} -tune hq");
+                if (settings.EnableHevcOptimization && encodeHevc) Flag("-rc vbr -cq 28 -qmin 28 -qmax 34");
             }
             else
             {
-                args.Add(encodeHevc ? "-c:v libx265" : "-c:v libx264");
-                args.Add($"-preset {swPreset}");
+                Flag(encodeHevc ? "-c:v libx265" : "-c:v libx264");
+                Flag($"-preset {swPreset}");
             }
 
             // -pix_fmt only applies when frames live in system RAM (CPU
@@ -615,7 +680,7 @@ public class FFmpegTranscodeService : ITranscodeService
             // pair behind the scenes and defeat the GPU pipeline.
             if (!encodeHevc && !fullGpuPipeline)
             {
-                args.Add("-pix_fmt yuv420p");
+                Flag("-pix_fmt yuv420p");
             }
 
             // Force keyframes at every segment boundary so the segment muxer
@@ -624,7 +689,7 @@ public class FFmpegTranscodeService : ITranscodeService
             // keyframe AFTER the target time) which breaks the player's
             // mapping between the pre-written EXTINF values and the actual
             // segment content.
-            args.Add($"-force_key_frames \"expr:gte(t,n_forced*{SegmentSeconds})\"");
+            Flag("-force_key_frames"); args.Add($"expr:gte(t,n_forced*{SegmentSeconds})");
 
             // Filter chain. We keep source resolution — never silently
             // downscale to "fix" pipeline speed. The encoder pipeline's
@@ -654,7 +719,7 @@ public class FFmpegTranscodeService : ITranscodeService
                     chain.Add("scale_cuda=-2:1080:format=p010le");
                 }
                 chain.Add($"tonemap_cuda=tonemap={settings.TonemappingAlgorithm}:format=nv12:peak=1000");
-                args.Add($"-vf \"{string.Join(",", chain)}\"");
+                Flag("-vf"); args.Add(string.Join(",", chain));
             }
             else if (fullGpuPipeline && needsTonemap)
             {
@@ -675,7 +740,7 @@ public class FFmpegTranscodeService : ITranscodeService
                 chain.Add("hwdownload");
                 chain.Add("format=p010le");
                 chain.Add(BuildHdrTonemapCpuChain(resolvedTonemapQuality, settings.TonemappingAlgorithm));
-                args.Add($"-vf \"{string.Join(",", chain)}\"");
+                Flag("-vf"); args.Add(string.Join(",", chain));
             }
             else if (fullGpuPipeline)
             {
@@ -685,7 +750,7 @@ public class FFmpegTranscodeService : ITranscodeService
                 // sources; h264_nvenc wants nv12, hevc_nvenc can keep
                 // p010le. scale_cuda with iw:ih preserves resolution.
                 var targetFmt = encodeHevc ? "p010le" : "nv12";
-                args.Add($"-vf \"scale_cuda=iw:ih:format={targetFmt}\"");
+                Flag("-vf"); args.Add($"scale_cuda=iw:ih:format={targetFmt}");
             }
             else if (needsTonemap)
             {
@@ -693,7 +758,7 @@ public class FFmpegTranscodeService : ITranscodeService
                 // UseHardwareEncoding turned off in server settings).
                 // Slow on 4K HDR, but it's the only correct thing when
                 // the user opts out of GPU.
-                args.Add($"-vf zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap={settings.TonemappingAlgorithm}:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p");
+                Flag($"-vf zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap={settings.TonemappingAlgorithm}:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p");
             }
 
             if (decision.RequiresSubtitleBurnIn)
@@ -701,13 +766,13 @@ public class FFmpegTranscodeService : ITranscodeService
                 // Subtitle burn-in runs on CPU only, so it can only attach
                 // here in the non-GPU path. We already excluded subtitle
                 // burn-in from fullGpuPipeline above.
-                args.Add($"-vf \"subtitles='{sourceFile}'\"");
+                Flag("-vf"); args.Add($"subtitles='{sourceFile}'");
             }
 
             if (decision.BandwidthKbps > 0)
             {
                 int bufferSizeKbps = decision.BandwidthKbps * Math.Max(1, settings.TranscoderThrottleBuffer);
-                args.Add($"-maxrate {decision.BandwidthKbps}k -bufsize {bufferSizeKbps}k");
+                Flag($"-maxrate {decision.BandwidthKbps}k -bufsize {bufferSizeKbps}k");
             }
         }
 
@@ -734,12 +799,12 @@ public class FFmpegTranscodeService : ITranscodeService
 
         if (shouldCopyAudio)
         {
-            args.Add("-c:a copy");
+            Flag("-c:a copy");
         }
         else
         {
-            args.Add(decision.TargetAudioCodec == AudioCodec.Aac ? "-c:a aac" : "-c:a ac3");
-            args.Add(decision.TargetAudioChannels > 2 ? $"-ac {decision.TargetAudioChannels} -b:a 384k" : "-ac 2 -b:a 192k");
+            Flag(decision.TargetAudioCodec == AudioCodec.Aac ? "-c:a aac" : "-c:a ac3");
+            Flag(decision.TargetAudioChannels > 2 ? $"-ac {decision.TargetAudioChannels} -b:a 384k" : "-ac 2 -b:a 192k");
         }
 
         // CRITICAL: when -ss seeks the input, FFmpeg by default resets
@@ -757,7 +822,7 @@ public class FFmpegTranscodeService : ITranscodeService
         // writes PTS+offset.
         if (alignedStartSeconds > 0.0)
         {
-            args.Add($"-output_ts_offset {alignedStartSeconds.ToString("0.000", CultureInfo.InvariantCulture)}");
+            Flag($"-output_ts_offset {alignedStartSeconds.ToString("0.000", CultureInfo.InvariantCulture)}");
         }
 
         // Use FFmpeg's HLS muxer for actual segment writing — it handles
@@ -767,19 +832,19 @@ public class FFmpegTranscodeService : ITranscodeService
         // referencing the same .ts segment files. -start_number gives
         // FFmpeg the absolute starting segment number so filenames line
         // up with our pre-written playlist after a seek-restart.
-        args.Add($"-f hls -hls_time {SegmentSeconds} -hls_playlist_type vod -hls_list_size 0");
-        args.Add("-hls_flags independent_segments+temp_file");
-        args.Add($"-hls_segment_filename \"{segmentPattern}\"");
+        Flag($"-f hls -hls_time {SegmentSeconds} -hls_playlist_type vod -hls_list_size 0");
+        Flag("-hls_flags independent_segments+temp_file");
+        Flag("-hls_segment_filename"); args.Add(segmentPattern);
         // FFmpeg's HLS muxer uses `-start_number` for the starting sequence
         // number, NOT `-hls_start_number`. Easy thing to get wrong (the
         // segment muxer's equivalent IS `-segment_start_number`). Using
         // the wrong name makes FFmpeg exit with code 8 + "Unrecognized
         // option 'hls_start_number'. Error splitting the argument list:
         // Option not found".
-        args.Add($"-start_number {startSegment}");
-        args.Add($"\"{internalPlaylistPath}\"");
+        Flag($"-start_number {startSegment}");
+        args.Add(internalPlaylistPath);
 
-        return string.Join(" ", args);
+        return args;
     }
 
     private static bool IsAudioCodecSafeForMpegTs(string? codec)
@@ -857,6 +922,7 @@ public class FFmpegTranscodeService : ITranscodeService
             DurationSeconds = durationSeconds;
             CurrentStartSegment = currentStartSegment;
             LaunchedAt = DateTime.UtcNow;
+            LastActivityAt = DateTime.UtcNow;
             HighestServedSegment = -1;
         }
         public string SourceFile { get; }
@@ -865,6 +931,7 @@ public class FFmpegTranscodeService : ITranscodeService
         public double DurationSeconds { get; }
         public int CurrentStartSegment { get; set; }
         public DateTime LaunchedAt { get; set; }
+        public DateTime LastActivityAt { get; set; }
         // Highest .ts segment index the chunk handler has actually served
         // to the client. -1 means nothing has been served yet — which lets
         // us distinguish player initial-probe requests for segment 0

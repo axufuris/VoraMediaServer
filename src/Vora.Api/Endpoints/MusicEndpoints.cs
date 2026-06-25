@@ -15,6 +15,9 @@ namespace Vora.Api.Endpoints;
 
 public static class MusicEndpoints
 {
+    private const string StreamTokenScope = "music";
+    private static readonly TimeSpan StreamTokenTtl = TimeSpan.FromHours(6);
+
     public static IEndpointRouteBuilder MapMusicEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/api/music").WithTags("Music");
@@ -55,6 +58,11 @@ public static class MusicEndpoints
 
         group.MapPost("/artists/{artistId:guid}/artwork/refresh", RefreshArtistArtworkAsync).RequireAuthorization();
         group.MapPost("/albums/{albumId:guid}/artwork/refresh", RefreshAlbumArtworkAsync).RequireAuthorization();
+
+        group.MapPost("/tracks/{trackId:guid}/play", GetMusicStreamUrlAsync)
+            .RequireAuthorization()
+            .WithName("GetMusicStreamUrl")
+            .Produces<MusicStreamUrlResponse>(StatusCodes.Status200OK);
 
         group.MapGet("/tracks/{trackId:guid}/stream", StreamTrackAsync).AllowAnonymous();
 
@@ -784,8 +792,26 @@ public static class MusicEndpoints
         public string? SeedGenre { get; set; }
     }
 
-    private static async Task<IResult> StreamTrackAsync(Guid trackId, [FromQuery] string? quality, IMusicManager manager, IAudioTranscodeService audioTranscodeService, HttpContext httpContext)
+    private static async Task<IResult> GetMusicStreamUrlAsync(Guid trackId, [FromQuery] string? quality, ClaimsPrincipal user, IMusicManager manager, IStreamingTokenSigner signer)
     {
+        var path = await manager.GetTrackFilePathAsync(trackId, BuildFilter(user));
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return Results.NotFound();
+
+        var token = signer.Sign(StreamTokenScope, trackId.ToString(), StreamTokenTtl);
+        var qualityParam = !string.IsNullOrWhiteSpace(quality) ? $"&quality={Uri.EscapeDataString(quality)}" : string.Empty;
+        return Results.Ok(new MusicStreamUrlResponse
+        {
+            Url = $"/api/music/tracks/{trackId}/stream?t={token}{qualityParam}",
+        });
+    }
+
+    private static async Task<IResult> StreamTrackAsync(Guid trackId, [FromQuery] string? t, [FromQuery] string? quality, IMusicManager manager, IAudioTranscodeService audioTranscodeService, IStreamingTokenSigner signer, HttpContext httpContext)
+    {
+        if (string.IsNullOrEmpty(t) || !signer.TryVerify(t, StreamTokenScope, out var payload) || payload != trackId.ToString())
+        {
+            return Results.NotFound();
+        }
+
         var path = await manager.GetTrackFilePathAsync(trackId, MusicAccessFilter.Unrestricted);
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return Results.NotFound();
 

@@ -33,6 +33,8 @@ When adding a **new** provider interface:
 - Finds every concrete `IVoraPlugin` and every concrete implementation of one of the `PluginProviderInterfaces`.
 - Registers them with DI.
 
+**Constraint — plugins are not hot-unloadable.** External plugin DLLs are loaded into `AssemblyLoadContext.Default` (`PluginLoaderExtensions.cs`), which is non-collectible: once loaded, an assembly stays loaded for the lifetime of the process and the DLL file stays locked on disk. This is why uninstall does **not** delete the DLL directly — `PluginManager` renames it to `*.dll.deleted` (`File.Move(..., assemblyPath + ".deleted")`) and the loader skips `.deleted` files on the next startup; the actual removal happens on restart. Enabling/disabling a plugin is a DB flag, not a load/unload. Plugin code also runs at full host trust (no sandbox). If true hot-unload is ever needed, each plugin would have to load into its own collectible `AssemblyLoadContext` — a larger change than the current model warrants.
+
 `Vora.Api/Extensions/PluginSettingsAdapter.cs` adapts the application-layer `ISystemSettingsRepository` to the plugin-facing `IPluginSettingsProvider`, so plugins can read/write their own settings without knowing about EF Core.
 
 `Vora.Application/Requests/RequestServerLookupAdapter.cs` implements `IRequestServerLookup` (declared in `Vora.Plugins.Interfaces`). Plugins that need to consume credentials owned by a different aggregate — most prominently the Radarr/Sonarr calendar providers — resolve `IRequestServerLookup` and ask for "calendar servers" by request-provider id (e.g. `radarr_requester`). This is how the calendar plugins share credentials with the Request Servers admin page; see the section on the `ProvidesReleaseCalendar` flag in `docs/database.md`.

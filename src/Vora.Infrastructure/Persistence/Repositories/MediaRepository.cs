@@ -473,6 +473,26 @@ public partial class MediaRepository : IMediaRepository
         return await _context.MediaItems.AnyAsync(m => m.TmdbId == externalId);
     }
 
+    public async Task<HashSet<string>> GetExistingExternalIdsAsync(IEnumerable<string> externalIds, string type)
+    {
+        var ids = externalIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+        if (ids.Count == 0) return new HashSet<string>();
+
+        IQueryable<MediaItem> query = type switch
+        {
+            "Movie" => _context.MediaItems.OfType<Movie>(),
+            "TvShow" => _context.MediaItems.OfType<TvShow>(),
+            _ => _context.MediaItems
+        };
+
+        var found = await query
+            .Where(m => m.TmdbId != null && ids.Contains(m.TmdbId))
+            .Select(m => m.TmdbId ?? string.Empty)
+            .ToListAsync();
+
+        return found.ToHashSet();
+    }
+
     public async Task<Dictionary<string, Guid>> GetLibraryIdsByTmdbIdsAsync(IEnumerable<string> tmdbIds)
     {
         var items = await _context.MediaItems

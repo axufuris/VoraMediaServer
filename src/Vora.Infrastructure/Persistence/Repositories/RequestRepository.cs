@@ -12,6 +12,24 @@ public class RequestRepository(VoraDbContext context) : IRequestRepository
             .Include(r => r.Requesters)
             .FirstOrDefaultAsync(r => r.ExternalId == externalId && r.Type == type);
 
+    public async Task<Dictionary<string, MediaRequest>> GetRequestsAsync(IEnumerable<string> externalIds, string type)
+    {
+        var ids = externalIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<string, MediaRequest>();
+
+        var requests = await context.MediaRequests
+            .Include(r => r.Requesters)
+            .Where(r => r.Type == type && ids.Contains(r.ExternalId))
+            .ToListAsync();
+
+        var map = new Dictionary<string, MediaRequest>();
+        foreach (var request in requests)
+        {
+            map[request.ExternalId] = request;
+        }
+        return map;
+    }
+
     public Task<MediaRequest?> GetRequestByIdAsync(Guid id) =>
         context.MediaRequests.FindAsync(id).AsTask();
 
