@@ -284,14 +284,10 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         }
 
         var orphanedSlots = existingMixes
-            .Where(e => !newMixes.Any(n => n.Slot == e.Slot))
+            .Where(e => newMixes.All(n => n.Slot != e.Slot))
+            .Select(e => e.Slot)
             .ToList();
-        foreach (var orphan in orphanedSlots)
-        {
-            await _repo.DeleteMixesForProfileAsync(profileId, GeneratedMixKind.DailyMix);
-            foreach (var m in newMixes) await _repo.SaveMixAsync(m);
-            break;
-        }
+        await _repo.DeleteMixSlotsAsync(profileId, GeneratedMixKind.DailyMix, orphanedSlots);
 
         await _notifier.NotifyMusicMixesUpdatedAsync(profileId);
     }
@@ -1168,6 +1164,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         var artistGenres = await _repo.GetGenresForArtistsAsync(topArtists.Select(a => a.ArtistId));
 
         var moodList = MoodDefinitions.ToList();
+        var producedSlots = new List<int>();
         for (int i = 0; i < moodList.Count; i++)
         {
             var (moodName, def) = (moodList[i].Key, moodList[i].Value);
@@ -1226,7 +1223,16 @@ public class MusicRecommendationManager : IMusicRecommendationManager
                     TrackOrder = trackIds
                 });
             }
+
+            producedSlots.Add(slot);
         }
+
+        var existingMoodMixes = await _repo.GetMixesForProfileAsync(profileId, GeneratedMixKind.MoodMix);
+        var staleMoodSlots = existingMoodMixes
+            .Where(m => !producedSlots.Contains(m.Slot))
+            .Select(m => m.Slot)
+            .ToList();
+        await _repo.DeleteMixSlotsAsync(profileId, GeneratedMixKind.MoodMix, staleMoodSlots);
     }
 
     private async Task<HashSet<Guid>> GetRecentlyPlayedTrackIdsAsync(Guid profileId, MusicAccessFilter access)

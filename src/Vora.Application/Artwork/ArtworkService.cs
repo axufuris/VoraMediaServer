@@ -66,14 +66,25 @@ public class ArtworkService : IArtworkService
 
     public async Task<string> UploadAsync(Guid mediaItemId, UploadedFile file, ArtworkKind kind)
     {
-        var ext = Path.GetExtension(file.FileName);
+        byte[] imageBytes;
+        await using (var buffer = new MemoryStream())
+        {
+            await file.Content.CopyToAsync(buffer);
+            imageBytes = buffer.ToArray();
+        }
+
+        var ext = Vora.Application.FileSystem.ImageContentValidator.DetectImageExtension(imageBytes);
+        if (ext == null)
+        {
+            throw new InvalidOperationException("Uploaded file is not a supported image (JPEG, PNG, WebP, or GIF).");
+        }
+
         var fileName = $"media_{mediaItemId}_{kind.ToString().ToLower()}_{Guid.NewGuid()}{ext}";
         var filePath = Path.Combine(_basePath, fileName);
 
         try
         {
-            await using var stream = new FileStream(filePath, FileMode.Create);
-            await file.Content.CopyToAsync(stream);
+            await File.WriteAllBytesAsync(filePath, imageBytes);
         }
         catch (Exception ex)
         {

@@ -5,5 +5,7 @@ public enum EmailTemplateKey
     PasswordReset,
     AdminInvite,
     RequestAvailable,
-    TestEmail
+    TestEmail,
+    EmailChange,
+    EmailChangedNotice
 }

@@ -150,10 +150,12 @@ public class IptvEpgServiceHelpersTests
             ["ch1"] = new() { MakeProgram("p1", "ch1", DateTime.UtcNow, rating: "TV-MA", title: "Mature Show", description: "adult content") }
         };
 
-        IptvEpgService.ApplyParentalControls(guide, new List<string> { "TV-G", "TV-PG" }, blockUnratedContent: false);
+        var result = IptvEpgService.ApplyParentalControls(guide, new List<string> { "TV-G", "TV-PG" }, blockUnratedContent: false);
 
-        guide["ch1"][0].Title.Should().Be("Restricted Content");
-        guide["ch1"][0].Description.Should().Be("This program exceeds the content rating limits for this profile.");
+        result["ch1"][0].Title.Should().Be("Restricted Content");
+        result["ch1"][0].Description.Should().Be("This program exceeds the content rating limits for this profile.");
+        // The original (cached) instance must NOT be mutated.
+        guide["ch1"][0].Title.Should().Be("Mature Show");
     }
 
     [Fact]
@@ -164,10 +166,10 @@ public class IptvEpgServiceHelpersTests
             ["ch1"] = new() { MakeProgram("p1", "ch1", DateTime.UtcNow, rating: "TV-PG", title: "Family Show", description: "fun") }
         };
 
-        IptvEpgService.ApplyParentalControls(guide, new List<string> { "TV-G", "TV-PG" }, blockUnratedContent: false);
+        var result = IptvEpgService.ApplyParentalControls(guide, new List<string> { "TV-G", "TV-PG" }, blockUnratedContent: false);
 
-        guide["ch1"][0].Title.Should().Be("Family Show");
-        guide["ch1"][0].Description.Should().Be("fun");
+        result["ch1"][0].Title.Should().Be("Family Show");
+        result["ch1"][0].Description.Should().Be("fun");
     }
 
     [Fact]
@@ -178,9 +180,9 @@ public class IptvEpgServiceHelpersTests
             ["ch1"] = new() { MakeProgram("p1", "ch1", DateTime.UtcNow, rating: "NR", title: "Unrated", description: "no rating") }
         };
 
-        IptvEpgService.ApplyParentalControls(guide, new List<string> { "TV-G" }, blockUnratedContent: false);
+        var result = IptvEpgService.ApplyParentalControls(guide, new List<string> { "TV-G" }, blockUnratedContent: false);
 
-        guide["ch1"][0].Title.Should().Be("Unrated");
+        result["ch1"][0].Title.Should().Be("Unrated");
     }
 
     [Fact]
@@ -191,9 +193,9 @@ public class IptvEpgServiceHelpersTests
             ["ch1"] = new() { MakeProgram("p1", "ch1", DateTime.UtcNow, rating: "NR", title: "Unrated", description: "no rating") }
         };
 
-        IptvEpgService.ApplyParentalControls(guide, new List<string> { "TV-G" }, blockUnratedContent: true);
+        var result = IptvEpgService.ApplyParentalControls(guide, new List<string> { "TV-G" }, blockUnratedContent: true);
 
-        guide["ch1"][0].Title.Should().Be("Restricted Content");
+        result["ch1"][0].Title.Should().Be("Restricted Content");
     }
 
     [Fact]
@@ -208,9 +210,9 @@ public class IptvEpgServiceHelpersTests
             }
         };
 
-        IptvEpgService.ApplyParentalControls(guide, new List<string> { "TV-G" }, blockUnratedContent: true);
+        var result = IptvEpgService.ApplyParentalControls(guide, new List<string> { "TV-G" }, blockUnratedContent: true);
 
-        guide["ch1"][0].Title.Should().Be("Cartoons");
-        guide["ch1"][1].Title.Should().Be("Restricted Content");
+        result["ch1"][0].Title.Should().Be("Cartoons");
+        result["ch1"][1].Title.Should().Be("Restricted Content");
     }
 }

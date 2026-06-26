@@ -19,6 +19,8 @@ public static class EmailTemplateVariables
     public const string MediaType = "mediaType";
     public const string MediaLink = "mediaLink";
     public const string PosterUrl = "posterUrl";
+    public const string ConfirmLink = "confirmLink";
+    public const string NewEmail = "newEmail";
 
     private static readonly IReadOnlyDictionary<EmailTemplateKey, IReadOnlyList<EmailTemplateVariable>> Catalog =
         new Dictionary<EmailTemplateKey, IReadOnlyList<EmailTemplateVariable>>
@@ -46,6 +48,19 @@ public static class EmailTemplateVariables
             },
             [EmailTemplateKey.TestEmail] = new List<EmailTemplateVariable>
             {
+                new() { Name = ServerName, Description = "The configured server name." }
+            },
+            [EmailTemplateKey.EmailChange] = new List<EmailTemplateVariable>
+            {
+                new() { Name = UserName, Description = "The display name of the user changing their email." },
+                new() { Name = NewEmail, Description = "The new email address awaiting confirmation." },
+                new() { Name = ConfirmLink, Description = "The single-use email-change confirmation link." },
+                new() { Name = ServerName, Description = "The configured server name." }
+            },
+            [EmailTemplateKey.EmailChangedNotice] = new List<EmailTemplateVariable>
+            {
+                new() { Name = UserName, Description = "The display name of the user whose email changed." },
+                new() { Name = NewEmail, Description = "The new email address the account was changed to." },
                 new() { Name = ServerName, Description = "The configured server name." }
             }
         };

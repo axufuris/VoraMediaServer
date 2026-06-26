@@ -23,9 +23,9 @@ public static partial class ArtworkEndpoints
         var authGroup = group.MapGroup("").RequireAuthorization();
 
         authGroup.MapGet("/media/{id:guid}/artwork", GetMediaArtworkAsync);
-        authGroup.MapPost("/media/{id:guid}/artwork/upload", UploadMediaArtworkAsync).DisableAntiforgery();
-        authGroup.MapPost("/media/{id:guid}/artwork/url", AddMediaArtworkUrlAsync);
-        authGroup.MapDelete("/media/artwork/{artworkId:guid}", DeleteMediaArtworkAsync);
+        authGroup.MapPost("/media/{id:guid}/artwork/upload", UploadMediaArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
+        authGroup.MapPost("/media/{id:guid}/artwork/url", AddMediaArtworkUrlAsync).RequireAuthorization("AdminOnly");
+        authGroup.MapDelete("/media/artwork/{artworkId:guid}", DeleteMediaArtworkAsync).RequireAuthorization("AdminOnly");
 
         return group;
     }

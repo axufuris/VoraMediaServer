@@ -61,6 +61,19 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
         }
     }
 
+    public async Task DeleteMixSlotsAsync(Guid profileId, GeneratedMixKind kind, IReadOnlyCollection<int> slots)
+    {
+        if (slots.Count == 0) return;
+        var mixes = await _context.GeneratedMixes
+            .Where(m => m.ProfileId == profileId && m.Kind == kind && slots.Contains(m.Slot))
+            .ToListAsync();
+        if (mixes.Count > 0)
+        {
+            _context.GeneratedMixes.RemoveRange(mixes);
+            await _context.SaveChangesAsync();
+        }
+    }
+
     public async Task<List<Guid>> GetProfileIdsWithRecentActivityAsync(int withinDays)
     {
         var cutoff = DateTime.UtcNow.AddDays(-withinDays);

@@ -222,9 +222,7 @@ public class IptvEpgService : IIptvEpgService
 
         if (profile == null || profile.HasAllLibraryAccess) return rawGuide;
 
-        ApplyParentalControls(rawGuide, profile.AllowedTvRatings ?? new List<string>(), profile.BlockUnratedContent);
-
-        return rawGuide;
+        return ApplyParentalControls(rawGuide, profile.AllowedTvRatings ?? new List<string>(), profile.BlockUnratedContent);
     }
 
     private async Task SyncSourceAsync(
@@ -337,18 +335,43 @@ public class IptvEpgService : IIptvEpgService
         await JsonSerializer.SerializeAsync(fileStream, cache, cancellationToken: cancellationToken);
     }
 
-    internal static void ApplyParentalControls(Dictionary<string, List<IptvProgramDto>> guide, List<string> allowedRatings, bool blockUnratedContent)
+    internal static Dictionary<string, List<IptvProgramDto>> ApplyParentalControls(Dictionary<string, List<IptvProgramDto>> guide, List<string> allowedRatings, bool blockUnratedContent)
     {
+        var result = new Dictionary<string, List<IptvProgramDto>>(guide.Count);
         foreach (var channel in guide)
         {
+            var programs = new List<IptvProgramDto>(channel.Value.Count);
             foreach (var program in channel.Value)
             {
-                if (allowedRatings.Contains(program.ContentRating)) continue;
-                if (!blockUnratedContent && program.ContentRating == UnratedRating) continue;
-
-                program.Title = RestrictedTitle;
-                program.Description = RestrictedDescription;
+                if (IsProgramAllowed(program, allowedRatings, blockUnratedContent))
+                {
+                    programs.Add(program);
+                }
+                else
+                {
+                    programs.Add(new IptvProgramDto
+                    {
+                        Id = program.Id,
+                        ChannelId = program.ChannelId,
+                        Title = RestrictedTitle,
+                        Description = RestrictedDescription,
+                        StartTime = program.StartTime,
+                        EndTime = program.EndTime,
+                        ContentRating = program.ContentRating,
+                        SeasonNumber = program.SeasonNumber,
+                        EpisodeNumber = program.EpisodeNumber
+                    });
+                }
             }
+            result[channel.Key] = programs;
         }
+        return result;
+    }
+
+    private static bool IsProgramAllowed(IptvProgramDto program, List<string> allowedRatings, bool blockUnratedContent)
+    {
+        if (allowedRatings.Contains(program.ContentRating)) return true;
+        var isUnrated = string.IsNullOrWhiteSpace(program.ContentRating) || program.ContentRating == UnratedRating;
+        return isUnrated && !blockUnratedContent;
     }
 }

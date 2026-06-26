@@ -182,7 +182,7 @@ public class UserManagerTests
             userId: Guid.NewGuid(),
             callingAccountId: Guid.NewGuid(),
             callerIsAdmin: false,
-            email: "x@y.com", displayName: "X", newPassword: null);
+            displayName: "X", newPassword: null);
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("*your own account*");
     }
@@ -196,9 +196,8 @@ public class UserManagerTests
 
         await _manager.UpdateUserAccountAsync(
             userId, callingAccountId: userId, callerIsAdmin: false,
-            email: "NEW@example.com", displayName: "New Name", newPassword: null);
+            displayName: "New Name", newPassword: null);
 
-        user.Email.Should().Be("new@example.com"); // lowercased
         user.DisplayName.Should().Be("New Name");
         await _repo.Received(1).UpdateUserAsync(user);
     }
@@ -212,7 +211,7 @@ public class UserManagerTests
 
         await _manager.UpdateUserAccountAsync(
             userId, callingAccountId: Guid.NewGuid(), callerIsAdmin: true,
-            email: "x@y.com", displayName: "X", newPassword: null);
+            displayName: "X", newPassword: null);
 
         await _repo.Received(1).UpdateUserAsync(user);
     }
@@ -225,7 +224,7 @@ public class UserManagerTests
 
         var act = async () => await _manager.UpdateUserAccountAsync(
             userId, callingAccountId: userId, callerIsAdmin: false,
-            email: "x@y.com", displayName: "X", newPassword: null);
+            displayName: "X", newPassword: null);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*User not found*");
     }
@@ -239,7 +238,7 @@ public class UserManagerTests
         _repo.GetUserByIdAsync(userId).Returns(user);
 
         await _manager.UpdateUserAccountAsync(
-            userId, userId, false, "x@y.com", "X", newPassword: null);
+            userId, userId, false, "X", newPassword: null);
 
         user.SecurityStamp.Should().Be(originalStamp);
         user.PasswordHash.Should().Be("old-hash");
@@ -254,7 +253,7 @@ public class UserManagerTests
         _repo.GetUserByIdAsync(userId).Returns(user);
 
         await _manager.UpdateUserAccountAsync(
-            userId, userId, false, "x@y.com", "X", newPassword: "new-secret");
+            userId, userId, false, "X", newPassword: "new-secret");
 
         user.PasswordHash.Should().NotBe("old-hash");
         BCrypt.Net.BCrypt.Verify("new-secret", user.PasswordHash).Should().BeTrue();
@@ -270,7 +269,7 @@ public class UserManagerTests
         _repo.GetUserByIdAsync(userId).Returns(user);
 
         await _manager.UpdateUserAccountAsync(
-            userId, userId, false, "x@y.com", "X", newPassword: null,
+            userId, userId, false, "X", newPassword: null,
             emailNotifyOnRequestAvailable: null);
 
         user.EmailNotifyOnRequestAvailable.Should().BeTrue();
@@ -285,7 +284,7 @@ public class UserManagerTests
         _repo.GetUserByIdAsync(userId).Returns(user);
 
         await _manager.UpdateUserAccountAsync(
-            userId, userId, false, "x@y.com", "X", newPassword: null,
+            userId, userId, false, "X", newPassword: null,
             emailNotifyOnRequestAvailable: false);
 
         user.EmailNotifyOnRequestAvailable.Should().BeFalse();

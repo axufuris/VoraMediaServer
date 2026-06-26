@@ -14,6 +14,7 @@ import LoginPage from './pages/Auth/LoginPage';
 import RegisterPage from './pages/Auth/RegisterPage';
 import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/Auth/ResetPasswordPage';
+import ConfirmEmailPage from './pages/Auth/ConfirmEmailPage';
 import ProfileSelectionPage from './pages/Profile/ProfileSelectionPage';
 
 const ClientLibraryPage = lazy(() => import('./pages/Client/LibraryPage'));
@@ -161,6 +162,7 @@ export default function App() {
                     <Route path="/register" element={<RegisterPage />} />
                     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/confirm-email" element={<ConfirmEmailPage />} />
                     <Route path="/profiles" element={<ProfileSelectionPage />} />
 
                     {/* CLIENT ROUTES */}

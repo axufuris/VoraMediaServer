@@ -15,13 +15,14 @@ public static class CollectionArtworkEndpoints
             .Produces(StatusCodes.Status200OK);
 
         group.MapPost("/{id:guid}/artwork/upload", UploadArtworkAsync)
+            .RequireAuthorization("AdminOnly")
             .DisableAntiforgery();
 
-        group.MapPost("/{id:guid}/artwork/url", AddArtworkUrlAsync);
+        group.MapPost("/{id:guid}/artwork/url", AddArtworkUrlAsync).RequireAuthorization("AdminOnly");
 
-        group.MapPost("/{id:guid}/artwork/fetch", RefreshProviderArtworkAsync);
+        group.MapPost("/{id:guid}/artwork/fetch", RefreshProviderArtworkAsync).RequireAuthorization("AdminOnly");
 
-        group.MapDelete("/artwork/{artworkId:guid}", DeleteArtworkAsync);
+        group.MapDelete("/artwork/{artworkId:guid}", DeleteArtworkAsync).RequireAuthorization("AdminOnly");
 
         return group;
     }

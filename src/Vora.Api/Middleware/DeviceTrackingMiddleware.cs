@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -19,7 +18,6 @@ public class DeviceTrackingMiddleware
     private const string OperatingSystemHeader = "X-Vora-OS";
 
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(5);
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> DeviceLocks = new();
 
     private readonly RequestDelegate _next;
     private readonly IMemoryCache _cache;
@@ -91,7 +89,7 @@ public class DeviceTrackingMiddleware
         Guid? profileId,
         string cacheKey)
     {
-        var deviceLock = DeviceLocks.GetOrAdd(deviceId, _ => new SemaphoreSlim(1, 1));
+        var deviceLock = GetDeviceLock(deviceId);
         await deviceLock.WaitAsync();
 
         try
@@ -132,6 +130,13 @@ public class DeviceTrackingMiddleware
             deviceLock.Release();
         }
     }
+
+    private SemaphoreSlim GetDeviceLock(string deviceId) =>
+        _cache.GetOrCreate($"DeviceLock_{deviceId}", entry =>
+        {
+            entry.SlidingExpiration = CacheLifetime;
+            return new SemaphoreSlim(1, 1);
+        }) ?? throw new InvalidOperationException("Device lock factory returned null.");
 
     private static (ClientDevice Device, bool IpChanged) UpsertDevice(
         VoraDbContext dbContext,

@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using Vora.Api.Extensions;
 using Vora.Application.Auth;
 using Vora.Application.Auth.ViewModels;
@@ -36,6 +37,11 @@ public class ResetPasswordRequestDto
     public required string NewPassword { get; set; }
 }
 
+public class ConfirmEmailChangeRequestDto
+{
+    public required string Token { get; set; }
+}
+
 public static class AuthEndpoints
 {
     public static RouteGroupBuilder MapAuthEndpoints(this IEndpointRouteBuilder routes)
@@ -59,6 +65,7 @@ public static class AuthEndpoints
         group.MapPost("/exchange-profile-token", ExchangeProfileTokenAsync)
             .WithName("ExchangeProfileToken")
             .Produces<ExchangeProfileTokenResponse>(StatusCodes.Status200OK)
+            .RequireAuthorization()
             .RequireRateLimiting(VoraRateLimitPolicies.AuthBurst);
         group.MapPost("/forgot-password", RequestPasswordResetAsync)
             .WithName("RequestPasswordReset")
@@ -66,6 +73,10 @@ public static class AuthEndpoints
             .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
         group.MapPost("/reset-password", ConfirmPasswordResetAsync)
             .WithName("ConfirmPasswordReset")
+            .Produces(StatusCodes.Status204NoContent)
+            .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
+        group.MapPost("/confirm-email-change", ConfirmEmailChangeAsync)
+            .WithName("ConfirmEmailChange")
             .Produces(StatusCodes.Status204NoContent)
             .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
 
@@ -138,9 +149,15 @@ public static class AuthEndpoints
         }
     }
 
-    private static async Task<IResult> ExchangeProfileTokenAsync([FromQuery] Guid accountId, [FromQuery] Guid profileId, IAuthManager manager)
+    private static async Task<IResult> ExchangeProfileTokenAsync([FromQuery] Guid accountId, [FromQuery] Guid profileId, ClaimsPrincipal user, IAuthManager manager)
     {
-        var token = await manager.GenerateProfileTokenAsync(accountId, profileId);
+        var callerAccountId = user.GetAccountId();
+        if (callerAccountId == null || callerAccountId.Value != accountId)
+        {
+            return Results.Forbid();
+        }
+
+        var token = await manager.GenerateProfileTokenAsync(callerAccountId.Value, profileId);
         return token != null
             ? Results.Ok(new ExchangeProfileTokenResponse { Token = token })
             : Results.Unauthorized();
@@ -168,6 +185,17 @@ public static class AuthEndpoints
             PasswordResetResult.Success => Results.NoContent(),
             PasswordResetResult.PasswordRejected => Results.BadRequest(new { Message = "Password must be at least 8 characters." }),
             _ => Results.BadRequest(new { Message = "Invalid or expired reset token." })
+        };
+    }
+
+    private static async Task<IResult> ConfirmEmailChangeAsync([FromBody] ConfirmEmailChangeRequestDto request, IAuthManager manager, CancellationToken cancellationToken)
+    {
+        var result = await manager.ConfirmEmailChangeAsync(request.Token, cancellationToken);
+        return result switch
+        {
+            EmailChangeConfirmResult.Success => Results.NoContent(),
+            EmailChangeConfirmResult.AlreadyInUse => Results.Conflict(new { Message = "That email address is already in use." }),
+            _ => Results.BadRequest(new { Message = "Invalid or expired confirmation link." })
         };
     }
 

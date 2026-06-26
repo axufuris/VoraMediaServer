@@ -23,6 +23,22 @@ public enum PasswordResetResult
     PasswordRejected
 }
 
+public enum EmailChangeRequestResult
+{
+    Unchanged,
+    AppliedDirectly,
+    VerificationSent,
+    AlreadyInUse,
+    Invalid
+}
+
+public enum EmailChangeConfirmResult
+{
+    Success,
+    InvalidToken,
+    AlreadyInUse
+}
+
 public interface IAuthManager
 {
     Task<(bool IsClaimed, RegistrationMode Mode)> GetSetupStatusAsync();
@@ -33,6 +49,8 @@ public interface IAuthManager
     Task<string> GenerateInviteCodeAsync();
     Task RequestPasswordResetAsync(string email, string requestOriginFallback, CancellationToken cancellationToken = default);
     Task<PasswordResetResult> ConfirmPasswordResetAsync(string token, string newPassword, CancellationToken cancellationToken = default);
+    Task<EmailChangeRequestResult> ChangeEmailAsync(Guid userId, Guid callingAccountId, bool callerIsAdmin, string newEmail, string requestOriginFallback, CancellationToken cancellationToken = default);
+    Task<EmailChangeConfirmResult> ConfirmEmailChangeAsync(string token, CancellationToken cancellationToken = default);
 }
 
 public class AuthManager(
@@ -48,9 +66,16 @@ public class AuthManager(
     private const int ProfileTokenLifetimeDays = 7;
     private const int InviteCodeLifetimeMinutes = 30;
     private const int PasswordResetTicketLifetimeMinutes = 60;
+    private const int EmailChangeTicketLifetimeMinutes = 60;
     private const int PasswordResetRequestsPerHour = 3;
     private const int MinPasswordLength = 8;
     private const string PasswordResetThrottlePrefix = "pwreset:throttle:";
+
+    private const int MaxLoginFailures = 5;
+    private const int LoginFailureWindowMinutes = 15;
+    private const int LoginLockoutMinutes = 5;
+    private const string LoginFailPrefix = "login:fail:";
+    private const string LoginLockPrefix = "login:lock:";
 
     private const int InvitePinLength = 4;
 
@@ -195,13 +220,37 @@ public class AuthManager(
 
     public async Task<AuthResponseDto?> LoginAsync(string email, string password)
     {
-        var user = await repository.GetUserWithProfilesByEmailAsync(email);
-        if (user == null || !VerifyPassword(password, user.PasswordHash))
+        var key = email.Trim().ToLowerInvariant();
+        if (memoryCache.TryGetValue(LoginLockPrefix + key, out _))
         {
             return null;
         }
 
+        var user = await repository.GetUserWithProfilesByEmailAsync(email);
+        if (user == null || !VerifyPassword(password, user.PasswordHash))
+        {
+            RegisterFailedLogin(key);
+            return null;
+        }
+
+        memoryCache.Remove(LoginFailPrefix + key);
         return BuildAuthResponse(user);
+    }
+
+    private void RegisterFailedLogin(string key)
+    {
+        var failKey = LoginFailPrefix + key;
+        var attempts = memoryCache.TryGetValue<int>(failKey, out var n) ? n + 1 : 1;
+
+        if (attempts >= MaxLoginFailures)
+        {
+            memoryCache.Set(LoginLockPrefix + key, true, TimeSpan.FromMinutes(LoginLockoutMinutes));
+            memoryCache.Remove(failKey);
+        }
+        else
+        {
+            memoryCache.Set(failKey, attempts, TimeSpan.FromMinutes(LoginFailureWindowMinutes));
+        }
     }
 
     public async Task<string?> GenerateProfileTokenAsync(Guid accountId, Guid profileId)
@@ -439,6 +488,154 @@ public class AuthManager(
         return PasswordResetResult.Success;
     }
 
+    public async Task<EmailChangeRequestResult> ChangeEmailAsync(Guid userId, Guid callingAccountId, bool callerIsAdmin, string newEmail, string requestOriginFallback, CancellationToken cancellationToken = default)
+    {
+        if (!callerIsAdmin && callingAccountId != userId)
+        {
+            throw new UnauthorizedAccessException("You may only change your own email.");
+        }
+
+        var normalized = (newEmail ?? string.Empty).Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(normalized) || !normalized.Contains('@'))
+        {
+            return EmailChangeRequestResult.Invalid;
+        }
+
+        var user = await repository.GetUserByIdAsync(userId)
+            ?? throw new InvalidOperationException("User not found.");
+
+        if (string.Equals(normalized, user.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            return EmailChangeRequestResult.Unchanged;
+        }
+
+        var existing = await repository.GetUserWithProfilesByEmailAsync(normalized);
+        if (existing != null && existing.Id != userId)
+        {
+            return EmailChangeRequestResult.AlreadyInUse;
+        }
+
+        var settings = await settingsRepo.GetSettingsAsync();
+
+        if (callerIsAdmin || !settings.EmailEnabled)
+        {
+            var oldEmail = user.Email;
+            user.Email = normalized;
+            user.SecurityStamp = Guid.NewGuid().ToString("N");
+            await repository.ApplyEmailChangeAsync(user);
+            if (settings.EmailEnabled)
+            {
+                await SendEmailChangedNoticeAsync(oldEmail, user.DisplayName, normalized, ResolveServerName(settings.ServerName), cancellationToken);
+            }
+            return EmailChangeRequestResult.AppliedDirectly;
+        }
+
+        await repository.InvalidateOutstandingEmailChangeTicketsForUserAsync(user.Id);
+
+        var token = GenerateResetToken();
+        var ticket = new EmailChangeTicket
+        {
+            UserId = user.Id,
+            NewEmail = normalized,
+            TokenHash = HashToken(token),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(EmailChangeTicketLifetimeMinutes)
+        };
+        await repository.CreateEmailChangeTicketAsync(ticket);
+
+        var confirmLink = BuildEmailChangeLink(settings.EmailPublicBaseUrl, requestOriginFallback, token);
+
+        try
+        {
+            await emailService.SendAsync(new EmailMessage
+            {
+                TemplateKey = EmailTemplateKey.EmailChange,
+                ToAddress = normalized,
+                ToDisplayName = user.DisplayName,
+                Variables = new Dictionary<string, string>
+                {
+                    [EmailTemplateVariables.ServerName] = string.IsNullOrWhiteSpace(settings.ServerName) ? "Vora" : settings.ServerName,
+                    [EmailTemplateVariables.UserName] = user.DisplayName,
+                    [EmailTemplateVariables.NewEmail] = normalized,
+                    [EmailTemplateVariables.ConfirmLink] = confirmLink
+                }
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to enqueue email-change confirmation for user {UserId}", userId);
+        }
+
+        return EmailChangeRequestResult.VerificationSent;
+    }
+
+    public async Task<EmailChangeConfirmResult> ConfirmEmailChangeAsync(string token, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return EmailChangeConfirmResult.InvalidToken;
+        }
+
+        var hash = HashToken(token);
+        var ticket = await repository.GetActiveEmailChangeTicketByHashAsync(hash);
+        if (ticket is null)
+        {
+            return EmailChangeConfirmResult.InvalidToken;
+        }
+
+        var user = await repository.GetUserByIdAsync(ticket.UserId);
+        if (user is null)
+        {
+            await repository.DeleteEmailChangeTicketAsync(ticket);
+            return EmailChangeConfirmResult.InvalidToken;
+        }
+
+        var existing = await repository.GetUserWithProfilesByEmailAsync(ticket.NewEmail);
+        if (existing != null && existing.Id != user.Id)
+        {
+            await repository.DeleteEmailChangeTicketAsync(ticket);
+            return EmailChangeConfirmResult.AlreadyInUse;
+        }
+
+        var previousEmail = user.Email;
+        user.Email = ticket.NewEmail;
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        await repository.ApplyEmailChangeAsync(user);
+
+        var settings = await settingsRepo.GetSettingsAsync();
+        if (settings.EmailEnabled)
+        {
+            await SendEmailChangedNoticeAsync(previousEmail, user.DisplayName, ticket.NewEmail, ResolveServerName(settings.ServerName), cancellationToken);
+        }
+
+        return EmailChangeConfirmResult.Success;
+    }
+
+    private static string ResolveServerName(string? configured) =>
+        string.IsNullOrWhiteSpace(configured) ? "Vora" : configured;
+
+    private async Task SendEmailChangedNoticeAsync(string oldEmail, string displayName, string newEmail, string serverName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await emailService.SendAsync(new EmailMessage
+            {
+                TemplateKey = EmailTemplateKey.EmailChangedNotice,
+                ToAddress = oldEmail,
+                ToDisplayName = displayName,
+                Variables = new Dictionary<string, string>
+                {
+                    [EmailTemplateVariables.ServerName] = serverName,
+                    [EmailTemplateVariables.UserName] = displayName,
+                    [EmailTemplateVariables.NewEmail] = newEmail
+                }
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to enqueue email-changed notice to the previous address.");
+        }
+    }
+
     private bool TryRecordResetThrottle(string normalizedEmail)
     {
         var key = PasswordResetThrottlePrefix + normalizedEmail;
@@ -481,6 +678,13 @@ public class AuthManager(
         var baseUrl = string.IsNullOrWhiteSpace(configuredBaseUrl) ? fallbackOrigin : configuredBaseUrl;
         baseUrl = baseUrl.TrimEnd('/');
         return $"{baseUrl}/reset-password?token={Uri.EscapeDataString(token)}";
+    }
+
+    private static string BuildEmailChangeLink(string? configuredBaseUrl, string fallbackOrigin, string token)
+    {
+        var baseUrl = string.IsNullOrWhiteSpace(configuredBaseUrl) ? fallbackOrigin : configuredBaseUrl;
+        baseUrl = baseUrl.TrimEnd('/');
+        return $"{baseUrl}/confirm-email?token={Uri.EscapeDataString(token)}";
     }
 
     private sealed class ResetThrottleEntry

@@ -53,6 +53,11 @@ export const authService = {
         return response.data;
     },
 
+    confirmEmailChange: async (baseUrl: string, token: string): Promise<void> => {
+        const client = createDirectClient(baseUrl);
+        await client.post('/auth/confirm-email-change', { token });
+    },
+
     loginToServer: async (baseUrl: string, email: string, password: string): Promise<AuthResponse> => {
         const client = createDirectClient(baseUrl);
         const response = await client.post<AuthResponse>('/auth/login', { email, password });

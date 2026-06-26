@@ -35,6 +35,11 @@ public class SecurityHeadersMiddleware
                 headers.Append("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
             }
 
+            if (!headers.ContainsKey("Content-Security-Policy"))
+            {
+                headers.Append("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'");
+            }
+
             return Task.CompletedTask;
         });
 

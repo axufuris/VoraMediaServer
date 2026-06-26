@@ -113,6 +113,7 @@ public static class ProfileEndpoints
 
         group.MapPost("/profiles/{profileId:guid}/validate-pin", ValidatePinAsync)
             .WithName("ValidateProfilePin")
+            .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict)
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized);
 

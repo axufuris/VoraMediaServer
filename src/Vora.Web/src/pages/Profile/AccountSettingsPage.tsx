@@ -76,8 +76,10 @@ export default function AccountSettingsPage() {
         e.preventDefault();
         if (!user) return;
         try {
-            await userService.updateAccount(user.id, email, displayName, newPassword || undefined, emailNotifyOnRequestAvailable, serverId);
-            setAccountMsg("Account updated successfully.");
+            const result = await userService.updateAccount(user.id, email, displayName, newPassword || undefined, emailNotifyOnRequestAvailable, serverId);
+            setAccountMsg(result.emailVerificationSent
+                ? `Account updated. To finish changing your email, open the confirmation link we sent to ${email}. Your email won't change until you confirm.`
+                : "Account updated successfully.");
             setNewPassword('');
             setRefreshTrigger(prev => prev + 1);
         } catch {

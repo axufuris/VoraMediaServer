@@ -49,6 +49,7 @@ public class DvrWorker : BackgroundService
         var repo = scope.ServiceProvider.GetRequiredService<IIptvRepository>();
         var dvrManager = scope.ServiceProvider.GetRequiredService<IDvrManager>();
         var recordingService = scope.ServiceProvider.GetRequiredService<IDvrRecordingService>();
+        var tunerGate = scope.ServiceProvider.GetRequiredService<ITunerGate>();
 
         var now = DateTime.UtcNow;
 
@@ -76,18 +77,20 @@ public class DvrWorker : BackgroundService
 
             try
             {
-                bool canAllocate = await dvrManager.CanAllocateTunerAsync(session.Schedule.Channel.PlaylistId);
-
-                if (canAllocate)
+                var playlistId = session.Schedule.Channel.PlaylistId;
+                await tunerGate.RunExclusiveAsync(playlistId, async () =>
                 {
-                    _logger.LogInformation($"[DVR Scheduler] Starting recording: {session.Title}");
-                    await recordingService.StartRecordingAsync(session.Id);
-                }
-                else
-                {
-                    _logger.LogWarning($"[DVR Scheduler] Insufficient tuners to record: {session.Title}. Marking as conflict.");
-                    await repo.UpdateSessionStatusAsync(session.Id, IptvRecordingSessionStatus.Conflict, errorMessage: "No tuners available at start time.");
-                }
+                    if (await dvrManager.CanAllocateTunerAsync(playlistId))
+                    {
+                        _logger.LogInformation($"[DVR Scheduler] Starting recording: {session.Title}");
+                        await recordingService.StartRecordingAsync(session.Id);
+                    }
+                    else
+                    {
+                        _logger.LogWarning($"[DVR Scheduler] Insufficient tuners to record: {session.Title}. Marking as conflict.");
+                        await repo.UpdateSessionStatusAsync(session.Id, IptvRecordingSessionStatus.Conflict, errorMessage: "No tuners available at start time.");
+                    }
+                });
             }
             catch (Exception ex)
             {

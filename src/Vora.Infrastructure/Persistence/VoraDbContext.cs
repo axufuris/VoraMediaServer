@@ -79,6 +79,7 @@ public class VoraDbContext : DbContext
     public DbSet<ProfileDeviceSetting> ProfileDeviceSettings { get; set; }
     public DbSet<RegistrationTicket> RegistrationTickets { get; set; }
     public DbSet<PasswordResetTicket> PasswordResetTickets { get; set; }
+    public DbSet<EmailChangeTicket> EmailChangeTickets { get; set; }
     public DbSet<InvitationTicket> InvitationTickets { get; set; }
     public DbSet<ClientDevice> ClientDevices { get; set; }
 
@@ -174,6 +175,7 @@ public class VoraDbContext : DbContext
         ConfigureProfileDeviceSettings(modelBuilder);
         ConfigureRegistrationTickets(modelBuilder);
         ConfigurePasswordResetTickets(modelBuilder);
+        ConfigureEmailChangeTickets(modelBuilder);
         ConfigureInvitationTickets(modelBuilder);
         ConfigureClientDevices(modelBuilder, converters);
 
@@ -831,6 +833,23 @@ public class VoraDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureEmailChangeTickets(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EmailChangeTicket>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.NewEmail).IsRequired().HasMaxLength(320);
             entity.HasIndex(e => e.TokenHash).IsUnique();
             entity.HasIndex(e => e.UserId);
 

@@ -41,14 +41,25 @@ public class UserProfileImageService : IUserProfileImageService
             DeleteImage(oldImageUrl);
         }
 
-        var ext = Path.GetExtension(file.FileName);
+        byte[] imageBytes;
+        await using (var buffer = new MemoryStream())
+        {
+            await file.Content.CopyToAsync(buffer);
+            imageBytes = buffer.ToArray();
+        }
+
+        var ext = ImageContentValidator.DetectImageExtension(imageBytes);
+        if (ext == null)
+        {
+            throw new InvalidOperationException("Uploaded file is not a supported image (JPEG, PNG, WebP, or GIF).");
+        }
+
         var fileName = $"profile_{Guid.NewGuid()}{ext}";
         var filePath = Path.Combine(_basePath, fileName);
 
         try
         {
-            await using var stream = new FileStream(filePath, FileMode.Create);
-            await file.Content.CopyToAsync(stream);
+            await File.WriteAllBytesAsync(filePath, imageBytes);
         }
         catch (Exception ex)
         {

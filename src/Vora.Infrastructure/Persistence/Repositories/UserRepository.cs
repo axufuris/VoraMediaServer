@@ -176,6 +176,45 @@ public class UserRepository(VoraDbContext context) : IUserRepository
         await context.SaveChangesAsync();
     }
 
+    public async Task CreateEmailChangeTicketAsync(EmailChangeTicket ticket)
+    {
+        await context.EmailChangeTickets.AddAsync(ticket);
+        await context.SaveChangesAsync();
+    }
+
+    public Task<EmailChangeTicket?> GetActiveEmailChangeTicketByHashAsync(string tokenHash) =>
+        context.EmailChangeTickets
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && t.ExpiresAt > DateTime.UtcNow);
+
+    public async Task DeleteEmailChangeTicketAsync(EmailChangeTicket ticket)
+    {
+        context.EmailChangeTickets.Remove(ticket);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task InvalidateOutstandingEmailChangeTicketsForUserAsync(Guid userId)
+    {
+        var outstanding = await context.EmailChangeTickets
+            .Where(t => t.UserId == userId)
+            .ToListAsync();
+        if (outstanding.Count == 0) return;
+        context.EmailChangeTickets.RemoveRange(outstanding);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task ApplyEmailChangeAsync(User user)
+    {
+        var outstanding = await context.EmailChangeTickets
+            .Where(t => t.UserId == user.Id)
+            .ToListAsync();
+        context.Users.Update(user);
+        if (outstanding.Count > 0)
+        {
+            context.EmailChangeTickets.RemoveRange(outstanding);
+        }
+        await context.SaveChangesAsync();
+    }
+
     public Task<(List<UserProfileHistoryDto> Data, int Total)> GetUserPlayHistoryAsync(
         Guid userId,
         Guid? profileId,

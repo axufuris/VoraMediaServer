@@ -6,6 +6,9 @@ services:
     build:
       context: .
       dockerfile: src/Vora.Api/Dockerfile
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_HTTP_PORTS=8080

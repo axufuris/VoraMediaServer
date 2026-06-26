@@ -51,8 +51,9 @@ export const userService = {
         return response.data;
     },
 
-    updateAccount: async (userId: string, email: string, displayName: string, newPassword?: string, emailNotifyOnRequestAvailable?: boolean, serverId?: string): Promise<void> => {
-        await apiClient.put(`/users/${userId}`, { email, displayName, newPassword, emailNotifyOnRequestAvailable }, { serverId });
+    updateAccount: async (userId: string, email: string, displayName: string, newPassword?: string, emailNotifyOnRequestAvailable?: boolean, serverId?: string): Promise<{ emailVerificationSent: boolean }> => {
+        const response = await apiClient.put<{ emailVerificationSent: boolean }>(`/users/${userId}`, { email, displayName, newPassword, emailNotifyOnRequestAvailable }, { serverId });
+        return response.data ?? { emailVerificationSent: false };
     },
 
     updateUserAccess: async (userId: string, hasAllLibraryAccess: boolean, allowedLibraryIds: string[], canRequestMedia: boolean, autoApproveRequests: boolean, enableAiRecommendations: boolean, hasAllIptvAccess: boolean, allowedIptvPlaylistIds: string[], canRecordLiveTv: boolean, dvrStorageQuotaBytes: number, canTimeshiftIptv: boolean, canAddCustomPodcastFeeds: boolean, serverId?: string): Promise<void> => {

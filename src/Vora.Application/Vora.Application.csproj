@@ -41,6 +41,12 @@
     <EmbeddedResource Include="Email\Templates\TestEmail.subject.txt" />
     <EmbeddedResource Include="Email\Templates\TestEmail.html" />
     <EmbeddedResource Include="Email\Templates\TestEmail.txt" />
+    <EmbeddedResource Include="Email\Templates\EmailChange.subject.txt" />
+    <EmbeddedResource Include="Email\Templates\EmailChange.html" />
+    <EmbeddedResource Include="Email\Templates\EmailChange.txt" />
+    <EmbeddedResource Include="Email\Templates\EmailChangedNotice.subject.txt" />
+    <EmbeddedResource Include="Email\Templates\EmailChangedNotice.html" />
+    <EmbeddedResource Include="Email\Templates\EmailChangedNotice.txt" />
   </ItemGroup>
 
   <ItemGroup>

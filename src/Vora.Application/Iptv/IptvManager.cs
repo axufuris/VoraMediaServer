@@ -52,6 +52,7 @@ public class IptvManager : IIptvManager
     private readonly IUserManager _userManager;
     private readonly ITaskQueueManager _taskQueue;
     private readonly ITimeshiftCoordinator _timeshiftCoordinator;
+    private readonly ITunerGate _tunerGate;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IStreamingTokenSigner _tokenSigner;
     private readonly ILogger<IptvManager> _logger;
@@ -62,6 +63,7 @@ public class IptvManager : IIptvManager
         IUserManager userManager,
         ITaskQueueManager taskQueue,
         ITimeshiftCoordinator timeshiftCoordinator,
+        ITunerGate tunerGate,
         IHttpClientFactory httpClientFactory,
         IStreamingTokenSigner tokenSigner,
         ILogger<IptvManager> logger)
@@ -71,6 +73,7 @@ public class IptvManager : IIptvManager
         _userManager = userManager;
         _taskQueue = taskQueue;
         _timeshiftCoordinator = timeshiftCoordinator;
+        _tunerGate = tunerGate;
         _httpClientFactory = httpClientFactory;
         _tokenSigner = tokenSigner;
         _logger = logger;
@@ -308,7 +311,7 @@ public class IptvManager : IIptvManager
         var channel = await _repository.GetChannelByIdAsync(channelId);
         if (channel == null) throw new InvalidOperationException("Channel not found.");
 
-        await EnsureTunerAvailableAsync(channel.PlaylistId);
+        await _tunerGate.RunExclusiveAsync(channel.PlaylistId, () => EnsureTunerAvailableAsync(channel.PlaylistId));
 
         var sessionPath = await PrepareTimeshiftDirectoryAsync(profileId);
         var sessionId = Path.GetFileName(sessionPath);

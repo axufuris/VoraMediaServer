@@ -812,10 +812,11 @@ public class MusicManager : IMusicManager
     {
         try
         {
-            var ext = Path.GetExtension(sourceFileName ?? string.Empty).ToLowerInvariant();
-            if (string.IsNullOrEmpty(ext) || (ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" && ext != ".gif"))
+            var ext = Vora.Application.FileSystem.ImageContentValidator.DetectImageExtension(bytes);
+            if (ext == null)
             {
-                ext = ".jpg";
+                _logger.LogWarning("Rejected non-image artwork upload for {Key}", identityKey);
+                return null;
             }
             var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes($"{identityKey}_{DateTime.UtcNow.Ticks}"))).ToLowerInvariant()[..16];
             var fileName = $"music_upload_{hash}{ext}";

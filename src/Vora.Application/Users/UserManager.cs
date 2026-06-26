@@ -13,7 +13,7 @@ public interface IUserManager
     Task<UserVM?> GetUserAccountAsync(Guid userId);
     Task<bool> ValidateProfilePinAsync(Guid profileId, string pin);
     Task<Guid> CreateManagedProfileAsync(Guid primaryUserId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, string? showtimesLocation);
-    Task UpdateUserAccountAsync(Guid userId, Guid callingAccountId, bool callerIsAdmin, string email, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null);
+    Task UpdateUserAccountAsync(Guid userId, Guid callingAccountId, bool callerIsAdmin, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null);
     Task UpdateManagedProfileAsync(Guid profileId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, string? showtimesLocation);
     Task DeleteManagedProfileAsync(Guid profileId);
     Task<bool> AccountOwnsProfileAsync(Guid accountId, Guid profileId);
@@ -67,7 +67,15 @@ public class UserManager(
         {
             return true;
         }
-        return dbPinHash == HashPin(pin);
+
+        if (dbPinHash.StartsWith("$2"))
+        {
+            return BCrypt.Net.BCrypt.Verify(pin, dbPinHash);
+        }
+
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(dbPinHash),
+            Encoding.UTF8.GetBytes(HashPin(pin)));
     }
 
     public async Task<Guid> CreateManagedProfileAsync(
@@ -106,7 +114,7 @@ public class UserManager(
 
         if (!string.IsNullOrWhiteSpace(pin))
         {
-            profile.PinHash = HashPin(pin);
+            profile.PinHash = BCrypt.Net.BCrypt.HashPassword(pin);
         }
 
         foreach (var schedule in BuildScheduleEntities(profile.Id, schedules))
@@ -127,7 +135,7 @@ public class UserManager(
         return profile.Id;
     }
 
-    public async Task UpdateUserAccountAsync(Guid userId, Guid callingAccountId, bool callerIsAdmin, string email, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null)
+    public async Task UpdateUserAccountAsync(Guid userId, Guid callingAccountId, bool callerIsAdmin, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null)
     {
         if (!callerIsAdmin && callingAccountId != userId)
         {
@@ -137,7 +145,6 @@ public class UserManager(
         var user = await repository.GetUserByIdAsync(userId)
             ?? throw new InvalidOperationException("User not found.");
 
-        user.Email = email.ToLower();
         user.DisplayName = displayName;
         if (!string.IsNullOrWhiteSpace(newPassword))
         {
@@ -356,7 +363,7 @@ public class UserManager(
 
         if (pin != null)
         {
-            profile.PinHash = string.IsNullOrWhiteSpace(pin) ? null : HashPin(pin);
+            profile.PinHash = string.IsNullOrWhiteSpace(pin) ? null : BCrypt.Net.BCrypt.HashPassword(pin);
         }
     }
 

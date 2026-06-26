@@ -417,7 +417,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             video.removeEventListener('pause', onPause);
             video.removeEventListener('ended', onEnded);
         };
-    }, [currentMediaId]);
+        // currentMedia.sessionId is the <video> element's React key, so the
+        // element re-mounts when it changes (e.g. a quality switch starts a new
+        // session). Re-run so these listeners bind to the new element — otherwise
+        // timeupdate/duration stop updating and the scrubber freezes at 0:00.
+    }, [currentMediaId, currentMedia?.sessionId]);
 
     useEffect(() => {
         if (!sessionId) return;

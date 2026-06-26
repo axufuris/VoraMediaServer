@@ -45,13 +45,13 @@ public static class MusicEndpoints
         group.MapPut("/albums/{albumId:guid}", UpdateAlbumAsync).RequireAuthorization();
         group.MapPut("/tracks/{trackId:guid}", UpdateTrackAsync).RequireAuthorization();
 
-        group.MapPost("/artists/{artistId:guid}/artwork/upload", UploadArtistArtworkAsync).RequireAuthorization().DisableAntiforgery();
-        group.MapPost("/albums/{albumId:guid}/artwork/upload", UploadAlbumArtworkAsync).RequireAuthorization().DisableAntiforgery();
-        group.MapPost("/artists/{artistId:guid}/background/upload", UploadArtistBackgroundAsync).RequireAuthorization().DisableAntiforgery();
-        group.MapPost("/albums/{albumId:guid}/background/upload", UploadAlbumBackgroundAsync).RequireAuthorization().DisableAntiforgery();
-        group.MapPost("/artists/{artistId:guid}/banner/upload", UploadArtistBannerAsync).RequireAuthorization().DisableAntiforgery();
-        group.MapPost("/artists/{artistId:guid}/clearlogo/upload", UploadArtistClearLogoAsync).RequireAuthorization().DisableAntiforgery();
-        group.MapPost("/albums/{albumId:guid}/discart/upload", UploadAlbumDiscArtAsync).RequireAuthorization().DisableAntiforgery();
+        group.MapPost("/artists/{artistId:guid}/artwork/upload", UploadArtistArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
+        group.MapPost("/albums/{albumId:guid}/artwork/upload", UploadAlbumArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
+        group.MapPost("/artists/{artistId:guid}/background/upload", UploadArtistBackgroundAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
+        group.MapPost("/albums/{albumId:guid}/background/upload", UploadAlbumBackgroundAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
+        group.MapPost("/artists/{artistId:guid}/banner/upload", UploadArtistBannerAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
+        group.MapPost("/artists/{artistId:guid}/clearlogo/upload", UploadArtistClearLogoAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
+        group.MapPost("/albums/{albumId:guid}/discart/upload", UploadAlbumDiscArtAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
 
         group.MapGet("/artists/{artistId:guid}/artwork/suggestions", GetArtistArtworkSuggestionsAsync).RequireAuthorization();
         group.MapGet("/albums/{albumId:guid}/artwork/suggestions", GetAlbumArtworkSuggestionsAsync).RequireAuthorization();

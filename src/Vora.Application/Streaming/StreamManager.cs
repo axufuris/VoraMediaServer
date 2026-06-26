@@ -154,6 +154,8 @@ public class StreamManager : IStreamManager
 
     public async Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search)
     {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 200);
         return await _repository.GetGroupedHistoryAsync(page, pageSize, search);
     }
 

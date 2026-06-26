@@ -36,6 +36,11 @@ public interface IUserRepository
     Task<PasswordResetTicket?> GetActivePasswordResetTicketByHashAsync(string tokenHash);
     Task DeletePasswordResetTicketAsync(PasswordResetTicket ticket);
     Task InvalidateOutstandingPasswordResetTicketsForUserAsync(Guid userId);
+    Task CreateEmailChangeTicketAsync(EmailChangeTicket ticket);
+    Task<EmailChangeTicket?> GetActiveEmailChangeTicketByHashAsync(string tokenHash);
+    Task DeleteEmailChangeTicketAsync(EmailChangeTicket ticket);
+    Task InvalidateOutstandingEmailChangeTicketsForUserAsync(Guid userId);
+    Task ApplyEmailChangeAsync(User user);
 
     Task<(List<UserProfileHistoryDto> Data, int Total)> GetUserPlayHistoryAsync(Guid userId, Guid? profileId, int page, int pageSize, string search, string typeFilter);
 

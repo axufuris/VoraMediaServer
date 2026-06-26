@@ -8,6 +8,7 @@ public interface IMusicRecommendationRepository
     Task<GeneratedMix?> GetMixByIdAsync(Guid mixId, Guid profileId);
     Task SaveMixAsync(GeneratedMix mix);
     Task DeleteMixesForProfileAsync(Guid profileId, GeneratedMixKind kind);
+    Task DeleteMixSlotsAsync(Guid profileId, GeneratedMixKind kind, IReadOnlyCollection<int> slots);
 
     Task<List<Guid>> GetProfileIdsWithRecentActivityAsync(int withinDays);
 

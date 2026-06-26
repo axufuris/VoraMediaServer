@@ -20,7 +20,9 @@ public class EmailTemplateManager : IEmailTemplateManager
             [EmailTemplateKey.PasswordReset] = ("Password reset", "Sent when a user requests a password reset link."),
             [EmailTemplateKey.AdminInvite] = ("Admin invitation", "Sent when an admin invites a new user to register."),
             [EmailTemplateKey.RequestAvailable] = ("Request available", "Sent when a previously requested media item lands in the library."),
-            [EmailTemplateKey.TestEmail] = ("Test email", "Sent from the admin email settings test button.")
+            [EmailTemplateKey.TestEmail] = ("Test email", "Sent from the admin email settings test button."),
+            [EmailTemplateKey.EmailChange] = ("Email change confirmation", "Sent to a new address to confirm an account email change."),
+            [EmailTemplateKey.EmailChangedNotice] = ("Email changed notice", "Sent to the previous address after an account email change is applied.")
         };
 
     private readonly IEmailTemplateRepository _templateRepo;

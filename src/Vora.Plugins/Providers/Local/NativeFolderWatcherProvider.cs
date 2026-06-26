@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -16,7 +17,13 @@ public class NativeFolderWatcherProvider : IFolderWatcherProvider, IDisposable
 
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => Enumerable.Empty<PluginSettingDefinitionDto>();
 
+    private readonly ILogger<NativeFolderWatcherProvider> _logger;
     private readonly ConcurrentDictionary<Guid, List<FileSystemWatcher>> _watchers = new();
+
+    public NativeFolderWatcherProvider(ILogger<NativeFolderWatcherProvider> logger)
+    {
+        _logger = logger;
+    }
 
     public void StartWatching(Guid libraryId, IEnumerable<string> directories, int pollingInterval, Func<string, Task> onFileAdded, Func<string, Task> onFileDeleted)
     {
@@ -34,14 +41,26 @@ public class NativeFolderWatcherProvider : IFolderWatcherProvider, IDisposable
                 EnableRaisingEvents = true
             };
 
-            watcher.Created += async (s, e) => await onFileAdded(e.FullPath);
-            watcher.Renamed += async (s, e) => await onFileAdded(e.FullPath);
-            watcher.Deleted += async (s, e) => await onFileDeleted(e.FullPath);
+            watcher.Created += async (s, e) => await SafeInvokeAsync(onFileAdded, e.FullPath, "Created");
+            watcher.Renamed += async (s, e) => await SafeInvokeAsync(onFileAdded, e.FullPath, "Renamed");
+            watcher.Deleted += async (s, e) => await SafeInvokeAsync(onFileDeleted, e.FullPath, "Deleted");
 
             libraryWatchers.Add(watcher);
         }
 
         if (libraryWatchers.Any()) _watchers.TryAdd(libraryId, libraryWatchers);
+    }
+
+    private async Task SafeInvokeAsync(Func<string, Task> handler, string path, string changeType)
+    {
+        try
+        {
+            await handler(path);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Folder watcher {ChangeType} handler failed for {Path}", changeType, path);
+        }
     }
 
     public void StopWatching(Guid libraryId)

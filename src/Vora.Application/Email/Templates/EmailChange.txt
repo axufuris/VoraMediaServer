@@ -1,0 +1,9 @@
+{{serverName}} - Confirm your new email address
+
+Hi {{userName}},
+
+We received a request to change your account email to {{newEmail}}. Open the link below to confirm the change. This link expires in one hour and can only be used once. Your email will not change until you confirm.
+
+{{confirmLink}}
+
+If you didn't request this, you can safely ignore this email and your address will stay the same.

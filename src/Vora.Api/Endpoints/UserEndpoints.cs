@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
+using Vora.Application.Auth;
 using Vora.Application.Users;
 using Vora.Application.Users.ViewModels;
 
@@ -92,7 +93,7 @@ public static class UserEndpoints
         return Results.Ok(new PlayHistoryPageVM { Data = result.Data, Total = result.Total });
     }
 
-    private static async Task<IResult> UpdateUserAsync(Guid userId, [FromBody] UpdateUserDto request, ClaimsPrincipal user, IUserManager manager)
+    private static async Task<IResult> UpdateUserAsync(Guid userId, [FromBody] UpdateUserDto request, ClaimsPrincipal user, IUserManager manager, IAuthManager authManager, HttpContext httpContext)
     {
         var callingAccountId = user.GetAccountId();
         if (callingAccountId is null)
@@ -106,15 +107,37 @@ public static class UserEndpoints
             return Results.Forbid();
         }
 
+        var origin = $"{httpContext.Request.Scheme}://{httpContext.Request.Host.Value}";
+
+        EmailChangeRequestResult emailResult;
         try
         {
-            await manager.UpdateUserAccountAsync(userId, callingAccountId.Value, callerIsAdmin, request.Email, request.DisplayName, request.NewPassword, request.EmailNotifyOnRequestAvailable);
+            emailResult = await authManager.ChangeEmailAsync(userId, callingAccountId.Value, callerIsAdmin, request.Email, origin);
         }
         catch (UnauthorizedAccessException)
         {
             return Results.Forbid();
         }
-        return Results.NoContent();
+
+        if (emailResult == EmailChangeRequestResult.AlreadyInUse)
+        {
+            return Results.Conflict(new { Message = "That email address is already in use." });
+        }
+        if (emailResult == EmailChangeRequestResult.Invalid)
+        {
+            return Results.BadRequest(new { Message = "A valid email address is required." });
+        }
+
+        try
+        {
+            await manager.UpdateUserAccountAsync(userId, callingAccountId.Value, callerIsAdmin, request.DisplayName, request.NewPassword, request.EmailNotifyOnRequestAvailable);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Forbid();
+        }
+
+        return Results.Ok(new { EmailVerificationSent = emailResult == EmailChangeRequestResult.VerificationSent });
     }
 
     private static async Task<IResult> UpdateUserAccessAsync(Guid userId, [FromBody] UpdateUserAccessDto request, IUserManager manager)

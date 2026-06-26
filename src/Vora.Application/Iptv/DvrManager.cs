@@ -22,8 +22,6 @@ public class DvrManager : IDvrManager
 {
     private const int SessionLookaheadDays = 14;
 
-    private static readonly SemaphoreSlim _tunerLock = new(1, 1);
-
     private readonly IIptvRepository _repository;
     private readonly IIptvEpgService _epgService;
     private readonly ILogger<DvrManager> _logger;
@@ -72,30 +70,22 @@ public class DvrManager : IDvrManager
 
     public async Task<bool> CanAllocateTunerAsync(Guid playlistId)
     {
-        await _tunerLock.WaitAsync();
-        try
+        var tunerProfile = await _repository.GetTunerProfileByPlaylistIdAsync(playlistId);
+
+        if (tunerProfile == null || tunerProfile.MaxConcurrentStreams <= 0)
         {
-            var tunerProfile = await _repository.GetTunerProfileByPlaylistIdAsync(playlistId);
-
-            if (tunerProfile == null || tunerProfile.MaxConcurrentStreams <= 0)
-            {
-                return true;
-            }
-
-            var activeRecordings = await _repository.GetActiveRecordingCountForPlaylistAsync(playlistId);
-
-            if (activeRecordings >= tunerProfile.MaxConcurrentStreams)
-            {
-                _logger.LogWarning("Tuner allocation failed for Playlist {PlaylistId}. Limit of {Limit} reached.", playlistId, tunerProfile.MaxConcurrentStreams);
-                return false;
-            }
-
             return true;
         }
-        finally
+
+        var activeRecordings = await _repository.GetActiveRecordingCountForPlaylistAsync(playlistId);
+
+        if (activeRecordings >= tunerProfile.MaxConcurrentStreams)
         {
-            _tunerLock.Release();
+            _logger.LogWarning("Tuner allocation failed for Playlist {PlaylistId}. Limit of {Limit} reached.", playlistId, tunerProfile.MaxConcurrentStreams);
+            return false;
         }
+
+        return true;
     }
 
     public Task MarkSessionFailedAsync(Guid sessionId, string reason) =>
