@@ -47,9 +47,7 @@ public class DvrWorker : BackgroundService
     {
         using var scope = _scopeFactory.CreateScope();
         var repo = scope.ServiceProvider.GetRequiredService<IIptvRepository>();
-        var dvrManager = scope.ServiceProvider.GetRequiredService<IDvrManager>();
         var recordingService = scope.ServiceProvider.GetRequiredService<IDvrRecordingService>();
-        var tunerGate = scope.ServiceProvider.GetRequiredService<ITunerGate>();
 
         var now = DateTime.UtcNow;
 
@@ -77,20 +75,8 @@ public class DvrWorker : BackgroundService
 
             try
             {
-                var playlistId = session.Schedule.Channel.PlaylistId;
-                await tunerGate.RunExclusiveAsync(playlistId, async () =>
-                {
-                    if (await dvrManager.CanAllocateTunerAsync(playlistId))
-                    {
-                        _logger.LogInformation($"[DVR Scheduler] Starting recording: {session.Title}");
-                        await recordingService.StartRecordingAsync(session.Id);
-                    }
-                    else
-                    {
-                        _logger.LogWarning($"[DVR Scheduler] Insufficient tuners to record: {session.Title}. Marking as conflict.");
-                        await repo.UpdateSessionStatusAsync(session.Id, IptvRecordingSessionStatus.Conflict, errorMessage: "No tuners available at start time.");
-                    }
-                });
+                _logger.LogInformation($"[DVR Scheduler] Attempting recording: {session.Title}");
+                await recordingService.StartRecordingAsync(session.Id);
             }
             catch (Exception ex)
             {

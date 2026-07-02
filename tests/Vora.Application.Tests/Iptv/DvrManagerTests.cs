@@ -84,52 +84,6 @@ public class DvrManagerTests
     }
 
     [Fact]
-    public async Task CanAllocateTunerAsync_true_when_no_tuner_profile()
-    {
-        var pid = Guid.NewGuid();
-        _repo.GetTunerProfileByPlaylistIdAsync(pid).Returns((IptvTunerProfile?)null);
-
-        var ok = await _manager.CanAllocateTunerAsync(pid);
-
-        ok.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task CanAllocateTunerAsync_true_when_tuner_has_zero_max_streams()
-    {
-        var pid = Guid.NewGuid();
-        _repo.GetTunerProfileByPlaylistIdAsync(pid).Returns(new IptvTunerProfile { PlaylistId = pid, MaxConcurrentStreams = 0 });
-
-        var ok = await _manager.CanAllocateTunerAsync(pid);
-
-        ok.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task CanAllocateTunerAsync_true_when_active_count_below_limit()
-    {
-        var pid = Guid.NewGuid();
-        _repo.GetTunerProfileByPlaylistIdAsync(pid).Returns(new IptvTunerProfile { PlaylistId = pid, MaxConcurrentStreams = 2 });
-        _repo.GetActiveRecordingCountForPlaylistAsync(pid).Returns(1);
-
-        var ok = await _manager.CanAllocateTunerAsync(pid);
-
-        ok.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task CanAllocateTunerAsync_false_when_active_count_equals_limit()
-    {
-        var pid = Guid.NewGuid();
-        _repo.GetTunerProfileByPlaylistIdAsync(pid).Returns(new IptvTunerProfile { PlaylistId = pid, MaxConcurrentStreams = 2 });
-        _repo.GetActiveRecordingCountForPlaylistAsync(pid).Returns(2);
-
-        var ok = await _manager.CanAllocateTunerAsync(pid);
-
-        ok.Should().BeFalse();
-    }
-
-    [Fact]
     public async Task ProcessSchedulesIntoSessionsAsync_creates_session_for_matching_series_program()
     {
         var schedule = MakeSchedule("Severance", isSeries: true, externalChannelId: "ch1");

@@ -10,7 +10,6 @@ namespace Vora.Application.Iptv;
 public interface IDvrManager
 {
     Task<IptvRecordingSchedule> ScheduleRecordingAsync(Guid profileId, Guid channelId, string title, string? programId, bool isSeries, int keepMaxEpisodes = 0);
-    Task<bool> CanAllocateTunerAsync(Guid playlistId);
     Task MarkSessionFailedAsync(Guid sessionId, string reason);
     Task ProcessSchedulesIntoSessionsAsync();
     Task EnforceRetentionPolicyAsync(Guid scheduleId);
@@ -66,26 +65,6 @@ public class DvrManager : IDvrManager
 
         _logger.LogInformation("DVR Schedule created: '{Title}' for Profile {ProfileId} (Parent User: {UserId}).", title, profileId, profile.UserId);
         return schedule;
-    }
-
-    public async Task<bool> CanAllocateTunerAsync(Guid playlistId)
-    {
-        var tunerProfile = await _repository.GetTunerProfileByPlaylistIdAsync(playlistId);
-
-        if (tunerProfile == null || tunerProfile.MaxConcurrentStreams <= 0)
-        {
-            return true;
-        }
-
-        var activeRecordings = await _repository.GetActiveRecordingCountForPlaylistAsync(playlistId);
-
-        if (activeRecordings >= tunerProfile.MaxConcurrentStreams)
-        {
-            _logger.LogWarning("Tuner allocation failed for Playlist {PlaylistId}. Limit of {Limit} reached.", playlistId, tunerProfile.MaxConcurrentStreams);
-            return false;
-        }
-
-        return true;
     }
 
     public Task MarkSessionFailedAsync(Guid sessionId, string reason) =>

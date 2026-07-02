@@ -452,7 +452,7 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<IFileSystemBrowserService, FileSystemBrowserService>();
         services.AddSingleton<IFolderWatcherService, FolderWatcherService>();
         services.AddSingleton<ITimeshiftCoordinator, TimeshiftCoordinator>();
-        services.AddSingleton<ITunerGate, TunerGate>();
+        services.AddSingleton<ITunerRegistry, TunerRegistry>();
         services.AddSingleton<ITranscodeService, FFmpegTranscodeService>();
         services.AddSingleton<IAudioTranscodeService, FFmpegAudioTranscodeService>();
         services.AddSingleton<IHardwareCapabilityService, HardwareCapabilityService>();

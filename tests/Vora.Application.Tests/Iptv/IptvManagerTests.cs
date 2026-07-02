@@ -20,7 +20,7 @@ public class IptvManagerTests
     private readonly IUserManager _users;
     private readonly ITaskQueueManager _tasks;
     private readonly ITimeshiftCoordinator _timeshift;
-    private readonly ITunerGate _tunerGate;
+    private readonly ITunerRegistry _tunerRegistry;
     private readonly IHttpClientFactory _httpFactory;
     private readonly IStreamingTokenSigner _signer;
     private readonly IptvManager _manager;
@@ -32,11 +32,11 @@ public class IptvManagerTests
         _users = Substitute.For<IUserManager>();
         _tasks = Substitute.For<ITaskQueueManager>();
         _timeshift = Substitute.For<ITimeshiftCoordinator>();
-        _tunerGate = new TunerGate();
+        _tunerRegistry = new TunerRegistry();
         _httpFactory = Substitute.For<IHttpClientFactory>();
         _signer = Substitute.For<IStreamingTokenSigner>();
 
-        _manager = new IptvManager(_repo, _epg, _users, _tasks, _timeshift, _tunerGate, _httpFactory, _signer,
+        _manager = new IptvManager(_repo, _epg, _users, _tasks, _timeshift, _tunerRegistry, _httpFactory, _signer,
             NullLogger<IptvManager>.Instance);
     }
 

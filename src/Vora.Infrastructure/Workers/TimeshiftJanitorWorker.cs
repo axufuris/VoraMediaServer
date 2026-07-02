@@ -11,19 +11,23 @@ public class TimeshiftJanitorWorker : BackgroundService
 
     private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan MaxIdleDuration = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan LiveMaxIdleDuration = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan OrphanMaxIdleAge = TimeSpan.FromMinutes(15);
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ITimeshiftCoordinator _coordinator;
+    private readonly ITunerRegistry _tunerRegistry;
     private readonly ILogger<TimeshiftJanitorWorker> _logger;
 
     public TimeshiftJanitorWorker(
         IServiceScopeFactory scopeFactory,
         ITimeshiftCoordinator coordinator,
+        ITunerRegistry tunerRegistry,
         ILogger<TimeshiftJanitorWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _coordinator = coordinator;
+        _tunerRegistry = tunerRegistry;
         _logger = logger;
     }
 
@@ -39,7 +43,14 @@ public class TimeshiftJanitorWorker : BackgroundService
             {
                 try
                 {
-                    await _coordinator.EvictStaleSessionsAsync(MaxIdleDuration);
+                    var evictedTimeshifts = await _coordinator.EvictStaleSessionsAsync(MaxIdleDuration);
+                    foreach (var profileId in evictedTimeshifts)
+                    {
+                        _tunerRegistry.Release(IptvManager.TimeshiftLeaseKey(profileId));
+                    }
+
+                    _tunerRegistry.EvictIdle(TunerLeaseKind.Live, LiveMaxIdleDuration);
+
                     await ReapOrphansAsync(stoppingToken);
                 }
                 catch (Exception ex)

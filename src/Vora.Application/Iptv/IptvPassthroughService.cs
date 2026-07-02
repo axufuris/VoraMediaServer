@@ -43,6 +43,7 @@ public class IptvPassthroughService : IIptvPassthroughService
     private readonly IIptvRepository _repository;
     private readonly IUserManager _userManager;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ITunerRegistry _tunerRegistry;
     private readonly IptvPassthroughOptions _passthroughOptions;
     private readonly JwtOptions _jwtOptions;
     private readonly ILogger<IptvPassthroughService> _logger;
@@ -51,6 +52,7 @@ public class IptvPassthroughService : IIptvPassthroughService
         IIptvRepository repository,
         IUserManager userManager,
         IHttpClientFactory httpClientFactory,
+        ITunerRegistry tunerRegistry,
         IOptions<IptvPassthroughOptions> passthroughOptions,
         IOptions<JwtOptions> jwtOptions,
         ILogger<IptvPassthroughService> logger)
@@ -58,10 +60,13 @@ public class IptvPassthroughService : IIptvPassthroughService
         _repository = repository;
         _userManager = userManager;
         _httpClientFactory = httpClientFactory;
+        _tunerRegistry = tunerRegistry;
         _passthroughOptions = passthroughOptions.Value;
         _jwtOptions = jwtOptions.Value;
         _logger = logger;
     }
+
+    private static string LiveLeaseKey(string leaseId) => $"live:{leaseId}";
 
     public async Task<PassthroughStartResult> StartPassthroughAsync(Guid channelId, Guid userId)
     {
@@ -82,7 +87,15 @@ public class IptvPassthroughService : IIptvPassthroughService
             };
         }
 
-        var playlistToken = SignToken(PlaylistTokenTag, resolvedUrl, DateTime.UtcNow.AddMinutes(PlaylistTokenTtlMinutes));
+        var tunerProfile = await _repository.GetTunerProfileByPlaylistIdAsync(channel.PlaylistId);
+        var maxConcurrent = tunerProfile?.MaxConcurrentStreams ?? 0;
+        var leaseId = Guid.NewGuid().ToString("N");
+        if (!_tunerRegistry.TryAcquire(channel.PlaylistId, maxConcurrent, LiveLeaseKey(leaseId), TunerLeaseKind.Live))
+        {
+            throw new TunerLimitReachedException();
+        }
+
+        var playlistToken = SignToken(PlaylistTokenTag, $"{leaseId}|{resolvedUrl}", DateTime.UtcNow.AddMinutes(PlaylistTokenTtlMinutes));
         return new PassthroughStartResult
         {
             Url = $"{PassthroughBasePath}/playlist.m3u8?t={playlistToken}",
@@ -226,10 +239,16 @@ public class IptvPassthroughService : IIptvPassthroughService
 
     public async Task<PassthroughPlaylistResult?> GetRewrittenPlaylistAsync(string token)
     {
-        if (!TryVerifyToken(token, PlaylistTokenTag, out var upstreamUrl))
+        if (!TryVerifyToken(token, PlaylistTokenTag, out var payload))
         {
             _logger.LogWarning("Passthrough playlist token verification failed.");
             return null;
+        }
+
+        var (leaseId, upstreamUrl) = SplitPlaylistPayload(payload);
+        if (leaseId.Length > 0)
+        {
+            _tunerRegistry.Heartbeat(LiveLeaseKey(leaseId));
         }
 
         _logger.LogDebug("Passthrough fetching upstream playlist: {Url}", upstreamUrl);
@@ -272,12 +291,22 @@ public class IptvPassthroughService : IIptvPassthroughService
 
         _logger.LogDebug("Passthrough upstream returned valid HLS ({Length} bytes, type {Type}).", rawContent.Length, upstreamContentType);
 
-        var rewritten = RewritePlaylist(rawContent, effectiveUrl);
+        var rewritten = RewritePlaylist(rawContent, effectiveUrl, leaseId);
         return new PassthroughPlaylistResult
         {
             Content = rewritten,
             ContentType = "application/vnd.apple.mpegurl"
         };
+    }
+
+    private static (string LeaseId, string Url) SplitPlaylistPayload(string payload)
+    {
+        var sep = payload.IndexOf('|');
+        if (sep < 0)
+        {
+            return (string.Empty, payload);
+        }
+        return (payload[..sep], payload[(sep + 1)..]);
     }
 
     private static async Task<string> SafeReadSnippetAsync(HttpResponseMessage response)
@@ -317,7 +346,7 @@ public class IptvPassthroughService : IIptvPassthroughService
         throw new UnauthorizedAccessException("User does not have access to this IPTV playlist.");
     }
 
-    private string RewritePlaylist(string content, string upstreamUrl)
+    private string RewritePlaylist(string content, string upstreamUrl, string leaseId)
     {
         var baseUri = new Uri(upstreamUrl);
         var sb = new StringBuilder(content.Length + 256);
@@ -334,7 +363,7 @@ public class IptvPassthroughService : IIptvPassthroughService
 
             if (line.StartsWith('#'))
             {
-                sb.Append(RewriteTagAttributes(line, baseUri));
+                sb.Append(RewriteTagAttributes(line, baseUri, leaseId));
                 sb.Append('\n');
                 continue;
             }
@@ -348,18 +377,18 @@ public class IptvPassthroughService : IIptvPassthroughService
                 continue;
             }
 
-            sb.Append(RewriteUriLine(absolute));
+            sb.Append(RewriteUriLine(absolute, leaseId));
             sb.Append('\n');
         }
 
         return sb.ToString();
     }
 
-    private string RewriteUriLine(string absoluteUrl)
+    private string RewriteUriLine(string absoluteUrl, string leaseId)
     {
         if (LooksLikePlaylist(absoluteUrl))
         {
-            var token = SignToken(PlaylistTokenTag, absoluteUrl, DateTime.UtcNow.AddMinutes(PlaylistTokenTtlMinutes));
+            var token = SignToken(PlaylistTokenTag, $"{leaseId}|{absoluteUrl}", DateTime.UtcNow.AddMinutes(PlaylistTokenTtlMinutes));
             return $"playlist.m3u8?t={token}";
         }
 
@@ -367,7 +396,7 @@ public class IptvPassthroughService : IIptvPassthroughService
         return $"segment?t={segmentToken}";
     }
 
-    private string RewriteTagAttributes(string line, Uri baseUri)
+    private string RewriteTagAttributes(string line, Uri baseUri, string leaseId)
     {
         const string marker = "URI=\"";
         var idx = line.IndexOf(marker, StringComparison.Ordinal);
@@ -385,7 +414,7 @@ public class IptvPassthroughService : IIptvPassthroughService
             return line;
         }
 
-        var rewritten = RewriteUriLine(absolute);
+        var rewritten = RewriteUriLine(absolute, leaseId);
         return string.Concat(line.AsSpan(0, start), rewritten, line.AsSpan(end));
     }
 

@@ -52,7 +52,7 @@ public class IptvManager : IIptvManager
     private readonly IUserManager _userManager;
     private readonly ITaskQueueManager _taskQueue;
     private readonly ITimeshiftCoordinator _timeshiftCoordinator;
-    private readonly ITunerGate _tunerGate;
+    private readonly ITunerRegistry _tunerRegistry;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IStreamingTokenSigner _tokenSigner;
     private readonly ILogger<IptvManager> _logger;
@@ -63,7 +63,7 @@ public class IptvManager : IIptvManager
         IUserManager userManager,
         ITaskQueueManager taskQueue,
         ITimeshiftCoordinator timeshiftCoordinator,
-        ITunerGate tunerGate,
+        ITunerRegistry tunerRegistry,
         IHttpClientFactory httpClientFactory,
         IStreamingTokenSigner tokenSigner,
         ILogger<IptvManager> logger)
@@ -73,11 +73,13 @@ public class IptvManager : IIptvManager
         _userManager = userManager;
         _taskQueue = taskQueue;
         _timeshiftCoordinator = timeshiftCoordinator;
-        _tunerGate = tunerGate;
+        _tunerRegistry = tunerRegistry;
         _httpClientFactory = httpClientFactory;
         _tokenSigner = tokenSigner;
         _logger = logger;
     }
+
+    public static string TimeshiftLeaseKey(Guid profileId) => $"timeshift:{profileId}";
 
     public async Task<List<IptvPlaylistVM>> GetAllPlaylistsAsync(Vora.Domain.Enums.IptvChannelKind? kind = null)
     {
@@ -311,53 +313,63 @@ public class IptvManager : IIptvManager
         var channel = await _repository.GetChannelByIdAsync(channelId);
         if (channel == null) throw new InvalidOperationException("Channel not found.");
 
-        await _tunerGate.RunExclusiveAsync(channel.PlaylistId, () => EnsureTunerAvailableAsync(channel.PlaylistId));
+        var leaseKey = TimeshiftLeaseKey(profileId);
+        var tunerProfile = await _repository.GetTunerProfileByPlaylistIdAsync(channel.PlaylistId);
+        var maxConcurrent = tunerProfile?.MaxConcurrentStreams ?? 0;
 
-        var sessionPath = await PrepareTimeshiftDirectoryAsync(profileId);
-        var sessionId = Path.GetFileName(sessionPath);
-
-        var outputPath = Path.Combine(sessionPath, PlaylistFileName).Replace("\\", "/");
-        var segmentPath = Path.Combine(sessionPath, SegmentFilePattern).Replace("\\", "/");
-
-        var process = BuildTimeshiftProcess(channel.StreamUrl, outputPath, segmentPath);
-
-        await StopTimeshiftSessionAsync(profileId);
-        _timeshiftCoordinator.TryRegister(profileId, process, sessionPath);
-        process.Start();
-
-        await WaitForBufferAsync(profileId, sessionPath);
-
-        if (!_timeshiftCoordinator.IsActive(profileId))
+        _tunerRegistry.Release(leaseKey);
+        if (!_tunerRegistry.TryAcquire(channel.PlaylistId, maxConcurrent, leaseKey, TunerLeaseKind.Timeshift))
         {
             return null;
         }
 
-        if (!File.Exists(outputPath))
+        try
         {
-            await StopTimeshiftSessionAsync(profileId);
-            throw new InvalidOperationException("FFmpeg failed to generate the stream playlist in time. The stream source may be dead or incompatible.");
-        }
+            var sessionPath = await PrepareTimeshiftDirectoryAsync(profileId);
+            var sessionId = Path.GetFileName(sessionPath);
 
-        var token = _tokenSigner.Sign(TimeshiftTokenScope, $"{profileId}:{sessionId}", TimeshiftTokenTtl);
-        return $"/api/streaming/hls/timeshift/{token}/{profileId}/{sessionId}/{PlaylistFileName}";
+            var outputPath = Path.Combine(sessionPath, PlaylistFileName).Replace("\\", "/");
+            var segmentPath = Path.Combine(sessionPath, SegmentFilePattern).Replace("\\", "/");
+
+            var process = BuildTimeshiftProcess(channel.StreamUrl, outputPath, segmentPath);
+
+            await _timeshiftCoordinator.StopAsync(profileId);
+            _timeshiftCoordinator.TryRegister(profileId, process, sessionPath);
+            process.Start();
+
+            await WaitForBufferAsync(profileId, sessionPath);
+
+            if (!_timeshiftCoordinator.IsActive(profileId))
+            {
+                _tunerRegistry.Release(leaseKey);
+                return null;
+            }
+
+            if (!File.Exists(outputPath))
+            {
+                await _timeshiftCoordinator.StopAsync(profileId);
+                _tunerRegistry.Release(leaseKey);
+                throw new InvalidOperationException("FFmpeg failed to generate the stream playlist in time. The stream source may be dead or incompatible.");
+            }
+
+            var token = _tokenSigner.Sign(TimeshiftTokenScope, $"{profileId}:{sessionId}", TimeshiftTokenTtl);
+            return $"/api/streaming/hls/timeshift/{token}/{profileId}/{sessionId}/{PlaylistFileName}";
+        }
+        catch
+        {
+            _tunerRegistry.Release(leaseKey);
+            throw;
+        }
     }
 
-    public Task StopTimeshiftSessionAsync(Guid profileId) =>
-        _timeshiftCoordinator.StopAsync(profileId);
+    public async Task StopTimeshiftSessionAsync(Guid profileId)
+    {
+        _tunerRegistry.Release(TimeshiftLeaseKey(profileId));
+        await _timeshiftCoordinator.StopAsync(profileId);
+    }
 
     public void PingTimeshiftSession(Guid profileId) =>
         _timeshiftCoordinator.Heartbeat(profileId);
-
-    private async Task EnsureTunerAvailableAsync(Guid playlistId)
-    {
-        var tunerProfile = await _repository.GetTunerProfileByPlaylistIdAsync(playlistId);
-        var activeCount = await _repository.GetActiveRecordingCountForPlaylistAsync(playlistId);
-
-        if (tunerProfile != null && tunerProfile.MaxConcurrentStreams > 0 && activeCount >= tunerProfile.MaxConcurrentStreams)
-        {
-            throw new InvalidOperationException("No tuners available for this playlist.");
-        }
-    }
 
     private async Task<string> PrepareTimeshiftDirectoryAsync(Guid profileId)
     {

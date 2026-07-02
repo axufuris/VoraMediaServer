@@ -11,7 +11,7 @@ namespace Vora.Application.Iptv;
 
 public interface IDvrRecordingService
 {
-    Task StartRecordingAsync(Guid sessionId);
+    Task<bool> StartRecordingAsync(Guid sessionId);
     Task StopRecordingAsync(Guid sessionId);
 }
 
@@ -86,17 +86,21 @@ public class DvrRecordingService : IDvrRecordingService
 
     private readonly ConcurrentDictionary<Guid, ActiveRecording> _activeRecordings = new();
     private readonly IServiceProvider _serviceProvider;
+    private readonly ITunerRegistry _tunerRegistry;
     private readonly StoragePathsOptions _storagePaths;
     private readonly ILogger<DvrRecordingService> _logger;
 
-    public DvrRecordingService(IServiceProvider serviceProvider, IOptions<StoragePathsOptions> storagePaths, ILogger<DvrRecordingService> logger)
+    public DvrRecordingService(IServiceProvider serviceProvider, ITunerRegistry tunerRegistry, IOptions<StoragePathsOptions> storagePaths, ILogger<DvrRecordingService> logger)
     {
         _serviceProvider = serviceProvider;
+        _tunerRegistry = tunerRegistry;
         _storagePaths = storagePaths.Value;
         _logger = logger;
     }
 
-    public async Task StartRecordingAsync(Guid sessionId)
+    private static string DvrLeaseKey(Guid sessionId) => $"dvr:{sessionId}";
+
+    public async Task<bool> StartRecordingAsync(Guid sessionId)
     {
         using var scope = _serviceProvider.CreateScope();
         var repo = scope.ServiceProvider.GetRequiredService<IIptvRepository>();
@@ -105,7 +109,7 @@ public class DvrRecordingService : IDvrRecordingService
         if (session == null || session.Schedule?.Channel?.StreamUrl == null)
         {
             await repo.UpdateSessionStatusAsync(sessionId, IptvRecordingSessionStatus.Failed, errorMessage: "Invalid session or missing stream URL.");
-            return;
+            return false;
         }
 
         var user = await repo.GetUserWithQuotaAsync(session.Schedule.UserId);
@@ -115,7 +119,7 @@ public class DvrRecordingService : IDvrRecordingService
             if (currentUsage >= user.DvrStorageQuotaBytes)
             {
                 await repo.UpdateSessionStatusAsync(sessionId, IptvRecordingSessionStatus.Failed, errorMessage: "DVR Storage Quota exceeded.");
-                return;
+                return false;
             }
         }
 
@@ -136,7 +140,19 @@ public class DvrRecordingService : IDvrRecordingService
         {
             activeRec.Dispose();
             _logger.LogWarning($"[DVR] Recording session {sessionId} is already active.");
-            return;
+            return false;
+        }
+
+        var playlistId = session.Schedule.Channel.PlaylistId;
+        var tunerProfile = await repo.GetTunerProfileByPlaylistIdAsync(playlistId);
+        var maxConcurrent = tunerProfile?.MaxConcurrentStreams ?? 0;
+        if (!_tunerRegistry.TryAcquire(playlistId, maxConcurrent, DvrLeaseKey(sessionId), TunerLeaseKind.Dvr))
+        {
+            _activeRecordings.TryRemove(sessionId, out _);
+            activeRec.Dispose();
+            _logger.LogWarning($"[DVR] No tuners available on playlist for session {sessionId}. Marking as conflict.");
+            await repo.UpdateSessionStatusAsync(sessionId, IptvRecordingSessionStatus.Conflict, errorMessage: "No tuners available at start time.");
+            return false;
         }
 
         _ = Task.Run(() => RecordingLoopAsync(sessionId, session.Schedule.Channel.StreamUrl, outputPath, session.EndTime, activeRec));
@@ -144,6 +160,7 @@ public class DvrRecordingService : IDvrRecordingService
         await repo.UpdateSessionStatusAsync(sessionId, IptvRecordingSessionStatus.Recording, outputPath: outputPath);
         var notifier = scope.ServiceProvider.GetRequiredService<IClientNotifier>();
         await notifier.NotifyDvrSessionsUpdatedAsync();
+        return true;
     }
 
     private async Task RecordingLoopAsync(Guid sessionId, string streamUrl, string outputPath, DateTime endTime, ActiveRecording activeRec)
@@ -179,6 +196,7 @@ public class DvrRecordingService : IDvrRecordingService
         }
         finally
         {
+            _tunerRegistry.Release(DvrLeaseKey(sessionId));
             _activeRecordings.TryRemove(sessionId, out _);
             activeRec.Dispose();
         }

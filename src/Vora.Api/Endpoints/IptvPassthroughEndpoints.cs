@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Vora.Api.Extensions;
 using Vora.Application.Iptv;
+using Vora.Application.Iptv.ViewModels;
 
 namespace Vora.Api.Endpoints;
 
@@ -19,7 +20,8 @@ public static class IptvPassthroughEndpoints
     {
         var group = routes.MapGroup("/api/iptv/passthrough").WithTags("IPTV Passthrough");
 
-        group.MapPost("/start", StartAsync).RequireAuthorization();
+        group.MapPost("/start", StartAsync).RequireAuthorization()
+            .Produces<PassthroughStartVM>(StatusCodes.Status200OK);
         group.MapGet("/playlist.m3u8", GetPlaylistAsync);
         group.MapGet("/segment", GetSegmentAsync);
         group.MapGet("/audio", GetAudioAsync);
@@ -38,11 +40,15 @@ public static class IptvPassthroughEndpoints
         try
         {
             var result = await service.StartPassthroughAsync(request.ChannelId, accountId.Value);
-            return Results.Ok(new { url = result.Url, streamType = result.StreamType });
+            return Results.Ok(new PassthroughStartVM { Url = result.Url, StreamType = result.StreamType });
         }
         catch (UnauthorizedAccessException)
         {
             return Results.Forbid();
+        }
+        catch (TunerLimitReachedException)
+        {
+            return Results.Conflict(new { error = "All available tuners for this playlist are in use." });
         }
         catch (InvalidOperationException)
         {

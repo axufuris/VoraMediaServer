@@ -160,8 +160,14 @@ export default function LiveTvPlayer() {
                 if (!isMounted) return;
                 passthroughUrl = `${import.meta.env.VITE_API_URL || ''}${data.url}`;
             } catch (err) {
-                console.error("Failed to start IPTV passthrough:", err);
+                if (!isMounted) return;
                 setIsVideoLoading(false);
+                const status = (err as { response?: { status?: number } }).response?.status;
+                if (status === 409) {
+                    await dialog.alert("All available tuners for this playlist are in use. Try again once another stream stops.");
+                } else {
+                    console.error("Failed to start IPTV passthrough:", err);
+                }
                 return;
             }
 

@@ -10,7 +10,7 @@ public interface ITimeshiftCoordinator
     bool IsActive(Guid profileId);
     void Heartbeat(Guid profileId);
     Task StopAsync(Guid profileId);
-    Task EvictStaleSessionsAsync(TimeSpan maxIdleDuration);
+    Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration);
     Task ReapOrphanedDirectoriesAsync(string timeshiftRoot, TimeSpan maxIdleAge);
 }
 
@@ -59,9 +59,10 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
         return Task.CompletedTask;
     }
 
-    public Task EvictStaleSessionsAsync(TimeSpan maxIdleDuration)
+    public Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration)
     {
         var now = DateTime.UtcNow;
+        var evicted = new List<Guid>();
         foreach (var kvp in _activeTimeshifts)
         {
             var profileId = kvp.Key;
@@ -72,10 +73,11 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
             {
                 TerminateProcess(session.Process, profileId);
                 TryDeleteSessionDirectory(session.SessionPath, profileId);
+                evicted.Add(profileId);
             }
             _heartbeats.TryRemove(profileId, out _);
         }
-        return Task.CompletedTask;
+        return Task.FromResult<IReadOnlyList<Guid>>(evicted);
     }
 
     public Task ReapOrphanedDirectoriesAsync(string timeshiftRoot, TimeSpan maxIdleAge)

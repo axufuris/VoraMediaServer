@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.Iptv;
+using Vora.Application.Iptv.ViewModels;
 
 namespace Vora.Api.Endpoints;
 
@@ -16,7 +17,8 @@ public static class TimeshiftEndpoints
     {
         var group = routes.MapGroup("/api/iptv/timeshift").WithTags("Timeshift").RequireAuthorization().RequireFeature(FeatureGate.LiveTv);
 
-        group.MapPost("/start", StartAsync);
+        group.MapPost("/start", StartAsync)
+            .Produces<TimeshiftStartVM>(StatusCodes.Status200OK);
         group.MapPost("/stop", StopAsync);
         group.MapPost("/ping", PingAsync);
 
@@ -46,7 +48,7 @@ public static class TimeshiftEndpoints
         {
             return Results.StatusCode(StatusCodes.Status409Conflict);
         }
-        return Results.Ok(new { url });
+        return Results.Ok(new TimeshiftStartVM { Url = url });
     }
 
     private static async Task<IResult> StopAsync(ClaimsPrincipal user, IIptvManager manager)
