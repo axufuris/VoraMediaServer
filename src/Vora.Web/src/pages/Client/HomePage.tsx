@@ -8,7 +8,9 @@ import ClientHomeCustomizeModal, { type HomeLayoutItem } from '../../components/
 import { profileDeviceSettingsService } from '../../api/Users/profileDeviceSettingsService';
 import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 import PageHeader from '../../components/Client/Primitives/PageHeader';
+import Tabs from '../../components/Client/Primitives/Tabs';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
+import PlaylistsPage from './Playlists/PlaylistsPage';
 import MediaRail from '../../components/Client/Primitives/MediaRail';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
 import MediaStill from '../../components/Client/Primitives/MediaStill';
@@ -16,6 +18,15 @@ import Hero from '../../components/Client/Primitives/Hero';
 import { useDialog } from '../../dialogs';
 
 const SPOTLIGHT_CYCLE_MS = 8000;
+
+type HomeTab = 'overview' | 'playlists';
+
+const HOME_TAB_STORAGE_KEY = 'home_active_tab';
+
+const readSavedHomeTab = (): HomeTab => {
+    const saved = sessionStorage.getItem(HOME_TAB_STORAGE_KEY);
+    return saved === 'playlists' ? 'playlists' : 'overview';
+};
 
 function HeroSpotlight({ items, serverId }: { items: LibraryItem[], serverId?: string }) {
     const navigate = useNavigate();
@@ -290,6 +301,12 @@ export default function HomePage() {
     const [clientLayout, setClientLayout] = useState<HomeLayoutItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState<HomeTab>(readSavedHomeTab);
+
+    const handleTabChange = (tab: HomeTab) => {
+        setActiveTab(tab);
+        sessionStorage.setItem(HOME_TAB_STORAGE_KEY, tab);
+    };
 
     const profileToken = localStorage.getItem(StorageKeys.profileToken);
     const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
@@ -371,12 +388,37 @@ export default function HomePage() {
             .sort((a, b) => a.orderIndex - b.orderIndex);
     }, [lists, clientLayout, spotlightListId]);
 
+    const tabBar = (
+        <div className="px-8 pt-4">
+            <Tabs<HomeTab>
+                tabs={[
+                    { key: 'overview', label: 'Home' },
+                    { key: 'playlists', label: 'Playlists' },
+                ]}
+                active={activeTab}
+                onChange={handleTabChange}
+            />
+        </div>
+    );
+
+    if (activeTab === 'playlists') {
+        return (
+            <div className="min-h-full pb-20">
+                {tabBar}
+                <PlaylistsPage embedded />
+            </div>
+        );
+    }
+
     if (loading) {
         return (
-            <div className="p-8">
-                <div className="vora-skeleton mb-8 h-[50vh] min-h-[420px]" />
-                <div className="vora-skeleton mx-8 mb-8 h-48" />
-                <div className="vora-skeleton mx-8 mb-8 h-48" />
+            <div className="min-h-full pb-20">
+                {tabBar}
+                <div className="p-8">
+                    <div className="vora-skeleton mb-8 h-[50vh] min-h-[420px]" />
+                    <div className="vora-skeleton mx-8 mb-8 h-48" />
+                    <div className="vora-skeleton mx-8 mb-8 h-48" />
+                </div>
             </div>
         );
     }
@@ -413,6 +455,7 @@ export default function HomePage() {
             />
 
             <div className="min-h-full pb-20">
+                {tabBar}
                 {heroVisible ? (
                     <HeroSpotlight items={spotlightItems} serverId={serverId} />
                 ) : (

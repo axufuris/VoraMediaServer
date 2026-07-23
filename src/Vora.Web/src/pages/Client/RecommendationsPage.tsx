@@ -38,7 +38,11 @@ function AsyncProviderBlock({ providerId, serverId }: { providerId: string, serv
     );
 }
 
-export default function RecommendationsPage() {
+interface RecommendationsPageProps {
+    embedded?: boolean;
+}
+
+export default function RecommendationsPage({ embedded = false }: RecommendationsPageProps = {}) {
     const { serverId } = useParams<{ serverId?: string }>();
     const [providers, setProviders] = useState<string[]>([]);
     const [loadingProviders, setLoadingProviders] = useState(true);
@@ -52,10 +56,12 @@ export default function RecommendationsPage() {
 
     return (
         <div className="min-h-full pb-20">
-            <PageHeader
-                title="For you"
-                subtitle="Personalized recommendations based on what you've watched."
-            />
+            {!embedded && (
+                <PageHeader
+                    title="For you"
+                    subtitle="Personalized recommendations based on what you've watched."
+                />
+            )}
 
             <div className="pt-2">
                 {loadingProviders ? (

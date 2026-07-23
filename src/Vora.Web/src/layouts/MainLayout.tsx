@@ -24,15 +24,15 @@ import { youtubeService } from '../api/YouTube/youtubeService';
 const isNavItemEnabled = (item: NavItem, flags: FeatureFlagsVM, youtubeAvailable: boolean): boolean => {
     if (item.type !== 'system') return true;
     switch (item.id) {
-        case 'discovery': return flags.discover;
-        case 'recommendations': return flags.forYou;
-        case 'calendar': return flags.releaseCalendar;
+        case 'discovery': return flags.discover || flags.forYou || flags.releaseCalendar;
+        case 'podcasts': return flags.podcasts;
+        case 'radio': return flags.internetRadio;
         case 'livetv': return flags.liveTv;
-        case 'dvr': return flags.liveTv && flags.dvr;
         case 'youtube': return youtubeAvailable;
         default: return true;
     }
 };
+
 export interface NavItem {
     id: string;
     serverId?: string;
@@ -206,17 +206,16 @@ export default function MainLayout() {
 
             const savedPrefs: NavItem[] | null = savedPrefsJson ? JSON.parse(savedPrefsJson) : null;
 
+            const primaryServerName = connectedServers[0]?.name;
+
             const baseItems: NavItem[] = [
-                { id: 'playlists', title: 'Playlists', path: '/playlists', type: 'system', isPinned: true, order: 0 },
-                { id: 'collections', title: 'Collections', path: '/collections', type: 'system', isPinned: true, order: 1 },
-                { id: 'discovery', title: 'Discover', path: '/discovery', type: 'system', isPinned: true, order: 2 },
-                { id: 'recommendations', title: 'For You', path: '/recommendations', type: 'system', isPinned: true, order: 3 },
-                { id: 'watchlist', title: 'Watchlist', path: '/watchlist', type: 'system', isPinned: true, order: 4 },
-                { id: 'calendar', title: 'Release Calendar', path: '/calendar', type: 'system', isPinned: true, order: 5 },
-                { id: 'livetv', title: 'Live TV', path: '/livetv', type: 'system', isPinned: true, order: 6 },
-                { id: 'dvr', title: 'DVR', path: '/dvr', type: 'system', isPinned: true, order: 7 },
-                { id: 'audio', title: 'Audio', path: '/audio', type: 'system', isPinned: true, order: 8 },
-                { id: 'youtube', title: 'YouTube', path: '/youtube', type: 'system', isPinned: true, order: 9 }
+                { id: 'music', title: 'Music', path: '/music', type: 'system', serverName: primaryServerName, isPinned: true, order: 0 },
+                { id: 'podcasts', title: 'Podcasts', path: '/podcasts', type: 'system', serverName: primaryServerName, isPinned: true, order: 1 },
+                { id: 'livetv', title: 'Live TV', path: '/livetv', type: 'system', isPinned: true, order: 2 },
+                { id: 'radio', title: 'Radio', path: '/radio', type: 'system', isPinned: true, order: 3 },
+                { id: 'youtube', title: 'YouTube', path: '/youtube', type: 'system', isPinned: true, order: 4 },
+                { id: 'discovery', title: 'Discover', path: '/discovery', type: 'system', isPinned: true, order: 5 },
+                { id: 'collections', title: 'Collections', path: '/collections', type: 'system', isPinned: true, order: 6 }
             ];
 
             const combinedItems = [...baseItems, ...allLibraries];

@@ -14,7 +14,7 @@ type TypeFilter = 'all' | 'music' | 'video';
 
 const TAB_STORAGE_KEY = 'playlists_active_tab';
 
-export default function PlaylistsPage() {
+export default function PlaylistsPage({ embedded = false }: { embedded?: boolean }) {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
@@ -103,7 +103,7 @@ export default function PlaylistsPage() {
     if (loading) {
         return (
             <div className="min-h-full pb-16">
-                <PageHeader title="My Playlists" subtitle="Curated by you, by us, and by smart rules." />
+                {!embedded && <PageHeader title="My Playlists" subtitle="Curated by you, by us, and by smart rules." />}
                 <div className="px-8">
                     <div className="vora-skeleton mb-6 h-10 w-64" />
                     <div className="grid grid-cols-2 gap-6 md:grid-cols-4 lg:grid-cols-6">
@@ -129,7 +129,11 @@ export default function PlaylistsPage() {
 
     return (
         <div className="min-h-full pb-16">
-            <PageHeader title="My Playlists" subtitle="Curated by you, by us, and by smart rules." actions={newAction} />
+            {embedded ? (
+                <div className="flex justify-end px-8 pt-4">{newAction}</div>
+            ) : (
+                <PageHeader title="My Playlists" subtitle="Curated by you, by us, and by smart rules." actions={newAction} />
+            )}
 
             <div className="px-8">
                 <Tabs<TypeFilter>
@@ -151,7 +155,7 @@ export default function PlaylistsPage() {
                                 <button
                                     key={mix.id}
                                     type="button"
-                                    onClick={() => navigate(serverId ? `/server/${serverId}/audio?mix=${mix.id}` : `/audio?mix=${mix.id}`)}
+                                    onClick={() => navigate(serverId ? `/server/${serverId}/music?mix=${mix.id}` : `/music?mix=${mix.id}`)}
                                     className="group text-left cursor-pointer"
                                     title={mix.name}
                                 >

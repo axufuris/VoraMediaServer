@@ -12,7 +12,7 @@ public interface ICollectionManager
 {
     Task<List<CollectionScheduleDto>> GetContentSyncCollectionsAsync();
     Task<List<CollectionScheduleDto>> GetAutoSyncCollectionsAsync();
-    Task<CollectionDetailsVM?> GetCollectionDetailsAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs);
+    Task<CollectionDetailsVM?> GetCollectionDetailsAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, CollectionSortOrder? sortOverride = null);
     Task<Guid> CreateCollectionAsync(CreateCollectionRequest request);
     Task AddMediaToCollectionAsync(Guid collectionId, Guid mediaItemId);
     Task<IEnumerable<CollectionSummaryVM>> GetLibraryCollectionsAsync(Guid libraryId, bool hasAllAccess, List<Guid> allowedLibs);
@@ -47,18 +47,20 @@ public class CollectionManager : ICollectionManager
         return await _repository.GetAutoSyncCollectionsAsync();
     }
 
-    public async Task<CollectionDetailsVM?> GetCollectionDetailsAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs)
+    public async Task<CollectionDetailsVM?> GetCollectionDetailsAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, CollectionSortOrder? sortOverride = null)
     {
         var collection = await _repository.GetProjectedByIdAsync(id, CollectionDetailsVM.Projection, hasAllAccess, allowedLibs);
         if (collection == null) return null;
 
+        var effectiveSort = sortOverride ?? collection.DefaultSort;
+
         Dictionary<Guid, decimal>? sortOrders = null;
-        if (collection.DefaultSort == CollectionSortOrder.Chronological)
+        if (effectiveSort == CollectionSortOrder.Chronological)
         {
             sortOrders = await _repository.GetCollectionItemSortOrdersAsync(id);
         }
 
-        collection.Items = collection.DefaultSort switch
+        collection.Items = effectiveSort switch
         {
             CollectionSortOrder.Chronological => collection.Items
                 .OrderBy(i => sortOrders != null && sortOrders.TryGetValue(i.Id, out var order) ? order : decimal.MaxValue)
@@ -101,7 +103,7 @@ public class CollectionManager : ICollectionManager
 
         var id = await _repository.CreateCollectionAsync(collection);
 
-        TriggerCollectionSyncTasks(id, request.Title, request.ContentSyncProviderId, request.SortProviderId, (int)request.DefaultSort);
+        TriggerCollectionSyncTasks(id, request.Title, request.ContentSyncProviderId, request.SortProviderId);
 
         if (request.LibraryId.HasValue)
         {
@@ -120,7 +122,7 @@ public class CollectionManager : ICollectionManager
         collection.Description = request.Description;
         collection.PosterUrl = request.PosterUrl;
         collection.BackdropUrl = request.BackdropUrl;
-        collection.DefaultSort = (CollectionSortOrder)request.DefaultSort;
+        collection.DefaultSort = request.DefaultSort;
         collection.LockedFields = request.LockedFields;
         collection.SortProviderId = request.SortProviderId;
         collection.ExternalListId = request.ExternalListId;
@@ -138,15 +140,15 @@ public class CollectionManager : ICollectionManager
 
         await _repository.UpdateCollectionAsync(collection);
 
-        TriggerCollectionSyncTasks(id, request.Title, request.ContentSyncProviderId, request.SortProviderId, request.DefaultSort);
+        TriggerCollectionSyncTasks(id, request.Title, request.ContentSyncProviderId, request.SortProviderId);
 
         await _notifier.NotifyCollectionUpdatedAsync(id);
     }
 
-    private void TriggerCollectionSyncTasks(Guid collectionId, string title, string? contentProvider, string? sortProvider, int defaultSort)
+    private void TriggerCollectionSyncTasks(Guid collectionId, string title, string? contentProvider, string? sortProvider)
     {
         bool hasContentSync = !string.IsNullOrEmpty(contentProvider);
-        bool hasChronologySort = defaultSort == (int)CollectionSortOrder.Chronological && !string.IsNullOrEmpty(sortProvider);
+        bool hasChronologySort = !string.IsNullOrEmpty(sortProvider);
 
         if (hasContentSync || hasChronologySort)
         {
@@ -160,7 +162,7 @@ public class CollectionManager : ICollectionManager
 
         await _notifier.NotifyCollectionUpdatedAsync(collectionId);
 
-        _taskQueueManager.QueueReevaluateCollectionOrder(collectionId, mediaItemId);
+        _taskQueueManager.QueueReevaluateCollectionOrder(collectionId);
     }
 
     public async Task<IEnumerable<CollectionSummaryVM>> GetLibraryCollectionsAsync(Guid libraryId, bool hasAllAccess, List<Guid> allowedLibs)

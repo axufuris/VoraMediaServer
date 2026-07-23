@@ -37,7 +37,7 @@ public interface ITaskQueueManager
     void QueueCollectionContentSync(Guid collectionId, string title);
     void QueueGeneratePosterOverlays(Guid mediaItemId);
     void QueueFullCollectionSync(Guid collectionId, string title, bool hasContentSync, bool hasChronologySort);
-    void QueueReevaluateCollectionOrder(Guid collectionId, Guid mediaItemId);
+    void QueueReevaluateCollectionOrder(Guid collectionId);
     Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null);
     bool CancelTask(Guid taskId);
     CancellationToken? GetTaskCancellationToken(Guid taskId);
@@ -324,12 +324,12 @@ public class TaskQueueManager : ITaskQueueManager
         });
     }
 
-    public void QueueReevaluateCollectionOrder(Guid collectionId, Guid mediaItemId)
+    public void QueueReevaluateCollectionOrder(Guid collectionId)
     {
         EnqueueTask("Reevaluate Collection Order", async (ct, sp) =>
         {
             var orderingService = sp.GetRequiredService<CollectionOrderingService>();
-            await orderingService.ReevaluateOrderOnItemAddedAsync(collectionId, mediaItemId);
+            await orderingService.ReevaluateOrderOnItemAddedAsync(collectionId, ct);
         });
     }
 

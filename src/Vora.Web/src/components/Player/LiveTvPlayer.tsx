@@ -275,6 +275,16 @@ export default function LiveTvPlayer() {
         };
     }, [currentMedia?.id, currentMedia?.streamUrl, videoRef, canTimeshift]);
 
+    useEffect(() => {
+        if (!canTimeshift || !currentMedia?.id) return;
+        const handlePageHide = () => {
+            const activeServer = serverVault.getActiveServer();
+            timeshiftService.stopTimeshiftBeacon(activeServer?.id);
+        };
+        window.addEventListener('pagehide', handlePageHide);
+        return () => window.removeEventListener('pagehide', handlePageHide);
+    }, [canTimeshift, currentMedia?.id]);
+
     const handleChannelChange = (direction: 'next' | 'prev') => {
         if (!channels.length || !currentMedia) return;
         const currentIndex = channels.findIndex(c => c.id === currentMedia.id);

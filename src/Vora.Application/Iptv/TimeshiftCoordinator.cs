@@ -10,7 +10,8 @@ public interface ITimeshiftCoordinator
     bool IsActive(Guid profileId);
     void Heartbeat(Guid profileId);
     Task StopAsync(Guid profileId);
-    Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration);
+    Task<IAsyncDisposable> LockProfileAsync(Guid profileId);
+    Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration, TimeSpan maxSessionLifetime);
     Task ReapOrphanedDirectoriesAsync(string timeshiftRoot, TimeSpan maxIdleAge);
 }
 
@@ -23,7 +24,7 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
     private const int DirectoryDeleteRetryDelayMs = 100;
 
     private readonly ConcurrentDictionary<Guid, ActiveSession> _activeTimeshifts = new();
-    private readonly ConcurrentDictionary<Guid, DateTime> _heartbeats = new();
+    private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _profileLocks = new();
     private readonly ILogger<TimeshiftCoordinator> _logger;
 
     public TimeshiftCoordinator(ILogger<TimeshiftCoordinator> logger)
@@ -33,18 +34,21 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
 
     public bool TryRegister(Guid profileId, Process process, string sessionPath)
     {
-        if (!_activeTimeshifts.TryAdd(profileId, new ActiveSession(process, sessionPath))) return false;
-        _heartbeats[profileId] = DateTime.UtcNow;
-        return true;
+        var now = DateTime.UtcNow;
+        return _activeTimeshifts.TryAdd(profileId, new ActiveSession(process, sessionPath)
+        {
+            StartedAtUtc = now,
+            LastHeartbeatUtc = now
+        });
     }
 
     public bool IsActive(Guid profileId) => _activeTimeshifts.ContainsKey(profileId);
 
     public void Heartbeat(Guid profileId)
     {
-        if (_activeTimeshifts.ContainsKey(profileId))
+        if (_activeTimeshifts.TryGetValue(profileId, out var session))
         {
-            _heartbeats[profileId] = DateTime.UtcNow;
+            session.LastHeartbeatUtc = DateTime.UtcNow;
         }
     }
 
@@ -55,27 +59,53 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
             TerminateProcess(session.Process, profileId);
             TryDeleteSessionDirectory(session.SessionPath, profileId);
         }
-        _heartbeats.TryRemove(profileId, out _);
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration)
+    public async Task<IAsyncDisposable> LockProfileAsync(Guid profileId)
+    {
+        var gate = _profileLocks.GetOrAdd(profileId, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync();
+        return new ProfileLockReleaser(gate);
+    }
+
+    private sealed class ProfileLockReleaser : IAsyncDisposable
+    {
+        private readonly SemaphoreSlim _gate;
+        private int _released;
+
+        public ProfileLockReleaser(SemaphoreSlim gate) => _gate = gate;
+
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _released, 1) == 0)
+            {
+                _gate.Release();
+            }
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    public Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration, TimeSpan maxSessionLifetime)
     {
         var now = DateTime.UtcNow;
         var evicted = new List<Guid>();
         foreach (var kvp in _activeTimeshifts)
         {
             var profileId = kvp.Key;
-            if (!_heartbeats.TryGetValue(profileId, out var lastBeat)) continue;
-            if (now - lastBeat <= maxIdleDuration) continue;
+            var isIdle = now - kvp.Value.LastHeartbeatUtc > maxIdleDuration;
+            var exceededLifetime = now - kvp.Value.StartedAtUtc > maxSessionLifetime;
+            if (!isIdle && !exceededLifetime) continue;
 
             if (_activeTimeshifts.TryRemove(profileId, out var session))
             {
                 TerminateProcess(session.Process, profileId);
                 TryDeleteSessionDirectory(session.SessionPath, profileId);
                 evicted.Add(profileId);
+                _logger.LogInformation(
+                    "Evicted timeshift session for profile {ProfileId} (idle: {Idle}, exceededLifetime: {ExceededLifetime}).",
+                    profileId, isIdle, exceededLifetime);
             }
-            _heartbeats.TryRemove(profileId, out _);
         }
         return Task.FromResult<IReadOnlyList<Guid>>(evicted);
     }
@@ -226,5 +256,9 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
         }
     }
 
-    private sealed record ActiveSession(Process Process, string SessionPath);
+    private sealed record ActiveSession(Process Process, string SessionPath)
+    {
+        public required DateTime StartedAtUtc { get; init; }
+        public required DateTime LastHeartbeatUtc { get; set; }
+    }
 }

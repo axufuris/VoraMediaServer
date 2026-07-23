@@ -60,6 +60,7 @@ export interface ServerSettings {
     dvrPreRollSeconds: number;
     dvrPostRollSeconds: number;
     dvrConflictPolicy: string;
+    timeshiftMaxSessionHours: number;
 }
 
 export interface PluginSettingField {

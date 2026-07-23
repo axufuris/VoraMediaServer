@@ -35,7 +35,11 @@ const getEventTheme = (mediaType: string): EventTheme => {
     }
 };
 
-export default function CalendarPage() {
+interface CalendarPageProps {
+    embedded?: boolean;
+}
+
+export default function CalendarPage({ embedded = false }: CalendarPageProps = {}) {
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
 
@@ -137,11 +141,17 @@ export default function CalendarPage() {
 
     return (
         <div className="flex h-full min-h-0 flex-col pb-6">
-            <PageHeader
-                title="Release Calendar"
-                subtitle="Track upcoming movies, episodes, and watchlist drops."
-                actions={navAction}
-            />
+            {embedded ? (
+                <div className="flex justify-end px-8 pt-4">
+                    {navAction}
+                </div>
+            ) : (
+                <PageHeader
+                    title="Release Calendar"
+                    subtitle="Track upcoming movies, episodes, and watchlist drops."
+                    actions={navAction}
+                />
+            )}
 
             <div className="relative flex min-h-0 flex-1 flex-col px-8">
                 {isLoading && (

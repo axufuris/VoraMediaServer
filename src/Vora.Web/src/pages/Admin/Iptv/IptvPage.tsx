@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { iptvAdminService, type IptvPlaylistVM, type IptvChannelKind } from '../../../api/Iptv/iptvAdminService';
 import { iptvEpgAdminService, type IptvEpgSourceVM } from '../../../api/Iptv/iptvEpgAdminService';
+import { systemSettingsAdminService, type ServerSettings } from '../../../api/System/systemSettingsAdminService';
 import AdminIptvChannelsModal from '../../../components/Admin/IptvChannelsModal';
 import IptvPlaylistEditModal from '../../../components/Admin/IptvPlaylistEditModal';
 import IptvEpgSourceEditModal from '../../../components/Admin/IptvEpgSourceEditModal';
@@ -100,6 +101,30 @@ export default function IptvPage({ kind }: IptvPageProps) {
     const [editingPlaylist, setEditingPlaylist] = useState<IptvPlaylistVM | null>(null);
     const [editingEpgSource, setEditingEpgSource] = useState<IptvEpgSourceVM | null>(null);
     const [showDiagnostics, setShowDiagnostics] = useState(false);
+
+    const [serverSettings, setServerSettings] = useState<ServerSettings | null>(null);
+    const [isSavingTimeshift, setIsSavingTimeshift] = useState(false);
+
+    useEffect(() => {
+        if (isRadio) return;
+        systemSettingsAdminService.getServerSettings(serverId)
+            .then(setServerSettings)
+            .catch(error => console.error("Failed to load timeshift settings", error));
+    }, [serverId, isRadio]);
+
+    const handleSaveTimeshift = async () => {
+        if (!serverSettings) return;
+        setIsSavingTimeshift(true);
+        try {
+            await systemSettingsAdminService.updateServerSettings(serverSettings, serverId);
+            await dialog.alert({ title: "Saved", message: "Timeshift settings saved." });
+        } catch (error) {
+            console.error("Failed to save timeshift settings", error);
+            await dialog.alert({ title: "Error", message: "Failed to save timeshift settings." });
+        } finally {
+            setIsSavingTimeshift(false);
+        }
+    };
 
     const loadData = useCallback(async () => {
         try {
@@ -334,6 +359,37 @@ export default function IptvPage({ kind }: IptvPageProps) {
                         : 'When off, the Live TV nav entry is hidden from clients, the program guide endpoint returns 403, and live TV playlists are filtered out of the IPTV client endpoint. DVR is also disabled when Live TV is off.'}
                     serverId={serverId}
                 />
+
+                {!isRadio && serverSettings && (
+                    <section className="vora-card p-6 mb-6">
+                        <h2 className="text-base font-semibold text-[var(--vora-text-primary)] mb-1">Timeshift</h2>
+                        <p className="text-xs text-[var(--vora-text-muted)] mb-4">Timeshift lets viewers pause and rewind live channels. Each active viewer holds a tuner and a transcode process for the duration of the session.</p>
+                        <div className="flex flex-wrap items-end gap-4">
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">Max session length (hours)</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={48}
+                                    value={serverSettings.timeshiftMaxSessionHours}
+                                    onChange={e => setServerSettings({ ...serverSettings, timeshiftMaxSessionHours: parseInt(e.target.value, 10) || 6 })}
+                                    className="vora-input w-32 text-center font-semibold"
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleSaveTimeshift}
+                                disabled={isSavingTimeshift}
+                                className="vora-button-primary"
+                            >
+                                {isSavingTimeshift ? 'Saving…' : 'Save'}
+                            </button>
+                        </div>
+                        <p className="text-xs text-[var(--vora-text-muted)] mt-3 max-w-2xl">
+                            A safety cap on how long a single timeshift session may run before the server tears it down and frees its tuner, even if the client keeps it alive. Idle sessions are still reaped within ~2 minutes; this only bounds abandoned-but-active ones. Default 6. Range 1–48.
+                        </p>
+                    </section>
+                )}
 
                 <section className="vora-card p-6 mb-6">
                     <h2 className="text-base font-semibold text-[var(--vora-text-primary)] mb-1">Add {playlistNoun}</h2>

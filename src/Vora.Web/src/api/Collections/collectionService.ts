@@ -1,5 +1,12 @@
 import { apiClient } from '../client';
 
+export type CollectionSortOrder =
+    | 'ReleaseDateAsc'
+    | 'ReleaseDateDesc'
+    | 'DateAddedDesc'
+    | 'Alphabetical'
+    | 'Chronological';
+
 export interface CollectionSummary {
     id: string;
     title: string;
@@ -23,7 +30,7 @@ export interface CollectionDetails {
     lockedFields: string[];
     items: CollectionDetailsLibraryItem[];
 
-    defaultSort: number;
+    defaultSort: CollectionSortOrder;
     libraryId?: string;
     sortProviderId?: string;
     externalListId?: string;
@@ -54,8 +61,11 @@ export const collectionService = {
         return response.data;
     },
 
-    getCollectionDetails: async (collectionId: string, serverId?: string): Promise<CollectionDetails> => {
-        const response = await apiClient.get<CollectionDetails>(`/collections/${collectionId}`, { serverId });
+    getCollectionDetails: async (collectionId: string, serverId?: string, sort?: CollectionSortOrder): Promise<CollectionDetails> => {
+        const response = await apiClient.get<CollectionDetails>(`/collections/${collectionId}`, {
+            serverId,
+            params: sort ? { sort } : undefined
+        });
         return response.data;
     },
 

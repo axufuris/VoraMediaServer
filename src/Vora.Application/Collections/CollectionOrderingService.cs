@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
-using Vora.Domain.Enums;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Collections;
@@ -54,18 +53,15 @@ public class CollectionOrderingService(
         }
     }
 
-    public async Task ReevaluateOrderOnItemAddedAsync(Guid collectionId, Guid newMediaItemId, bool forceFullRefetch = false, string? providerId = null, CancellationToken cancellationToken = default)
+    public async Task ReevaluateOrderOnItemAddedAsync(Guid collectionId, CancellationToken cancellationToken = default)
     {
-        var defaultSort = await repository.GetProjectedByIdAsync(collectionId, c => c.DefaultSort);
-        if (defaultSort != CollectionSortOrder.Chronological)
+        var sortProviderId = await repository.GetProjectedByIdAsync(collectionId, c => c.SortProviderId);
+        if (string.IsNullOrEmpty(sortProviderId))
         {
             return;
         }
 
-        if (forceFullRefetch && !string.IsNullOrEmpty(providerId))
-        {
-            await ApplyChronologicalOrderAsync(collectionId, cancellationToken);
-            await notifier.NotifyCollectionUpdatedAsync(collectionId);
-        }
+        await ApplyChronologicalOrderAsync(collectionId, cancellationToken);
+        await notifier.NotifyCollectionUpdatedAsync(collectionId);
     }
 }

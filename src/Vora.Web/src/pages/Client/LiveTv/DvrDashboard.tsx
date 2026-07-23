@@ -21,7 +21,11 @@ interface SeriesPromptState {
     onSeries: () => void;
 }
 
-export default function DvrDashboard() {
+interface DvrDashboardProps {
+    embedded?: boolean;
+}
+
+export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
     const { serverId } = useParams<{ serverId?: string }>();
     const { playMedia } = usePlayer();
     const dialog = useDialog();
@@ -284,13 +288,19 @@ export default function DvrDashboard() {
 
     return (
         <div className="min-h-full pb-16">
-            <PageHeader
-                title={expandedGroup ?? 'DVR Recordings'}
-                subtitle={expandedGroup ? `Episodes of "${expandedGroup}"` : 'Schedule, watch, and manage everything you have recorded.'}
-                actions={backAction}
-            />
+            {!embedded && (
+                <PageHeader
+                    title={expandedGroup ?? 'DVR Recordings'}
+                    subtitle={expandedGroup ? `Episodes of "${expandedGroup}"` : 'Schedule, watch, and manage everything you have recorded.'}
+                    actions={backAction}
+                />
+            )}
 
-            <div className="px-8">
+            {embedded && backAction && (
+                <div className="px-8 pt-6">{backAction}</div>
+            )}
+
+            <div className={embedded ? 'px-8 pt-6' : 'px-8'}>
                 <Tabs<DvrTabKey>
                     tabs={[
                         { key: 'Completed', label: 'Completed', badge: tabBadge(counts.Completed) },

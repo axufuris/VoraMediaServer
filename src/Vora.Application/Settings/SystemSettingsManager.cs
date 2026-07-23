@@ -144,6 +144,8 @@ public class SystemSettingsManager : ISystemSettingsManager
             settings.DvrConflictPolicy = parsedPolicy;
         }
 
+        settings.TimeshiftMaxSessionHours = Math.Clamp(request.TimeshiftMaxSessionHours, 1, 48);
+
         await _settingsRepo.SaveChangesAsync();
 
         if (watcherChanged)

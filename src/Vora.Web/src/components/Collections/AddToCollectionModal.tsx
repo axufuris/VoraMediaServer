@@ -79,7 +79,7 @@ export default function AddToCollectionModal({
         try {
             const req: CreateCollectionRequest = {
                 title: newTitle,
-                defaultSort: 0,
+                defaultSort: 'ReleaseDateAsc',
                 libraryId: isGlobal ? undefined : libraryId,
                 autoSyncChronology: false,
                 systemGenerated: false

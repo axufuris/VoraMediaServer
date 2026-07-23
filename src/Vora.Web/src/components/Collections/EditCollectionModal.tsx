@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { collectionAdminService } from '../../api/Collections/collectionAdminService';
-import type { CollectionDetails } from '../../api/Collections/collectionService';
+import type { CollectionDetails, CollectionSortOrder } from '../../api/Collections/collectionService';
 import type { ArtworkResult } from '../../api/Media/artworkService';
 import { Modal } from '../Common/Modal';
 import ArtworkPicker from '../Common/ArtworkPicker';
@@ -159,9 +159,9 @@ export default function EditCollectionModal({
                 title, description: description.trim() || undefined,
                 posterUrl: posterUrl.trim() || undefined, backdropUrl: backdropUrl.trim() || undefined,
                 defaultSort, makeGlobal, lockedFields,
-                sortProviderId: Number(defaultSort) === 4 ? sortProviderId : undefined,
-                externalListId: Number(defaultSort) === 4 ? externalListId : undefined,
-                autoSyncChronology: Number(defaultSort) === 4 ? autoSyncChronology : false,
+                sortProviderId: sortProviderId || undefined,
+                externalListId: sortProviderId ? (externalListId.trim() || undefined) : undefined,
+                autoSyncChronology: sortProviderId ? autoSyncChronology : false,
                 sortTitle: sortTitle.trim() || undefined,
                 visibleStartDate: visibleStartDate || undefined, visibleEndDate: visibleEndDate || undefined,
                 contentSyncProviderId, contentSyncExternalId
@@ -279,17 +279,22 @@ export default function EditCollectionModal({
 
                             <div className="pt-4 border-t border-[var(--vora-border-subtle)]">
                                 <label className="flex items-center text-sm font-medium text-[var(--vora-text-muted)] mb-1">Default Sort Order <LockIcon field="DefaultSort" /></label>
-                                <select value={defaultSort} onChange={e => setDefaultSort(Number(e.target.value))} className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none">
-                                    <option value={0}>Release Date (Oldest First)</option>
-                                    <option value={1}>Release Date (Newest First)</option>
-                                    <option value={2}>Date Added</option>
-                                    <option value={3}>Alphabetical</option>
-                                    {(chronologyProviders.length > 0 || defaultSort === 4) && <option value={4}>Chronological</option>}
+                                <select value={defaultSort} onChange={e => setDefaultSort(e.target.value as CollectionSortOrder)} className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none">
+                                    <option value="ReleaseDateAsc">Release Date (Oldest First)</option>
+                                    <option value="ReleaseDateDesc">Release Date (Newest First)</option>
+                                    <option value="DateAddedDesc">Date Added</option>
+                                    <option value="Alphabetical">Alphabetical</option>
+                                    {(chronologyProviders.length > 0 || defaultSort === 'Chronological') && <option value="Chronological">Chronological</option>}
                                 </select>
                             </div>
-                            {Number(defaultSort) === 4 && (
+                            {(chronologyProviders.length > 0 || sortProviderId) && (
                                 <div className="p-4 bg-[var(--vora-bg-raised)]/50 border border-orange-500/30 rounded-lg space-y-4 mt-4">
-                                    <h3 className="text-[var(--vora-accent-500)] font-bold text-sm tracking-wide uppercase">Chronological Sync Settings</h3>
+                                    <div>
+                                        <h3 className="text-[var(--vora-accent-500)] font-bold text-sm tracking-wide uppercase">Chronological Ordering (Optional)</h3>
+                                        <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-1">
+                                            Pick a provider to make Chronological (timeline) order available for this collection. Choose "Chronological" as the Default Sort Order above to use it by default, or leave the default as-is and viewers can switch to it.
+                                        </p>
+                                    </div>
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -299,7 +304,7 @@ export default function EditCollectionModal({
                                                 onChange={e => setSortProviderId(e.target.value)}
                                                 className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none"
                                             >
-                                                <option value="">Select a Provider...</option>
+                                                <option value="">None (not enabled)</option>
                                                 {chronologyProviders.map(provider => (
                                                     <option key={provider.id} value={provider.id}>
                                                         {provider.name}
@@ -323,21 +328,26 @@ export default function EditCollectionModal({
                                             </div>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-2 pt-2 border-t border-[var(--vora-border-subtle)]/50 mt-4">
-                                        <input
-                                            type="checkbox"
-                                            id="autoSyncChronologyEdit"
-                                            checked={autoSyncChronology}
-                                            onChange={e => setAutoSyncChronology(e.target.checked)}
-                                            className="w-4 h-4 accent-orange-500 rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)] cursor-pointer"
-                                        />
-                                        <label htmlFor="autoSyncChronologyEdit" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">
-                                            Enable Auto-Sync
-                                        </label>
-                                    </div>
-                                    <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-2">
-                                        If enabled, Vora will run a background task periodically to check the provider for updates and automatically sort new items into this collection's timeline.
-                                    </p>
+
+                                    {sortProviderId && (
+                                        <div className="pt-2 border-t border-[var(--vora-border-subtle)]/50">
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id="autoSyncChronologyEdit"
+                                                    checked={autoSyncChronology}
+                                                    onChange={e => setAutoSyncChronology(e.target.checked)}
+                                                    className="w-4 h-4 accent-orange-500 rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)] cursor-pointer"
+                                                />
+                                                <label htmlFor="autoSyncChronologyEdit" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">
+                                                    Enable Auto-Sync
+                                                </label>
+                                            </div>
+                                            <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-2">
+                                                If enabled, Vora will run a background task periodically to check the provider for updates and automatically sort new items into this collection's timeline.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {collection.libraryId && !collection.systemGenerated && (

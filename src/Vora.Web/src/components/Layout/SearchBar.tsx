@@ -95,12 +95,11 @@ export default function SearchBar() {
                 ? { view: 'album', albumId, artistId }
                 : { view: 'artist', artistId };
             sessionStorage.setItem(SessionKeys.musicNavState, JSON.stringify(navState));
-            sessionStorage.setItem('audio_active_tab', 'Music');
             const token = localStorage.getItem(StorageKeys.profileToken);
             const profileId = getProfileIdFromToken(token) ?? '';
             sessionStorage.setItem(SessionKeys.musicNavProfile, profileId || '');
         } catch { /* ignore */ }
-        handleItemClick(`/server/${targetServerId}/audio`);
+        handleItemClick(`/server/${targetServerId}/music`);
     };
 
     const totalResults = totalLocalResults + discoveryResults.length;

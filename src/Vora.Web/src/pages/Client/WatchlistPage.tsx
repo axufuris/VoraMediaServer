@@ -6,7 +6,11 @@ import EmptyState from '../../components/Client/Primitives/EmptyState';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
 import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 
-export default function WatchlistPage() {
+interface WatchlistPageProps {
+    embedded?: boolean;
+}
+
+export default function WatchlistPage({ embedded = false }: WatchlistPageProps = {}) {
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
     const [items, setItems] = useState<WatchlistItem[]>([]);
@@ -28,10 +32,12 @@ export default function WatchlistPage() {
 
     return (
         <div className="min-h-full pb-20">
-            <PageHeader
-                title="My Watchlist"
-                subtitle={items.length > 0 ? `${items.length} item${items.length === 1 ? '' : 's'} you saved for later.` : 'Anything you bookmark from Discovery lands here.'}
-            />
+            {!embedded && (
+                <PageHeader
+                    title="My Watchlist"
+                    subtitle={items.length > 0 ? `${items.length} item${items.length === 1 ? '' : 's'} you saved for later.` : 'Anything you bookmark from Discovery lands here.'}
+                />
+            )}
 
             <div className="px-8 pt-2">
                 {isLoading ? (

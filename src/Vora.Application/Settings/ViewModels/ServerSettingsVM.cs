@@ -65,6 +65,7 @@ public class ServerSettingsVM
     public int DvrPreRollSeconds { get; set; } = 120;
     public int DvrPostRollSeconds { get; set; } = 300;
     public string DvrConflictPolicy { get; set; } = "AlwaysRecord";
+    public int TimeshiftMaxSessionHours { get; set; } = 6;
 
     public static Expression<Func<ServerSetting, ServerSettingsVM>> Projection =>
         s => new ServerSettingsVM
@@ -126,6 +127,7 @@ public class ServerSettingsVM
             DvrNotifyOnStorageThreshold = s.DvrNotifyOnStorageThreshold,
             DvrPreRollSeconds = s.DvrPreRollSeconds,
             DvrPostRollSeconds = s.DvrPostRollSeconds,
-            DvrConflictPolicy = s.DvrConflictPolicy.ToString()
+            DvrConflictPolicy = s.DvrConflictPolicy.ToString(),
+            TimeshiftMaxSessionHours = s.TimeshiftMaxSessionHours
         };
 }

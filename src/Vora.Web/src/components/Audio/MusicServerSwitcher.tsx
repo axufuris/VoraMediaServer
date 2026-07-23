@@ -47,7 +47,7 @@ export default function MusicServerSwitcher() {
                 return (
                     <button
                         key={s.id}
-                        onClick={() => navigate(`/server/${s.id}/audio`)}
+                        onClick={() => navigate(`/server/${s.id}/music`)}
                         className={`px-3 py-1.5 text-xs font-bold rounded transition-colors cursor-pointer ${isActive ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-raised)]/60 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                     >
                         {s.name}

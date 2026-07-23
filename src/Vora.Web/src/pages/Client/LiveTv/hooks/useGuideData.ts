@@ -100,7 +100,7 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
 
                 currentPrefs.enabledProviders = currentPrefs.enabledProviders.filter(id => allProviders.some(p => p.id === id));
 
-                if (!hasSavedSettings && currentPrefs.enabledProviders.length === 0 && allProviders.length > 0) {
+                if (currentPrefs.enabledProviders.length === 0 && allProviders.length > 0) {
                     currentPrefs.enabledProviders = allProviders.map(p => p.id);
                 }
                 setPrefs(currentPrefs);
