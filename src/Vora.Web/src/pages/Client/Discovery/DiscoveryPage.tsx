@@ -11,7 +11,11 @@ import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
 import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 
-export default function DiscoveryPage() {
+interface DiscoveryPageProps {
+    embedded?: boolean;
+}
+
+export default function DiscoveryPage({ embedded = false }: DiscoveryPageProps = {}) {
     const { serverId } = useParams<{ serverId?: string }>();
     const [configs, setConfigs] = useState<(DiscoveryRowConfig & { uniqueId: string, serverId?: string, serverName?: string })[]>([]);
     const [clientLayout, setClientLayout] = useState<ClientLayoutItem[]>([]);
@@ -117,11 +121,17 @@ export default function DiscoveryPage() {
             />
 
             <div className="min-h-full pb-20">
-                <PageHeader
-                    title="Discover"
-                    subtitle="What's out there — trending, popular, and curated picks from external sources."
-                    actions={customizeAction}
-                />
+                {embedded ? (
+                    <div className="flex justify-end px-8 pt-4">
+                        {customizeAction}
+                    </div>
+                ) : (
+                    <PageHeader
+                        title="Discover"
+                        subtitle="What's out there — trending, popular, and curated picks from external sources."
+                        actions={customizeAction}
+                    />
+                )}
 
                 <div className="space-y-10 pt-2">
                     {isLoading ? (

@@ -102,12 +102,11 @@ export default function SearchPage() {
                 ? { view: 'album', albumId, artistId }
                 : { view: 'artist', artistId };
             sessionStorage.setItem(SessionKeys.musicNavState, JSON.stringify(navState));
-            sessionStorage.setItem('audio_active_tab', 'Music');
             const token = localStorage.getItem(StorageKeys.profileToken);
             const profileId = getProfileIdFromToken(token) ?? '';
             sessionStorage.setItem(SessionKeys.musicNavProfile, profileId || '');
         } catch { /* ignore */ }
-        navigate(`/server/${targetServerId}/audio`);
+        navigate(`/server/${targetServerId}/music`);
     };
 
     const navigateToDiscovery = (providerId: string, type: string, externalId: string) => {

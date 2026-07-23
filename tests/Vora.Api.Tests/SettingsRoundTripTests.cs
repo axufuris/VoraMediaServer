@@ -49,6 +49,7 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
         current.NightlyScanTime = "03:30";
         current.DvrPreRollSeconds = 90;
         current.DailyMixCount = 8;
+        current.TimeshiftMaxSessionHours = 4;
 
         var put = await client.PutAsJsonAsync("/api/settings/server", current, TestContext.Current.CancellationToken);
         put.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -58,6 +59,7 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
         refreshed.NightlyScanTime.Should().Be("03:30");
         refreshed.DvrPreRollSeconds.Should().Be(90);
         refreshed.DailyMixCount.Should().Be(8);
+        refreshed.TimeshiftMaxSessionHours.Should().Be(4);
     }
 
     [Fact]

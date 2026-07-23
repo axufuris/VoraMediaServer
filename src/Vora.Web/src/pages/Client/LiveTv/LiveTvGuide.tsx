@@ -175,11 +175,27 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
             return matchesCategory && matchesRegion && matchesResolution && matchesSearch && matchesEmpty;
         });
 
+        const now = Date.now();
+        const parseProgramTime = (t: string): number => new Date(t.endsWith('Z') ? t : t + 'Z').getTime();
+        const hasCurrentProgram = (externalChannelId: string): boolean => {
+            const programs = guideData[(externalChannelId || '').toLowerCase()] || [];
+            return programs.some(p => {
+                const start = parseProgramTime(p.startTime);
+                const end = parseProgramTime(p.endTime);
+                return start <= now && now < end;
+            });
+        };
+
         return filtered.sort((a, b) => {
             const aFav = prefs.favoriteChannels.includes(a.externalChannelId);
             const bFav = prefs.favoriteChannels.includes(b.externalChannelId);
             if (aFav && !bFav) return -1;
             if (!aFav && bFav) return 1;
+
+            const aHasCurrent = hasCurrentProgram(a.externalChannelId);
+            const bHasCurrent = hasCurrentProgram(b.externalChannelId);
+            if (aHasCurrent && !bHasCurrent) return -1;
+            if (!aHasCurrent && bHasCurrent) return 1;
 
             const aHasPrograms = (guideData[(a.externalChannelId || '').toLowerCase()] || []).length > 0;
             const bHasPrograms = (guideData[(b.externalChannelId || '').toLowerCase()] || []).length > 0;

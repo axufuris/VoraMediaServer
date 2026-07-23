@@ -4,6 +4,7 @@ using Vora.Api.Extensions;
 using Vora.Application.Collections;
 using Vora.Application.Collections.Requests;
 using Vora.Application.Collections.ViewModels;
+using Vora.Domain.Enums;
 
 namespace Vora.Api.Endpoints;
 
@@ -74,9 +75,9 @@ public static class CollectionEndpoints
         return Results.Ok(collections);
     }
 
-    private static async Task<IResult> GetCollectionAsync(Guid id, ClaimsPrincipal user, ICollectionManager manager)
+    private static async Task<IResult> GetCollectionAsync(Guid id, [FromQuery] CollectionSortOrder? sort, ClaimsPrincipal user, ICollectionManager manager)
     {
-        var collection = await manager.GetCollectionDetailsAsync(id, user.GetProfileId(), user.HasAllLibraryAccess(), user.GetAllowedLibraryIds());
+        var collection = await manager.GetCollectionDetailsAsync(id, user.GetProfileId(), user.HasAllLibraryAccess(), user.GetAllowedLibraryIds(), sort);
         return collection != null ? Results.Ok(collection) : Results.NotFound();
     }
 

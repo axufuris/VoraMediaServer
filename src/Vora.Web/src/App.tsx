@@ -44,10 +44,8 @@ const ClientPlaylistDetailsPage = lazy(() => import('./pages/Client/Playlists/Pl
 const SmartPlaylistDetailsPage = lazy(() => import('./pages/Client/Playlists/SmartPlaylistDetailsPage'));
 const SearchPage = lazy(() => import('./pages/Client/SearchPage'));
 const AdminDiscoveryPage = lazy(() => import('./pages/Admin/Discovery/DiscoveryPage'));
-const ClientDiscoveryPage = lazy(() => import('./pages/Client/Discovery/DiscoveryPage'));
 const ClientDiscoveryDetailsPage = lazy(() => import('./pages/Client/Discovery/DiscoveryDetailsPage'));
 const ClientDiscoveryActorPage = lazy(() => import('./pages/Client/Discovery/DiscoveryActorPage'));
-const ClientWatchlistPage = lazy(() => import('./pages/Client/WatchlistPage'));
 const ClientYouTubePage = lazy(() => import('./pages/Client/YouTube/YouTubePage'));
 const ClientYouTubeChannelPage = lazy(() => import('./pages/Client/YouTube/YouTubeChannelPage'));
 const ClientYouTubePlayerPage = lazy(() => import('./pages/Client/YouTube/YouTubePlayerPage'));
@@ -55,8 +53,6 @@ const ClientYouTubeSubscriptionsPage = lazy(() => import('./pages/Client/YouTube
 const AdminYouTubePage = lazy(() => import('./pages/Admin/Features/YouTubeAdminPage'));
 const ClientDiscoveryViewAllPage = lazy(() => import('./pages/Client/Discovery/DiscoveryViewAllPage'));
 const AdminRequestsPage = lazy(() => import('./pages/Admin/RequestsPage'));
-const CalendarPage = lazy(() => import('./pages/Client/CalendarPage'));
-const ClientRecommendationsPage = lazy(() => import('./pages/Client/RecommendationsPage'));
 const AdminAiStatsPage = lazy(() => import('./pages/Admin/AiStatsPage'));
 const AdminDedupePage = lazy(() => import('./pages/Admin/DedupePage'));
 const OverlayEditor = lazy(() => import('./pages/Admin/Overlay/OverlayEditor'));
@@ -73,10 +69,12 @@ const AdminMusicHistoryPage = lazy(() => import('./pages/Admin/MusicHistoryPage'
 const AdminLogsPage = lazy(() => import('./pages/Admin/LogsPage'));
 const AdminBackupsPage = lazy(() => import('./pages/Admin/BackupsPage'));
 const AdminLibraryMigrationPage = lazy(() => import('./pages/Admin/LibraryMigrationPage'));
-const LiveTvPage = lazy(() => import('./pages/Client/LiveTv/LiveTvPage'));
 const ClientSettingsPage = lazy(() => import('./pages/Client/SettingsPage'));
-const DvrDashboard = lazy(() => import('./pages/Client/LiveTv/DvrDashboard'));
-const AudioHubPage = lazy(() => import('./pages/Client/Audio/AudioHubPage'));
+const MusicPage = lazy(() => import('./pages/Client/Audio/MusicPage'));
+const PodcastsPage = lazy(() => import('./pages/Client/Audio/PodcastsPage'));
+const RadioPage = lazy(() => import('./pages/Client/Audio/RadioPage'));
+const DiscoverHubPage = lazy(() => import('./pages/Client/Discovery/DiscoverHubPage'));
+const LiveTvHubPage = lazy(() => import('./pages/Client/LiveTv/LiveTvHubPage'));
 
 if (!localStorage.getItem(StorageKeys.deviceId)) {
     localStorage.setItem(StorageKeys.deviceId, crypto.randomUUID());
@@ -180,13 +178,11 @@ export default function App() {
                         <Route path="collection/:id" element={<ClientCollectionDetailsPage />} />
                         <Route path="collections" element={<ClientCollectionsPage />} />
                         <Route path="/actor/:id" element={<ClientActorDetailsPage />} />
-                        <Route path="discovery" element={<ClientDiscoveryPage />} />
-                        <Route path="recommendations" element={<ClientRecommendationsPage />} />
-                        <Route path="watchlist" element={<ClientWatchlistPage />} />
-                        <Route path="calendar" element={<CalendarPage />} />
-                        <Route path="livetv" element={<LiveTvPage />} />
-                        <Route path="dvr" element={<DvrDashboard />} /> {/* <-- NEW */}
-                        <Route path="audio" element={<AudioHubPage />} />
+                        <Route path="discovery" element={<DiscoverHubPage />} />
+                        <Route path="livetv" element={<LiveTvHubPage />} />
+                        <Route path="music" element={<MusicPage />} />
+                        <Route path="podcasts" element={<PodcastsPage />} />
+                        <Route path="radio" element={<RadioPage />} />
                         <Route path="settings" element={<ClientSettingsPage />} />
                         <Route path="discovery/:providerId/row/:rowId" element={<ClientDiscoveryViewAllPage />} />
                         <Route path="discovery/:providerId/:type/:externalId" element={<ClientDiscoveryDetailsPage />} />
@@ -204,15 +200,13 @@ export default function App() {
                             <Route path="collections" element={<ClientCollectionsPage />} />
                             <Route path="actor/:id" element={<ClientActorDetailsPage />} />
                             <Route path="playlists" element={<ClientPlaylistsPage />} />
-                            <Route path="watchlist" element={<ClientWatchlistPage />} />
                             <Route path="playlist/:id" element={<ClientPlaylistDetailsPage />} />
                             <Route path="smart-playlist/:id" element={<SmartPlaylistDetailsPage />} />
-                            <Route path="discovery" element={<ClientDiscoveryPage />} />
-                            <Route path="recommendations" element={<ClientRecommendationsPage />} />
-                            <Route path="calendar" element={<CalendarPage />} />
-                            <Route path="livetv" element={<LiveTvPage />} />
-                            <Route path="dvr" element={<DvrDashboard />} /> {/* <-- NEW */}
-                            <Route path="audio" element={<AudioHubPage />} />
+                            <Route path="discovery" element={<DiscoverHubPage />} />
+                            <Route path="livetv" element={<LiveTvHubPage />} />
+                            <Route path="music" element={<MusicPage />} />
+                            <Route path="podcasts" element={<PodcastsPage />} />
+                            <Route path="radio" element={<RadioPage />} />
                             <Route path="settings" element={<ClientSettingsPage />} />
                             <Route path="discovery/:providerId/row/:rowId" element={<ClientDiscoveryViewAllPage />} />
                             <Route path="discovery/:providerId/:type/:externalId" element={<ClientDiscoveryDetailsPage />} />

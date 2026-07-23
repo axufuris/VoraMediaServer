@@ -132,6 +132,7 @@ export interface MediaItem {
     episodes?: Episode[];
     tvShowTitle?: string;
     tvShowId?: string;
+    seasonId?: string;
     thirdPartyRating1?: number;
     thirdPartyRating1Name?: string;
     thirdPartyRating2?: number;

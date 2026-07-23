@@ -102,7 +102,7 @@ export default function CollectionsPage() {
                         style={{ color: activeTab === 'global' ? 'var(--vora-text-primary)' : 'var(--vora-text-muted)' }}
                     >
                         Global
-                        {activeTab === 'global' && <span className="absolute -bottom-px left-0 right-0 h-0.5 rounded-full" style={{ background: 'var(--vora-accent-500)' }} />}
+                        {activeTab === 'global' && <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full" style={{ background: 'var(--vora-accent-500)' }} />}
                     </button>
                     {sortedLibraries.map(lib => {
                         const isActive = activeTab === lib.id;
@@ -115,7 +115,7 @@ export default function CollectionsPage() {
                                 style={{ color: isActive ? 'var(--vora-text-primary)' : 'var(--vora-text-muted)' }}
                             >
                                 {lib.name}
-                                {isActive && <span className="absolute -bottom-px left-0 right-0 h-0.5 rounded-full" style={{ background: 'var(--vora-accent-500)' }} />}
+                                {isActive && <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full" style={{ background: 'var(--vora-accent-500)' }} />}
                             </button>
                         );
                     })}

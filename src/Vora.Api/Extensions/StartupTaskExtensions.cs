@@ -40,11 +40,6 @@ public static class StartupTaskExtensions
 
     private static async Task MigrateDatabaseAsync(WebApplication app)
     {
-        if (app.Environment.IsDevelopment())
-        {
-            return;
-        }
-
         using var scope = app.Services.CreateScope();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 

@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collectionService, type CollectionDetails } from '../../../api/Collections/collectionService';
+import { collectionService, type CollectionDetails, type CollectionSortOrder } from '../../../api/Collections/collectionService';
 import { collectionAdminService } from '../../../api/Collections/collectionAdminService';
 import EditCollectionModal from '../../../components/Collections/EditCollectionModal';
 import ReorderCollectionModal from '../../../components/Collections/ReorderCollectionModal';
@@ -10,12 +10,33 @@ import { useDialog } from '../../../dialogs';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
 import { StorageKeys } from '../../../utils/storageKeys';
 
+const SORT_LABELS: Record<CollectionSortOrder, string> = {
+    Chronological: 'Chronological (Timeline)',
+    ReleaseDateAsc: 'Release Date (Oldest First)',
+    ReleaseDateDesc: 'Release Date (Newest First)',
+    DateAddedDesc: 'Date Added',
+    Alphabetical: 'Alphabetical (A–Z)',
+};
+
+const USER_SORT_OPTIONS: CollectionSortOrder[] = ['ReleaseDateAsc', 'ReleaseDateDesc', 'Alphabetical'];
+
+function getSortOptions(defaultSort: CollectionSortOrder, hasChronological: boolean): CollectionSortOrder[] {
+    const order: CollectionSortOrder[] = ['Chronological', 'ReleaseDateAsc', 'ReleaseDateDesc', 'DateAddedDesc', 'Alphabetical'];
+    return order.filter(s =>
+        USER_SORT_OPTIONS.includes(s)
+        || s === defaultSort
+        || (s === 'Chronological' && hasChronological)
+    );
+}
+
 export default function CollectionDetailsPage() {
     const dialog = useDialog();
     const { serverId, id } = useParams<{ serverId?: string, id: string }>();
     const navigate = useNavigate();
     const [collection, setCollection] = useState<CollectionDetails | null>(null);
     const [loading, setLoading] = useState(true);
+    const [sort, setSort] = useState<CollectionSortOrder | null>(null);
+    const sortRef = useRef<CollectionSortOrder | null>(null);
 
     const [isSyncing, setIsSyncing] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -25,8 +46,14 @@ export default function CollectionDetailsPage() {
     const fetchCollection = useCallback((silent = false) => {
         if (!id) return;
         if (!silent) setLoading(true);
-        collectionService.getCollectionDetails(id, serverId)
-            .then(setCollection)
+        collectionService.getCollectionDetails(id, serverId, sortRef.current ?? undefined)
+            .then(data => {
+                setCollection(data);
+                if (sortRef.current === null) {
+                    sortRef.current = data.defaultSort;
+                    setSort(data.defaultSort);
+                }
+            })
             .catch(console.error)
             .finally(() => {
                 if (!silent) setLoading(false);
@@ -34,8 +61,20 @@ export default function CollectionDetailsPage() {
     }, [id, serverId]);
 
     useEffect(() => {
+        sortRef.current = null;
+        setSort(null);
+    }, [id]);
+
+    useEffect(() => {
         fetchCollection();
     }, [fetchCollection]);
+
+    const handleSortChange = (newSort: CollectionSortOrder) => {
+        if (newSort === sortRef.current) return;
+        sortRef.current = newSort;
+        setSort(newSort);
+        fetchCollection(true);
+    };
 
     useSignalREvent("CollectionUpdated", useCallback((updatedId: string) => {
         if (id && updatedId.toLowerCase() === id.toLowerCase()) {
@@ -138,7 +177,7 @@ export default function CollectionDetailsPage() {
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                     </button>
 
-                                    {isAdmin && collection.defaultSort === 4 && (
+                                    {isAdmin && collection.defaultSort === 'Chronological' && (
                                         <button
                                             onClick={() => setIsReorderModalOpen(true)}
                                             className="p-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-accent-hover)] rounded-full text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors shadow-lg cursor-pointer"
@@ -148,7 +187,7 @@ export default function CollectionDetailsPage() {
                                         </button>
                                     )}
 
-                                    {collection.defaultSort === 4 && collection.sortProviderId && (
+                                    {collection.sortProviderId && (
                                         <button
                                             onClick={handleSyncTimeline}
                                             disabled={isSyncing}
@@ -175,9 +214,27 @@ export default function CollectionDetailsPage() {
                 </div>
 
                 <div>
-                    <h2 className="text-2xl font-bold mb-6 text-[var(--vora-text-primary)] border-b border-[var(--vora-border-subtle)] pb-2">
-                        Items in Collection ({collection.itemCount})
-                    </h2>
+                    <div className="flex items-center justify-between gap-4 mb-6 border-b border-[var(--vora-border-subtle)] pb-2">
+                        <h2 className="text-2xl font-bold text-[var(--vora-text-primary)]">
+                            Items in Collection ({collection.itemCount})
+                        </h2>
+
+                        {collection.itemCount > 1 && (
+                            <div className="flex items-center gap-2 shrink-0">
+                                <label htmlFor="collection-sort" className="text-sm font-medium text-[var(--vora-text-muted)]">Sort by</label>
+                                <select
+                                    id="collection-sort"
+                                    value={sort ?? collection.defaultSort}
+                                    onChange={e => handleSortChange(e.target.value as CollectionSortOrder)}
+                                    className="cursor-pointer rounded-md border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-raised)] p-2 text-sm text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)]"
+                                >
+                                    {getSortOptions(collection.defaultSort, !!collection.sortProviderId || collection.defaultSort === 'Chronological').map(option => (
+                                        <option key={option} value={option}>{SORT_LABELS[option]}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                         {collection.items?.map(item => (

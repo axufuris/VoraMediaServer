@@ -59,9 +59,10 @@ export default function MainLayoutSidebar({
 
             {!isEditingNav ? (
                 <>
-                    <div className="mb-4 px-4">
+                    <div className="mb-4 space-y-1 px-4">
                         <NavLink
                             to="/"
+                            end
                             className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${isActive ? '' : 'hover:bg-white/5 hover:text-[var(--vora-text-primary)]'}`}
                             style={({ isActive }) => navItemStyle(isActive)}
                         >
@@ -75,7 +76,7 @@ export default function MainLayoutSidebar({
 
                     <div className="flex-1 overflow-y-auto px-4">
                         <div className="space-y-1">
-                            {pinnedItems.map(item => {
+                            {[...pinnedItems].sort((a, b) => a.order - b.order).map(item => {
                                 const icon = renderNavIcon(item.type === 'library' ? item.mediaType : item.id, 'w-5 h-5');
                                 return (
                                     <NavLink

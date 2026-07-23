@@ -126,6 +126,8 @@ public class ServerSetting
     public int DvrPostRollSeconds { get; set; } = 300;
     public DvrConflictPolicy DvrConflictPolicy { get; set; } = DvrConflictPolicy.AlwaysRecord;
 
+    public int TimeshiftMaxSessionHours { get; set; } = 6;
+
     public string AdminThemeId { get; set; } = "vora-default";
 
     public string DefaultClientTemplateId { get; set; } = "vora-cinema";

@@ -7,7 +7,6 @@ using Vora.Domain.Entities.Collections;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Users;
-using Vora.Domain.Enums;
 
 namespace Vora.Infrastructure.Persistence.Repositories;
 
@@ -60,7 +59,7 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
     public Task<List<CollectionScheduleDto>> GetAutoSyncCollectionsAsync() =>
         context.Collections
             .AsNoTracking()
-            .Where(c => c.AutoSyncChronology && c.DefaultSort == CollectionSortOrder.Chronological)
+            .Where(c => c.AutoSyncChronology && !string.IsNullOrEmpty(c.SortProviderId))
             .Select(CollectionScheduleDto.Projection)
             .ToListAsync();
 
@@ -177,15 +176,13 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
 
         var maxSortOrder = await context.Set<CollectionItem>()
             .Where(ci => ci.CollectionId == collectionId)
-            .Select(ci => ci.SortOrder)
-            .DefaultIfEmpty(0)
-            .MaxAsync();
+            .MaxAsync(ci => (int?)ci.SortOrder);
 
         await context.Set<CollectionItem>().AddAsync(new CollectionItem
         {
             CollectionId = collectionId,
             MediaItemId = mediaItemId,
-            SortOrder = maxSortOrder + 1
+            SortOrder = (maxSortOrder ?? 0) + 1
         });
         await context.SaveChangesAsync();
     }

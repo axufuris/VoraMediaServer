@@ -414,6 +414,7 @@ export default function MediaDetailsPage() {
 
     const isEpisode = media.type === 'Episode';
     const isSeason = media.type === 'Season';
+    const showParentNav = (isEpisode && !!media.seasonId) || (isSeason && !!media.tvShowId);
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = (isSeason || isEpisode) ? media.title : undefined;
     const showQualityButton = (media.type === 'Movie' || isEpisode) && (sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
@@ -619,6 +620,13 @@ export default function MediaDetailsPage() {
                                                 boxShadow: 'var(--vora-shadow-lg)',
                                             }}
                                         >
+                                            {isEpisode && media.seasonId && (
+                                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.seasonId}` : `/media/${media.seasonId}`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Go to season</button>
+                                            )}
+                                            {isSeason && media.tvShowId && (
+                                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Go to show</button>
+                                            )}
+                                            {showParentNav && <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />}
                                             <button type="button" onClick={() => { setIsEditModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit metadata</button>
                                             <button type="button" onClick={() => { setIsCollectionModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Add to collection</button>
                                             {isAdmin && (

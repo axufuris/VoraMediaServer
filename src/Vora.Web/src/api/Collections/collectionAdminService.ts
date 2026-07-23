@@ -1,12 +1,13 @@
 import { apiClient } from '../client';
 import type { ArtworkResult } from '../Media/artworkService';
+import type { CollectionSortOrder } from './collectionService';
 
 export interface UpdateCollectionRequest {
     title: string;
     description?: string;
     posterUrl?: string;
     backdropUrl?: string;
-    defaultSort: number;
+    defaultSort: CollectionSortOrder;
     lockedFields: string[];
     makeGlobal?: boolean;
     sortProviderId?: string;
@@ -24,7 +25,7 @@ export interface CreateCollectionRequest {
     description?: string;
     posterUrl?: string;
     backdropUrl?: string;
-    defaultSort: number;
+    defaultSort: CollectionSortOrder;
     sortProviderId?: string;
     externalListId?: string;
     autoSyncChronology: boolean;

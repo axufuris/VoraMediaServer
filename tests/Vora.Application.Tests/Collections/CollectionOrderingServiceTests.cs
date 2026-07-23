@@ -4,7 +4,6 @@ using Vora.Application.Analysis;
 using Vora.Application.Collections;
 using Vora.Domain.Entities.Collections;
 using Vora.Domain.Entities.Library;
-using Vora.Domain.Enums;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Tests.Collections;
@@ -42,88 +41,40 @@ public class CollectionOrderingServiceTests
         await _repo.DidNotReceive().UpdateCollectionItemsAsync(Arg.Any<IEnumerable<CollectionItem>>());
     }
 
-    [Fact]
-    public async Task ReevaluateOrderOnItemAddedAsync_no_op_when_default_sort_is_not_chronological()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task ReevaluateOrderOnItemAddedAsync_no_op_when_no_sort_provider(string? providerId)
     {
         var collectionId = Guid.NewGuid();
         _repo.GetProjectedByIdAsync(
             collectionId,
-            Arg.Any<Expression<Func<Collection, CollectionSortOrder>>>(),
+            Arg.Any<Expression<Func<Collection, string?>>>(),
             Arg.Any<bool>(),
             Arg.Any<List<Guid>?>())
-            .Returns(CollectionSortOrder.ReleaseDateAsc);
+            .Returns(providerId);
 
-        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: "tmdb-collections", TestContext.Current.CancellationToken);
+        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, TestContext.Current.CancellationToken);
 
         await _notifier.DidNotReceiveWithAnyArgs().NotifyCollectionUpdatedAsync(default);
         await _repo.DidNotReceive().GetCollectionItemsWithMediaAsync(Arg.Any<Guid>());
     }
 
-    [Theory]
-    [InlineData(CollectionSortOrder.Alphabetical)]
-    [InlineData(CollectionSortOrder.DateAddedDesc)]
-    [InlineData(CollectionSortOrder.ReleaseDateDesc)]
-    public async Task ReevaluateOrderOnItemAddedAsync_no_op_for_non_chronological_default_sorts(CollectionSortOrder sort)
-    {
-        var collectionId = Guid.NewGuid();
-        _repo.GetProjectedByIdAsync(
-            collectionId,
-            Arg.Any<Expression<Func<Collection, CollectionSortOrder>>>(),
-            Arg.Any<bool>(),
-            Arg.Any<List<Guid>?>())
-            .Returns(sort);
-
-        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: "p", TestContext.Current.CancellationToken);
-
-        await _notifier.DidNotReceiveWithAnyArgs().NotifyCollectionUpdatedAsync(default);
-    }
-
     [Fact]
-    public async Task ReevaluateOrderOnItemAddedAsync_skips_when_not_force_full_refetch_even_if_chronological()
+    public async Task ReevaluateOrderOnItemAddedAsync_reapplies_and_notifies_when_sort_provider_set()
     {
+        // Note: the inner ApplyChronologicalOrderAsync reads an anonymous-type projection
+        // that returns null by default, so it returns early without touching items — but
+        // the re-evaluation gate passes when a provider is set and the notifier still fires.
         var collectionId = Guid.NewGuid();
         _repo.GetProjectedByIdAsync(
             collectionId,
-            Arg.Any<Expression<Func<Collection, CollectionSortOrder>>>(),
+            Arg.Any<Expression<Func<Collection, string?>>>(),
             Arg.Any<bool>(),
             Arg.Any<List<Guid>?>())
-            .Returns(CollectionSortOrder.Chronological);
+            .Returns("trakt_chronology");
 
-        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: false, providerId: "p", TestContext.Current.CancellationToken);
-
-        await _notifier.DidNotReceiveWithAnyArgs().NotifyCollectionUpdatedAsync(default);
-    }
-
-    [Fact]
-    public async Task ReevaluateOrderOnItemAddedAsync_skips_when_provider_id_blank_even_if_chronological_and_forced()
-    {
-        var collectionId = Guid.NewGuid();
-        _repo.GetProjectedByIdAsync(
-            collectionId,
-            Arg.Any<Expression<Func<Collection, CollectionSortOrder>>>(),
-            Arg.Any<bool>(),
-            Arg.Any<List<Guid>?>())
-            .Returns(CollectionSortOrder.Chronological);
-
-        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: null, TestContext.Current.CancellationToken);
-
-        await _notifier.DidNotReceiveWithAnyArgs().NotifyCollectionUpdatedAsync(default);
-    }
-
-    [Fact]
-    public async Task ReevaluateOrderOnItemAddedAsync_notifies_when_chronological_force_refetch_and_provider_set()
-    {
-        // Note: the inner ApplyChronologicalOrderAsync also reads an anonymous-type projection
-        // that returns null by default, so it returns early — but the notifier still fires.
-        var collectionId = Guid.NewGuid();
-        _repo.GetProjectedByIdAsync(
-            collectionId,
-            Arg.Any<Expression<Func<Collection, CollectionSortOrder>>>(),
-            Arg.Any<bool>(),
-            Arg.Any<List<Guid>?>())
-            .Returns(CollectionSortOrder.Chronological);
-
-        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, Guid.NewGuid(), forceFullRefetch: true, providerId: "tmdb-collections", TestContext.Current.CancellationToken);
+        await _service.ReevaluateOrderOnItemAddedAsync(collectionId, TestContext.Current.CancellationToken);
 
         await _notifier.Received(1).NotifyCollectionUpdatedAsync(collectionId);
     }

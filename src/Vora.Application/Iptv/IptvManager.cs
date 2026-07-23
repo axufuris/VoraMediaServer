@@ -313,6 +313,8 @@ public class IptvManager : IIptvManager
         var channel = await _repository.GetChannelByIdAsync(channelId);
         if (channel == null) throw new InvalidOperationException("Channel not found.");
 
+        await using var profileLock = await _timeshiftCoordinator.LockProfileAsync(profileId);
+
         var leaseKey = TimeshiftLeaseKey(profileId);
         var tunerProfile = await _repository.GetTunerProfileByPlaylistIdAsync(channel.PlaylistId);
         var maxConcurrent = tunerProfile?.MaxConcurrentStreams ?? 0;
@@ -334,7 +336,13 @@ public class IptvManager : IIptvManager
             var process = BuildTimeshiftProcess(channel.StreamUrl, outputPath, segmentPath);
 
             await _timeshiftCoordinator.StopAsync(profileId);
-            _timeshiftCoordinator.TryRegister(profileId, process, sessionPath);
+            if (!_timeshiftCoordinator.TryRegister(profileId, process, sessionPath))
+            {
+                process.Dispose();
+                TryDeleteDirectory(sessionPath);
+                _tunerRegistry.Release(leaseKey);
+                return null;
+            }
             process.Start();
 
             await WaitForBufferAsync(profileId, sessionPath);
@@ -364,6 +372,7 @@ public class IptvManager : IIptvManager
 
     public async Task StopTimeshiftSessionAsync(Guid profileId)
     {
+        await using var profileLock = await _timeshiftCoordinator.LockProfileAsync(profileId);
         _tunerRegistry.Release(TimeshiftLeaseKey(profileId));
         await _timeshiftCoordinator.StopAsync(profileId);
     }
@@ -386,6 +395,21 @@ public class IptvManager : IIptvManager
         Directory.CreateDirectory(sessionPath);
 
         return sessionPath;
+    }
+
+    private void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to delete timeshift session folder {Folder}.", path);
+        }
     }
 
     private void CleanupPreviousSessions(string baseProfilePath)

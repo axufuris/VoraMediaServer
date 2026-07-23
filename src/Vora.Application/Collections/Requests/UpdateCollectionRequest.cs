@@ -1,4 +1,6 @@
-﻿namespace Vora.Application.Collections.Requests;
+﻿using Vora.Domain.Enums;
+
+namespace Vora.Application.Collections.Requests;
 
 public class UpdateCollectionRequest
 {
@@ -6,7 +8,7 @@ public class UpdateCollectionRequest
     public string? Description { get; set; }
     public string? PosterUrl { get; set; }
     public string? BackdropUrl { get; set; }
-    public int DefaultSort { get; set; }
+    public CollectionSortOrder DefaultSort { get; set; }
     public List<string> LockedFields { get; set; } = new();
     public bool MakeGlobal { get; set; }
     public string? SortProviderId { get; set; }
