@@ -123,7 +123,8 @@ public class UserManagerTests
             new List<ProfileScheduleVM>(), true, null);
 
         captured.Should().NotBeNull();
-        captured!.PinHash.Should().Be(ComputeSha256Hex("1234"));
+        captured!.PinHash.Should().StartWith("$2");
+        BCrypt.Net.BCrypt.Verify("1234", captured.PinHash).Should().BeTrue();
     }
 
     [Fact]
