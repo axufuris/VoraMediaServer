@@ -33,13 +33,14 @@ const mockConnection = {
     }
 };
 
-vi.mock('@microsoft/signalr', () => ({
-    HubConnectionBuilder: vi.fn().mockImplementation(() => ({
-        withUrl: vi.fn().mockReturnThis(),
-        withAutomaticReconnect: vi.fn().mockReturnThis(),
-        build: vi.fn().mockReturnValue(mockConnection),
-    })),
-}));
+vi.mock('@microsoft/signalr', () => {
+    class HubConnectionBuilder {
+        withUrl() { return this; }
+        withAutomaticReconnect() { return this; }
+        build() { return mockConnection; }
+    }
+    return { HubConnectionBuilder };
+});
 
 // Helper to use the hook inside a test component.
 async function renderHook(eventName: string, callback: (p: unknown) => void) {

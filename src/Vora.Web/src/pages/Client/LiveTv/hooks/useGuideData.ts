@@ -88,11 +88,9 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
 
                 let currentPrefs = emptyPrefs();
 
-                let hasSavedSettings = false;
                 const savedIptv = localStorage.getItem(StorageKeys.iptvPrefs(activeProfileId, deviceId));
 
                 if (savedIptv && savedIptv !== "[]" && savedIptv !== "") {
-                    hasSavedSettings = true;
                     const raw = JSON.parse(savedIptv);
                     if (Array.isArray(raw)) currentPrefs.enabledProviders = raw;
                     else currentPrefs = { ...currentPrefs, ...raw };
