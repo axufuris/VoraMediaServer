@@ -18,8 +18,8 @@ export interface PlayableMedia {
     // Output resolution / HDR (from StartStreamResponse, what's actually
     // delivered to the player after transcoding). Used by the badge bar
     // so it doesn't lie about an HDR→SDR or 4K→1080p transcode.
-    outputResolution?: string;
-    outputHdrType?: string;
+    outputResolution?: string | null;
+    outputHdrType?: string | null;
     audioChannels?: number;
     videoTrackId?: string;
     audioTrackId?: string;

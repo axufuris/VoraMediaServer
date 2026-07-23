@@ -193,6 +193,7 @@ function CoverageStat({ label, value, warn = false }: { label: string, value: st
 export default function ManageLibrary() {
     const { serverId, id } = useParams<{ serverId?: string, id: string }>();
     const navigate = useNavigate();
+    const dialog = useDialog();
 
     const [library, setLibrary] = useState<MediaLibrary | null>(null);
     const [saving, setSaving] = useState(false);
