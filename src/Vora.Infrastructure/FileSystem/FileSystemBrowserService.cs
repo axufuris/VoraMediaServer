@@ -107,16 +107,30 @@ public class FileSystemBrowserService : IFileSystemBrowserService
         });
     }
 
+    private static readonly string[] ExcludedMountPrefixes =
+    {
+        "/proc", "/sys", "/dev", "/run", "/etc", "/app", "/transcode",
+    };
+
     private List<FileSystemRootVM> ResolveAllowedRoots()
     {
         var configured = _configuration.GetSection("FileSystemBrowser:AllowedRoots").Get<List<FileSystemRootVM>>();
 
-        if (configured == null || configured.Count == 0)
+        if (configured != null && configured.Count > 0)
         {
-            _logger.LogWarning("FileSystemBrowser:AllowedRoots is not configured. Filesystem browsing is disabled — set the config to enable.");
-            return new List<FileSystemRootVM>();
+            return ResolveConfiguredRoots(configured);
         }
 
+        var discovered = DiscoverMountRoots();
+        if (discovered.Count == 0)
+        {
+            _logger.LogWarning("No browsable media mounts were auto-detected and FileSystemBrowser:AllowedRoots is not set. Mount your media into the container (or set the config) to enable browsing.");
+        }
+        return discovered;
+    }
+
+    private List<FileSystemRootVM> ResolveConfiguredRoots(List<FileSystemRootVM> configured)
+    {
         var resolved = new List<FileSystemRootVM>();
         foreach (var root in configured)
         {
@@ -146,6 +160,86 @@ public class FileSystemBrowserService : IFileSystemBrowserService
         }
 
         return resolved;
+    }
+
+    private List<FileSystemRootVM> DiscoverMountRoots()
+    {
+        const string mountInfoPath = "/proc/self/mountinfo";
+        var results = new List<FileSystemRootVM>();
+
+        if (!File.Exists(mountInfoPath))
+        {
+            return results;
+        }
+
+        string[] lines;
+        try
+        {
+            lines = File.ReadAllLines(mountInfoPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read {Path} for media mount auto-detection.", mountInfoPath);
+            return results;
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var line in lines)
+        {
+            var fields = line.Split(' ');
+            if (fields.Length < 5)
+            {
+                continue;
+            }
+
+            var mountPoint = UnescapeMountPath(fields[4]);
+            if (string.IsNullOrWhiteSpace(mountPoint))
+            {
+                continue;
+            }
+
+            var normalized = NormalizePath(mountPoint);
+            if (!seen.Add(normalized)) continue;
+            if (IsDriveRoot(normalized)) continue;
+            if (IsExcludedMount(normalized)) continue;
+            if (!Directory.Exists(normalized)) continue;
+
+            results.Add(new FileSystemRootVM
+            {
+                Label = DeriveRootLabel(normalized),
+                Path = normalized
+            });
+        }
+
+        results.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
+        return results;
+    }
+
+    private static bool IsExcludedMount(string normalizedPath)
+    {
+        foreach (var prefix in ExcludedMountPrefixes)
+        {
+            if (string.Equals(normalizedPath, prefix, StringComparison.Ordinal) ||
+                normalizedPath.StartsWith(prefix + "/", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static string UnescapeMountPath(string raw)
+    {
+        if (!raw.Contains('\\'))
+        {
+            return raw;
+        }
+
+        return raw
+            .Replace("\\040", " ")
+            .Replace("\\011", "\t")
+            .Replace("\\012", "\n")
+            .Replace("\\134", "\\");
     }
 
     private static bool IsDriveRoot(string normalizedPath)
