@@ -16,19 +16,8 @@ public interface IThemeRegistry
 
 public class ThemeRegistry : IThemeRegistry
 {
-    private const string DefaultThemeId = "vora-default";
-
     private static readonly IReadOnlyList<ThemeMetaVM> BuiltIn = new List<ThemeMetaVM>
     {
-        new()
-        {
-            Id = DefaultThemeId,
-            Name = "Vora Default",
-            Version = "1.0.0",
-            Author = "Vora",
-            Description = "Warm neutrals with an amber accent. Editorial and quiet.",
-            IsBuiltIn = true,
-        },
         new()
         {
             Id = "vora-dark",
@@ -36,6 +25,15 @@ public class ThemeRegistry : IThemeRegistry
             Version = "1.0.0",
             Author = "Vora",
             Description = "Cool zinc neutrals with a brighter amber accent and a subtle canvas glow.",
+            IsBuiltIn = true,
+        },
+        new()
+        {
+            Id = "vora-light",
+            Name = "Vora Light",
+            Version = "1.0.0",
+            Author = "Vora",
+            Description = "Warm neutrals with an amber accent. Editorial and quiet.",
             IsBuiltIn = true,
         },
         new()

@@ -99,7 +99,7 @@ function ThemeSwatchStrip({ themeId }: { themeId: string }) {
  * Plugin themes that don't appear in this map render the default palette.
  */
 const INACTIVE_SWATCHES: Record<string, { canvas: string, surface: string, accent: string, text: string, muted: string }> = {
-    'vora-default': { canvas: '#fafaf9', surface: '#ffffff', accent: '#d97706', text: '#1c1917', muted: '#78716c' },
+    'vora-light':   { canvas: '#fafaf9', surface: '#ffffff', accent: '#d97706', text: '#1c1917', muted: '#78716c' },
     'vora-dark':    { canvas: '#09090b', surface: '#18181b', accent: '#f59e0b', text: '#fafafa', muted: '#71717a' },
     'vora-ocean':   { canvas: '#0a1623', surface: '#0f1f30', accent: '#14b8a6', text: '#e2e8f0', muted: '#64748b' },
     default:        { canvas: '#e7e5e4', surface: '#f5f5f4', accent: '#a3a3a3', text: '#525252', muted: '#a3a3a3' },

@@ -128,7 +128,7 @@ public class ServerSetting
 
     public int TimeshiftMaxSessionHours { get; set; } = 6;
 
-    public string AdminThemeId { get; set; } = "vora-default";
+    public string AdminThemeId { get; set; } = "vora-dark";
 
     public string DefaultClientTemplateId { get; set; } = "vora-cinema";
 

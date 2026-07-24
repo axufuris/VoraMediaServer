@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { ThemeManifest } from '../src/theme/types';
-import { voraDefault } from '../src/theme/themes/voraDefault';
+import { voraLight } from '../src/theme/themes/voraLight';
 import { voraDark } from '../src/theme/themes/voraDark';
 import { voraOcean } from '../src/theme/themes/voraOcean';
 import { voraCinema } from '../src/theme/clientTemplates/voraCinema';
@@ -21,7 +21,7 @@ const outRoot = resolve(repoRoot, 'dist', 'tokens');
 // vora-velvet, or vora-aurora hot-swaps instantly on Android/iOS without a
 // round-trip to /api/templates/{id}/manifest.
 const themes: ThemeManifest[] = [
-    voraDefault,
+    voraLight,
     voraDark,
     voraOcean,
     voraCinema,
@@ -453,7 +453,7 @@ function emitSwiftFile(): string {
 // Themes included: ${themeNames}
 //
 // Consume in a SwiftUI client by adding this file to your VoraCore Swift package.
-// Pick a preset via \`VoraThemes.voraDefault\`; read the active theme inside a view
+// Pick a preset via \`VoraThemes.voraDark\`; read the active theme inside a view
 // via the environment value the hand-written VoraTheme accessor exposes.
 
 import SwiftUI

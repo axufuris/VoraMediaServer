@@ -2,15 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useLocation } from 'react-router-dom';
 import type { ThemeManifest } from './types';
 import { applyTheme } from './applyTheme';
-import { voraDefault } from './themes/voraDefault';
 import { voraDark } from './themes/voraDark';
+import { voraLight } from './themes/voraLight';
 import { voraOcean } from './themes/voraOcean';
 import { themeService } from '../api/System/themeService';
 import { useSignalREvent } from '../hooks/useSignalREvent';
 import { StorageKeys } from '../utils/storageKeys';
 import { ThemeContext, type ThemeContextValue } from './useTheme';
 
-const BUILT_IN_THEMES: ThemeManifest[] = [voraDefault, voraDark, voraOcean];
+const BUILT_IN_THEMES: ThemeManifest[] = [voraDark, voraLight, voraOcean];
 
 const STORAGE_KEY = 'vora_admin_theme_id';
 const URL_PARAM = 'theme';
@@ -28,7 +28,7 @@ function readUrlOverrideThemeId(): string | null {
 }
 
 function resolveInitialThemeId(): string {
-    if (typeof window === 'undefined') return voraDefault.id;
+    if (typeof window === 'undefined') return voraDark.id;
 
     // URL takes precedence; useful for preview or recovery. Note that a URL
     // override pointing at a plugin theme will fall back to the default for
@@ -40,7 +40,7 @@ function resolveInitialThemeId(): string {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return stored;
 
-    return voraDefault.id;
+    return voraDark.id;
 }
 
 function findBuiltIn(id: string): ThemeManifest | undefined {
@@ -80,7 +80,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
     const [activeId, setActiveId] = useState<string>(resolveInitialThemeId);
     const [activeManifest, setActiveManifest] = useState<ThemeManifest>(() => {
-        return findBuiltIn(resolveInitialThemeId()) ?? voraDefault;
+        return findBuiltIn(resolveInitialThemeId()) ?? voraDark;
     });
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isSwitching, setIsSwitching] = useState<boolean>(false);

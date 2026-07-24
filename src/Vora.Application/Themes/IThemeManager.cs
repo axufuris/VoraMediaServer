@@ -13,7 +13,7 @@ public interface IThemeManager
 
 public class ThemeManager : IThemeManager
 {
-    private const string FallbackThemeId = "vora-default";
+    private const string FallbackThemeId = "vora-dark";
 
     private readonly IThemeRegistry _registry;
     private readonly IThemeBundleLoader _bundleLoader;

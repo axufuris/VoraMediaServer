@@ -1,14 +1,14 @@
 import type { ThemeManifest } from '../types';
 
 /**
- * Vora Default — light theme.
+ * Vora Light — light theme.
  *
  * Warm-neutral palette (Tailwind's stone family) with amber accent.
  * 1:1 with the values shipped in styles/tokens.css as the static fallback.
  */
-export const voraDefault: ThemeManifest = {
-    id: 'vora-default',
-    name: 'Vora Default',
+export const voraLight: ThemeManifest = {
+    id: 'vora-light',
+    name: 'Vora Light',
     version: '1.0.0',
     author: 'Vora',
     description: 'Warm neutrals with an amber accent. Editorial and quiet.',

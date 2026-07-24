@@ -119,7 +119,7 @@ public class ThemeBundleLoader : IThemeBundleLoader
             return Reject(folderName, $"folder name '{folderName}' must match manifest id '{id}'", logger);
         }
 
-        if (id == "vora-default" || id == "vora-dark")
+        if (id == "vora-light" || id == "vora-dark" || id == "vora-ocean")
         {
             return Reject(folderName, $"id '{id}' is reserved for built-in themes", logger);
         }
