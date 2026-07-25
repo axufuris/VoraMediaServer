@@ -18,7 +18,7 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
         Directory.CreateDirectory(_tempRoot);
 
         _ingestion = Substitute.For<IMediaIngestionService>();
-        _scanner = new VoraLocalMediaScannerProvider(NullLogger<VoraLocalMediaScannerProvider>.Instance, _ingestion);
+        _scanner = new VoraLocalMediaScannerProvider(NullLogger<VoraLocalMediaScannerProvider>.Instance, _ingestion, new NullTaskProgressReporter());
         _library = LibraryHandle.FromGuid(Guid.NewGuid());
 
         _ingestion.GetLibraryDetailsAsync(Arg.Any<LibraryHandle>())
@@ -157,6 +157,24 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task ScanMovieLibrary_extracts_edition_from_radarr_edition_tag()
+    {
+        // "Fan Edit" is not in the keyword list — only the {edition-...} tag yields it.
+        TouchFile("Dune (2021) {tmdb-438631} {edition-Fan Edit} [Bluray-2160p].mkv");
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).EnsureMovieAsync(
+            Arg.Any<LibraryHandle>(),
+            "Dune",
+            2021,
+            tmdbId: "438631",
+            imdbId: null,
+            tvdbId: null,
+            edition: "Fan Edit");
+    }
+
+    [Fact]
     public async Task ScanMovieLibrary_falls_back_to_filename_when_no_year()
     {
         TouchFile("WeirdFile.mkv");
@@ -213,6 +231,91 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task ScanMovieLibrary_skips_trailer_and_sample_suffix_files_but_keeps_movie()
+    {
+        TouchFile(Path.Combine("Inception (2010)", "Inception (2010).mkv"));
+        TouchFile(Path.Combine("Inception (2010)", "Inception (2010)-trailer.mkv"));
+        TouchFile(Path.Combine("Inception (2010)", "Inception (2010)-sample.mkv"));
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).EnsureMovieAsync(
+            Arg.Any<LibraryHandle>(),
+            Arg.Any<string>(),
+            Arg.Any<int?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task ScanMovieLibrary_skips_files_in_extras_subfolder()
+    {
+        TouchFile(Path.Combine("Inception (2010)", "Extras", "Making Of.mkv"));
+        TouchFile(Path.Combine("Inception (2010)", "Trailers", "Teaser.mkv"));
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.DidNotReceive().EnsureMovieAsync(
+            Arg.Any<LibraryHandle>(),
+            Arg.Any<string>(),
+            Arg.Any<int?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task ScanMovieLibrary_removes_legacy_trailer_items_ingested_as_movies()
+    {
+        var trailerPath = Path.Combine(_tempRoot, "Inception (2010)", "Inception (2010)-trailer.mkv");
+        var moviePath = Path.Combine(_tempRoot, "Inception (2010)", "Inception (2010).mkv");
+        _ingestion.GetLibraryItemFilePathsAsync(Arg.Any<LibraryHandle>())
+            .Returns(new List<string> { trailerPath, moviePath });
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).RemoveMediaItemByPathAsync(trailerPath);
+        await _ingestion.DidNotReceive().RemoveMediaItemByPathAsync(moviePath);
+    }
+
+    [Fact]
+    public async Task ScanMovieLibrary_attaches_trailer_suffix_as_local_extra_to_parent()
+    {
+        TouchFile(Path.Combine("Inception (2010)", "Inception (2010).mkv"));
+        TouchFile(Path.Combine("Inception (2010)", "Inception (2010)-trailer.mkv"));
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).AttachLocalExtraAsync(
+            Arg.Any<LibraryHandle>(),
+            "Inception",
+            2010,
+            Arg.Is<string>(p => p.EndsWith("-trailer.mkv")),
+            "Trailer",
+            Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task ScanMovieLibrary_attaches_extras_folder_file_to_parent_with_filename_title()
+    {
+        TouchFile(Path.Combine("Inception (2010)", "Inception (2010).mkv"));
+        TouchFile(Path.Combine("Inception (2010)", "Trailers", "Teaser One.mkv"));
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).AttachLocalExtraAsync(
+            Arg.Any<LibraryHandle>(),
+            "Inception",
+            2010,
+            Arg.Is<string>(p => p.EndsWith("Teaser One.mkv")),
+            "Trailer",
+            "Teaser One");
+    }
+
+    [Fact]
     public async Task ScanTvShowLibrary_extracts_season_episode_from_filename()
     {
         TouchFile(Path.Combine("Breaking Bad (2008)", "Season 01", "S01E03 - And the Bag's in the River.mkv"));
@@ -255,6 +358,38 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
             Arg.Any<string>(),
             new DateTime(2024, 1, 15),
             Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task ScanTvShowLibrary_attaches_show_level_extra_to_show()
+    {
+        TouchFile(Path.Combine("Breaking Bad (2008)", "Season 01", "S01E01 - Pilot.mkv"));
+        TouchFile(Path.Combine("Breaking Bad (2008)", "Extras", "Making Of.mkv"));
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).AttachTvShowLocalExtraAsync(
+            Arg.Any<LibraryHandle>(),
+            "Breaking Bad",
+            Arg.Is<string>(p => p.EndsWith("Making Of.mkv")),
+            Arg.Any<string>(),
+            "Making Of");
+    }
+
+    [Fact]
+    public async Task ScanTvShowLibrary_attaches_season_folder_extra_to_show()
+    {
+        TouchFile(Path.Combine("Breaking Bad (2008)", "Season 01", "S01E01 - Pilot.mkv"));
+        TouchFile(Path.Combine("Breaking Bad (2008)", "Season 01", "S01E01 - Pilot-trailer.mkv"));
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).AttachTvShowLocalExtraAsync(
+            Arg.Any<LibraryHandle>(),
+            "Breaking Bad",
+            Arg.Is<string>(p => p.EndsWith("-trailer.mkv")),
+            "Trailer",
+            Arg.Any<string>());
     }
 
     [Fact]

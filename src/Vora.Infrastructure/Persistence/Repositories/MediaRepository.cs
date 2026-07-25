@@ -63,10 +63,28 @@ public partial class MediaRepository : IMediaRepository
     {
         var existingPaths = await _context.MediaParts
             .AsNoTracking()
-            .Where(p => p.MediaItem.LibraryId == libraryId)
+            .Where(p => p.MediaItem != null && p.MediaItem.LibraryId == libraryId)
             .Select(p => p.FilePath)
             .ToListAsync();
-        return new HashSet<string>(existingPaths, StringComparer.OrdinalIgnoreCase);
+
+        var extraPaths = await _context.MediaParts
+            .AsNoTracking()
+            .Where(p => p.MediaExtraId != null && p.MediaExtra!.MediaItem.LibraryId == libraryId)
+            .Select(p => p.FilePath)
+            .ToListAsync();
+
+        var set = new HashSet<string>(existingPaths, StringComparer.OrdinalIgnoreCase);
+        set.UnionWith(extraPaths);
+        return set;
+    }
+
+    public async Task<List<string>> GetLibraryItemFilePathsAsync(Guid libraryId)
+    {
+        return await _context.MediaParts
+            .AsNoTracking()
+            .Where(p => p.MediaItem != null && p.MediaItem.LibraryId == libraryId)
+            .Select(p => p.FilePath)
+            .ToListAsync();
     }
 
     public async Task<List<Guid>> GetMediaIdsByExternalIdsAsync(List<string> tmdbIds, List<string> imdbIds)
@@ -197,6 +215,16 @@ public partial class MediaRepository : IMediaRepository
                       m.ReleaseDate == null))
                 ))
             .OrderBy(m => m is TvShow ? 0 : m is Movie ? 0 : m is Season ? 1 : 2)
+            .Select(m => m.Id)
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<Guid>> GetMediaIdsMissingRatingsAsync(Guid libraryId)
+    {
+        return await _context.MediaItems
+            .Where(m => m.LibraryId == libraryId
+                && (m is Movie || m is TvShow)
+                && m.ThirdPartyRating1 == null)
             .Select(m => m.Id)
             .ToListAsync();
     }
@@ -393,6 +421,12 @@ public partial class MediaRepository : IMediaRepository
     {
         _context.MediaVideos.RemoveRange(videos);
         return Task.CompletedTask;
+    }
+
+    public async Task AddMediaExtraAsync(MediaExtra extra)
+    {
+        await _context.MediaExtras.AddAsync(extra);
+        await _context.SaveChangesAsync();
     }
 
     public async Task DeleteMediaByFilePathAsync(string filePath)

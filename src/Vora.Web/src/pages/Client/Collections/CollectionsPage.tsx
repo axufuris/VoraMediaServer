@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { libraryService, type LibrarySummary } from '../../../api/Media/libraryService';
 import { collectionService, type CollectionSummary } from '../../../api/Collections/collectionService';
 import CreateCollectionModal from '../../../components/Collections/CreateCollectionModal';
@@ -11,9 +11,14 @@ import { StorageKeys } from '../../../utils/storageKeys';
 export default function CollectionsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // The active tab lives in the URL (?tab=<libraryId|global>) so returning
+    // from a collection (Back = navigate(-1)) restores the tab you were on
+    // instead of snapping back to Global.
+    const activeTab = searchParams.get('tab') ?? 'global';
 
     const [libraries, setLibraries] = useState<LibrarySummary[]>([]);
-    const [activeTab, setActiveTab] = useState<string>('global');
     const [collections, setCollections] = useState<CollectionSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -61,7 +66,12 @@ export default function CollectionsPage() {
     const handleTabChange = (tabId: string) => {
         if (activeTab === tabId) return;
         setLoading(true);
-        setActiveTab(tabId);
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            if (tabId === 'global') next.delete('tab');
+            else next.set('tab', tabId);
+            return next;
+        }, { replace: true });
     };
 
     const createAction = isAdmin ? (
@@ -124,7 +134,7 @@ export default function CollectionsPage() {
 
             <div className="px-8 pt-6">
                 {loading ? (
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                    <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
                         {Array.from({ length: 10 }, (_, i) => <div key={i} className="vora-skeleton aspect-[2/3]" />)}
                     </div>
                 ) : collections.length === 0 ? (
@@ -143,7 +153,7 @@ export default function CollectionsPage() {
                         )}
                     />
                 ) : (
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                    <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
                         {collections.map(collection => (
                             <MediaPoster
                                 key={collection.id}

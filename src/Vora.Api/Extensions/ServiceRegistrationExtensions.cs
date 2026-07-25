@@ -411,6 +411,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ISyncAndStateManager, SyncAndStateManager>();
         services.AddScoped<ISystemSettingsManager, SystemSettingsManager>();
         services.AddSingleton<ITaskQueueManager, TaskQueueManager>();
+        services.AddSingleton<Vora.Plugins.Interfaces.ITaskProgressReporter, TaskProgressReporter>();
         services.AddSingleton<IThemeBundleLoader>(sp =>
             new ThemeBundleLoader(Path.Combine(AppContext.BaseDirectory, "Themes"),
                 sp.GetRequiredService<ILogger<ThemeBundleLoader>>()));

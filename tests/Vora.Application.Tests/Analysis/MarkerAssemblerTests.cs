@@ -159,6 +159,36 @@ public class MarkerAssemblerTests
     }
 
     [Fact]
+    public void DetectCredits_false_suppresses_credits_but_keeps_intro()
+    {
+        var result = _assembler.Assemble(new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromMinutes(90),
+            SilenceIntervals = new List<DetectedInterval> { Interval(30, 90), Interval(4800, 4860) },
+            BlackIntervals = new List<DetectedInterval> { Interval(30, 90), Interval(4800, 4860) },
+            DetectCredits = false
+        });
+
+        result.Should().Contain(m => m.Type == MarkerType.Intro);
+        result.Where(m => m.Type == MarkerType.Credits).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DetectIntro_false_suppresses_intro_but_keeps_credits()
+    {
+        var result = _assembler.Assemble(new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromMinutes(90),
+            SilenceIntervals = new List<DetectedInterval> { Interval(30, 90), Interval(4800, 4860) },
+            BlackIntervals = new List<DetectedInterval> { Interval(30, 90), Interval(4800, 4860) },
+            DetectIntro = false
+        });
+
+        result.Where(m => m.Type == MarkerType.Intro).Should().BeEmpty();
+        result.Should().Contain(m => m.Type == MarkerType.Credits);
+    }
+
+    [Fact]
     public void Returned_markers_are_ordered_by_start_time()
     {
         // 45-min episode: recap, intro, credits. Markers should come out in time order.

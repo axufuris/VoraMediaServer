@@ -137,17 +137,40 @@ public class MetadataMappingService : IMetadataMappingService
     {
         bool updated = false;
 
-        if (ratingsData.Rating1.HasValue && (!item.IsLocked(nameof(item.ThirdPartyRating1)) || forceOverride))
+        // A non-null Name means the library has a provider configured for that
+        // slot. When configured, this slot is owned by that provider: use its
+        // value, or clear any stale value (e.g. the TMDB rating seeded during
+        // core-metadata application) when the provider returned nothing — so the
+        // poster never shows the wrong rating source.
+        if (!item.IsLocked(nameof(item.ThirdPartyRating1)) || forceOverride)
         {
-            item.ThirdPartyRating1 = ratingsData.Rating1.Value;
-            item.ThirdPartyRating1Name = ratingsData.Name1;
-            updated = true;
+            if (ratingsData.Rating1.HasValue)
+            {
+                item.ThirdPartyRating1 = ratingsData.Rating1.Value;
+                item.ThirdPartyRating1Name = ratingsData.Name1;
+                updated = true;
+            }
+            else if (ratingsData.Name1 != null && (item.ThirdPartyRating1 != null || item.ThirdPartyRating1Name != null))
+            {
+                item.ThirdPartyRating1 = null;
+                item.ThirdPartyRating1Name = null;
+                updated = true;
+            }
         }
-        if (ratingsData.Rating2.HasValue && (!item.IsLocked(nameof(item.ThirdPartyRating2)) || forceOverride))
+        if (!item.IsLocked(nameof(item.ThirdPartyRating2)) || forceOverride)
         {
-            item.ThirdPartyRating2 = ratingsData.Rating2.Value;
-            item.ThirdPartyRating2Name = ratingsData.Name2;
-            updated = true;
+            if (ratingsData.Rating2.HasValue)
+            {
+                item.ThirdPartyRating2 = ratingsData.Rating2.Value;
+                item.ThirdPartyRating2Name = ratingsData.Name2;
+                updated = true;
+            }
+            else if (ratingsData.Name2 != null && (item.ThirdPartyRating2 != null || item.ThirdPartyRating2Name != null))
+            {
+                item.ThirdPartyRating2 = null;
+                item.ThirdPartyRating2Name = null;
+                updated = true;
+            }
         }
 
         return Task.FromResult(updated);
@@ -170,6 +193,9 @@ public class MetadataMappingService : IMetadataMappingService
         if (!item.IsLocked(nameof(item.ImdbId)) || forceOverride) item.ImdbId = metadata.ImdbId ?? item.ImdbId;
         if (!item.IsLocked(nameof(item.TvdbId)) || forceOverride) item.TvdbId = metadata.TvdbId ?? item.TvdbId;
         if (!item.IsLocked(nameof(item.IsAdult)) || forceOverride) item.IsAdult = metadata.IsAdult;
+
+        item.HasMidCreditsStinger = metadata.HasMidCreditsStinger;
+        item.HasPostCreditsStinger = metadata.HasPostCreditsStinger;
 
         if (!item.IsLocked(nameof(item.PosterUrl)) || forceOverride)
         {

@@ -68,6 +68,7 @@ public class CollectionManager : ICollectionManager
 
             CollectionSortOrder.ReleaseDateDesc => collection.Items.OrderByDescending(i => i.ReleaseDate).ToList(),
             CollectionSortOrder.ReleaseDateAsc => collection.Items.OrderBy(i => i.ReleaseDate).ToList(),
+            CollectionSortOrder.DateAddedDesc => collection.Items.OrderByDescending(i => i.AddedAt).ToList(),
             CollectionSortOrder.Alphabetical => collection.Items.OrderBy(i => i.SortTitle ?? i.Title).ToList(),
             _ => collection.Items
         };
@@ -171,17 +172,19 @@ public class CollectionManager : ICollectionManager
         if (minSize < 1) minSize = 1;
 
         var collections = await _repository.GetAllProjectedAsync(CollectionSummaryVM.LibraryProjection(libraryId), libraryId, false, hasAllAccess, allowedLibs);
-        return collections.Where(c => c.ItemCount >= minSize);
+        return collections.Where(c => c.ItemCount >= minSize).OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<IEnumerable<CollectionSummaryVM>> GetAllCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs)
     {
-        return await _repository.GetAllProjectedAsync(CollectionSummaryVM.StandardProjection, null, false, hasAllAccess, allowedLibs);
+        var collections = await _repository.GetAllProjectedAsync(CollectionSummaryVM.StandardProjection, null, false, hasAllAccess, allowedLibs);
+        return collections.OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<IEnumerable<CollectionSummaryVM>> GetGlobalCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs)
     {
-        return await _repository.GetAllProjectedAsync(CollectionSummaryVM.StandardProjection, null, true, hasAllAccess, allowedLibs);
+        var collections = await _repository.GetAllProjectedAsync(CollectionSummaryVM.StandardProjection, null, true, hasAllAccess, allowedLibs);
+        return collections.OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task RemoveMediaFromCollectionAsync(Guid collectionId, Guid mediaItemId)

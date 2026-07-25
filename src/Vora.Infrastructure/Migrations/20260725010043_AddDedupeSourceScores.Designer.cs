@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -12,9 +13,11 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    partial class VoraDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260725010043_AddDedupeSourceScores")]
+    partial class AddDedupeSourceScores
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1525,32 +1528,6 @@ namespace Vora.Infrastructure.Migrations
                     b.ToTable("MediaDedupeSettings");
                 });
 
-            modelBuilder.Entity("Vora.Domain.Entities.Media.MediaExtra", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ExtraType")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<Guid>("MediaItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MediaItemId");
-
-                    b.ToTable("MediaExtras");
-                });
-
             modelBuilder.Entity("Vora.Domain.Entities.Media.MediaItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1782,10 +1759,7 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<long?>("FileSizeBytes")
                         .HasColumnType("bigint");
 
-                    b.Property<Guid?>("MediaExtraId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("MediaItemId")
+                    b.Property<Guid>("MediaItemId")
                         .HasColumnType("uuid");
 
                     b.Property<long?>("OverallBitrate")
@@ -1803,8 +1777,6 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("character varying(128)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("MediaExtraId");
 
                     b.HasIndex("MediaItemId");
 
@@ -3162,9 +3134,6 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("ExtraId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("HdrType")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
@@ -4496,17 +4465,6 @@ namespace Vora.Infrastructure.Migrations
                     b.Navigation("Library");
                 });
 
-            modelBuilder.Entity("Vora.Domain.Entities.Media.MediaExtra", b =>
-                {
-                    b.HasOne("Vora.Domain.Entities.Media.MediaItem", "MediaItem")
-                        .WithMany("Extras")
-                        .HasForeignKey("MediaItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("MediaItem");
-                });
-
             modelBuilder.Entity("Vora.Domain.Entities.Media.MediaItem", b =>
                 {
                     b.HasOne("Vora.Domain.Entities.Library.MediaLibrary", "Library")
@@ -4542,17 +4500,11 @@ namespace Vora.Infrastructure.Migrations
 
             modelBuilder.Entity("Vora.Domain.Entities.Media.MediaPart", b =>
                 {
-                    b.HasOne("Vora.Domain.Entities.Media.MediaExtra", "MediaExtra")
-                        .WithMany("Parts")
-                        .HasForeignKey("MediaExtraId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
                     b.HasOne("Vora.Domain.Entities.Media.MediaItem", "MediaItem")
                         .WithMany("MediaParts")
                         .HasForeignKey("MediaItemId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.Navigation("MediaExtra");
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("MediaItem");
                 });
@@ -4995,11 +4947,6 @@ namespace Vora.Infrastructure.Migrations
                     b.Navigation("Albums");
                 });
 
-            modelBuilder.Entity("Vora.Domain.Entities.Media.MediaExtra", b =>
-                {
-                    b.Navigation("Parts");
-                });
-
             modelBuilder.Entity("Vora.Domain.Entities.Media.MediaItem", b =>
                 {
                     b.Navigation("Analysis")
@@ -5008,8 +4955,6 @@ namespace Vora.Infrastructure.Migrations
                     b.Navigation("Artwork");
 
                     b.Navigation("Cast");
-
-                    b.Navigation("Extras");
 
                     b.Navigation("Markers");
 

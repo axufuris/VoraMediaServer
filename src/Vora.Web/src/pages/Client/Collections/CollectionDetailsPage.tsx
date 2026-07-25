@@ -18,7 +18,7 @@ const SORT_LABELS: Record<CollectionSortOrder, string> = {
     Alphabetical: 'Alphabetical (A–Z)',
 };
 
-const USER_SORT_OPTIONS: CollectionSortOrder[] = ['ReleaseDateAsc', 'ReleaseDateDesc', 'Alphabetical'];
+const USER_SORT_OPTIONS: CollectionSortOrder[] = ['ReleaseDateAsc', 'ReleaseDateDesc', 'DateAddedDesc', 'Alphabetical'];
 
 function getSortOptions(defaultSort: CollectionSortOrder, hasChronological: boolean): CollectionSortOrder[] {
     const order: CollectionSortOrder[] = ['Chronological', 'ReleaseDateAsc', 'ReleaseDateDesc', 'DateAddedDesc', 'Alphabetical'];
@@ -141,7 +141,7 @@ export default function CollectionDetailsPage() {
                 <CinematicBackdrop src={collection.backdropUrl || collection.posterUrl} intensity="detail" parallax transitionKey={collection.id} />
             </div>
 
-            <div className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-12 pt-8">
+            <div className="relative z-10 w-full flex-1 px-12 pt-8">
                 <button
                     type="button"
                     onClick={() => navigate(-1)}
@@ -236,7 +236,7 @@ export default function CollectionDetailsPage() {
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,192px))] gap-4">
                         {collection.items?.map(item => (
                             <MediaCard
                                 key={item.id}

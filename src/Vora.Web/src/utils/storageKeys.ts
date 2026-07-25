@@ -16,6 +16,7 @@ export const SessionKeys = {
     pendingUserToken: 'pending_user_token',
     musicNavState: 'music_nav_state',
     musicNavProfile: 'music_nav_profile',
+    freshServerSetup: 'fresh_server_setup',
 } as const;
 
 interface JwtPayload {

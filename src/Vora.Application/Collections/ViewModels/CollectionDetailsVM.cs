@@ -68,6 +68,7 @@ public class CollectionDetailsVM
                     : "Unknown",
                 PosterUrl = item.PosterUrl,
                 ReleaseDate = item.ReleaseDate,
+                AddedAt = item.AddedAt,
                 IsPlayed = false,
                 UnplayedItemCount = null
             }).ToList()

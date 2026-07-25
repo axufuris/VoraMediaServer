@@ -12,6 +12,7 @@ public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[]
 public interface IStreamManager
 {
     Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null);
+    Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null);
     Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search);
     Task PingSessionAsync(Guid sessionId, double currentPosition, double duration, bool isPaused);
     Task<List<NowPlayingSessionDto>> GetNowPlayingSessionsAsync();
@@ -152,6 +153,68 @@ public class StreamManager : IStreamManager
         return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}");
     }
 
+    public async Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null)
+    {
+        var extra = await _repository.GetMediaExtraAsync(extraId);
+        if (extra == null) throw new InvalidOperationException("Extra not found.");
+
+        var streamInfo = await _repository.GetExtraStreamInfoAsync(extraId);
+        if (streamInfo == null || !streamInfo.Parts.Any()) throw new InvalidOperationException("Extra has not been analyzed yet.");
+
+        var client = await _repository.GetClientDeviceAsync(deviceId);
+        if (client == null) throw new InvalidOperationException("Unknown Device.");
+
+        if (capabilities != null)
+        {
+            client.SupportedVideoCodecs = capabilities.VideoCodecs?.ToList() ?? new List<string>();
+            client.SupportedAudioCodecs = capabilities.AudioCodecs?.ToList() ?? new List<string>();
+            client.SupportedContainers = capabilities.Containers?.ToList() ?? new List<string>();
+            client.MaxAudioChannels = capabilities.MaxAudioChannels;
+        }
+
+        await _repository.EndActiveSessionsForDeviceAsync(client.Id);
+
+        var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, 0, "None", null, null, null, capabilities?.RequestedMaxResolution ?? 0);
+
+        var selectedPart = streamInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);
+        var selectedVideo = selectedPart?.VideoTracks.FirstOrDefault(v => v.Id == decision.SelectedVideoTrackId);
+
+        var session = new StreamSession
+        {
+            ClientDeviceId = client.Id,
+            MediaItemId = extra.MediaItemId,
+            ExtraId = extra.Id,
+            UserId = userId,
+            UserProfileId = profileId,
+            Strategy = decision.Strategy.ToString(),
+            VideoStrategy = decision.VideoStrategy,
+            AudioStrategy = decision.AudioStrategy,
+            SubtitleStrategy = decision.SubtitleStrategy,
+            VideoCodec = decision.TargetVideoCodec,
+            AudioCodec = decision.TargetAudioCodec,
+            Container = decision.TargetContainer,
+            Resolution = selectedPart?.Resolution,
+            HdrType = selectedVideo?.HdrType,
+            OutputResolution = decision.OutputResolution,
+            OutputHdrType = decision.OutputHdrType,
+            StartPosition = startPosition,
+            CurrentPosition = startPosition,
+            MediaPartId = decision.SelectedMediaPartId,
+            VideoTrackId = decision.SelectedVideoTrackId,
+            AudioTrackId = decision.SelectedAudioTrackId,
+            SubtitleTrackId = decision.SelectedSubtitleTrackId,
+            TargetAudioChannels = decision.TargetAudioChannels,
+            IsSubtitleBurnIn = decision.RequiresSubtitleBurnIn,
+            Quality = decision.Quality,
+            BandwidthKbps = decision.BandwidthKbps,
+            DecisionLog = decision.GetDecisionLogJson()
+        };
+
+        var createdSession = await _repository.CreateSessionAsync(session);
+        var playToken = _tokenSigner.Sign(PlayTokenScope, createdSession.Id.ToString(), PlayTokenTtl);
+        return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}");
+    }
+
     public async Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search)
     {
         page = Math.Max(1, page);
@@ -171,11 +234,14 @@ public class StreamManager : IStreamManager
         session.IsPaused = isPaused;
         session.LastPingAt = now;
 
-        _transcodeService.TouchSession(session.MediaItemId);
+        _transcodeService.TouchSession(session.ExtraId ?? session.MediaItemId);
 
         await _repository.UpdateSessionAsync(session);
 
-        if (session.UserProfileId.HasValue)
+        // Extras (trailers/featurettes) must not write progress onto the parent
+        // media item — otherwise watching a 2-minute trailer marks the movie
+        // as watched.
+        if (!session.ExtraId.HasValue && session.UserProfileId.HasValue)
         {
             await _repository.UpdateUserMediaStateAsync(session.UserProfileId.Value, session.MediaItemId, currentPosition, duration);
         }

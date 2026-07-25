@@ -116,6 +116,15 @@ export default function ProfileSelectionPage() {
                 serverVault.setActiveServerId(newServerId);
             }
 
+            const isFreshSetup = sessionStorage.getItem(SessionKeys.freshServerSetup) === 'true';
+            if (isFreshSetup) {
+                sessionStorage.removeItem(SessionKeys.freshServerSetup);
+                if (fullUser.isAdmin) {
+                    navigate('/admin/settings');
+                    return;
+                }
+            }
+
             navigate('/');
         } catch {
             setPinError(true);

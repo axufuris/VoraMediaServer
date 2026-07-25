@@ -44,6 +44,7 @@ export default function SetupPage() {
             sessionStorage.setItem(SessionKeys.pendingServerUrl, targetUrl);
             sessionStorage.setItem(SessionKeys.pendingUserToken, auth.accessToken);
             sessionStorage.setItem('pending_user_id', auth.userId);
+            sessionStorage.setItem(SessionKeys.freshServerSetup, 'true');
 
             localStorage.setItem(StorageKeys.accountToken, auth.accessToken);
             localStorage.setItem(StorageKeys.userId, auth.userId);

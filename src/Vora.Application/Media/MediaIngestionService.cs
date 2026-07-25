@@ -2,11 +2,13 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Vora.Application.Analysis;
 using Vora.Application.Libraries;
 using Vora.Application.Requests;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
+using Vora.Domain.Enums;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -21,6 +23,7 @@ public class MediaIngestionService : IMediaIngestionService
     private readonly IRequestManager _requestManager;
     private readonly IMusicRepository _musicRepository;
     private readonly ITaskQueueManager _taskQueue;
+    private readonly IMediaAnalyzerService _analyzerService;
     private readonly ILogger<MediaIngestionService> _logger;
     private readonly string _artworkBasePath;
 
@@ -30,6 +33,7 @@ public class MediaIngestionService : IMediaIngestionService
         IRequestManager requestManager,
         IMusicRepository musicRepository,
         ITaskQueueManager taskQueue,
+        IMediaAnalyzerService analyzerService,
         IOptions<StoragePathsOptions> storagePaths,
         ILogger<MediaIngestionService> logger)
     {
@@ -38,6 +42,7 @@ public class MediaIngestionService : IMediaIngestionService
         _requestManager = requestManager;
         _musicRepository = musicRepository;
         _taskQueue = taskQueue;
+        _analyzerService = analyzerService;
         _logger = logger;
 
         var configured = storagePaths.Value.CustomArtwork;
@@ -68,6 +73,12 @@ public class MediaIngestionService : IMediaIngestionService
 
     public Task<HashSet<string>> GetExistingLibraryPathsAsync(LibraryHandle library) =>
         _repository.GetExistingLibraryPathsAsync(library.Value);
+
+    public Task<List<string>> GetLibraryItemFilePathsAsync(LibraryHandle library) =>
+        _repository.GetLibraryItemFilePathsAsync(library.Value);
+
+    public Task RemoveMediaItemByPathAsync(string filePath) =>
+        _repository.DeleteMediaByFilePathAsync(filePath);
 
     public Task<List<string>> GetMediaFilePathsAsync(MediaItemHandle item) =>
         _repository.GetMediaFilePathsAsync(item.Value);
@@ -353,6 +364,58 @@ public class MediaIngestionService : IMediaIngestionService
             Container = Path.GetExtension(filePath).TrimStart('.').ToLower()
         };
         await _repository.AddMediaPartAsync(part);
+    }
+
+    public async Task AttachLocalExtraAsync(LibraryHandle library, string parentTitle, int? parentYear, string filePath, string extraType, string title)
+    {
+        var movieId = await _repository.GetMovieIdByTitleAndYearAsync(parentTitle, parentYear, library.Value);
+        if (movieId == null) return;
+        await CreateAndAnalyzeExtraAsync(movieId.Value, filePath, extraType, title);
+    }
+
+    public async Task AttachTvShowLocalExtraAsync(LibraryHandle library, string showTitle, string filePath, string extraType, string title)
+    {
+        var showId = await _repository.GetTvShowIdByTitleAsync(showTitle, library.Value);
+        if (showId == null) return;
+        await CreateAndAnalyzeExtraAsync(showId.Value, filePath, extraType, title);
+    }
+
+    private async Task CreateAndAnalyzeExtraAsync(Guid parentId, string filePath, string extraType, string title)
+    {
+        var extra = new MediaExtra
+        {
+            MediaItemId = parentId,
+            Title = string.IsNullOrWhiteSpace(title) ? Path.GetFileNameWithoutExtension(filePath) : title,
+            ExtraType = Enum.TryParse<MediaExtraType>(extraType, ignoreCase: true, out var parsed) ? parsed : MediaExtraType.Other
+        };
+        await _repository.AddMediaExtraAsync(extra);
+
+        var analysis = await _analyzerService.AnalyzeFileAsync(filePath);
+        var fileInfo = new FileInfo(filePath);
+
+        var part = new MediaPart
+        {
+            FilePath = filePath,
+            MediaExtraId = extra.Id,
+            Container = Path.GetExtension(filePath).TrimStart('.').ToLowerInvariant(),
+            FileSizeBytes = analysis?.FileSizeBytes ?? (fileInfo.Exists ? fileInfo.Length : null),
+            OverallBitrate = analysis?.OverallBitrate,
+            Duration = analysis?.Duration
+        };
+        await _repository.AddMediaPartAsync(part);
+
+        if (analysis == null) return;
+
+        var incomingVideo = analysis.VideoTracks.Select(v => new MediaVideoTrack
+        { StreamIndex = v.StreamIndex, Codec = v.Codec, Profile = v.Profile, HdrType = v.HdrType, BitDepth = v.BitDepth, Bitrate = v.Bitrate, IsDefault = v.IsDefault }).ToList();
+
+        var incomingAudio = analysis.AudioTracks.Select(a => new MediaAudioTrack
+        { StreamIndex = a.StreamIndex, Codec = a.Codec, Language = a.Language, Channels = a.Channels, Title = a.Title, IsDefault = a.IsDefault }).ToList();
+
+        var incomingSubtitles = analysis.SubtitleTracks.Select(s => new MediaSubtitleTrack
+        { StreamIndex = s.StreamIndex, Codec = s.Codec, Language = s.Language, Title = s.Title, IsDefault = s.IsDefault, IsForced = s.IsForced }).ToList();
+
+        await _repository.SyncMediaTracksAsync(part.Id, incomingVideo, incomingAudio, incomingSubtitles);
     }
 
     private string? SaveArtworkBytes(string kind, string identityKey, byte[] bytes, string? mimeType)

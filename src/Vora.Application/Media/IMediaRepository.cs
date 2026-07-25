@@ -16,6 +16,7 @@ public interface IMediaRepository
     Task<Guid?> GetEpisodeIdByNumberAsync(Guid seasonId, int episodeNumber);
     Task<List<Guid>> GetMediaIdsByExternalIdsAsync(List<string> tmdbIds, List<string> imdbIds);
     Task<HashSet<string>> GetExistingLibraryPathsAsync(Guid libraryId);
+    Task<List<string>> GetLibraryItemFilePathsAsync(Guid libraryId);
     Task<IEnumerable<Guid>> GetAllMediaItemIdsByLibraryAsync(Guid libraryId);
     Task<List<string>> GetMediaFilePathsAsync(Guid mediaItemId);
     Task<T?> GetProjectedAsync<T>(Guid id, Expression<Func<MediaItem, T>> projection, bool hasAllAccess = true, List<Guid>? allowedLibs = null, bool hasAllRatings = true, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false);
@@ -24,6 +25,7 @@ public interface IMediaRepository
     Task<MediaItem?> GetForPosterOverlayAsync(Guid id);
     Task<MediaItem?> GetForMetadataSyncAsync(Guid id);
     Task<IEnumerable<Guid>> GetMediaIdsMissingMetadataAsync(Guid libraryId);
+    Task<IEnumerable<Guid>> GetMediaIdsMissingRatingsAsync(Guid libraryId);
     Task<MediaItem?> GetForBasicUpdateAsync(Guid id);
     Task SyncMediaTracksAsync(Guid mediaPartId, List<MediaVideoTrack> incomingVideo, List<MediaAudioTrack> incomingAudio, List<MediaSubtitleTrack> incomingSubtitles);
     Task ReplaceMarkersAsync(Guid mediaItemId, IEnumerable<MediaItemMarker> markers);
@@ -39,6 +41,7 @@ public interface IMediaRepository
     Task AddMediaItemAsync(MediaItem item);
     Task AddMediaVideosAsync(IEnumerable<MediaVideo> videos);
     Task RemoveMediaVideosAsync(IEnumerable<MediaVideo> videos);
+    Task AddMediaExtraAsync(MediaExtra extra);
     Task DeleteMediaByFilePathAsync(string filePath);
     Task DeleteMediaItemAsync(Guid id);
     Task AddMediaPartAsync(MediaPart part);

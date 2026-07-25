@@ -209,7 +209,8 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
                                                     <>
                                                         {part.bitrate && <Chip>{Math.round(part.bitrate / 1000000)} Mbps</Chip>}
                                                         <Chip>{part.container}</Chip>
-                                                        <Chip>{part.videoCodec}</Chip>
+                                                        {part.source && <Chip tone="highlight">{part.source}</Chip>}
+                                                        {part.videoCodec && <Chip>{part.videoCodec}</Chip>}
                                                         {part.hdrFormat !== 'SDR' ? <Chip tone="highlight">{part.hdrFormat}</Chip> : <Chip>SDR</Chip>}
                                                     </>
                                                 )}
@@ -434,6 +435,17 @@ function RulesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: string }
                             <NumberField label="1080p" value={editing.scoreResolution1080} onChange={v => setEditing({ ...editing, scoreResolution1080: v })} />
                             <NumberField label="720p" value={editing.scoreResolution720} onChange={v => setEditing({ ...editing, scoreResolution720: v })} />
                             <NumberField label="Other / SD" value={editing.scoreResolutionOther} onChange={v => setEditing({ ...editing, scoreResolutionOther: v })} />
+                        </div>
+                    </SettingsSection>
+
+                    <SettingsSection title="Video score — source" description="Detected from the release name in the file. Remux (untouched disc copy) ranks above BluRay encode, which ranks above WEB-DL, WEBRip, HDTV and DVD.">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <NumberField label="Remux" value={editing.scoreSourceRemux} onChange={v => setEditing({ ...editing, scoreSourceRemux: v })} />
+                            <NumberField label="BluRay" value={editing.scoreSourceBluRay} onChange={v => setEditing({ ...editing, scoreSourceBluRay: v })} />
+                            <NumberField label="WEB-DL" value={editing.scoreSourceWebDl} onChange={v => setEditing({ ...editing, scoreSourceWebDl: v })} />
+                            <NumberField label="WEBRip" value={editing.scoreSourceWebRip} onChange={v => setEditing({ ...editing, scoreSourceWebRip: v })} />
+                            <NumberField label="HDTV" value={editing.scoreSourceHdtv} onChange={v => setEditing({ ...editing, scoreSourceHdtv: v })} />
+                            <NumberField label="DVD" value={editing.scoreSourceDvd} onChange={v => setEditing({ ...editing, scoreSourceDvd: v })} />
                         </div>
                     </SettingsSection>
 

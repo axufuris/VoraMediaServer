@@ -96,7 +96,12 @@ export default function TaskDashboard() {
                                                 <HealthBadge tone="neutral">Pending</HealthBadge>
                                             )}
                                         </td>
-                                        <td className="px-5 py-3 text-sm font-semibold text-[var(--vora-text-primary)]">{task.name}</td>
+                                        <td className="px-5 py-3">
+                                            <div className="text-sm font-semibold text-[var(--vora-text-primary)]">{task.name}</div>
+                                            {task.progress && (
+                                                <div className="mt-0.5 text-xs text-[var(--vora-text-muted)] font-normal truncate max-w-md">{task.progress}</div>
+                                            )}
+                                        </td>
                                         <td className="px-5 py-3 text-right">
                                             <button
                                                 type="button"

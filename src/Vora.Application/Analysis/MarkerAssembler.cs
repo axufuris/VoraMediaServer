@@ -19,6 +19,8 @@ public class MarkerAssemblerInput
     public bool ExpectsMidCreditsStinger { get; init; }
     public bool ExpectsPostCreditsStinger { get; init; }
     public bool IsEpisode { get; init; }
+    public bool DetectIntro { get; init; } = true;
+    public bool DetectCredits { get; init; } = true;
 }
 
 public interface IMarkerAssembler
@@ -42,13 +44,17 @@ public class MarkerAssembler : IMarkerAssembler
         var jointGaps = FindJointSilenceAndBlackGaps(input.SilenceIntervals, input.BlackIntervals);
         if (jointGaps.Count == 0) return markers;
 
-        var introMarker = FindIntroMarker(jointGaps, input);
-        if (introMarker != null) markers.Add(introMarker);
+        DetectedMarker? introMarker = null;
+        if (input.DetectIntro)
+        {
+            introMarker = FindIntroMarker(jointGaps, input);
+            if (introMarker != null) markers.Add(introMarker);
 
-        var recapMarker = FindRecapMarker(jointGaps, input, introMarker);
-        if (recapMarker != null) markers.Add(recapMarker);
+            var recapMarker = FindRecapMarker(jointGaps, input, introMarker);
+            if (recapMarker != null) markers.Add(recapMarker);
+        }
 
-        var creditsRollStart = FindCreditsRollStart(jointGaps, input);
+        var creditsRollStart = input.DetectCredits ? FindCreditsRollStart(jointGaps, input) : null;
         if (creditsRollStart != null)
         {
             markers.Add(new DetectedMarker

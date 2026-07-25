@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text.Json;
 using Vora.Plugins.Dtos;
@@ -134,10 +135,67 @@ public class OmdbMetacriticRatingsProvider : IRatingsProvider
 
 internal static class OmdbFetcher
 {
+    // A single OMDb response carries IMDb, Rotten Tomatoes and Metacritic all
+    // at once. The three rating providers each ask for one source, and the two
+    // configured on a library fire in parallel per item — so cache the parsed
+    // response per IMDb id and share it, turning up to 3 HTTP calls per movie
+    // into 1. This roughly halves consumption of the (small) OMDb daily quota.
+    private sealed class OmdbData
+    {
+        public Dictionary<string, string> RatingsBySource { get; } = new(StringComparer.Ordinal);
+        public string? ImdbRating { get; set; }
+        public string? Metascore { get; set; }
+    }
+
+    private static readonly ConcurrentDictionary<string, Lazy<Task<OmdbData?>>> _cache = new();
+    private static readonly ConcurrentDictionary<string, DateTime> _cacheTime = new();
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
+
     public static async Task<decimal?> FetchRatingCoreAsync(HttpClient httpClient, IServiceScopeFactory scopeFactory, string? imdbId, string sourceName, CancellationToken cancellationToken = default)
     {
         if (OmdbCircuitBreaker.IsBlocked || string.IsNullOrEmpty(imdbId)) return null;
 
+        var data = await GetOrFetchAsync(httpClient, scopeFactory, imdbId, cancellationToken);
+        if (data == null) return null;
+
+        if (data.RatingsBySource.TryGetValue(sourceName, out var value) && !string.IsNullOrEmpty(value))
+        {
+            return ParseRating(value);
+        }
+
+        if (sourceName == "Internet Movie Database" && !string.IsNullOrEmpty(data.ImdbRating) && data.ImdbRating != "N/A")
+        {
+            return ParseRating(data.ImdbRating);
+        }
+
+        if (sourceName == "Metacritic" && !string.IsNullOrEmpty(data.Metascore) && data.Metascore != "N/A")
+        {
+            return ParseRating(data.Metascore);
+        }
+
+        return null;
+    }
+
+    private static Task<OmdbData?> GetOrFetchAsync(HttpClient httpClient, IServiceScopeFactory scopeFactory, string imdbId, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        if (_cacheTime.TryGetValue(imdbId, out var fetchedAt) && now - fetchedAt > CacheTtl)
+        {
+            _cache.TryRemove(imdbId, out _);
+            _cacheTime.TryRemove(imdbId, out _);
+        }
+
+        var lazy = _cache.GetOrAdd(imdbId, key =>
+        {
+            _cacheTime[key] = now;
+            return new Lazy<Task<OmdbData?>>(() => FetchAndParseAsync(httpClient, scopeFactory, key, cancellationToken));
+        });
+
+        return lazy.Value;
+    }
+
+    private static async Task<OmdbData?> FetchAndParseAsync(HttpClient httpClient, IServiceScopeFactory scopeFactory, string imdbId, CancellationToken cancellationToken)
+    {
         using var scope = scopeFactory.CreateScope();
         var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
 
@@ -162,33 +220,32 @@ internal static class OmdbFetcher
             return null;
         }
 
+        var data = new OmdbData();
+
         if (root.TryGetProperty("Ratings", out var ratings) && ratings.ValueKind == JsonValueKind.Array)
         {
             foreach (var rating in ratings.EnumerateArray())
             {
-                var source = rating.TryGetProperty("Source", out var s) ? s.GetString() : "";
-                var value = rating.TryGetProperty("Value", out var v) ? v.GetString() : "";
-
-                if (source == sourceName && !string.IsNullOrEmpty(value))
+                var source = rating.TryGetProperty("Source", out var s) ? s.GetString() : null;
+                var value = rating.TryGetProperty("Value", out var v) ? v.GetString() : null;
+                if (!string.IsNullOrEmpty(source) && !string.IsNullOrEmpty(value))
                 {
-                    return ParseRating(value);
+                    data.RatingsBySource[source] = value;
                 }
             }
         }
 
-        if (sourceName == "Internet Movie Database" && root.TryGetProperty("imdbRating", out var imdbRating) && imdbRating.ValueKind != JsonValueKind.Null)
+        if (root.TryGetProperty("imdbRating", out var imdbRating) && imdbRating.ValueKind != JsonValueKind.Null)
         {
-            var val = imdbRating.GetString();
-            if (val != "N/A" && !string.IsNullOrEmpty(val)) return ParseRating(val);
+            data.ImdbRating = imdbRating.GetString();
         }
 
-        if (sourceName == "Metacritic" && root.TryGetProperty("Metascore", out var metaRating) && metaRating.ValueKind != JsonValueKind.Null)
+        if (root.TryGetProperty("Metascore", out var metascore) && metascore.ValueKind != JsonValueKind.Null)
         {
-            var val = metaRating.GetString();
-            if (val != "N/A" && !string.IsNullOrEmpty(val)) return ParseRating(val);
+            data.Metascore = metascore.GetString();
         }
 
-        return null;
+        return data;
     }
 
     private static decimal? ParseRating(string value)

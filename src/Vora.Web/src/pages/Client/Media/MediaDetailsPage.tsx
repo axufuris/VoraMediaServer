@@ -708,7 +708,7 @@ export default function MediaDetailsPage() {
 
                 <div className="mt-12 px-12">
                     <MediaCastRow cast={media.cast || []} serverId={serverId} />
-                    <MediaExtrasRow videos={media.videos || []} />
+                    <MediaExtrasRow videos={media.videos || []} extras={media.extras || []} serverId={serverId} />
                     <MediaEpisodesList episodes={media.episodes || []} serverId={serverId} />
                 </div>
             </div>

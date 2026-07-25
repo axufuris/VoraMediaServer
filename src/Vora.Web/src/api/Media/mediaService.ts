@@ -8,6 +8,13 @@ export interface MediaVideo {
     isOfficial: boolean;
 }
 
+export interface MediaExtra {
+    id: string;
+    title: string;
+    extraType: string;
+    container?: string | null;
+}
+
 export interface VideoTrack {
     id: string;
     codec?: string;
@@ -128,6 +135,7 @@ export interface MediaItem {
     seasons?: Season[];
     cast?: CastMember[];
     videos?: MediaVideo[];
+    extras?: MediaExtra[];
     lockedFields?: string[];
     episodes?: Episode[];
     tvShowTitle?: string;

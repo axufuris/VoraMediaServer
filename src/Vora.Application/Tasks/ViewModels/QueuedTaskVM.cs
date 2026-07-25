@@ -6,4 +6,6 @@ public class QueuedTaskVM
     public string Name { get; set; } = string.Empty;
 
     public string Status { get; set; } = "Pending";
+
+    public string? Progress { get; set; }
 }

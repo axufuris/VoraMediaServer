@@ -46,6 +46,12 @@ public class StreamSession
     public Guid MediaItemId { get; set; }
     public virtual MediaItem MediaItem { get; set; } = null!;
 
+    // Set when the session plays a local "extra" (trailer/featurette). The
+    // parent MediaItemId still holds (for history/FK), MediaPartId points at the
+    // extra's own analyzed part, and ExtraId is the transcode key so an extra's
+    // stream never collides with the parent item's stream.
+    public Guid? ExtraId { get; set; }
+
     public Guid MediaPartId { get; set; }
     public Guid VideoTrackId { get; set; }
     public Guid AudioTrackId { get; set; }

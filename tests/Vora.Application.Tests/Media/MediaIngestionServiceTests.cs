@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Vora.Application.Analysis;
 using Vora.Application.Libraries;
 using Vora.Application.Media;
 using Vora.Application.Requests;
@@ -18,6 +19,7 @@ public class MediaIngestionServiceTests : IDisposable
     private readonly IRequestManager _requestManager;
     private readonly IMusicRepository _musicRepo;
     private readonly ITaskQueueManager _taskQueue;
+    private readonly IMediaAnalyzerService _analyzerService;
     private readonly MediaIngestionService _service;
 
     public MediaIngestionServiceTests()
@@ -29,6 +31,7 @@ public class MediaIngestionServiceTests : IDisposable
         _requestManager = Substitute.For<IRequestManager>();
         _musicRepo = Substitute.For<IMusicRepository>();
         _taskQueue = Substitute.For<ITaskQueueManager>();
+        _analyzerService = Substitute.For<IMediaAnalyzerService>();
 
         var options = Options.Create(new StoragePathsOptions { CustomArtwork = _tempArtwork });
 
@@ -38,6 +41,7 @@ public class MediaIngestionServiceTests : IDisposable
             _requestManager,
             _musicRepo,
             _taskQueue,
+            _analyzerService,
             options,
             NullLogger<MediaIngestionService>.Instance);
     }

@@ -95,7 +95,13 @@ public class MetadataManager : IMetadataManager
 
     public async Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false)
     {
-        var ids = await _repository.GetAllProjectedAsync(n => n.Id, libraryId);
+        // Non-force runs only fetch items still missing their primary rating, so
+        // re-runs fill in items skipped when the provider's daily quota tripped
+        // — instead of re-spending the quota on already-rated items every pass.
+        var ids = forceOverride
+            ? await _repository.GetAllProjectedAsync(n => n.Id, libraryId)
+            : await _repository.GetMediaIdsMissingRatingsAsync(libraryId);
+
         await ProcessLibraryItemsAsync(libraryId, ids, "ratings", id => RefreshRatingsAsync(id, forceOverride));
     }
 

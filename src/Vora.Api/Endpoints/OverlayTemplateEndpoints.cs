@@ -1,3 +1,4 @@
+using Vora.Application.Libraries;
 using Vora.Application.Posters;
 using Vora.Application.Posters.Dtos;
 using Vora.Application.Tasks;
@@ -44,9 +45,10 @@ public static class OverlayTemplateEndpoints
         return Results.NoContent();
     }
 
-    private static IResult QueueLibrarySyncAsync(Guid libraryId, ITaskQueueManager taskQueue)
+    private static async Task<IResult> QueueLibrarySyncAsync(Guid libraryId, ITaskQueueManager taskQueue, ILibraryManager libraryManager)
     {
-        taskQueue.QueueGenerateLibraryPosterOverlays(libraryId);
+        var library = await libraryManager.GetLibraryByIdAsync(libraryId);
+        taskQueue.QueueGenerateLibraryPosterOverlays(libraryId, library?.Name);
         return Results.Accepted(uri: null, value: new { Message = "Library overlay sync queued." });
     }
 }

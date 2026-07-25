@@ -377,15 +377,29 @@ export default function HomePage() {
     const heroVisible = showSpotlightPref && spotlightItems.length > 0;
 
     const displayLists = useMemo(() => {
-        return [...lists]
+        const base = [...lists]
             .filter(l => l.id !== spotlightListId)
-            .map(list => {
-                const pref = clientLayout.find(l => l.listId === list.id);
-                if (pref) return { ...list, isEnabled: pref.isEnabled, orderIndex: pref.orderIndex };
-                return { ...list, isEnabled: true, orderIndex: 999 };
-            })
-            .filter(l => l.isEnabled)
-            .sort((a, b) => a.orderIndex - b.orderIndex);
+            .sort((a, b) => a.displayOrder - b.displayOrder);
+
+        if (clientLayout.length === 0) {
+            return base;
+        }
+
+        const prefById = new Map(clientLayout.map(p => [p.listId, p]));
+        const withPref = base
+            .filter(l => prefById.has(l.id))
+            .sort((a, b) => {
+                const pa = prefById.get(a.id);
+                const pb = prefById.get(b.id);
+                return (pa ? pa.orderIndex : 0) - (pb ? pb.orderIndex : 0);
+            });
+        const withoutPref = base.filter(l => !prefById.has(l.id));
+
+        return [...withPref, ...withoutPref]
+            .filter(l => {
+                const pref = prefById.get(l.id);
+                return pref ? pref.isEnabled : true;
+            });
     }, [lists, clientLayout, spotlightListId]);
 
     const tabBar = (
@@ -476,7 +490,7 @@ export default function HomePage() {
                 ) : (
                     <div className={heroVisible ? '-mt-12 space-y-10' : 'space-y-10 pt-2'}>
                         {heroVisible && (
-                            <div className="flex justify-end px-8">
+                            <div className="relative z-10 flex justify-end px-8">
                                 {customizeAction}
                             </div>
                         )}

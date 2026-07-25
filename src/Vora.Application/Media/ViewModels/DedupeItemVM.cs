@@ -7,6 +7,7 @@ public class DedupeItemVM
     public string FileName { get; set; } = string.Empty;
     public long FileSizeBytes { get; set; }
     public string VideoCodec { get; set; } = string.Empty;
+    public string? Source { get; set; }
     public string HdrFormat { get; set; } = string.Empty;
     public string? AudioCodec { get; set; }
     public int? SampleRate { get; set; }

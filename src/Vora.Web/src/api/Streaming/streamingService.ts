@@ -36,6 +36,17 @@ export const streamingService = {
 
         return response.data as StartSessionResponse;
     },
+    startExtraSession: async (extraId: string, startPosition: number = 0, serverId?: string) => {
+        const capabilities = scanDeviceCapabilities();
+
+        const response = await apiClient.post('/streaming/start-extra', {
+            extraId,
+            startPosition,
+            capabilities
+        }, { serverId });
+
+        return response.data as StartSessionResponse;
+    },
     pingSession: async (sessionId: string, currentPosition: number, duration: number, isPaused: boolean, serverId?: string) => {
         const safeDuration = Number.isFinite(duration) ? duration : 0;
         const safePosition = Number.isFinite(currentPosition) ? currentPosition : 0;
