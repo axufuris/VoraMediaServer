@@ -22,6 +22,15 @@ function formatBytes(bytes: number) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+function audioChannelCount(track: string) {
+    const match = track.match(/(\d+)\s*CH/i);
+    return match ? parseInt(match[1], 10) : 0;
+}
+
+function sortAudioTracksByChannels(tracks: string[]) {
+    return [...tracks].sort((a, b) => audioChannelCount(a) - audioChannelCount(b));
+}
+
 function Chip({ children, tone = 'neutral' }: { children: React.ReactNode, tone?: 'neutral' | 'highlight' }) {
     const cls = tone === 'highlight'
         ? 'bg-[var(--vora-accent-soft)] text-[var(--vora-accent-text)]'
@@ -136,9 +145,21 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
         }
     };
 
+    const potentialSavings = groups.reduce(
+        (sum, g) => sum + g.parts.slice(1).reduce((s, p) => s + p.fileSizeBytes, 0),
+        0
+    );
+
     return (
         <>
-            <div className="flex justify-end mb-4">
+            <div className="flex justify-between items-center gap-4 mb-4 flex-wrap">
+                {groups.length > 0 ? (
+                    <div className="vora-card px-5 py-3 flex items-baseline gap-2">
+                        <span className="text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">Potential savings</span>
+                        <span className="text-xl font-bold text-[var(--vora-accent-text)]">{formatBytes(potentialSavings)}</span>
+                        <span className="text-xs text-[var(--vora-text-muted)]">if you keep the best version in each group</span>
+                    </div>
+                ) : <div />}
                 <button type="button" onClick={fetchDuplicates} className="vora-button-secondary flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     Rescan
@@ -217,7 +238,7 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
                                             </div>
                                             {group.mediaKind === 'video' && part.audioTracks.length > 0 && (
                                                 <div className="mt-2 flex flex-wrap gap-1">
-                                                    {part.audioTracks.map((audio, i) => (
+                                                    {sortAudioTracksByChannels(part.audioTracks).map((audio, i) => (
                                                         <span key={i} className="text-[10px] uppercase tracking-wider bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] px-2 py-0.5 rounded border border-[var(--vora-border-subtle)] font-semibold">{audio}</span>
                                                     ))}
                                                 </div>
