@@ -117,17 +117,17 @@ public class MediaDetailsVM
                     ExtraType = e.ExtraType,
                     Container = e.Parts.Select(p => p.Container).FirstOrDefault()
                 }).ToList(),
-            NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count : (int?)null,
+            NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count(s => s.MissingSince == null) : (int?)null,
             SeasonNumber = item is Season ? ((Season)item).SeasonNumber :
                            item is Episode ? ((Episode)item).Season.SeasonNumber : null,
             EpisodeNumber = item is Episode ? ((Episode)item).EpisodeNumber : null,
-            Seasons = item is TvShow ? ((TvShow)item).Seasons.Select(s => new SeasonVM
+            Seasons = item is TvShow ? ((TvShow)item).Seasons.Where(s => s.MissingSince == null).Select(s => new SeasonVM
             {
                 Id = s.Id,
                 SeasonNumber = s.SeasonNumber,
                 Title = s.Title,
                 PosterUrl = s.PosterUrl,
-                EpisodeCount = s.Episodes.Count,
+                EpisodeCount = s.Episodes.Count(e => e.MissingSince == null),
                 ServerAdminRating = s.ServerAdminRating
             }).ToList() : new List<SeasonVM>(),
             TvShowId = item is Season ? ((Season)item).TvShowId :
@@ -139,7 +139,7 @@ public class MediaDetailsVM
             UpcomingEpisodesJson = item is TvShow ? ((TvShow)item).UpcomingEpisodesJson :
                                    item is Season ? ((Season)item).TvShow.UpcomingEpisodesJson :
                                    item is Episode ? ((Episode)item).Season.TvShow.UpcomingEpisodesJson : "[]",
-            Episodes = item is Season ? ((Season)item).Episodes.Select(e => new EpisodeVM
+            Episodes = item is Season ? ((Season)item).Episodes.Where(e => e.MissingSince == null).Select(e => new EpisodeVM
             {
                 Id = e.Id,
                 EpisodeNumber = e.EpisodeNumber,

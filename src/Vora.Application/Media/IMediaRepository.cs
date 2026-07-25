@@ -43,6 +43,10 @@ public interface IMediaRepository
     Task RemoveMediaVideosAsync(IEnumerable<MediaVideo> videos);
     Task AddMediaExtraAsync(MediaExtra extra);
     Task DeleteMediaByFilePathAsync(string filePath);
+    Task MarkMediaMissingByFilePathAsync(string filePath);
+    Task<List<TrashMediaItemVM>> GetMissingMediaAsync();
+    Task<List<Guid>> GetExpiredMissingMediaIdsAsync(DateTime cutoffUtc);
+    Task RestoreMissingMediaAsync(Guid id);
     Task DeleteMediaItemAsync(Guid id);
     Task AddMediaPartAsync(MediaPart part);
     Task AddMediaCastMembersAsync(IEnumerable<MediaCastMember> castMembers);

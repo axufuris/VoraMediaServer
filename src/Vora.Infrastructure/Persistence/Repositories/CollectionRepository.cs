@@ -86,7 +86,7 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
     public async Task<List<CollectionItem>> GetCollectionItemsWithMediaAsync(Guid collectionId) =>
         await context.Set<CollectionItem>()
             .Include(ci => ci.MediaItem)
-            .Where(ci => ci.CollectionId == collectionId)
+            .Where(ci => ci.CollectionId == collectionId && ci.MediaItem.MissingSince == null)
             .ToListAsync();
 
     public Task<Dictionary<Guid, decimal>> GetCollectionItemSortOrdersAsync(Guid collectionId) =>

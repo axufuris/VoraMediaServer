@@ -103,6 +103,8 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.FolderWatcherProviderId = request.FolderWatcherProviderId;
         settings.FolderWatcherPollingInterval = request.FolderWatcherPollingInterval;
         settings.LocalMediaScannerProviderId = request.LocalMediaScannerProviderId;
+        settings.EnableTrashAutoPurge = request.EnableTrashAutoPurge;
+        settings.MissingMediaRetentionDays = Math.Clamp(request.MissingMediaRetentionDays, 1, 3650);
         settings.RegistrationMode = (RegistrationMode)request.RegistrationMode;
         settings.InternetUploadSpeedMbps = request.InternetUploadSpeedMbps;
         settings.MaxRemoteStreamBitrateMbps = request.MaxRemoteStreamBitrateMbps;

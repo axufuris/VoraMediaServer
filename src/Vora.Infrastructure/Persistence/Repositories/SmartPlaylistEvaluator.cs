@@ -91,6 +91,7 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
     {
         var baseQuery = _context.Tracks
             .AsNoTracking()
+            .Where(t => t.MissingSince == null)
             .Where(t => t.AlbumId != null && t.Album != null);
 
         if (!access.HasAllLibraryAccess)
@@ -153,7 +154,7 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
 
     private IQueryable<VideoRow> BuildMovieRowQuery(SmartPlaylistDefinition definition, Guid profileId, MusicAccessFilter access)
     {
-        var baseQuery = _context.Movies.AsNoTracking();
+        var baseQuery = _context.Movies.AsNoTracking().Where(m => m.MissingSince == null);
 
         if (!access.HasAllLibraryAccess)
         {
@@ -205,6 +206,7 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
     {
         var baseQuery = _context.Episodes
             .AsNoTracking()
+            .Where(e => e.MissingSince == null)
             .Where(e => e.Season != null && e.Season.TvShow != null);
 
         if (!access.HasAllLibraryAccess)

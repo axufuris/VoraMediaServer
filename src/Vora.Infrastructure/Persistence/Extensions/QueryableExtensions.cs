@@ -9,6 +9,8 @@ public static class QueryableExtensions
         bool hasAllLibs, List<Guid> allowedLibs,
         bool hasAllRatings, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
     {
+        query = query.Where(m => m.MissingSince == null);
+
         if (!hasAllLibs)
         {
             query = query.Where(m => allowedLibs.Contains(m.LibraryId));

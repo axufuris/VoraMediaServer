@@ -50,7 +50,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
             {
                 result.NextItem = await _context.PlaylistItems
                     .AsNoTracking()
-                    .Where(p => p.PlaylistId == contextId.Value && p.Order > currentPlaylistItem)
+                    .Where(p => p.PlaylistId == contextId.Value && p.Order > currentPlaylistItem && p.MediaItem.MissingSince == null)
                     .OrderBy(p => p.Order)
                     .Select(p => new UpNextItemVM
                     {
@@ -68,7 +68,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
 
                 result.PreviousItem = await _context.PlaylistItems
                     .AsNoTracking()
-                    .Where(p => p.PlaylistId == contextId.Value && p.Order < currentPlaylistItem)
+                    .Where(p => p.PlaylistId == contextId.Value && p.Order < currentPlaylistItem && p.MediaItem.MissingSince == null)
                     .OrderByDescending(p => p.Order)
                     .Select(p => new UpNextItemVM
                     {
@@ -97,7 +97,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
             {
                 result.NextItem = await _context.Set<Episode>()
                     .AsNoTracking()
-                    .Where(e => e.Season.TvShowId == seasonInfo.TvShowId &&
+                    .Where(e => e.Season.TvShowId == seasonInfo.TvShowId && e.MissingSince == null &&
                                ((e.Season.SeasonNumber == seasonInfo.SeasonNumber && e.EpisodeNumber > currentMedia.EpisodeNumber) ||
                                  e.Season.SeasonNumber > seasonInfo.SeasonNumber))
                     .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
@@ -197,7 +197,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
 
         var movieRows = await _context.UserMediaStates
             .AsNoTracking()
-            .Where(s => s.ProfileId == profileId && s.ResumePositionSeconds > 0 && !s.IsPlayed && !s.IsHiddenFromContinueWatching && s.MediaItem is Movie)
+            .Where(s => s.ProfileId == profileId && s.ResumePositionSeconds > 0 && !s.IsPlayed && !s.IsHiddenFromContinueWatching && s.MediaItem is Movie && s.MediaItem.MissingSince == null)
             .Select(s => new
             {
                 Vm = new ContinueWatchingVM
@@ -221,7 +221,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
 
         var watchedShowSummaries = await _context.UserMediaStates
             .AsNoTracking()
-            .Where(s => s.ProfileId == profileId && s.MediaItem is Episode && !s.IsHiddenFromContinueWatching)
+            .Where(s => s.ProfileId == profileId && s.MediaItem is Episode && !s.IsHiddenFromContinueWatching && s.MediaItem.MissingSince == null)
             .Select(s => new
             {
                 TvShowId = ((Episode)s.MediaItem).Season.TvShowId,
@@ -243,6 +243,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
             var unplayedKeys = await _context.Set<Episode>()
                 .AsNoTracking()
                 .Where(e => candidateShowIds.Contains(e.Season.TvShowId))
+                .Where(e => e.MissingSince == null)
                 .Where(e => !_context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == e.Id && (s.IsPlayed || s.IsHiddenFromContinueWatching)))
                 .Select(e => new { e.Id, TvShowId = e.Season.TvShowId, SeasonNumber = e.Season.SeasonNumber, e.EpisodeNumber })
                 .ToListAsync();

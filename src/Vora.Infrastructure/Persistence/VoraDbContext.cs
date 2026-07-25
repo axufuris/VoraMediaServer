@@ -246,6 +246,7 @@ public class VoraDbContext : DbContext
             entity.HasIndex(e => e.ImdbId).HasFilter("\"ImdbId\" IS NOT NULL");
             entity.HasIndex(e => e.TvdbId).HasFilter("\"TvdbId\" IS NOT NULL");
             entity.HasIndex("LibraryId", "MediaType");
+            entity.HasIndex(e => e.MissingSince).HasFilter("\"MissingSince\" IS NOT NULL");
         });
 
         modelBuilder.Entity<TvShow>(entity =>

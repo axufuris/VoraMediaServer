@@ -456,6 +456,55 @@ public partial class MediaRepository : IMediaRepository
         }
     }
 
+    public async Task MarkMediaMissingByFilePathAsync(string filePath)
+    {
+        var item = await _context.MediaItems
+            .Include(m => m.MediaParts)
+            .FirstOrDefaultAsync(m => m.MediaParts.Any(p => p.FilePath == filePath));
+
+        if (item == null) return;
+
+        var partToRemove = item.MediaParts.FirstOrDefault(p => p.FilePath == filePath);
+        if (partToRemove == null) return;
+
+        item.MediaParts.Remove(partToRemove);
+        _context.Entry(partToRemove).State = EntityState.Deleted;
+
+        if (item.MediaParts.Count == 0)
+        {
+            if (item is Track)
+            {
+                _context.MediaItems.Remove(item);
+            }
+            else if (item.MissingSince == null)
+            {
+                item.MissingSince = DateTime.UtcNow;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public Task<List<TrashMediaItemVM>> GetMissingMediaAsync() =>
+        _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.MissingSince != null)
+            .OrderByDescending(m => m.MissingSince)
+            .Select(TrashMediaItemVM.Projection)
+            .ToListAsync();
+
+    public Task<List<Guid>> GetExpiredMissingMediaIdsAsync(DateTime cutoffUtc) =>
+        _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.MissingSince != null && m.MissingSince < cutoffUtc)
+            .Select(m => m.Id)
+            .ToListAsync();
+
+    public Task RestoreMissingMediaAsync(Guid id) =>
+        _context.MediaItems
+            .Where(m => m.Id == id && m.MissingSince != null)
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.MissingSince, (DateTime?)null));
+
     public async Task DeleteMediaItemAsync(Guid id)
     {
         var item = await _context.MediaItems.FindAsync(id);
@@ -470,6 +519,10 @@ public partial class MediaRepository : IMediaRepository
     {
         await _context.MediaParts.AddAsync(part);
         await _context.SaveChangesAsync();
+
+        await _context.MediaItems
+            .Where(m => m.Id == part.MediaItemId && m.MissingSince != null)
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.MissingSince, (DateTime?)null));
     }
 
     public async Task AddMediaCastMembersAsync(IEnumerable<MediaCastMember> castMembers)

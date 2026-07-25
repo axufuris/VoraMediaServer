@@ -73,6 +73,15 @@ public static class MediaEndpoints
 
         adminGroup.MapDelete("/{id:guid}", DeleteMediaAsync)
             .Produces(StatusCodes.Status204NoContent);
+
+        adminGroup.MapGet("/trash", GetTrashAsync)
+            .Produces<List<TrashMediaItemVM>>(StatusCodes.Status200OK);
+
+        adminGroup.MapPost("/trash/{id:guid}/restore", RestoreFromTrashAsync)
+            .Produces(StatusCodes.Status204NoContent);
+
+        adminGroup.MapDelete("/trash/{id:guid}", PurgeFromTrashAsync)
+            .Produces(StatusCodes.Status204NoContent);
     }
 
     private static void MapSeasonEndpoints(IEndpointRouteBuilder routes)
@@ -229,6 +238,24 @@ public static class MediaEndpoints
     }
 
     private static async Task<IResult> DeleteMediaAsync(Guid id, IMediaManager manager)
+    {
+        await manager.DeleteMediaAsync(id);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> GetTrashAsync(IMediaManager manager)
+    {
+        var trash = await manager.GetTrashAsync();
+        return Results.Ok(trash);
+    }
+
+    private static async Task<IResult> RestoreFromTrashAsync(Guid id, IMediaManager manager)
+    {
+        await manager.RestoreFromTrashAsync(id);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> PurgeFromTrashAsync(Guid id, IMediaManager manager)
     {
         await manager.DeleteMediaAsync(id);
         return Results.NoContent();

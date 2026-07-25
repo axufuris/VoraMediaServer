@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -12,9 +13,11 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    partial class VoraDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260725195104_AddMediaItemMissingSince")]
+    partial class AddMediaItemMissingSince
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2728,9 +2731,6 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<bool>("EnableRemoteAccess")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("EnableTrashAutoPurge")
-                        .HasColumnType("boolean");
-
                     b.Property<bool>("EnableWeeklyMixes")
                         .HasColumnType("boolean");
 
@@ -2785,9 +2785,6 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("MaxRemoteStreamBitrateMbps")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("MissingMediaRetentionDays")
                         .HasColumnType("integer");
 
                     b.Property<TimeSpan>("NightlyScanTime")
@@ -2947,7 +2944,6 @@ namespace Vora.Infrastructure.Migrations
                             EnablePodcasts = true,
                             EnableReleaseCalendar = true,
                             EnableRemoteAccess = true,
-                            EnableTrashAutoPurge = true,
                             EnableWeeklyMixes = true,
                             EpisodeIntroClusterMinAgreementPct = 70,
                             EpisodeIntroClusterToleranceSec = 5,
@@ -2964,7 +2960,6 @@ namespace Vora.Infrastructure.Migrations
                             MaxCpuTranscodes = 0,
                             MaxGpuTranscodes = 2,
                             MaxRemoteStreamBitrateMbps = 0,
-                            MissingMediaRetentionDays = 30,
                             NightlyScanTime = new TimeSpan(0, 2, 0, 0, 0),
                             PublicPort = 32080,
                             RegistrationMode = 2,

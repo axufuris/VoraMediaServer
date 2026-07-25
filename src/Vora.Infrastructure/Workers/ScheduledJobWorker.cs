@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Collections;
 using Vora.Application.Libraries;
+using Vora.Application.Media;
 using Vora.Application.Metadata;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
@@ -24,6 +25,7 @@ public class ScheduledJobWorker : BackgroundService
     private DateTime _lastOverlaySyncDate = DateTime.MinValue.Date;
     private DateTime _lastIptvSyncDate = DateTime.MinValue.Date;
     private DateTime _lastVideoThumbnailDate = DateTime.MinValue.Date;
+    private DateTime _lastTrashPurgeDate = DateTime.MinValue.Date;
 
     private bool _startupCatchUpDone = false;
 
@@ -97,6 +99,7 @@ public class ScheduledJobWorker : BackgroundService
             if (overlayParsed && timeOfDay >= overlayTime) _lastOverlaySyncDate = today;
             if (timeOfDay >= settings.IptvSyncTime) _lastIptvSyncDate = today;
             if (timeOfDay >= settings.VideoThumbnailScheduleTime) _lastVideoThumbnailDate = today;
+            if (timeOfDay >= settings.NightlyScanTime) _lastTrashPurgeDate = today;
         }
 
         if (settings.EnableNightlyScan && timeOfDay >= settings.NightlyScanTime && _lastNightlyScanDate < today)
@@ -113,6 +116,18 @@ public class ScheduledJobWorker : BackgroundService
             await metadataManager.TriggerActorMetadataRefreshAsync();
 
             _lastNightlyScanDate = today;
+        }
+
+        if (settings.EnableTrashAutoPurge && settings.MissingMediaRetentionDays > 0 && timeOfDay >= settings.NightlyScanTime && _lastTrashPurgeDate < today)
+        {
+            var mediaManager = scope.ServiceProvider.GetRequiredService<IMediaManager>();
+            var purged = await mediaManager.PurgeExpiredTrashAsync(settings.MissingMediaRetentionDays);
+            if (purged > 0)
+            {
+                _logger.LogInformation("Purged {Count} expired missing media item(s) past the {Days}-day retention window.", purged, settings.MissingMediaRetentionDays);
+            }
+
+            _lastTrashPurgeDate = today;
         }
 
         bool shouldRunDetections = settings.RunDetections == Domain.Enums.DetectionTrigger.OnSchedule ||

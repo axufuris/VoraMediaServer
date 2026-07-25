@@ -308,6 +308,33 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 </div>
             </SettingsCard>
 
+            <SettingsCard
+                title="Missing Media (Trash)"
+                headingControl={
+                    <input
+                        type="checkbox"
+                        checked={serverSettings.enableTrashAutoPurge}
+                        onChange={e => setServerSettings({ ...serverSettings, enableTrashAutoPurge: e.target.checked })}
+                        className="w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer"
+                    />
+                }
+            >
+                <div className="pl-7">
+                    <FieldLabel>Auto-delete after (days)</FieldLabel>
+                    <input
+                        type="number"
+                        min={1}
+                        value={serverSettings.missingMediaRetentionDays}
+                        onChange={e => setServerSettings({ ...serverSettings, missingMediaRetentionDays: parseInt(e.target.value) || 0 })}
+                        disabled={!serverSettings.enableTrashAutoPurge}
+                        className="vora-input w-auto disabled:opacity-50"
+                    />
+                    <FieldHint>
+                        When a media file disappears (e.g. moved out for transcoding), the item is hidden and moved to Trash instead of being deleted, so watch progress and ratings are kept. If the file returns, the item is restored automatically. Items left in Trash longer than this are permanently deleted. Uncheck to keep missing items forever. Review them under Library → Media Trash.
+                    </FieldHint>
+                </div>
+            </SettingsCard>
+
             {scanners.length > 1 && (
                 <SettingsCard title="Local Media Scanner Engine">
                     <FieldLabel>Active Scanner Plugin</FieldLabel>

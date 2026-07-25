@@ -27,6 +27,9 @@ public interface IMediaManager
     Task UpdateSeasonMetadataAsync(Guid id, UpdateSeasonRequest request);
     Task DeleteMediaAsync(Guid id);
     Task TriggerTargetedScanAsync(Guid id);
+    Task<List<TrashMediaItemVM>> GetTrashAsync();
+    Task RestoreFromTrashAsync(Guid id);
+    Task<int> PurgeExpiredTrashAsync(int retentionDays);
 }
 
 public class MediaManager : IMediaManager
@@ -206,6 +209,31 @@ public class MediaManager : IMediaManager
 
         await _repository.DeleteMediaItemAsync(id);
         await _notifier.NotifyLibraryUpdatedAsync(libraryId);
+    }
+
+    public Task<List<TrashMediaItemVM>> GetTrashAsync() =>
+        _repository.GetMissingMediaAsync();
+
+    public async Task RestoreFromTrashAsync(Guid id)
+    {
+        var item = await _repository.GetForBasicUpdateAsync(id);
+        if (item == null || item.MissingSince == null) return;
+
+        await _repository.RestoreMissingMediaAsync(id);
+        await _notifier.NotifyLibraryUpdatedAsync(item.LibraryId);
+    }
+
+    public async Task<int> PurgeExpiredTrashAsync(int retentionDays)
+    {
+        var cutoff = DateTime.UtcNow.AddDays(-retentionDays);
+        var expiredIds = await _repository.GetExpiredMissingMediaIdsAsync(cutoff);
+
+        foreach (var expiredId in expiredIds)
+        {
+            await DeleteMediaAsync(expiredId);
+        }
+
+        return expiredIds.Count;
     }
 
     public async Task TriggerTargetedScanAsync(Guid id)

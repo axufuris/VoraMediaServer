@@ -55,6 +55,7 @@ const ClientDiscoveryViewAllPage = lazy(() => import('./pages/Client/Discovery/D
 const AdminRequestsPage = lazy(() => import('./pages/Admin/RequestsPage'));
 const AdminAiStatsPage = lazy(() => import('./pages/Admin/AiStatsPage'));
 const AdminDedupePage = lazy(() => import('./pages/Admin/DedupePage'));
+const AdminMediaTrashPage = lazy(() => import('./pages/Admin/MediaTrashPage'));
 const OverlayEditor = lazy(() => import('./pages/Admin/Overlay/OverlayEditor'));
 const AdminIptvPage = lazy(() => import('./pages/Admin/Iptv/IptvPage'));
 const AdminForYouPage = lazy(() => import('./pages/Admin/Features/ForYouPage'));
@@ -224,6 +225,7 @@ export default function App() {
                         <Route path="history" element={<AdminHistoryPage />} />
                         <Route path="libraries" element={<LibraryDashboard />} />
                         <Route path="dedupe" element={<AdminDedupePage />} />
+                        <Route path="media-trash" element={<AdminMediaTrashPage />} />
                         <Route path="devices" element={<AuthorizedDevicesPage />} />
                         <Route path="users" element={<AdminUserManagementPage />} />
                         <Route path="invitations" element={<AdminInvitationsPage />} />
@@ -258,6 +260,7 @@ export default function App() {
                             <Route path="history" element={<AdminHistoryPage />} />
                             <Route path="libraries" element={<LibraryDashboard />} />
                             <Route path="dedupe" element={<AdminDedupePage />} />
+                            <Route path="media-trash" element={<AdminMediaTrashPage />} />
                             <Route path="devices" element={<AuthorizedDevicesPage />} />
                             <Route path="users" element={<AdminUserManagementPage />} />
                             <Route path="invitations" element={<AdminInvitationsPage />} />

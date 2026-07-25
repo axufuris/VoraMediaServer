@@ -34,14 +34,14 @@ public class SeasonDetailsVM
             Overview = item.Overview,
             PosterUrl = item.PosterUrl,
             ReleaseDate = item.ReleaseDate,
-            EpisodeCount = ((Season)item).Episodes.Count,
+            EpisodeCount = ((Season)item).Episodes.Count(e => e.MissingSince == null),
             LockedFields = item.LockedFields,
 
             TvShowId = ((Season)item).TvShowId,
             TvShowTitle = ((Season)item).TvShow.Title,
             UpcomingEpisodesJson = ((Season)item).TvShow.UpcomingEpisodesJson,
 
-            Episodes = ((Season)item).Episodes.Select(e => new EpisodeVM
+            Episodes = ((Season)item).Episodes.Where(e => e.MissingSince == null).Select(e => new EpisodeVM
             {
                 Id = e.Id,
                 EpisodeNumber = e.EpisodeNumber,

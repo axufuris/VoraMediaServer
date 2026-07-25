@@ -61,7 +61,7 @@ public class LibraryItemVM
             ThirdPartyRating1Name = item.ThirdPartyRating1Name,
             ThirdPartyRating2 = item.ThirdPartyRating2,
             ThirdPartyRating2Name = item.ThirdPartyRating2Name,
-            NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count : (int?)null,
+            NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count(s => s.MissingSince == null) : (int?)null,
             TvShowTitle = item is Season ? ((Season)item).TvShow.Title : null,
             Genres = item.Genres.Select(g => g.Name).ToList()
         };
