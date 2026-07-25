@@ -20,6 +20,9 @@ public static partial class ArtworkEndpoints
         group.MapGet("/artwork/custom/{fileName}", ServeCustomArtwork)
             .AllowAnonymous();
 
+        group.MapGet("/artwork/thumb", ServeThumbnailAsync)
+            .AllowAnonymous();
+
         var authGroup = group.MapGroup("").RequireAuthorization();
 
         authGroup.MapGet("/media/{id:guid}/artwork", GetMediaArtworkAsync);
@@ -59,6 +62,38 @@ public static partial class ArtworkEndpoints
         httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
         return Results.File(path, contentType);
     }
+
+    private static async Task<IResult> ServeThumbnailAsync(
+        [FromQuery] string? src,
+        [FromQuery] int? w,
+        IArtworkThumbnailService thumbnails,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(src))
+        {
+            return Results.NotFound();
+        }
+
+        var width = ClampThumbnailWidth(w ?? 360);
+        var path = await thumbnails.GetOrCreateThumbnailAsync(src, width, cancellationToken);
+        if (path == null || !File.Exists(path))
+        {
+            return Results.NotFound();
+        }
+
+        httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
+        return Results.File(path, "image/jpeg");
+    }
+
+    private static int ClampThumbnailWidth(int w) => w switch
+    {
+        <= 200 => 200,
+        <= 360 => 360,
+        <= 500 => 500,
+        <= 780 => 780,
+        _ => 1280
+    };
 
     private static async Task<IResult> GetMediaArtworkAsync(Guid id, IArtworkService service)
     {
