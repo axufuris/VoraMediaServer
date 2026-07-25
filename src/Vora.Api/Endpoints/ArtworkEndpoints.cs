@@ -66,6 +66,7 @@ public static partial class ArtworkEndpoints
     private static async Task<IResult> ServeThumbnailAsync(
         [FromQuery] string? src,
         [FromQuery] int? w,
+        [FromQuery] string? kind,
         IArtworkThumbnailService thumbnails,
         HttpContext httpContext,
         CancellationToken cancellationToken)
@@ -76,7 +77,7 @@ public static partial class ArtworkEndpoints
         }
 
         var width = ClampThumbnailWidth(w ?? 360);
-        var path = await thumbnails.GetOrCreateThumbnailAsync(src, width, cancellationToken);
+        var path = await thumbnails.GetOrCreateThumbnailAsync(src, width, NormalizeKind(kind), cancellationToken);
         if (path == null || !File.Exists(path))
         {
             return Results.NotFound();
@@ -85,6 +86,13 @@ public static partial class ArtworkEndpoints
         httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
         return Results.File(path, "image/jpeg");
     }
+
+    private static string NormalizeKind(string? kind) => kind?.ToLowerInvariant() switch
+    {
+        "still" => "still",
+        "backdrop" => "backdrop",
+        _ => "poster"
+    };
 
     private static int ClampThumbnailWidth(int w) => w switch
     {

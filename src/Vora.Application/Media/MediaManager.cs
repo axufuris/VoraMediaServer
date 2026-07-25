@@ -44,6 +44,7 @@ public class MediaManager : IMediaManager
     private readonly IEnumerable<ILocalMediaScannerProvider> _scanners;
     private readonly StoragePathsOptions _storagePaths;
     private readonly Vora.Application.Thumbnails.IVideoThumbnailStorageService _thumbnailStorage;
+    private readonly Vora.Application.Artwork.IArtworkThumbnailService _artworkThumbnails;
     private readonly ILogger<MediaManager> _logger;
 
     public MediaManager(
@@ -55,6 +56,7 @@ public class MediaManager : IMediaManager
         IEnumerable<ILocalMediaScannerProvider> scanners,
         IOptions<StoragePathsOptions> storagePaths,
         Vora.Application.Thumbnails.IVideoThumbnailStorageService thumbnailStorage,
+        Vora.Application.Artwork.IArtworkThumbnailService artworkThumbnails,
         ILogger<MediaManager> logger)
     {
         _repository = repository;
@@ -65,6 +67,7 @@ public class MediaManager : IMediaManager
         _scanners = scanners;
         _storagePaths = storagePaths.Value;
         _thumbnailStorage = thumbnailStorage;
+        _artworkThumbnails = artworkThumbnails;
         _logger = logger;
     }
 
@@ -197,6 +200,8 @@ public class MediaManager : IMediaManager
         var libraryId = item.LibraryId;
 
         CleanupOrphanedOverlay(item);
+        _artworkThumbnails.RemoveThumbnailsForSource(item.PosterUrl);
+        _artworkThumbnails.RemoveThumbnailsForSource(item.BackgroundUrl);
         _thumbnailStorage.DeleteItemDirectory(id);
 
         await _repository.DeleteMediaItemAsync(id);
@@ -234,6 +239,7 @@ public class MediaManager : IMediaManager
         if (string.IsNullOrEmpty(newPosterUrl) || newPosterUrl == item.PosterUrl) return;
 
         CleanupOrphanedOverlay(item);
+        _artworkThumbnails.RemoveThumbnailsForSource(item.PosterUrl);
         item.OriginalPosterUrl = newPosterUrl;
         item.PosterUrl = newPosterUrl;
     }
@@ -245,8 +251,10 @@ public class MediaManager : IMediaManager
         if (item is Episode)
         {
             CleanupOrphanedOverlay(item);
+            _artworkThumbnails.RemoveThumbnailsForSource(item.PosterUrl);
             item.OriginalPosterUrl = newBackgroundUrl;
         }
+        _artworkThumbnails.RemoveThumbnailsForSource(item.BackgroundUrl);
         item.BackgroundUrl = newBackgroundUrl;
     }
 
