@@ -73,6 +73,7 @@ public class VoraDbContext : DbContext
     public DbSet<UserProfile> UserProfiles { get; set; }
     public DbSet<UserMediaState> UserMediaStates { get; set; }
     public DbSet<UserMediaRating> UserMediaRatings { get; set; }
+    public DbSet<PreservedUserMediaData> PreservedUserMediaData { get; set; }
     public DbSet<UserAlbumRating> UserAlbumRatings { get; set; }
     public DbSet<UserArtistRating> UserArtistRatings { get; set; }
     public DbSet<UserProviderConnection> UserProviderConnections { get; set; }
@@ -759,6 +760,19 @@ public class VoraDbContext : DbContext
             entity.HasOne(e => e.MediaItem)
                   .WithMany()
                   .HasForeignKey(e => e.MediaItemId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PreservedUserMediaData>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ContentKey).IsRequired().HasMaxLength(256);
+            entity.HasIndex(e => new { e.ProfileId, e.ContentKey }).IsUnique();
+            entity.HasIndex(e => e.ContentKey);
+
+            entity.HasOne(e => e.Profile)
+                  .WithMany()
+                  .HasForeignKey(e => e.ProfileId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 

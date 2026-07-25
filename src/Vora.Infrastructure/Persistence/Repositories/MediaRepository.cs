@@ -6,6 +6,7 @@ using Vora.Application.Media;
 using Vora.Application.Media.ViewModels;
 using Vora.Domain.Entities.Actors;
 using Vora.Domain.Entities.Media;
+using Vora.Domain.Entities.Users;
 using Vora.Infrastructure.Persistence.Extensions;
 
 namespace Vora.Infrastructure.Persistence.Repositories;
@@ -404,6 +405,7 @@ public partial class MediaRepository : IMediaRepository
         {
             await _context.MediaItems.AddAsync(item);
             await _context.SaveChangesAsync();
+            await RestoreUserDataForItemAsync(item.Id);
         }
         catch (Exception ex)
         {
@@ -510,9 +512,164 @@ public partial class MediaRepository : IMediaRepository
         var item = await _context.MediaItems.FindAsync(id);
         if (item != null)
         {
+            await ArchiveUserDataForItemAsync(id);
             _context.MediaItems.Remove(item);
             await _context.SaveChangesAsync();
         }
+    }
+
+    private async Task<string?> GetContentKeyAsync(Guid id)
+    {
+        var info = await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == id)
+            .Select(m => new
+            {
+                Type = m is Movie ? "movie"
+                    : m is TvShow ? "show"
+                    : m is Season ? "season"
+                    : m is Episode ? "episode"
+                    : "other",
+                m.TmdbId,
+                m.ImdbId,
+                m.TvdbId,
+                SeasonNumber = m is Season ? ((Season)m).SeasonNumber
+                    : m is Episode ? ((Episode)m).Season.SeasonNumber
+                    : (int?)null,
+                EpisodeNumber = m is Episode ? ((Episode)m).EpisodeNumber : (int?)null,
+                SeriesTmdbId = m is Season ? ((Season)m).TvShow.TmdbId
+                    : m is Episode ? ((Episode)m).Season.TvShow.TmdbId
+                    : null,
+                SeriesImdbId = m is Season ? ((Season)m).TvShow.ImdbId
+                    : m is Episode ? ((Episode)m).Season.TvShow.ImdbId
+                    : null,
+                SeriesTvdbId = m is Season ? ((Season)m).TvShow.TvdbId
+                    : m is Episode ? ((Episode)m).Season.TvShow.TvdbId
+                    : null
+            })
+            .FirstOrDefaultAsync();
+
+        if (info == null) return null;
+
+        return ContentIdentity.Compute(
+            info.Type, info.TmdbId, info.ImdbId, info.TvdbId,
+            info.SeasonNumber, info.EpisodeNumber,
+            info.SeriesTmdbId, info.SeriesImdbId, info.SeriesTvdbId);
+    }
+
+    private async Task ArchiveUserDataForItemAsync(Guid id)
+    {
+        var contentKey = await GetContentKeyAsync(id);
+        if (contentKey == null) return;
+
+        var ratings = await _context.UserMediaRatings.AsNoTracking().Where(r => r.MediaItemId == id).ToListAsync();
+        var states = await _context.UserMediaStates.AsNoTracking().Where(s => s.MediaItemId == id).ToListAsync();
+        if (ratings.Count == 0 && states.Count == 0) return;
+
+        var profileIds = ratings.Select(r => r.ProfileId).Concat(states.Select(s => s.ProfileId)).Distinct().ToList();
+
+        var existing = await _context.PreservedUserMediaData
+            .Where(p => p.ContentKey == contentKey && profileIds.Contains(p.ProfileId))
+            .ToListAsync();
+        var byProfile = existing.ToDictionary(p => p.ProfileId);
+
+        foreach (var profileId in profileIds)
+        {
+            if (!byProfile.TryGetValue(profileId, out var archive))
+            {
+                archive = new PreservedUserMediaData { ProfileId = profileId, ContentKey = contentKey };
+                _context.PreservedUserMediaData.Add(archive);
+                byProfile[profileId] = archive;
+            }
+            archive.ArchivedAt = DateTime.UtcNow;
+
+            var rating = ratings.FirstOrDefault(r => r.ProfileId == profileId);
+            if (rating != null && (archive.RatedAt == null || rating.RatedAt >= archive.RatedAt))
+            {
+                archive.Rating = rating.Rating;
+                archive.RatedAt = rating.RatedAt;
+            }
+
+            var state = states.FirstOrDefault(s => s.ProfileId == profileId);
+            if (state != null && (!archive.HasState || archive.LastPlayedAt == null || state.LastPlayedAt >= archive.LastPlayedAt))
+            {
+                archive.HasState = true;
+                archive.ResumePositionSeconds = state.ResumePositionSeconds;
+                archive.IsPlayed = state.IsPlayed;
+                archive.IsHiddenFromContinueWatching = state.IsHiddenFromContinueWatching;
+                archive.LastPlayedAt = state.LastPlayedAt;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    private async Task RestoreUserDataForItemAsync(Guid id)
+    {
+        if (!await _context.PreservedUserMediaData.AnyAsync()) return;
+
+        var contentKey = await GetContentKeyAsync(id);
+        if (contentKey == null) return;
+
+        var archives = await _context.PreservedUserMediaData.Where(p => p.ContentKey == contentKey).ToListAsync();
+        if (archives.Count == 0) return;
+
+        var profileIds = archives.Select(p => p.ProfileId).ToList();
+        var existingRatings = await _context.UserMediaRatings
+            .Where(r => r.MediaItemId == id && profileIds.Contains(r.ProfileId)).ToListAsync();
+        var existingStates = await _context.UserMediaStates
+            .Where(s => s.MediaItemId == id && profileIds.Contains(s.ProfileId)).ToListAsync();
+
+        foreach (var archive in archives)
+        {
+            if (archive.Rating.HasValue)
+            {
+                var rating = existingRatings.FirstOrDefault(r => r.ProfileId == archive.ProfileId);
+                if (rating == null)
+                {
+                    _context.UserMediaRatings.Add(new UserMediaRating
+                    {
+                        ProfileId = archive.ProfileId,
+                        MediaItemId = id,
+                        Rating = archive.Rating.Value,
+                        RatedAt = archive.RatedAt ?? DateTime.UtcNow
+                    });
+                }
+                else if (archive.RatedAt.HasValue && archive.RatedAt > rating.RatedAt)
+                {
+                    rating.Rating = archive.Rating.Value;
+                    rating.RatedAt = archive.RatedAt.Value;
+                }
+            }
+
+            if (archive.HasState)
+            {
+                var state = existingStates.FirstOrDefault(s => s.ProfileId == archive.ProfileId);
+                if (state == null)
+                {
+                    _context.UserMediaStates.Add(new UserMediaState
+                    {
+                        ProfileId = archive.ProfileId,
+                        MediaItemId = id,
+                        ResumePositionSeconds = archive.ResumePositionSeconds,
+                        IsPlayed = archive.IsPlayed,
+                        IsHiddenFromContinueWatching = archive.IsHiddenFromContinueWatching,
+                        LastPlayedAt = archive.LastPlayedAt ?? DateTime.UtcNow
+                    });
+                }
+                else if (archive.LastPlayedAt.HasValue && archive.LastPlayedAt > state.LastPlayedAt)
+                {
+                    state.ResumePositionSeconds = archive.ResumePositionSeconds;
+                    state.IsPlayed = archive.IsPlayed;
+                    state.IsHiddenFromContinueWatching = archive.IsHiddenFromContinueWatching;
+                    state.LastPlayedAt = archive.LastPlayedAt.Value;
+                }
+            }
+
+            _context.PreservedUserMediaData.Remove(archive);
+        }
+
+        await _context.SaveChangesAsync();
     }
 
     public async Task AddMediaPartAsync(MediaPart part)
