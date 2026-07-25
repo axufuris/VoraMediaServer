@@ -20,6 +20,7 @@ public class PosterOverlayManager : IPosterOverlayManager
     private readonly IOverlayTemplateRepository _templateRepo;
     private readonly IEnumerable<IOverlayProvider> _providers;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ITaskProgressReporter _progress;
     private readonly ILogger<PosterOverlayManager> _logger;
     private readonly string _overlayDirectory;
     private readonly string _originalArtworkCacheDir;
@@ -30,12 +31,14 @@ public class PosterOverlayManager : IPosterOverlayManager
         IEnumerable<IOverlayProvider> providers,
         IOptions<StoragePathsOptions> storagePaths,
         IHttpClientFactory httpClientFactory,
+        ITaskProgressReporter progress,
         ILogger<PosterOverlayManager> logger)
     {
         _mediaRepo = mediaRepo;
         _templateRepo = templateRepo;
         _providers = providers;
         _httpClientFactory = httpClientFactory;
+        _progress = progress;
         _logger = logger;
 
         var configPath = storagePaths.Value.CustomArtwork;
@@ -75,8 +78,11 @@ public class PosterOverlayManager : IPosterOverlayManager
 
         var itemsToProcess = await _mediaRepo.GetItemsPendingOverlayGenerationAsync(libraryId, templates.Select(t => t.UpdatedAt).Max());
 
-        foreach (var item in itemsToProcess)
+        for (int i = 0; i < itemsToProcess.Count; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            var item = itemsToProcess[i];
+            _progress.Report($"Overlaying {item.Title} ({i + 1}/{itemsToProcess.Count})");
             try
             {
                 await ProcessSingleItemAsync(item, templates, activeProvider, cancellationToken);

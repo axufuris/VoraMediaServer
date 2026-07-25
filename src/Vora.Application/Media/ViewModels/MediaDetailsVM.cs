@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using Vora.Application.Actors.ViewModels;
 using Vora.Application.Media.ViewModels;
 using Vora.Domain.Entities.Media;
+using Vora.Domain.Enums;
 
 namespace Vora.Application.Media;
 
@@ -42,6 +43,7 @@ public class MediaDetailsVM
     public List<SeasonVM> Seasons { get; set; } = new();
     public List<CastMemberVM> Cast { get; set; } = new();
     public List<MediaVideoVM> Videos { get; set; } = new();
+    public List<MediaExtraVM> Extras { get; set; } = new();
     public List<MediaDetailsPartVM> MediaParts { get; set; } = new();
     public List<string> Genres { get; set; } = new();
     public List<MediaMarkerVM> Markers { get; set; } = new();
@@ -104,6 +106,16 @@ public class MediaDetailsVM
                     Site = v.Site,
                     Type = v.Type,
                     IsOfficial = v.IsOfficial
+                }).ToList(),
+            Extras = item.Extras
+                .OrderBy(e => e.ExtraType)
+                .ThenBy(e => e.Title)
+                .Select(e => new MediaExtraVM
+                {
+                    Id = e.Id,
+                    Title = e.Title,
+                    ExtraType = e.ExtraType,
+                    Container = e.Parts.Select(p => p.Container).FirstOrDefault()
                 }).ToList(),
             NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count : (int?)null,
             SeasonNumber = item is Season ? ((Season)item).SeasonNumber :

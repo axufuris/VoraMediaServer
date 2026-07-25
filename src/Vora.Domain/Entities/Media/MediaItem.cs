@@ -61,6 +61,7 @@ public abstract class MediaItem : LockableEntity
     public virtual ICollection<MediaPart> MediaParts { get; set; } = new List<MediaPart>();
     public virtual ICollection<MediaArtwork> Artwork { get; set; } = new List<MediaArtwork>();
     public virtual ICollection<MediaVideo> Videos { get; set; } = new List<MediaVideo>();
+    public virtual ICollection<MediaExtra> Extras { get; set; } = new List<MediaExtra>();
     public virtual ICollection<MediaCastMember> Cast { get; set; } = new List<MediaCastMember>();
     public virtual ICollection<Genre> Genres { get; set; } = new List<Genre>();
     public virtual ICollection<Company> ProductionCompanies { get; set; } = new List<Company>();

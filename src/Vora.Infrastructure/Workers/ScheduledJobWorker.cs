@@ -165,7 +165,7 @@ public class ScheduledJobWorker : BackgroundService
                 var libraries = await libraryManager.GetLibrariesAsync(true, new List<Guid>());
                 foreach (var lib in libraries)
                 {
-                    taskQueue.QueueGenerateLibraryPosterOverlays(lib.Id);
+                    taskQueue.QueueGenerateLibraryPosterOverlays(lib.Id, lib.Name);
                 }
             }
 

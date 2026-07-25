@@ -6,6 +6,7 @@ export interface MediaLibrary {
     type: string;
     folderPaths: string[];
     scanner: string;
+    scannerRegex?: string;
     findExtras: boolean;
     onlyShowTrailers: boolean;
     enableVideoPreviewThumbnails: boolean;

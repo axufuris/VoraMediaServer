@@ -5,6 +5,7 @@ public class QueuedTaskDto
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public string Status { get; set; } = "Pending";
+    public string? Progress { get; set; }
     public Func<CancellationToken, IServiceProvider, Task> WorkItem { get; set; } = null!;
 
     // Optional: resolves a friendly display name at run time (e.g. look up a

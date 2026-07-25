@@ -222,7 +222,7 @@ export default function GlobalVideoPlayer() {
 
     useEffect(() => {
         if (currentMedia?.id) {
-            if (currentMedia.playbackContextType !== 'LiveTv' && currentMedia.playbackContextType !== 'Dvr') {
+            if (currentMedia.playbackContextType !== 'LiveTv' && currentMedia.playbackContextType !== 'Dvr' && !currentMedia.isExtra) {
                 mediaService.getMediaItem(currentMedia.id, serverId).then(setMediaDetails).catch(console.error);
                 mediaService.getUpNext(currentMedia.id, currentMedia.playbackContextType, currentMedia.playbackContextId, serverId)
                     .then(setUpNextData)

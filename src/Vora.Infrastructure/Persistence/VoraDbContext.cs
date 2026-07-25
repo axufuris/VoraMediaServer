@@ -52,6 +52,7 @@ public class VoraDbContext : DbContext
     public DbSet<MediaSubtitleTrack> MediaSubtitleTracks { get; set; }
     public DbSet<MediaArtwork> MediaArtwork { get; set; }
     public DbSet<MediaVideo> MediaVideos { get; set; }
+    public DbSet<MediaExtra> MediaExtras { get; set; }
     public DbSet<MediaItemAnalysis> MediaItemAnalysis { get; set; }
     public DbSet<MediaItemMarker> MediaItemMarkers { get; set; }
     public DbSet<Genre> Genres { get; set; }
@@ -158,6 +159,7 @@ public class VoraDbContext : DbContext
         ConfigureMediaParts(modelBuilder);
         ConfigureMediaArtwork(modelBuilder);
         ConfigureMediaVideo(modelBuilder);
+        ConfigureMediaExtra(modelBuilder);
         ConfigureMediaItemAnalysis(modelBuilder);
         ConfigureMediaItemMarkers(modelBuilder);
         ConfigureMediaItemRelationships(modelBuilder, converters);
@@ -483,6 +485,32 @@ public class VoraDbContext : DbContext
         });
     }
 
+    private static void ConfigureMediaExtra(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<MediaExtra>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.ExtraType)
+                  .HasConversion<string>()
+                  .HasMaxLength(32)
+                  .IsRequired();
+
+            entity.HasOne(e => e.MediaItem)
+                  .WithMany(m => m.Extras)
+                  .HasForeignKey(e => e.MediaItemId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.Parts)
+                  .WithOne(p => p.MediaExtra)
+                  .HasForeignKey(p => p.MediaExtraId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.MediaItemId);
+        });
+    }
+
     private static void ConfigureMediaItemAnalysis(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<MediaItemAnalysis>(entity =>
@@ -522,6 +550,7 @@ public class VoraDbContext : DbContext
             .HasMany(m => m.MediaParts)
             .WithOne(p => p.MediaItem)
             .HasForeignKey(p => p.MediaItemId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<MediaItem>()

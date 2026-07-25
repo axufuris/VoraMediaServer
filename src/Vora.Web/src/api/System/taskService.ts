@@ -4,6 +4,7 @@ export interface BackgroundTask {
     id: string;
     name: string;
     status: string;
+    progress?: string | null;
 }
 
 export const taskService = {

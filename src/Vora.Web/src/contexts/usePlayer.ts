@@ -35,6 +35,10 @@ export interface PlayableMedia {
     bandwidthKbps?: number;
     playbackContextType?: string;
     playbackContextId?: string;
+    // True when playing a local movie "extra" (trailer/featurette). Suppresses
+    // media-detail track fetches and up-next, and keeps ping from writing
+    // watch progress onto the parent movie.
+    isExtra?: boolean;
     commercialMarkers?: { start: number, end: number }[];
     skipMarkers?: MediaMarker[];
 }

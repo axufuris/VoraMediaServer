@@ -232,10 +232,13 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             return;
         }
 
+        bool detectIntro = true, detectCredits = true;
         if (!forceOverride)
         {
-            var isDetectionEnabled = await _mediaRepository.GetProjectedAsync(mediaItemId, m => m.Library.EnableIntroDetection);
-            if (!isDetectionEnabled) return;
+            var flags = await _mediaRepository.GetProjectedAsync(mediaItemId, m => new { m.Library.EnableIntroDetection, m.Library.EnableCreditsDetection });
+            detectIntro = flags?.EnableIntroDetection ?? false;
+            detectCredits = flags?.EnableCreditsDetection ?? false;
+            if (!detectIntro && !detectCredits) return;
         }
 
         var filePaths = await _mediaRepository.GetMediaFilePathsAsync(mediaItemId);
@@ -274,7 +277,9 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             BlackIntervals = detection.BlackIntervals,
             ExpectsMidCreditsStinger = midStinger,
             ExpectsPostCreditsStinger = postStinger,
-            IsEpisode = isEpisode
+            IsEpisode = isEpisode,
+            DetectIntro = detectIntro,
+            DetectCredits = detectCredits
         });
 
         var markers = assembled.Select(m => new MediaItemMarker

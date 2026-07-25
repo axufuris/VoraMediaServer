@@ -290,6 +290,9 @@ public class MediaDedupeManager : IMediaDedupeManager
         else if (res.Contains("720")) score += settings.ScoreResolution720;
         else score += settings.ScoreResolutionOther;
 
+        var (sourceLabel, sourceScore) = DetectSource(part.FilePath, settings);
+        score += sourceScore;
+
         var codec = video?.Codec?.ToLowerInvariant() ?? string.Empty;
         if (codec.Contains("av1")) score += settings.ScoreCodecAv1;
         else if (codec.Contains("hevc") || codec.Contains("h265") || codec.Contains("x265")) score += settings.ScoreCodecHevc;
@@ -332,12 +335,31 @@ public class MediaDedupeManager : IMediaDedupeManager
             FileName = Path.GetFileName(part.FilePath),
             FileSizeBytes = part.FileSizeBytes ?? 0,
             VideoCodec = codec.ToUpperInvariant(),
+            Source = sourceLabel,
             HdrFormat = string.IsNullOrWhiteSpace(hdr) ? "SDR" : hdr.ToUpperInvariant(),
             AudioTracks = audioDescriptions,
             QualityScore = score,
             Container = part.Container?.ToUpperInvariant() ?? "UNKNOWN",
             Bitrate = part.OverallBitrate
         };
+    }
+
+    private static (string? Label, int Score) DetectSource(string filePath, MediaDedupeSettings settings)
+    {
+        var name = Path.GetFileName(filePath)?.ToLowerInvariant() ?? string.Empty;
+        if (name.Length == 0) return (null, 0);
+
+        if (name.Contains("remux")) return ("REMUX", settings.ScoreSourceRemux);
+        if (name.Contains("bluray") || name.Contains("blu-ray") || name.Contains("bdrip") || name.Contains("brrip"))
+            return ("BLURAY", settings.ScoreSourceBluRay);
+        if (name.Contains("webrip") || name.Contains("web-rip") || name.Contains("web.rip"))
+            return ("WEBRIP", settings.ScoreSourceWebRip);
+        if (name.Contains("web-dl") || name.Contains("webdl") || name.Contains("web.dl") || name.Contains("web "))
+            return ("WEB-DL", settings.ScoreSourceWebDl);
+        if (name.Contains("hdtv") || name.Contains("pdtv")) return ("HDTV", settings.ScoreSourceHdtv);
+        if (name.Contains("dvdrip") || name.Contains("dvd")) return ("DVD", settings.ScoreSourceDvd);
+
+        return (null, 0);
     }
 
     private DedupeItemVM MapAndScoreAudioPart(MediaPart part, Track track, MediaDedupeSettings settings)
@@ -495,6 +517,12 @@ public class MediaDedupeManager : IMediaDedupeManager
             ScoreResolution1080 = entity.ScoreResolution1080,
             ScoreResolution720 = entity.ScoreResolution720,
             ScoreResolutionOther = entity.ScoreResolutionOther,
+            ScoreSourceRemux = entity.ScoreSourceRemux,
+            ScoreSourceBluRay = entity.ScoreSourceBluRay,
+            ScoreSourceWebDl = entity.ScoreSourceWebDl,
+            ScoreSourceWebRip = entity.ScoreSourceWebRip,
+            ScoreSourceHdtv = entity.ScoreSourceHdtv,
+            ScoreSourceDvd = entity.ScoreSourceDvd,
             ScoreCodecAv1 = entity.ScoreCodecAv1,
             ScoreCodecHevc = entity.ScoreCodecHevc,
             ScoreCodecVp9 = entity.ScoreCodecVp9,
@@ -529,6 +557,12 @@ public class MediaDedupeManager : IMediaDedupeManager
             ScoreResolution1080 = vm.ScoreResolution1080,
             ScoreResolution720 = vm.ScoreResolution720,
             ScoreResolutionOther = vm.ScoreResolutionOther,
+            ScoreSourceRemux = vm.ScoreSourceRemux,
+            ScoreSourceBluRay = vm.ScoreSourceBluRay,
+            ScoreSourceWebDl = vm.ScoreSourceWebDl,
+            ScoreSourceWebRip = vm.ScoreSourceWebRip,
+            ScoreSourceHdtv = vm.ScoreSourceHdtv,
+            ScoreSourceDvd = vm.ScoreSourceDvd,
             ScoreCodecAv1 = vm.ScoreCodecAv1,
             ScoreCodecHevc = vm.ScoreCodecHevc,
             ScoreCodecVp9 = vm.ScoreCodecVp9,

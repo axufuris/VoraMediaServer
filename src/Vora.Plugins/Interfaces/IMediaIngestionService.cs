@@ -7,6 +7,8 @@ public interface IMediaIngestionService
     Task<(List<string> FolderPaths, string? ScannerRegex)> GetLibraryDetailsAsync(LibraryHandle library);
     Task<LibraryHandle?> GetLibraryForMediaAsync(MediaItemHandle item);
     Task<HashSet<string>> GetExistingLibraryPathsAsync(LibraryHandle library);
+    Task<List<string>> GetLibraryItemFilePathsAsync(LibraryHandle library);
+    Task RemoveMediaItemByPathAsync(string filePath);
     Task<List<string>> GetMediaFilePathsAsync(MediaItemHandle item);
 
     Task<MediaItemHandle> EnsureMovieAsync(LibraryHandle library, string title, int? year, string? tmdbId, string? imdbId, string? tvdbId = null, string? edition = null);
@@ -27,4 +29,7 @@ public interface IMediaIngestionService
     Task<MediaItemHandle> EnsureTrackAsync(LibraryHandle library, AlbumHandle album, string title, int trackNumber, int? discNumber, int? durationSeconds, string? audioCodec, int? sampleRate, int? bitrate, string? contentRating, string? trackArtist = null);
 
     Task AddMediaPartAsync(MediaItemHandle item, string filePath, string? resolution);
+
+    Task AttachLocalExtraAsync(LibraryHandle library, string parentTitle, int? parentYear, string filePath, string extraType, string title);
+    Task AttachTvShowLocalExtraAsync(LibraryHandle library, string showTitle, string filePath, string extraType, string title);
 }

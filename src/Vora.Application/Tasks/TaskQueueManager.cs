@@ -12,6 +12,7 @@ using Vora.Application.Posters;
 using Vora.Application.Recommendations;
 using Vora.Application.Tasks.Dtos;
 using Vora.Application.Tasks.ViewModels;
+using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Tasks;
 
@@ -45,10 +46,11 @@ public interface ITaskQueueManager
     Func<IServiceProvider, Task<string?>>? GetTaskNameResolver(Guid taskId);
     IAsyncEnumerable<QueuedTaskDto> DequeueAsync(CancellationToken cancellationToken);
     void MarkTaskAsRunning(Guid taskId);
+    void ReportProgress(string? detail);
     void RemoveTask(Guid taskId);
     IEnumerable<QueuedTaskVM> GetAllTasks();
     void QueueGenerateAiEmbeddings();
-    void QueueGenerateLibraryPosterOverlays(Guid libraryId);
+    void QueueGenerateLibraryPosterOverlays(Guid libraryId, string? libraryName = null);
     void QueueIptvEpgSync();
     void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false);
     void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
@@ -58,11 +60,15 @@ public class TaskQueueManager : ITaskQueueManager
 {
     private const int AiEmbeddingsBatchSize = 100;
     private const string RunningStatus = "Running";
+    private static readonly TimeSpan ProgressNotifyInterval = TimeSpan.FromMilliseconds(500);
 
     private readonly IClientNotifier _notifier;
     private readonly Channel<QueuedTaskDto> _queue = Channel.CreateUnbounded<QueuedTaskDto>();
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _taskTokens = new();
     private readonly ConcurrentDictionary<Guid, QueuedTaskDto> _taskStates = new();
+
+    private Guid? _runningTaskId;
+    private DateTime _lastProgressNotifyUtc = DateTime.MinValue;
 
     public TaskQueueManager(IClientNotifier notifier)
     {
@@ -383,6 +389,23 @@ public class TaskQueueManager : ITaskQueueManager
         if (_taskStates.TryGetValue(taskId, out var state))
         {
             state.Status = RunningStatus;
+            _runningTaskId = taskId;
+            _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
+        }
+    }
+
+    public void ReportProgress(string? detail)
+    {
+        var taskId = _runningTaskId;
+        if (taskId == null || !_taskStates.TryGetValue(taskId.Value, out var state)) return;
+        if (state.Progress == detail) return;
+
+        state.Progress = detail;
+
+        var now = DateTime.UtcNow;
+        if (detail == null || now - _lastProgressNotifyUtc >= ProgressNotifyInterval)
+        {
+            _lastProgressNotifyUtc = now;
             _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
         }
     }
@@ -413,6 +436,7 @@ public class TaskQueueManager : ITaskQueueManager
 
     public void RemoveTask(Guid taskId)
     {
+        if (_runningTaskId == taskId) _runningTaskId = null;
         if (_taskTokens.TryRemove(taskId, out var cts)) cts.Dispose();
         if (_taskStates.TryRemove(taskId, out _))
         {
@@ -428,7 +452,8 @@ public class TaskQueueManager : ITaskQueueManager
             {
                 Id = t.Id,
                 Name = t.Name,
-                Status = t.Status
+                Status = t.Status,
+                Progress = t.Progress
             })
             .ToList();
     }
@@ -447,12 +472,16 @@ public class TaskQueueManager : ITaskQueueManager
         });
     }
 
-    public void QueueGenerateLibraryPosterOverlays(Guid libraryId)
+    public void QueueGenerateLibraryPosterOverlays(Guid libraryId, string? libraryName = null)
     {
-        EnqueueTask($"Generate Library Poster Overlays: {libraryId}", async (ct, sp) =>
+        var label = string.IsNullOrWhiteSpace(libraryName)
+            ? "Generate Library Poster Overlays"
+            : $"Generate Library Poster Overlays: {libraryName}";
+
+        EnqueueTask(label, async (ct, sp) =>
         {
             var manager = sp.GetRequiredService<IPosterOverlayManager>();
-            await manager.RunLibraryOverlaySyncAsync(libraryId);
+            await manager.RunLibraryOverlaySyncAsync(libraryId, ct);
         }, LibraryLabel(libraryId, "Generate Library Poster Overlays: {0}"));
     }
 
@@ -493,29 +522,40 @@ public class TaskQueueManager : ITaskQueueManager
         var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
         var libraryManager = sp.GetRequiredService<ILibraryManager>();
         var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
+        var progress = sp.GetRequiredService<ITaskProgressReporter>();
 
         // The individual trigger methods don't yet take a token, so honour
         // cancellation between the (long) steps — a cancel stops the workflow
         // at the next boundary instead of running to completion.
         ct.ThrowIfCancellationRequested();
+        progress.Report("Scanning files…");
         await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId);
         ct.ThrowIfCancellationRequested();
+        progress.Report("Analyzing media…");
         await analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName);
 
         ct.ThrowIfCancellationRequested();
+        progress.Report("Fetching metadata…");
         await metadataManager.TriggerLibraryMetadataRefreshAsync(libraryId, forceOverride: forceOverride);
         ct.ThrowIfCancellationRequested();
+        progress.Report("Fetching artwork…");
         await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, forceOverride: forceOverride);
         ct.ThrowIfCancellationRequested();
+        progress.Report("Fetching ratings…");
         await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, forceOverride: forceOverride);
         ct.ThrowIfCancellationRequested();
+        progress.Report("Refreshing actor metadata…");
         await metadataManager.TriggerActorMetadataRefreshAsync();
 
         ct.ThrowIfCancellationRequested();
+        progress.Report("Generating poster overlays…");
         await overlayManager.RunLibraryOverlaySyncAsync(libraryId);
 
         ct.ThrowIfCancellationRequested();
+        progress.Report("Detecting intro/credit markers…");
         await analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: isAdditionTrigger);
+
+        progress.Report(null);
     }
 
     private static string ResolveDisplayName(Guid id, string? name) =>

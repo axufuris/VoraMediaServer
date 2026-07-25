@@ -69,9 +69,11 @@ public class LibraryRepository : ILibraryRepository
 
         var validFolders = library.FolderPaths ?? new List<string>();
 
+        await CleanUpOrphanedExtrasAsync(libraryId, validFolders);
+
         var allParts = await _context.MediaParts
-            .Where(p => p.MediaItem.LibraryId == libraryId)
-            .Select(p => new { p.Id, p.FilePath, MediaItemId = p.MediaItem.Id })
+            .Where(p => p.MediaItem != null && p.MediaItem.LibraryId == libraryId)
+            .Select(p => new { p.Id, p.FilePath, p.MediaItemId })
             .ToListAsync();
 
         var orphanedPartIds = allParts
@@ -187,6 +189,33 @@ public class LibraryRepository : ILibraryRepository
         {
             await _context.Set<Artist>().Where(a => artistsToDelete.Contains(a.Id)).ExecuteDeleteAsync();
         }
+    }
+
+    private async Task CleanUpOrphanedExtrasAsync(Guid libraryId, List<string> validFolders)
+    {
+        var extraParts = await _context.MediaParts
+            .Where(p => p.MediaExtra != null && p.MediaExtra.MediaItem.LibraryId == libraryId)
+            .Select(p => new { p.Id, p.FilePath, p.MediaExtraId })
+            .ToListAsync();
+
+        var orphanedPartIds = extraParts
+            .Where(p => !validFolders.Any(f => p.FilePath.StartsWith(f, StringComparison.OrdinalIgnoreCase)))
+            .Select(p => p.Id)
+            .ToList();
+
+        if (!orphanedPartIds.Any()) return;
+
+        var affectedExtraIds = extraParts
+            .Where(p => orphanedPartIds.Contains(p.Id))
+            .Select(p => p.MediaExtraId)
+            .Distinct()
+            .ToList();
+
+        await _context.MediaParts.Where(p => orphanedPartIds.Contains(p.Id)).ExecuteDeleteAsync();
+
+        await _context.MediaExtras
+            .Where(e => affectedExtraIds.Contains(e.Id) && !_context.MediaParts.Any(p => p.MediaExtraId == e.Id))
+            .ExecuteDeleteAsync();
     }
 
     public async Task DeleteLibraryAsync(Guid id)

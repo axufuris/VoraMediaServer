@@ -20,6 +20,8 @@ public record StartStreamRequest(
     Guid? SubtitleTrackId,
     DeviceCapsDto? Capabilities);
 
+public record StartExtraStreamRequest(Guid ExtraId, double StartPosition, DeviceCapsDto? Capabilities);
+
 public record StreamPingRequest(double CurrentPosition, double Duration, bool IsPaused);
 
 public static class StreamingEndpoints
@@ -34,6 +36,10 @@ public static class StreamingEndpoints
 
         group.MapPost("/start", StartSessionAsync)
             .WithName("StartStream")
+            .Produces<StartStreamResponse>(StatusCodes.Status200OK)
+            .RequireAuthorization();
+        group.MapPost("/start-extra", StartExtraSessionAsync)
+            .WithName("StartExtraStream")
             .Produces<StartStreamResponse>(StatusCodes.Status200OK)
             .RequireAuthorization();
         group.MapPut("/sessions/{sessionId:guid}/ping", PingSessionAsync)
@@ -103,6 +109,51 @@ public static class StreamingEndpoints
         }
     }
 
+    private static async Task<IResult> StartExtraSessionAsync(
+        HttpContext context,
+        ClaimsPrincipal user,
+        IStreamManager streamManager,
+        [FromBody] StartExtraStreamRequest req)
+    {
+        try
+        {
+            var accountId = user.GetAccountId() ?? Guid.Empty;
+            var profileId = user.GetProfileId();
+
+            var deviceId = context.Request.Headers["X-Vora-Device-Id"].FirstOrDefault();
+            if (string.IsNullOrEmpty(deviceId))
+            {
+                return Results.BadRequest("Missing X-Vora-Device-Id header");
+            }
+
+            var result = await streamManager.StartExtraSessionAsync(req.ExtraId, deviceId, accountId, profileId, req.StartPosition, req.Capabilities);
+
+            return Results.Ok(new StartStreamResponse
+            {
+                SessionId = result.Session.Id,
+                StreamUrl = result.StreamUrl,
+                VideoTrackId = result.Session.VideoTrackId,
+                AudioTrackId = result.Session.AudioTrackId,
+                SubtitleTrackId = result.Session.SubtitleTrackId,
+                Strategy = result.Session.Strategy,
+                VideoStrategy = result.Session.VideoStrategy,
+                AudioStrategy = result.Session.AudioStrategy,
+                SubtitleStrategy = result.Session.SubtitleStrategy,
+                VideoCodec = result.Session.VideoCodec,
+                AudioCodec = result.Session.AudioCodec,
+                Container = result.Session.Container,
+                BandwidthKbps = result.Session.BandwidthKbps,
+                TargetAudioChannels = result.Session.TargetAudioChannels,
+                OutputResolution = result.Session.OutputResolution,
+                OutputHdrType = result.Session.OutputHdrType,
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(ex.Message);
+        }
+    }
+
     private static async Task<IResult> PingSessionAsync(Guid sessionId, IStreamManager streamManager, [FromBody] StreamPingRequest req)
     {
         await streamManager.PingSessionAsync(sessionId, req.CurrentPosition, req.Duration, req.IsPaused);
@@ -122,7 +173,7 @@ public static class StreamingEndpoints
         var session = await streamRepo.GetSessionAsync(sessionId);
         if (session != null)
         {
-            await transcodeService.StopTranscodeSessionAsync(session.MediaItemId);
+            await transcodeService.StopTranscodeSessionAsync(session.ExtraId ?? session.MediaItemId);
         }
         await streamManager.StopSessionAsync(sessionId);
         return Results.NoContent();
@@ -354,7 +405,7 @@ public static class StreamingEndpoints
 
     private static PlaybackDecisionVM BuildPlaybackDecision(Vora.Domain.Entities.Streaming.StreamSession session) => new()
     {
-        MediaItemId = session.MediaItemId,
+        MediaItemId = session.ExtraId ?? session.MediaItemId,
         Decision = Enum.TryParse<StreamingState>(session.Strategy, out var s) ? s : StreamingState.Transcode,
         TargetVideoCodec = string.Equals(session.VideoCodec, "hevc", StringComparison.OrdinalIgnoreCase) || string.Equals(session.VideoCodec, "h265", StringComparison.OrdinalIgnoreCase)
             ? VideoCodec.Hevc

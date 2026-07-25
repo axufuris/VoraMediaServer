@@ -490,6 +490,24 @@ export default function ManageLibrary() {
                         </div>
                     </div>
 
+                    <SectionHeading>Filename Scanner Regex</SectionHeading>
+                    <div className="space-y-2">
+                        <textarea
+                            value={library.scannerRegex ?? ''}
+                            onChange={e => handleChange('scannerRegex', e.target.value)}
+                            rows={3}
+                            spellCheck={false}
+                            placeholder="Leave blank to restore the default parser for this library type"
+                            className="vora-input w-full font-mono text-xs"
+                        />
+                        <p className="text-xs text-[var(--vora-text-muted)]">
+                            How the local scanner parses filenames. Named groups it reads —
+                            Movies: <span className="font-mono">Title</span>, <span className="font-mono">Year</span>, <span className="font-mono">Provider</span>, <span className="font-mono">ProviderId</span>;
+                            TV: <span className="font-mono">Season</span>, <span className="font-mono">Episode</span>, <span className="font-mono">AirDate</span>, <span className="font-mono">EpisodeTitle</span>.
+                            Leave blank to restore the default. Resolution and edition (including Radarr/Sonarr <span className="font-mono">{'{edition-...}'}</span> tags) are detected separately; audio/video codecs come from file analysis.
+                        </p>
+                    </div>
+
                     <SectionHeading>Options</SectionHeading>
                     <label className="flex items-center gap-3 cursor-pointer select-none bg-[var(--vora-info-soft)] border border-[var(--vora-info-500)]/30 p-3 rounded-[var(--vora-radius-md)] transition-colors hover:bg-[var(--vora-info-soft)]/70">
                         <input

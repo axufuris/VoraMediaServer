@@ -147,10 +147,8 @@ public class MetadataManagerTests
         var libId = Guid.NewGuid();
         var idA = Guid.NewGuid();
         var idB = Guid.NewGuid();
-        _media.GetAllProjectedAsync(
-            Arg.Any<System.Linq.Expressions.Expression<Func<Vora.Domain.Entities.Media.MediaItem, Guid>>>(),
-            libraryId: libId)
-            .Returns(new[] { idA, idB });
+        // Non-force ratings refresh targets only items still missing a rating.
+        _media.GetMediaIdsMissingRatingsAsync(libId).Returns(new[] { idA, idB });
         // GetForMetadataSyncAsync returns null for both → RefreshRatingsAsync no-ops
         _media.GetForMetadataSyncAsync(Arg.Any<Guid>()).Returns((Vora.Domain.Entities.Media.MediaItem?)null);
 

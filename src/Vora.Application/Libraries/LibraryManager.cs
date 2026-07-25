@@ -43,17 +43,9 @@ public class LibraryManager : ILibraryManager
 
     public async Task<Guid> CreateLibraryAsync(CreateLibraryRequest request)
     {
-        var regex = request.ScannerRegex;
-        if (string.IsNullOrWhiteSpace(regex))
-        {
-            regex = request.Type switch
-            {
-                LibraryType.Movie => @"^(?<Title>.*?(?=\s*\(\d{4}\)|\s*\{|\s*\[|$))(?:\s*\((?<Year>\d{4})\))?(?:\s*\{(?<Provider>imdb|tmdb)-(?<ProviderId>[^}]+)\})?",
-                LibraryType.TvShow => @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*(?<Absolute>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$",
-                LibraryType.Music => @"^(?<Artist>[^_]+)_(?<Album>[^_]+)_(?:(?<Disc>\d{1,2})-)?(?<Track>\d{1,3})_(?<TrackTitle>.+)",
-                _ => @"^(?<Title>.+)"
-            };
-        }
+        var regex = string.IsNullOrWhiteSpace(request.ScannerRegex)
+            ? DefaultScannerRegex(request.Type)
+            : request.ScannerRegex;
 
         var library = new MediaLibrary
         {
@@ -113,6 +105,14 @@ public class LibraryManager : ILibraryManager
         return library;
     }
 
+    private static string DefaultScannerRegex(LibraryType type) => type switch
+    {
+        LibraryType.Movie => @"^(?<Title>.*?(?=\s*\(\d{4}\)|\s*\{|\s*\[|$))(?:\s*\((?<Year>\d{4})\))?(?:\s*\{(?<Provider>imdb|tmdb|tvdb)-(?<ProviderId>[^}]+)\})?",
+        LibraryType.TvShow => @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*(?<Absolute>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$",
+        LibraryType.Music => @"^(?<Artist>[^_]+)_(?<Album>[^_]+)_(?:(?<Disc>\d{1,2})-)?(?<Track>\d{1,3})_(?<TrackTitle>.+)",
+        _ => @"^(?<Title>.+)"
+    };
+
     public async Task UpdateLibraryAsync(Guid id, UpdateLibraryRequest request)
     {
         var library = await _repository.GetForUpdateAsync(id);
@@ -149,6 +149,9 @@ public class LibraryManager : ILibraryManager
         library.ArtworkProviderId = request.ArtworkProviderId;
 
         library.EnableRealTimeWatching = request.EnableRealTimeWatching;
+        library.ScannerRegex = string.IsNullOrWhiteSpace(request.ScannerRegex)
+            ? DefaultScannerRegex(library.Type)
+            : request.ScannerRegex;
 
         await _repository.UpdateLibraryAsync(library);
 

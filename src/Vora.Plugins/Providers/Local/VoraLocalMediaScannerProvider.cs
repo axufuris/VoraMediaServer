@@ -9,8 +9,24 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 {
     private readonly ILogger<VoraLocalMediaScannerProvider> _logger;
     private readonly IMediaIngestionService _ingestionService;
+    private readonly ITaskProgressReporter _progress;
     private readonly string[] _supportedExtensions = { ".mkv", ".mp4", ".avi", ".m4v" };
     private readonly string[] _supportedAudioExtensions = { ".mp3", ".flac", ".m4a", ".ogg", ".opus", ".wav", ".aac", ".wma" };
+
+    private static readonly string[] ExtraFileSuffixes =
+    {
+        "-trailer", "-sample", "-featurette", "-featurettes", "-behindthescenes",
+        "-deleted", "-deletedscene", "-deletedscenes", "-interview", "-interviews",
+        "-scene", "-scenes", "-short", "-shorts", "-clip", "-clips", "-other",
+        "-extra", "-extras"
+    };
+
+    private static readonly HashSet<string> ExtraFolderNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "trailers", "extras", "featurettes", "behind the scenes", "behindthescenes",
+        "deleted scenes", "deletedscenes", "interviews", "scenes", "shorts",
+        "clips", "samples", "sample", "other"
+    };
 
     public string Id => "Vora_scanner";
     public string Name => "Vora Standard Scanner";
@@ -24,10 +40,12 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
     public VoraLocalMediaScannerProvider(
         ILogger<VoraLocalMediaScannerProvider> logger,
-        IMediaIngestionService ingestionService)
+        IMediaIngestionService ingestionService,
+        ITaskProgressReporter progress)
     {
         _logger = logger;
         _ingestionService = ingestionService;
+        _progress = progress;
     }
 
     public async Task ScanMovieLibraryAsync(Guid libraryId)
@@ -116,6 +134,19 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         await ProcessTvDirectoriesAsync(library.Value, directories, details.ScannerRegex);
     }
 
+    // Radarr/Sonarr write an explicit edition token, e.g. "{edition-Director's Cut}".
+    // Prefer that (it carries any edition text); fall back to the known-keyword list.
+    private static readonly Regex EditionTagRegex = new(@"\{edition-(?<Edition>[^}]+)\}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static string? ExtractEdition(string fileName, Regex editionKeywordRegex)
+    {
+        var tag = EditionTagRegex.Match(fileName);
+        if (tag.Success) return tag.Groups["Edition"].Value.Trim();
+
+        var keyword = editionKeywordRegex.Match(fileName);
+        return keyword.Success ? keyword.Value.Trim() : null;
+    }
+
     private (Regex titleRegex, Regex resolutionRegex, Regex editionRegex) BuildMovieRegexes(string? customRegex)
     {
         var regexPattern = customRegex ?? @"^(?<Title>.*?(?=\s*\(\d{4}\)|\s*\{|\s*\[|$))(?:\s*\((?<Year>\d{4})\))?(?:\s*\{(?<Provider>imdb|tmdb|tvdb)-(?<ProviderId>[^}]+)\})?";
@@ -129,13 +160,89 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
     {
         var (regex, resolutionRegex, editionRegex) = BuildMovieRegexes(customRegex);
 
-        var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
-        var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet);
+        await CleanupLegacyExtrasAsync(library);
 
-        foreach (var filePath in filesToProcess)
+        var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        var newFiles = GetNewFilesInDirectories(directories, existingPathsSet).ToList();
+        var movieFiles = newFiles.Where(f => !IsExtraFile(f)).ToList();
+        var extraFiles = newFiles.Where(IsExtraFile).ToList();
+
+        for (int i = 0; i < movieFiles.Count; i++)
         {
+            var filePath = movieFiles[i];
+            _progress.Report($"Scanning {Path.GetFileNameWithoutExtension(filePath)} ({i + 1}/{movieFiles.Count})");
             await IngestMovieFileAsync(library, filePath, regex, resolutionRegex, editionRegex);
         }
+
+        foreach (var extraPath in extraFiles)
+        {
+            await IngestMovieExtraAsync(library, extraPath, regex);
+        }
+    }
+
+    private async Task IngestMovieExtraAsync(LibraryHandle library, string extraPath, Regex titleRegex)
+    {
+        var rootFolder = GetMovieRootFolder(extraPath);
+        var folderName = Path.GetFileName(rootFolder);
+        if (string.IsNullOrEmpty(folderName)) return;
+
+        var match = titleRegex.Match(folderName);
+        string parentTitle = match.Success && match.Groups["Title"].Success ? match.Groups["Title"].Value.Trim() : folderName;
+        int? parentYear = match.Groups["Year"].Success && int.TryParse(match.Groups["Year"].Value, out int year) ? year : null;
+
+        var extraType = DetectExtraType(extraPath);
+        var title = BuildExtraTitle(extraPath, extraType);
+
+        await _ingestionService.AttachLocalExtraAsync(library, parentTitle, parentYear, extraPath, extraType, title);
+    }
+
+    private static string GetMovieRootFolder(string extraPath)
+    {
+        var dir = Path.GetDirectoryName(extraPath) ?? string.Empty;
+        var name = Path.GetFileName(dir);
+        if (!string.IsNullOrEmpty(name) && ExtraFolderNames.Contains(name))
+        {
+            dir = Path.GetDirectoryName(dir) ?? dir;
+        }
+        return dir;
+    }
+
+    private static string DetectExtraType(string filePath)
+    {
+        var name = Path.GetFileNameWithoutExtension(filePath).ToLowerInvariant();
+        var parent = Path.GetFileName(Path.GetDirectoryName(filePath) ?? string.Empty).ToLowerInvariant();
+
+        if (name.EndsWith("-trailer") || parent == "trailers") return "Trailer";
+        if (name.EndsWith("-featurette") || name.EndsWith("-featurettes") || parent == "featurettes") return "Featurette";
+        if (name.EndsWith("-behindthescenes") || parent == "behind the scenes" || parent == "behindthescenes") return "BehindTheScenes";
+        if (name.EndsWith("-deleted") || name.EndsWith("-deletedscene") || name.EndsWith("-deletedscenes") || parent == "deleted scenes" || parent == "deletedscenes") return "DeletedScene";
+        if (name.EndsWith("-interview") || name.EndsWith("-interviews") || parent == "interviews") return "Interview";
+        if (name.EndsWith("-scene") || name.EndsWith("-scenes") || parent == "scenes") return "Scene";
+        if (name.EndsWith("-short") || name.EndsWith("-shorts") || parent == "shorts") return "Short";
+        if (name.EndsWith("-clip") || name.EndsWith("-clips") || parent == "clips") return "Clip";
+        if (name == "sample" || name.EndsWith("-sample") || parent == "sample" || parent == "samples") return "Sample";
+        return "Other";
+    }
+
+    private static string BuildExtraTitle(string extraPath, string extraType)
+    {
+        var fileName = Path.GetFileNameWithoutExtension(extraPath);
+        var parentName = Path.GetFileName(Path.GetDirectoryName(extraPath) ?? string.Empty);
+
+        if (!string.IsNullOrEmpty(parentName) && ExtraFolderNames.Contains(parentName))
+        {
+            return fileName;
+        }
+
+        var lower = fileName.ToLowerInvariant();
+        var matched = ExtraFileSuffixes.FirstOrDefault(s => lower.EndsWith(s, StringComparison.Ordinal));
+        if (matched != null)
+        {
+            var trimmed = fileName[..^matched.Length].TrimEnd(' ', '-', '.');
+            return string.IsNullOrWhiteSpace(trimmed) ? extraType : trimmed;
+        }
+
+        return fileName;
     }
 
     private async Task<Guid> IngestMovieFileAsync(LibraryHandle library, string filePath, Regex regex, Regex resolutionRegex, Regex editionRegex)
@@ -159,8 +266,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var resMatch = resolutionRegex.Match(fileName);
         string? resolution = resMatch.Success ? resMatch.Groups["Resolution"].Value.ToLower() : null;
 
-        var edMatch = editionRegex.Match(fileName);
-        string? edition = edMatch.Success ? edMatch.Value.Trim() : null;
+        string? edition = ExtractEdition(fileName, editionRegex);
 
         string? tmdbId = provider == "tmdb" ? providerId : null;
         string? imdbId = provider == "imdb" ? providerId : null;
@@ -185,13 +291,56 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
     {
         var (episodeRegex, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(customRegex);
 
-        var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
-        var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet);
+        await CleanupLegacyExtrasAsync(library);
 
-        foreach (var filePath in filesToProcess)
+        var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        var newFiles = GetNewFilesInDirectories(directories, existingPathsSet).ToList();
+        var episodeFiles = newFiles.Where(f => !IsExtraFile(f)).ToList();
+        var extraFiles = newFiles.Where(IsExtraFile).ToList();
+
+        for (int i = 0; i < episodeFiles.Count; i++)
         {
+            var filePath = episodeFiles[i];
+            _progress.Report($"Scanning {Path.GetFileNameWithoutExtension(filePath)} ({i + 1}/{episodeFiles.Count})");
             await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
         }
+
+        foreach (var extraPath in extraFiles)
+        {
+            await IngestTvExtraAsync(library, extraPath, showFolderRegex);
+        }
+    }
+
+    private async Task IngestTvExtraAsync(LibraryHandle library, string extraPath, Regex showFolderRegex)
+    {
+        var showFolder = GetTvShowFolderName(extraPath);
+        if (string.IsNullOrEmpty(showFolder)) return;
+
+        var match = showFolderRegex.Match(showFolder);
+        string showTitle = match.Success && match.Groups["SeriesTitle"].Success ? match.Groups["SeriesTitle"].Value.Trim() : showFolder;
+
+        var extraType = DetectExtraType(extraPath);
+        var title = BuildExtraTitle(extraPath, extraType);
+
+        await _ingestionService.AttachTvShowLocalExtraAsync(library, showTitle, extraPath, extraType, title);
+    }
+
+    private static string GetTvShowFolderName(string extraPath)
+    {
+        var dir = Path.GetDirectoryName(extraPath);
+        while (!string.IsNullOrEmpty(dir))
+        {
+            var name = Path.GetFileName(dir);
+            if (!string.IsNullOrEmpty(name)
+                && !ExtraFolderNames.Contains(name)
+                && !name.StartsWith("Season", StringComparison.OrdinalIgnoreCase)
+                && !name.StartsWith("Specials", StringComparison.OrdinalIgnoreCase))
+            {
+                return name;
+            }
+            dir = Path.GetDirectoryName(dir);
+        }
+        return string.Empty;
     }
 
     private async Task<ScanFileResult> IngestTvFileAsync(LibraryHandle library, string filePath, Regex episodeRegex, Regex showFolderRegex, Regex resolutionRegex, Regex editionRegex)
@@ -233,8 +382,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var resMatch = resolutionRegex.Match(fileName);
         string? resolution = resMatch.Success ? resMatch.Groups["Resolution"].Value.ToLower() : null;
 
-        var edMatch = editionRegex.Match(fileName);
-        string? edition = edMatch.Success ? edMatch.Value.Trim() : null;
+        string? edition = ExtractEdition(fileName, editionRegex);
 
         string? tmdbId = provider == "tmdb" ? providerId : null;
         string? imdbId = provider == "imdb" ? providerId : null;
@@ -268,6 +416,13 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
         var (regex, resolutionRegex, editionRegex) = BuildMovieRegexes(details.ScannerRegex);
+
+        if (IsExtraFile(filePath))
+        {
+            await IngestMovieExtraAsync(library, filePath, regex);
+            return null;
+        }
+
         return await IngestMovieFileAsync(library, filePath, regex, resolutionRegex, editionRegex);
     }
 
@@ -281,7 +436,45 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
         var (episodeRegex, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(details.ScannerRegex);
+
+        if (IsExtraFile(filePath))
+        {
+            await IngestTvExtraAsync(library, filePath, showFolderRegex);
+            return ScanFileResult.None;
+        }
+
         return await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
+    }
+
+    // Files ingested as standalone media items before extras existed (e.g. a
+    // "Movie-trailer.mkv" that became a Movie) still linger as items and show up
+    // in the library and search. Delete those items here; because the file is
+    // then no longer "existing", the same scan re-ingests it as a proper extra
+    // attached to its parent.
+    private async Task CleanupLegacyExtrasAsync(LibraryHandle library)
+    {
+        var itemPaths = await _ingestionService.GetLibraryItemFilePathsAsync(library) ?? new List<string>();
+        foreach (var path in itemPaths.Where(IsExtraFile))
+        {
+            await _ingestionService.RemoveMediaItemByPathAsync(path);
+        }
+    }
+
+    private static bool IsExtraFile(string filePath)
+    {
+        var fileName = Path.GetFileNameWithoutExtension(filePath);
+        if (!string.IsNullOrEmpty(fileName))
+        {
+            var lower = fileName.ToLowerInvariant();
+            if (lower == "sample" || lower.EndsWith(".sample", StringComparison.Ordinal)) return true;
+            foreach (var suffix in ExtraFileSuffixes)
+            {
+                if (lower.EndsWith(suffix, StringComparison.Ordinal)) return true;
+            }
+        }
+
+        var parent = Path.GetFileName(Path.GetDirectoryName(filePath) ?? string.Empty);
+        return !string.IsNullOrEmpty(parent) && ExtraFolderNames.Contains(parent);
     }
 
     private IEnumerable<string> GetNewFilesInDirectories(IEnumerable<string> directories, HashSet<string> existingPaths)
@@ -311,8 +504,10 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         if (filesToProcess.Count == 0) return;
 
         var parsed = new List<MusicFileMeta>();
-        foreach (var filePath in filesToProcess)
+        for (int i = 0; i < filesToProcess.Count; i++)
         {
+            var filePath = filesToProcess[i];
+            _progress.Report($"Scanning {Path.GetFileNameWithoutExtension(filePath)} ({i + 1}/{filesToProcess.Count})");
             try
             {
                 using var tagFile = TagLib.File.Create(filePath);

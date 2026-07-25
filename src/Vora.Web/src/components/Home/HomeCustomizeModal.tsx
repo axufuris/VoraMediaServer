@@ -22,12 +22,20 @@ export default function HomeCustomizeModal({ isOpen, onClose, activeLists, saved
     useEffect(() => {
         if (isOpen) {
             const timeoutId = window.setTimeout(() => {
-                const combined = activeLists.map((list, index) => {
-                    const existing = savedLayout.find(l => l.listId === list.id);
-                    if (existing) return { ...existing };
-                    return { listId: list.id, isEnabled: true, orderIndex: index };
+                const prefById = new Map(savedLayout.map(p => [p.listId, p]));
+                const withPref = activeLists
+                    .filter(l => prefById.has(l.id))
+                    .sort((a, b) => {
+                        const pa = prefById.get(a.id);
+                        const pb = prefById.get(b.id);
+                        return (pa ? pa.orderIndex : 0) - (pb ? pb.orderIndex : 0);
+                    });
+                const withoutPref = activeLists.filter(l => !prefById.has(l.id));
+
+                const combined = [...withPref, ...withoutPref].map((list, index) => {
+                    const existing = prefById.get(list.id);
+                    return { listId: list.id, isEnabled: existing ? existing.isEnabled : true, orderIndex: index };
                 });
-                combined.sort((a, b) => a.orderIndex - b.orderIndex);
                 setWorkingLayout(combined);
             }, 0);
             return () => window.clearTimeout(timeoutId);

@@ -20,6 +20,13 @@ public class MediaDedupeSettings
     public int ScoreResolution720 { get; set; } = 1000;
     public int ScoreResolutionOther { get; set; } = 500;
 
+    public int ScoreSourceRemux { get; set; } = 900;
+    public int ScoreSourceBluRay { get; set; } = 600;
+    public int ScoreSourceWebDl { get; set; } = 400;
+    public int ScoreSourceWebRip { get; set; } = 250;
+    public int ScoreSourceHdtv { get; set; } = 100;
+    public int ScoreSourceDvd { get; set; } = 50;
+
     public int ScoreCodecAv1 { get; set; } = 800;
     public int ScoreCodecHevc { get; set; } = 600;
     public int ScoreCodecVp9 { get; set; } = 400;

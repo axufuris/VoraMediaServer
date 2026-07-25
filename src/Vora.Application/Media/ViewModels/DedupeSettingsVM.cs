@@ -15,6 +15,13 @@ public class DedupeSettingsVM
     public int ScoreResolution720 { get; set; }
     public int ScoreResolutionOther { get; set; }
 
+    public int ScoreSourceRemux { get; set; }
+    public int ScoreSourceBluRay { get; set; }
+    public int ScoreSourceWebDl { get; set; }
+    public int ScoreSourceWebRip { get; set; }
+    public int ScoreSourceHdtv { get; set; }
+    public int ScoreSourceDvd { get; set; }
+
     public int ScoreCodecAv1 { get; set; }
     public int ScoreCodecHevc { get; set; }
     public int ScoreCodecVp9 { get; set; }

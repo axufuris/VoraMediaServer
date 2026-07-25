@@ -313,18 +313,34 @@ function LibraryToolbar({
     );
 }
 
-function AsyncLibraryProviderBlock({ providerId, libraryId, serverId }: { providerId: string, libraryId: string, serverId?: string }) {
-    const [lists, setLists] = useState<RecommendationListVM[]>([]);
-    const [loading, setLoading] = useState(true);
+function RecommendationsPanel({ providers, libraryId, serverId }: { providers: string[], libraryId: string, serverId?: string }) {
+    const [results, setResults] = useState<Record<string, RecommendationListVM[]>>({});
+    const [loaded, setLoaded] = useState(false);
+
+    const orderedProviders = [...providers].sort((a, b) => {
+        if (a === 'openai_recommendations') return -1;
+        if (b === 'openai_recommendations') return 1;
+        return 0;
+    });
 
     useEffect(() => {
-        recommendationService.getLibraryRecommendations(libraryId, providerId, serverId)
-            .then(setLists)
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    }, [providerId, libraryId, serverId]);
+        let cancelled = false;
+        setLoaded(false);
+        Promise.all(providers.map(providerId =>
+            recommendationService.getLibraryRecommendations(libraryId, providerId, serverId)
+                .then(lists => ({ providerId, lists }))
+                .catch(() => ({ providerId, lists: [] as RecommendationListVM[] }))
+        )).then(all => {
+            if (cancelled) return;
+            const map: Record<string, RecommendationListVM[]> = {};
+            all.forEach(r => { map[r.providerId] = r.lists; });
+            setResults(map);
+            setLoaded(true);
+        });
+        return () => { cancelled = true; };
+    }, [providers, libraryId, serverId]);
 
-    if (loading) {
+    if (!loaded) {
         return (
             <div className="mb-8 px-8">
                 <div className="vora-skeleton mb-4 h-6 w-48" />
@@ -337,14 +353,26 @@ function AsyncLibraryProviderBlock({ providerId, libraryId, serverId }: { provid
         );
     }
 
-    if (lists.length === 0) return null;
+    const totalRows = Object.values(results).reduce((n, lists) => n + lists.length, 0);
+    if (totalRows === 0) {
+        return (
+            <EmptyState
+                title="No recommendations yet"
+                description="Recommendations are personalized from your viewing. Mark some titles as watched — and, for AI-powered picks, ask your admin to enable AI and generate embeddings — to see rows here."
+            />
+        );
+    }
 
     return (
-        <>
-            {[...lists].sort((a, b) => a.weight - b.weight).map((list, index) => (
-                <RecommendationRow key={`${providerId}-${index}`} list={list} serverId={serverId} />
-            ))}
-        </>
+        <div>
+            {orderedProviders.flatMap(providerId =>
+                [...(results[providerId] ?? [])]
+                    .sort((a, b) => a.weight - b.weight)
+                    .map((list, index) => (
+                        <RecommendationRow key={`${providerId}-${index}`} list={list} serverId={serverId} />
+                    ))
+            )}
+        </div>
     );
 }
 
@@ -677,7 +705,7 @@ export default function LibraryPage() {
                 <div className="vora-skeleton mb-8 h-[280px] w-full" />
                 <div className="px-8">
                     <div className="vora-skeleton mb-6 h-10 w-64" />
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                    <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
                         {Array.from({ length: 18 }, (_, i) => <div key={i} className="vora-skeleton aspect-[2/3]" />)}
                     </div>
                 </div>
@@ -787,13 +815,13 @@ export default function LibraryPage() {
                                 availableLetters.map(letter => (
                                     <section key={letter} id={`letter-${letter}`} className="mb-10 scroll-mt-24">
                                         <h2 className="m-0 mb-4 text-base font-semibold" style={{ color: 'var(--vora-text-muted)', letterSpacing: '0.04em' }}>{letter}</h2>
-                                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                                        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
                                             {groupedItems[letter].map(item => renderLibraryCard(item, { isAdmin, navigate, serverId, handleDeleteMedia }))}
                                         </div>
                                     </section>
                                 ))
                             ) : (
-                                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                                <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
                                     {visibleItems.map(item => renderLibraryCard(item, { isAdmin, navigate, serverId, handleDeleteMedia }))}
                                 </div>
                             )}
@@ -815,7 +843,7 @@ export default function LibraryPage() {
                             description="Collections group related media — like a movie franchise or a curated set."
                         />
                     ) : (
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
                             {collections.map(collection => (
                                 <MediaPoster
                                     key={collection.id}
@@ -844,15 +872,7 @@ export default function LibraryPage() {
                             description="Ask your server admin to enable a recommendation provider in the admin Plugins page."
                         />
                     ) : (
-                        <div>
-                            {[...providers].sort((a, b) => {
-                                if (a === 'openai_recommendations') return -1;
-                                if (b === 'openai_recommendations') return 1;
-                                return 0;
-                            }).map(providerId => (
-                                <AsyncLibraryProviderBlock key={providerId} providerId={providerId} libraryId={id!} serverId={serverId} />
-                            ))}
-                        </div>
+                        <RecommendationsPanel providers={providers} libraryId={id!} serverId={serverId} />
                     )}
                 </div>
             )}

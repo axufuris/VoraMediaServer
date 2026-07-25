@@ -6,6 +6,7 @@ export interface DedupeItemVM {
     fileName: string;
     fileSizeBytes: number;
     videoCodec: string;
+    source?: string | null;
     hdrFormat: string;
     audioCodec?: string | null;
     sampleRate?: number | null;
@@ -34,6 +35,12 @@ export interface DedupeSettingsVM {
     scoreResolution1080: number;
     scoreResolution720: number;
     scoreResolutionOther: number;
+    scoreSourceRemux: number;
+    scoreSourceBluRay: number;
+    scoreSourceWebDl: number;
+    scoreSourceWebRip: number;
+    scoreSourceHdtv: number;
+    scoreSourceDvd: number;
     scoreCodecAv1: number;
     scoreCodecHevc: number;
     scoreCodecVp9: number;

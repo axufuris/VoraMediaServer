@@ -14,8 +14,14 @@ public class MediaPart
     public long? OverallBitrate { get; set; }
     public TimeSpan? Duration { get; set; }
 
-    public Guid MediaItemId { get; set; }
-    public virtual MediaItem MediaItem { get; set; } = null!;
+    // A part belongs to exactly one owner: either a MediaItem (the item's own
+    // file) or a MediaExtra (a trailer/featurette file). Both FKs are nullable;
+    // exactly one is set.
+    public Guid? MediaItemId { get; set; }
+    public virtual MediaItem? MediaItem { get; set; }
+
+    public Guid? MediaExtraId { get; set; }
+    public virtual MediaExtra? MediaExtra { get; set; }
 
     public virtual ICollection<MediaVideoTrack> VideoTracks { get; set; } = new List<MediaVideoTrack>();
     public virtual ICollection<MediaAudioTrack> AudioTracks { get; set; } = new List<MediaAudioTrack>();

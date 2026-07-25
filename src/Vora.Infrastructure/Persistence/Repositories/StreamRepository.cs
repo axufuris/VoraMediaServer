@@ -159,6 +159,49 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
         await context.SaveChangesAsync();
     }
 
+    public Task<MediaExtra?> GetMediaExtraAsync(Guid extraId) =>
+        context.MediaExtras.AsNoTracking().FirstOrDefaultAsync(e => e.Id == extraId);
+
+    public Task<MediaStreamInfoDto?> GetExtraStreamInfoAsync(Guid extraId) =>
+        context.MediaExtras
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Where(e => e.Id == extraId)
+            .Select(e => new MediaStreamInfoDto
+            {
+                Id = e.Id,
+                Parts = e.Parts.Select(p => new MediaPartStreamInfoDto
+                {
+                    Id = p.Id,
+                    Resolution = p.Resolution,
+                    Container = p.Container,
+                    OverallBitrate = p.OverallBitrate,
+                    VideoTracks = p.VideoTracks.Select(vt => new TrackStreamInfoDto
+                    {
+                        Id = vt.Id,
+                        Codec = vt.Codec,
+                        IsDefault = vt.IsDefault,
+                        HdrType = vt.HdrType
+                    }).ToList(),
+                    AudioTracks = p.AudioTracks.Select(at => new TrackStreamInfoDto
+                    {
+                        Id = at.Id,
+                        Title = at.Title,
+                        Codec = at.Codec,
+                        IsDefault = at.IsDefault,
+                        Channels = at.Channels
+                    }).ToList(),
+                    SubtitleTracks = p.SubtitleTracks.Select(st => new SubtitleStreamInfoDto
+                    {
+                        Id = st.Id,
+                        Codec = st.Codec,
+                        IsDefault = st.IsDefault,
+                        IsForced = st.IsForced
+                    }).ToList()
+                }).ToList()
+            })
+            .FirstOrDefaultAsync();
+
     public async Task<MediaPart?> GetMediaPartForSessionAsync(Guid sessionId)
     {
         var session = await context.StreamSessions.FindAsync(sessionId);
