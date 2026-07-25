@@ -1,16 +1,19 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vora.Application.FileSystem;
+using Vora.Application.Media;
 using Vora.Application.Net;
 using Vora.Application.Settings;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Enums;
+using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Artwork;
 
 public interface IArtworkService
 {
     Task<IEnumerable<Vora.Plugins.Dtos.ArtworkResult>> GetArtworkOptionsAsync(Guid mediaItemId);
+    Task RefreshProviderArtworkAsync(Guid mediaItemId, string? providerId);
     Task<string> UploadAsync(Guid mediaItemId, UploadedFile file, ArtworkKind kind);
     Task<string> AddUrlAsync(Guid mediaItemId, string url, ArtworkKind kind);
     Task DeleteAsync(Guid artworkId);
@@ -22,18 +25,26 @@ public class ArtworkService : IArtworkService
     private const string UserUploadProvider = "user_upload";
     private const string UserUrlProvider = "user_url";
 
+    private const string DefaultArtworkProvider = "tmdb_artwork";
+
     private readonly IMediaArtworkRepository _repository;
+    private readonly IMediaRepository _mediaRepository;
+    private readonly IEnumerable<IArtworkProvider> _artworkProviders;
     private readonly ISafeImageDownloader _imageDownloader;
     private readonly ILogger<ArtworkService> _logger;
     private readonly string _basePath;
 
     public ArtworkService(
         IMediaArtworkRepository repository,
+        IMediaRepository mediaRepository,
+        IEnumerable<IArtworkProvider> artworkProviders,
         IOptions<StoragePathsOptions> storagePaths,
         ISafeImageDownloader imageDownloader,
         ILogger<ArtworkService> logger)
     {
         _repository = repository;
+        _mediaRepository = mediaRepository;
+        _artworkProviders = artworkProviders;
         _imageDownloader = imageDownloader;
         _logger = logger;
 
@@ -62,6 +73,37 @@ public class ArtworkService : IArtworkService
             Height = a.Height,
             VoteAverage = a.VoteAverage
         });
+    }
+
+    public async Task RefreshProviderArtworkAsync(Guid mediaItemId, string? providerId)
+    {
+        var item = await _mediaRepository.GetForMetadataSyncAsync(mediaItemId);
+        if (item == null) return;
+
+        var resolvedProviderId = !string.IsNullOrWhiteSpace(providerId)
+            ? providerId
+            : (item.Library?.ArtworkProviderId ?? DefaultArtworkProvider);
+
+        var provider = _artworkProviders.FirstOrDefault(p => p.Id == resolvedProviderId)
+            ?? _artworkProviders.FirstOrDefault(p => p.Id == DefaultArtworkProvider);
+        if (provider == null) return;
+
+        var results = await provider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name, null, item.Title);
+
+        var newArtwork = results.Select(r => new MediaArtwork
+        {
+            MediaItemId = mediaItemId,
+            Kind = (ArtworkKind)r.Kind,
+            Url = r.Url,
+            Language = r.Language,
+            Width = r.Width,
+            Height = r.Height,
+            VoteAverage = r.VoteAverage,
+            ProviderId = provider.Id,
+            IsUserUploaded = false
+        }).ToList();
+
+        await _repository.ReplaceProviderMediaArtworkAsync(mediaItemId, newArtwork);
     }
 
     public async Task<string> UploadAsync(Guid mediaItemId, UploadedFile file, ArtworkKind kind)

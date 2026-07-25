@@ -44,7 +44,7 @@ export default function MediaStill({ imageUrl, title, subtitle, badge, bottomLef
                 }}
             >
                 {imageUrl ? (
-                    <img src={imageUrl} alt={title} loading="lazy" className="h-full w-full object-cover" />
+                    <img src={imageUrl} alt={title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 ) : (
                     <div className="flex h-full w-full items-center justify-center" style={{ color: 'var(--vora-text-muted)' }}>
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">

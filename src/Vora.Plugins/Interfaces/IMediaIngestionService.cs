@@ -4,7 +4,7 @@ namespace Vora.Plugins.Interfaces;
 
 public interface IMediaIngestionService
 {
-    Task<(List<string> FolderPaths, string? ScannerRegex)> GetLibraryDetailsAsync(LibraryHandle library);
+    Task<(List<string> FolderPaths, string? ScannerRegex, List<string> ExcludeFilters)> GetLibraryDetailsAsync(LibraryHandle library);
     Task<LibraryHandle?> GetLibraryForMediaAsync(MediaItemHandle item);
     Task<HashSet<string>> GetExistingLibraryPathsAsync(LibraryHandle library);
     Task<List<string>> GetLibraryItemFilePathsAsync(LibraryHandle library);

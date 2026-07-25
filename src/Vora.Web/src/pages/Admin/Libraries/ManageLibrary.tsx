@@ -508,6 +508,21 @@ export default function ManageLibrary() {
                         </p>
                     </div>
 
+                    <SectionHeading>Exclude Filters</SectionHeading>
+                    <div className="space-y-2">
+                        <input
+                            type="text"
+                            value={(library.excludeFilters ?? []).join(', ')}
+                            onChange={e => handleChange('excludeFilters', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                            spellCheck={false}
+                            placeholder="e.g. .TDARR, .sample, WIP"
+                            className="vora-input w-full font-mono text-xs"
+                        />
+                        <p className="text-xs text-[var(--vora-text-muted)]">
+                            Comma-separated. Any file whose name contains one of these (case-insensitive) is skipped by the scanner — useful for files still being transcoded (e.g. <span className="font-mono">.TDARR</span>). Rename the file to have it picked up.
+                        </p>
+                    </div>
+
                     <SectionHeading>Options</SectionHeading>
                     <label className="flex items-center gap-3 cursor-pointer select-none bg-[var(--vora-info-soft)] border border-[var(--vora-info-500)]/30 p-3 rounded-[var(--vora-radius-md)] transition-colors hover:bg-[var(--vora-info-soft)]/70">
                         <input

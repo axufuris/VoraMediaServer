@@ -56,13 +56,13 @@ public class MediaIngestionService : IMediaIngestionService
         }
     }
 
-    public async Task<(List<string> FolderPaths, string? ScannerRegex)> GetLibraryDetailsAsync(LibraryHandle library)
+    public async Task<(List<string> FolderPaths, string? ScannerRegex, List<string> ExcludeFilters)> GetLibraryDetailsAsync(LibraryHandle library)
     {
         var libraryId = library.Value;
-        var row = await _libraryRepository.GetProjectedByIdAsync(libraryId, l => new { l.FolderPaths, l.ScannerRegex });
+        var row = await _libraryRepository.GetProjectedByIdAsync(libraryId, l => new { l.FolderPaths, l.ScannerRegex, l.ExcludeFilters });
         if (row == null) throw new InvalidOperationException($"Library {libraryId} not found.");
 
-        return (row.FolderPaths, row.ScannerRegex);
+        return (row.FolderPaths, row.ScannerRegex, row.ExcludeFilters ?? new List<string>());
     }
 
     public async Task<LibraryHandle?> GetLibraryForMediaAsync(MediaItemHandle item)

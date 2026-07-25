@@ -5,6 +5,7 @@ public class UpdateLibraryRequest
     public string Name { get; set; } = string.Empty;
     public List<string> FolderPaths { get; set; } = new();
     public string? ScannerRegex { get; set; }
+    public List<string> ExcludeFilters { get; set; } = new();
 
     public bool EnableRealTimeWatching { get; set; }
     public bool FindExtras { get; set; }

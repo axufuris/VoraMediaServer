@@ -12,6 +12,10 @@ public class MediaLibrary
     public List<string> FolderPaths { get; set; } = new();
     public string? ScannerRegex { get; set; }
 
+    // Substrings that, if present in a file's name, cause the scanner to skip
+    // the file entirely (e.g. ".TDARR" for files still awaiting transcode).
+    public List<string> ExcludeFilters { get; set; } = new();
+
     public string MetadataProviderId { get; set; } = "tmdb_metadata";
     public string? ArtworkProviderId { get; set; }
     public string? ThirdPartyRating1ProviderId { get; set; }

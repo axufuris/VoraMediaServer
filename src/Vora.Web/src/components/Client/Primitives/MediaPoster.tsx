@@ -67,6 +67,7 @@ export default function MediaPoster({ imageUrl, title, subtitle, badge, bottomLe
                         src={imageUrl}
                         alt={title}
                         loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                     />
                 ) : (

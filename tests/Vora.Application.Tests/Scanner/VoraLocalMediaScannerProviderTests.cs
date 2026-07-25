@@ -22,7 +22,7 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
         _library = LibraryHandle.FromGuid(Guid.NewGuid());
 
         _ingestion.GetLibraryDetailsAsync(Arg.Any<LibraryHandle>())
-            .Returns(Task.FromResult<(List<string> FolderPaths, string? ScannerRegex)>((new List<string> { _tempRoot }, null)));
+            .Returns(Task.FromResult<(List<string> FolderPaths, string? ScannerRegex, List<string> ExcludeFilters)>((new List<string> { _tempRoot }, null, new List<string>())));
 
         _ingestion.GetExistingLibraryPathsAsync(Arg.Any<LibraryHandle>())
             .Returns(new HashSet<string>());
@@ -154,6 +154,25 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
             imdbId: Arg.Any<string?>(),
             tvdbId: Arg.Any<string?>(),
             edition: Arg.Is<string?>(e => e != null && e.Contains("Director", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
+    public async Task ScanMovieLibrary_skips_files_matching_exclude_filter()
+    {
+        _ingestion.GetLibraryDetailsAsync(Arg.Any<LibraryHandle>())
+            .Returns(Task.FromResult<(List<string> FolderPaths, string? ScannerRegex, List<string> ExcludeFilters)>((new List<string> { _tempRoot }, null, new List<string> { ".TDARR" })));
+
+        TouchFile("Inception (2010).mkv");
+        TouchFile("Dune (2021) [WEBDL-2160p].TDARR.mkv");
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).EnsureMovieAsync(
+            Arg.Any<LibraryHandle>(), "Inception", 2010,
+            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>());
+        await _ingestion.DidNotReceive().EnsureMovieAsync(
+            Arg.Any<LibraryHandle>(), "Dune", Arg.Any<int?>(),
+            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>());
     }
 
     [Fact]

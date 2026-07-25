@@ -23,6 +23,17 @@ public class MediaArtworkRepository(VoraDbContext context) : IMediaArtworkReposi
         await context.SaveChangesAsync();
     }
 
+    // Replaces only provider-sourced rows, preserving the user's manual uploads.
+    public async Task ReplaceProviderMediaArtworkAsync(Guid mediaItemId, IEnumerable<MediaArtwork> artwork)
+    {
+        var existing = await context.Set<MediaArtwork>()
+            .Where(a => a.MediaItemId == mediaItemId && !a.IsUserUploaded)
+            .ToListAsync();
+        context.Set<MediaArtwork>().RemoveRange(existing);
+        await context.Set<MediaArtwork>().AddRangeAsync(artwork);
+        await context.SaveChangesAsync();
+    }
+
     public Task ClearArtworkForLibraryAsync(Guid libraryId) =>
         context.Set<MediaArtwork>()
             .Where(a => a.MediaItem.LibraryId == libraryId && !a.IsUserUploaded)

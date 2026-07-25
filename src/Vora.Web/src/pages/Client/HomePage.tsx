@@ -377,8 +377,9 @@ export default function HomePage() {
     const heroVisible = showSpotlightPref && spotlightItems.length > 0;
 
     const displayLists = useMemo(() => {
+        // The spotlight list is featured in the hero AND still shown as a row so
+        // it's browsable (the hero only rotates a few items at a time).
         const base = [...lists]
-            .filter(l => l.id !== spotlightListId)
             .sort((a, b) => a.displayOrder - b.displayOrder);
 
         if (clientLayout.length === 0) {

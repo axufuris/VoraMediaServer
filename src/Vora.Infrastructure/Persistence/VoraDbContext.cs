@@ -658,6 +658,10 @@ public class VoraDbContext : DbContext
                   .HasConversion(converters.StringList)
                   .Metadata.SetValueComparer(converters.StringListComparer);
 
+            entity.Property(e => e.ExcludeFilters)
+                  .HasConversion(converters.StringList)
+                  .Metadata.SetValueComparer(converters.StringListComparer);
+
             entity.HasMany(l => l.MediaItems)
                   .WithOne(m => m.Library)
                   .HasForeignKey(m => m.LibraryId)

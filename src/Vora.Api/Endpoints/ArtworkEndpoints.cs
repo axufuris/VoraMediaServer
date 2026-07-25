@@ -23,6 +23,7 @@ public static partial class ArtworkEndpoints
         var authGroup = group.MapGroup("").RequireAuthorization();
 
         authGroup.MapGet("/media/{id:guid}/artwork", GetMediaArtworkAsync);
+        authGroup.MapPost("/media/{id:guid}/artwork/fetch", RefreshMediaArtworkAsync).RequireAuthorization("AdminOnly");
         authGroup.MapPost("/media/{id:guid}/artwork/upload", UploadMediaArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
         authGroup.MapPost("/media/{id:guid}/artwork/url", AddMediaArtworkUrlAsync).RequireAuthorization("AdminOnly");
         authGroup.MapDelete("/media/artwork/{artworkId:guid}", DeleteMediaArtworkAsync).RequireAuthorization("AdminOnly");
@@ -63,6 +64,12 @@ public static partial class ArtworkEndpoints
     {
         var artwork = await service.GetArtworkOptionsAsync(id);
         return Results.Ok(artwork);
+    }
+
+    private static async Task<IResult> RefreshMediaArtworkAsync(Guid id, [FromQuery] string? providerId, IArtworkService service)
+    {
+        await service.RefreshProviderArtworkAsync(id, providerId);
+        return Results.Accepted();
     }
 
     private static async Task<IResult> UploadMediaArtworkAsync(Guid id, IFormFile file, [FromQuery] ArtworkKind kind, IArtworkService service)

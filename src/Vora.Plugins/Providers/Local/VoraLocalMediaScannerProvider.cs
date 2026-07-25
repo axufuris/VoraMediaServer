@@ -52,21 +52,21 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
     {
         var library = LibraryHandle.FromGuid(libraryId);
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
-        await ProcessMovieDirectoriesAsync(library, details.FolderPaths, details.ScannerRegex);
+        await ProcessMovieDirectoriesAsync(library, details.FolderPaths, details.ScannerRegex, details.ExcludeFilters);
     }
 
     public async Task ScanTvShowLibraryAsync(Guid libraryId)
     {
         var library = LibraryHandle.FromGuid(libraryId);
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
-        await ProcessTvDirectoriesAsync(library, details.FolderPaths, details.ScannerRegex);
+        await ProcessTvDirectoriesAsync(library, details.FolderPaths, details.ScannerRegex, details.ExcludeFilters);
     }
 
     public async Task ScanMusicLibraryAsync(Guid libraryId)
     {
         var library = LibraryHandle.FromGuid(libraryId);
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
-        await ProcessMusicDirectoriesAsync(library, details.FolderPaths);
+        await ProcessMusicDirectoriesAsync(library, details.FolderPaths, details.ExcludeFilters);
     }
 
     public async Task ScanMovieAsync(Guid movieId)
@@ -86,7 +86,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         if (library == null) return;
 
         var details = await _ingestionService.GetLibraryDetailsAsync(library.Value);
-        await ProcessMovieDirectoriesAsync(library.Value, directories, details.ScannerRegex);
+        await ProcessMovieDirectoriesAsync(library.Value, directories, details.ScannerRegex, details.ExcludeFilters);
     }
 
     public async Task ScanTvShowAsync(Guid tvShowId)
@@ -101,7 +101,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         if (library == null) return;
 
         var details = await _ingestionService.GetLibraryDetailsAsync(library.Value);
-        await ProcessTvDirectoriesAsync(library.Value, directories, details.ScannerRegex);
+        await ProcessTvDirectoriesAsync(library.Value, directories, details.ScannerRegex, details.ExcludeFilters);
     }
 
     public async Task ScanSeasonAsync(Guid seasonId)
@@ -116,7 +116,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         if (library == null) return;
 
         var details = await _ingestionService.GetLibraryDetailsAsync(library.Value);
-        await ProcessTvDirectoriesAsync(library.Value, directories, details.ScannerRegex);
+        await ProcessTvDirectoriesAsync(library.Value, directories, details.ScannerRegex, details.ExcludeFilters);
     }
 
     public async Task ScanEpisodeAsync(Guid episodeId)
@@ -131,7 +131,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         if (library == null) return;
 
         var details = await _ingestionService.GetLibraryDetailsAsync(library.Value);
-        await ProcessTvDirectoriesAsync(library.Value, directories, details.ScannerRegex);
+        await ProcessTvDirectoriesAsync(library.Value, directories, details.ScannerRegex, details.ExcludeFilters);
     }
 
     // Radarr/Sonarr write an explicit edition token, e.g. "{edition-Director's Cut}".
@@ -156,14 +156,16 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         return (regex, resolutionRegex, editionRegex);
     }
 
-    private async Task ProcessMovieDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex)
+    private async Task ProcessMovieDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex, IReadOnlyList<string> excludeFilters)
     {
         var (regex, resolutionRegex, editionRegex) = BuildMovieRegexes(customRegex);
 
         await CleanupLegacyExtrasAsync(library);
 
         var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
-        var newFiles = GetNewFilesInDirectories(directories, existingPathsSet).ToList();
+        var newFiles = GetNewFilesInDirectories(directories, existingPathsSet)
+            .Where(f => !IsExcluded(f, excludeFilters))
+            .ToList();
         var movieFiles = newFiles.Where(f => !IsExtraFile(f)).ToList();
         var extraFiles = newFiles.Where(IsExtraFile).ToList();
 
@@ -287,14 +289,16 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         return (episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
     }
 
-    private async Task ProcessTvDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex)
+    private async Task ProcessTvDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex, IReadOnlyList<string> excludeFilters)
     {
         var (episodeRegex, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(customRegex);
 
         await CleanupLegacyExtrasAsync(library);
 
         var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
-        var newFiles = GetNewFilesInDirectories(directories, existingPathsSet).ToList();
+        var newFiles = GetNewFilesInDirectories(directories, existingPathsSet)
+            .Where(f => !IsExcluded(f, excludeFilters))
+            .ToList();
         var episodeFiles = newFiles.Where(f => !IsExtraFile(f)).ToList();
         var extraFiles = newFiles.Where(IsExtraFile).ToList();
 
@@ -415,6 +419,8 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         if (existing.Contains(filePath) || !File.Exists(filePath)) return null;
 
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        if (IsExcluded(filePath, details.ExcludeFilters)) return null;
+
         var (regex, resolutionRegex, editionRegex) = BuildMovieRegexes(details.ScannerRegex);
 
         if (IsExtraFile(filePath))
@@ -435,6 +441,8 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         if (existing.Contains(filePath) || !File.Exists(filePath)) return ScanFileResult.None;
 
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        if (IsExcluded(filePath, details.ExcludeFilters)) return ScanFileResult.None;
+
         var (episodeRegex, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(details.ScannerRegex);
 
         if (IsExtraFile(filePath))
@@ -458,6 +466,22 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         {
             await _ingestionService.RemoveMediaItemByPathAsync(path);
         }
+    }
+
+    // A file is skipped entirely if its name contains any of the library's
+    // exclude substrings (e.g. ".TDARR" for files still being transcoded).
+    private static bool IsExcluded(string filePath, IReadOnlyList<string> excludeFilters)
+    {
+        if (excludeFilters == null || excludeFilters.Count == 0) return false;
+        var name = Path.GetFileName(filePath);
+        foreach (var filter in excludeFilters)
+        {
+            if (!string.IsNullOrWhiteSpace(filter) && name.Contains(filter.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static bool IsExtraFile(string filePath)
@@ -496,10 +520,12 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         return newFiles;
     }
 
-    private async Task ProcessMusicDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories)
+    private async Task ProcessMusicDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, IReadOnlyList<string> excludeFilters)
     {
         var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
-        var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet, _supportedAudioExtensions).ToList();
+        var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet, _supportedAudioExtensions)
+            .Where(f => !IsExcluded(f, excludeFilters))
+            .ToList();
 
         if (filesToProcess.Count == 0) return;
 

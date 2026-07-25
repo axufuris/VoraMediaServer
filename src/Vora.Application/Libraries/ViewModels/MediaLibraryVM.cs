@@ -11,6 +11,7 @@ public class MediaLibraryVM
     public string Type { get; set; } = string.Empty;
     public List<string> FolderPaths { get; set; } = new();
     public string? ScannerRegex { get; set; }
+    public List<string> ExcludeFilters { get; set; } = new();
     public bool EnableRealTimeWatching { get; set; }
     public bool IsBeingWatched { get; set; }
     public int MinimumCollectionSize { get; set; }
@@ -43,6 +44,7 @@ public class MediaLibraryVM
                 : "Unknown",
             FolderPaths = l.FolderPaths,
             ScannerRegex = l.ScannerRegex,
+            ExcludeFilters = l.ExcludeFilters,
             MetadataProviderId = l.MetadataProviderId,
             FindExtras = l.FindExtras,
             OnlyShowTrailers = l.OnlyShowTrailers,
