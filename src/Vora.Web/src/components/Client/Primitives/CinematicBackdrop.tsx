@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { thumbUrl } from '../../../utils/thumbnails';
 
 export type BackdropIntensity = 'hero' | 'detail' | 'ambient';
 
@@ -62,7 +63,7 @@ export default function CinematicBackdrop({ src, intensity = 'detail', parallax,
                 style={{
                     transition: 'opacity 560ms var(--vora-ease-out, ease-out)',
                     opacity,
-                    backgroundImage: currentSrc ? `url("${currentSrc}")` : 'none',
+                    backgroundImage: currentSrc ? `url("${thumbUrl(currentSrc, 1280)}")` : 'none',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundColor: 'var(--vora-bg-sunken)',
