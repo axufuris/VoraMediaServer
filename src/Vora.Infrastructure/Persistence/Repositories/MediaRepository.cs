@@ -28,6 +28,36 @@ public partial class MediaRepository : IMediaRepository
     public async Task<List<Guid>> GetEpisodeIdsForShowAsync(Guid tvShowId) =>
         await _context.Set<Episode>().AsNoTracking().Where(e => e.Season != null && e.Season.TvShowId == tvShowId).Select(e => e.Id).ToListAsync();
 
+    public async Task<Dictionary<Guid, string>> GetDisplayTitlesByIdsAsync(IReadOnlyCollection<Guid> ids)
+    {
+        if (ids.Count == 0) return new Dictionary<Guid, string>();
+
+        var rows = await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => ids.Contains(m.Id))
+            .Select(m => new
+            {
+                m.Id,
+                m.Title,
+                Kind = m is Episode ? "episode" : m is Season ? "season" : "other",
+                SeasonNumber = m is Episode ? ((Episode)m).Season.SeasonNumber
+                    : m is Season ? ((Season)m).SeasonNumber
+                    : (int?)null,
+                EpisodeNumber = m is Episode ? ((Episode)m).EpisodeNumber : (int?)null,
+                ShowTitle = m is Episode ? ((Episode)m).Season.TvShow.Title
+                    : m is Season ? ((Season)m).TvShow.Title
+                    : null
+            })
+            .ToListAsync();
+
+        return rows.ToDictionary(r => r.Id, r => r.Kind switch
+        {
+            "episode" => $"{r.ShowTitle} — S{r.SeasonNumber:D2}E{r.EpisodeNumber:D2} — {r.Title}",
+            "season" => $"{r.ShowTitle} — {r.Title}",
+            _ => r.Title
+        });
+    }
+
     public async Task<Guid?> GetMovieIdByTitleAndYearAsync(string title, int? year, Guid libraryId)
     {
         return await _context.Set<Movie>()

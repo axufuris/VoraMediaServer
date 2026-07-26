@@ -30,14 +30,7 @@ public static class CollectionArtworkEndpoints
     private static async Task<IResult> GetArtworkAsync(Guid id, ICollectionArtworkService service)
     {
         var artwork = await service.GetArtworkAsync(id);
-        var dto = artwork.Select(a => new
-        {
-            Id = a.Id.ToString(),
-            a.IsUserUploaded,
-            a.Url,
-            Kind = a.Kind.ToString()
-        });
-        return Results.Ok(dto);
+        return Results.Ok(artwork);
     }
 
     private static async Task<IResult> UploadArtworkAsync(Guid id, IFormFile file, [FromQuery] ArtworkKind kind, ICollectionArtworkService service)

@@ -33,8 +33,12 @@ public class MetadataManagerTests
         _fetch = Substitute.For<IMetadataFetchService>();
         _mapping = Substitute.For<IMetadataMappingService>();
 
+        _media.GetDisplayTitlesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>())
+            .Returns(new Dictionary<Guid, string>());
+
         _manager = new MetadataManager(
             _media, _actors, _scopeFactory, _notifier, _fetch, _mapping,
+            new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
             NullLogger<MetadataManager>.Instance);
     }
 
