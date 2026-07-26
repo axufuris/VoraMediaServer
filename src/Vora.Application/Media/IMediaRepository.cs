@@ -27,6 +27,7 @@ public interface IMediaRepository
     Task<MediaItem?> GetForMetadataSyncAsync(Guid id);
     Task<IEnumerable<Guid>> GetMediaIdsMissingMetadataAsync(Guid libraryId);
     Task<IEnumerable<Guid>> GetMediaIdsMissingRatingsAsync(Guid libraryId);
+    Task<List<Guid>> GetMovieIdsMissingTvdbIdAsync();
     Task<MediaItem?> GetForBasicUpdateAsync(Guid id);
     Task SyncMediaTracksAsync(Guid mediaPartId, List<MediaVideoTrack> incomingVideo, List<MediaAudioTrack> incomingAudio, List<MediaSubtitleTrack> incomingSubtitles);
     Task ReplaceMarkersAsync(Guid mediaItemId, IEnumerable<MediaItemMarker> markers);

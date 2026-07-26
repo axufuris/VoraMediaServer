@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { systemSettingsAdminService, type ServerSettings } from '../../../api/System/systemSettingsAdminService';
+import { libraryAdminService } from '../../../api/Media/libraryAdminService';
 import FolderPathInput from '../FolderBrowser/FolderPathInput';
 
 interface CoreSettingsTabProps {
@@ -350,6 +351,25 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                     <FieldHint>
                         Movies come from TMDB and have no TVDB id, so TVDB can't contribute posters/backdrops for them. When enabled, metadata refresh looks each movie up on TVDB (by IMDb id, then title/year) and stores the id so TVDB artwork becomes available. Requires a configured TVDB provider; adds one TVDB lookup per movie that lacks an id (skipped once resolved). Coverage is sparse — many movies aren't in TVDB.
                     </FieldHint>
+                    {serverSettings.resolveMovieTvdbIds && (
+                        <div className="mt-4">
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    try {
+                                        await libraryAdminService.resolveMovieTvdbIds(serverId);
+                                        showModal('Task queued', 'Resolving TVDB ids for movies that are missing one — watch progress under Background Tasks. If you just enabled this setting, save it first so the pass sees it as on.');
+                                    } catch {
+                                        showModal('Failed', 'Could not queue the TVDB id resolution.', true);
+                                    }
+                                }}
+                                className="vora-button-secondary"
+                            >
+                                Resolve now for existing movies
+                            </button>
+                            <FieldHint>One-time backfill for movies already in your library. New movies get their id automatically on their first scan.</FieldHint>
+                        </div>
+                    )}
                 </div>
             </SettingsCard>
 

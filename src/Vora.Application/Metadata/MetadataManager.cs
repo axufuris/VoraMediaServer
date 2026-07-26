@@ -12,6 +12,7 @@ public interface IMetadataManager
 {
     Task TriggerLibraryMetadataRefreshAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false);
     Task TriggerActorMetadataRefreshAsync();
+    Task TriggerMovieTvdbResolutionAsync();
     Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false);
     Task TriggerMediaItemArtworkRefreshAsync(Guid mediaItemId, bool forceOverride = false);
     Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false);
@@ -268,6 +269,11 @@ public class MetadataManager : IMetadataManager
         var settings = await _settingsRepository.GetSettingsAsync();
         if (!settings.ResolveMovieTvdbIds) return;
 
+        await ResolveTvdbIdForMovieAsync(movie);
+    }
+
+    private async Task ResolveTvdbIdForMovieAsync(Movie movie)
+    {
         var provider = _metadataProviders.FirstOrDefault(p => p.Id == TvdbMetadataProviderId);
         if (provider == null) return;
 
@@ -292,6 +298,35 @@ public class MetadataManager : IMetadataManager
         {
             _logger.LogWarning(ex, "TVDB id resolution failed for movie {MediaItemId}.", movie.Id);
         }
+    }
+
+    public async Task TriggerMovieTvdbResolutionAsync()
+    {
+        var settings = await _settingsRepository.GetSettingsAsync();
+        if (!settings.ResolveMovieTvdbIds) return;
+        if (_metadataProviders.All(p => p.Id != TvdbMetadataProviderId)) return;
+
+        var ids = await _repository.GetMovieIdsMissingTvdbIdAsync();
+        var total = ids.Count;
+        var count = 0;
+
+        foreach (var id in ids)
+        {
+            count++;
+            var item = await _repository.GetForBasicUpdateAsync(id);
+            if (item is not Movie movie || !string.IsNullOrWhiteSpace(movie.TvdbId)) continue;
+            if (movie.IsLocked(nameof(movie.TvdbId))) continue;
+
+            _progress.Report($"Resolving TVDB ids — {movie.Title} ({count}/{total})");
+
+            await ResolveTvdbIdForMovieAsync(movie);
+            if (!string.IsNullOrWhiteSpace(movie.TvdbId))
+            {
+                await _repository.UpdateMediaItemAsync(movie);
+            }
+        }
+
+        _progress.Report(null);
     }
 
     private async Task ProcessLibraryItemsAsync(Guid libraryId, IEnumerable<Guid> ids, string operation, Func<Guid, Task> refreshFn)
