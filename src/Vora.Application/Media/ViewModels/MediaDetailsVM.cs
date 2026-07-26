@@ -163,6 +163,7 @@ public class MediaDetailsVM
             {
                 Id = p.Id,
                 Resolution = p.Resolution,
+                Edition = p.Edition,
                 FileSizeBytes = p.FileSizeBytes,
                 BitrateKbps = p.OverallBitrate.HasValue ? (int)(p.OverallBitrate.Value / 1000) : (int?)null,
                 FilePath = p.FilePath,
@@ -234,6 +235,7 @@ public class MediaDetailsPartVM
 {
     public Guid Id { get; set; }
     public string? Resolution { get; set; }
+    public string? Edition { get; set; }
     public long? FileSizeBytes { get; set; }
     public int? BitrateKbps { get; set; }
     public string FilePath { get; set; } = string.Empty;

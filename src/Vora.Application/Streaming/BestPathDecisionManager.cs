@@ -7,7 +7,7 @@ namespace Vora.Application.Streaming;
 
 public interface IBestPathDecisionManager
 {
-    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0);
+    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null);
 }
 
 public class BestPathDecisionManager : IBestPathDecisionManager
@@ -25,13 +25,18 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         public int PenaltyScore { get; set; }
     }
 
-    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0)
+    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
         var options = new List<StreamOption>();
         var decisionLogs = new List<StreamOptionLogDto>();
 
-        foreach (var part in mediaItem.Parts)
+        var partsToEvaluate = (requestedMediaPartId.HasValue
+            ? mediaItem.Parts.Where(p => p.Id == requestedMediaPartId.Value)
+            : mediaItem.Parts).ToList();
+        if (partsToEvaluate.Count == 0) partsToEvaluate = mediaItem.Parts.ToList();
+
+        foreach (var part in partsToEvaluate)
         {
             var videoTracksToEvaluate = requestedVideoId.HasValue
                 ? part.VideoTracks.Where(v => v.Id == requestedVideoId.Value).ToList()

@@ -45,6 +45,7 @@ export interface SubtitleTrack {
 export interface MediaPart {
     id: string;
     resolution?: string;
+    edition?: string;
     fileSizeBytes?: number;
     bitrateKbps?: number;
     filePath: string;
