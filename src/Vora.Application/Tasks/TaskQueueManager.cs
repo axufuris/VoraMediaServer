@@ -33,7 +33,7 @@ public interface ITaskQueueManager
     void QueueRefreshArtistArtwork(Guid artistId, string? artistName = null, bool forceOverride = false);
     void QueueRefreshAlbumArtwork(Guid albumId, string? albumName = null, bool forceOverride = false);
     void QueueRefreshAllActorMetadata();
-    void QueueResolveMovieTvdbIds();
+    void QueueResolveTvdbIds();
     void QueueRemoveOrphanedMedia(string filePath);
     void QueueCollectionChronologySync(Guid collectionId, string title);
     void QueueCollectionContentSync(Guid collectionId, string title);
@@ -274,12 +274,12 @@ public class TaskQueueManager : ITaskQueueManager
         });
     }
 
-    public void QueueResolveMovieTvdbIds()
+    public void QueueResolveTvdbIds()
     {
-        EnqueueTask("Resolve Movie TVDB Ids", async (ct, sp) =>
+        EnqueueTask("Resolve TVDB Ids", async (ct, sp) =>
         {
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
-            await metadataManager.TriggerMovieTvdbResolutionAsync();
+            await metadataManager.TriggerMediaTvdbResolutionAsync();
         });
     }
 

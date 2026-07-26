@@ -99,8 +99,8 @@ export const libraryAdminService = {
         await apiClient.post('/metadata/actors/refresh', null, { serverId });
     },
 
-    resolveMovieTvdbIds: async (serverId?: string): Promise<void> => {
-        await apiClient.post('/metadata/movies/resolve-tvdb-ids', null, { serverId });
+    resolveTvdbIds: async (serverId?: string): Promise<void> => {
+        await apiClient.post('/metadata/resolve-tvdb-ids', null, { serverId });
     },
 
     toggleWatch: async (libraryId: string, enable: boolean, serverId?: string): Promise<void> => {

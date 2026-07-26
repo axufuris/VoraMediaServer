@@ -106,7 +106,7 @@ public static class MediaEndpoints
         group.MapPost("/actors/refresh", QueueRefreshAllActorsAsync)
             .Produces(StatusCodes.Status202Accepted);
 
-        group.MapPost("/movies/resolve-tvdb-ids", QueueResolveMovieTvdbIdsAsync)
+        group.MapPost("/resolve-tvdb-ids", QueueResolveTvdbIdsAsync)
             .Produces(StatusCodes.Status202Accepted);
     }
 
@@ -289,9 +289,9 @@ public static class MediaEndpoints
         return Results.Accepted();
     }
 
-    private static IResult QueueResolveMovieTvdbIdsAsync(ITaskQueueManager taskQueue)
+    private static IResult QueueResolveTvdbIdsAsync(ITaskQueueManager taskQueue)
     {
-        taskQueue.QueueResolveMovieTvdbIds();
+        taskQueue.QueueResolveTvdbIds();
         return Results.Accepted();
     }
 }

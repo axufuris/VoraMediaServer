@@ -12,7 +12,7 @@ public interface IMetadataManager
 {
     Task TriggerLibraryMetadataRefreshAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false);
     Task TriggerActorMetadataRefreshAsync();
-    Task TriggerMovieTvdbResolutionAsync();
+    Task TriggerMediaTvdbResolutionAsync();
     Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false);
     Task TriggerMediaItemArtworkRefreshAsync(Guid mediaItemId, bool forceOverride = false);
     Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false);
@@ -38,6 +38,7 @@ public class MetadataManager : IMetadataManager
     private readonly ILogger<MetadataManager> _logger;
 
     private const string TvdbMetadataProviderId = "tvdb_metadata";
+    private const string TmdbMetadataProviderId = "tmdb_metadata";
 
     public MetadataManager(
         IMediaRepository repository,
@@ -300,13 +301,34 @@ public class MetadataManager : IMetadataManager
         }
     }
 
-    public async Task TriggerMovieTvdbResolutionAsync()
+    // Shows carry their TVDB id in TMDB's external_ids (now mapped), so for an
+    // existing show we just re-read its TMDB metadata rather than TVDB-searching.
+    private async Task ResolveTvdbIdForShowAsync(TvShow show)
+    {
+        if (string.IsNullOrWhiteSpace(show.TmdbId)) return;
+        var provider = _metadataProviders.FirstOrDefault(p => p.Id == TmdbMetadataProviderId);
+        if (provider == null) return;
+
+        try
+        {
+            var result = await provider.FetchTvShowMetadataByIdAsync(show.TmdbId, "tmdb");
+            if (!string.IsNullOrWhiteSpace(result?.TvdbId))
+            {
+                show.TvdbId = result.TvdbId;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "TVDB id resolution failed for show {MediaItemId}.", show.Id);
+        }
+    }
+
+    public async Task TriggerMediaTvdbResolutionAsync()
     {
         var settings = await _settingsRepository.GetSettingsAsync();
         if (!settings.ResolveMovieTvdbIds) return;
-        if (_metadataProviders.All(p => p.Id != TvdbMetadataProviderId)) return;
 
-        var ids = await _repository.GetMovieIdsMissingTvdbIdAsync();
+        var ids = await _repository.GetMediaIdsMissingTvdbIdAsync();
         var total = ids.Count;
         var count = 0;
 
@@ -314,15 +336,16 @@ public class MetadataManager : IMetadataManager
         {
             count++;
             var item = await _repository.GetForBasicUpdateAsync(id);
-            if (item is not Movie movie || !string.IsNullOrWhiteSpace(movie.TvdbId)) continue;
-            if (movie.IsLocked(nameof(movie.TvdbId))) continue;
+            if (item == null || !string.IsNullOrWhiteSpace(item.TvdbId) || item.IsLocked(nameof(item.TvdbId))) continue;
 
-            _progress.Report($"Resolving TVDB ids — {movie.Title} ({count}/{total})");
+            _progress.Report($"Resolving TVDB ids — {item.Title} ({count}/{total})");
 
-            await ResolveTvdbIdForMovieAsync(movie);
-            if (!string.IsNullOrWhiteSpace(movie.TvdbId))
+            if (item is Movie movie) await ResolveTvdbIdForMovieAsync(movie);
+            else if (item is TvShow show) await ResolveTvdbIdForShowAsync(show);
+
+            if (!string.IsNullOrWhiteSpace(item.TvdbId))
             {
-                await _repository.UpdateMediaItemAsync(movie);
+                await _repository.UpdateMediaItemAsync(item);
             }
         }
 

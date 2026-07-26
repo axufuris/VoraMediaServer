@@ -28,10 +28,10 @@ public partial class MediaRepository : IMediaRepository
     public async Task<List<Guid>> GetEpisodeIdsForShowAsync(Guid tvShowId) =>
         await _context.Set<Episode>().AsNoTracking().Where(e => e.Season != null && e.Season.TvShowId == tvShowId).Select(e => e.Id).ToListAsync();
 
-    public Task<List<Guid>> GetMovieIdsMissingTvdbIdAsync() =>
-        _context.Set<Movie>()
+    public Task<List<Guid>> GetMediaIdsMissingTvdbIdAsync() =>
+        _context.MediaItems
             .AsNoTracking()
-            .Where(m => m.TvdbId == null)
+            .Where(m => (m is Movie || m is TvShow) && m.TvdbId == null)
             .Select(m => m.Id)
             .ToListAsync();
 
