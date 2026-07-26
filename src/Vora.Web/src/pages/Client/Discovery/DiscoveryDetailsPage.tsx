@@ -175,7 +175,7 @@ export default function DiscoveryDetailsPage() {
                     <CinematicBackdrop src={details.backgroundUrl} intensity="detail" parallax transitionKey={details.externalId} />
                 </div>
 
-                <div className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-12 pt-8">
+                <div className="relative z-10 px-12 pt-8">
                     <button
                         type="button"
                         onClick={() => navigate(-1)}

@@ -283,20 +283,31 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
             if (el.TryGetProperty("combined_credits", out var credits) && credits.TryGetProperty("cast", out var cast))
             {
                 var sortedCast = cast.EnumerateArray()
-                    .OrderByDescending(c => c.TryGetProperty("popularity", out var pop) ? pop.GetDouble() : 0)
-                    .Take(40);
+                    .OrderByDescending(c => c.TryGetProperty("popularity", out var pop) ? pop.GetDouble() : 0);
+
+                // combined_credits.cast returns one entry per credit, so the same
+                // title repeats when a person has multiple roles/characters in it.
+                // Dedup by (type, id) — keeping the highest-popularity occurrence
+                // via the sort above — then cap at 40 unique titles.
+                var seenKeys = new HashSet<string>();
 
                 foreach (var role in sortedCast)
                 {
+                    if (actor.Filmography.Count >= 40) break;
+
                     var mediaType = role.TryGetProperty("media_type", out var mt) ? mt.GetString() : "movie";
                     if (mediaType != "movie" && mediaType != "tv") continue;
+                    if (!role.TryGetProperty("id", out var idProp) || idProp.ValueKind != JsonValueKind.Number) continue;
+
+                    var externalId = idProp.GetInt32().ToString();
+                    if (!seenKeys.Add($"{mediaType}:{externalId}")) continue;
 
                     var rawDate = role.TryGetProperty(mediaType == "tv" ? "first_air_date" : "release_date", out var rd) ? rd.GetString() : "";
                     var parsedDate = DateTime.TryParse(rawDate, out var date) ? (DateTime?)DateTime.SpecifyKind(date, DateTimeKind.Utc) : null;
 
                     actor.Filmography.Add(new DiscoveryItemDto
                     {
-                        ExternalId = role.GetProperty("id").GetInt32().ToString(),
+                        ExternalId = externalId,
                         ProviderId = Id,
                         Type = mediaType == "tv" ? "TvShow" : "Movie",
                         Title = role.TryGetProperty(mediaType == "tv" ? "name" : "title", out var t) ? t.GetString() ?? "Unknown" : "Unknown",

@@ -39,7 +39,7 @@ public static class DiscoveryEndpoints
             .Produces(StatusCodes.Status404NotFound);
         group.MapGet("/actor/{providerId}/{externalId}", GetActorAsync)
             .WithName("GetDiscoveryActor")
-            .Produces<DiscoveryActorDto>(StatusCodes.Status200OK)
+            .Produces<Vora.Application.Discovery.ViewModels.DiscoveryActorVM>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
         group.MapGet("/search", SearchAsync)
             .WithName("SearchDiscovery")

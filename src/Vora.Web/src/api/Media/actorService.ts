@@ -15,6 +15,7 @@ export interface ActorFilmographyItem {
 
 export interface ActorProfile {
     id: string;
+    tmdbId: number;
     name: string;
     profileImageUrl?: string;
     biography?: string;

@@ -1,14 +1,21 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { actorService, type ActorProfile } from '../../../api/Media/actorService';
+import { discoveryService, type DiscoveryActor } from '../../../api/Discovery/discoveryService';
+import { useFeatureFlags } from '../../../hooks/useFeatureFlags';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
 import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import InLibraryBadge from '../../../components/Client/Primitives/InLibraryBadge';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
+
+const DISCOVERY_PROVIDER = 'tmdb_discovery';
 
 export default function ActorDetailsPage() {
     const { serverId, id } = useParams<{ serverId?: string, id: string }>();
     const navigate = useNavigate();
+    const flags = useFeatureFlags();
     const [actor, setActor] = useState<ActorProfile | null>(null);
+    const [knownFor, setKnownFor] = useState<DiscoveryActor | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -22,6 +29,20 @@ export default function ActorDetailsPage() {
 
         return () => { isMounted = false; };
     }, [id, serverId]);
+
+    // When Discover is enabled and the actor has a TMDB id, pull their wider
+    // "Known For" list so the in-library filmography isn't the whole picture.
+    useEffect(() => {
+        let isMounted = true;
+        setKnownFor(null);
+        if (!flags.discover || !actor?.tmdbId) return;
+
+        discoveryService.getActorDetails(DISCOVERY_PROVIDER, actor.tmdbId.toString(), serverId)
+            .then(res => { if (isMounted) setKnownFor(res); })
+            .catch(() => { /* discovery may be unavailable — just skip the row */ });
+
+        return () => { isMounted = false; };
+    }, [flags.discover, actor?.tmdbId, serverId]);
 
     const calculateAge = (birthday?: string, deathday?: string) => {
         if (!birthday) return null;
@@ -151,6 +172,29 @@ export default function ActorDetailsPage() {
                                     fill
                                 />
                             ))}
+                        </div>
+                    </div>
+                )}
+
+                {knownFor && knownFor.filmography.length > 0 && (
+                    <div className="mt-16 px-12">
+                        <h2 className="m-0 mb-6 pb-2 text-xl font-semibold" style={{ color: 'var(--vora-text-primary)', borderBottom: '1px solid var(--vora-border-subtle)', letterSpacing: '-0.01em' }}>
+                            Known For
+                        </h2>
+                        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
+                            {[...knownFor.filmography]
+                                .sort((a, b) => (b.year || 0) - (a.year || 0))
+                                .map((item, idx) => (
+                                    <MediaPoster
+                                        key={`${item.externalId}-${idx}`}
+                                        imageUrl={item.posterUrl}
+                                        title={item.title}
+                                        subtitle={item.year ? item.year.toString() : 'Unknown year'}
+                                        badge={item.inLibrary ? <InLibraryBadge /> : undefined}
+                                        onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${DISCOVERY_PROVIDER}/${item.type}/${item.externalId}` : `/discovery/${DISCOVERY_PROVIDER}/${item.type}/${item.externalId}`)}
+                                        fill
+                                    />
+                                ))}
                         </div>
                     </div>
                 )}
