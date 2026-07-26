@@ -11,7 +11,7 @@ public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[]
 
 public interface IStreamManager
 {
-    Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null);
+    Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
     Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null);
     Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search);
     Task PingSessionAsync(Guid sessionId, double currentPosition, double duration, bool isPaused);
@@ -43,7 +43,7 @@ public class StreamManager : IStreamManager
         _transcodeService = transcodeService;
     }
 
-    public async Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null)
+    public async Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null)
     {
         var mediaInfo = await _repository.GetMediaStreamInfoAsync(mediaId);
         if (mediaInfo == null || !mediaInfo.Parts.Any()) throw new InvalidOperationException("Media not found or has no parts.");
@@ -112,7 +112,7 @@ public class StreamManager : IStreamManager
             }
         }
 
-        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0);
+        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId);
 
         var selectedPart = mediaInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);
         var selectedVideo = selectedPart?.VideoTracks.FirstOrDefault(v => v.Id == decision.SelectedVideoTrackId);

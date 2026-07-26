@@ -275,7 +275,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         string? tvdbId = provider == "tvdb" ? providerId : null;
 
         var movieId = await _ingestionService.EnsureMovieAsync(library, title, year, tmdbId, imdbId, tvdbId, edition);
-        await _ingestionService.AddMediaPartAsync(movieId, filePath, resolution);
+        await _ingestionService.AddMediaPartAsync(movieId, filePath, resolution, edition);
         return movieId.Value;
     }
 
@@ -405,7 +405,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
         var episodeId = await _ingestionService.EnsureEpisodeAsync(library, seasonId, episodeNumber, finalTitle, airDate, edition);
 
-        await _ingestionService.AddMediaPartAsync(episodeId, filePath, resolution);
+        await _ingestionService.AddMediaPartAsync(episodeId, filePath, resolution, edition);
 
         return new ScanFileResult(episodeId.Value, showId.Value, newSeason);
     }

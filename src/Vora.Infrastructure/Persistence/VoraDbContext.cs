@@ -399,6 +399,7 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.Container).HasMaxLength(32);
             entity.Property(e => e.Resolution).HasMaxLength(16);
             entity.Property(e => e.VersionName).HasMaxLength(128);
+            entity.Property(e => e.Edition).HasMaxLength(64);
 
             entity.HasMany(e => e.VideoTracks)
                   .WithOne(e => e.MediaPart)

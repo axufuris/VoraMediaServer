@@ -28,7 +28,7 @@ public interface IMediaIngestionService
     Task<AlbumHandle> EnsureAlbumAsync(LibraryHandle library, ArtistHandle artist, string title, int? year, string? genre, byte[]? artworkBytes, string? artworkMimeType, byte[]? backgroundBytes = null, string? backgroundMimeType = null, byte[]? discArtBytes = null, string? discArtMimeType = null, string? albumArtist = null, bool isCompilation = false);
     Task<MediaItemHandle> EnsureTrackAsync(LibraryHandle library, AlbumHandle album, string title, int trackNumber, int? discNumber, int? durationSeconds, string? audioCodec, int? sampleRate, int? bitrate, string? contentRating, string? trackArtist = null);
 
-    Task AddMediaPartAsync(MediaItemHandle item, string filePath, string? resolution);
+    Task AddMediaPartAsync(MediaItemHandle item, string filePath, string? resolution, string? edition = null);
 
     Task AttachLocalExtraAsync(LibraryHandle library, string parentTitle, int? parentYear, string filePath, string extraType, string title);
     Task AttachTvShowLocalExtraAsync(LibraryHandle library, string showTitle, string filePath, string extraType, string title);

@@ -74,6 +74,12 @@ public sealed class VoraApiTestFactory : WebApplicationFactory<Program>
             // this just bypasses the DB-backed stamp check.
             services.RemoveAll<Vora.Application.Auth.IJwtSecurityStampValidator>();
             services.AddScoped<Vora.Application.Auth.IJwtSecurityStampValidator, AlwaysValidStampValidator>();
+
+            // Background workers aren't needed for endpoint/auth tests and can throw
+            // during host shutdown on slower CI runners (e.g. touching the InMemory
+            // DB after its scope is torn down), which surfaces as a test-class cleanup
+            // failure. Strip them so the test host stays hermetic and shuts down cleanly.
+            services.RemoveAll<Microsoft.Extensions.Hosting.IHostedService>();
         });
     }
 

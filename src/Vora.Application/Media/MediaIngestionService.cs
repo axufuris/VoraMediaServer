@@ -352,18 +352,20 @@ public class MediaIngestionService : IMediaIngestionService
         return new MediaItemHandle(track.Id);
     }
 
-    public async Task AddMediaPartAsync(MediaItemHandle item, string filePath, string? resolution)
+    public async Task AddMediaPartAsync(MediaItemHandle item, string filePath, string? resolution, string? edition = null)
     {
         var fileInfo = new FileInfo(filePath);
         var part = new MediaPart
         {
             FilePath = filePath,
             Resolution = resolution,
+            Edition = edition,
             FileSizeBytes = fileInfo.Length,
             MediaItemId = item.Value,
             Container = Path.GetExtension(filePath).TrimStart('.').ToLower()
         };
         await _repository.AddMediaPartAsync(part);
+        await _repository.SyncItemEditionFromPartsAsync(item.Value);
     }
 
     public async Task AttachLocalExtraAsync(LibraryHandle library, string parentTitle, int? parentYear, string filePath, string extraType, string title)

@@ -50,6 +50,7 @@ public interface IMediaRepository
     Task RestoreMissingMediaAsync(Guid id);
     Task DeleteMediaItemAsync(Guid id);
     Task AddMediaPartAsync(MediaPart part);
+    Task SyncItemEditionFromPartsAsync(Guid mediaItemId);
     Task AddMediaCastMembersAsync(IEnumerable<MediaCastMember> castMembers);
     Task RemoveMediaCastMembersAsync(IEnumerable<MediaCastMember> castMembers);
     Task SetMediaCompaniesAsync(Guid mediaItemId, IEnumerable<int> companyIds);

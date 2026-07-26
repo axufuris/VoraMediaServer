@@ -197,7 +197,7 @@ export default function DvrPage() {
                             <div className="space-y-2 text-sm text-[var(--vora-text-secondary)]">
                                 <p>
                                     Recordings are automatically converted to MP4 using your{' '}
-                                    <a className="text-[var(--vora-accent-text)] hover:text-[var(--vora-accent-active)] hover:underline" href={serverId ? `/server/${serverId}/admin/settings` : '/admin/settings'}>
+                                    <a className="text-[var(--vora-accent-text)] hover:text-[var(--vora-accent-active)] hover:underline" href={serverId ? `/admin/server/${serverId}/settings` : '/admin/settings'}>
                                         global transcoding settings
                                     </a>
                                     . The raw .ts file is deleted on successful conversion.

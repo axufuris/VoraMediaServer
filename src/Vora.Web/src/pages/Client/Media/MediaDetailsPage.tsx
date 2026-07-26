@@ -207,9 +207,10 @@ export default function MediaDetailsPage() {
             const startPos = resume ? (media.resumePositionSeconds || 0) : 0;
             const subId = selectedSubtitleId === 'none' ? '00000000-0000-0000-0000-000000000000' : selectedSubtitleId;
 
-            const sessionInfo = await streamingService.startSession(media.id, deviceId, startPos, selectedVideoId || undefined, selectedAudioId || undefined, subId, serverId);
-
             const activePart = media.mediaParts?.find(p => p.videoTracks?.some(v => v.id === selectedVideoId)) || media.mediaParts?.[0];
+
+            const sessionInfo = await streamingService.startSession(media.id, deviceId, startPos, selectedVideoId || undefined, selectedAudioId || undefined, subId, serverId, activePart?.id);
+
             const activeVideoTrack = activePart?.videoTracks?.find(v => v.id === selectedVideoId) || activePart?.videoTracks?.[0];
             const activeAudioTrack = activePart?.audioTracks?.find(a => a.id === selectedAudioId) || activePart?.audioTracks?.[0];
 
@@ -320,6 +321,13 @@ export default function MediaDetailsPage() {
         }
     }, [media, isAdmin, serverId, dialog, reloadMedia]);
 
+    const handleVersionChange = (partId: string) => {
+        const part = media?.mediaParts?.find(p => p.id === partId);
+        if (!part) return;
+        const bestVideo = part.videoTracks?.find(v => v.isDefault) || part.videoTracks?.[0];
+        if (bestVideo) handleVideoChange(bestVideo.id);
+    };
+
     const handleVideoChange = (newVideoId: string) => {
         setSelectedVideoId(newVideoId);
         const newPart = media?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === newVideoId));
@@ -396,6 +404,14 @@ export default function MediaDetailsPage() {
             sublabel: [s.title, s.isForced ? 'Forced' : null, s.isDefault ? 'Default' : null].filter(Boolean).join(' · ') || undefined,
         })),
     ];
+    const versionOptions: QualityOption<string>[] = (media.mediaParts ?? []).map((p, i) => {
+        const displayRes = p.resolution === '2160p' ? '4K' : (p.resolution || `Version ${i + 1}`);
+        return {
+            value: p.id,
+            label: p.edition || displayRes,
+            sublabel: [p.edition ? displayRes : null, p.bitrateKbps ? `${Math.round(p.bitrateKbps / 1000)} Mbps` : null].filter(Boolean).join(' · ') || undefined,
+        };
+    });
 
     let nextEpisode: UpcomingEpisodeParsed | null = null;
     if (media.upcomingEpisodesJson && media.upcomingEpisodesJson !== '[]') {
@@ -417,7 +433,7 @@ export default function MediaDetailsPage() {
     const showParentNav = (isEpisode && !!media.seasonId) || (isSeason && !!media.tvShowId);
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = (isSeason || isEpisode) ? media.title : undefined;
-    const showQualityButton = (media.type === 'Movie' || isEpisode) && (sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
+    const showQualityButton = (media.type === 'Movie' || isEpisode) && (versionOptions.length > 1 || sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
     const playLabel = media.type === 'TvShow' ? 'Play next' : inProgress ? 'Resume' : 'Play';
     const playRuntime = formatRuntime(media.durationMinutes);
 
@@ -429,6 +445,9 @@ export default function MediaDetailsPage() {
             <MarkerEditorModal isOpen={isMarkerEditorOpen} onClose={() => setIsMarkerEditorOpen(false)} mediaItemId={media.id} mediaItemTitle={media.title} durationSeconds={media.durationMinutes ? media.durationMinutes * 60 : undefined} serverId={serverId} onSaved={reloadMedia} />
 
             <QualityPanel open={isQualityPanelOpen} onClose={() => setIsQualityPanelOpen(false)}>
+                {versionOptions.length > 1 && (
+                    <QualityPanelSection title="Version" options={versionOptions} value={activePart?.id ?? ''} onChange={handleVersionChange} />
+                )}
                 {videoOptions.length > 0 && (
                     <QualityPanelSection title="Video" options={videoOptions} value={selectedVideoId} onChange={handleVideoChange} />
                 )}

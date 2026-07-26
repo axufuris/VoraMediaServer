@@ -712,6 +712,33 @@ public partial class MediaRepository : IMediaRepository
             .ExecuteUpdateAsync(s => s.SetProperty(m => m.MissingSince, (DateTime?)null));
     }
 
+    public async Task SyncItemEditionFromPartsAsync(Guid mediaItemId)
+    {
+        var item = await _context.MediaItems
+            .Include(m => m.MediaParts)
+            .FirstOrDefaultAsync(m => m.Id == mediaItemId);
+        if (item == null) return;
+
+        var bestEdition = item.MediaParts
+            .OrderByDescending(p => ResolutionRank(p.Resolution))
+            .ThenBy(p => p.Id)
+            .Select(p => p.Edition)
+            .FirstOrDefault();
+
+        if (item.Edition != bestEdition)
+        {
+            item.Edition = bestEdition;
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    private static int ResolutionRank(string? resolution)
+    {
+        if (string.IsNullOrWhiteSpace(resolution)) return 0;
+        var digits = new string(resolution.Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var value) ? value : 0;
+    }
+
     public async Task AddMediaCastMembersAsync(IEnumerable<MediaCastMember> castMembers)
     {
         if (castMembers.Any())

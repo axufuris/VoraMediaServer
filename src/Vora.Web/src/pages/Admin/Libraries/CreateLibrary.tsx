@@ -132,7 +132,7 @@ export default function CreateLibrary() {
         try {
             await libraryAdminService.createLibrary(library, serverId);
             await dialog.alert('Library created. The initial scan has started in the background.');
-            navigate(serverId ? `/server/${serverId}/admin/libraries` : '/admin/libraries');
+            navigate(serverId ? `/admin/server/${serverId}/libraries` : '/admin/libraries');
         } catch (err) {
             await dialog.alert('Failed to create library.');
             console.error(err);
@@ -156,7 +156,7 @@ export default function CreateLibrary() {
     const isTvShow = library.type === 2;
     const showVideoOptions = library.type === 1 || library.type === 2;
     const showVideoPreviewThumbnails = library.type === 1 || library.type === 2 || library.type === 4;
-    const backUrl = serverId ? `/server/${serverId}/admin/libraries` : '/admin/libraries';
+    const backUrl = serverId ? `/admin/server/${serverId}/libraries` : '/admin/libraries';
 
     return (
         <div data-vora-page="">

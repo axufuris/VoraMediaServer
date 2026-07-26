@@ -271,7 +271,7 @@ export default function ManageLibrary() {
             async () => {
                 try {
                     await libraryAdminService.deleteLibrary(library.id, serverId);
-                    navigate(serverId ? `/server/${serverId}/admin/libraries` : '/admin/libraries');
+                    navigate(serverId ? `/admin/server/${serverId}/libraries` : '/admin/libraries');
                 } catch (err) {
                     showAlert('Error', 'Failed to delete library. Please check the console.');
                     console.error(err);
@@ -298,7 +298,7 @@ export default function ManageLibrary() {
     const isTvShow = library.type.toLowerCase() === 'tvshow';
     const showVideoOptions = library.type.toLowerCase() === 'movie' || library.type.toLowerCase() === 'tvshow';
     const showVideoPreviewThumbnails = library.type.toLowerCase() === 'movie' || library.type.toLowerCase() === 'tvshow' || library.type.toLowerCase() === 'homevideo';
-    const backUrl = serverId ? `/server/${serverId}/admin/libraries` : '/admin/libraries';
+    const backUrl = serverId ? `/admin/server/${serverId}/libraries` : '/admin/libraries';
 
     return (
         <div data-vora-page="">

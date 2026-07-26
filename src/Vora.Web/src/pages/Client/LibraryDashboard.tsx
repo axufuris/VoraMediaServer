@@ -42,7 +42,7 @@ export default function LibraryDashboard() {
                     activeTab === 'libraries' && (
                         <button
                             type="button"
-                            onClick={() => navigate(serverId ? `/server/${serverId}/admin/libraries/new` : '/admin/libraries/new')}
+                            onClick={() => navigate(serverId ? `/admin/server/${serverId}/libraries/new` : '/admin/libraries/new')}
                             className="vora-button-primary flex items-center gap-2"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
@@ -75,7 +75,7 @@ export default function LibraryDashboard() {
                                 title="No libraries yet"
                                 description="Add a library to start indexing your media."
                                 actionLabel="Add library"
-                                onAction={() => navigate(serverId ? `/server/${serverId}/admin/libraries/new` : '/admin/libraries/new')}
+                                onAction={() => navigate(serverId ? `/admin/server/${serverId}/libraries/new` : '/admin/libraries/new')}
                             />
                         </div>
                     ) : (
@@ -86,7 +86,7 @@ export default function LibraryDashboard() {
                                     title={lib.name}
                                     subtitle={LIBRARY_TYPE_LABEL[lib.type] ?? lib.type}
                                     badge={<HealthBadge tone={lib.isBeingWatched ? 'ok' : 'neutral'}>{lib.isBeingWatched ? 'Watching' : 'Idle'}</HealthBadge>}
-                                    onClick={() => navigate(serverId ? `/server/${serverId}/admin/libraries/${lib.id}/manage` : `/admin/libraries/${lib.id}/manage`)}
+                                    onClick={() => navigate(serverId ? `/admin/server/${serverId}/libraries/${lib.id}/manage` : `/admin/libraries/${lib.id}/manage`)}
                                     footer={
                                         <div className="text-xs font-semibold text-[var(--vora-accent-text)] text-right">
                                             Manage settings →

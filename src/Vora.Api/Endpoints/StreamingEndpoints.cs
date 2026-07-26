@@ -18,7 +18,8 @@ public record StartStreamRequest(
     Guid? VideoTrackId,
     Guid? AudioTrackId,
     Guid? SubtitleTrackId,
-    DeviceCapsDto? Capabilities);
+    DeviceCapsDto? Capabilities,
+    Guid? MediaPartId = null);
 
 public record StartExtraStreamRequest(Guid ExtraId, double StartPosition, DeviceCapsDto? Capabilities);
 
@@ -81,7 +82,8 @@ public static class StreamingEndpoints
                 req.VideoTrackId,
                 req.AudioTrackId,
                 req.SubtitleTrackId,
-                req.Capabilities);
+                req.Capabilities,
+                req.MediaPartId);
 
             return Results.Ok(new StartStreamResponse
             {
