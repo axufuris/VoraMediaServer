@@ -130,6 +130,7 @@ export interface MediaItem {
     resumePositionSeconds?: number;
     unplayedItemCount?: number;
     libraryId: string;
+    libraryArtworkProviderId?: string;
     upcomingEpisodesJson?: string;
     collectionIds: string[];
     genres?: string[];

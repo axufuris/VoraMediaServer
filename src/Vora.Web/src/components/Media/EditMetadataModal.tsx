@@ -14,7 +14,7 @@ interface EditMetadataModalProps {
     onSaved: () => void;
     itemId: string;
     type: 'media' | 'season';
-    initialData: UpdateMediaRequest & { lockedFields?: string[] };
+    initialData: UpdateMediaRequest & { lockedFields?: string[]; libraryArtworkProviderId?: string };
 }
 
 export default function EditMetadataModal({
@@ -67,9 +67,18 @@ export default function EditMetadataModal({
 
     useEffect(() => {
         if (isOpen && type === 'media') {
-            pluginAdminService.getArtworkProviders(serverId).then(setArtworkProviders).catch(console.error);
+            pluginAdminService.getArtworkProviders(serverId).then(providers => {
+                setArtworkProviders(providers);
+                // Pre-select the library's default provider (falling back to TMDB)
+                // so the dropdown names the provider the fetch actually uses,
+                // instead of showing the generic "Default provider" placeholder.
+                const defaultId = initialData.libraryArtworkProviderId || 'tmdb_artwork';
+                if (providers.some(p => p.id === defaultId)) {
+                    setSelectedProviderId(defaultId);
+                }
+            }).catch(console.error);
         }
-    }, [isOpen, type, serverId]);
+    }, [isOpen, type, serverId, initialData.libraryArtworkProviderId]);
 
     const handleFetchProvider = useCallback(() => {
         setLoadingArt(true);
