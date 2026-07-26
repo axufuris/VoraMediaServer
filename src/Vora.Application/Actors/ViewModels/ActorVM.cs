@@ -30,6 +30,7 @@ public class ActorVM
             Filmography = a.Roles.Select(r => new ActorRoleVM
             {
                 Id = r.MediaItem.Id,
+                TmdbId = r.MediaItem.TmdbId,
                 Title = r.MediaItem.Title,
                 SortTitle = r.MediaItem.SortTitle,
                 ReleaseDate = r.MediaItem.ReleaseDate,

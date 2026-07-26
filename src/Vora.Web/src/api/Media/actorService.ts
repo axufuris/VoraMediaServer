@@ -2,6 +2,7 @@ import { apiClient } from '../client';
 
 export interface ActorFilmographyItem {
     id: string;
+    tmdbId?: string;
     title: string;
     sortTitle?: string;
     releaseDate?: string;

@@ -61,6 +61,18 @@ export default function ActorDetailsPage() {
         return uniqueRoles.length > 0 ? uniqueRoles.join(', ') : 'Actor';
     }, [actor]);
 
+    // Exclude Known For titles the actor already appears in locally (shown in
+    // Filmography), matched by TMDB id + type.
+    const knownForFiltered = useMemo(() => {
+        if (!knownFor) return [];
+        const owned = new Set(
+            (actor?.filmography ?? [])
+                .filter(f => f.tmdbId)
+                .map(f => `${f.type}:${f.tmdbId}`)
+        );
+        return knownFor.filmography.filter(i => !owned.has(`${i.type}:${i.externalId}`));
+    }, [knownFor, actor]);
+
     if (loading) {
         return (
             <div>
@@ -176,13 +188,13 @@ export default function ActorDetailsPage() {
                     </div>
                 )}
 
-                {knownFor && knownFor.filmography.length > 0 && (
+                {knownForFiltered.length > 0 && (
                     <div className="mt-16 px-12">
                         <h2 className="m-0 mb-6 pb-2 text-xl font-semibold" style={{ color: 'var(--vora-text-primary)', borderBottom: '1px solid var(--vora-border-subtle)', letterSpacing: '-0.01em' }}>
                             Known For
                         </h2>
                         <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
-                            {[...knownFor.filmography]
+                            {knownForFiltered
                                 .sort((a, b) => (b.year || 0) - (a.year || 0))
                                 .map((item, idx) => (
                                     <MediaPoster

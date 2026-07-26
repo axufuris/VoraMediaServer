@@ -288,12 +288,12 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
                 // combined_credits.cast returns one entry per credit, so the same
                 // title repeats when a person has multiple roles/characters in it.
                 // Dedup by (type, id) — keeping the highest-popularity occurrence
-                // via the sort above — then cap at 40 unique titles.
+                // via the sort above — then cap at 100 unique titles.
                 var seenKeys = new HashSet<string>();
 
                 foreach (var role in sortedCast)
                 {
-                    if (actor.Filmography.Count >= 40) break;
+                    if (actor.Filmography.Count >= 100) break;
 
                     var mediaType = role.TryGetProperty("media_type", out var mt) ? mt.GetString() : "movie";
                     if (mediaType != "movie" && mediaType != "tv") continue;
