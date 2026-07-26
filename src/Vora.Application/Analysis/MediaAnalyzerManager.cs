@@ -25,6 +25,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     private readonly ISystemSettingsRepository _settingsRepo;
     private readonly ITaskQueueManager _taskQueueManager;
     private readonly IClientNotifier _notifier;
+    private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
     private readonly ILogger<MediaAnalyzerManager> _logger;
 
     public MediaAnalyzerManager(
@@ -34,6 +35,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         ISystemSettingsRepository settingsRepo,
         ITaskQueueManager taskQueueManager,
         IClientNotifier notifier,
+        Vora.Plugins.Interfaces.ITaskProgressReporter progress,
         ILogger<MediaAnalyzerManager> logger)
     {
         _mediaRepository = mediaRepository;
@@ -42,6 +44,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         _settingsRepo = settingsRepo;
         _taskQueueManager = taskQueueManager;
         _notifier = notifier;
+        _progress = progress;
         _logger = logger;
     }
 
@@ -67,9 +70,15 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
 
     public async Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null)
     {
-        var mediaIds = await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId);
+        var mediaIds = (await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId)).ToList();
+        var titles = await _mediaRepository.GetDisplayTitlesByIdsAsync(mediaIds);
+        var total = mediaIds.Count;
+        var count = 0;
+
         foreach (var id in mediaIds)
         {
+            count++;
+            _progress.Report($"Analyzing media — {ProgressTitle(titles, id)} ({count}/{total})");
             try
             {
                 await RunFileAnalysisAsync(id);
@@ -80,6 +89,9 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             }
         }
     }
+
+    private static string ProgressTitle(IReadOnlyDictionary<Guid, string> titles, Guid id) =>
+        titles.TryGetValue(id, out var t) && !string.IsNullOrWhiteSpace(t) ? t : "…";
 
     public async Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false)
     {
@@ -121,9 +133,14 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             if (isScheduleTrigger && settings.RunDetections != DetectionTrigger.OnSchedule && settings.RunDetections != DetectionTrigger.OnAdditionAndSchedule) return;
         }
 
-        var mediaIds = await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId);
+        var mediaIds = (await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId)).ToList();
+        var titles = await _mediaRepository.GetDisplayTitlesByIdsAsync(mediaIds);
+        var total = mediaIds.Count;
+        var count = 0;
+
         foreach (var id in mediaIds)
         {
+            count++;
             try
             {
                 var itemType = await _mediaRepository.GetProjectedAsync(id, m => m.GetType().Name);
@@ -131,6 +148,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
                 {
                     continue;
                 }
+                _progress.Report($"Detecting intro/credit markers — {ProgressTitle(titles, id)} ({count}/{total})");
                 await TriggerMediaItemSilenceDetectionAsync(id, forceOverride: forceOverride);
             }
             catch (Exception ex)

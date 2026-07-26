@@ -43,6 +43,7 @@ public class MediaAnalyzerManagerDetectionTests
 
         _manager = new MediaAnalyzerManager(
             _media, _analyzer, _assembler, _settings, _queue, _notifier,
+            new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
             NullLogger<MediaAnalyzerManager>.Instance);
     }
 
