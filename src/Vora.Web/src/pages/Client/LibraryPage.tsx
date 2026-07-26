@@ -639,6 +639,14 @@ export default function LibraryPage() {
 
     const availableLetters = useMemo(() => Object.keys(groupedItems).sort(), [groupedItems]);
 
+    // The rail stays A→Z for navigation, but the rendered sections must follow
+    // the sort direction — descending reverses the group order too, not just the
+    // items within each group.
+    const sectionLetters = useMemo(
+        () => (sortDir === 'desc' ? [...availableLetters].reverse() : availableLetters),
+        [availableLetters, sortDir]
+    );
+
     const showAsLetterRail = sortBy === 'title';
 
     // For the hero we prefer backdrops (item.backgroundUrl) since posters carry overlay
@@ -812,7 +820,7 @@ export default function LibraryPage() {
                                     description="Try a different filter, or switch back to 'All'."
                                 />
                             ) : showAsLetterRail ? (
-                                availableLetters.map(letter => (
+                                sectionLetters.map(letter => (
                                     <section key={letter} id={`letter-${letter}`} className="mb-10 scroll-mt-24">
                                         <h2 className="m-0 mb-4 text-base font-semibold" style={{ color: 'var(--vora-text-muted)', letterSpacing: '0.04em' }}>{letter}</h2>
                                         <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
