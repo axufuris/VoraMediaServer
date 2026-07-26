@@ -174,8 +174,16 @@ public class PosterOverlayManager : IPosterOverlayManager
             .OrderByDescending(p => ParseResolutionHeight(p.Resolution))
             .ThenBy(p => p.Id)
             .FirstOrDefault();
-        var bestAudioTrack = bestPart?.AudioTracks?.OrderByDescending(a => a.Channels).FirstOrDefault();
         var bestVideoTrack = bestPart?.VideoTracks?.FirstOrDefault();
+
+        // The audio badge advertises the best audio the title has, across every
+        // part (a lossless/Atmos track on a 1080p file still counts even if the
+        // 4K only carries EAC3). Rank by quality tier first, then channels.
+        var bestAudioTrack = item.MediaParts
+            .SelectMany(p => p.AudioTracks)
+            .OrderByDescending(AudioQualityTier)
+            .ThenByDescending(a => a.Channels ?? 0)
+            .FirstOrDefault();
 
         string? actualContentRating = item.ContentRating ?? await _mediaRepo.GetParentContentRatingAsync(item.Id);
 
@@ -281,6 +289,15 @@ public class PosterOverlayManager : IPosterOverlayManager
         if (string.IsNullOrWhiteSpace(resolution)) return 0;
         var digits = new string(resolution.Where(char.IsDigit).ToArray());
         return int.TryParse(digits, out var value) ? value : 0;
+    }
+
+    private static int AudioQualityTier(Domain.Entities.Media.MediaAudioTrack track)
+    {
+        var codec = track.Codec?.ToLowerInvariant() ?? string.Empty;
+        var title = track.Title?.ToLowerInvariant() ?? string.Empty;
+        if (codec.Contains("truehd") || codec.Contains("dts-hd") || title.Contains("atmos")) return 3;
+        if (codec.Contains("eac3") || codec.Contains("ac3") || (track.Channels ?? 0) >= 6) return 2;
+        return 1;
     }
 
     private void CleanupOldOverlay(string? currentUrl, string? originalUrl)
