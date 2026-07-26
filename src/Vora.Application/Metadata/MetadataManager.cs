@@ -323,11 +323,11 @@ public class MetadataManager : IMetadataManager
         }
     }
 
+    // Triggered explicitly by the admin "Resolve now" button, so it runs
+    // regardless of the persisted toggle (which only gates the automatic,
+    // during-refresh path) — otherwise clicking before saving silently no-ops.
     public async Task TriggerMediaTvdbResolutionAsync()
     {
-        var settings = await _settingsRepository.GetSettingsAsync();
-        if (!settings.ResolveMovieTvdbIds) return;
-
         var ids = await _repository.GetMediaIdsMissingTvdbIdAsync();
         var total = ids.Count;
         var count = 0;
