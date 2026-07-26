@@ -335,6 +335,24 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 </div>
             </SettingsCard>
 
+            <SettingsCard
+                title="Resolve TVDB ids for movies"
+                headingControl={
+                    <input
+                        type="checkbox"
+                        checked={serverSettings.resolveMovieTvdbIds}
+                        onChange={e => setServerSettings({ ...serverSettings, resolveMovieTvdbIds: e.target.checked })}
+                        className="w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer"
+                    />
+                }
+            >
+                <div className="pl-7">
+                    <FieldHint>
+                        Movies come from TMDB and have no TVDB id, so TVDB can't contribute posters/backdrops for them. When enabled, metadata refresh looks each movie up on TVDB (by IMDb id, then title/year) and stores the id so TVDB artwork becomes available. Requires a configured TVDB provider; adds one TVDB lookup per movie that lacks an id (skipped once resolved). Coverage is sparse — many movies aren't in TVDB.
+                    </FieldHint>
+                </div>
+            </SettingsCard>
+
             {scanners.length > 1 && (
                 <SettingsCard title="Local Media Scanner Engine">
                     <FieldLabel>Active Scanner Plugin</FieldLabel>

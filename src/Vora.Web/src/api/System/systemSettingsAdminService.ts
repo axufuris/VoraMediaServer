@@ -23,6 +23,7 @@ export interface ServerSettings {
     localMediaScannerProviderId: string;
     enableTrashAutoPurge: boolean;
     missingMediaRetentionDays: number;
+    resolveMovieTvdbIds: boolean;
     registrationMode: number;
     internetUploadSpeedMbps: number;
     maxRemoteStreamBitrateMbps: number;

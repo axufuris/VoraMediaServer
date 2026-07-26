@@ -36,8 +36,12 @@ public class MetadataManagerTests
         _media.GetDisplayTitlesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>())
             .Returns(new Dictionary<Guid, string>());
 
+        var settingsRepo = Substitute.For<Vora.Application.Settings.ISystemSettingsRepository>();
+        settingsRepo.GetSettingsAsync().Returns(new Vora.Domain.Entities.Settings.ServerSetting());
+
         _manager = new MetadataManager(
             _media, _actors, _scopeFactory, _notifier, _fetch, _mapping,
+            settingsRepo, Array.Empty<Vora.Plugins.Interfaces.IMetadataProvider>(),
             new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
             NullLogger<MetadataManager>.Instance);
     }

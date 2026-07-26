@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Vora.Application.Actors;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
+using Vora.Application.Settings;
 using Vora.Domain.Entities.Media;
 
 namespace Vora.Application.Metadata;
@@ -30,8 +31,12 @@ public class MetadataManager : IMetadataManager
     private readonly IClientNotifier _notifier;
     private readonly IMetadataFetchService _fetchService;
     private readonly IMetadataMappingService _mappingService;
+    private readonly ISystemSettingsRepository _settingsRepository;
+    private readonly IEnumerable<Vora.Plugins.Interfaces.IMetadataProvider> _metadataProviders;
     private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
     private readonly ILogger<MetadataManager> _logger;
+
+    private const string TvdbMetadataProviderId = "tvdb_metadata";
 
     public MetadataManager(
         IMediaRepository repository,
@@ -40,6 +45,8 @@ public class MetadataManager : IMetadataManager
         IClientNotifier notifier,
         IMetadataFetchService fetchService,
         IMetadataMappingService mappingService,
+        ISystemSettingsRepository settingsRepository,
+        IEnumerable<Vora.Plugins.Interfaces.IMetadataProvider> metadataProviders,
         Vora.Plugins.Interfaces.ITaskProgressReporter progress,
         ILogger<MetadataManager> logger)
     {
@@ -49,6 +56,8 @@ public class MetadataManager : IMetadataManager
         _notifier = notifier;
         _fetchService = fetchService;
         _mappingService = mappingService;
+        _settingsRepository = settingsRepository;
+        _metadataProviders = metadataProviders;
         _progress = progress;
         _logger = logger;
     }
@@ -182,6 +191,7 @@ public class MetadataManager : IMetadataManager
         if (textFetch.Metadata != null)
         {
             await _mappingService.ApplyTextMetadataAsync(item, textFetch.Metadata, forceOverride, textFetch.ProviderId, textFetch.ProviderName);
+            await TryResolveMovieTvdbIdAsync(item, forceOverride);
             await _repository.UpdateMediaItemAsync(item);
         }
         else if (item is Season season)
@@ -242,6 +252,45 @@ public class MetadataManager : IMetadataManager
         foreach (var season in tvShow.Seasons)
         {
             await refreshFn(season.Id, forceOverride);
+        }
+    }
+
+    // Movies come from TMDB and never carry a TVDB id, so the TVDB artwork
+    // provider (which needs one) can't contribute. When the admin opts in, look
+    // the movie up on TVDB — by IMDb id first, then title/year — and store the
+    // resolved TVDB id so TVDB posters/backdrops become available.
+    private async Task TryResolveMovieTvdbIdAsync(MediaItem item, bool forceOverride)
+    {
+        if (item is not Movie movie) return;
+        if (!string.IsNullOrWhiteSpace(movie.TvdbId)) return;
+        if (movie.IsLocked(nameof(movie.TvdbId)) && !forceOverride) return;
+
+        var settings = await _settingsRepository.GetSettingsAsync();
+        if (!settings.ResolveMovieTvdbIds) return;
+
+        var provider = _metadataProviders.FirstOrDefault(p => p.Id == TvdbMetadataProviderId);
+        if (provider == null) return;
+
+        try
+        {
+            Vora.Plugins.Dtos.MetadataResult? result = null;
+            if (!string.IsNullOrWhiteSpace(movie.ImdbId))
+            {
+                result = await provider.FetchMovieMetadataByIdAsync(movie.ImdbId, "imdb");
+            }
+            if (string.IsNullOrWhiteSpace(result?.TvdbId) && !string.IsNullOrWhiteSpace(movie.Title))
+            {
+                result = await provider.FetchMovieMetadataAsync(movie.Title, movie.ReleaseDate?.Year);
+            }
+
+            if (!string.IsNullOrWhiteSpace(result?.TvdbId))
+            {
+                movie.TvdbId = result.TvdbId;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "TVDB id resolution failed for movie {MediaItemId}.", movie.Id);
         }
     }
 
