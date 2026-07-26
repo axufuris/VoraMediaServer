@@ -167,8 +167,15 @@ public class PosterOverlayManager : IPosterOverlayManager
 
         if (string.IsNullOrEmpty(physicalSourcePath) || !File.Exists(physicalSourcePath)) return;
 
-        var bestAudioTrack = item.MediaParts.FirstOrDefault()?.AudioTracks?.OrderByDescending(a => a.Channels).FirstOrDefault();
-        var bestVideoTrack = item.MediaParts.FirstOrDefault()?.VideoTracks?.FirstOrDefault();
+        // Badge attributes come from the best (highest-resolution) part, not an
+        // arbitrary one — so when a 4K file is added alongside an existing 1080p,
+        // the resolution/video/audio badges reflect the 4K version.
+        var bestPart = item.MediaParts
+            .OrderByDescending(p => ParseResolutionHeight(p.Resolution))
+            .ThenBy(p => p.Id)
+            .FirstOrDefault();
+        var bestAudioTrack = bestPart?.AudioTracks?.OrderByDescending(a => a.Channels).FirstOrDefault();
+        var bestVideoTrack = bestPart?.VideoTracks?.FirstOrDefault();
 
         string? actualContentRating = item.ContentRating ?? await _mediaRepo.GetParentContentRatingAsync(item.Id);
 
@@ -177,7 +184,7 @@ public class PosterOverlayManager : IPosterOverlayManager
             Id = item.Id,
             MediaType = mediaType,
             ContentRating = actualContentRating,
-            Resolution = item.MediaParts.FirstOrDefault()?.Resolution,
+            Resolution = bestPart?.Resolution,
             VideoFormat = bestVideoTrack?.HdrType,
             AudioCodec = bestAudioTrack?.Codec,
             HasStinger = item.HasMidCreditsStinger || item.HasPostCreditsStinger,
@@ -267,6 +274,13 @@ public class PosterOverlayManager : IPosterOverlayManager
         }
 
         return url;
+    }
+
+    private static int ParseResolutionHeight(string? resolution)
+    {
+        if (string.IsNullOrWhiteSpace(resolution)) return 0;
+        var digits = new string(resolution.Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var value) ? value : 0;
     }
 
     private void CleanupOldOverlay(string? currentUrl, string? originalUrl)
