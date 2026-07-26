@@ -97,9 +97,23 @@ public class FolderWatcherService : IFolderWatcherService
         if (!SupportedExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return;
 
         await Task.Delay(5000);
-        _logger.LogInformation("New media detected: {FilePath}. Triggering single-file ingestion.", filePath);
 
         using var scope = _serviceProvider.CreateScope();
+
+        // Honor the library's exclude filters here so excluded files (e.g. a
+        // *.TDARR copy still transcoding) don't even queue a scan task — the
+        // scanner would reject them anyway, but this keeps them off the task list.
+        var libraryManager = scope.ServiceProvider.GetRequiredService<ILibraryManager>();
+        var library = await libraryManager.GetLibraryByIdAsync(libraryId);
+        var fileName = Path.GetFileName(filePath);
+        if (library?.ExcludeFilters != null
+            && library.ExcludeFilters.Any(f => !string.IsNullOrWhiteSpace(f) && fileName.Contains(f.Trim(), StringComparison.OrdinalIgnoreCase)))
+        {
+            _logger.LogInformation("Skipping excluded file {FilePath}.", filePath);
+            return;
+        }
+
+        _logger.LogInformation("New media detected: {FilePath}. Triggering single-file ingestion.", filePath);
         var taskQueue = scope.ServiceProvider.GetRequiredService<ITaskQueueManager>();
         taskQueue.QueueScanNewFile(libraryId, filePath);
     }

@@ -86,7 +86,8 @@ public class MediaIngestionService : IMediaIngestionService
     public async Task<MediaItemHandle> EnsureMovieAsync(LibraryHandle library, string title, int? year, string? tmdbId, string? imdbId, string? tvdbId = null, string? edition = null)
     {
         var libraryId = library.Value;
-        var movieId = await _repository.GetMovieIdByTitleAndYearAsync(title, year, libraryId);
+        var movieId = await _repository.GetMovieIdByExternalIdAsync(tmdbId, imdbId, libraryId)
+            ?? await _repository.GetMovieIdByTitleAndYearAsync(title, year, libraryId);
         if (movieId.HasValue) return new MediaItemHandle(movieId.Value);
 
         var movie = new Movie

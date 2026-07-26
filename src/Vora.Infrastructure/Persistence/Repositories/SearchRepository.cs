@@ -34,9 +34,19 @@ public class SearchRepository(VoraDbContext context) : ISearchRepository
             _ => dbQuery
         };
 
-        var searchPattern = $"%{query}%";
+        // Match each word independently (case-insensitive via ILIKE) so results
+        // aren't tied to word order or exact spacing — e.g. "avatar water" finds
+        // "Avatar: The Way of Water".
+        var tokens = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length == 0) return new List<MediaSearchResultVM>();
+
+        foreach (var token in tokens)
+        {
+            var pattern = $"%{token}%";
+            dbQuery = dbQuery.Where(m => EF.Functions.ILike(m.Title, pattern));
+        }
+
         return await dbQuery
-            .Where(m => EF.Functions.ILike(m.Title, searchPattern))
             .OrderBy(m => m.Title)
             .Take(limit)
             .Select(MediaSearchResultVM.Projection)

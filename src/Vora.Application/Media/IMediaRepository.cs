@@ -11,6 +11,7 @@ public interface IMediaRepository
     Task<List<Guid>> GetEpisodeIdsForSeasonAsync(Guid seasonId);
     Task<List<Guid>> GetEpisodeIdsForShowAsync(Guid tvShowId);
     Task<Guid?> GetMovieIdByTitleAndYearAsync(string title, int? year, Guid libraryId);
+    Task<Guid?> GetMovieIdByExternalIdAsync(string? tmdbId, string? imdbId, Guid libraryId);
     Task<Guid?> GetTvShowIdByTitleAsync(string title, Guid libraryId);
     Task<Guid?> GetSeasonIdByNumberAsync(Guid tvShowId, int seasonNumber);
     Task<Guid?> GetEpisodeIdByNumberAsync(Guid seasonId, int episodeNumber);
@@ -26,6 +27,7 @@ public interface IMediaRepository
     Task<MediaItem?> GetForPosterOverlayAsync(Guid id);
     Task<MediaItem?> GetForMetadataSyncAsync(Guid id);
     Task<IEnumerable<Guid>> GetMediaIdsMissingMetadataAsync(Guid libraryId);
+    Task<IEnumerable<Guid>> GetMediaIdsMissingArtworkAsync(Guid libraryId);
     Task<IEnumerable<Guid>> GetMediaIdsMissingRatingsAsync(Guid libraryId);
     Task<List<Guid>> GetMediaIdsMissingTvdbIdAsync();
     Task<MediaItem?> GetForBasicUpdateAsync(Guid id);

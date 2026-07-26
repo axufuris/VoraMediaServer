@@ -67,10 +67,45 @@ public partial class MediaRepository : IMediaRepository
 
     public async Task<Guid?> GetMovieIdByTitleAndYearAsync(string title, int? year, Guid libraryId)
     {
-        return await _context.Set<Movie>()
-            .Where(m => m.Title == title && m.LibraryId == libraryId && (year == null || m.ReleaseDate!.Value.Year == year))
+        // Match on a normalized title (lowercased, punctuation stripped) so a
+        // freshly-parsed filename title still matches an existing item whose
+        // Title was rewritten by metadata — e.g. "Avatar The Way of Water" vs
+        // "Avatar: The Way of Water". Exact/case-sensitive matching here would
+        // create a duplicate item instead of merging the new file as a part.
+        var normalized = NormalizeTitle(title);
+        var candidates = await _context.Set<Movie>()
+            .AsNoTracking()
+            .Where(m => m.LibraryId == libraryId && (year == null || (m.ReleaseDate != null && m.ReleaseDate.Value.Year == year)))
+            .Select(m => new { m.Id, m.Title })
+            .ToListAsync();
+
+        return candidates.FirstOrDefault(c => NormalizeTitle(c.Title) == normalized)?.Id;
+    }
+
+    public Task<Guid?> GetMovieIdByExternalIdAsync(string? tmdbId, string? imdbId, Guid libraryId)
+    {
+        if (string.IsNullOrWhiteSpace(tmdbId) && string.IsNullOrWhiteSpace(imdbId))
+        {
+            return Task.FromResult<Guid?>(null);
+        }
+
+        return _context.Set<Movie>()
+            .AsNoTracking()
+            .Where(m => m.LibraryId == libraryId
+                && ((tmdbId != null && m.TmdbId == tmdbId) || (imdbId != null && m.ImdbId == imdbId)))
             .Select(m => (Guid?)m.Id)
             .FirstOrDefaultAsync();
+    }
+
+    private static string NormalizeTitle(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return string.Empty;
+        var sb = new System.Text.StringBuilder(title.Length);
+        foreach (var ch in title)
+        {
+            if (char.IsLetterOrDigit(ch)) sb.Append(char.ToLowerInvariant(ch));
+        }
+        return sb.ToString();
     }
 
     public async Task<Guid?> GetTvShowIdByTitleAsync(string title, Guid libraryId)
@@ -253,6 +288,14 @@ public partial class MediaRepository : IMediaRepository
                       m.ReleaseDate == null))
                 ))
             .OrderBy(m => m is TvShow ? 0 : m is Movie ? 0 : m is Season ? 1 : 2)
+            .Select(m => m.Id)
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<Guid>> GetMediaIdsMissingArtworkAsync(Guid libraryId)
+    {
+        return await _context.MediaItems
+            .Where(m => m.LibraryId == libraryId && m.PosterUrl == null)
             .Select(m => m.Id)
             .ToListAsync();
     }
