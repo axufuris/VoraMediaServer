@@ -5,6 +5,7 @@ namespace Vora.Application.Actors.ViewModels;
 public class ActorRoleVM
 {
     public Guid Id { get; set; }
+    public string? TmdbId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? SortTitle { get; set; }
     public DateTime? ReleaseDate { get; set; }

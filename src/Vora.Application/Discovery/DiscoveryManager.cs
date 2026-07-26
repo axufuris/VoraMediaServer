@@ -19,7 +19,7 @@ public interface IDiscoveryManager
     Task<List<UserWatchlistItem>> GetWatchlistAsync(Guid profileId);
     Task ToggleWatchlistAsync(Guid profileId, string externalId, string providerId, string type, string title, string? posterUrl, DateTime? expectedReleaseDate);
     Task<bool> CheckWatchlistStatusAsync(Guid profileId, string externalId, string providerId);
-    Task<DiscoveryActorDto?> GetActorDetailsAsync(string providerId, string externalId, CancellationToken cancellationToken = default);
+    Task<DiscoveryActorVM?> GetActorDetailsAsync(string providerId, string externalId, CancellationToken cancellationToken = default);
     Task<IEnumerable<DiscoveryItemVM>> SearchAsync(string query, CancellationToken cancellationToken = default);
     Task<IEnumerable<TheaterDto>> GetShowtimesAsync(string movieTitle, string location, DateTime date, int? maxTheaters);
     Task<bool> IsTheaterAutoLoadEnabledAsync();
@@ -240,7 +240,7 @@ public class DiscoveryManager(
     public Task<bool> CheckWatchlistStatusAsync(Guid profileId, string externalId, string providerId) =>
         repository.IsInWatchlistAsync(profileId, externalId, providerId);
 
-    public async Task<DiscoveryActorDto?> GetActorDetailsAsync(string providerId, string externalId, CancellationToken cancellationToken = default)
+    public async Task<DiscoveryActorVM?> GetActorDetailsAsync(string providerId, string externalId, CancellationToken cancellationToken = default)
     {
         var plugin = plugins.FirstOrDefault(p => p.Id == providerId);
         if (plugin == null)
@@ -250,7 +250,27 @@ public class DiscoveryManager(
 
         try
         {
-            return await plugin.GetActorDetailsAsync(externalId, cancellationToken);
+            var actor = await plugin.GetActorDetailsAsync(externalId, cancellationToken);
+            if (actor == null) return null;
+
+            var deduped = actor.Filmography
+                .Where(i => !string.IsNullOrWhiteSpace(i.ExternalId))
+                .GroupBy(i => (i.ExternalId, i.Type))
+                .Select(g => g.First())
+                .ToList();
+
+            return new DiscoveryActorVM
+            {
+                ExternalId = actor.ExternalId,
+                ProviderId = actor.ProviderId,
+                Name = actor.Name,
+                Biography = actor.Biography,
+                PlaceOfBirth = actor.PlaceOfBirth,
+                Birthday = actor.Birthday,
+                Deathday = actor.Deathday,
+                ProfileImageUrl = actor.ProfileImageUrl,
+                Filmography = await EnrichWithStatusAsync(deduped)
+            };
         }
         catch (Exception ex)
         {

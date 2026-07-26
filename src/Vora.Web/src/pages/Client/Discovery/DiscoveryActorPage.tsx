@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { discoveryService, type DiscoveryActor } from '../../../api/Discovery/discoveryService';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
 import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import InLibraryBadge from '../../../components/Client/Primitives/InLibraryBadge';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 
 export default function DiscoveryActorPage() {
@@ -129,6 +130,7 @@ export default function DiscoveryActorPage() {
                                     imageUrl={item.posterUrl}
                                     title={item.title}
                                     subtitle={item.year ? item.year.toString() : 'Unknown year'}
+                                    badge={item.inLibrary ? <InLibraryBadge /> : undefined}
                                     onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${providerId}/${item.type}/${item.externalId}` : `/discovery/${providerId}/${item.type}/${item.externalId}`)}
                                     fill
                                 />

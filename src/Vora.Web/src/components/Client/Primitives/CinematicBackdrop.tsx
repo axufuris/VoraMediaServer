@@ -65,7 +65,7 @@ export default function CinematicBackdrop({ src, intensity = 'detail', parallax,
                     opacity,
                     backgroundImage: currentSrc ? `url("${thumbUrl(currentSrc, 1280, 'backdrop')}")` : 'none',
                     backgroundSize: 'cover',
-                    backgroundPosition: 'center',
+                    backgroundPosition: 'center 20%',
                     backgroundColor: 'var(--vora-bg-sunken)',
                 }}
             />

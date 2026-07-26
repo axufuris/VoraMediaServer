@@ -28,6 +28,7 @@ public class ServerSettingsVM
     public string LocalMediaScannerProviderId { get; set; } = "Vora_scanner";
     public bool EnableTrashAutoPurge { get; set; } = true;
     public int MissingMediaRetentionDays { get; set; } = 30;
+    public bool ResolveMovieTvdbIds { get; set; }
     public int InternetUploadSpeedMbps { get; set; }
     public int MaxRemoteStreamBitrateMbps { get; set; }
     public int TranscodeQuality { get; set; }
@@ -95,6 +96,7 @@ public class ServerSettingsVM
             LocalMediaScannerProviderId = s.LocalMediaScannerProviderId,
             EnableTrashAutoPurge = s.EnableTrashAutoPurge,
             MissingMediaRetentionDays = s.MissingMediaRetentionDays,
+            ResolveMovieTvdbIds = s.ResolveMovieTvdbIds,
             InternetUploadSpeedMbps = s.InternetUploadSpeedMbps,
             MaxRemoteStreamBitrateMbps = s.MaxRemoteStreamBitrateMbps,
             TranscodeQuality = s.TranscodeQuality,

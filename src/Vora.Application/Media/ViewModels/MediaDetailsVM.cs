@@ -20,6 +20,7 @@ public class MediaDetailsVM
     public string? ContentRating { get; set; }
     public string? Resolution { get; set; }
     public Guid LibraryId { get; set; }
+    public string? LibraryArtworkProviderId { get; set; }
     public List<Guid> CollectionIds { get; set; } = new();
     public List<string> LockedFields { get; set; } = new();
     public decimal? ThirdPartyRating1 { get; set; }
@@ -67,6 +68,7 @@ public class MediaDetailsVM
             Resolution = item.MediaParts.FirstOrDefault() != null ? item.MediaParts.FirstOrDefault()!.Resolution : null,
             LockedFields = item.LockedFields,
             LibraryId = item.LibraryId,
+            LibraryArtworkProviderId = item.Library != null ? item.Library.ArtworkProviderId : null,
             ThirdPartyRating1 = item.ThirdPartyRating1,
             ThirdPartyRating1Name = item.ThirdPartyRating1Name,
             ThirdPartyRating2 = item.ThirdPartyRating2,

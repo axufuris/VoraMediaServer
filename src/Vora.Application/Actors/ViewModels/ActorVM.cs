@@ -7,6 +7,7 @@ namespace Vora.Application.Actors.ViewModels;
 public class ActorVM
 {
     public Guid Id { get; set; }
+    public int TmdbId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? ProfileImageUrl { get; set; }
     public string? Biography { get; set; }
@@ -19,6 +20,7 @@ public class ActorVM
         a => new ActorVM
         {
             Id = a.Id,
+            TmdbId = a.TmdbId,
             Name = a.Name,
             ProfileImageUrl = a.ProfileImageUrl,
             Biography = a.Biography,
@@ -28,6 +30,7 @@ public class ActorVM
             Filmography = a.Roles.Select(r => new ActorRoleVM
             {
                 Id = r.MediaItem.Id,
+                TmdbId = r.MediaItem.TmdbId,
                 Title = r.MediaItem.Title,
                 SortTitle = r.MediaItem.SortTitle,
                 ReleaseDate = r.MediaItem.ReleaseDate,

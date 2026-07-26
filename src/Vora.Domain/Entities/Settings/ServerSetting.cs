@@ -42,6 +42,8 @@ public class ServerSetting
     public bool EnableTrashAutoPurge { get; set; } = true;
     public int MissingMediaRetentionDays { get; set; } = 30;
 
+    public bool ResolveMovieTvdbIds { get; set; }
+
     public bool EnableRemoteAccess { get; set; } = true;
     public bool ManuallySpecifyPublicPort { get; set; }
     public int PublicPort { get; set; } = 32080;
