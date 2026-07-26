@@ -12,7 +12,7 @@ namespace Vora.Application.Artwork;
 
 public interface IArtworkService
 {
-    Task<IEnumerable<Vora.Plugins.Dtos.ArtworkResult>> GetArtworkOptionsAsync(Guid mediaItemId);
+    Task<IEnumerable<MediaArtworkVM>> GetArtworkOptionsAsync(Guid mediaItemId);
     Task RefreshProviderArtworkAsync(Guid mediaItemId, string? providerId);
     Task<string> UploadAsync(Guid mediaItemId, UploadedFile file, ArtworkKind kind);
     Task<string> AddUrlAsync(Guid mediaItemId, string url, ArtworkKind kind);
@@ -59,15 +59,15 @@ public class ArtworkService : IArtworkService
         }
     }
 
-    public async Task<IEnumerable<Vora.Plugins.Dtos.ArtworkResult>> GetArtworkOptionsAsync(Guid mediaItemId)
+    public async Task<IEnumerable<MediaArtworkVM>> GetArtworkOptionsAsync(Guid mediaItemId)
     {
         var artwork = await _repository.GetMediaArtworkAsync(mediaItemId);
-        return artwork.Select(a => new Vora.Plugins.Dtos.ArtworkResult
+        return artwork.Select(a => new MediaArtworkVM
         {
             Id = a.Id.ToString(),
             IsUserUploaded = a.IsUserUploaded,
             Url = a.Url,
-            Kind = (Vora.Plugins.Dtos.ArtworkKind)a.Kind,
+            Type = a.Kind.ToString(),
             Language = a.Language,
             Width = a.Width,
             Height = a.Height,
