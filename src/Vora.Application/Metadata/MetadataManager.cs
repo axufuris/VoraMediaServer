@@ -30,6 +30,7 @@ public class MetadataManager : IMetadataManager
     private readonly IClientNotifier _notifier;
     private readonly IMetadataFetchService _fetchService;
     private readonly IMetadataMappingService _mappingService;
+    private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
     private readonly ILogger<MetadataManager> _logger;
 
     public MetadataManager(
@@ -39,6 +40,7 @@ public class MetadataManager : IMetadataManager
         IClientNotifier notifier,
         IMetadataFetchService fetchService,
         IMetadataMappingService mappingService,
+        Vora.Plugins.Interfaces.ITaskProgressReporter progress,
         ILogger<MetadataManager> logger)
     {
         _repository = repository;
@@ -47,6 +49,7 @@ public class MetadataManager : IMetadataManager
         _notifier = notifier;
         _fetchService = fetchService;
         _mappingService = mappingService;
+        _progress = progress;
         _logger = logger;
     }
 
@@ -244,9 +247,18 @@ public class MetadataManager : IMetadataManager
 
     private async Task ProcessLibraryItemsAsync(Guid libraryId, IEnumerable<Guid> ids, string operation, Func<Guid, Task> refreshFn)
     {
+        var idList = ids as IReadOnlyList<Guid> ?? ids.ToList();
+        var total = idList.Count;
+        var titles = await _repository.GetDisplayTitlesByIdsAsync(idList);
+        var label = ProgressLabel(operation);
+
         var count = 0;
-        foreach (var id in ids)
+        foreach (var id in idList)
         {
+            count++;
+            var title = titles.TryGetValue(id, out var t) && !string.IsNullOrWhiteSpace(t) ? t : "…";
+            _progress.Report($"{label} — {title} ({count}/{total})");
+
             try
             {
                 await refreshFn(id);
@@ -256,7 +268,6 @@ public class MetadataManager : IMetadataManager
                 _logger.LogError(ex, "Library {Operation} refresh failed for {MediaItemId}.", operation, id);
             }
 
-            count++;
             if (count % NotificationBatchSize == 0)
             {
                 await _notifier.NotifyLibraryUpdatedAsync(libraryId);
@@ -265,6 +276,14 @@ public class MetadataManager : IMetadataManager
 
         await _notifier.NotifyLibraryUpdatedAsync(libraryId);
     }
+
+    private static string ProgressLabel(string operation) => operation switch
+    {
+        "metadata" => "Fetching metadata",
+        "artwork" => "Fetching artwork",
+        "ratings" => "Fetching ratings",
+        _ => $"Processing {operation}"
+    };
 
     private async Task NotifyItemAndParentsAsync(MediaItem item)
     {
