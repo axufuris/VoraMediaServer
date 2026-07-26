@@ -21,6 +21,7 @@ public class PosterOverlayManager : IPosterOverlayManager
     private readonly IEnumerable<IOverlayProvider> _providers;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ITaskProgressReporter _progress;
+    private readonly Vora.Application.Artwork.IArtworkThumbnailService _thumbnails;
     private readonly ILogger<PosterOverlayManager> _logger;
     private readonly string _overlayDirectory;
     private readonly string _originalArtworkCacheDir;
@@ -32,6 +33,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         IOptions<StoragePathsOptions> storagePaths,
         IHttpClientFactory httpClientFactory,
         ITaskProgressReporter progress,
+        Vora.Application.Artwork.IArtworkThumbnailService thumbnails,
         ILogger<PosterOverlayManager> logger)
     {
         _mediaRepo = mediaRepo;
@@ -39,6 +41,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         _providers = providers;
         _httpClientFactory = httpClientFactory;
         _progress = progress;
+        _thumbnails = thumbnails;
         _logger = logger;
 
         var configPath = storagePaths.Value.CustomArtwork;
@@ -272,6 +275,8 @@ public class PosterOverlayManager : IPosterOverlayManager
 
         if (currentUrl.StartsWith("/api/artwork/custom/", StringComparison.OrdinalIgnoreCase) && currentUrl.Contains("_overlay_"))
         {
+            _thumbnails.RemoveThumbnailsForSource(currentUrl);
+
             var oldFileName = currentUrl.Split('/').Last();
             var oldPhysicalPath = Path.Combine(_overlayDirectory, oldFileName);
 
