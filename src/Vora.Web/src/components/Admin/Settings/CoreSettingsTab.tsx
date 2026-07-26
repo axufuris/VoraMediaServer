@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { systemSettingsAdminService, type ServerSettings } from '../../../api/System/systemSettingsAdminService';
+import { libraryAdminService } from '../../../api/Media/libraryAdminService';
 import FolderPathInput from '../FolderBrowser/FolderPathInput';
 
 interface CoreSettingsTabProps {
@@ -336,7 +337,7 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
             </SettingsCard>
 
             <SettingsCard
-                title="Resolve TVDB ids for movies"
+                title="Resolve TVDB ids for movies & shows"
                 headingControl={
                     <input
                         type="checkbox"
@@ -348,8 +349,27 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
             >
                 <div className="pl-7">
                     <FieldHint>
-                        Movies come from TMDB and have no TVDB id, so TVDB can't contribute posters/backdrops for them. When enabled, metadata refresh looks each movie up on TVDB (by IMDb id, then title/year) and stores the id so TVDB artwork becomes available. Requires a configured TVDB provider; adds one TVDB lookup per movie that lacks an id (skipped once resolved). Coverage is sparse — many movies aren't in TVDB.
+                        Media from TMDB has no stored TVDB id, so the TVDB artwork provider can't contribute posters/backdrops. TV shows carry a TVDB id in TMDB's data, so they're filled in automatically during metadata refresh at no extra cost. Movies aren't cross-referenced by TMDB — when this is enabled, each movie missing an id is looked up on TVDB (by IMDb id, then title/year) and stored. Requires a configured TVDB provider; coverage is sparse for movies, so many won't resolve.
                     </FieldHint>
+                    {serverSettings.resolveMovieTvdbIds && (
+                        <div className="mt-4">
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    try {
+                                        await libraryAdminService.resolveTvdbIds(serverId);
+                                        showModal('Task queued', 'Resolving TVDB ids for movies and shows that are missing one — watch progress under Background Tasks. If you just enabled this setting, save it first so the pass sees it as on.');
+                                    } catch {
+                                        showModal('Failed', 'Could not queue the TVDB id resolution.', true);
+                                    }
+                                }}
+                                className="vora-button-secondary"
+                            >
+                                Resolve now for existing movies &amp; shows
+                            </button>
+                            <FieldHint>One-time backfill for items already in your library. New items get their id automatically on their first scan.</FieldHint>
+                        </div>
+                    )}
                 </div>
             </SettingsCard>
 

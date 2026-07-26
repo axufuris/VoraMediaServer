@@ -12,6 +12,7 @@ public interface IMetadataManager
 {
     Task TriggerLibraryMetadataRefreshAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false);
     Task TriggerActorMetadataRefreshAsync();
+    Task TriggerMediaTvdbResolutionAsync();
     Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false);
     Task TriggerMediaItemArtworkRefreshAsync(Guid mediaItemId, bool forceOverride = false);
     Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false);
@@ -37,6 +38,7 @@ public class MetadataManager : IMetadataManager
     private readonly ILogger<MetadataManager> _logger;
 
     private const string TvdbMetadataProviderId = "tvdb_metadata";
+    private const string TmdbMetadataProviderId = "tmdb_metadata";
 
     public MetadataManager(
         IMediaRepository repository,
@@ -268,6 +270,11 @@ public class MetadataManager : IMetadataManager
         var settings = await _settingsRepository.GetSettingsAsync();
         if (!settings.ResolveMovieTvdbIds) return;
 
+        await ResolveTvdbIdForMovieAsync(movie);
+    }
+
+    private async Task ResolveTvdbIdForMovieAsync(Movie movie)
+    {
         var provider = _metadataProviders.FirstOrDefault(p => p.Id == TvdbMetadataProviderId);
         if (provider == null) return;
 
@@ -292,6 +299,57 @@ public class MetadataManager : IMetadataManager
         {
             _logger.LogWarning(ex, "TVDB id resolution failed for movie {MediaItemId}.", movie.Id);
         }
+    }
+
+    // Shows carry their TVDB id in TMDB's external_ids (now mapped), so for an
+    // existing show we just re-read its TMDB metadata rather than TVDB-searching.
+    private async Task ResolveTvdbIdForShowAsync(TvShow show)
+    {
+        if (string.IsNullOrWhiteSpace(show.TmdbId)) return;
+        var provider = _metadataProviders.FirstOrDefault(p => p.Id == TmdbMetadataProviderId);
+        if (provider == null) return;
+
+        try
+        {
+            var result = await provider.FetchTvShowMetadataByIdAsync(show.TmdbId, "tmdb");
+            if (!string.IsNullOrWhiteSpace(result?.TvdbId))
+            {
+                show.TvdbId = result.TvdbId;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "TVDB id resolution failed for show {MediaItemId}.", show.Id);
+        }
+    }
+
+    public async Task TriggerMediaTvdbResolutionAsync()
+    {
+        var settings = await _settingsRepository.GetSettingsAsync();
+        if (!settings.ResolveMovieTvdbIds) return;
+
+        var ids = await _repository.GetMediaIdsMissingTvdbIdAsync();
+        var total = ids.Count;
+        var count = 0;
+
+        foreach (var id in ids)
+        {
+            count++;
+            var item = await _repository.GetForBasicUpdateAsync(id);
+            if (item == null || !string.IsNullOrWhiteSpace(item.TvdbId) || item.IsLocked(nameof(item.TvdbId))) continue;
+
+            _progress.Report($"Resolving TVDB ids — {item.Title} ({count}/{total})");
+
+            if (item is Movie movie) await ResolveTvdbIdForMovieAsync(movie);
+            else if (item is TvShow show) await ResolveTvdbIdForShowAsync(show);
+
+            if (!string.IsNullOrWhiteSpace(item.TvdbId))
+            {
+                await _repository.UpdateMediaItemAsync(item);
+            }
+        }
+
+        _progress.Report(null);
     }
 
     private async Task ProcessLibraryItemsAsync(Guid libraryId, IEnumerable<Guid> ids, string operation, Func<Guid, Task> refreshFn)

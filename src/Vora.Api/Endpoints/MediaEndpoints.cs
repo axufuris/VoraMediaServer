@@ -105,6 +105,9 @@ public static class MediaEndpoints
 
         group.MapPost("/actors/refresh", QueueRefreshAllActorsAsync)
             .Produces(StatusCodes.Status202Accepted);
+
+        group.MapPost("/resolve-tvdb-ids", QueueResolveTvdbIdsAsync)
+            .Produces(StatusCodes.Status202Accepted);
     }
 
     private static async Task<IResult> GetMarkersAsync(Guid id, IMediaManager manager)
@@ -283,6 +286,12 @@ public static class MediaEndpoints
     private static IResult QueueRefreshAllActorsAsync(ITaskQueueManager taskQueue)
     {
         taskQueue.QueueRefreshAllActorMetadata();
+        return Results.Accepted();
+    }
+
+    private static IResult QueueResolveTvdbIdsAsync(ITaskQueueManager taskQueue)
+    {
+        taskQueue.QueueResolveTvdbIds();
         return Results.Accepted();
     }
 }

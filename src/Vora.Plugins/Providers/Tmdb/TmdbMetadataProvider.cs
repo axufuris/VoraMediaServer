@@ -211,6 +211,15 @@ public class TmdbMetadataProvider : IMetadataProvider
             result.ImdbId = rootImdb.GetString();
         }
 
+        // TMDB cross-references TV shows to TVDB (movies aren't), so this fills in
+        // a show's TvdbId for free from data we already fetched — no extra call.
+        if (el.TryGetProperty("external_ids", out var extIdsForTvdb)
+            && extIdsForTvdb.TryGetProperty("tvdb_id", out var tvdbId)
+            && tvdbId.ValueKind == JsonValueKind.Number)
+        {
+            result.TvdbId = tvdbId.GetInt32().ToString();
+        }
+
         if (isTv && el.TryGetProperty("episode_run_time", out var runTimes) && runTimes.GetArrayLength() > 0)
         {
             result.RuntimeMinutes = runTimes[0].GetInt32();

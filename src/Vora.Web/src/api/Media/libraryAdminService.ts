@@ -99,6 +99,10 @@ export const libraryAdminService = {
         await apiClient.post('/metadata/actors/refresh', null, { serverId });
     },
 
+    resolveTvdbIds: async (serverId?: string): Promise<void> => {
+        await apiClient.post('/metadata/resolve-tvdb-ids', null, { serverId });
+    },
+
     toggleWatch: async (libraryId: string, enable: boolean, serverId?: string): Promise<void> => {
         await apiClient.post(`/libraries/${libraryId}/watchfolder?enable=${enable}`, null, { serverId });
     },
