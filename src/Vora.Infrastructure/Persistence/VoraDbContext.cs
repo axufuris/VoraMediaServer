@@ -73,6 +73,7 @@ public class VoraDbContext : DbContext
     public DbSet<UserProfile> UserProfiles { get; set; }
     public DbSet<UserMediaState> UserMediaStates { get; set; }
     public DbSet<UserMediaRating> UserMediaRatings { get; set; }
+    public DbSet<PreservedUserMediaData> PreservedUserMediaData { get; set; }
     public DbSet<UserAlbumRating> UserAlbumRatings { get; set; }
     public DbSet<UserArtistRating> UserArtistRatings { get; set; }
     public DbSet<UserProviderConnection> UserProviderConnections { get; set; }
@@ -246,6 +247,7 @@ public class VoraDbContext : DbContext
             entity.HasIndex(e => e.ImdbId).HasFilter("\"ImdbId\" IS NOT NULL");
             entity.HasIndex(e => e.TvdbId).HasFilter("\"TvdbId\" IS NOT NULL");
             entity.HasIndex("LibraryId", "MediaType");
+            entity.HasIndex(e => e.MissingSince).HasFilter("\"MissingSince\" IS NOT NULL");
         });
 
         modelBuilder.Entity<TvShow>(entity =>
@@ -658,6 +660,10 @@ public class VoraDbContext : DbContext
                   .HasConversion(converters.StringList)
                   .Metadata.SetValueComparer(converters.StringListComparer);
 
+            entity.Property(e => e.ExcludeFilters)
+                  .HasConversion(converters.StringList)
+                  .Metadata.SetValueComparer(converters.StringListComparer);
+
             entity.HasMany(l => l.MediaItems)
                   .WithOne(m => m.Library)
                   .HasForeignKey(m => m.LibraryId)
@@ -754,6 +760,19 @@ public class VoraDbContext : DbContext
             entity.HasOne(e => e.MediaItem)
                   .WithMany()
                   .HasForeignKey(e => e.MediaItemId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PreservedUserMediaData>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ContentKey).IsRequired().HasMaxLength(256);
+            entity.HasIndex(e => new { e.ProfileId, e.ContentKey }).IsUnique();
+            entity.HasIndex(e => e.ContentKey);
+
+            entity.HasOne(e => e.Profile)
+                  .WithMany()
+                  .HasForeignKey(e => e.ProfileId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 

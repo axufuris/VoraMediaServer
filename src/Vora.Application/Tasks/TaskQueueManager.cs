@@ -278,7 +278,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Auto-Cleanup: {Path.GetFileName(filePath)}", async (ct, sp) =>
         {
             var mediaRepo = sp.GetRequiredService<IMediaRepository>();
-            await mediaRepo.DeleteMediaByFilePathAsync(filePath);
+            await mediaRepo.MarkMediaMissingByFilePathAsync(filePath);
         });
     }
 

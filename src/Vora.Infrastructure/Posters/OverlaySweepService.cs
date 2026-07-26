@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Vora.Application.Artwork;
 using Vora.Application.Posters;
 using Vora.Application.Settings;
 
@@ -11,11 +12,13 @@ public class OverlaySweepService : IOverlaySweepService
     private const string CustomArtworkUrlPrefix = "/api/artwork/custom/";
 
     private readonly StoragePathsOptions _storagePaths;
+    private readonly IArtworkThumbnailService _artworkThumbnails;
     private readonly ILogger<OverlaySweepService> _logger;
 
-    public OverlaySweepService(IOptions<StoragePathsOptions> storagePaths, ILogger<OverlaySweepService> logger)
+    public OverlaySweepService(IOptions<StoragePathsOptions> storagePaths, IArtworkThumbnailService artworkThumbnails, ILogger<OverlaySweepService> logger)
     {
         _storagePaths = storagePaths.Value;
+        _artworkThumbnails = artworkThumbnails;
         _logger = logger;
     }
 
@@ -28,6 +31,9 @@ public class OverlaySweepService : IOverlaySweepService
         foreach (var url in urls)
         {
             if (string.IsNullOrEmpty(url)) continue;
+
+            _artworkThumbnails.RemoveThumbnailsForSource(url);
+
             if (!url.Contains(OverlayMarker, StringComparison.Ordinal)) continue;
             if (!url.StartsWith(CustomArtworkUrlPrefix, StringComparison.Ordinal)) continue;
 

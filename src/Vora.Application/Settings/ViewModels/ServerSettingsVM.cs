@@ -26,6 +26,8 @@ public class ServerSettingsVM
     public string FolderWatcherProviderId { get; set; } = "polling_watcher";
     public int FolderWatcherPollingInterval { get; set; } = 30;
     public string LocalMediaScannerProviderId { get; set; } = "Vora_scanner";
+    public bool EnableTrashAutoPurge { get; set; } = true;
+    public int MissingMediaRetentionDays { get; set; } = 30;
     public int InternetUploadSpeedMbps { get; set; }
     public int MaxRemoteStreamBitrateMbps { get; set; }
     public int TranscodeQuality { get; set; }
@@ -91,6 +93,8 @@ public class ServerSettingsVM
             FolderWatcherProviderId = s.FolderWatcherProviderId,
             FolderWatcherPollingInterval = s.FolderWatcherPollingInterval,
             LocalMediaScannerProviderId = s.LocalMediaScannerProviderId,
+            EnableTrashAutoPurge = s.EnableTrashAutoPurge,
+            MissingMediaRetentionDays = s.MissingMediaRetentionDays,
             InternetUploadSpeedMbps = s.InternetUploadSpeedMbps,
             MaxRemoteStreamBitrateMbps = s.MaxRemoteStreamBitrateMbps,
             TranscodeQuality = s.TranscodeQuality,

@@ -39,6 +39,9 @@ public class ServerSetting
     public int FolderWatcherPollingInterval { get; set; } = 30;
     public string LocalMediaScannerProviderId { get; set; } = "Vora_scanner";
 
+    public bool EnableTrashAutoPurge { get; set; } = true;
+    public int MissingMediaRetentionDays { get; set; } = 30;
+
     public bool EnableRemoteAccess { get; set; } = true;
     public bool ManuallySpecifyPublicPort { get; set; }
     public int PublicPort { get; set; } = 32080;

@@ -140,7 +140,7 @@ export default function ActorDetailsPage() {
                         <h2 className="m-0 mb-6 pb-2 text-xl font-semibold" style={{ color: 'var(--vora-text-primary)', borderBottom: '1px solid var(--vora-border-subtle)', letterSpacing: '-0.01em' }}>
                             Filmography
                         </h2>
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
                             {actor.filmography.map(item => (
                                 <MediaPoster
                                     key={item.id}

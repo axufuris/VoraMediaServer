@@ -60,7 +60,7 @@ public class RecommendationRepository(VoraDbContext context) : IRecommendationRe
     {
         var query = context.MediaItems
             .AsNoTracking()
-            .Where(m => m.Genres.Any(g => g.Id == genreId) && (m is Movie || m is TvShow));
+            .Where(m => m.MissingSince == null && m.Genres.Any(g => g.Id == genreId) && (m is Movie || m is TvShow));
 
         if (libraryId.HasValue)
         {

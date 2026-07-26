@@ -6,6 +6,7 @@ public class CreateLibraryRequest
     public Vora.Domain.Enums.LibraryType Type { get; set; }
     public List<string> FolderPaths { get; set; } = new();
     public string? ScannerRegex { get; set; }
+    public List<string> ExcludeFilters { get; set; } = new();
 
     public bool EnableRealTimeWatching { get; set; }
     public bool FindExtras { get; set; }

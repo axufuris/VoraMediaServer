@@ -106,10 +106,10 @@ function renderLibraryCard(
         <MediaPoster imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} badge={unplayedBadge} fill />
     );
 
-    if (!isAdmin) return <div key={item.id}>{card}</div>;
+    if (!isAdmin) return <div key={item.id} className="[content-visibility:auto] [contain-intrinsic-size:180px_320px]">{card}</div>;
 
     return (
-        <div key={item.id} className="group relative">
+        <div key={item.id} className="group relative [content-visibility:auto] [contain-intrinsic-size:180px_320px]">
             {card}
             <button
                 type="button"

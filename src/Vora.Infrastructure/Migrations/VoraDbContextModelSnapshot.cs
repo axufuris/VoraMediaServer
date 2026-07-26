@@ -815,6 +815,10 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<int>("EpisodeSorting")
                         .HasColumnType("integer");
 
+                    b.Property<string>("ExcludeFilters")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<bool>("FindExtras")
                         .HasColumnType("boolean");
 
@@ -1610,6 +1614,9 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(13)
                         .HasColumnType("character varying(13)");
 
+                    b.Property<DateTime?>("MissingSince")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("OriginalLanguage")
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)");
@@ -1695,6 +1702,9 @@ namespace Vora.Infrastructure.Migrations
 
                     b.HasIndex("ImdbId")
                         .HasFilter("\"ImdbId\" IS NOT NULL");
+
+                    b.HasIndex("MissingSince")
+                        .HasFilter("\"MissingSince\" IS NOT NULL");
 
                     b.HasIndex("TmdbId")
                         .HasFilter("\"TmdbId\" IS NOT NULL");
@@ -2718,6 +2728,9 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<bool>("EnableRemoteAccess")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("EnableTrashAutoPurge")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("EnableWeeklyMixes")
                         .HasColumnType("boolean");
 
@@ -2772,6 +2785,9 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("MaxRemoteStreamBitrateMbps")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MissingMediaRetentionDays")
                         .HasColumnType("integer");
 
                     b.Property<TimeSpan>("NightlyScanTime")
@@ -2931,6 +2947,7 @@ namespace Vora.Infrastructure.Migrations
                             EnablePodcasts = true,
                             EnableReleaseCalendar = true,
                             EnableRemoteAccess = true,
+                            EnableTrashAutoPurge = true,
                             EnableWeeklyMixes = true,
                             EpisodeIntroClusterMinAgreementPct = 70,
                             EpisodeIntroClusterToleranceSec = 5,
@@ -2947,6 +2964,7 @@ namespace Vora.Infrastructure.Migrations
                             MaxCpuTranscodes = 0,
                             MaxGpuTranscodes = 2,
                             MaxRemoteStreamBitrateMbps = 0,
+                            MissingMediaRetentionDays = 30,
                             NightlyScanTime = new TimeSpan(0, 2, 0, 0, 0),
                             PublicPort = 32080,
                             RegistrationMode = 2,
@@ -3502,6 +3520,54 @@ namespace Vora.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("PasswordResetTickets");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.PreservedUserMediaData", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ContentKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("HasState")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsHiddenFromContinueWatching")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsPlayed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastPlayedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("Rating")
+                        .HasColumnType("numeric");
+
+                    b.Property<double>("ResumePositionSeconds")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContentKey");
+
+                    b.HasIndex("ProfileId", "ContentKey")
+                        .IsUnique();
+
+                    b.ToTable("PreservedUserMediaData");
                 });
 
             modelBuilder.Entity("Vora.Domain.Entities.Users.ProfileAccessSchedule", b =>
@@ -4809,6 +4875,17 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.PreservedUserMediaData", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Users.UserProfile", "Profile")
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Profile");
                 });
 
             modelBuilder.Entity("Vora.Domain.Entities.Users.ProfileAccessSchedule", b =>

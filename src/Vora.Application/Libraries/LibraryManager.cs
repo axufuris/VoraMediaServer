@@ -53,6 +53,7 @@ public class LibraryManager : ILibraryManager
             Type = request.Type,
             FolderPaths = request.FolderPaths,
             ScannerRegex = regex,
+            ExcludeFilters = request.ExcludeFilters ?? new List<string>(),
 
             MetadataProviderId = string.IsNullOrEmpty(request.MetadataProviderId) ? "tmdb_metadata" : request.MetadataProviderId,
             ThirdPartyRating1ProviderId = request.ThirdPartyRating1ProviderId,
@@ -132,6 +133,7 @@ public class LibraryManager : ILibraryManager
 
         library.Name = request.Name;
         library.FolderPaths = newPaths;
+        library.ExcludeFilters = request.ExcludeFilters ?? new List<string>();
         library.MetadataProviderId = request.MetadataProviderId;
         library.FindExtras = request.FindExtras;
         library.OnlyShowTrailers = request.OnlyShowTrailers;

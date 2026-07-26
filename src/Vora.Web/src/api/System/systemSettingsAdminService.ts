@@ -21,6 +21,8 @@ export interface ServerSettings {
     folderWatcherProviderId: string;
     folderWatcherPollingInterval: number;
     localMediaScannerProviderId: string;
+    enableTrashAutoPurge: boolean;
+    missingMediaRetentionDays: number;
     registrationMode: number;
     internetUploadSpeedMbps: number;
     maxRemoteStreamBitrateMbps: number;

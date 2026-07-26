@@ -27,6 +27,9 @@ public interface IMediaManager
     Task UpdateSeasonMetadataAsync(Guid id, UpdateSeasonRequest request);
     Task DeleteMediaAsync(Guid id);
     Task TriggerTargetedScanAsync(Guid id);
+    Task<List<TrashMediaItemVM>> GetTrashAsync();
+    Task RestoreFromTrashAsync(Guid id);
+    Task<int> PurgeExpiredTrashAsync(int retentionDays);
 }
 
 public class MediaManager : IMediaManager
@@ -44,6 +47,7 @@ public class MediaManager : IMediaManager
     private readonly IEnumerable<ILocalMediaScannerProvider> _scanners;
     private readonly StoragePathsOptions _storagePaths;
     private readonly Vora.Application.Thumbnails.IVideoThumbnailStorageService _thumbnailStorage;
+    private readonly Vora.Application.Artwork.IArtworkThumbnailService _artworkThumbnails;
     private readonly ILogger<MediaManager> _logger;
 
     public MediaManager(
@@ -55,6 +59,7 @@ public class MediaManager : IMediaManager
         IEnumerable<ILocalMediaScannerProvider> scanners,
         IOptions<StoragePathsOptions> storagePaths,
         Vora.Application.Thumbnails.IVideoThumbnailStorageService thumbnailStorage,
+        Vora.Application.Artwork.IArtworkThumbnailService artworkThumbnails,
         ILogger<MediaManager> logger)
     {
         _repository = repository;
@@ -65,6 +70,7 @@ public class MediaManager : IMediaManager
         _scanners = scanners;
         _storagePaths = storagePaths.Value;
         _thumbnailStorage = thumbnailStorage;
+        _artworkThumbnails = artworkThumbnails;
         _logger = logger;
     }
 
@@ -197,10 +203,37 @@ public class MediaManager : IMediaManager
         var libraryId = item.LibraryId;
 
         CleanupOrphanedOverlay(item);
+        _artworkThumbnails.RemoveThumbnailsForSource(item.PosterUrl);
+        _artworkThumbnails.RemoveThumbnailsForSource(item.BackgroundUrl);
         _thumbnailStorage.DeleteItemDirectory(id);
 
         await _repository.DeleteMediaItemAsync(id);
         await _notifier.NotifyLibraryUpdatedAsync(libraryId);
+    }
+
+    public Task<List<TrashMediaItemVM>> GetTrashAsync() =>
+        _repository.GetMissingMediaAsync();
+
+    public async Task RestoreFromTrashAsync(Guid id)
+    {
+        var item = await _repository.GetForBasicUpdateAsync(id);
+        if (item == null || item.MissingSince == null) return;
+
+        await _repository.RestoreMissingMediaAsync(id);
+        await _notifier.NotifyLibraryUpdatedAsync(item.LibraryId);
+    }
+
+    public async Task<int> PurgeExpiredTrashAsync(int retentionDays)
+    {
+        var cutoff = DateTime.UtcNow.AddDays(-retentionDays);
+        var expiredIds = await _repository.GetExpiredMissingMediaIdsAsync(cutoff);
+
+        foreach (var expiredId in expiredIds)
+        {
+            await DeleteMediaAsync(expiredId);
+        }
+
+        return expiredIds.Count;
     }
 
     public async Task TriggerTargetedScanAsync(Guid id)
@@ -234,6 +267,7 @@ public class MediaManager : IMediaManager
         if (string.IsNullOrEmpty(newPosterUrl) || newPosterUrl == item.PosterUrl) return;
 
         CleanupOrphanedOverlay(item);
+        _artworkThumbnails.RemoveThumbnailsForSource(item.PosterUrl);
         item.OriginalPosterUrl = newPosterUrl;
         item.PosterUrl = newPosterUrl;
     }
@@ -245,8 +279,10 @@ public class MediaManager : IMediaManager
         if (item is Episode)
         {
             CleanupOrphanedOverlay(item);
+            _artworkThumbnails.RemoveThumbnailsForSource(item.PosterUrl);
             item.OriginalPosterUrl = newBackgroundUrl;
         }
+        _artworkThumbnails.RemoveThumbnailsForSource(item.BackgroundUrl);
         item.BackgroundUrl = newBackgroundUrl;
     }
 

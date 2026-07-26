@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Collections;
 using Vora.Application.Libraries;
+using Vora.Application.Media;
 using Vora.Application.Metadata;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
@@ -24,6 +25,9 @@ public class ScheduledJobWorker : BackgroundService
     private DateTime _lastOverlaySyncDate = DateTime.MinValue.Date;
     private DateTime _lastIptvSyncDate = DateTime.MinValue.Date;
     private DateTime _lastVideoThumbnailDate = DateTime.MinValue.Date;
+    private DateTime _lastTrashPurgeDate = DateTime.MinValue.Date;
+
+    private bool _startupCatchUpDone = false;
 
     private int _scannerFrequency = 5;
 
@@ -75,6 +79,29 @@ public class ScheduledJobWorker : BackgroundService
         var timeOfDay = now.TimeOfDay;
         var today = now.Date;
 
+        var aiScheduleStr = await settingsRepo.GetPluginSettingAsync("openai_recommendations", "schedule_time");
+        var aiParsed = TimeSpan.TryParse(string.IsNullOrWhiteSpace(aiScheduleStr) ? "02:00" : aiScheduleStr, out var aiTime);
+
+        var overlayScheduleStr = await settingsRepo.GetPluginSettingAsync("local_imagesharp_overlays", "schedule_time");
+        var overlayParsed = TimeSpan.TryParse(string.IsNullOrWhiteSpace(overlayScheduleStr) ? "03:00" : overlayScheduleStr, out var overlayTime);
+
+        // First check after startup: don't retroactively fire daily jobs whose
+        // scheduled time already passed today — that made every restart re-run a
+        // storm of scans/overlays/EPG syncs. Baseline those as "already handled
+        // today" so they fire at their next scheduled time instead. Jobs whose
+        // time hasn't come yet still run today as normal.
+        if (!_startupCatchUpDone)
+        {
+            _startupCatchUpDone = true;
+            if (timeOfDay >= settings.NightlyScanTime) { _lastNightlyScanDate = today; _lastChronologySyncDate = today; _lastContentSyncDate = today; }
+            if (timeOfDay >= settings.DetectionScheduleTime) _lastSilenceDetectionDate = today;
+            if (aiParsed && timeOfDay >= aiTime) _lastAiEmbedDate = today;
+            if (overlayParsed && timeOfDay >= overlayTime) _lastOverlaySyncDate = today;
+            if (timeOfDay >= settings.IptvSyncTime) _lastIptvSyncDate = today;
+            if (timeOfDay >= settings.VideoThumbnailScheduleTime) _lastVideoThumbnailDate = today;
+            if (timeOfDay >= settings.NightlyScanTime) _lastTrashPurgeDate = today;
+        }
+
         if (settings.EnableNightlyScan && timeOfDay >= settings.NightlyScanTime && _lastNightlyScanDate < today)
         {
             _logger.LogInformation("Triggering Scheduled Nightly Library Scan.");
@@ -89,6 +116,18 @@ public class ScheduledJobWorker : BackgroundService
             await metadataManager.TriggerActorMetadataRefreshAsync();
 
             _lastNightlyScanDate = today;
+        }
+
+        if (settings.EnableTrashAutoPurge && settings.MissingMediaRetentionDays > 0 && timeOfDay >= settings.NightlyScanTime && _lastTrashPurgeDate < today)
+        {
+            var mediaManager = scope.ServiceProvider.GetRequiredService<IMediaManager>();
+            var purged = await mediaManager.PurgeExpiredTrashAsync(settings.MissingMediaRetentionDays);
+            if (purged > 0)
+            {
+                _logger.LogInformation("Purged {Count} expired missing media item(s) past the {Days}-day retention window.", purged, settings.MissingMediaRetentionDays);
+            }
+
+            _lastTrashPurgeDate = today;
         }
 
         bool shouldRunDetections = settings.RunDetections == Domain.Enums.DetectionTrigger.OnSchedule ||
@@ -136,10 +175,7 @@ public class ScheduledJobWorker : BackgroundService
             _lastContentSyncDate = today;
         }
 
-        var aiScheduleStr = await settingsRepo.GetPluginSettingAsync("openai_recommendations", "schedule_time");
-        var aiTimeStr = string.IsNullOrWhiteSpace(aiScheduleStr) ? "02:00" : aiScheduleStr;
-
-        if (TimeSpan.TryParse(aiTimeStr, out var aiTime) && timeOfDay >= aiTime && _lastAiEmbedDate < today)
+        if (aiParsed && timeOfDay >= aiTime && _lastAiEmbedDate < today)
         {
             var isAiEnabled = await settingsRepo.GetPluginSettingAsync("openai_recommendations", "is_enabled");
             if (isAiEnabled != "false")
@@ -151,10 +187,7 @@ public class ScheduledJobWorker : BackgroundService
             _lastAiEmbedDate = today;
         }
 
-        var overlayScheduleStr = await settingsRepo.GetPluginSettingAsync("local_imagesharp_overlays", "schedule_time");
-        var overlayTimeStr = string.IsNullOrWhiteSpace(overlayScheduleStr) ? "03:00" : overlayScheduleStr;
-
-        if (TimeSpan.TryParse(overlayTimeStr, out var overlayTime) && timeOfDay >= overlayTime && _lastOverlaySyncDate < today)
+        if (overlayParsed && timeOfDay >= overlayTime && _lastOverlaySyncDate < today)
         {
             var isOverlayEnabledStr = await settingsRepo.GetPluginSettingAsync("local_imagesharp_overlays", "enable_schedule");
 

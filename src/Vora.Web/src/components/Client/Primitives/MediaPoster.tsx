@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { thumbUrl } from '../../../utils/thumbnails';
 
 export type PosterVariant = 'standard' | 'xl' | 'actor';
 
@@ -64,9 +65,10 @@ export default function MediaPoster({ imageUrl, title, subtitle, badge, bottomLe
             >
                 {imageUrl ? (
                     <img
-                        src={imageUrl}
+                        src={thumbUrl(imageUrl, 360)}
                         alt={title}
                         loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                     />
                 ) : (

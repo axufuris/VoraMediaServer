@@ -435,6 +435,7 @@ public static class ServiceRegistrationExtensions
     private static IServiceCollection AddVoraApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<IArtworkService, ArtworkService>();
+        services.AddSingleton<Vora.Application.Artwork.IArtworkThumbnailService, Vora.Infrastructure.Artwork.ArtworkThumbnailService>();
         services.AddScoped<ICollectionArtworkService, CollectionArtworkService>();
         services.AddScoped<IIptvEpgService, IptvEpgService>();
         services.AddScoped<IIptvPassthroughService, IptvPassthroughService>();

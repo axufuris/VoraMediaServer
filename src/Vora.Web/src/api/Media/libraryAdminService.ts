@@ -26,6 +26,8 @@ export interface CreateLibraryRequest {
     name: string;
     type: number;
     folderPaths: string[];
+    scannerRegex?: string;
+    excludeFilters?: string[];
     enableRealTimeWatching: boolean;
     findExtras: boolean;
     onlyShowTrailers: boolean;

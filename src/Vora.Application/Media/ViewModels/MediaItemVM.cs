@@ -70,16 +70,16 @@ public class MediaItemVM
                     ProfileImageUrl = c.Actor != null ? c.Actor.ProfileImageUrl : null
                 }).ToList(),
 
-            NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count : (int?)null,
+            NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count(s => s.MissingSince == null) : (int?)null,
 
             Seasons = item is TvShow
-                ? ((TvShow)item).Seasons.Select(s => new SeasonVM
+                ? ((TvShow)item).Seasons.Where(s => s.MissingSince == null).Select(s => new SeasonVM
                 {
                     Id = s.Id,
                     SeasonNumber = s.SeasonNumber,
                     Title = s.Title,
                     PosterUrl = s.PosterUrl,
-                    EpisodeCount = s.Episodes.Count
+                    EpisodeCount = s.Episodes.Count(e => e.MissingSince == null)
                 }).ToList()
                 : new List<SeasonVM>(),
 
