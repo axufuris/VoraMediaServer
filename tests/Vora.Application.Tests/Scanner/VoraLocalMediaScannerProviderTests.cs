@@ -136,7 +136,8 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
         await _ingestion.Received(1).AddMediaPartAsync(
             Arg.Any<MediaItemHandle>(),
             Arg.Any<string>(),
-            "2160p");
+            "2160p",
+            Arg.Any<string?>());
     }
 
     [Fact]
@@ -154,6 +155,12 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
             imdbId: Arg.Any<string?>(),
             tvdbId: Arg.Any<string?>(),
             edition: Arg.Is<string?>(e => e != null && e.Contains("Director", StringComparison.OrdinalIgnoreCase)));
+
+        await _ingestion.Received(1).AddMediaPartAsync(
+            Arg.Any<MediaItemHandle>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Is<string?>(e => e != null && e.Contains("Director", StringComparison.OrdinalIgnoreCase)));
     }
 
     [Fact]

@@ -85,6 +85,46 @@ public class MediaRepositoryPreservationTests
     }
 
     [Fact]
+    public async Task SyncItemEditionFromParts_UsesBestResolutionPartsEdition()
+    {
+        using var db = NewContext();
+        var (libraryId, _) = Seed(db);
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+
+        var movie = new Movie { Title = "Blade Runner", LibraryId = libraryId, TmdbId = "78" };
+        await repo.AddMediaItemAsync(movie);
+
+        db.MediaParts.Add(new MediaPart { FilePath = "/m/br-1080-dc.mkv", MediaItemId = movie.Id, Resolution = "1080p", Edition = "Director's Cut" });
+        db.MediaParts.Add(new MediaPart { FilePath = "/m/br-2160-theatrical.mkv", MediaItemId = movie.Id, Resolution = "2160p", Edition = null });
+        await db.SaveChangesAsync();
+
+        await repo.SyncItemEditionFromPartsAsync(movie.Id);
+
+        var refreshed = await db.MediaItems.FindAsync(movie.Id);
+        Assert.Null(refreshed!.Edition); // best (2160p) part has no edition
+    }
+
+    [Fact]
+    public async Task SyncItemEditionFromParts_TakesEditionOfHighestResolutionPart()
+    {
+        using var db = NewContext();
+        var (libraryId, _) = Seed(db);
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+
+        var movie = new Movie { Title = "Dune", LibraryId = libraryId, TmdbId = "438631" };
+        await repo.AddMediaItemAsync(movie);
+
+        db.MediaParts.Add(new MediaPart { FilePath = "/m/dune-1080.mkv", MediaItemId = movie.Id, Resolution = "1080p", Edition = null });
+        db.MediaParts.Add(new MediaPart { FilePath = "/m/dune-2160-imax.mkv", MediaItemId = movie.Id, Resolution = "2160p", Edition = "IMAX" });
+        await db.SaveChangesAsync();
+
+        await repo.SyncItemEditionFromPartsAsync(movie.Id);
+
+        var refreshed = await db.MediaItems.FindAsync(movie.Id);
+        Assert.Equal("IMAX", refreshed!.Edition);
+    }
+
+    [Fact]
     public async Task DeleteMovie_WithoutExternalId_DoesNotArchive()
     {
         using var db = NewContext();

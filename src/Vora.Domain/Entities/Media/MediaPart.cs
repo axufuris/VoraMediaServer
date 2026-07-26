@@ -6,6 +6,7 @@ public class MediaPart
 
     public required string FilePath { get; set; }
     public string? VersionName { get; set; }
+    public string? Edition { get; set; }
     public int PartNumber { get; set; } = 1;
 
     public string? Container { get; set; }
