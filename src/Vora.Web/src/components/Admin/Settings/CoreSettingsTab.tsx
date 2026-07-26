@@ -358,7 +358,7 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                                 onClick={async () => {
                                     try {
                                         await libraryAdminService.resolveTvdbIds(serverId);
-                                        showModal('Task queued', 'Resolving TVDB ids for movies and shows that are missing one — watch progress under Background Tasks. If you just enabled this setting, save it first so the pass sees it as on.');
+                                        showModal('Task queued', 'Resolving TVDB ids for movies and shows that are missing one — watch progress under Background Tasks.');
                                     } catch {
                                         showModal('Failed', 'Could not queue the TVDB id resolution.', true);
                                     }

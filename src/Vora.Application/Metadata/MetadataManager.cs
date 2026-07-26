@@ -121,7 +121,12 @@ public class MetadataManager : IMetadataManager
 
     public async Task TriggerLibraryArtworkRefreshAsync(Guid libraryId, bool forceOverride = false)
     {
-        var ids = await _repository.GetAllProjectedAsync(n => n.Id, libraryId);
+        // Non-force runs only fetch items missing a poster, so adding a folder (or
+        // the nightly scan) doesn't re-pull artwork for the whole library — only
+        // genuinely new items. Force still refreshes everything.
+        var ids = forceOverride
+            ? await _repository.GetAllProjectedAsync(n => n.Id, libraryId)
+            : await _repository.GetMediaIdsMissingArtworkAsync(libraryId);
         await ProcessLibraryItemsAsync(libraryId, ids, "artwork", id => RefreshArtworkAsync(id, forceOverride));
     }
 
@@ -323,11 +328,11 @@ public class MetadataManager : IMetadataManager
         }
     }
 
+    // Triggered explicitly by the admin "Resolve now" button, so it runs
+    // regardless of the persisted toggle (which only gates the automatic,
+    // during-refresh path) — otherwise clicking before saving silently no-ops.
     public async Task TriggerMediaTvdbResolutionAsync()
     {
-        var settings = await _settingsRepository.GetSettingsAsync();
-        if (!settings.ResolveMovieTvdbIds) return;
-
         var ids = await _repository.GetMediaIdsMissingTvdbIdAsync();
         var total = ids.Count;
         var count = 0;
