@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { HubConnectionBuilder, HubConnection } from '@microsoft/signalr';
+import { HubConnectionBuilder, HubConnection, HubConnectionState } from '@microsoft/signalr';
 import { serverVault } from '../utils/serverVault';
 import { StorageKeys } from '../utils/storageKeys';
 
@@ -85,22 +85,29 @@ export function useSignalREvent<T = unknown>(eventName: VoraEventName | string, 
                 })
                 .withAutomaticReconnect()
                 .build();
-
-            sharedConnection.start()
-                .then(() => console.log(`Connected to Vora SignalR Hub at ${baseUrl}!`))
-                .catch(err => console.error("SignalR Connection Error: ", err));
         }
 
+        const connection = sharedConnection;
         const handleEvent = (payload: T) => {
             callbackRef.current(payload);
         };
 
-        sharedConnection.on(eventName, handleEvent);
+        connection.on(eventName, handleEvent);
+
+        // Ensure the connection is actually running. A soft navigation can reuse
+        // a shared connection that's sitting in Disconnected state — e.g. its
+        // initial start failed, or it dropped and withAutomaticReconnect
+        // exhausted its retry schedule. Neither case is retried automatically,
+        // so start it here; otherwise the handler is attached to a dead
+        // connection and no events arrive until a full page reload rebuilds it.
+        if (connection.state === HubConnectionState.Disconnected) {
+            connection.start()
+                .then(() => console.log(`Connected to Vora SignalR Hub at ${baseUrl}!`))
+                .catch(err => console.error("SignalR Connection Error: ", err));
+        }
 
         return () => {
-            if (sharedConnection) {
-                sharedConnection.off(eventName, handleEvent);
-            }
+            connection.off(eventName, handleEvent);
         };
     }, [eventName]);
 }
