@@ -114,5 +114,5 @@ export const ADMIN_NAV: AdminNavEntry[] = [
  */
 export function resolveAdminPath(pathTemplate: string, serverId?: string): string {
     if (!serverId) return pathTemplate;
-    return pathTemplate.replace('/admin', `/server/${serverId}/admin`);
+    return pathTemplate.replace('/admin', `/admin/server/${serverId}`);
 }

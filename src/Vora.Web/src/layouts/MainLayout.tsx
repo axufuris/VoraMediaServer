@@ -404,7 +404,7 @@ export default function MainLayout() {
                     onToggleMenu={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
                     onCloseMenu={() => setIsProfileMenuOpen(false)}
                     onManageServers={() => { setIsProfileMenuOpen(false); setIsServerManagerOpen(true); }}
-                    onServerSettings={() => { setIsProfileMenuOpen(false); navigate(serverId ? `/server/${serverId}/admin` : '/admin'); }}
+                    onServerSettings={() => { setIsProfileMenuOpen(false); navigate(serverId ? `/admin/server/${serverId}` : '/admin'); }}
                     onClientSettings={() => { setIsProfileMenuOpen(false); navigate(serverId ? `/server/${serverId}/settings` : '/settings'); }}
                     onAccountSettings={() => { setIsProfileMenuOpen(false); navigate(serverId ? `/server/${serverId}/account` : '/account'); }}
                     onPlayHistory={() => { setIsProfileMenuOpen(false); navigate(serverId ? `/server/${serverId}/history` : '/history'); }}

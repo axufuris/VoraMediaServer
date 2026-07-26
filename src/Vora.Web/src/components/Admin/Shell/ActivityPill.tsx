@@ -34,7 +34,7 @@ export default function ActivityPill() {
     return (
         <button
             type="button"
-            onClick={() => navigate(serverId ? `/server/${serverId}/admin` : '/admin')}
+            onClick={() => navigate(serverId ? `/admin/server/${serverId}` : '/admin')}
             className="flex items-center gap-2 px-2.5 py-1 rounded-full border border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-strong)] bg-[var(--vora-bg-surface)] transition-colors cursor-pointer"
             title="View now playing"
         >

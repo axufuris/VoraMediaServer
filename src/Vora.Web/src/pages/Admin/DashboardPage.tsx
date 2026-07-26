@@ -357,7 +357,7 @@ export default function DashboardPage() {
                         </div>
                         <button
                             type="button"
-                            onClick={() => navigate(serverId ? `/server/${serverId}/admin/libraries` : '/admin/libraries')}
+                            onClick={() => navigate(serverId ? `/admin/server/${serverId}/libraries` : '/admin/libraries')}
                             className="text-xs font-semibold text-[var(--vora-accent-text)] hover:text-[var(--vora-accent-active)] cursor-pointer"
                         >
                             Manage all →
@@ -373,7 +373,7 @@ export default function DashboardPage() {
                                 title="No libraries yet"
                                 description="Add a library to start indexing your media."
                                 actionLabel="Add Library"
-                                onAction={() => navigate(serverId ? `/server/${serverId}/admin/libraries/new` : '/admin/libraries/new')}
+                                onAction={() => navigate(serverId ? `/admin/server/${serverId}/libraries/new` : '/admin/libraries/new')}
                             />
                         </div>
                     ) : (
@@ -384,7 +384,7 @@ export default function DashboardPage() {
                                     title={lib.name}
                                     subtitle={LIBRARY_TYPE_LABEL[lib.type] ?? lib.type}
                                     badge={<HealthBadge tone={lib.isBeingWatched ? 'ok' : 'neutral'}>{lib.isBeingWatched ? 'Watching' : 'Idle'}</HealthBadge>}
-                                    onClick={() => navigate(serverId ? `/server/${serverId}/admin/libraries/${lib.id}/manage` : `/admin/libraries/${lib.id}/manage`)}
+                                    onClick={() => navigate(serverId ? `/admin/server/${serverId}/libraries/${lib.id}/manage` : `/admin/libraries/${lib.id}/manage`)}
                                 />
                             ))}
                         </div>
@@ -414,7 +414,7 @@ export default function DashboardPage() {
                             value={pluginsHealth.label}
                             tone={pluginsHealth.tone}
                             badge={pluginsHealth.tone === 'ok' ? 'Healthy' : pluginsHealth.tone === 'warn' ? 'Attention' : 'Empty'}
-                            onClick={() => navigate(serverId ? `/server/${serverId}/admin/plugins` : '/admin/plugins')}
+                            onClick={() => navigate(serverId ? `/admin/server/${serverId}/plugins` : '/admin/plugins')}
                         />
                         {(() => {
                             if (!stats || stats.diskTotalBytes === 0) {
