@@ -10,7 +10,7 @@ namespace Vora.Application.Collections;
 
 public interface ICollectionArtworkService
 {
-    Task<IEnumerable<CollectionArtwork>> GetArtworkAsync(Guid collectionId);
+    Task<IEnumerable<CollectionArtworkVM>> GetArtworkAsync(Guid collectionId);
     Task<string> UploadAsync(Guid collectionId, UploadedFile file, ArtworkKind kind);
     Task<string> AddUrlAsync(Guid collectionId, string url, ArtworkKind kind);
     Task DeleteAsync(Guid artworkId);
@@ -38,9 +38,20 @@ public class CollectionArtworkService : ICollectionArtworkService
         if (!Directory.Exists(_basePath)) Directory.CreateDirectory(_basePath);
     }
 
-    public async Task<IEnumerable<CollectionArtwork>> GetArtworkAsync(Guid collectionId)
+    public async Task<IEnumerable<CollectionArtworkVM>> GetArtworkAsync(Guid collectionId)
     {
-        return await _repository.GetCollectionArtworkAsync(collectionId);
+        var artwork = await _repository.GetCollectionArtworkAsync(collectionId);
+        return artwork.Select(a => new CollectionArtworkVM
+        {
+            Id = a.Id.ToString(),
+            IsUserUploaded = a.IsUserUploaded,
+            Url = a.Url,
+            Type = a.Kind.ToString(),
+            Language = a.Language,
+            Width = a.Width,
+            Height = a.Height,
+            VoteAverage = a.VoteAverage
+        });
     }
 
     public async Task<string> UploadAsync(Guid collectionId, UploadedFile file, ArtworkKind kind)
