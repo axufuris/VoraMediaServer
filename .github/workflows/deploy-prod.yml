@@ -70,7 +70,15 @@ jobs:
         with:
           context: .
           file: src/Vora.Api/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          # amd64-only. Our deploy targets (Unraid, generic Linux, Windows via
+          # Docker) are all x86-64. Building linux/arm64 here runs under QEMU
+          # emulation on the amd64 runner and dominates build time (5-10x
+          # slower, since the Dockerfile compiles .NET + the React app from
+          # source). To also publish an arm64 image (e.g. Raspberry Pi), append
+          # ",linux/arm64" below — the QEMU step above is left in place so this
+          # is a one-line change. For frequent arm64 builds, prefer a native
+          # ubuntu-24.04-arm runner matrix over emulation.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
