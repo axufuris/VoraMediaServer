@@ -540,26 +540,27 @@ public class TaskQueueManager : ITaskQueueManager
         ct.ThrowIfCancellationRequested();
         progress.Report("Scanning files…");
         await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId);
-        ct.ThrowIfCancellationRequested();
-        progress.Report("Analyzing media…");
-        await analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName);
 
+        // Enrich each item (metadata → artwork → ratings) one at a time so
+        // posters populate progressively as the scan's items come online,
+        // rather than only after three separate whole-library passes finish.
         ct.ThrowIfCancellationRequested();
-        progress.Report("Fetching metadata…");
-        await metadataManager.TriggerLibraryMetadataRefreshAsync(libraryId, forceOverride: forceOverride);
-        ct.ThrowIfCancellationRequested();
-        progress.Report("Fetching artwork…");
-        await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, forceOverride: forceOverride);
-        ct.ThrowIfCancellationRequested();
-        progress.Report("Fetching ratings…");
-        await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, forceOverride: forceOverride);
-        ct.ThrowIfCancellationRequested();
-        progress.Report("Refreshing actor metadata…");
-        await metadataManager.TriggerActorMetadataRefreshAsync();
+        progress.Report("Fetching details…");
+        await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: forceOverride);
 
         ct.ThrowIfCancellationRequested();
         progress.Report("Generating poster overlays…");
         await overlayManager.RunLibraryOverlaySyncAsync(libraryId);
+
+        ct.ThrowIfCancellationRequested();
+        progress.Report("Refreshing actor metadata…");
+        await metadataManager.TriggerActorMetadataRefreshAsync();
+
+        // Analysis + marker detection are heavy FFmpeg passes that don't affect
+        // posters, so they run last — after the library is visually populated.
+        ct.ThrowIfCancellationRequested();
+        progress.Report("Analyzing media…");
+        await analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName);
 
         ct.ThrowIfCancellationRequested();
         progress.Report("Detecting intro/credit markers…");

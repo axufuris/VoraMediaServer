@@ -11,6 +11,7 @@ namespace Vora.Application.Metadata;
 public interface IMetadataManager
 {
     Task TriggerLibraryMetadataRefreshAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false);
+    Task TriggerLibraryEnrichmentAsync(Guid libraryId, bool forceOverride = false);
     Task TriggerActorMetadataRefreshAsync();
     Task TriggerMediaTvdbResolutionAsync();
     Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false);
@@ -128,6 +129,49 @@ public class MetadataManager : IMetadataManager
             ? await _repository.GetAllProjectedAsync(n => n.Id, libraryId)
             : await _repository.GetMediaIdsMissingArtworkAsync(libraryId);
         await ProcessLibraryItemsAsync(libraryId, ids, "artwork", id => RefreshArtworkAsync(id, forceOverride));
+    }
+
+    public async Task TriggerLibraryEnrichmentAsync(Guid libraryId, bool forceOverride = false)
+    {
+        // Enrich each item fully (metadata → artwork → ratings) before moving to
+        // the next, so posters fill in progressively during a first scan instead
+        // of after three separate whole-library phases. The set of work is
+        // identical to running those phases — same guard sets, same leaf refresh
+        // calls — only the grouping (by item vs by operation) differs.
+        HashSet<Guid> metaSet, artSet, ratSet;
+        List<Guid> ordered;
+
+        if (forceOverride)
+        {
+            ordered = (await _repository.GetAllProjectedAsync(n => n.Id, libraryId)).ToList();
+            metaSet = ordered.ToHashSet();
+            artSet = metaSet;
+            ratSet = metaSet;
+        }
+        else
+        {
+            var metaIds = (await _repository.GetMediaIdsMissingMetadataAsync(libraryId)).ToList();
+            metaSet = metaIds.ToHashSet();
+            artSet = (await _repository.GetMediaIdsMissingArtworkAsync(libraryId)).ToHashSet();
+            ratSet = (await _repository.GetMediaIdsMissingRatingsAsync(libraryId)).ToHashSet();
+
+            ordered = new List<Guid>(metaIds);
+            var seen = new HashSet<Guid>(metaIds);
+            foreach (var id in artSet) if (seen.Add(id)) ordered.Add(id);
+            foreach (var id in ratSet) if (seen.Add(id)) ordered.Add(id);
+        }
+
+        await ProcessLibraryItemsAsync(libraryId, ordered, "enrich", async id =>
+        {
+            if (forceOverride || metaSet.Contains(id))
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var scopedManager = scope.ServiceProvider.GetRequiredService<IMetadataManager>();
+                await scopedManager.RefreshMetadataAsync(id, forceOverride);
+            }
+            if (forceOverride || artSet.Contains(id)) await RefreshArtworkAsync(id, forceOverride);
+            if (forceOverride || ratSet.Contains(id)) await RefreshRatingsAsync(id, forceOverride);
+        });
     }
 
     public async Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false)
@@ -394,6 +438,7 @@ public class MetadataManager : IMetadataManager
         "metadata" => "Fetching metadata",
         "artwork" => "Fetching artwork",
         "ratings" => "Fetching ratings",
+        "enrich" => "Fetching details",
         _ => $"Processing {operation}"
     };
 
