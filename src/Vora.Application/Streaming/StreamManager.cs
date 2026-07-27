@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Microsoft.Extensions.Options;
 using Vora.Application.Analysis;
 using Vora.Application.Settings;
 using Vora.Application.Streaming.Dtos;
@@ -32,8 +33,9 @@ public class StreamManager : IStreamManager
     private readonly IStreamingTokenSigner _tokenSigner;
     private readonly IClientNotifier _notifier;
     private readonly ITranscodeService _transcodeService;
+    private readonly StoragePathsOptions _storagePaths;
 
-    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService)
+    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths)
     {
         _repository = repository;
         _decisionManager = decisionManager;
@@ -41,6 +43,7 @@ public class StreamManager : IStreamManager
         _tokenSigner = tokenSigner;
         _notifier = notifier;
         _transcodeService = transcodeService;
+        _storagePaths = storagePaths.Value;
     }
 
     public async Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null)
@@ -301,19 +304,21 @@ public class StreamManager : IStreamManager
         var ramBytes = Process.GetCurrentProcess().WorkingSet64;
         var ramGb = ramBytes / (1024.0 * 1024.0 * 1024.0);
 
-        // Disk stats for the drive hosting the API's working directory.
-        // In Docker that's typically /app, which is mounted onto the host's
-        // disk. DriveInfo reflects the mounted volume, which is what admins
-        // care about (the disk that fills up if libraries or DVR grow).
+        // Disk stats for the volume that actually holds Vora's data. In a
+        // container the data path (e.g. /app/data) is a bind mount, so it lives
+        // on a different filesystem than the container root "/". On Linux
+        // Path.GetPathRoot always returns "/", which would report the Docker
+        // vDisk instead — so resolve the mount whose mount point is the longest
+        // prefix of the data path (a bind mount is its own DriveInfo entry).
         long diskTotal = 0;
         long diskFree = 0;
         try
         {
-            var workingDrive = new DriveInfo(Path.GetPathRoot(AppContext.BaseDirectory) ?? "/");
-            if (workingDrive.IsReady)
+            var dataDrive = ResolveDataDrive();
+            if (dataDrive?.IsReady == true)
             {
-                diskTotal = workingDrive.TotalSize;
-                diskFree = workingDrive.AvailableFreeSpace;
+                diskTotal = dataDrive.TotalSize;
+                diskFree = dataDrive.AvailableFreeSpace;
             }
         }
         catch
@@ -330,5 +335,53 @@ public class StreamManager : IStreamManager
             DiskUsedBytes = diskTotal - diskFree,
             DiskFreeBytes = diskFree,
         };
+    }
+
+    private DriveInfo? ResolveDataDrive()
+    {
+        var candidates = new[]
+        {
+            _storagePaths.Metadata,
+            _storagePaths.CustomArtwork,
+            _storagePaths.Backups,
+            _storagePaths.VideoThumbnails,
+            _storagePaths.UserImages,
+        };
+
+        var target = candidates.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p) && Directory.Exists(p))
+            ?? AppContext.BaseDirectory;
+        target = Path.GetFullPath(target);
+
+        DriveInfo? best = null;
+        var bestLen = -1;
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            try
+            {
+                if (!drive.IsReady) continue;
+                var mount = drive.RootDirectory.FullName;
+                if (!PathIsUnder(target, mount)) continue;
+                if (mount.Length > bestLen)
+                {
+                    best = drive;
+                    bestLen = mount.Length;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        return best;
+    }
+
+    private static bool PathIsUnder(string path, string mount)
+    {
+        if (mount == "/" || mount.Length == 0) return true;
+        var normalized = mount.TrimEnd('/', '\\');
+        if (normalized.Length == 0) return true;
+        return string.Equals(path, normalized, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(normalized + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(normalized + "/", StringComparison.OrdinalIgnoreCase);
     }
 }

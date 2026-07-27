@@ -367,7 +367,7 @@ public class IptvRepository : IIptvRepository
 
     public async Task<ServerSetting> GetServerSettingsAsync()
     {
-        return await _context.ServerSettings.FirstOrDefaultAsync() ?? new ServerSetting();
+        return await _context.ServerSettings.OrderBy(s => s.Id).FirstOrDefaultAsync() ?? new ServerSetting();
     }
 
     public async Task<UserProfile?> GetUserProfileAsync(Guid profileId)

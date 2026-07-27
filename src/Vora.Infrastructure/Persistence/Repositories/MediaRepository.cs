@@ -229,6 +229,7 @@ public partial class MediaRepository : IMediaRepository
                 .ThenInclude(p => p.VideoTracks)
             .Include(m => m.MediaParts)
                 .ThenInclude(p => p.SubtitleTracks)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id);
     }
 
@@ -241,6 +242,7 @@ public partial class MediaRepository : IMediaRepository
                 .ThenInclude(p => p.AudioTracks)
             .Include(m => m.MediaParts)
                 .ThenInclude(p => p.VideoTracks)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id);
     }
 
