@@ -80,6 +80,26 @@ export default function MediaDetailsPage() {
     const caps = useMemo(() => scanDeviceCapabilities(), []);
     const { playMedia, isPlaying } = usePlayer();
 
+    // Pick the audio track the client can play directly: heavily penalize codecs
+    // the device can't decode or channel counts it can't handle, then prefer more
+    // channels among the playable ones (commentary tracks deprioritized).
+    const pickBestAudioId = useCallback((part?: MediaPart): string => {
+        if (!part?.audioTracks?.length) return '';
+        let bestId = '';
+        let lowest = Number.POSITIVE_INFINITY;
+        for (const track of part.audioTracks) {
+            let penalty = 0;
+            const codec = track.codec?.toLowerCase() || '';
+            const channels = track.channels || 2;
+            const needsDownmix = channels > caps.maxAudioChannels;
+            if (!caps.audioCodecs.includes(codec) || needsDownmix) penalty += 1000;
+            penalty -= channels * 10;
+            if (track.title?.toLowerCase().includes('commentary')) penalty += 500;
+            if (penalty < lowest) { lowest = penalty; bestId = track.id; }
+        }
+        return bestId;
+    }, [caps]);
+
     const reloadMedia = useCallback(async () => {
         if (!id) return;
         try {
@@ -131,26 +151,7 @@ export default function MediaDetailsPage() {
                 }
             }
 
-            let bestAudioId = '';
-            if (winningPart.audioTracks?.length) {
-                let lowestAudioPenalty = 9999;
-
-                for (const track of winningPart.audioTracks) {
-                    let penalty = 0;
-                    const codec = track.codec?.toLowerCase() || '';
-                    const channels = track.channels || 2;
-                    const needsDownmix = channels > caps.maxAudioChannels;
-
-                    if (!caps.audioCodecs.includes(codec) || needsDownmix) penalty += 1000;
-                    penalty -= (channels * 10);
-                    if (track.title?.toLowerCase().includes('commentary')) penalty += 500;
-
-                    if (penalty < lowestAudioPenalty) {
-                        lowestAudioPenalty = penalty;
-                        bestAudioId = track.id;
-                    }
-                }
-            }
+            const bestAudioId = pickBestAudioId(winningPart);
 
             let bestSubId = 'none';
             if (winningPart.subtitleTracks?.length) {
@@ -333,8 +334,9 @@ export default function MediaDetailsPage() {
         const newPart = media?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === newVideoId));
 
         if (newPart) {
-            const hasCurrentAudio = newPart.audioTracks?.some(a => a.id === selectedAudioId);
-            if (!hasCurrentAudio && newPart.audioTracks?.length) setSelectedAudioId(newPart.audioTracks[0].id);
+            // Switching version/video always re-selects the audio the client can
+            // play; only a manual audio pick keeps a track the client can't.
+            if (newPart.audioTracks?.length) setSelectedAudioId(pickBestAudioId(newPart));
 
             const hasCurrentSub = selectedSubtitleId === 'none' || newPart.subtitleTracks?.some(s => s.id === selectedSubtitleId);
             if (!hasCurrentSub && newPart.subtitleTracks?.length) {
@@ -404,14 +406,17 @@ export default function MediaDetailsPage() {
             sublabel: [s.title, s.isForced ? 'Forced' : null, s.isDefault ? 'Default' : null].filter(Boolean).join(' · ') || undefined,
         })),
     ];
-    const versionOptions: QualityOption<string>[] = (media.mediaParts ?? []).map((p, i) => {
-        const displayRes = p.resolution === '2160p' ? '4K' : (p.resolution || `Version ${i + 1}`);
-        return {
-            value: p.id,
-            label: p.edition || displayRes,
-            sublabel: [p.edition ? displayRes : null, p.bitrateKbps ? `${Math.round(p.bitrateKbps / 1000)} Mbps` : null].filter(Boolean).join(' · ') || undefined,
-        };
-    });
+    const resHeight = (res?: string) => parseInt((res || '').replace(/[^0-9]/g, ''), 10) || 0;
+    const versionOptions: QualityOption<string>[] = [...(media.mediaParts ?? [])]
+        .sort((a, b) => resHeight(b.resolution) - resHeight(a.resolution) || (b.bitrateKbps ?? 0) - (a.bitrateKbps ?? 0))
+        .map((p, i) => {
+            const displayRes = p.resolution === '2160p' ? '4K' : (p.resolution || `Version ${i + 1}`);
+            return {
+                value: p.id,
+                label: p.edition || displayRes,
+                sublabel: [p.edition ? displayRes : null, p.bitrateKbps ? `${Math.round(p.bitrateKbps / 1000)} Mbps` : null].filter(Boolean).join(' · ') || undefined,
+            };
+        });
 
     let nextEpisode: UpcomingEpisodeParsed | null = null;
     if (media.upcomingEpisodesJson && media.upcomingEpisodesJson !== '[]') {

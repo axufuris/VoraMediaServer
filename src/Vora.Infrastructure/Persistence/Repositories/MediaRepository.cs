@@ -757,9 +757,15 @@ public partial class MediaRepository : IMediaRepository
         await _context.MediaParts.AddAsync(part);
         await _context.SaveChangesAsync();
 
+        // Adding a part can change the item's best resolution/audio/HDR, so clear
+        // LastOverlayGeneratedAt to flag it for overlay regeneration on the next
+        // sync (the gate otherwise only re-runs on metadata/template changes).
+        // Also clear the missing flag if the file returned.
         await _context.MediaItems
-            .Where(m => m.Id == part.MediaItemId && m.MissingSince != null)
-            .ExecuteUpdateAsync(s => s.SetProperty(m => m.MissingSince, (DateTime?)null));
+            .Where(m => m.Id == part.MediaItemId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(m => m.LastOverlayGeneratedAt, (DateTime?)null)
+                .SetProperty(m => m.MissingSince, (DateTime?)null));
     }
 
     public async Task SyncItemEditionFromPartsAsync(Guid mediaItemId)
