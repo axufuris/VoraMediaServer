@@ -18,6 +18,18 @@ Each task carries:
 
 Long tasks that iterate a set of items (metadata / artwork / ratings refresh, analysis + marker phases) report **which item they're on** so the admin UI shows live detail instead of a static "Running". `ITaskProgressReporter` (`Vora.Plugins/Interfaces/ITaskProgressReporter.cs`) is resolved from the work item's scope; `TaskProgressReporter` (`Vora.Application/Tasks/TaskProgressReporter.cs`) forwards to `ITaskQueueManager.ReportProgress`, and the detail rides the existing `TasksUpdated` push — **no new SignalR event**. Managers that don't run inside a task use `NullTaskProgressReporter` (no-op), so the same manager method works from both an endpoint and a queued task. New iterating work items should take `ITaskProgressReporter` and call it per item.
 
+## Full-library workflow order (per-item enrichment)
+
+`RunFullLibraryWorkflowAsync` (in `TaskQueueManager`) is the ordered pipeline a library add / full rescan runs. It is deliberately **not** a series of whole-library phases for the enrichment step:
+
+1. **Scan files** — `TriggerLibraryFolderAndFileScanAsync` creates the `MediaItem`s from disk (fast: filename parse + ffprobe tracks/resolution).
+2. **Fetch details (per item)** — `IMetadataManager.TriggerLibraryEnrichmentAsync` walks the items and enriches each one fully — **metadata → artwork → ratings** — before moving to the next, so posters fill in progressively as the scan's items come online instead of after three separate whole-library passes. The set of work is identical to running the old `TriggerLibrary{Metadata,Artwork,Ratings}RefreshAsync` phases: same guard sets (non-force only touches items missing that data via `GetMediaIdsMissing*Async`; force touches all), same leaf refreshers (`RefreshMetadataAsync` in a fresh scope per item, `RefreshArtworkAsync` / `RefreshRatingsAsync`), only the grouping differs (by item, not by operation).
+3. **Poster overlays** — `RunLibraryOverlaySyncAsync` (a sweep; the badge composites the poster the artwork step already set).
+4. **Actor metadata** — one global, whole-DB pass. This **must** stay a single deferred pass, not per-item: it's not library-scoped, so running it per item would redo every actor N times.
+5. **Analyze media + detect markers** — the heavy FFmpeg passes (`TriggerLibraryFileAnalysisAsync`, then `TriggerLibrarySilenceDetectionAsync`). They don't affect posters and season marker clustering needs the whole season present, so they run **last**, after the library is visually populated.
+
+The single-file watcher path (below) already interleaves per item; this brings the initial full scan in line with it, minus the per-item actor refresh (which the watcher can afford for one occasional file but a full scan cannot).
+
 ## Cancellation (must stay correct)
 
 Each enqueued task gets its own `CancellationTokenSource` in `_taskTokens`. The worker links it with the app-lifetime `stoppingToken` and passes **that linked token** to the work item:

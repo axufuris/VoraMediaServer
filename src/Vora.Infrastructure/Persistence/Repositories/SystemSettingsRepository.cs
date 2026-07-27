@@ -12,13 +12,13 @@ public class SystemSettingsRepository(VoraDbContext dbContext) : ISystemSettings
 
     public async Task<ServerSetting> GetSettingsAsync()
     {
-        var settings = await dbContext.ServerSettings.AsNoTracking().FirstOrDefaultAsync();
+        var settings = await dbContext.ServerSettings.AsNoTracking().OrderBy(s => s.Id).FirstOrDefaultAsync();
         return settings ?? await GetSettingsForUpdateAsync();
     }
 
     public async Task<ServerSetting> GetSettingsForUpdateAsync()
     {
-        var settings = await dbContext.ServerSettings.FirstOrDefaultAsync();
+        var settings = await dbContext.ServerSettings.OrderBy(s => s.Id).FirstOrDefaultAsync();
         if (settings != null)
         {
             return settings;
@@ -36,6 +36,7 @@ public class SystemSettingsRepository(VoraDbContext dbContext) : ISystemSettings
     {
         var vm = await dbContext.ServerSettings
             .AsNoTracking()
+            .OrderBy(s => s.Id)
             .Select(ServerSettingsVM.Projection)
             .FirstOrDefaultAsync();
 
