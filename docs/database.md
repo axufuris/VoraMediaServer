@@ -31,7 +31,8 @@ These are easy to overflow accidentally — note the limit when sending data fro
 | `ClientDevice.Location` | reverse-geo string | 128 |
 | `Media.Title` / `SortTitle` / `OriginalTitle` | | 500 |
 | `Media.OriginalLanguage` | ISO code | 8 |
-| `Media.Edition` | | 64 |
+| `Media.Edition` | denormalized display value, synced from the best (highest-resolution) `MediaPart.Edition` (see `docs/scanning-and-tasks.md`) | 64 |
+| `MediaPart.Edition` | per-file edition (Director's Cut, IMAX, …), parsed from the filename; the source of truth for editions | 64 |
 | `Media.Status` | | 32 |
 | `Media.HomePage` | URL | 1024 |
 | `Media.ContentRating` | | 32 |
@@ -42,6 +43,12 @@ These are easy to overflow accidentally — note the limit when sending data fro
 | `ServerSetting.SmtpPasswordCiphertext` | DataProtection-encrypted SMTP password | `text` |
 | `ServerSetting.EmailPublicBaseUrl` | base URL for absolute links in emails | 512 |
 | `ServerSetting.BackupConfigurationJson` | JSON-serialized `BackupSettings` (cadence, retention, included section keys, last-run timestamp). See `docs/backups.md` | `text` |
+| `ServerSetting.EnableTrashAutoPurge` | when true, items soft-deleted longer than `MissingMediaRetentionDays` are permanently purged by the nightly maintenance task. See `docs/scanning-and-tasks.md` | (bool) |
+| `ServerSetting.MissingMediaRetentionDays` | days a soft-deleted (trashed) item is kept before auto-purge is eligible | (int) |
+| `ServerSetting.ResolveMovieTvdbIds` | when true, the nightly metadata pass resolves missing `TvdbId`s for movies **and** shows; admins can also trigger a one-time pass. See `docs/scanning-and-tasks.md` | (bool) |
+| `MediaItem.MissingSince` | UTC timestamp set when all of an item's files disappear from disk (soft-delete / Trash); `null` while the item is present. Restored files clear it | (timestamp) |
+| `PreservedUserMediaData.ContentKey` | stable content identity (`ContentIdentity.Compute`) used to restore ratings + watch-state when a purged item is later re-added. See `docs/auth-and-devices.md` | 256 |
+| `MediaLibrary.ExcludeFilters` | string collection; a file whose name contains any entry (case-insensitive) is skipped by the scanner and folder watcher (e.g. `.TDARR`, transcoder temp dirs). See `docs/scanning-and-tasks.md` | (list) |
 | `UserProfile.ShowtimesLocation` | per-profile ZIP/city used by the SerpApi theater plugin; null falls back to admin default | 120 |
 | `RequestServer.ProvidesReleaseCalendar` | when true, the Radarr/Sonarr calendar plugins read this server's URL+API key via `IRequestServerLookup` (see `docs/plugins.md`). Allows a single Arr instance to power both requests and the release calendar | (bool) |
 | `EmailTemplate.Key` | string-converted `EmailTemplateKey` enum, primary key | 64 |

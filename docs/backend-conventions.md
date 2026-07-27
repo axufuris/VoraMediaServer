@@ -90,7 +90,7 @@ Every endpoint must declare its auth requirement explicitly. The two policies:
 **Public exceptions** (via `.AllowAnonymous()` or by leaving the route off any auth group):
 
 - `AuthEndpoints` — `setup-status`, `setup`, `login`, `register`, `exchange-profile-token`
-- `ArtworkEndpoints` — `GET /api/artwork/custom/{fileName}` (image tags can't carry a JWT)
+- `ArtworkEndpoints` — `GET /api/artwork/custom/{fileName}` and `GET /api/artwork/thumb` (image tags can't carry a JWT; `thumb` serves the resized-artwork cache — see `docs/artwork-image-cache.md`)
 - `UserImageEndpoints` — `GET /api/users/images/custom/{fileName}` (same reason)
 - `StreamingEndpoints` — `GET /api/streaming/play/{sessionId}` and `GET /api/streaming/hls/{fileName}` (the `<video>` element fetches these directly; auth is implicit via short-lived session token in the URL)
 - `DvrPlaybackEndpoints` — `GET /api/streaming/dvr/file/{sessionId}` and `GET /api/streaming/hls/timeshift/...` (same reason)

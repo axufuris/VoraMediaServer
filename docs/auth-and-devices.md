@@ -119,6 +119,15 @@ Every authenticated request goes through `Vora.Api/Middleware/DeviceTrackingMidd
 
 **Header naming is universal: `X-Vora-Device-Id`.** Older code may reference `X-Device-Id`; treat any sighting as a bug and fix it.
 
+## Per-profile data preservation across purge
+
+Per-profile ratings + watch-state don't die with a purged media item. When an item is permanently removed (Media Trash auto-purge or manual `DELETE /media/trash/{id}` — see `docs/scanning-and-tasks.md`), each profile's rating and watch-state is first archived into the `PreservedUserMediaData` table, keyed by a **content identity** rather than the item's `MediaItem.Id`:
+
+- `ContentIdentity.Compute` (`Vora.Application/Media/ContentIdentity.cs`) builds a stable key from external ids — movies/shows as `type:tmdb|imdb|tvdb:<id>`, episodes as `episode:<series id>:<season>:<episode>`.
+- When the same content is later re-added (a different `MediaItem.Id`, same content key), the archived rating + watch-state is restored to each profile.
+
+This is why removal is non-destructive to user data even though the row's GUID changes on re-add. The table schema is in `docs/database.md`.
+
 ## Multi-server clients
 
 `utils/serverVault.ts` stores an array of connected `VoraServer` records (id, name, url, token, profileId, profileName). The active server is tracked separately. `apiClient` calls accept `{ serverId }` to target a non-active server. `ServerManagerModal` is the UI for adding/switching/removing servers.
