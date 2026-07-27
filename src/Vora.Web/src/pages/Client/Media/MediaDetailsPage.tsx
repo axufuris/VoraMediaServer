@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mediaService, type MediaItem } from '../../../api/Media/mediaService';
+import { mediaService, type MediaItem, type MediaPart } from '../../../api/Media/mediaService';
 import { libraryAdminService } from '../../../api/Media/libraryAdminService';
 import EditMetadataModal from '../../../components/Media/EditMetadataModal';
 import MarkerEditorModal from '../../../components/Admin/MarkerEditorModal';
