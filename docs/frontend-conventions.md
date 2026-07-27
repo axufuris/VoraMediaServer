@@ -115,7 +115,8 @@ pages/Profile/            AccountSettingsPage, ProfileSelectionPage
 pages/Admin/              DashboardPage, AiStatsPage, HistoryPage,
                           MusicHistoryPage, PluginsPage, RequestsPage,
                           SettingsPage, UserManagementPage, DedupePage,
-                          AuthorizedDevicesPage, AppearancePage
+                          AuthorizedDevicesPage, AppearancePage,
+                          MediaTrashPage
 pages/Admin/Libraries/    CreateLibrary, ManageLibrary
 pages/Admin/SmartLists/   SmartListsPage
 pages/Admin/Discovery/    DiscoveryPage

@@ -14,7 +14,7 @@ Plugins extend Vora at runtime with new providers — metadata sources, artwork 
 
 Vora plugins fall into these provider interfaces (defined in `Vora.Plugins.Abstractions`):
 
-- **Metadata provider** — looks up media metadata by external ID or title (e.g. TMDB, IMDB, TVDB)
+- **Metadata provider** — looks up media metadata by external ID or title (e.g. TMDB, IMDB, TVDB). The built-in TMDB provider (`Providers/Tmdb/TmdbMetadataProvider.cs`) also maps `external_ids.tvdb_id` onto results — free for TV shows. **Movies** don't get a TVDB id from TMDB; the opt-in `ServerSetting.ResolveMovieTvdbIds` (off by default) makes the nightly metadata pass run an extra TVDB search to backfill missing movie **and** show `TvdbId`s (`MetadataManager.ResolveTvdbIdForMovieAsync` / `ResolveTvdbIdForShowAsync`). Admins can also trigger a one-time backfill via `POST /metadata/resolve-tvdb-ids` (Core Settings → "Resolve now"). Items that already have a `TvdbId`, and movies that come back empty, aren't re-searched every night.
 - **Artwork provider** — fetches posters/backdrops/banners
 - **IPTV provider** — supplies channels, EPG, stream URLs at the plugin contract level. Distinct from the user-facing `IptvPlaylist` / `IptvEpgSource` aggregates documented in `docs/iptv-and-dvr.md`; an IPTV provider plugin would typically feed data into those aggregates (e.g. HDHomeRun integration).
 - **Collection sync provider** — pulls list contents from external sources (Trakt lists, custom feeds)

@@ -132,6 +132,11 @@ Key environment variables:
   covers everything. Transcoder scratch (HLS segments, IPTV timeshift)
   lives under `/transcode` and is configured separately through the
   admin UI — that path should be a fast local disk or tmpfs.
+  The server also writes a **resized-artwork cache** under
+  `StoragePaths__CustomArtwork/imagecache` (posters/stills/backdrops
+  the clients request through `/api/artwork/thumb`). It self-bounds at
+  512 MB and needs no separate volume — see
+  [`docs/artwork-image-cache.md`](docs/artwork-image-cache.md).
 
 Media mounts should be read-only (`:ro`) unless you want Vora to
 manage the files. Read-only is safer; the API only needs to read.
@@ -462,6 +467,10 @@ Project documentation lives under [`docs/`](docs/). Highlights:
   app structure and conventions
 - [`docs/database.md`](docs/database.md) — schema, migrations, vector
   extension
+- [`docs/scanning-and-tasks.md`](docs/scanning-and-tasks.md) — media
+  ingest, background tasks, exclude filters, and Media Trash
+- [`docs/artwork-image-cache.md`](docs/artwork-image-cache.md) — resized
+  artwork cache and poster overlay badges
 - [`docs/auth-and-devices.md`](docs/auth-and-devices.md) — auth flow and
   device tracking
 - [`docs/iptv-and-dvr.md`](docs/iptv-and-dvr.md) — IPTV, EPG, and DVR

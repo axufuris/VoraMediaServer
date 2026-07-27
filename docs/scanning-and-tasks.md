@@ -14,6 +14,10 @@ Each task carries:
 
 `QueueXxx` methods only enqueue (fire-and-forget). Heavy logic lives in the managers the work item resolves from the scope; the queue manager just wires them together.
 
+### Per-item progress
+
+Long tasks that iterate a set of items (metadata / artwork / ratings refresh, analysis + marker phases) report **which item they're on** so the admin UI shows live detail instead of a static "Running". `ITaskProgressReporter` (`Vora.Plugins/Interfaces/ITaskProgressReporter.cs`) is resolved from the work item's scope; `TaskProgressReporter` (`Vora.Application/Tasks/TaskProgressReporter.cs`) forwards to `ITaskQueueManager.ReportProgress`, and the detail rides the existing `TasksUpdated` push — **no new SignalR event**. Managers that don't run inside a task use `NullTaskProgressReporter` (no-op), so the same manager method works from both an endpoint and a queued task. New iterating work items should take `ITaskProgressReporter` and call it per item.
+
 ## Cancellation (must stay correct)
 
 Each enqueued task gets its own `CancellationTokenSource` in `_taskTokens`. The worker links it with the app-lifetime `stoppingToken` and passes **that linked token** to the work item:
@@ -45,6 +49,8 @@ taskQueue.QueueScanNewFile(libraryId, filePath);
 
 `QueueScanNewFile` ingests **just that one file** — NOT a full library scan. This is deliberate: copying a season folder with N episodes produces N cheap per-file ingests, each doing its own distinct file, so there's no scan flood and no dedupe needed. (The old behaviour queued a full `QueueScanLibrary` per file → N redundant full scans.)
 
+**Exclude filters are enforced watcher-side.** Before enqueuing, `FolderWatcherService` checks the file path against the library's `ExcludeFilters` (e.g. `.TDARR`, transcoder working dirs). A single-file scan also re-checks, but the watcher must reject first — otherwise the task is queued (and shows up in the UI) before the scanner no-ops it. Keep both gates: watcher-side to avoid queuing, scanner-side as the backstop.
+
 The per-file work item:
 
 1. `ILibraryManager.TriggerFileScanAsync(libraryId, filePath)` → dispatches by library type to the scanner's single-file method and returns a `ScanFileResult { MediaItemId, ParentShowId, NewSeasonCreated }`.
@@ -62,6 +68,27 @@ A **season's** poster and (metadata) fields come from the parent **show's** meta
 - `QueueScanNewFile` refreshes the parent show's metadata **exactly once** for a genuinely new season. Because the single consumer runs tasks sequentially, the first file of a new season sees `NewSeasonCreated = true` and the rest see the season already exists — so a 20-episode season copy maps the show once, not 20 times.
 
 Manual "Refresh metadata" (force) still re-maps everything; this just makes the common add-a-season case self-heal.
+
+### Duplicate-item prevention
+
+`IMediaIngestionService.EnsureMovieAsync` must not create a second `MediaItem` for a movie that's already in the library under a differently-cased or metadata-rewritten title. It resolves an existing item by, in order: **external id** (`GetMovieIdByExternalIdAsync` — TMDB, then IMDB, within the library), then **normalized title + year** (`GetMovieIdByTitleAndYearAsync`, which lower-cases and strips punctuation via `NormalizeTitle` and compares in memory). Only if both miss is a new item created. The old code compared the raw, case-sensitive `Title`, so a file scanned before metadata mapping and one scanned after (metadata rewrote the title) produced two rows sharing the same TmdbId/ImdbId.
+
+### Editions live on the part
+
+Each `MediaPart` carries its own `Edition` (Director's Cut, IMAX, …), parsed from the filename during ingest. `AddMediaPartAsync` sets `part.Edition` and calls `SyncItemEditionFromPartsAsync`, which denormalizes `MediaItem.Edition` from the **best (highest-resolution) part** for display/sort. Adding a part also clears `MediaItem.LastOverlayGeneratedAt` (so the poster overlay regenerates against the new best part — see `docs/artwork-image-cache.md`) and `MediaItem.MissingSince` (a re-added file un-trashes the item). At play time the client picks a part through the "Version" selector; the choice flows as `StartStreamRequest.MediaPartId` → `BestPathDecisionManager` → `StreamSession.MediaPartId`.
+
+### Artwork refresh only fetches what's missing
+
+A **non-force** library artwork refresh (`MetadataManager.TriggerLibraryArtworkRefreshAsync`) now fetches only items missing a poster (`GetMediaIdsMissingArtworkAsync`, `PosterUrl == null`) instead of re-hitting every item. Force still refetches everything.
+
+## Soft-delete & Media Trash
+
+Removing a file from disk no longer hard-deletes its library item. When the folder watcher sees a video file disappear (or a scan finds all of an item's parts gone), the video `MediaItem` is **marked missing** by stamping `MissingSince` (UTC) instead of being deleted; re-adding the file clears `MissingSince`. Missing items are filtered out of every client read path (`QueryableExtensions`, `SmartPlaylistEvaluator`, `RecommendationRepository`, `CollectionRepository`, `UserMediaStateRepository`) so they vanish from clients but survive in the DB with their metadata, ratings, and watch-state intact.
+
+- **Music `Track` still hard-deletes** — the soft-delete tombstone is video-only. Don't assume symmetry.
+- **Admin Media Trash page** (`pages/Admin/MediaTrashPage.tsx`, `mediaTrashService.ts`) lists trashed items via `GET /media/trash` (→ `TrashMediaItemVM[]`), restores with `POST /media/trash/{id}/restore`, and permanently removes with `DELETE /media/trash/{id}`.
+- **Auto-purge**: the daily maintenance job in `ScheduledJobWorker` runs at `NightlyScanTime` and, when `ServerSetting.EnableTrashAutoPurge` is on, calls `MediaManager.PurgeExpiredTrashAsync` to permanently delete items whose `MissingSince` is older than `MissingMediaRetentionDays`.
+- **User data outlives the purge**: a permanent purge first archives per-profile ratings + watch-state into `PreservedUserMediaData`, so re-adding the same content later restores them. See `docs/auth-and-devices.md`.
 
 ## Episode counts are live
 
