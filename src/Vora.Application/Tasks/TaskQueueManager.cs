@@ -173,7 +173,12 @@ public class TaskQueueManager : ITaskQueueManager
                 await metadataManager.TriggerMediaItemMetadataRefreshAsync(result.ParentShowId.Value, false);
             }
 
-            await metadataManager.TriggerActorMetadataRefreshAsync();
+            // Actor entity metadata (bios, photos) is NOT refreshed per file:
+            // TriggerActorMetadataRefreshAsync fetches up to 50 actors from TMDB
+            // each call, which is crippling when a whole library is ingested one
+            // file at a time. The item's own cast is already linked by the
+            // metadata refresh above; actor entities are enriched by the nightly
+            // scan and the full-library workflow.
             await overlayManager.GenerateOverlaysForMediaAsync(itemId);
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(itemId, null, isAdditionTrigger: true);
         });

@@ -49,14 +49,14 @@ taskQueue.QueueScanNewFile(libraryId, filePath);
 
 `QueueScanNewFile` ingests **just that one file** — NOT a full library scan. This is deliberate: copying a season folder with N episodes produces N cheap per-file ingests, each doing its own distinct file, so there's no scan flood and no dedupe needed. (The old behaviour queued a full `QueueScanLibrary` per file → N redundant full scans.)
 
-**Exclude filters are enforced watcher-side.** Before enqueuing, `FolderWatcherService` checks the file path against the library's `ExcludeFilters` (e.g. `.TDARR`, transcoder working dirs). A single-file scan also re-checks, but the watcher must reject first — otherwise the task is queued (and shows up in the UI) before the scanner no-ops it. Keep both gates: watcher-side to avoid queuing, scanner-side as the backstop.
+**Exclude filters are enforced watcher-side, on both adds and deletes.** Before enqueuing, `FolderWatcherService` checks the file name against the library's `ExcludeFilters` (e.g. `.TDARR`, transcoder working dirs) via the shared `IsExcludedAsync` helper. A single-file scan also re-checks, but the watcher must reject first — otherwise the task is queued (and shows up in the UI) before the scanner no-ops it. The **delete** path checks too: an excluded file was never ingested, so its deletion must not queue an `Auto-Cleanup` (`QueueRemoveOrphanedMedia`) task — otherwise a transcoder churning `*.TDARR` temp files floods the queue with no-op cleanups.
 
 The per-file work item:
 
 1. `ILibraryManager.TriggerFileScanAsync(libraryId, filePath)` → dispatches by library type to the scanner's single-file method and returns a `ScanFileResult { MediaItemId, ParentShowId, NewSeasonCreated }`.
-2. Runs targeted analysis + metadata/artwork/ratings refresh for the ingested leaf item (episode/movie).
+2. Runs targeted analysis + metadata/artwork/ratings refresh for the ingested leaf item (episode/movie). The metadata refresh links the item's own **cast**, so actors appear on the item immediately.
 3. **Only if a new season was created**, refreshes the parent show's metadata once (see next section).
-4. Actor metadata, overlays, silence detection for the item.
+4. Overlays + silence detection for the item. The per-file path deliberately does **not** call the global `TriggerActorMetadataRefreshAsync` — that fetches up to 50 actors from TMDB per call, which is crippling when a whole library is ingested one file at a time. Actor **entity** metadata (bios, photos on the actor detail page) is enriched by the nightly scan and the full-library workflow instead; the cast list itself is already set in step 2.
 
 ## Single-file scanner + new-season metadata
 

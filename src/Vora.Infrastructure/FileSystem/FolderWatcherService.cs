@@ -50,7 +50,7 @@ public class FolderWatcherService : IFolderWatcherService
                     directoryPaths,
                     interval,
                     async (filePath) => await ProcessFileAddedAsync(libraryId, filePath),
-                    async (filePath) => await ProcessFileDeletedAsync(filePath)
+                    async (filePath) => await ProcessFileDeletedAsync(libraryId, filePath)
                 );
 
                 _activeWatchers.TryAdd(libraryId, provider);
@@ -103,11 +103,7 @@ public class FolderWatcherService : IFolderWatcherService
         // Honor the library's exclude filters here so excluded files (e.g. a
         // *.TDARR copy still transcoding) don't even queue a scan task — the
         // scanner would reject them anyway, but this keeps them off the task list.
-        var libraryManager = scope.ServiceProvider.GetRequiredService<ILibraryManager>();
-        var library = await libraryManager.GetLibraryByIdAsync(libraryId);
-        var fileName = Path.GetFileName(filePath);
-        if (library?.ExcludeFilters != null
-            && library.ExcludeFilters.Any(f => !string.IsNullOrWhiteSpace(f) && fileName.Contains(f.Trim(), StringComparison.OrdinalIgnoreCase)))
+        if (await IsExcludedAsync(scope, libraryId, Path.GetFileName(filePath)))
         {
             _logger.LogInformation("Skipping excluded file {FilePath}.", filePath);
             return;
@@ -118,13 +114,28 @@ public class FolderWatcherService : IFolderWatcherService
         taskQueue.QueueScanNewFile(libraryId, filePath);
     }
 
-    private async Task ProcessFileDeletedAsync(string filePath)
+    private async Task ProcessFileDeletedAsync(Guid libraryId, string filePath)
     {
         if (!SupportedExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return;
 
-        await Task.Yield();
         using var scope = _serviceProvider.CreateScope();
+
+        // Excluded files (e.g. *.TDARR temp copies) were never ingested, so a
+        // deletion must not queue an orphan-cleanup task for them.
+        if (await IsExcludedAsync(scope, libraryId, Path.GetFileName(filePath)))
+        {
+            return;
+        }
+
         var taskQueue = scope.ServiceProvider.GetRequiredService<ITaskQueueManager>();
         taskQueue.QueueRemoveOrphanedMedia(filePath);
+    }
+
+    private static async Task<bool> IsExcludedAsync(IServiceScope scope, Guid libraryId, string fileName)
+    {
+        var libraryManager = scope.ServiceProvider.GetRequiredService<ILibraryManager>();
+        var library = await libraryManager.GetLibraryByIdAsync(libraryId);
+        return library?.ExcludeFilters != null
+            && library.ExcludeFilters.Any(f => !string.IsNullOrWhiteSpace(f) && fileName.Contains(f.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 }
