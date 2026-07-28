@@ -175,6 +175,8 @@ public class TvdbMetadataProvider : IMetadataProvider
             RuntimeMinutes = data.TryGetProperty("runtime", out var rt) && rt.ValueKind == JsonValueKind.Number ? rt.GetInt32() : null,
         };
 
+        await ApplyEnglishTranslationAsync(tvdbIdToFetch, "movies", data, result, token);
+
         if (data.TryGetProperty("first_release", out var firstReleaseObj) && firstReleaseObj.ValueKind == JsonValueKind.Object)
         {
             var releaseDateStr = firstReleaseObj.TryGetProperty("date", out var fr) && fr.ValueKind != JsonValueKind.Null ? fr.GetString() : null;
@@ -292,6 +294,8 @@ public class TvdbMetadataProvider : IMetadataProvider
             PosterUrl = data.TryGetProperty("image", out var img) && img.ValueKind != JsonValueKind.Null ? img.GetString() : null,
             Status = data.TryGetProperty("status", out var st) && st.ValueKind != JsonValueKind.Null && st.TryGetProperty("name", out var stn) && stn.ValueKind != JsonValueKind.Null ? stn.GetString() : null,
         };
+
+        await ApplyEnglishTranslationAsync(tvdbIdToFetch, "series", data, result, token);
 
         if (data.TryGetProperty("contentRatings", out var crList) && crList.ValueKind == JsonValueKind.Array && crList.GetArrayLength() > 0)
         {
@@ -542,6 +546,35 @@ public class TvdbMetadataProvider : IMetadataProvider
             Birthday = DateTime.TryParse(data.TryGetProperty("birth", out var b) && b.ValueKind != JsonValueKind.Null ? b.GetString() : "", out var bd) ? DateTime.SpecifyKind(bd, DateTimeKind.Utc) : null,
             Deathday = DateTime.TryParse(data.TryGetProperty("death", out var d) && d.ValueKind != JsonValueKind.Null ? d.GetString() : "", out var dd) ? DateTime.SpecifyKind(dd, DateTimeKind.Utc) : null
         };
+    }
+
+    private async Task ApplyEnglishTranslationAsync(string tvdbId, string kind, JsonElement data, MetadataResult result, string token)
+    {
+        if (!data.TryGetProperty("nameTranslations", out var nt) || nt.ValueKind != JsonValueKind.Array) return;
+        if (!nt.EnumerateArray().Any(x => x.ValueKind == JsonValueKind.String && x.GetString() == "eng")) return;
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{kind}/{tvdbId}/translations/eng");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode) return;
+
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var doc = await JsonDocument.ParseAsync(stream);
+            if (!doc.RootElement.TryGetProperty("data", out var tr) || tr.ValueKind != JsonValueKind.Object) return;
+
+            if (tr.TryGetProperty("name", out var en) && en.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(en.GetString()))
+            {
+                result.Title = en.GetString();
+            }
+            if (tr.TryGetProperty("overview", out var eo) && eo.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(eo.GetString()))
+            {
+                result.Overview = eo.GetString();
+            }
+        }
+        catch (HttpRequestException) { }
+        catch (TaskCanceledException) { }
     }
 
     private static CastRole MapPeopleTypeToRole(string? peopleType) => peopleType switch
