@@ -123,7 +123,7 @@ public class MediaDetailsVM
             SeasonNumber = item is Season ? ((Season)item).SeasonNumber :
                            item is Episode ? ((Episode)item).Season.SeasonNumber : null,
             EpisodeNumber = item is Episode ? ((Episode)item).EpisodeNumber : null,
-            Seasons = item is TvShow ? ((TvShow)item).Seasons.Where(s => s.MissingSince == null).Select(s => new SeasonVM
+            Seasons = item is TvShow ? ((TvShow)item).Seasons.Where(s => s.MissingSince == null).OrderBy(s => s.SeasonNumber).Select(s => new SeasonVM
             {
                 Id = s.Id,
                 SeasonNumber = s.SeasonNumber,
