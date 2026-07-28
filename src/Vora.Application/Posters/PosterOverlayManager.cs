@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vora.Application.Media;
@@ -26,6 +27,8 @@ public class PosterOverlayManager : IPosterOverlayManager
     private readonly string _overlayDirectory;
     private readonly string _originalArtworkCacheDir;
 
+    private readonly IServiceScopeFactory _scopeFactory;
+
     public PosterOverlayManager(
         IMediaRepository mediaRepo,
         IOverlayTemplateRepository templateRepo,
@@ -34,6 +37,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         IHttpClientFactory httpClientFactory,
         ITaskProgressReporter progress,
         Vora.Application.Artwork.IArtworkThumbnailService thumbnails,
+        IServiceScopeFactory scopeFactory,
         ILogger<PosterOverlayManager> logger)
     {
         _mediaRepo = mediaRepo;
@@ -42,6 +46,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         _httpClientFactory = httpClientFactory;
         _progress = progress;
         _thumbnails = thumbnails;
+        _scopeFactory = scopeFactory;
         _logger = logger;
 
         var configPath = storagePaths.Value.CustomArtwork;
@@ -81,20 +86,33 @@ public class PosterOverlayManager : IPosterOverlayManager
 
         var itemsToProcess = await _mediaRepo.GetItemsPendingOverlayGenerationAsync(libraryId, templates.Select(t => t.UpdatedAt).Max());
 
-        for (int i = 0; i < itemsToProcess.Count; i++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var item = itemsToProcess[i];
-            _progress.Report($"Overlaying {item.Title} ({i + 1}/{itemsToProcess.Count})");
-            try
+        // Overlay generation downloads a poster + composites with ImageSharp per
+        // item, so run several at once. Each item enriches in its own scope
+        // (GenerateOverlaysForMediaAsync loads + saves in a fresh DbContext), and
+        // items are independent (distinct rows + distinct output files).
+        var total = itemsToProcess.Count;
+        var done = 0;
+        var parallelism = Math.Clamp(Environment.ProcessorCount, 2, 6);
+        await Parallel.ForEachAsync(
+            itemsToProcess,
+            new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
+            async (item, ct) =>
             {
-                await ProcessSingleItemAsync(item, templates, activeProvider, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to generate overlay for {Title} ({MediaItemId}).", item.Title, item.Id);
-            }
-        }
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var overlay = scope.ServiceProvider.GetRequiredService<IPosterOverlayManager>();
+                    await overlay.GenerateOverlaysForMediaAsync(item.Id, ct);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to generate overlay for {Title} ({MediaItemId}).", item.Title, item.Id);
+                }
+
+                var n = Interlocked.Increment(ref done);
+                _progress.Report($"Overlaying {item.Title} ({n}/{total})");
+            });
 
         return true;
     }

@@ -14,6 +14,7 @@ public class MediaPart
     public long? FileSizeBytes { get; set; }
     public long? OverallBitrate { get; set; }
     public TimeSpan? Duration { get; set; }
+    public DateTime? LastAnalyzedAt { get; set; }
 
     // A part belongs to exactly one owner: either a MediaItem (the item's own
     // file) or a MediaExtra (a trailer/featurette file). Both FKs are nullable;
