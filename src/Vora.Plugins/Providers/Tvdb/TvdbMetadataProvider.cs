@@ -13,6 +13,7 @@ public class TvdbMetadataProvider : IMetadataProvider
     private readonly HttpClient _httpClient;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly Dictionary<string, Dictionary<string, MetadataResult>> _tvdbEpisodeCache = new();
+    private string? _cachedLanguage;
 
     private readonly bool _fetchExtendedSeasonData = true;
 
@@ -72,6 +73,19 @@ public class TvdbMetadataProvider : IMetadataProvider
             }
         }
         return token;
+    }
+
+    // The server-wide metadata language as a TVDB 3-letter code (e.g. "eng").
+    // Cached for the lifetime of this (transient) provider instance so a single
+    // show + its episodes don't each re-read the setting.
+    private async Task<string> GetLanguageAsync()
+    {
+        if (_cachedLanguage != null) return _cachedLanguage;
+        using var scope = _scopeFactory.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
+        var lang = await settings.GetMetadataLanguageAsync();
+        _cachedLanguage = string.IsNullOrWhiteSpace(lang) ? "eng" : lang.Trim();
+        return _cachedLanguage;
     }
 
     public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
@@ -175,7 +189,7 @@ public class TvdbMetadataProvider : IMetadataProvider
             RuntimeMinutes = data.TryGetProperty("runtime", out var rt) && rt.ValueKind == JsonValueKind.Number ? rt.GetInt32() : null,
         };
 
-        await ApplyEnglishTranslationAsync(tvdbIdToFetch, "movies", data, result, token);
+        await ApplyTranslationAsync(tvdbIdToFetch, "movies", data, result, token);
 
         if (data.TryGetProperty("first_release", out var firstReleaseObj) && firstReleaseObj.ValueKind == JsonValueKind.Object)
         {
@@ -295,7 +309,7 @@ public class TvdbMetadataProvider : IMetadataProvider
             Status = data.TryGetProperty("status", out var st) && st.ValueKind != JsonValueKind.Null && st.TryGetProperty("name", out var stn) && stn.ValueKind != JsonValueKind.Null ? stn.GetString() : null,
         };
 
-        await ApplyEnglishTranslationAsync(tvdbIdToFetch, "series", data, result, token);
+        await ApplyTranslationAsync(tvdbIdToFetch, "series", data, result, token);
 
         if (data.TryGetProperty("contentRatings", out var crList) && crList.ValueKind == JsonValueKind.Array && crList.GetArrayLength() > 0)
         {
@@ -354,6 +368,7 @@ public class TvdbMetadataProvider : IMetadataProvider
 
         if (data.TryGetProperty("seasons", out var seasons) && seasons.ValueKind == JsonValueKind.Array)
         {
+            var seriesOriginalLang = data.TryGetProperty("originalLanguage", out var slo) && slo.ValueKind == JsonValueKind.String ? slo.GetString() : null;
             var seasonDataList = new List<(int Number, int Id, string Name, string? Poster)>();
             foreach (var season in seasons.EnumerateArray())
             {
@@ -387,6 +402,8 @@ public class TvdbMetadataProvider : IMetadataProvider
                         {
                             if (sData.TryGetProperty("overview", out var sOv) && sOv.ValueKind != JsonValueKind.Null)
                                 seasonResult.Overview = sOv.GetString();
+
+                            await ApplySeasonOverviewTranslationAsync(s.Id, sData, seasonResult, seriesOriginalLang, token);
 
                             if (sData.TryGetProperty("score", out var sScore) && sScore.ValueKind == JsonValueKind.Number)
                                 seasonResult.VoteAverage = sScore.GetDecimal();
@@ -456,12 +473,13 @@ public class TvdbMetadataProvider : IMetadataProvider
         {
             showEpisodes = new Dictionary<string, MetadataResult>();
             var token = await GetValidTokenAsync();
+            var lang = await GetLanguageAsync();
 
             if (!string.IsNullOrEmpty(token))
             {
                 for (int page = 0; page < 5; page++)
                 {
-                    var url = $"series/{showTmdbId}/episodes/default/eng?page={page}";
+                    var url = $"series/{showTmdbId}/episodes/default/{lang}?page={page}";
                     using var request = new HttpRequestMessage(HttpMethod.Get, url);
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
@@ -548,14 +566,57 @@ public class TvdbMetadataProvider : IMetadataProvider
         };
     }
 
-    private async Task ApplyEnglishTranslationAsync(string tvdbId, string kind, JsonElement data, MetadataResult result, string token)
+    private async Task ApplySeasonOverviewTranslationAsync(int seasonId, JsonElement sData, SeasonResult seasonResult, string? originalLang, string token)
     {
-        if (!data.TryGetProperty("nameTranslations", out var nt) || nt.ValueKind != JsonValueKind.Array) return;
-        if (!nt.EnumerateArray().Any(x => x.ValueKind == JsonValueKind.String && x.GetString() == "eng")) return;
+        var lang = await GetLanguageAsync();
+
+        // The season-extended overview is in the series' original language, so skip
+        // the extra call when that already matches the configured language.
+        if (string.Equals(originalLang, lang, StringComparison.OrdinalIgnoreCase)) return;
+        if (!sData.TryGetProperty("overviewTranslations", out var ot) || ot.ValueKind != JsonValueKind.Array) return;
+        if (!ot.EnumerateArray().Any(x => x.ValueKind == JsonValueKind.String && x.GetString() == lang)) return;
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{kind}/{tvdbId}/translations/eng");
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"seasons/{seasonId}/translations/{lang}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode) return;
+
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var doc = await JsonDocument.ParseAsync(stream);
+            if (!doc.RootElement.TryGetProperty("data", out var tr) || tr.ValueKind != JsonValueKind.Object) return;
+
+            if (tr.TryGetProperty("overview", out var ov) && ov.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(ov.GetString()))
+            {
+                seasonResult.Overview = ov.GetString();
+            }
+        }
+        catch (HttpRequestException) { }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task ApplyTranslationAsync(string tvdbId, string kind, JsonElement data, MetadataResult result, string token)
+    {
+        var lang = await GetLanguageAsync();
+
+        // The extended name/overview are already in the title's original language,
+        // so when that IS the configured language there's nothing to fetch — this
+        // skips the extra call for (e.g.) English titles on an English server.
+        if (data.TryGetProperty("originalLanguage", out var ol) && ol.ValueKind == JsonValueKind.String &&
+            string.Equals(ol.GetString(), lang, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        // Only override when the title actually advertises a translation in the
+        // configured language.
+        if (!data.TryGetProperty("nameTranslations", out var nt) || nt.ValueKind != JsonValueKind.Array) return;
+        if (!nt.EnumerateArray().Any(x => x.ValueKind == JsonValueKind.String && x.GetString() == lang)) return;
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{kind}/{tvdbId}/translations/{lang}");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             var response = await _httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode) return;

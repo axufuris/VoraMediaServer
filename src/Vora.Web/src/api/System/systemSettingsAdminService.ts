@@ -24,6 +24,7 @@ export interface ServerSettings {
     enableTrashAutoPurge: boolean;
     missingMediaRetentionDays: number;
     resolveMovieTvdbIds: boolean;
+    metadataLanguage: string;
     registrationMode: number;
     internetUploadSpeedMbps: number;
     maxRemoteStreamBitrateMbps: number;
