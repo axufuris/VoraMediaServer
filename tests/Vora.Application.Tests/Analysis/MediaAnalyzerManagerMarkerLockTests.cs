@@ -46,6 +46,7 @@ public class MediaAnalyzerManagerMarkerLockTests
             _queue,
             _notifier,
             new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
+            Substitute.For<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(),
             NullLogger<MediaAnalyzerManager>.Instance);
     }
 

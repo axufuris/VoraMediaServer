@@ -114,6 +114,11 @@ export default function MediaDetailsPage() {
         let isMounted = true;
         if (!id) return;
 
+        // Navigating between items (e.g. episode → season) reuses this component,
+        // so close any open overlay/menu from the previous item.
+        setIsQualityPanelOpen(false);
+        setShowMenu(false);
+
         mediaService.getMediaItem(id, serverId)
             .then(data => {
                 if (isMounted) {

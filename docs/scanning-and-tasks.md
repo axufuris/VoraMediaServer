@@ -4,12 +4,22 @@ How new media gets ingested and how long-running work is queued, named, and canc
 
 ## Background task queue
 
-`ITaskQueueManager` (`Vora.Application/Tasks/TaskQueueManager.cs`) is an in-memory queue over an unbounded `Channel<QueuedTaskDto>`. Every long-running operation (library scan, metadata/artwork/ratings refresh, analysis, overlays, thumbnails, collection sync, EPG sync, embeddings) is enqueued through a `QueueXxx` method. `TaskProcessingWorker` (`Vora.Infrastructure/Workers/TaskProcessingWorker.cs`) is the **single** `BackgroundService` consumer — tasks run **sequentially**, one at a time.
+`ITaskQueueManager` (`Vora.Application/Tasks/TaskQueueManager.cs`) is an in-memory queue over an unbounded `Channel<QueuedTaskDto>`. Every long-running operation (library scan, metadata/artwork/ratings refresh, analysis, overlays, thumbnails, collection sync, EPG sync, embeddings) is enqueued through a `QueueXxx` method. `TaskProcessingWorker` (`Vora.Infrastructure/Workers/TaskProcessingWorker.cs`) is the `BackgroundService` consumer.
+
+### Concurrency + resource keys
+
+The worker is a **bounded, key-aware dispatcher** — not a single sequential loop. It runs up to **`MaxConcurrency` (3)** tasks at once, but **never two tasks that share a `ResourceKey`**:
+
+- Each task has a `ResourceKey`. Unkeyed tasks (via `EnqueueTask(...)` with no key) get a **unique** key, so they're always eligible to run alongside others.
+- **Every heavy job on one library is keyed `library:{id}`** (via `LibraryKey(id)`) — scan, update, refresh-metadata, analyze, watcher file-ingest, video-thumbnails. So a scan and a refresh of the *same* library **serialize** (they'd otherwise race on its rows), while **different libraries run concurrently** and a quick unrelated task (EPG sync, single-item refresh) isn't blocked behind a long scan.
+- The cap is deliberately low because heavy jobs **already parallelize internally** (scan/analysis/overlays run several items at once); a high cap would over-subscribe CPU + providers.
+- FIFO within a key: a key-blocked task stays pending and starts when its key frees. On shutdown the dispatcher **awaits in-flight tasks** so each removes itself cleanly.
 
 Each task carries:
 
 - `Id`, `Name`, `Status` — surfaced to the admin Tasks UI via `GetAllTasks()` + the `TasksUpdated` SignalR push.
 - `WorkItem(CancellationToken, IServiceProvider)` — the actual work; gets a fresh DI scope per run.
+- `ResourceKey` — mutual-exclusion group (see above).
 - `NameResolver(IServiceProvider) -> string?` — optional; resolves a friendly display name at run time (see below).
 
 `QueueXxx` methods only enqueue (fire-and-forget). Heavy logic lives in the managers the work item resolves from the scope; the queue manager just wires them together.
@@ -18,17 +28,27 @@ Each task carries:
 
 Long tasks that iterate a set of items (metadata / artwork / ratings refresh, analysis + marker phases) report **which item they're on** so the admin UI shows live detail instead of a static "Running". `ITaskProgressReporter` (`Vora.Plugins/Interfaces/ITaskProgressReporter.cs`) is resolved from the work item's scope; `TaskProgressReporter` (`Vora.Application/Tasks/TaskProgressReporter.cs`) forwards to `ITaskQueueManager.ReportProgress`, and the detail rides the existing `TasksUpdated` push — **no new SignalR event**. Managers that don't run inside a task use `NullTaskProgressReporter` (no-op), so the same manager method works from both an endpoint and a queued task. New iterating work items should take `ITaskProgressReporter` and call it per item.
 
-## Full-library workflow order (per-item enrichment)
+## Full-library workflow order (parallel per-unit scan + enrich)
 
-`RunFullLibraryWorkflowAsync` (in `TaskQueueManager`) is the ordered pipeline a library add / full rescan runs. It is deliberately **not** a series of whole-library phases for the enrichment step:
+`RunFullLibraryWorkflowAsync` (in `TaskQueueManager`) is the ordered pipeline a library add / full rescan runs. A **unit** is one show (all its episode + extra files) or one movie (its file(s) + extras). The pipeline:
 
-1. **Scan files** — `TriggerLibraryFolderAndFileScanAsync` creates the `MediaItem`s from disk (fast: filename parse + ffprobe tracks/resolution).
-2. **Fetch details (per item)** — `IMetadataManager.TriggerLibraryEnrichmentAsync` walks the items and enriches each one fully — **metadata → artwork → ratings** — before moving to the next, so posters fill in progressively as the scan's items come online instead of after three separate whole-library passes. The set of work is identical to running the old `TriggerLibrary{Metadata,Artwork,Ratings}RefreshAsync` phases: same guard sets (non-force only touches items missing that data via `GetMediaIdsMissing*Async`; force touches all), same leaf refreshers (`RefreshMetadataAsync` in a fresh scope per item, `RefreshArtworkAsync` / `RefreshRatingsAsync`), only the grouping differs (by item, not by operation).
-3. **Poster overlays** — `RunLibraryOverlaySyncAsync` (a sweep; the badge composites the poster the artwork step already set).
-4. **Actor metadata** — one global, whole-DB pass. This **must** stay a single deferred pass, not per-item: it's not library-scoped, so running it per item would redo every actor N times.
-5. **Analyze media + detect markers** — the heavy FFmpeg passes (`TriggerLibraryFileAnalysisAsync`, then `TriggerLibrarySilenceDetectionAsync`). They don't affect posters and season marker clustering needs the whole season present, so they run **last**, after the library is visually populated.
+1. **Discover units** — `ILibraryManager.DiscoverScanUnitsAsync` → the scanner enumerates the library's new (non-excluded) files and groups them: TV by `GetTvShowFolderName`, movies by parent directory. Returns a `List<ScanUnit>` (label + file paths).
+2. **Scan + enrich each unit, in parallel** — `Parallel.ForEachAsync` over the units at `Math.Clamp(ProcessorCount, 2, 6)` degree. Each unit runs `ILibraryManager.ScanAndEnrichUnitAsync`, which:
+   - Opens **one DI scope per unit** and resolves the scanner **and** the metadata manager from it — so the scan and the enrich share the **same `DbContext`**. The scanner ingests the unit's files (creating the show/seasons/episodes or movie), then `TriggerMediaItemMetadataRefreshAsync` → `...ArtworkRefreshAsync` → `...RatingsRefreshAsync` fill its metadata/posters onto **the very rows the scan just created**. This shared scope is what keeps season posters from being clobbered (see the note below). A poster therefore appears per show/movie *as the scan runs*, and several fill at once.
+   - One failing unit is caught and skipped — it doesn't abort the library.
+   Music libraries (no units) fall back to the whole-library `TriggerLibraryFolderAndFileScanAsync` + `TriggerLibraryEnrichmentAsync`.
+3. **Enrichment safety net** — `TriggerLibraryEnrichmentAsync` (non-force) catches anything a unit missed; already-enriched items are skipped, so it's cheap.
+4. **Poster overlays** — `RunLibraryOverlaySyncAsync` composites badges onto the posters the enrich step set. It runs **in parallel** (each item's overlay in its own scope via `GenerateOverlaysForMediaAsync`), since it downloads a poster + composites with ImageSharp per item.
+5. **Actor metadata** — one global, whole-DB pass. Must stay deferred/global, not per-unit (it's not library-scoped).
+6. **Analyze media + detect markers** — the heavy FFmpeg passes (`TriggerLibraryFileAnalysisAsync`, then `TriggerLibrarySilenceDetectionAsync`), plus video-preview thumbnails on their own schedule. They don't affect posters, so they run **last**, after the library is visually populated. **File analysis is parallel and part-guarded**: it runs items through `Parallel.ForEachAsync` (each in its own scope via `AnalyzeMediaFileAsync`), and `RunFileAnalysisAsync` ffprobes a `MediaPart` only if it was never analyzed (`MediaPart.LastAnalyzedAt == null`) or its file changed on disk (size differs). So a re-scan of an unchanged library costs one cheap file-size check per part rather than a full re-probe. Note: this "Analyzing media" pass is the **track/duration probe** the player needs (audio/video/subtitle streams, HDR, bitrate) — it is **not** the intro/credit/thumbnail detection, which is separately gated on the library's detection toggles.
 
-The single-file watcher path (below) already interleaves per item; this brings the initial full scan in line with it, minus the per-item actor refresh (which the watcher can afford for one occasional file but a full scan cannot).
+### Why the shared scope matters (season-poster regression)
+
+Season posters are written by `ProcessTvSeasonsAsync` during the **show's** metadata refresh, onto the season rows. An earlier design ran the scan in one `DbContext` and enrichment in a *separate* context while the scanner's context was still open on those rows — a concurrent-context clobber that left season posters null. Keeping a unit's scan **and** enrich in **one scope** removes that entirely; separate units use separate scopes, so parallelism stays isolated. **Do not** reintroduce a design where enrichment runs in a different context from the scan that created the rows.
+
+### Parallel-safe shared rows (`ReferenceWriteGate`)
+
+Actors, genres, companies, countries, networks, and collections are shared across items, so two parallel units could both "read missing → insert" the same row and collide. `ReferenceWriteGate` (a **singleton** `SemaphoreSlim`, injected into `MetadataMappingService`) serializes just the read-create-**commit** of those shared rows inside `ApplyTextMetadataAsync` — committing inside the gate makes the row visible to the next worker before it reads. The metadata **network fetch stays outside the gate**, so it runs fully in parallel; only the brief shared-row write is serial.
 
 ## Cancellation (must stay correct)
 

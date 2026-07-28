@@ -194,4 +194,60 @@ public class TaskProcessingWorkerTests
         queue.Received(totalTasks).MarkTaskAsRunning(Arg.Any<Guid>());
         queue.Received(totalTasks).RemoveTask(Arg.Any<Guid>());
     }
+
+    [Fact]
+    public async Task ExecuteAsync_serializes_same_key_and_respects_concurrency_cap()
+    {
+        var (worker, queue, _, controlled) = Build();
+        using var cts = new CancellationTokenSource();
+
+        var gate = new object();
+        var running = 0;
+        var maxConcurrent = 0;
+        var perKeyRunning = new Dictionary<string, int>();
+        var sameKeyOverlap = false;
+        var completed = 0;
+        const int total = 12;
+        var allDone = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Func<CancellationToken, IServiceProvider, Task> Work(string key) => async (ct, sp) =>
+        {
+            lock (gate)
+            {
+                running++;
+                maxConcurrent = Math.Max(maxConcurrent, running);
+                perKeyRunning.TryGetValue(key, out var c);
+                if (c > 0) sameKeyOverlap = true;
+                perKeyRunning[key] = c + 1;
+            }
+            await Task.Delay(40, ct);
+            lock (gate)
+            {
+                running--;
+                perKeyRunning[key]--;
+                if (++completed == total) allDone.TrySetResult(true);
+            }
+        };
+
+        // 4 tasks that must serialize (shared key) + 8 with unique keys.
+        for (var i = 0; i < 4; i++)
+            await controlled.EnqueueAsync(new QueuedTaskDto { Name = $"lib-{i}", ResourceKey = "library:X", WorkItem = Work("library:X") });
+        for (var i = 0; i < 8; i++)
+        {
+            var k = $"u{i}";
+            await controlled.EnqueueAsync(new QueuedTaskDto { Name = k, ResourceKey = k, WorkItem = Work(k) });
+        }
+
+        await worker.StartAsync(cts.Token);
+        await allDone.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        controlled.Complete();
+        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await worker.StopAsync(TestContext.Current.CancellationToken);
+
+        sameKeyOverlap.Should().BeFalse("tasks sharing a resource key must never run concurrently");
+        maxConcurrent.Should().BeLessThanOrEqualTo(3, "the global concurrency cap is 3");
+        maxConcurrent.Should().BeGreaterThan(1, "unrelated tasks should run in parallel");
+        completed.Should().Be(total);
+    }
 }

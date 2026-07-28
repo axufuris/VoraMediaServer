@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis.Results;
 using Vora.Application.Media;
@@ -12,6 +13,7 @@ namespace Vora.Application.Analysis;
 public interface IMediaAnalyzerManager
 {
     Task TriggerMediaItemFileAnalysisAsync(Guid mediaItemId, string? name = null);
+    Task AnalyzeMediaFileAsync(Guid mediaItemId);
     Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null);
     Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false);
     Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false);
@@ -26,6 +28,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     private readonly ITaskQueueManager _taskQueueManager;
     private readonly IClientNotifier _notifier;
     private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MediaAnalyzerManager> _logger;
 
     public MediaAnalyzerManager(
@@ -36,6 +39,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         ITaskQueueManager taskQueueManager,
         IClientNotifier notifier,
         Vora.Plugins.Interfaces.ITaskProgressReporter progress,
+        IServiceScopeFactory scopeFactory,
         ILogger<MediaAnalyzerManager> logger)
     {
         _mediaRepository = mediaRepository;
@@ -45,6 +49,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         _taskQueueManager = taskQueueManager;
         _notifier = notifier;
         _progress = progress;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -73,21 +78,32 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         var mediaIds = (await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId)).ToList();
         var titles = await _mediaRepository.GetDisplayTitlesByIdsAsync(mediaIds);
         var total = mediaIds.Count;
-        var count = 0;
+        var done = 0;
 
-        foreach (var id in mediaIds)
-        {
-            count++;
-            _progress.Report($"Analyzing media — {ProgressTitle(titles, id)} ({count}/{total})");
-            try
+        // ffprobe is slow, so probe several files at once. Each item runs in its
+        // own scope (its own DbContext + analyzer) so parallel probes don't share
+        // a context. The part-level skip guard means an already-analyzed library
+        // costs only a cheap file-size check per part.
+        var parallelism = Math.Clamp(Environment.ProcessorCount, 2, 6);
+        await Parallel.ForEachAsync(
+            mediaIds,
+            new ParallelOptions { MaxDegreeOfParallelism = parallelism },
+            async (id, ct) =>
             {
-                await RunFileAnalysisAsync(id);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "File analysis failed for {MediaItemId}.", id);
-            }
-        }
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var analyzer = scope.ServiceProvider.GetRequiredService<IMediaAnalyzerManager>();
+                    await analyzer.AnalyzeMediaFileAsync(id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "File analysis failed for {MediaItemId}.", id);
+                }
+
+                var n = Interlocked.Increment(ref done);
+                _progress.Report($"Analyzing media — {ProgressTitle(titles, id)} ({n}/{total})");
+            });
     }
 
     private static string ProgressTitle(IReadOnlyDictionary<Guid, string> titles, Guid id) =>
@@ -160,41 +176,35 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
 
     private async Task RunFileAnalysisAsync(Guid mediaItemId)
     {
-        var filePaths = await _mediaRepository.GetMediaFilePathsAsync(mediaItemId);
-        if (filePaths == null || !filePaths.Any()) return;
-
-        var analysisResults = new Dictionary<string, MediaAnalysisResult>();
-
-        foreach (var path in filePaths)
-        {
-            var analysis = await _analyzerService.AnalyzeFileAsync(path);
-            if (analysis != null) analysisResults[path] = analysis;
-        }
-
-        if (!analysisResults.Any()) return;
-
         var item = await _mediaRepository.GetForAnalysisAsync(mediaItemId);
-        if (item == null) return;
+        if (item == null || item.MediaParts.Count == 0) return;
 
-        bool isPrimaryFile = true;
+        // Part-level skip guard: only (re)probe parts that were never analyzed or
+        // whose file changed on disk (size differs). An unchanged, already-
+        // analyzed library isn't re-probed on every scan, but an added or
+        // replaced file still gets analyzed.
+        var partsToAnalyze = item.MediaParts.Where(PartNeedsAnalysis).ToHashSet();
+        if (partsToAnalyze.Count == 0) return;
+
+        var primaryPart = item.MediaParts.First();
 
         foreach (var part in item.MediaParts)
         {
-            if (!analysisResults.TryGetValue(part.FilePath, out var analysis)) continue;
+            if (!partsToAnalyze.Contains(part)) continue;
 
-            if (isPrimaryFile)
+            var analysis = await _analyzerService.AnalyzeFileAsync(part.FilePath);
+            if (analysis == null) continue;
+
+            if (analysis.Duration != null && !item.IsLocked("Duration") && (part == primaryPart || item.Analysis?.Duration == null))
             {
-                if (analysis.Duration != null && !item.IsLocked("Duration"))
-                {
-                    item.Analysis ??= new MediaItemAnalysis { MediaItemId = item.Id };
-
-                    item.Analysis.Duration = analysis.Duration;
-                }
+                item.Analysis ??= new MediaItemAnalysis { MediaItemId = item.Id };
+                item.Analysis.Duration = analysis.Duration;
             }
 
             part.FileSizeBytes = analysis.FileSizeBytes;
             part.OverallBitrate = analysis.OverallBitrate;
             part.Duration = analysis.Duration;
+            part.LastAnalyzedAt = DateTime.UtcNow;
 
             var incomingVideo = analysis.VideoTracks.Select(v => new MediaVideoTrack
             { StreamIndex = v.StreamIndex, Codec = v.Codec, Profile = v.Profile, HdrType = v.HdrType, BitDepth = v.BitDepth, Bitrate = v.Bitrate, IsDefault = v.IsDefault }).ToList();
@@ -206,13 +216,27 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             { StreamIndex = s.StreamIndex, Codec = s.Codec, Language = s.Language, Title = s.Title, IsDefault = s.IsDefault, IsForced = s.IsForced }).ToList();
 
             await _mediaRepository.SyncMediaTracksAsync(part.Id, incomingVideo, incomingAudio, incomingSubtitles);
-
-            isPrimaryFile = false;
         }
 
         await _mediaRepository.UpdateMediaItemAsync(item);
 
         await _notifier.NotifyMediaAnalysisUpdatedAsync(mediaItemId);
+    }
+
+    public Task AnalyzeMediaFileAsync(Guid mediaItemId) => RunFileAnalysisAsync(mediaItemId);
+
+    private static bool PartNeedsAnalysis(MediaPart part)
+    {
+        if (part.LastAnalyzedAt == null) return true;
+        try
+        {
+            var info = new FileInfo(part.FilePath);
+            return !info.Exists || info.Length != part.FileSizeBytes;
+        }
+        catch
+        {
+            return true;
+        }
     }
 
     private async Task RunSeasonSilenceDetectionAsync(Guid seasonId, ServerSetting settings, bool forceOverride)
