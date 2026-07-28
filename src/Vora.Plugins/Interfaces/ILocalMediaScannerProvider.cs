@@ -4,8 +4,8 @@ namespace Vora.Plugins.Interfaces;
 
 public interface ILocalMediaScannerProvider : IVoraPlugin
 {
-    Task ScanMovieLibraryAsync(Guid libraryId, Func<Guid, Task>? onMovieScannedAsync = null);
-    Task ScanTvShowLibraryAsync(Guid libraryId, Func<Guid, Task>? onShowScannedAsync = null);
+    Task ScanMovieLibraryAsync(Guid libraryId);
+    Task ScanTvShowLibraryAsync(Guid libraryId);
     Task ScanMusicLibraryAsync(Guid libraryId);
     Task ScanMovieAsync(Guid movieId);
     Task ScanTvShowAsync(Guid tvShowId);

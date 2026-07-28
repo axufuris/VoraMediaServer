@@ -18,7 +18,7 @@ public interface ILibraryManager
     Task<IEnumerable<LibrarySummaryVM>> GetLibrariesAsync(bool hasAllAccess, List<Guid> allowedLibs);
     Task<MediaLibraryVM?> GetLibraryByIdAsync(Guid id);
     Task UpdateLibraryAsync(Guid id, UpdateLibraryRequest request);
-    Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId, Func<Guid, Task>? onItemScannedAsync = null);
+    Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId);
     Task<ScanFileResult> TriggerFileScanAsync(Guid libraryId, string filePath);
     Task DeleteLibraryAsync(Guid id);
     Task ToggleWatchingAsync(Guid libraryId, bool enable);
@@ -200,7 +200,7 @@ public class LibraryManager : ILibraryManager
         await _repository.DeleteLibraryAsync(id);
     }
 
-    public async Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId, Func<Guid, Task>? onItemScannedAsync = null)
+    public async Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId)
     {
         var library = await _repository.GetProjectedByIdAsync(libraryId, l => new { l.Id, l.Name, l.Type });
         if (library == null) return;
@@ -218,9 +218,9 @@ public class LibraryManager : ILibraryManager
         if (scanner == null) throw new InvalidOperationException("No Local Media Scanner plugins are installed!");
 
         if (library.Type == LibraryType.Movie)
-            await scanner.ScanMovieLibraryAsync(library.Id, onItemScannedAsync);
+            await scanner.ScanMovieLibraryAsync(library.Id);
         else if (library.Type == LibraryType.TvShow)
-            await scanner.ScanTvShowLibraryAsync(library.Id, onItemScannedAsync);
+            await scanner.ScanTvShowLibraryAsync(library.Id);
         else if (library.Type == LibraryType.Music)
             await scanner.ScanMusicLibraryAsync(library.Id);
 
