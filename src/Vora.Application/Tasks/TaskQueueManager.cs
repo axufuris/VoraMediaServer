@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Vora.Application.Analysis;
@@ -596,30 +597,42 @@ public class TaskQueueManager : ITaskQueueManager
             await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false);
         }
 
+        // The deferred passes are independent: overlays, actor metadata,
+        // analysis, and marker detection each stand alone. Run each in its own
+        // try/catch so one failing pass can't starve the ones after it — a
+        // library must never end up with, say, no analysis just because overlay
+        // generation threw. Cancellation still stops the whole workflow.
+        var logger = sp.GetService<ILogger<TaskQueueManager>>();
+
+        async Task RunStepAsync(string label, Func<Task> step)
+        {
+            ct.ThrowIfCancellationRequested();
+            progress.Report(label);
+            try
+            {
+                await step();
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                logger?.LogError(ex, "Library workflow step '{Step}' failed for {LibraryId}; continuing with the remaining steps.", label, libraryId);
+            }
+        }
+
         // Safety net for anything the per-unit path missed (never double-fetches
         // an already-enriched item; force stays off here so a force rescan the
         // units already handled isn't re-run).
-        ct.ThrowIfCancellationRequested();
-        progress.Report("Fetching details…");
-        await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false);
+        await RunStepAsync("Fetching details…", () => metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false));
 
-        ct.ThrowIfCancellationRequested();
-        progress.Report("Generating poster overlays…");
-        await overlayManager.RunLibraryOverlaySyncAsync(libraryId);
+        await RunStepAsync("Generating poster overlays…", () => overlayManager.RunLibraryOverlaySyncAsync(libraryId));
 
-        ct.ThrowIfCancellationRequested();
-        progress.Report("Refreshing actor metadata…");
-        await metadataManager.TriggerActorMetadataRefreshAsync();
+        await RunStepAsync("Refreshing actor metadata…", () => metadataManager.TriggerActorMetadataRefreshAsync());
 
         // Analysis + marker detection are heavy FFmpeg passes that don't affect
         // posters, so they run last — after the library is visually populated.
-        ct.ThrowIfCancellationRequested();
-        progress.Report("Analyzing media…");
-        await analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName);
+        await RunStepAsync("Analyzing media…", () => analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName));
 
-        ct.ThrowIfCancellationRequested();
-        progress.Report("Detecting intro/credit markers…");
-        await analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: isAdditionTrigger);
+        await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: isAdditionTrigger));
 
         progress.Report(null);
     }
