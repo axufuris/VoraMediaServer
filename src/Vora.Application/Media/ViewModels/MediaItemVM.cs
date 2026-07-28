@@ -73,7 +73,7 @@ public class MediaItemVM
             NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count(s => s.MissingSince == null) : (int?)null,
 
             Seasons = item is TvShow
-                ? ((TvShow)item).Seasons.Where(s => s.MissingSince == null).Select(s => new SeasonVM
+                ? ((TvShow)item).Seasons.Where(s => s.MissingSince == null).OrderBy(s => s.SeasonNumber).Select(s => new SeasonVM
                 {
                     Id = s.Id,
                     SeasonNumber = s.SeasonNumber,
