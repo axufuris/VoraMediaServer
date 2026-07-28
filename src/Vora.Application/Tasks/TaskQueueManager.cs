@@ -574,6 +574,7 @@ public class TaskQueueManager : ITaskQueueManager
                 new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = ct },
                 async (unit, unitCt) =>
                 {
+                    progress.Report($"Scanning & loading {CleanUnitLabel(unit.Label)}…");
                     try
                     {
                         await libraryManager.ScanAndEnrichUnitAsync(libraryId, libraryType.Value, unit.FilePaths, forceOverride);
@@ -582,7 +583,7 @@ public class TaskQueueManager : ITaskQueueManager
                     catch { /* one failing show/movie shouldn't abort the whole library */ }
 
                     var n = Interlocked.Increment(ref done);
-                    progress.Report($"Scanning & loading… ({n}/{total})");
+                    progress.Report($"Scanning & loading {CleanUnitLabel(unit.Label)}… ({n}/{total})");
                 });
         }
         else
@@ -622,4 +623,12 @@ public class TaskQueueManager : ITaskQueueManager
 
     private static string ResolveDisplayName(Guid id, string? name) =>
         string.IsNullOrEmpty(name) ? id.ToString() : name;
+
+    private static string CleanUnitLabel(string label)
+    {
+        // Strip the trailing external-id tag (e.g. " [imdb-tt0115082]") so the
+        // task shows "3rd Rock from the Sun (1996)" instead of the raw folder.
+        var idx = label.IndexOf(" [", StringComparison.Ordinal);
+        return idx > 0 ? label[..idx].Trim() : label.Trim();
+    }
 }
