@@ -106,6 +106,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.EnableTrashAutoPurge = request.EnableTrashAutoPurge;
         settings.MissingMediaRetentionDays = Math.Clamp(request.MissingMediaRetentionDays, 1, 3650);
         settings.ResolveMovieTvdbIds = request.ResolveMovieTvdbIds;
+        settings.MetadataLanguage = string.IsNullOrWhiteSpace(request.MetadataLanguage) ? "eng" : request.MetadataLanguage;
         settings.RegistrationMode = (RegistrationMode)request.RegistrationMode;
         settings.InternetUploadSpeedMbps = request.InternetUploadSpeedMbps;
         settings.MaxRemoteStreamBitrateMbps = request.MaxRemoteStreamBitrateMbps;

@@ -29,6 +29,7 @@ public class ServerSettingsVM
     public bool EnableTrashAutoPurge { get; set; } = true;
     public int MissingMediaRetentionDays { get; set; } = 30;
     public bool ResolveMovieTvdbIds { get; set; }
+    public string MetadataLanguage { get; set; } = "eng";
     public int InternetUploadSpeedMbps { get; set; }
     public int MaxRemoteStreamBitrateMbps { get; set; }
     public int TranscodeQuality { get; set; }
@@ -97,6 +98,7 @@ public class ServerSettingsVM
             EnableTrashAutoPurge = s.EnableTrashAutoPurge,
             MissingMediaRetentionDays = s.MissingMediaRetentionDays,
             ResolveMovieTvdbIds = s.ResolveMovieTvdbIds,
+            MetadataLanguage = s.MetadataLanguage,
             InternetUploadSpeedMbps = s.InternetUploadSpeedMbps,
             MaxRemoteStreamBitrateMbps = s.MaxRemoteStreamBitrateMbps,
             TranscodeQuality = s.TranscodeQuality,
