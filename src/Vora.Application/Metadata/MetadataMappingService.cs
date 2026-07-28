@@ -30,6 +30,7 @@ public class MetadataMappingService : IMetadataMappingService
     private readonly IActorRepository _actorRepository;
     private readonly ICollectionRepository _collectionRepository;
     private readonly IReferenceRepository _referenceRepository;
+    private readonly ReferenceWriteGate _referenceGate;
     private readonly StoragePathsOptions _storagePaths;
 
     public MetadataMappingService(
@@ -38,6 +39,7 @@ public class MetadataMappingService : IMetadataMappingService
         IActorRepository actorRepository,
         ICollectionRepository collectionRepository,
         IReferenceRepository referenceRepository,
+        ReferenceWriteGate referenceGate,
         IOptions<StoragePathsOptions> storagePaths)
     {
         _repository = repository;
@@ -45,6 +47,7 @@ public class MetadataMappingService : IMetadataMappingService
         _actorRepository = actorRepository;
         _collectionRepository = collectionRepository;
         _referenceRepository = referenceRepository;
+        _referenceGate = referenceGate;
         _storagePaths = storagePaths.Value;
     }
 
@@ -52,16 +55,29 @@ public class MetadataMappingService : IMetadataMappingService
     {
         ApplyCoreMetadata(item, metadata, forceOverride, providerName);
 
-        await ProcessCollectionsAsync(item, metadata);
-        await ProcessProductionCompaniesExplicitAsync(item, metadata);
-        await ProcessOriginCountriesExplicitAsync(item, metadata);
-        await ProcessGenresExplicitAsync(item, metadata, forceOverride);
-        await ProcessCastExplicitAsync(item, metadata);
+        // Shared reference rows (collections, companies, countries, genres,
+        // cast/actors, networks) can be created by two parallel workers at once,
+        // so serialize their read-create-commit through the gate. Committing
+        // inside the gate makes the rows visible to the next worker before it
+        // reads, preventing duplicate inserts / unique-constraint collisions.
+        await _referenceGate.RunAsync(async () =>
+        {
+            await ProcessCollectionsAsync(item, metadata);
+            await ProcessProductionCompaniesExplicitAsync(item, metadata);
+            await ProcessOriginCountriesExplicitAsync(item, metadata);
+            await ProcessGenresExplicitAsync(item, metadata, forceOverride);
+            await ProcessCastExplicitAsync(item, metadata);
+            if (item is TvShow tvNetworks)
+            {
+                await ProcessTvNetworksExplicitAsync(tvNetworks, metadata);
+            }
+            await _repository.SaveChangesAsync();
+        });
+
         await ProcessVideosExplicitAsync(item, metadata);
 
         if (item is TvShow tvShow)
         {
-            await ProcessTvNetworksExplicitAsync(tvShow, metadata);
             await ProcessTvSeasonsAsync(tvShow, metadata, forceOverride, providerId);
 
             if (metadata.UpcomingEpisodes.Any())

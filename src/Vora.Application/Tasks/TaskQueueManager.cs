@@ -12,6 +12,8 @@ using Vora.Application.Posters;
 using Vora.Application.Recommendations;
 using Vora.Application.Tasks.Dtos;
 using Vora.Application.Tasks.ViewModels;
+using Vora.Domain.Enums;
+using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Tasks;
@@ -542,24 +544,57 @@ public class TaskQueueManager : ITaskQueueManager
         // The individual trigger methods don't yet take a token, so honour
         // cancellation between the (long) steps — a cancel stops the workflow
         // at the next boundary instead of running to completion.
-        // Enrich each show/movie (metadata → artwork → ratings) the moment the
-        // scanner finishes ingesting it, so its poster appears mid-scan instead
-        // of only after the whole library is scanned. A fresh scope per item
-        // keeps the EF change-tracker from growing across a large library.
+        // Scan + enrich each show/movie together as an isolated unit, several
+        // at a time. Each unit scans and enriches in the SAME DbContext (so the
+        // posters land on the rows the scan just created — nothing to clobber),
+        // and different units run in parallel for speed. Posters therefore fill
+        // in per show/movie as the scan progresses, not after it finishes.
         ct.ThrowIfCancellationRequested();
         progress.Report("Scanning & loading…");
-        await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId, async itemId =>
-        {
-            using var itemScope = sp.CreateScope();
-            var scopedMetadata = itemScope.ServiceProvider.GetRequiredService<IMetadataManager>();
-            await scopedMetadata.TriggerMediaItemMetadataRefreshAsync(itemId, forceOverride);
-            await scopedMetadata.TriggerMediaItemArtworkRefreshAsync(itemId, forceOverride);
-            await scopedMetadata.TriggerMediaItemRatingsRefreshAsync(itemId, forceOverride);
-        });
 
-        // Safety net for anything the per-item callback didn't cover (scan edge
-        // cases, music). Non-force: already-enriched items are skipped, so this
-        // is a cheap no-op walk after a normal scan and never double-fetches.
+        var libraryVm = await libraryManager.GetLibraryByIdAsync(libraryId);
+        var libraryType = libraryVm?.Type switch
+        {
+            "Movie" => (LibraryType?)LibraryType.Movie,
+            "TvShow" => LibraryType.TvShow,
+            _ => null
+        };
+
+        var units = libraryType.HasValue
+            ? await libraryManager.DiscoverScanUnitsAsync(libraryId)
+            : new List<ScanUnit>();
+
+        if (units.Count > 0 && libraryType.HasValue)
+        {
+            var total = units.Count;
+            var done = 0;
+            var parallelism = Math.Clamp(Environment.ProcessorCount, 2, 6);
+            await Parallel.ForEachAsync(
+                units,
+                new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = ct },
+                async (unit, unitCt) =>
+                {
+                    try
+                    {
+                        await libraryManager.ScanAndEnrichUnitAsync(libraryId, libraryType.Value, unit.FilePaths, forceOverride);
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch { /* one failing show/movie shouldn't abort the whole library */ }
+
+                    var n = Interlocked.Increment(ref done);
+                    progress.Report($"Scanning & loading… ({n}/{total})");
+                });
+        }
+        else
+        {
+            // Music (or nothing discovered): whole-library scan then enrich.
+            await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId);
+            await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false);
+        }
+
+        // Safety net for anything the per-unit path missed (never double-fetches
+        // an already-enriched item; force stays off here so a force rescan the
+        // units already handled isn't re-run).
         ct.ThrowIfCancellationRequested();
         progress.Report("Fetching details…");
         await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false);

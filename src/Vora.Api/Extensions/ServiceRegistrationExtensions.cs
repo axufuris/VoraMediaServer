@@ -444,6 +444,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMediaIngestionService, MediaIngestionService>();
         services.AddScoped<IMetadataFetchService, MetadataFetchService>();
         services.AddScoped<IMetadataMappingService, MetadataMappingService>();
+        services.AddSingleton<Vora.Application.Metadata.ReferenceWriteGate>();
         services.AddScoped<IRequestNotificationService, RequestNotificationService>();
         services.AddScoped<IUserProfileImageService, UserProfileImageService>();
         services.AddScoped<IYouTubeDataApiClient, YouTubeDataApiClient>();

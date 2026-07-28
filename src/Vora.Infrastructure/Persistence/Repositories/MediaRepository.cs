@@ -481,6 +481,8 @@ public partial class MediaRepository : IMediaRepository
         await _context.SaveChangesAsync();
     }
 
+    public Task SaveChangesAsync() => _context.SaveChangesAsync();
+
     public async Task AddMediaItemAsync(MediaItem item)
     {
         try

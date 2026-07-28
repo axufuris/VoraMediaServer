@@ -2,6 +2,7 @@
 using Vora.Application.Analysis;
 using Vora.Application.Libraries.Requests;
 using Vora.Application.Libraries.ViewModels;
+using Vora.Application.Metadata;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Application.Watchers;
@@ -18,7 +19,9 @@ public interface ILibraryManager
     Task<IEnumerable<LibrarySummaryVM>> GetLibrariesAsync(bool hasAllAccess, List<Guid> allowedLibs);
     Task<MediaLibraryVM?> GetLibraryByIdAsync(Guid id);
     Task UpdateLibraryAsync(Guid id, UpdateLibraryRequest request);
-    Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId, Func<Guid, Task>? onItemScannedAsync = null);
+    Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId);
+    Task<List<ScanUnit>> DiscoverScanUnitsAsync(Guid libraryId);
+    Task<Guid?> ScanAndEnrichUnitAsync(Guid libraryId, LibraryType libraryType, IReadOnlyList<string> filePaths, bool forceOverride);
     Task<ScanFileResult> TriggerFileScanAsync(Guid libraryId, string filePath);
     Task DeleteLibraryAsync(Guid id);
     Task ToggleWatchingAsync(Guid libraryId, bool enable);
@@ -200,7 +203,7 @@ public class LibraryManager : ILibraryManager
         await _repository.DeleteLibraryAsync(id);
     }
 
-    public async Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId, Func<Guid, Task>? onItemScannedAsync = null)
+    public async Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId)
     {
         var library = await _repository.GetProjectedByIdAsync(libraryId, l => new { l.Id, l.Name, l.Type });
         if (library == null) return;
@@ -218,13 +221,65 @@ public class LibraryManager : ILibraryManager
         if (scanner == null) throw new InvalidOperationException("No Local Media Scanner plugins are installed!");
 
         if (library.Type == LibraryType.Movie)
-            await scanner.ScanMovieLibraryAsync(library.Id, onItemScannedAsync);
+            await scanner.ScanMovieLibraryAsync(library.Id);
         else if (library.Type == LibraryType.TvShow)
-            await scanner.ScanTvShowLibraryAsync(library.Id, onItemScannedAsync);
+            await scanner.ScanTvShowLibraryAsync(library.Id);
         else if (library.Type == LibraryType.Music)
             await scanner.ScanMusicLibraryAsync(library.Id);
 
         await notifier.NotifyLibraryUpdatedAsync(library.Id);
+    }
+
+    public async Task<List<ScanUnit>> DiscoverScanUnitsAsync(Guid libraryId)
+    {
+        var library = await _repository.GetProjectedByIdAsync(libraryId, l => new { l.Type });
+        if (library == null) return new List<ScanUnit>();
+
+        using var scope = _serviceProvider.CreateScope();
+        var scanner = await ResolveScannerAsync(scope.ServiceProvider);
+        if (scanner == null) return new List<ScanUnit>();
+
+        return library.Type switch
+        {
+            LibraryType.Movie => await scanner.DiscoverMovieScanUnitsAsync(libraryId),
+            LibraryType.TvShow => await scanner.DiscoverTvScanUnitsAsync(libraryId),
+            _ => new List<ScanUnit>()
+        };
+    }
+
+    public async Task<Guid?> ScanAndEnrichUnitAsync(Guid libraryId, LibraryType libraryType, IReadOnlyList<string> filePaths, bool forceOverride)
+    {
+        // One scope for the whole unit: the scanner (which creates the show/
+        // seasons/episodes or movie) and the metadata manager (which fills the
+        // posters) resolve the SAME scoped DbContext, so enrichment writes to
+        // the very rows the scan just created — no second context to clobber
+        // them. Each unit runs in its own scope, so parallel units stay isolated.
+        using var scope = _serviceProvider.CreateScope();
+        var sp = scope.ServiceProvider;
+        var scanner = await ResolveScannerAsync(sp);
+        if (scanner == null) return null;
+
+        var itemId = libraryType switch
+        {
+            LibraryType.Movie => await scanner.ScanMovieUnitAsync(libraryId, filePaths),
+            LibraryType.TvShow => await scanner.ScanTvUnitAsync(libraryId, filePaths),
+            _ => (Guid?)null
+        };
+        if (itemId == null) return null;
+
+        var metadata = sp.GetRequiredService<IMetadataManager>();
+        await metadata.TriggerMediaItemMetadataRefreshAsync(itemId.Value, forceOverride);
+        await metadata.TriggerMediaItemArtworkRefreshAsync(itemId.Value, forceOverride);
+        await metadata.TriggerMediaItemRatingsRefreshAsync(itemId.Value, forceOverride);
+        return itemId;
+    }
+
+    private async Task<ILocalMediaScannerProvider?> ResolveScannerAsync(IServiceProvider sp)
+    {
+        var settingsRepo = sp.GetRequiredService<ISystemSettingsRepository>();
+        var settings = await settingsRepo.GetSettingsAsync();
+        var scanners = sp.GetServices<ILocalMediaScannerProvider>();
+        return scanners.FirstOrDefault(s => s.Id == settings.LocalMediaScannerProviderId) ?? scanners.FirstOrDefault();
     }
 
     public async Task<ScanFileResult> TriggerFileScanAsync(Guid libraryId, string filePath)
