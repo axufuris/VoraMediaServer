@@ -4,12 +4,22 @@ How new media gets ingested and how long-running work is queued, named, and canc
 
 ## Background task queue
 
-`ITaskQueueManager` (`Vora.Application/Tasks/TaskQueueManager.cs`) is an in-memory queue over an unbounded `Channel<QueuedTaskDto>`. Every long-running operation (library scan, metadata/artwork/ratings refresh, analysis, overlays, thumbnails, collection sync, EPG sync, embeddings) is enqueued through a `QueueXxx` method. `TaskProcessingWorker` (`Vora.Infrastructure/Workers/TaskProcessingWorker.cs`) is the **single** `BackgroundService` consumer — tasks run **sequentially**, one at a time.
+`ITaskQueueManager` (`Vora.Application/Tasks/TaskQueueManager.cs`) is an in-memory queue over an unbounded `Channel<QueuedTaskDto>`. Every long-running operation (library scan, metadata/artwork/ratings refresh, analysis, overlays, thumbnails, collection sync, EPG sync, embeddings) is enqueued through a `QueueXxx` method. `TaskProcessingWorker` (`Vora.Infrastructure/Workers/TaskProcessingWorker.cs`) is the `BackgroundService` consumer.
+
+### Concurrency + resource keys
+
+The worker is a **bounded, key-aware dispatcher** — not a single sequential loop. It runs up to **`MaxConcurrency` (3)** tasks at once, but **never two tasks that share a `ResourceKey`**:
+
+- Each task has a `ResourceKey`. Unkeyed tasks (via `EnqueueTask(...)` with no key) get a **unique** key, so they're always eligible to run alongside others.
+- **Every heavy job on one library is keyed `library:{id}`** (via `LibraryKey(id)`) — scan, update, refresh-metadata, analyze, watcher file-ingest, video-thumbnails. So a scan and a refresh of the *same* library **serialize** (they'd otherwise race on its rows), while **different libraries run concurrently** and a quick unrelated task (EPG sync, single-item refresh) isn't blocked behind a long scan.
+- The cap is deliberately low because heavy jobs **already parallelize internally** (scan/analysis/overlays run several items at once); a high cap would over-subscribe CPU + providers.
+- FIFO within a key: a key-blocked task stays pending and starts when its key frees. On shutdown the dispatcher **awaits in-flight tasks** so each removes itself cleanly.
 
 Each task carries:
 
 - `Id`, `Name`, `Status` — surfaced to the admin Tasks UI via `GetAllTasks()` + the `TasksUpdated` SignalR push.
 - `WorkItem(CancellationToken, IServiceProvider)` — the actual work; gets a fresh DI scope per run.
+- `ResourceKey` — mutual-exclusion group (see above).
 - `NameResolver(IServiceProvider) -> string?` — optional; resolves a friendly display name at run time (see below).
 
 `QueueXxx` methods only enqueue (fire-and-forget). Heavy logic lives in the managers the work item resolves from the scope; the queue manager just wires them together.
