@@ -468,7 +468,8 @@ Project documentation lives under [`docs/`](docs/). Highlights:
 - [`docs/database.md`](docs/database.md) — schema, migrations, vector
   extension
 - [`docs/scanning-and-tasks.md`](docs/scanning-and-tasks.md) — media
-  ingest, background tasks, exclude filters, and Media Trash
+  ingest, background tasks, parallel per-unit scan+enrich, exclude
+  filters, and Media Trash
 - [`docs/artwork-image-cache.md`](docs/artwork-image-cache.md) — resized
   artwork cache and poster overlay badges
 - [`docs/auth-and-devices.md`](docs/auth-and-devices.md) — auth flow and
