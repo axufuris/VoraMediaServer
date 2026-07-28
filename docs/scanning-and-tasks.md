@@ -28,9 +28,9 @@ Long tasks that iterate a set of items (metadata / artwork / ratings refresh, an
    - One failing unit is caught and skipped — it doesn't abort the library.
    Music libraries (no units) fall back to the whole-library `TriggerLibraryFolderAndFileScanAsync` + `TriggerLibraryEnrichmentAsync`.
 3. **Enrichment safety net** — `TriggerLibraryEnrichmentAsync` (non-force) catches anything a unit missed; already-enriched items are skipped, so it's cheap.
-4. **Poster overlays** — `RunLibraryOverlaySyncAsync` (a sweep; the badge composites onto the poster the enrich step already set).
+4. **Poster overlays** — `RunLibraryOverlaySyncAsync` composites badges onto the posters the enrich step set. It runs **in parallel** (each item's overlay in its own scope via `GenerateOverlaysForMediaAsync`), since it downloads a poster + composites with ImageSharp per item.
 5. **Actor metadata** — one global, whole-DB pass. Must stay deferred/global, not per-unit (it's not library-scoped).
-6. **Analyze media + detect markers** — the heavy FFmpeg passes (`TriggerLibraryFileAnalysisAsync`, then `TriggerLibrarySilenceDetectionAsync`), plus video-preview thumbnails on their own schedule. They don't affect posters, so they run **last**, after the library is visually populated.
+6. **Analyze media + detect markers** — the heavy FFmpeg passes (`TriggerLibraryFileAnalysisAsync`, then `TriggerLibrarySilenceDetectionAsync`), plus video-preview thumbnails on their own schedule. They don't affect posters, so they run **last**, after the library is visually populated. **File analysis is parallel and part-guarded**: it runs items through `Parallel.ForEachAsync` (each in its own scope via `AnalyzeMediaFileAsync`), and `RunFileAnalysisAsync` ffprobes a `MediaPart` only if it was never analyzed (`MediaPart.LastAnalyzedAt == null`) or its file changed on disk (size differs). So a re-scan of an unchanged library costs one cheap file-size check per part rather than a full re-probe. Note: this "Analyzing media" pass is the **track/duration probe** the player needs (audio/video/subtitle streams, HDR, bitrate) — it is **not** the intro/credit/thumbnail detection, which is separately gated on the library's detection toggles.
 
 ### Why the shared scope matters (season-poster regression)
 
