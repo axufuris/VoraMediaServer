@@ -16,7 +16,7 @@ public interface IMetadataManager
     Task TriggerMediaTvdbResolutionAsync();
     Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false);
     Task TriggerMediaItemArtworkRefreshAsync(Guid mediaItemId, bool forceOverride = false);
-    Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false);
+    Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false, bool includeEpisodes = true);
     Task TriggerLibraryArtworkRefreshAsync(Guid libraryId, bool forceOverride = false);
     Task TriggerMediaItemRatingsRefreshAsync(Guid mediaItemId, bool forceOverride = false);
     Task RefreshMetadataAsync(Guid mediaItemId, bool forceOverride = false);
@@ -174,7 +174,7 @@ public class MetadataManager : IMetadataManager
         });
     }
 
-    public async Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false)
+    public async Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false, bool includeEpisodes = true)
     {
         var itemInfo = await _repository.GetProjectedAsync(mediaItemId, m => new { m.Id, Type = m.GetType().Name });
         if (itemInfo == null) return;
@@ -182,7 +182,7 @@ public class MetadataManager : IMetadataManager
         if (itemInfo.Type == nameof(Season))
         {
             var season = await _repository.GetForBasicUpdateAsync(mediaItemId) as Season;
-            if (season != null) await TriggerMediaItemMetadataRefreshAsync(season.TvShowId, forceOverride);
+            if (season != null) await TriggerMediaItemMetadataRefreshAsync(season.TvShowId, forceOverride, includeEpisodes);
             return;
         }
 
@@ -199,8 +199,17 @@ public class MetadataManager : IMetadataManager
                     await RefreshRatingsAsync(season.Id, forceOverride);
                 }
             }
-            var episodeIds = await _repository.GetEpisodeIdsForShowAsync(mediaItemId);
-            foreach (var epId in episodeIds) await RefreshMetadataAsync(epId, forceOverride);
+
+            // Episode metadata is fetched over the network per episode. During a
+            // full-library scan that would block the per-show callback on N
+            // network calls before the scan can advance, so callers that only
+            // need the show + season posters to appear pass includeEpisodes:
+            // false and let the deferred enrichment pass fill episodes in after.
+            if (includeEpisodes)
+            {
+                var episodeIds = await _repository.GetEpisodeIdsForShowAsync(mediaItemId);
+                foreach (var epId in episodeIds) await RefreshMetadataAsync(epId, forceOverride);
+            }
         }
     }
 

@@ -552,7 +552,10 @@ public class TaskQueueManager : ITaskQueueManager
         {
             using var itemScope = sp.CreateScope();
             var scopedMetadata = itemScope.ServiceProvider.GetRequiredService<IMetadataManager>();
-            await scopedMetadata.TriggerMediaItemMetadataRefreshAsync(itemId, forceOverride);
+            // Show + season posters only (includeEpisodes: false). Per-episode
+            // metadata is network-heavy and would stall the scan; the deferred
+            // enrichment pass below fills episodes in after the whole scan.
+            await scopedMetadata.TriggerMediaItemMetadataRefreshAsync(itemId, forceOverride, includeEpisodes: false);
             await scopedMetadata.TriggerMediaItemArtworkRefreshAsync(itemId, forceOverride);
             await scopedMetadata.TriggerMediaItemRatingsRefreshAsync(itemId, forceOverride);
         });
