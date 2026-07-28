@@ -461,7 +461,7 @@ public class TvdbMetadataProvider : IMetadataProvider
             {
                 for (int page = 0; page < 5; page++)
                 {
-                    var url = $"series/{showTmdbId}/episodes/default?page={page}";
+                    var url = $"series/{showTmdbId}/episodes/default/eng?page={page}";
                     using var request = new HttpRequestMessage(HttpMethod.Get, url);
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
