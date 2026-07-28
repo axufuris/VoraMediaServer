@@ -41,13 +41,19 @@ public class TmdbArtworkProvider : IArtworkProvider
         if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(tmdbId))
             return new List<ArtworkResult>();
 
+        // Prefer artwork in the server's metadata language, then English, then
+        // language-neutral (text-free) images — so a non-English server gets
+        // localized posters where they exist without losing coverage.
+        var preferredLang = MetadataLanguageCodes.ToIso6391(await settings.GetMetadataLanguageAsync());
+        var imageLanguages = preferredLang == "en" ? "en,null" : $"{preferredLang},en,null";
+
         string endpoint;
         if (mediaType.Equals("Collection", StringComparison.OrdinalIgnoreCase))
-            endpoint = $"collection/{tmdbId}/images?api_key={apiKey}";
+            endpoint = $"collection/{tmdbId}/images?api_key={apiKey}&include_image_language={imageLanguages}";
         else if (mediaType.Equals("TvShow", StringComparison.OrdinalIgnoreCase))
-            endpoint = $"tv/{tmdbId}/images?api_key={apiKey}&include_image_language=en,null";
+            endpoint = $"tv/{tmdbId}/images?api_key={apiKey}&include_image_language={imageLanguages}";
         else if (mediaType.Equals("Movie", StringComparison.OrdinalIgnoreCase))
-            endpoint = $"movie/{tmdbId}/images?api_key={apiKey}&include_image_language=en,null";
+            endpoint = $"movie/{tmdbId}/images?api_key={apiKey}&include_image_language={imageLanguages}";
         else
             return new List<ArtworkResult>();
 
