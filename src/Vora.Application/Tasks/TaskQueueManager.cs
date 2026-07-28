@@ -542,16 +542,27 @@ public class TaskQueueManager : ITaskQueueManager
         // The individual trigger methods don't yet take a token, so honour
         // cancellation between the (long) steps — a cancel stops the workflow
         // at the next boundary instead of running to completion.
+        // Enrich each show/movie (metadata → artwork → ratings) the moment the
+        // scanner finishes ingesting it, so its poster appears mid-scan instead
+        // of only after the whole library is scanned. A fresh scope per item
+        // keeps the EF change-tracker from growing across a large library.
         ct.ThrowIfCancellationRequested();
-        progress.Report("Scanning files…");
-        await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId);
+        progress.Report("Scanning & loading…");
+        await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId, async itemId =>
+        {
+            using var itemScope = sp.CreateScope();
+            var scopedMetadata = itemScope.ServiceProvider.GetRequiredService<IMetadataManager>();
+            await scopedMetadata.TriggerMediaItemMetadataRefreshAsync(itemId, forceOverride);
+            await scopedMetadata.TriggerMediaItemArtworkRefreshAsync(itemId, forceOverride);
+            await scopedMetadata.TriggerMediaItemRatingsRefreshAsync(itemId, forceOverride);
+        });
 
-        // Enrich each item (metadata → artwork → ratings) one at a time so
-        // posters populate progressively as the scan's items come online,
-        // rather than only after three separate whole-library passes finish.
+        // Safety net for anything the per-item callback didn't cover (scan edge
+        // cases, music). Non-force: already-enriched items are skipped, so this
+        // is a cheap no-op walk after a normal scan and never double-fetches.
         ct.ThrowIfCancellationRequested();
         progress.Report("Fetching details…");
-        await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: forceOverride);
+        await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false);
 
         ct.ThrowIfCancellationRequested();
         progress.Report("Generating poster overlays…");

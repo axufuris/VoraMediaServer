@@ -48,18 +48,18 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         _progress = progress;
     }
 
-    public async Task ScanMovieLibraryAsync(Guid libraryId)
+    public async Task ScanMovieLibraryAsync(Guid libraryId, Func<Guid, Task>? onMovieScannedAsync = null)
     {
         var library = LibraryHandle.FromGuid(libraryId);
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
-        await ProcessMovieDirectoriesAsync(library, details.FolderPaths, details.ScannerRegex, details.ExcludeFilters);
+        await ProcessMovieDirectoriesAsync(library, details.FolderPaths, details.ScannerRegex, details.ExcludeFilters, onMovieScannedAsync);
     }
 
-    public async Task ScanTvShowLibraryAsync(Guid libraryId)
+    public async Task ScanTvShowLibraryAsync(Guid libraryId, Func<Guid, Task>? onShowScannedAsync = null)
     {
         var library = LibraryHandle.FromGuid(libraryId);
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
-        await ProcessTvDirectoriesAsync(library, details.FolderPaths, details.ScannerRegex, details.ExcludeFilters);
+        await ProcessTvDirectoriesAsync(library, details.FolderPaths, details.ScannerRegex, details.ExcludeFilters, onShowScannedAsync);
     }
 
     public async Task ScanMusicLibraryAsync(Guid libraryId)
@@ -156,7 +156,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         return (regex, resolutionRegex, editionRegex);
     }
 
-    private async Task ProcessMovieDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex, IReadOnlyList<string> excludeFilters)
+    private async Task ProcessMovieDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex, IReadOnlyList<string> excludeFilters, Func<Guid, Task>? onMovieScannedAsync = null)
     {
         var (regex, resolutionRegex, editionRegex) = BuildMovieRegexes(customRegex);
 
@@ -169,11 +169,19 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var movieFiles = newFiles.Where(f => !IsExtraFile(f)).ToList();
         var extraFiles = newFiles.Where(IsExtraFile).ToList();
 
+        var enriched = new HashSet<Guid>();
         for (int i = 0; i < movieFiles.Count; i++)
         {
             var filePath = movieFiles[i];
             _progress.Report($"Scanning {Path.GetFileNameWithoutExtension(filePath)} ({i + 1}/{movieFiles.Count})");
-            await IngestMovieFileAsync(library, filePath, regex, resolutionRegex, editionRegex);
+            var movieId = await IngestMovieFileAsync(library, filePath, regex, resolutionRegex, editionRegex);
+
+            // Enrich each movie the first time it's ingested so its poster appears
+            // mid-scan; multi-part movies resolve to the same id and only fire once.
+            if (onMovieScannedAsync != null && movieId != Guid.Empty && enriched.Add(movieId))
+            {
+                await onMovieScannedAsync(movieId);
+            }
         }
 
         foreach (var extraPath in extraFiles)
@@ -289,7 +297,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         return (episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
     }
 
-    private async Task ProcessTvDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex, IReadOnlyList<string> excludeFilters)
+    private async Task ProcessTvDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex, IReadOnlyList<string> excludeFilters, Func<Guid, Task>? onShowScannedAsync = null)
     {
         var (episodeRegex, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(customRegex);
 
@@ -302,11 +310,26 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var episodeFiles = newFiles.Where(f => !IsExtraFile(f)).ToList();
         var extraFiles = newFiles.Where(IsExtraFile).ToList();
 
-        for (int i = 0; i < episodeFiles.Count; i++)
+        // Group by show root folder so we can enrich each show as soon as all of
+        // its episodes are ingested — this makes posters appear per show during
+        // the scan rather than after the whole library is scanned.
+        var showGroups = episodeFiles.GroupBy(f => GetTvShowFolderName(f), StringComparer.OrdinalIgnoreCase);
+        var scanned = 0;
+        foreach (var group in showGroups)
         {
-            var filePath = episodeFiles[i];
-            _progress.Report($"Scanning {Path.GetFileNameWithoutExtension(filePath)} ({i + 1}/{episodeFiles.Count})");
-            await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
+            Guid? showId = null;
+            foreach (var filePath in group)
+            {
+                scanned++;
+                _progress.Report($"Scanning {Path.GetFileNameWithoutExtension(filePath)} ({scanned}/{episodeFiles.Count})");
+                var result = await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
+                if (result.ParentShowId.HasValue) showId = result.ParentShowId;
+            }
+
+            if (onShowScannedAsync != null && showId.HasValue)
+            {
+                await onShowScannedAsync(showId.Value);
+            }
         }
 
         foreach (var extraPath in extraFiles)
