@@ -13,18 +13,6 @@ public class TmdbMetadataProvider : IMetadataProvider
     private readonly Dictionary<string, Dictionary<int, MetadataResult>> _tmdbSeasonCache = new();
     private string? _cachedLanguage;
 
-    // The metadata language is stored as a TVDB 3-letter code (ISO 639-2); TMDB
-    // expects ISO 639-1. Map the codes Vora offers in the admin dropdown; anything
-    // unmapped falls back to English.
-    private static readonly Dictionary<string, string> TvdbToTmdbLanguage = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["eng"] = "en", ["spa"] = "es", ["fra"] = "fr", ["deu"] = "de", ["ita"] = "it",
-        ["por"] = "pt", ["nld"] = "nl", ["jpn"] = "ja", ["kor"] = "ko", ["zho"] = "zh",
-        ["rus"] = "ru", ["swe"] = "sv", ["pol"] = "pl", ["tur"] = "tr", ["dan"] = "da",
-        ["nor"] = "no", ["fin"] = "fi", ["ara"] = "ar", ["heb"] = "he", ["hin"] = "hi",
-        ["ces"] = "cs", ["ell"] = "el", ["hun"] = "hu", ["ukr"] = "uk", ["tha"] = "th",
-    };
-
     public string Id => "tmdb_metadata";
     public string Name => "The Movie Database (TMDB)";
     public string Version => "1.0.0";
@@ -72,7 +60,7 @@ public class TmdbMetadataProvider : IMetadataProvider
         using var scope = _scopeFactory.CreateScope();
         var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
         var stored = await settings.GetMetadataLanguageAsync();
-        _cachedLanguage = TvdbToTmdbLanguage.TryGetValue(stored ?? "", out var code) ? code : "en";
+        _cachedLanguage = MetadataLanguageCodes.ToIso6391(stored);
         return _cachedLanguage;
     }
 

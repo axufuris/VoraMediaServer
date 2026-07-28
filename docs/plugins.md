@@ -61,6 +61,10 @@ User-facing docs and the full plugin/setting matrix live in the README's **Boots
 
 Plugin settings (API keys, endpoints) come through `IPluginSettingsProvider`. The settings UI on the admin pages reads/writes via `pluginAdminService` on the frontend, which calls the corresponding backend endpoint. New settings fields are declared by the plugin and surfaced generically — you don't have to hand-build admin UI for them.
 
+### Server-wide metadata language
+
+`IPluginSettingsProvider.GetMetadataLanguageAsync()` returns the admin's chosen metadata language (Admin → Settings → Core) as a **TVDB-style ISO 639-2 (3-letter) code** — e.g. `"eng"`, `"kor"`. Any metadata/artwork provider should read it so titles, overviews, and localized artwork come back in the admin's language instead of the item's original language. TVDB endpoints take the 3-letter code verbatim; for APIs that expect ISO 639-1 (2-letter, e.g. TMDB) call `Vora.Plugins.MetadataLanguageCodes.ToIso6391(code)` rather than re-deriving the table — adding a language to the admin dropdown then lights up every provider at once. Prefer skipping the extra translation call when the item is already in the target language (TVDB exposes `originalLanguage`), and always fall back to the original language when no translation exists. Built-in consumers: `TvdbMetadataProvider`, `TmdbMetadataProvider`, `TmdbArtworkProvider`.
+
 ## Where plugin settings render in the admin UI
 
 The `PluginSection` component in `components/Admin/Settings/PluginSettingsTab.tsx` renders one plugin's settings inline. It's exported so feature pages can mount it directly. The `FeaturePluginList` wrapper in `components/Admin/Features/FeaturePluginList.tsx` takes a list of plugin type names (matching the interface name without the `I` prefix and `Provider` suffix — e.g. `Discovery` for `IDiscoveryProvider`), fetches plugins, filters, and renders a `PluginSection` per match.
