@@ -11,6 +11,7 @@ public class TmdbMetadataProvider : IMetadataProvider
     private readonly HttpClient _httpClient;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly Dictionary<string, Dictionary<int, MetadataResult>> _tmdbSeasonCache = new();
+    private string? _cachedLanguage;
 
     public string Id => "tmdb_metadata";
     public string Name => "The Movie Database (TMDB)";
@@ -51,12 +52,25 @@ public class TmdbMetadataProvider : IMetadataProvider
         return await settings.GetSettingAsync(Id, "api_key");
     }
 
+    // TMDB ISO 639-1 code for the server's metadata language, cached for this
+    // (transient) provider instance.
+    private async Task<string> GetLanguageAsync()
+    {
+        if (_cachedLanguage != null) return _cachedLanguage;
+        using var scope = _scopeFactory.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
+        var stored = await settings.GetMetadataLanguageAsync();
+        _cachedLanguage = MetadataLanguageCodes.ToIso6391(stored);
+        return _cachedLanguage;
+    }
+
     public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
+        var lang = await GetLanguageAsync();
         if (string.IsNullOrEmpty(apiKey)) return null;
 
-        var url = $"search/movie?api_key={apiKey}&query={Uri.EscapeDataString(query)}";
+        var url = $"search/movie?api_key={apiKey}&language={lang}&query={Uri.EscapeDataString(query)}";
         if (year.HasValue) url += $"&year={year.Value}";
 
         var response = await _httpClient.GetAsync(url);
@@ -75,9 +89,10 @@ public class TmdbMetadataProvider : IMetadataProvider
     public async Task<MetadataResult?> FetchTvShowMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
+        var lang = await GetLanguageAsync();
         if (string.IsNullOrEmpty(apiKey)) return null;
 
-        var url = $"search/tv?api_key={apiKey}&query={Uri.EscapeDataString(query)}";
+        var url = $"search/tv?api_key={apiKey}&language={lang}&query={Uri.EscapeDataString(query)}";
         if (year.HasValue) url += $"&first_air_date_year={year.Value}";
 
         var response = await _httpClient.GetAsync(url);
@@ -96,6 +111,7 @@ public class TmdbMetadataProvider : IMetadataProvider
     public async Task<MetadataResult?> FetchMovieMetadataByIdAsync(string id, string source, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
+        var lang = await GetLanguageAsync();
         string tmdbIdToFetch = id;
 
         if (source.ToLower() == "imdb")
@@ -109,7 +125,7 @@ public class TmdbMetadataProvider : IMetadataProvider
             tmdbIdToFetch = movieResults[0].GetProperty("id").GetInt32().ToString();
         }
 
-        var url = $"movie/{tmdbIdToFetch}?api_key={apiKey}&append_to_response=credits,external_ids,release_dates,videos,keywords";
+        var url = $"movie/{tmdbIdToFetch}?api_key={apiKey}&language={lang}&append_to_response=credits,external_ids,release_dates,videos,keywords";
         var response = await _httpClient.GetAsync(url);
         if (!response.IsSuccessStatusCode) return null;
 
@@ -121,6 +137,7 @@ public class TmdbMetadataProvider : IMetadataProvider
     public async Task<MetadataResult?> FetchTvShowMetadataByIdAsync(string id, string source, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
+        var lang = await GetLanguageAsync();
         string tmdbIdToFetch = id;
 
         if (source.ToLower() == "imdb")
@@ -134,7 +151,7 @@ public class TmdbMetadataProvider : IMetadataProvider
             tmdbIdToFetch = tvResults[0].GetProperty("id").GetInt32().ToString();
         }
 
-        var url = $"tv/{tmdbIdToFetch}?api_key={apiKey}&append_to_response=credits,external_ids,content_ratings,videos";
+        var url = $"tv/{tmdbIdToFetch}?api_key={apiKey}&language={lang}&append_to_response=credits,external_ids,content_ratings,videos";
         var response = await _httpClient.GetAsync(url);
         if (!response.IsSuccessStatusCode) return null;
 
@@ -450,7 +467,8 @@ public class TmdbMetadataProvider : IMetadataProvider
         {
             seasonEpisodes = new Dictionary<int, MetadataResult>();
             var apiKey = await GetApiKeyAsync();
-            var url = $"tv/{showTmdbId}/season/{seasonNumber}?api_key={apiKey}&append_to_response=credits,videos";
+            var lang = await GetLanguageAsync();
+            var url = $"tv/{showTmdbId}/season/{seasonNumber}?api_key={apiKey}&language={lang}&append_to_response=credits,videos";
 
             var response = await _httpClient.GetAsync(url);
             if (response.IsSuccessStatusCode)
@@ -548,7 +566,8 @@ public class TmdbMetadataProvider : IMetadataProvider
     public async Task<ActorMetadataResult?> FetchActorMetadataAsync(int personId, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
-        var url = $"person/{personId}?api_key={apiKey}";
+        var lang = await GetLanguageAsync();
+        var url = $"person/{personId}?api_key={apiKey}&language={lang}";
 
         var response = await _httpClient.GetAsync(url);
         if (!response.IsSuccessStatusCode) return null;

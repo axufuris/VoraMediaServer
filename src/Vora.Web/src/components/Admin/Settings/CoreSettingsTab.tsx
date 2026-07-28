@@ -91,6 +91,42 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 <FieldHint>The display name of this server across client applications.</FieldHint>
             </SettingsCard>
 
+            <SettingsCard title="Metadata Language">
+                <FieldLabel>Preferred Language</FieldLabel>
+                <select
+                    value={serverSettings.metadataLanguage || 'eng'}
+                    onChange={e => setServerSettings({ ...serverSettings, metadataLanguage: e.target.value })}
+                    className="vora-input w-56 cursor-pointer"
+                >
+                    <option value="eng">English</option>
+                    <option value="spa">Spanish (Español)</option>
+                    <option value="fra">French (Français)</option>
+                    <option value="deu">German (Deutsch)</option>
+                    <option value="ita">Italian (Italiano)</option>
+                    <option value="por">Portuguese (Português)</option>
+                    <option value="nld">Dutch (Nederlands)</option>
+                    <option value="swe">Swedish (Svenska)</option>
+                    <option value="dan">Danish (Dansk)</option>
+                    <option value="nor">Norwegian (Norsk)</option>
+                    <option value="fin">Finnish (Suomi)</option>
+                    <option value="pol">Polish (Polski)</option>
+                    <option value="ces">Czech (Čeština)</option>
+                    <option value="ell">Greek (Ελληνικά)</option>
+                    <option value="hun">Hungarian (Magyar)</option>
+                    <option value="tur">Turkish (Türkçe)</option>
+                    <option value="rus">Russian (Русский)</option>
+                    <option value="ukr">Ukrainian (Українська)</option>
+                    <option value="ara">Arabic (العربية)</option>
+                    <option value="heb">Hebrew (עברית)</option>
+                    <option value="hin">Hindi (हिन्दी)</option>
+                    <option value="tha">Thai (ไทย)</option>
+                    <option value="jpn">Japanese (日本語)</option>
+                    <option value="kor">Korean (한국어)</option>
+                    <option value="zho">Chinese (中文)</option>
+                </select>
+                <FieldHint>Language used when fetching titles and descriptions from metadata providers (TMDB, TVDB). Titles fall back to their original language when no translation exists. Applies to newly scanned or refreshed items.</FieldHint>
+            </SettingsCard>
+
             <SettingsCard title="Global Streaming Profile">
                 <FieldLabel>Transcoder Behavior Priority</FieldLabel>
                 <select

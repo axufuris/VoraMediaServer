@@ -44,6 +44,8 @@ public class ServerSetting
 
     public bool ResolveMovieTvdbIds { get; set; }
 
+    public string MetadataLanguage { get; set; } = "eng";
+
     public bool EnableRemoteAccess { get; set; } = true;
     public bool ManuallySpecifyPublicPort { get; set; }
     public int PublicPort { get; set; } = 32080;
