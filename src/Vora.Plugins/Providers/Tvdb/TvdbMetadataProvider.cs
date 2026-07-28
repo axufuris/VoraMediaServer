@@ -81,7 +81,17 @@ public class TvdbMetadataProvider : IMetadataProvider
 
     public async Task<MetadataResult?> FetchTvShowMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
-        return await ExecuteSearch(query, "series", year);
+        // A plain search result carries no seasons array. Once it gives us a TVDB
+        // id, re-fetch the extended series (which includes seasons + their poster
+        // images) so title-matched shows get season posters too — not just shows
+        // matched by external id.
+        var searchResult = await ExecuteSearch(query, "series", year);
+        if (!string.IsNullOrEmpty(searchResult?.TvdbId))
+        {
+            var extended = await FetchTvShowMetadataByIdAsync(searchResult.TvdbId, "tvdb", cancellationToken);
+            if (extended != null) return extended;
+        }
+        return searchResult;
     }
 
     private async Task<MetadataResult?> ExecuteSearch(string query, string type, int? year)
@@ -123,7 +133,9 @@ public class TvdbMetadataProvider : IMetadataProvider
 
         if (source.Equals("imdb", StringComparison.OrdinalIgnoreCase))
         {
-            using var searchReq = new HttpRequestMessage(HttpMethod.Get, $"search?query={id}&type=movie");
+            // Resolve the IMDB id via the remote-id endpoint (see the TV method) —
+            // `search?query=` does not match an IMDB id string.
+            using var searchReq = new HttpRequestMessage(HttpMethod.Get, $"search/remoteid/{Uri.EscapeDataString(id)}");
             searchReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             var searchRes = await _httpClient.SendAsync(searchReq);
             if (!searchRes.IsSuccessStatusCode) return null;
@@ -132,8 +144,8 @@ public class TvdbMetadataProvider : IMetadataProvider
             using var searchDoc = await JsonDocument.ParseAsync(searchStream);
             if (!searchDoc.RootElement.TryGetProperty("data", out var dataArr) || dataArr.GetArrayLength() == 0) return null;
 
-            var tvdbIdElement = dataArr[0].GetProperty("tvdb_id");
-            tvdbIdToFetch = tvdbIdElement.ValueKind == JsonValueKind.Number ? tvdbIdElement.GetInt32().ToString() : tvdbIdElement.GetString() ?? "";
+            if (!dataArr[0].TryGetProperty("movie", out var movieObj) || !movieObj.TryGetProperty("id", out var movieId)) return null;
+            tvdbIdToFetch = movieId.ValueKind == JsonValueKind.Number ? movieId.GetInt32().ToString() : movieId.GetString() ?? "";
 
             if (string.IsNullOrEmpty(tvdbIdToFetch)) return null;
         }
@@ -236,7 +248,12 @@ public class TvdbMetadataProvider : IMetadataProvider
 
         if (source.Equals("imdb", StringComparison.OrdinalIgnoreCase))
         {
-            using var searchReq = new HttpRequestMessage(HttpMethod.Get, $"search?query={id}&type=series");
+            // Resolve the external (IMDB) id to a TVDB series id via the remote-id
+            // endpoint. The generic `search?query=` endpoint does NOT match an
+            // IMDB id string, so an imdb-tagged show would otherwise fail here and
+            // fall back to a title search that never fetches the extended data
+            // (and its seasons), leaving season posters blank.
+            using var searchReq = new HttpRequestMessage(HttpMethod.Get, $"search/remoteid/{Uri.EscapeDataString(id)}");
             searchReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             var searchRes = await _httpClient.SendAsync(searchReq);
             if (!searchRes.IsSuccessStatusCode) return null;
@@ -245,8 +262,8 @@ public class TvdbMetadataProvider : IMetadataProvider
             using var searchDoc = await JsonDocument.ParseAsync(searchStream);
             if (!searchDoc.RootElement.TryGetProperty("data", out var dataArr) || dataArr.GetArrayLength() == 0) return null;
 
-            var tvdbIdElement = dataArr[0].GetProperty("tvdb_id");
-            tvdbIdToFetch = tvdbIdElement.ValueKind == JsonValueKind.Number ? tvdbIdElement.GetInt32().ToString() : tvdbIdElement.GetString() ?? "";
+            if (!dataArr[0].TryGetProperty("series", out var seriesObj) || !seriesObj.TryGetProperty("id", out var seriesId)) return null;
+            tvdbIdToFetch = seriesId.ValueKind == JsonValueKind.Number ? seriesId.GetInt32().ToString() : seriesId.GetString() ?? "";
 
             if (string.IsNullOrEmpty(tvdbIdToFetch)) return null;
         }
