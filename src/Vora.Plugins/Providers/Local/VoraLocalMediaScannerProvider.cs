@@ -62,6 +62,80 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         await ProcessTvDirectoriesAsync(library, details.FolderPaths, details.ScannerRegex, details.ExcludeFilters);
     }
 
+    public async Task<List<ScanUnit>> DiscoverMovieScanUnitsAsync(Guid libraryId)
+    {
+        var library = LibraryHandle.FromGuid(libraryId);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        var newFiles = GetNewFilesInDirectories(details.FolderPaths, existing)
+            .Where(f => !IsExcluded(f, details.ExcludeFilters))
+            .ToList();
+
+        return newFiles
+            .GroupBy(f => Path.GetDirectoryName(f) ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new ScanUnit(Path.GetFileName(g.Key), g.ToList()))
+            .ToList();
+    }
+
+    public async Task<List<ScanUnit>> DiscoverTvScanUnitsAsync(Guid libraryId)
+    {
+        var library = LibraryHandle.FromGuid(libraryId);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        var newFiles = GetNewFilesInDirectories(details.FolderPaths, existing)
+            .Where(f => !IsExcluded(f, details.ExcludeFilters))
+            .ToList();
+
+        return newFiles
+            .GroupBy(GetTvShowFolderName, StringComparer.OrdinalIgnoreCase)
+            .Where(g => !string.IsNullOrEmpty(g.Key))
+            .Select(g => new ScanUnit(g.Key, g.ToList()))
+            .ToList();
+    }
+
+    public async Task<Guid?> ScanMovieUnitAsync(Guid libraryId, IReadOnlyList<string> filePaths)
+    {
+        var library = LibraryHandle.FromGuid(libraryId);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        var (regex, resolutionRegex, editionRegex) = BuildMovieRegexes(details.ScannerRegex);
+        var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
+
+        Guid? movieId = null;
+        foreach (var filePath in filePaths.Where(f => !existing.Contains(f)))
+        {
+            if (IsExtraFile(filePath))
+            {
+                await IngestMovieExtraAsync(library, filePath, regex);
+                continue;
+            }
+            var id = await IngestMovieFileAsync(library, filePath, regex, resolutionRegex, editionRegex);
+            if (id != Guid.Empty) movieId ??= id;
+        }
+        return movieId;
+    }
+
+    public async Task<Guid?> ScanTvUnitAsync(Guid libraryId, IReadOnlyList<string> filePaths)
+    {
+        var library = LibraryHandle.FromGuid(libraryId);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        var (episodeRegex, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(details.ScannerRegex);
+        var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
+
+        Guid? showId = null;
+        var episodeFiles = filePaths.Where(f => !existing.Contains(f) && !IsExtraFile(f));
+        foreach (var filePath in episodeFiles)
+        {
+            var result = await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
+            if (result.ParentShowId.HasValue) showId ??= result.ParentShowId;
+        }
+
+        foreach (var extraPath in filePaths.Where(f => !existing.Contains(f) && IsExtraFile(f)))
+        {
+            await IngestTvExtraAsync(library, extraPath, showFolderRegex);
+        }
+        return showId;
+    }
+
     public async Task ScanMusicLibraryAsync(Guid libraryId)
     {
         var library = LibraryHandle.FromGuid(libraryId);
