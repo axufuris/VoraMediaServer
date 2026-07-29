@@ -204,7 +204,10 @@ public class TvdbMetadataProvider : IMetadataProvider
 
             using var searchStream = await searchRes.Content.ReadAsStreamAsync();
             using var searchDoc = await JsonDocument.ParseAsync(searchStream);
-            if (!searchDoc.RootElement.TryGetProperty("data", out var dataArr) || dataArr.GetArrayLength() == 0) return null;
+            // remoteid returns {"status":"success","data":null} for an unknown id —
+            // "data" exists but is null, so GetArrayLength() would throw and abort
+            // the whole fetch (skipping the title-search fallback). Guard on Array.
+            if (!searchDoc.RootElement.TryGetProperty("data", out var dataArr) || dataArr.ValueKind != JsonValueKind.Array || dataArr.GetArrayLength() == 0) return null;
 
             if (!dataArr[0].TryGetProperty("movie", out var movieObj) || !movieObj.TryGetProperty("id", out var movieId)) return null;
             tvdbIdToFetch = movieId.ValueKind == JsonValueKind.Number ? movieId.GetInt32().ToString() : movieId.GetString() ?? "";
@@ -325,7 +328,10 @@ public class TvdbMetadataProvider : IMetadataProvider
 
             using var searchStream = await searchRes.Content.ReadAsStreamAsync();
             using var searchDoc = await JsonDocument.ParseAsync(searchStream);
-            if (!searchDoc.RootElement.TryGetProperty("data", out var dataArr) || dataArr.GetArrayLength() == 0) return null;
+            // remoteid returns {"status":"success","data":null} for an unknown id —
+            // "data" exists but is null, so GetArrayLength() would throw and abort
+            // the whole fetch (skipping the title-search fallback). Guard on Array.
+            if (!searchDoc.RootElement.TryGetProperty("data", out var dataArr) || dataArr.ValueKind != JsonValueKind.Array || dataArr.GetArrayLength() == 0) return null;
 
             if (!dataArr[0].TryGetProperty("series", out var seriesObj) || !seriesObj.TryGetProperty("id", out var seriesId)) return null;
             tvdbIdToFetch = seriesId.ValueKind == JsonValueKind.Number ? seriesId.GetInt32().ToString() : seriesId.GetString() ?? "";
