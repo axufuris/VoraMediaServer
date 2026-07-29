@@ -88,6 +88,21 @@ public class TvdbMetadataProvider : IMetadataProvider
         return _cachedLanguage;
     }
 
+    // TVDB's series/season/movie endpoints return absolute artwork URLs, but the
+    // episodes endpoint returns a relative path (e.g. "/banners/v4/episode/…").
+    // Stored raw, the client resolves it against the Vora host and the image
+    // 404s — so an episode still needs the artwork host prefixed. Idempotent for
+    // values that are already absolute.
+    private const string TvdbArtworkBaseUrl = "https://artworks.thetvdb.com";
+    private static string? PrefixArtwork(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return path;
+        if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return path;
+        return path.StartsWith("/", StringComparison.Ordinal)
+            ? TvdbArtworkBaseUrl + path
+            : $"{TvdbArtworkBaseUrl}/{path}";
+    }
+
     public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
         var result = await ExecuteSearch(query, "movie", year);
@@ -522,8 +537,8 @@ public class TvdbMetadataProvider : IMetadataProvider
                                     Title = ep.TryGetProperty("name", out var t) && t.ValueKind != JsonValueKind.Null ? t.GetString() : null,
                                     Overview = ep.TryGetProperty("overview", out var ov) && ov.ValueKind != JsonValueKind.Null ? ov.GetString() : null,
                                     ReleaseDate = DateTime.TryParse(ep.TryGetProperty("aired", out var rd) && rd.ValueKind != JsonValueKind.Null ? rd.GetString() : "", out var dt) ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : null,
-                                    PosterUrl = ep.TryGetProperty("image", out var img) && img.ValueKind != JsonValueKind.Null ? img.GetString() : null,
-                                    BackgroundUrl = ep.TryGetProperty("image", out var bImg) && bImg.ValueKind != JsonValueKind.Null ? bImg.GetString() : null,
+                                    PosterUrl = PrefixArtwork(ep.TryGetProperty("image", out var img) && img.ValueKind != JsonValueKind.Null ? img.GetString() : null),
+                                    BackgroundUrl = PrefixArtwork(ep.TryGetProperty("image", out var bImg) && bImg.ValueKind != JsonValueKind.Null ? bImg.GetString() : null),
                                     RuntimeMinutes = ep.TryGetProperty("runtime", out var rt) && rt.ValueKind == JsonValueKind.Number ? rt.GetInt32() : null,
                                     Rating = ep.TryGetProperty("score", out var sc) && sc.ValueKind == JsonValueKind.Number ? (decimal)sc.GetDouble() : null
                                 };
