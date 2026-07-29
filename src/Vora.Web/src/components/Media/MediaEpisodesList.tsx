@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mediaService, type Episode } from '../../api/Media/mediaService';
 import StarRating from '../Client/Primitives/StarRating';
+import ArtImage from '../Client/Primitives/ArtImage';
 import { StorageKeys } from '../../utils/storageKeys';
 
 interface Props {
@@ -43,11 +44,7 @@ export default function MediaEpisodesList({ episodes, serverId }: Props) {
                                 onClick={() => navigate(serverId ? `/server/${serverId}/media/${ep.id}` : `/media/${ep.id}`)}
                                 className="w-full sm:w-48 shrink-0 relative aspect-video bg-[var(--vora-bg-canvas)] rounded-md overflow-hidden shadow-md cursor-pointer"
                             >
-                                {ep.posterUrl ? (
-                                    <img src={ep.posterUrl} alt={ep.title} className="w-full h-full object-contain bg-black" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-xs text-[var(--vora-text-muted)]">No Image</div>
-                                )}
+                                <ArtImage src={ep.posterUrl} alt={ep.title} variant="still" imgClassName="w-full h-full object-contain bg-black" />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
                                 {ep.isPlayed && (

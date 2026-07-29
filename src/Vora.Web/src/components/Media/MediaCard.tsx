@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import MediaPlaceholder from '../Client/Primitives/MediaPlaceholder';
 
 export interface MediaCardProps {
     id: string;
@@ -25,6 +26,10 @@ export default function MediaCard({
 }: MediaCardProps) {
 
     const aspectClass = aspectRatio === 'video' ? 'aspect-video' : aspectRatio === 'square' ? 'aspect-square' : 'aspect-[2/3]';
+
+    const [failed, setFailed] = useState(false);
+    useEffect(() => { setFailed(false); }, [imageUrl]);
+    const showImage = !!imageUrl && !failed;
 
     return (
         <div className="flex flex-col group cursor-pointer w-full" onClick={onClick}>
@@ -54,12 +59,14 @@ export default function MediaCard({
                         <img src={multiPosters[0]} className="w-1/2 h-full object-cover border-r border-[var(--vora-bg-raised)]" alt="" />
                         <img src={multiPosters[1]} className="w-1/2 h-full object-cover border-l border-[var(--vora-bg-raised)]" alt="" />
                     </div>
-                ) : imageUrl ? (
-                    <img src={imageUrl} alt={title} className={`w-full h-full ${type === 'Episode' ? 'object-contain bg-black' : 'object-cover'} ${type === 'Playlist' ? 'opacity-80 group-hover:opacity-100 transition-opacity' : ''}`} />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-muted)] text-sm bg-[var(--vora-bg-sunken)]">
-                        {type === 'Playlist' ? <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg> : 'No Image'}
+                ) : showImage ? (
+                    <img src={imageUrl} alt={title} onError={() => setFailed(true)} className={`w-full h-full ${type === 'Episode' ? 'object-contain bg-black' : 'object-cover'} ${type === 'Playlist' ? 'opacity-80 group-hover:opacity-100 transition-opacity' : ''}`} />
+                ) : type === 'Playlist' || type === 'Track' ? (
+                    <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-muted)] bg-[var(--vora-bg-sunken)]">
+                        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
                     </div>
+                ) : (
+                    <MediaPlaceholder title={title} variant={aspectRatio === 'video' || type === 'Episode' ? 'still' : 'poster'} />
                 )}
 
                 {/* Overlays & Badges */}

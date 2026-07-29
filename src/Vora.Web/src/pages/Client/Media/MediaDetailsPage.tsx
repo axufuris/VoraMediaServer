@@ -16,6 +16,7 @@ import { scanDeviceCapabilities } from '../../../utils/hardwareScanner';
 import { useDialog } from '../../../dialogs';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
 import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import ArtImage from '../../../components/Client/Primitives/ArtImage';
 import MediaRail from '../../../components/Client/Primitives/MediaRail';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import QualityPanel, { QualityPanelSection, type QualityOption } from '../../../components/Client/Primitives/QualityPanel';
@@ -496,13 +497,12 @@ export default function MediaDetailsPage() {
                                 maxWidth: isEpisode ? 400 : 260,
                             }}
                         >
-                            {media.posterUrl ? (
-                                <img src={media.posterUrl} alt={media.title} className={`h-full w-full ${isEpisode ? 'object-contain' : 'object-cover'}`} />
-                            ) : (
-                                <div className="flex h-full w-full items-center justify-center" style={{ color: 'var(--vora-text-muted)' }}>
-                                    No image
-                                </div>
-                            )}
+                            <ArtImage
+                                src={media.posterUrl}
+                                alt={media.title}
+                                variant={isEpisode ? 'still' : 'poster'}
+                                imgClassName={`h-full w-full ${isEpisode ? 'object-contain' : 'object-cover'}`}
+                            />
                         </div>
                     </div>
 

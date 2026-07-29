@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { thumbUrl } from '../../../utils/thumbnails';
+import MediaPlaceholder from './MediaPlaceholder';
 
 interface MediaStillProps {
     imageUrl?: string | null;
@@ -16,6 +17,9 @@ interface MediaStillProps {
 
 export default function MediaStill({ imageUrl, title, subtitle, badge, bottomLeftBadge, progressPercent, onClick, width = 280, fill, className }: MediaStillProps) {
     const widthStyle = fill ? '100%' : width;
+    const [failed, setFailed] = useState(false);
+    useEffect(() => { setFailed(false); }, [imageUrl]);
+    const showImage = !!imageUrl && !failed;
     const handleKeyDown = onClick
         ? (e: React.KeyboardEvent<HTMLDivElement>) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -44,15 +48,10 @@ export default function MediaStill({ imageUrl, title, subtitle, badge, bottomLef
                     transition: 'transform var(--vora-duration-med, 240ms) var(--vora-ease-out)',
                 }}
             >
-                {imageUrl ? (
-                    <img src={thumbUrl(imageUrl, 500, 'still')} alt={title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                {showImage ? (
+                    <img src={thumbUrl(imageUrl!, 500, 'still')} alt={title} loading="lazy" decoding="async" onError={() => setFailed(true)} className="h-full w-full object-cover" />
                 ) : (
-                    <div className="flex h-full w-full items-center justify-center" style={{ color: 'var(--vora-text-muted)' }}>
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                            <rect x="3" y="3" width="18" height="18" rx="2" />
-                            <polygon points="10 8 16 12 10 16 10 8" />
-                        </svg>
-                    </div>
+                    <MediaPlaceholder title={title} variant="still" />
                 )}
                 {badge && <div className="absolute right-2 top-2">{badge}</div>}
                 {bottomLeftBadge && <div className="absolute left-2 bottom-2">{bottomLeftBadge}</div>}
