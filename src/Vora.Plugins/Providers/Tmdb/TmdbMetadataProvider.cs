@@ -190,15 +190,23 @@ public class TmdbMetadataProvider : IMetadataProvider
             {
                 if (country.TryGetProperty("iso_3166_1", out var iso) && iso.GetString() == "US")
                 {
-                    if (country.TryGetProperty("release_dates", out var dates) && dates.GetArrayLength() > 0)
+                    if (country.TryGetProperty("release_dates", out var dates) && dates.ValueKind == JsonValueKind.Array)
                     {
-                        var cert = dates[0].TryGetProperty("certification", out var c) ? c.GetString() : null;
-                        if (!string.IsNullOrWhiteSpace(cert))
+                        // A US movie has several release entries (premiere,
+                        // theatrical, digital, physical…) and only some carry a
+                        // certification — the first is often blank. Scan them all
+                        // for the first non-empty cert instead of trusting [0].
+                        foreach (var usRelease in dates.EnumerateArray())
                         {
-                            result.ContentRating = cert;
-                            break;
+                            var cert = usRelease.TryGetProperty("certification", out var c) ? c.GetString() : null;
+                            if (!string.IsNullOrWhiteSpace(cert))
+                            {
+                                result.ContentRating = cert;
+                                break;
+                            }
                         }
                     }
+                    if (!string.IsNullOrWhiteSpace(result.ContentRating)) break;
                 }
             }
         }

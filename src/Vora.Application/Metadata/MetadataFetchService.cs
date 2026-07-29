@@ -76,12 +76,18 @@ public class MetadataFetchService : IMetadataFetchService
     }
 
     // Folder-name id tags (e.g. " [imdb-tt123]", or a malformed empty " [imdb-]")
-    // pollute a title search and can stop a show from matching at all. Strip them
-    // before falling back to a title lookup.
-    private static string CleanSearchTitle(string title) =>
-        System.Text.RegularExpressions.Regex.Replace(
+    // and a trailing "(year)" both pollute a title search and can stop a title
+    // from matching at all (the year is already passed as a separate param).
+    // Strip them before falling back to a title lookup.
+    private static string CleanSearchTitle(string title)
+    {
+        var cleaned = System.Text.RegularExpressions.Regex.Replace(
             title, @"\s*\[(?:imdb|tmdb|tvdb)-[^\]]*\]", string.Empty,
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned, @"\s*\((?:19|20)\d{2}\)\s*$", string.Empty);
+        return cleaned.Trim();
+    }
 
     private async Task<MetadataResult?> FetchMetadataForItemAsync(MediaItem item, IMetadataProvider provider)
     {

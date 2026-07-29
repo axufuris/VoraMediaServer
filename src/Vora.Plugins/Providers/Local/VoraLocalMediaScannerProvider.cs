@@ -426,7 +426,11 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var fileName = Path.GetFileNameWithoutExtension(filePath);
         var directoryInfo = new DirectoryInfo(Path.GetDirectoryName(filePath)!);
 
+        // A "Specials" (Season 0) subfolder is a season, not the show — walk up to
+        // the show folder just like a "Season NN" folder. Missing this made every
+        // show's Specials episodes group under a phantom show called "Specials".
         var seriesFolderName = directoryInfo.Name.StartsWith("Season", StringComparison.OrdinalIgnoreCase)
+            || directoryInfo.Name.StartsWith("Specials", StringComparison.OrdinalIgnoreCase)
             ? directoryInfo.Parent?.Name ?? directoryInfo.Name
             : directoryInfo.Name;
 
@@ -1051,7 +1055,8 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         {
             var dirInfo = new DirectoryInfo(Path.GetDirectoryName(path)!);
 
-            if (dirInfo.Name.StartsWith("Season", StringComparison.OrdinalIgnoreCase) && dirInfo.Parent != null)
+            if ((dirInfo.Name.StartsWith("Season", StringComparison.OrdinalIgnoreCase)
+                 || dirInfo.Name.StartsWith("Specials", StringComparison.OrdinalIgnoreCase)) && dirInfo.Parent != null)
             {
                 dirs.Add(dirInfo.Parent.FullName);
             }

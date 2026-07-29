@@ -88,9 +88,51 @@ public class TvdbMetadataProvider : IMetadataProvider
         return _cachedLanguage;
     }
 
+    // TVDB's series/season/movie endpoints return absolute artwork URLs, but the
+    // episodes endpoint returns a relative path (e.g. "/banners/v4/episode/…").
+    // Stored raw, the client resolves it against the Vora host and the image
+    // 404s — so an episode still needs the artwork host prefixed. Idempotent for
+    // values that are already absolute.
+    private const string TvdbArtworkBaseUrl = "https://artworks.thetvdb.com";
+    private static string? PrefixArtwork(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return path;
+        if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return path;
+        return path.StartsWith("/", StringComparison.Ordinal)
+            ? TvdbArtworkBaseUrl + path
+            : $"{TvdbArtworkBaseUrl}/{path}";
+    }
+
+    // TVDB's extended series/movie carries the title's external ids in remoteIds
+    // (IMDB, TheMovieDB.com, …). Backfill them onto the result so a title-matched
+    // item gets its imdb/tmdb id saved — and a wrong folder imdb id (e.g. Only
+    // Murders' folder tag pointing at the wrong title) is corrected to TVDB's.
+    private static void ApplyRemoteIds(JsonElement data, MetadataResult result)
+    {
+        if (!data.TryGetProperty("remoteIds", out var rids) || rids.ValueKind != JsonValueKind.Array) return;
+        foreach (var rid in rids.EnumerateArray())
+        {
+            var source = rid.TryGetProperty("sourceName", out var s) ? s.GetString() : null;
+            var id = rid.TryGetProperty("id", out var i) && i.ValueKind == JsonValueKind.String ? i.GetString() : null;
+            if (string.IsNullOrWhiteSpace(id)) continue;
+            if (string.Equals(source, "IMDB", StringComparison.OrdinalIgnoreCase))
+                result.ImdbId = id;
+            else if (string.Equals(source, "TheMovieDB.com", StringComparison.OrdinalIgnoreCase))
+                result.TmdbId = id;
+        }
+    }
+
     public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
-        return await ExecuteSearch(query, "movie", year);
+        var result = await ExecuteSearch(query, "movie", year);
+        // TVDB's year filter is exact, but a local folder's year is often off by
+        // one (release vs. air year, or just wrong) — so a year-filtered miss
+        // retries without the year rather than leaving the title unmatched.
+        if (result == null && year.HasValue)
+        {
+            result = await ExecuteSearch(query, "movie", null);
+        }
+        return result;
     }
 
     public async Task<MetadataResult?> FetchTvShowMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
@@ -100,6 +142,12 @@ public class TvdbMetadataProvider : IMetadataProvider
         // images) so title-matched shows get season posters too — not just shows
         // matched by external id.
         var searchResult = await ExecuteSearch(query, "series", year);
+        // Exact-year miss → retry without the year (folder years are frequently
+        // off by one, which otherwise leaves the show completely unmatched).
+        if (string.IsNullOrEmpty(searchResult?.TvdbId) && year.HasValue)
+        {
+            searchResult = await ExecuteSearch(query, "series", null);
+        }
         if (!string.IsNullOrEmpty(searchResult?.TvdbId))
         {
             var extended = await FetchTvShowMetadataByIdAsync(searchResult.TvdbId, "tvdb", cancellationToken);
@@ -189,6 +237,7 @@ public class TvdbMetadataProvider : IMetadataProvider
             RuntimeMinutes = data.TryGetProperty("runtime", out var rt) && rt.ValueKind == JsonValueKind.Number ? rt.GetInt32() : null,
         };
 
+        ApplyRemoteIds(data, result);
         await ApplyTranslationAsync(tvdbIdToFetch, "movies", data, result, token);
 
         if (data.TryGetProperty("first_release", out var firstReleaseObj) && firstReleaseObj.ValueKind == JsonValueKind.Object)
@@ -309,6 +358,7 @@ public class TvdbMetadataProvider : IMetadataProvider
             Status = data.TryGetProperty("status", out var st) && st.ValueKind != JsonValueKind.Null && st.TryGetProperty("name", out var stn) && stn.ValueKind != JsonValueKind.Null ? stn.GetString() : null,
         };
 
+        ApplyRemoteIds(data, result);
         await ApplyTranslationAsync(tvdbIdToFetch, "series", data, result, token);
 
         if (data.TryGetProperty("contentRatings", out var crList) && crList.ValueKind == JsonValueKind.Array && crList.GetArrayLength() > 0)
@@ -508,8 +558,8 @@ public class TvdbMetadataProvider : IMetadataProvider
                                     Title = ep.TryGetProperty("name", out var t) && t.ValueKind != JsonValueKind.Null ? t.GetString() : null,
                                     Overview = ep.TryGetProperty("overview", out var ov) && ov.ValueKind != JsonValueKind.Null ? ov.GetString() : null,
                                     ReleaseDate = DateTime.TryParse(ep.TryGetProperty("aired", out var rd) && rd.ValueKind != JsonValueKind.Null ? rd.GetString() : "", out var dt) ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : null,
-                                    PosterUrl = ep.TryGetProperty("image", out var img) && img.ValueKind != JsonValueKind.Null ? img.GetString() : null,
-                                    BackgroundUrl = ep.TryGetProperty("image", out var bImg) && bImg.ValueKind != JsonValueKind.Null ? bImg.GetString() : null,
+                                    PosterUrl = PrefixArtwork(ep.TryGetProperty("image", out var img) && img.ValueKind != JsonValueKind.Null ? img.GetString() : null),
+                                    BackgroundUrl = PrefixArtwork(ep.TryGetProperty("image", out var bImg) && bImg.ValueKind != JsonValueKind.Null ? bImg.GetString() : null),
                                     RuntimeMinutes = ep.TryGetProperty("runtime", out var rt) && rt.ValueKind == JsonValueKind.Number ? rt.GetInt32() : null,
                                     Rating = ep.TryGetProperty("score", out var sc) && sc.ValueKind == JsonValueKind.Number ? (decimal)sc.GetDouble() : null
                                 };
