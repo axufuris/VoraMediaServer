@@ -103,6 +103,25 @@ public class TvdbMetadataProvider : IMetadataProvider
             : $"{TvdbArtworkBaseUrl}/{path}";
     }
 
+    // TVDB's extended series/movie carries the title's external ids in remoteIds
+    // (IMDB, TheMovieDB.com, …). Backfill them onto the result so a title-matched
+    // item gets its imdb/tmdb id saved — and a wrong folder imdb id (e.g. Only
+    // Murders' folder tag pointing at the wrong title) is corrected to TVDB's.
+    private static void ApplyRemoteIds(JsonElement data, MetadataResult result)
+    {
+        if (!data.TryGetProperty("remoteIds", out var rids) || rids.ValueKind != JsonValueKind.Array) return;
+        foreach (var rid in rids.EnumerateArray())
+        {
+            var source = rid.TryGetProperty("sourceName", out var s) ? s.GetString() : null;
+            var id = rid.TryGetProperty("id", out var i) && i.ValueKind == JsonValueKind.String ? i.GetString() : null;
+            if (string.IsNullOrWhiteSpace(id)) continue;
+            if (string.Equals(source, "IMDB", StringComparison.OrdinalIgnoreCase))
+                result.ImdbId = id;
+            else if (string.Equals(source, "TheMovieDB.com", StringComparison.OrdinalIgnoreCase))
+                result.TmdbId = id;
+        }
+    }
+
     public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
         var result = await ExecuteSearch(query, "movie", year);
@@ -218,6 +237,7 @@ public class TvdbMetadataProvider : IMetadataProvider
             RuntimeMinutes = data.TryGetProperty("runtime", out var rt) && rt.ValueKind == JsonValueKind.Number ? rt.GetInt32() : null,
         };
 
+        ApplyRemoteIds(data, result);
         await ApplyTranslationAsync(tvdbIdToFetch, "movies", data, result, token);
 
         if (data.TryGetProperty("first_release", out var firstReleaseObj) && firstReleaseObj.ValueKind == JsonValueKind.Object)
@@ -338,6 +358,7 @@ public class TvdbMetadataProvider : IMetadataProvider
             Status = data.TryGetProperty("status", out var st) && st.ValueKind != JsonValueKind.Null && st.TryGetProperty("name", out var stn) && stn.ValueKind != JsonValueKind.Null ? stn.GetString() : null,
         };
 
+        ApplyRemoteIds(data, result);
         await ApplyTranslationAsync(tvdbIdToFetch, "series", data, result, token);
 
         if (data.TryGetProperty("contentRatings", out var crList) && crList.ValueKind == JsonValueKind.Array && crList.GetArrayLength() > 0)
