@@ -19,7 +19,7 @@ public interface IMetadataManager
     Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false);
     Task TriggerLibraryArtworkRefreshAsync(Guid libraryId, bool forceOverride = false);
     Task TriggerMediaItemRatingsRefreshAsync(Guid mediaItemId, bool forceOverride = false);
-    Task RefreshMetadataAsync(Guid mediaItemId, bool forceOverride = false);
+    Task RefreshMetadataAsync(Guid mediaItemId, bool forceOverride = false, bool notify = true);
 }
 
 public class MetadataManager : IMetadataManager
@@ -210,13 +210,19 @@ public class MetadataManager : IMetadataManager
             {
                 try
                 {
-                    await RefreshMetadataAsync(epId, forceOverride);
+                    // Suppress the per-episode SignalR fan-out (episode + season +
+                    // show, ×N episodes re-notifies the same show/seasons over and
+                    // over). One notification for the show after the loop is enough
+                    // during a bulk scan; the episode counts refresh with it.
+                    await RefreshMetadataAsync(epId, forceOverride, notify: false);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Episode metadata refresh failed for {EpisodeId}.", epId);
                 }
             }
+
+            if (episodeIds.Count > 0) await _notifier.NotifyMediaItemUpdatedAsync(mediaItemId);
         }
     }
 
@@ -246,7 +252,7 @@ public class MetadataManager : IMetadataManager
         }
     }
 
-    public async Task RefreshMetadataAsync(Guid mediaItemId, bool forceOverride = false)
+    public async Task RefreshMetadataAsync(Guid mediaItemId, bool forceOverride = false, bool notify = true)
     {
         var item = await _repository.GetForMetadataSyncAsync(mediaItemId);
         if (item == null) return;
@@ -276,7 +282,7 @@ public class MetadataManager : IMetadataManager
             await _repository.UpdateMediaItemAsync(item);
         }
 
-        await NotifyItemAndParentsAsync(item);
+        if (notify) await NotifyItemAndParentsAsync(item);
     }
 
     private async Task RefreshArtworkAsync(Guid mediaItemId, bool forceOverride = false)

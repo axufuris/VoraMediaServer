@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Threading.Channels;
 using Vora.Application.Analysis;
 using Vora.Application.Artwork;
@@ -576,17 +577,22 @@ public class TaskQueueManager : ITaskQueueManager
             ? await libraryManager.DiscoverScanUnitsAsync(libraryId)
             : new List<ScanUnit>();
 
+        var workflowStopwatch = Stopwatch.StartNew();
+
         if (units.Count > 0 && libraryType.HasValue)
         {
             var total = units.Count;
             var done = 0;
             var parallelism = Math.Clamp(Environment.ProcessorCount, 2, 6);
+            var scanStopwatch = Stopwatch.StartNew();
+            var unitTimings = new ConcurrentBag<(string Label, double Seconds)>();
             await Parallel.ForEachAsync(
                 units,
                 new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = ct },
                 async (unit, unitCt) =>
                 {
                     progress.Report($"Scanning & loading {CleanUnitLabel(unit.Label)}…");
+                    var unitStopwatch = Stopwatch.StartNew();
                     try
                     {
                         var unitTask = libraryManager.ScanAndEnrichUnitAsync(libraryId, libraryType.Value, unit.FilePaths, forceOverride);
@@ -605,15 +611,28 @@ public class TaskQueueManager : ITaskQueueManager
                     catch (OperationCanceledException) { throw; }
                     catch { /* one failing show/movie shouldn't abort the whole library */ }
 
+                    unitStopwatch.Stop();
+                    unitTimings.Add((CleanUnitLabel(unit.Label), unitStopwatch.Elapsed.TotalSeconds));
+
                     var n = Interlocked.Increment(ref done);
                     progress.Report($"Scanning & loading {CleanUnitLabel(unit.Label)}… ({n}/{total})");
                 });
+
+            scanStopwatch.Stop();
+            var avg = unitTimings.IsEmpty ? 0 : unitTimings.Average(t => t.Seconds);
+            var slowest = unitTimings.OrderByDescending(t => t.Seconds).Take(5)
+                .Select(t => $"{t.Label} {t.Seconds:n1}s");
+            logger?.LogInformation(
+                "Scan+enrich for library {LibraryId}: {Units} units in {Wall:n1}s wall ({Parallelism}-way, avg {Avg:n1}s/unit). Slowest: {Slowest}",
+                libraryId, total, scanStopwatch.Elapsed.TotalSeconds, parallelism, avg, string.Join(", ", slowest));
         }
         else
         {
             // Music (or nothing discovered): whole-library scan then enrich.
+            var musicStopwatch = Stopwatch.StartNew();
             await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId);
             await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false);
+            logger?.LogInformation("Scan+enrich (whole-library) for {LibraryId} took {Wall:n1}s.", libraryId, musicStopwatch.Elapsed.TotalSeconds);
         }
 
         // The deferred passes are independent: overlays, actor metadata,
@@ -625,6 +644,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             ct.ThrowIfCancellationRequested();
             progress.Report(label);
+            var stepStopwatch = Stopwatch.StartNew();
             try
             {
                 await step();
@@ -633,6 +653,11 @@ public class TaskQueueManager : ITaskQueueManager
             catch (Exception ex)
             {
                 logger?.LogError(ex, "Library workflow step '{Step}' failed for {LibraryId}; continuing with the remaining steps.", label, libraryId);
+            }
+            finally
+            {
+                stepStopwatch.Stop();
+                logger?.LogInformation("Library workflow phase '{Step}' took {Wall:n1}s for {LibraryId}.", label.TrimEnd('…', '.', ' '), stepStopwatch.Elapsed.TotalSeconds, libraryId);
             }
         }
 
@@ -651,6 +676,8 @@ public class TaskQueueManager : ITaskQueueManager
 
         await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: isAdditionTrigger));
 
+        workflowStopwatch.Stop();
+        logger?.LogInformation("Full library workflow for {LibraryId} completed in {Wall:n1}s.", libraryId, workflowStopwatch.Elapsed.TotalSeconds);
         progress.Report(null);
     }
 
