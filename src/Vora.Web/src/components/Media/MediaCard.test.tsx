@@ -21,9 +21,10 @@ describe('MediaCard', () => {
         expect(img.src).toContain('/img/poster.jpg');
     });
 
-    it('renders "No Image" placeholder when no imageUrl', () => {
-        render(<MediaCard {...defaults} />);
-        expect(screen.getByText('No Image')).toBeInTheDocument();
+    it('renders the branded placeholder (no img element) when no imageUrl', () => {
+        const { container } = render(<MediaCard {...defaults} />);
+        // No <img> tag is rendered — the branded MediaPlaceholder (an svg) is shown instead.
+        expect(container.querySelector('img')).toBeNull();
     });
 
     it('renders a 4-image grid when multiPosters has at least 4 entries', () => {

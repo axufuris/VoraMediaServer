@@ -13,7 +13,14 @@ public class TvdbMetadataProvider : IMetadataProvider
     private readonly HttpClient _httpClient;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly Dictionary<string, Dictionary<string, MetadataResult>> _tvdbEpisodeCache = new();
+    private readonly Dictionary<string, SeasonPosterInfo> _seasonPosterCache = new();
     private string? _cachedLanguage;
+
+    private sealed class SeasonPosterInfo
+    {
+        public Dictionary<int, string> PosterByNumber { get; init; } = new();
+        public string? ShowPoster { get; init; }
+    }
 
     private readonly bool _fetchExtendedSeasonData = true;
 
@@ -347,6 +354,52 @@ public class TvdbMetadataProvider : IMetadataProvider
         }
 
         return result;
+    }
+
+    // Resolve a single season's poster from the parent series' extended data.
+    // Season rows created after the show's ProcessTvSeasons pass (folder-watcher
+    // new seasons, partial scans) never received a poster; the per-season refresh
+    // used to only stamp a timestamp. This gives that refresh a real poster —
+    // the configured-language season poster (type 7), falling back to the show
+    // poster so a season is never left blank. The per-instance cache means the
+    // series' extended is fetched once even when several sibling seasons refresh.
+    public async Task<MetadataResult?> FetchSeasonMetadataAsync(string showId, string source, int seasonNumber, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(showId) || !source.Equals("tvdb", StringComparison.OrdinalIgnoreCase)) return null;
+
+        var token = await GetValidTokenAsync();
+        if (string.IsNullOrEmpty(token)) return null;
+
+        if (!_seasonPosterCache.TryGetValue(showId, out var info))
+        {
+            info = await LoadSeasonPosterInfoAsync(showId, token);
+            _seasonPosterCache[showId] = info;
+        }
+
+        var poster = info.PosterByNumber.TryGetValue(seasonNumber, out var chosen) ? chosen : info.ShowPoster;
+        if (string.IsNullOrEmpty(poster)) return null;
+
+        return new MetadataResult { TvdbId = showId, PosterUrl = poster };
+    }
+
+    private async Task<SeasonPosterInfo> LoadSeasonPosterInfoAsync(string tvdbId, string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"series/{tvdbId}/extended");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode) return new SeasonPosterInfo();
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        if (!doc.RootElement.TryGetProperty("data", out var data)) return new SeasonPosterInfo();
+
+        var showPoster = data.TryGetProperty("image", out var im) && im.ValueKind == JsonValueKind.String ? im.GetString() : null;
+
+        var posters = data.TryGetProperty("seasons", out var seasons) && seasons.ValueKind == JsonValueKind.Array
+            ? BuildSeasonPosterMap(seasons, data, await GetLanguageAsync())
+            : new Dictionary<int, string>();
+
+        return new SeasonPosterInfo { PosterByNumber = posters, ShowPoster = showPoster };
     }
 
     public async Task<MetadataResult?> FetchTvShowMetadataByIdAsync(string id, string source, CancellationToken cancellationToken = default)
