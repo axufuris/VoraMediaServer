@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { thumbUrl } from '../../../utils/thumbnails';
+import MediaPlaceholder from './MediaPlaceholder';
 
 export type PosterVariant = 'standard' | 'xl' | 'actor';
 
@@ -34,6 +35,12 @@ export default function MediaPoster({ imageUrl, title, subtitle, badge, bottomLe
     const round = variant === 'actor';
     const widthStyle = fill ? '100%' : (width ?? DEFAULT_WIDTH_BY_VARIANT[variant]);
 
+    // Fall back to the branded placeholder if the image URL is broken (404/etc.),
+    // not just when it's absent. Reset when the URL changes (lists reuse the node).
+    const [failed, setFailed] = useState(false);
+    useEffect(() => { setFailed(false); }, [imageUrl]);
+    const showImage = !!imageUrl && !failed;
+
     const handleKeyDown = onClick
         ? (e: React.KeyboardEvent<HTMLDivElement>) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -63,22 +70,17 @@ export default function MediaPoster({ imageUrl, title, subtitle, badge, bottomLe
                     transition: 'transform var(--vora-duration-med, 240ms) var(--vora-ease-out)',
                 }}
             >
-                {imageUrl ? (
+                {showImage ? (
                     <img
-                        src={thumbUrl(imageUrl, 360)}
+                        src={thumbUrl(imageUrl!, 360)}
                         alt={title}
                         loading="lazy"
                         decoding="async"
+                        onError={() => setFailed(true)}
                         className="h-full w-full object-cover"
                     />
                 ) : (
-                    <div className="flex h-full w-full items-center justify-center" style={{ color: 'var(--vora-text-muted)' }}>
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                            <rect x="3" y="3" width="18" height="18" rx="2" />
-                            <circle cx="9" cy="9" r="2" />
-                            <path d="m21 15-5-5L5 21" />
-                        </svg>
-                    </div>
+                    <MediaPlaceholder title={title} variant={round ? 'actor' : 'poster'} />
                 )}
                 {badge && (
                     <div className="absolute right-2 top-2">
