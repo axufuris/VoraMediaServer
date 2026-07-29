@@ -544,6 +544,14 @@ public class TaskQueueManager : ITaskQueueManager
         var libraryManager = sp.GetRequiredService<ILibraryManager>();
         var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
         var progress = sp.GetRequiredService<ITaskProgressReporter>();
+        var logger = sp.GetService<ILogger<TaskQueueManager>>();
+
+        // No single show/movie may hold the whole library hostage. If a unit's
+        // enrich stalls (an unresponsive provider, a title that triggers a slow
+        // path), it's abandoned after this budget so the scan finishes and the
+        // deferred passes (overlays, analysis) still run. The abandoned task is
+        // left to finish in the background; its exceptions are observed/logged.
+        var unitTimeout = TimeSpan.FromMinutes(5);
 
         // The individual trigger methods don't yet take a token, so honour
         // cancellation between the (long) steps — a cancel stops the workflow
@@ -581,7 +589,18 @@ public class TaskQueueManager : ITaskQueueManager
                     progress.Report($"Scanning & loading {CleanUnitLabel(unit.Label)}…");
                     try
                     {
-                        await libraryManager.ScanAndEnrichUnitAsync(libraryId, libraryType.Value, unit.FilePaths, forceOverride);
+                        var unitTask = libraryManager.ScanAndEnrichUnitAsync(libraryId, libraryType.Value, unit.FilePaths, forceOverride);
+                        var finished = await Task.WhenAny(unitTask, Task.Delay(unitTimeout, unitCt));
+                        if (finished == unitTask)
+                        {
+                            await unitTask;
+                        }
+                        else
+                        {
+                            logger?.LogWarning("Scan unit '{Unit}' exceeded {Timeout} and was abandoned; continuing the library scan.", CleanUnitLabel(unit.Label), unitTimeout);
+                            _ = unitTask.ContinueWith(t => logger?.LogError(t.Exception, "Abandoned scan unit '{Unit}' later faulted.", CleanUnitLabel(unit.Label)),
+                                CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+                        }
                     }
                     catch (OperationCanceledException) { throw; }
                     catch { /* one failing show/movie shouldn't abort the whole library */ }
@@ -602,8 +621,6 @@ public class TaskQueueManager : ITaskQueueManager
         // try/catch so one failing pass can't starve the ones after it — a
         // library must never end up with, say, no analysis just because overlay
         // generation threw. Cancellation still stops the whole workflow.
-        var logger = sp.GetService<ILogger<TaskQueueManager>>();
-
         async Task RunStepAsync(string label, Func<Task> step)
         {
             ct.ThrowIfCancellationRequested();
