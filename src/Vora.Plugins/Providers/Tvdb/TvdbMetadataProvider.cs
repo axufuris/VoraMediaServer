@@ -107,6 +107,48 @@ public class TvdbMetadataProvider : IMetadataProvider
     // (IMDB, TheMovieDB.com, …). Backfill them onto the result so a title-matched
     // item gets its imdb/tmdb id saved — and a wrong folder imdb id (e.g. Only
     // Murders' folder tag pointing at the wrong title) is corrected to TVDB's.
+    // Best per-season-NUMBER poster from the series artworks (type 7), preferring
+    // the configured language, then a language-neutral one. Season-poster artworks
+    // are keyed to the "official" order season id, so resolve every season entry's
+    // id -> number first (the aired-order seasons we use share those numbers).
+    private static Dictionary<int, string> BuildSeasonPosterMap(JsonElement seasons, JsonElement data, string lang)
+    {
+        var result = new Dictionary<int, string>();
+        var idToNumber = new Dictionary<int, int>();
+        foreach (var s in seasons.EnumerateArray())
+        {
+            if (s.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.Number
+                && s.TryGetProperty("number", out var num) && num.ValueKind == JsonValueKind.Number)
+            {
+                idToNumber[id.GetInt32()] = num.GetInt32();
+            }
+        }
+
+        if (!data.TryGetProperty("artworks", out var arts) || arts.ValueKind != JsonValueKind.Array) return result;
+
+        var best = new Dictionary<int, (int Rank, double Score)>();
+        foreach (var a in arts.EnumerateArray())
+        {
+            if (!a.TryGetProperty("type", out var t) || t.ValueKind != JsonValueKind.Number || t.GetInt32() != 7) continue;
+            if (!a.TryGetProperty("seasonId", out var sid) || sid.ValueKind != JsonValueKind.Number) continue;
+            if (!idToNumber.TryGetValue(sid.GetInt32(), out var number)) continue;
+            var img = a.TryGetProperty("image", out var im) && im.ValueKind == JsonValueKind.String ? im.GetString() : null;
+            if (string.IsNullOrEmpty(img)) continue;
+
+            var aLang = a.TryGetProperty("language", out var l) && l.ValueKind == JsonValueKind.String ? l.GetString() : null;
+            var rank = string.Equals(aLang, lang, StringComparison.OrdinalIgnoreCase) ? 2 : (string.IsNullOrEmpty(aLang) ? 1 : 0);
+            if (rank == 0) continue; // skip posters in other languages
+
+            var score = a.TryGetProperty("score", out var sc) && sc.ValueKind == JsonValueKind.Number ? sc.GetDouble() : 0;
+            if (!best.TryGetValue(number, out var cur) || rank > cur.Rank || (rank == cur.Rank && score > cur.Score))
+            {
+                best[number] = (rank, score);
+                result[number] = PrefixArtwork(img)!;
+            }
+        }
+        return result;
+    }
+
     private static void ApplyRemoteIds(JsonElement data, MetadataResult result)
     {
         if (!data.TryGetProperty("remoteIds", out var rids) || rids.ValueKind != JsonValueKind.Array) return;
@@ -204,7 +246,10 @@ public class TvdbMetadataProvider : IMetadataProvider
 
             using var searchStream = await searchRes.Content.ReadAsStreamAsync();
             using var searchDoc = await JsonDocument.ParseAsync(searchStream);
-            if (!searchDoc.RootElement.TryGetProperty("data", out var dataArr) || dataArr.GetArrayLength() == 0) return null;
+            // remoteid returns {"status":"success","data":null} for an unknown id —
+            // "data" exists but is null, so GetArrayLength() would throw and abort
+            // the whole fetch (skipping the title-search fallback). Guard on Array.
+            if (!searchDoc.RootElement.TryGetProperty("data", out var dataArr) || dataArr.ValueKind != JsonValueKind.Array || dataArr.GetArrayLength() == 0) return null;
 
             if (!dataArr[0].TryGetProperty("movie", out var movieObj) || !movieObj.TryGetProperty("id", out var movieId)) return null;
             tvdbIdToFetch = movieId.ValueKind == JsonValueKind.Number ? movieId.GetInt32().ToString() : movieId.GetString() ?? "";
@@ -325,7 +370,10 @@ public class TvdbMetadataProvider : IMetadataProvider
 
             using var searchStream = await searchRes.Content.ReadAsStreamAsync();
             using var searchDoc = await JsonDocument.ParseAsync(searchStream);
-            if (!searchDoc.RootElement.TryGetProperty("data", out var dataArr) || dataArr.GetArrayLength() == 0) return null;
+            // remoteid returns {"status":"success","data":null} for an unknown id —
+            // "data" exists but is null, so GetArrayLength() would throw and abort
+            // the whole fetch (skipping the title-search fallback). Guard on Array.
+            if (!searchDoc.RootElement.TryGetProperty("data", out var dataArr) || dataArr.ValueKind != JsonValueKind.Array || dataArr.GetArrayLength() == 0) return null;
 
             if (!dataArr[0].TryGetProperty("series", out var seriesObj) || !seriesObj.TryGetProperty("id", out var seriesId)) return null;
             tvdbIdToFetch = seriesId.ValueKind == JsonValueKind.Number ? seriesId.GetInt32().ToString() : seriesId.GetString() ?? "";
@@ -419,6 +467,13 @@ public class TvdbMetadataProvider : IMetadataProvider
         if (data.TryGetProperty("seasons", out var seasons) && seasons.ValueKind == JsonValueKind.Array)
         {
             var seriesOriginalLang = data.TryGetProperty("originalLanguage", out var slo) && slo.ValueKind == JsonValueKind.String ? slo.GetString() : null;
+
+            // TVDB's per-season "image" is whatever it picked as default — often a
+            // foreign-language poster, or null. The series' artworks list carries
+            // proper per-language season posters (type 7). Prefer the configured
+            // language, then a language-neutral one, keyed by season number.
+            var seasonPosterByNumber = BuildSeasonPosterMap(seasons, data, await GetLanguageAsync());
+
             var seasonDataList = new List<(int Number, int Id, string Name, string? Poster)>();
             foreach (var season in seasons.EnumerateArray())
             {
@@ -428,7 +483,9 @@ public class TvdbMetadataProvider : IMetadataProvider
                 var sId = season.TryGetProperty("id", out var sid) && sid.ValueKind == JsonValueKind.Number ? sid.GetInt32() : 0;
                 var sNameRaw = season.TryGetProperty("name", out var sname) && sname.ValueKind != JsonValueKind.Null ? sname.GetString() : null;
                 var sName = string.IsNullOrEmpty(sNameRaw) ? $"Season {sNumber}" : sNameRaw;
-                var sPoster = season.TryGetProperty("image", out var simg) && simg.ValueKind != JsonValueKind.Null ? simg.GetString() : null;
+                var defaultPoster = PrefixArtwork(season.TryGetProperty("image", out var simg) && simg.ValueKind != JsonValueKind.Null ? simg.GetString() : null);
+                // Language-appropriate artwork → TVDB default → show poster.
+                var sPoster = seasonPosterByNumber.TryGetValue(sNumber, out var chosen) ? chosen : (defaultPoster ?? result.PosterUrl);
 
                 seasonDataList.Add((sNumber, sId, sName, sPoster));
             }
