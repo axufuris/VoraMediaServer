@@ -471,14 +471,14 @@ function FilterBar(props: FilterBarProps) {
 
 function LogRow({ entry, isExpanded, onToggleExpand }: { entry: LogEntryVM; isExpanded: boolean; onToggleExpand: () => void }) {
     const tone = levelTone(entry.level);
-    const clickable = entry.hasException;
+    // Every entry is expandable — click to see the full timestamp, category and
+    // message (and the stack trace when there is one), not just exception rows.
     return (
         <div className="border-b border-[var(--vora-border-subtle)]/50 hover:bg-[var(--vora-bg-sunken)]/50 transition-colors">
             <button
                 type="button"
-                onClick={clickable ? onToggleExpand : undefined}
-                disabled={!clickable}
-                className={`w-full text-left px-4 py-1.5 flex items-start gap-3 ${clickable ? 'cursor-pointer' : 'cursor-default'}`}
+                onClick={onToggleExpand}
+                className="w-full text-left px-4 py-1.5 flex items-start gap-3 cursor-pointer"
             >
                 <span className="text-[var(--vora-text-muted)] shrink-0 tabular-nums">
                     {timestampLabel(entry.timestampUtc)}
@@ -489,19 +489,26 @@ function LogRow({ entry, isExpanded, onToggleExpand }: { entry: LogEntryVM; isEx
                 <span className="shrink-0 text-[var(--vora-text-secondary)] max-w-[280px] truncate" title={entry.category}>
                     {entry.category}
                 </span>
-                <span className="flex-1 min-w-0 text-[var(--vora-text-primary)] whitespace-pre-wrap break-words">
+                <span className={`flex-1 min-w-0 text-[var(--vora-text-primary)] break-words ${isExpanded ? 'whitespace-pre-wrap' : 'truncate'}`}>
                     {entry.message}
                 </span>
-                {clickable && (
-                    <span className="shrink-0 text-[10px] text-[var(--vora-text-muted)]">
-                        {isExpanded ? '▾' : '▸'}
-                    </span>
-                )}
+                <span className="shrink-0 text-[10px] text-[var(--vora-text-muted)]">
+                    {isExpanded ? '▾' : '▸'}
+                </span>
             </button>
-            {clickable && isExpanded && entry.exception && (
-                <pre className="px-4 pb-3 pt-1 text-[11px] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)]/30 whitespace-pre-wrap break-words border-t border-[var(--vora-border-subtle)]/50">
-                    {entry.exception}
-                </pre>
+            {isExpanded && (
+                <div className="px-4 pb-3 pt-1 text-[11px] border-t border-[var(--vora-border-subtle)]/50 space-y-2">
+                    <div className="text-[var(--vora-text-secondary)]">
+                        <span className="tabular-nums">{new Date(entry.timestampUtc).toISOString()}</span>
+                        {' · '}<span>{entry.category}</span>
+                    </div>
+                    <pre className="text-[var(--vora-text-primary)] whitespace-pre-wrap break-words">{entry.message}</pre>
+                    {entry.exception && (
+                        <pre className="text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)]/30 whitespace-pre-wrap break-words p-2 rounded">
+                            {entry.exception}
+                        </pre>
+                    )}
+                </div>
             )}
         </div>
     );

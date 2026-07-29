@@ -288,6 +288,16 @@ public static class ServiceRegistrationExtensions
             };
         }
 
+        // The framework emits a "Request starting"/"Request finished" pair at
+        // Information for EVERY HTTP call — including the admin Logs page polling
+        // itself, which otherwise floods the buffer and bloats the file. Default
+        // these chatty framework categories to Warning; admins can still raise
+        // them at runtime from the Logs page.
+        foreach (var noisy in new[] { "Microsoft.AspNetCore", "Microsoft.Hosting.Lifetime", "System.Net.Http.HttpClient", "Microsoft.EntityFrameworkCore" })
+        {
+            levels.SetOverride(noisy, Vora.Application.Logging.VoraLogLevel.Warning);
+        }
+
         builder.Services.AddSingleton<Vora.Application.Logging.ILogBuffer>(buffer);
         builder.Services.AddSingleton(fileSink);
         builder.Services.AddSingleton(levels);
