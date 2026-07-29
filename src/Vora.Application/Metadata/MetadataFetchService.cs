@@ -164,7 +164,19 @@ public class MetadataFetchService : IMetadataFetchService
             return await provider.FetchTvShowMetadataAsync(CleanSearchTitle(tvShow.Title), tvShow.ReleaseDate?.Year);
         }
 
-        if (item is Season) return null;
+        if (item is Season season)
+        {
+            var show = season.TvShow;
+            if (show == null) return null;
+
+            if (provider.Id == "tvdb_metadata" && !string.IsNullOrEmpty(show.TvdbId))
+                return await provider.FetchSeasonMetadataAsync(show.TvdbId, "tvdb", season.SeasonNumber);
+
+            if (!string.IsNullOrEmpty(show.TmdbId))
+                return await provider.FetchSeasonMetadataAsync(show.TmdbId, "tmdb", season.SeasonNumber);
+
+            return null;
+        }
 
         if (item is Episode episode)
         {

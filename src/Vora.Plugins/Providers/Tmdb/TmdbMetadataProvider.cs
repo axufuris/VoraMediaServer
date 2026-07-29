@@ -466,6 +466,29 @@ public class TmdbMetadataProvider : IMetadataProvider
         return result;
     }
 
+    public async Task<MetadataResult?> FetchSeasonMetadataAsync(string showId, string source, int seasonNumber, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(showId) || !source.Equals("tmdb", StringComparison.OrdinalIgnoreCase)) return null;
+
+        var apiKey = await GetApiKeyAsync();
+        if (string.IsNullOrEmpty(apiKey)) return null;
+        var lang = await GetLanguageAsync();
+
+        var response = await _httpClient.GetAsync($"tv/{showId}/season/{seasonNumber}?api_key={apiKey}&language={lang}", cancellationToken);
+        if (!response.IsSuccessStatusCode) return null;
+
+        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        var el = doc.RootElement;
+
+        var poster = el.TryGetProperty("poster_path", out var p) && p.ValueKind == JsonValueKind.String && p.GetString() != null
+            ? $"https://image.tmdb.org/t/p/w500{p.GetString()}" : null;
+        var overview = el.TryGetProperty("overview", out var o) && o.ValueKind == JsonValueKind.String ? o.GetString() : null;
+        if (string.IsNullOrEmpty(poster) && string.IsNullOrEmpty(overview)) return null;
+
+        return new MetadataResult { TmdbId = showId, PosterUrl = poster, Overview = string.IsNullOrEmpty(overview) ? null : overview };
+    }
+
     public async Task<MetadataResult?> FetchEpisodeMetadataAsync(string showTmdbId, int seasonNumber, int episodeNumber, CancellationToken cancellationToken = default)
     {
         await Task.Delay(250);

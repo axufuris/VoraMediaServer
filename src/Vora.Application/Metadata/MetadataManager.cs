@@ -257,7 +257,12 @@ public class MetadataManager : IMetadataManager
         var item = await _repository.GetForMetadataSyncAsync(mediaItemId);
         if (item == null) return;
 
-        if (!forceOverride && item.LastMetadataRefresh.HasValue) return;
+        // A season whose poster never resolved (its rows were created after the
+        // show's ProcessTvSeasons pass, so the poster map had nothing to write to)
+        // must be allowed back in even though it carries a refresh timestamp — the
+        // season branch below now resolves the poster from the parent series.
+        var seasonNeedsPoster = item is Season && string.IsNullOrEmpty(item.PosterUrl);
+        if (!forceOverride && item.LastMetadataRefresh.HasValue && !seasonNeedsPoster) return;
 
         var textFetch = await _fetchService.GetTextMetadataAsync(item);
 

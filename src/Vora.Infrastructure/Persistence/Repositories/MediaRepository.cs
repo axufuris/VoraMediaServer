@@ -260,6 +260,7 @@ public partial class MediaRepository : IMediaRepository
             .Include(m => m.Videos)
             .Include(m => ((TvShow)m).Networks)
             .Include(m => ((TvShow)m).Seasons)
+            .Include(m => ((Season)m).TvShow)
             .Include(m => ((Episode)m).Season).ThenInclude(s => s.TvShow).ThenInclude(t => t.Cast).ThenInclude(c => c.Actor)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id);
@@ -288,6 +289,8 @@ public partial class MediaRepository : IMediaRepository
                       m.PosterUrl == null ||
                       m.BackgroundUrl == null ||
                       m.ReleaseDate == null))
+                    ||
+                    (m is Season && m.PosterUrl == null)
                 ))
             .OrderBy(m => m is TvShow ? 0 : m is Movie ? 0 : m is Season ? 1 : 2)
             .Select(m => m.Id)
