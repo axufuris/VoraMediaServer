@@ -591,7 +591,12 @@ public class TaskQueueManager : ITaskQueueManager
                 new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = ct },
                 async (unit, unitCt) =>
                 {
-                    progress.Report($"Scanning & loading {CleanUnitLabel(unit.Label)}…");
+                    // Always include the completed count. With several units in
+                    // flight the label shows whichever reported last, so a bare
+                    // "Scanning & loading X…" (no count) can linger after X is done
+                    // and read as stuck. The "(done/total)" makes progress visible
+                    // even when the name lags the actual work.
+                    progress.Report($"Scanning & loading {CleanUnitLabel(unit.Label)}… ({Volatile.Read(ref done)}/{total})");
                     var unitStopwatch = Stopwatch.StartNew();
                     try
                     {
