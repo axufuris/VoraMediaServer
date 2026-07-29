@@ -26,11 +26,6 @@ public class MetadataManager : IMetadataManager
 {
     private const int ActorBatchSize = 50;
     private const int NotificationBatchSize = 10;
-    // Episodes of one show enrich this many at a time. Kept modest because the
-    // show units themselves already run in parallel, so the effective ceiling is
-    // (units × this); a small value overlaps episode fetches without hammering
-    // the metadata providers or the DB connection pool.
-    private const int EpisodeEnrichmentConcurrency = 4;
 
     private readonly IMediaRepository _repository;
     private readonly IActorRepository _actorRepository;
@@ -205,30 +200,22 @@ public class MetadataManager : IMetadataManager
                 }
             }
             var episodeIds = await _repository.GetEpisodeIdsForShowAsync(mediaItemId);
-            if (episodeIds.Count > 0)
+            // Enrich episodes on THIS scope so they share the provider's per-show
+            // episode-list cache: the bulk episode list is fetched once and every
+            // episode reads from it. (Enriching each episode in its own scope threw
+            // that cache away and re-fetched the whole list per episode — a ~Nx
+            // request storm that saturated the provider and stalled the scan.) A
+            // failing episode is isolated so it can't abort the rest of the show.
+            foreach (var epId in episodeIds)
             {
-                // Enrich episodes in parallel: on a first scan a show can have
-                // hundreds of episodes, and one-at-a-time network fetches make a
-                // single episode-heavy show gate the whole library scan. Each
-                // episode runs in its own scope (own DbContext, thread-safe); the
-                // shared-row writes stay serialized by ReferenceWriteGate, and a
-                // failing episode is isolated so it can't abort the rest.
-                await Parallel.ForEachAsync(
-                    episodeIds,
-                    new ParallelOptions { MaxDegreeOfParallelism = EpisodeEnrichmentConcurrency },
-                    async (epId, _) =>
-                    {
-                        try
-                        {
-                            using var scope = _scopeFactory.CreateScope();
-                            var scopedManager = scope.ServiceProvider.GetRequiredService<IMetadataManager>();
-                            await scopedManager.RefreshMetadataAsync(epId, forceOverride);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Episode metadata refresh failed for {EpisodeId}.", epId);
-                        }
-                    });
+                try
+                {
+                    await RefreshMetadataAsync(epId, forceOverride);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Episode metadata refresh failed for {EpisodeId}.", epId);
+                }
             }
         }
     }

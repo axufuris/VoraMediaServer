@@ -75,6 +75,14 @@ public class MetadataFetchService : IMetadataFetchService
         return await FetchRatingsDataAsync(item, cancellationToken);
     }
 
+    // Folder-name id tags (e.g. " [imdb-tt123]", or a malformed empty " [imdb-]")
+    // pollute a title search and can stop a show from matching at all. Strip them
+    // before falling back to a title lookup.
+    private static string CleanSearchTitle(string title) =>
+        System.Text.RegularExpressions.Regex.Replace(
+            title, @"\s*\[(?:imdb|tmdb|tvdb)-[^\]]*\]", string.Empty,
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+
     private async Task<MetadataResult?> FetchMetadataForItemAsync(MediaItem item, IMetadataProvider provider)
     {
         if (provider.Id == "local_metadata")
@@ -118,7 +126,7 @@ public class MetadataFetchService : IMetadataFetchService
                 if (res != null) return res;
             }
 
-            return await provider.FetchMovieMetadataAsync(movie.Title, movie.ReleaseDate?.Year);
+            return await provider.FetchMovieMetadataAsync(CleanSearchTitle(movie.Title), movie.ReleaseDate?.Year);
         }
 
         if (item is TvShow tvShow)
@@ -147,7 +155,7 @@ public class MetadataFetchService : IMetadataFetchService
                 if (res != null) return res;
             }
 
-            return await provider.FetchTvShowMetadataAsync(tvShow.Title, tvShow.ReleaseDate?.Year);
+            return await provider.FetchTvShowMetadataAsync(CleanSearchTitle(tvShow.Title), tvShow.ReleaseDate?.Year);
         }
 
         if (item is Season) return null;
