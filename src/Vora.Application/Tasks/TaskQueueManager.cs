@@ -666,15 +666,22 @@ public class TaskQueueManager : ITaskQueueManager
         // units already handled isn't re-run).
         await RunStepAsync("Fetching details…", () => metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false));
 
-        await RunStepAsync("Generating poster overlays…", () => overlayManager.RunLibraryOverlaySyncAsync(libraryId));
-
         await RunStepAsync("Refreshing actor metadata…", () => metadataManager.TriggerActorMetadataRefreshAsync());
 
-        // Analysis + marker detection are heavy FFmpeg passes that don't affect
-        // posters, so they run last — after the library is visually populated.
+        // Analysis populates each part's audio/video tracks (codec, HDR). The
+        // overlay badges read that data, so analysis MUST run before overlays —
+        // otherwise the audio-codec / HDR badges have nothing to draw and the
+        // poster is overlaid with only the scan-time data (resolution). Marker
+        // detection runs here too so the stinger badge is available.
         await RunStepAsync("Analyzing media…", () => analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName));
 
         await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: isAdditionTrigger));
+
+        // Overlays LAST: now the posters get every badge — resolution (scan),
+        // content rating (enrich), audio/video codec + HDR (analysis), and
+        // stinger (markers). Running this before analysis is what left movies
+        // with no audio-codec badge.
+        await RunStepAsync("Generating poster overlays…", () => overlayManager.RunLibraryOverlaySyncAsync(libraryId));
 
         workflowStopwatch.Stop();
         logger?.LogInformation("Full library workflow for {LibraryId} completed in {Wall:n1}s.", libraryId, workflowStopwatch.Elapsed.TotalSeconds);

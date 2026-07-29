@@ -90,7 +90,15 @@ public class TvdbMetadataProvider : IMetadataProvider
 
     public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
-        return await ExecuteSearch(query, "movie", year);
+        var result = await ExecuteSearch(query, "movie", year);
+        // TVDB's year filter is exact, but a local folder's year is often off by
+        // one (release vs. air year, or just wrong) — so a year-filtered miss
+        // retries without the year rather than leaving the title unmatched.
+        if (result == null && year.HasValue)
+        {
+            result = await ExecuteSearch(query, "movie", null);
+        }
+        return result;
     }
 
     public async Task<MetadataResult?> FetchTvShowMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
@@ -100,6 +108,12 @@ public class TvdbMetadataProvider : IMetadataProvider
         // images) so title-matched shows get season posters too — not just shows
         // matched by external id.
         var searchResult = await ExecuteSearch(query, "series", year);
+        // Exact-year miss → retry without the year (folder years are frequently
+        // off by one, which otherwise leaves the show completely unmatched).
+        if (string.IsNullOrEmpty(searchResult?.TvdbId) && year.HasValue)
+        {
+            searchResult = await ExecuteSearch(query, "series", null);
+        }
         if (!string.IsNullOrEmpty(searchResult?.TvdbId))
         {
             var extended = await FetchTvShowMetadataByIdAsync(searchResult.TvdbId, "tvdb", cancellationToken);

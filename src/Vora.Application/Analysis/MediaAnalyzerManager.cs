@@ -150,6 +150,21 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
 
         var mediaIds = (await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId)).ToList();
+        if (mediaIds.Count == 0) return;
+
+        // Both marker toggles off → there's nothing to detect. Bail before the
+        // per-item loop so the task doesn't iterate the whole library (and show
+        // "Detecting intro/credit markers …") when the library has detection
+        // disabled. The per-item path also checks these flags, but only after
+        // loading each item — this skips the work and the misleading progress.
+        var markerFlags = await _mediaRepository.GetProjectedAsync(mediaIds[0],
+            m => new { m.Library.EnableIntroDetection, m.Library.EnableCreditsDetection });
+        if (markerFlags != null && !markerFlags.EnableIntroDetection && !markerFlags.EnableCreditsDetection)
+        {
+            _logger.LogInformation("Skipping intro/credit marker detection for library {LibraryId}: both toggles are disabled.", libraryId);
+            return;
+        }
+
         var titles = await _mediaRepository.GetDisplayTitlesByIdsAsync(mediaIds);
         var total = mediaIds.Count;
         var count = 0;
