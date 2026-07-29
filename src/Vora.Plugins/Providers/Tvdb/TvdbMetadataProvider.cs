@@ -467,10 +467,13 @@ public class TvdbMetadataProvider : IMetadataProvider
 
     public async Task<MetadataResult?> FetchEpisodeMetadataAsync(string showTmdbId, int seasonNumber, int episodeNumber, CancellationToken cancellationToken = default)
     {
-        await Task.Delay(250);
-
         if (!_tvdbEpisodeCache.TryGetValue(showTmdbId, out var showEpisodes))
         {
+            // Only pace the actual network fetch — every episode of a show hits
+            // this method, but the list is fetched once and the rest are cache
+            // hits, so delaying on a hit needlessly slowed episode enrichment.
+            await Task.Delay(250);
+
             showEpisodes = new Dictionary<string, MetadataResult>();
             var token = await GetValidTokenAsync();
             var lang = await GetLanguageAsync();
