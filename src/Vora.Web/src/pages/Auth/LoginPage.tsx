@@ -27,6 +27,19 @@ export default function LoginPage() {
     const [reachable, setReachable] = useState<boolean | null>(null);
     const [emailEnabled, setEmailEnabled] = useState(false);
 
+    // Already signed in? Don't show the login form — send them where
+    // RequireAuth would: home if a profile is active, else profile selection.
+    // (If the token turns out stale, the API 401 handler bounces back here.)
+    useEffect(() => {
+        const accountToken = localStorage.getItem(StorageKeys.accountToken);
+        const profileToken = localStorage.getItem(StorageKeys.profileToken);
+        if (accountToken && profileToken) {
+            navigate('/', { replace: true });
+        } else if (accountToken) {
+            navigate('/profiles', { replace: true });
+        }
+    }, [navigate]);
+
     useEffect(() => {
         const probe = async () => {
             try {
