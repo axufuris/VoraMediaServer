@@ -72,7 +72,11 @@ public class TaskQueueManager : ITaskQueueManager
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _taskTokens = new();
     private readonly ConcurrentDictionary<Guid, QueuedTaskDto> _taskStates = new();
 
-    private Guid? _runningTaskId;
+    // The task whose work is running on THIS async flow. AsyncLocal (not a
+    // single field) because the scheduler runs several tasks concurrently — a
+    // shared _runningTaskId let one task's progress overwrite another's and, once
+    // the other finished and nulled it, froze the survivor's label entirely.
+    private static readonly AsyncLocal<Guid?> _currentTaskId = new();
     private DateTime _lastProgressNotifyUtc = DateTime.MinValue;
 
     public TaskQueueManager(IClientNotifier notifier)
@@ -411,14 +415,17 @@ public class TaskQueueManager : ITaskQueueManager
         if (_taskStates.TryGetValue(taskId, out var state))
         {
             state.Status = RunningStatus;
-            _runningTaskId = taskId;
+            // Runs on the worker's per-task async flow (right before awaiting the
+            // work item), so this pins progress reporting to THIS task for the
+            // duration of its work — even while other tasks run concurrently.
+            _currentTaskId.Value = taskId;
             _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
         }
     }
 
     public void ReportProgress(string? detail)
     {
-        var taskId = _runningTaskId;
+        var taskId = _currentTaskId.Value;
         if (taskId == null || !_taskStates.TryGetValue(taskId.Value, out var state)) return;
         if (state.Progress == detail) return;
 
@@ -458,7 +465,8 @@ public class TaskQueueManager : ITaskQueueManager
 
     public void RemoveTask(Guid taskId)
     {
-        if (_runningTaskId == taskId) _runningTaskId = null;
+        // No _runningTaskId to clear — _currentTaskId is AsyncLocal and lives only
+        // on the finished task's own async flow, so it goes away with it.
         if (_taskTokens.TryRemove(taskId, out var cts)) cts.Dispose();
         if (_taskStates.TryRemove(taskId, out _))
         {

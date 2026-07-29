@@ -125,13 +125,31 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var episodeFiles = filePaths.Where(f => !existing.Contains(f) && !IsExtraFile(f));
         foreach (var filePath in episodeFiles)
         {
-            var result = await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
-            if (result.ParentShowId.HasValue) showId ??= result.ParentShowId;
+            try
+            {
+                // Isolate per-file: a single file that fails to ingest must not
+                // abort the rest of the show (which left the show created but with
+                // no episodes — an orphan) and must be logged with its path so the
+                // failure is diagnosable instead of silently swallowed upstream.
+                var result = await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
+                if (result.ParentShowId.HasValue) showId ??= result.ParentShowId;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to ingest TV episode file {FilePath}", filePath);
+            }
         }
 
         foreach (var extraPath in filePaths.Where(f => !existing.Contains(f) && IsExtraFile(f)))
         {
-            await IngestTvExtraAsync(library, extraPath, showFolderRegex);
+            try
+            {
+                await IngestTvExtraAsync(library, extraPath, showFolderRegex);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to ingest TV extra file {FilePath}", extraPath);
+            }
         }
         return showId;
     }
