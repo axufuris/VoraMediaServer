@@ -14,6 +14,7 @@ public interface IPosterOverlayManager
     Task<bool> RunLibraryOverlaySyncAsync(Guid libraryId, CancellationToken cancellationToken = default);
     Task<bool> GenerateOverlaysForMediaAsync(Guid mediaItemId, CancellationToken cancellationToken = default);
     Task<bool> HasPendingOverlayWorkAsync(Guid libraryId, CancellationToken cancellationToken = default);
+    Task<int> SweepOrphanedOverlayFilesAsync(CancellationToken cancellationToken = default);
 }
 
 public class PosterOverlayManager : IPosterOverlayManager
@@ -68,6 +69,42 @@ public class PosterOverlayManager : IPosterOverlayManager
         return await _mediaRepo.AnyItemHasOverlayAppliedAsync(libraryId);
     }
 
+    public async Task<int> SweepOrphanedOverlayFilesAsync(CancellationToken cancellationToken = default)
+    {
+        if (!Directory.Exists(_overlayDirectory)) return 0;
+
+        var referenced = await _mediaRepo.GetReferencedOverlayFileNamesAsync();
+
+        var deleted = 0;
+        foreach (var path in Directory.EnumerateFiles(_overlayDirectory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var fileName = System.IO.Path.GetFileName(path);
+            if (!fileName.Contains("_overlay_", StringComparison.Ordinal)) continue;
+            if (referenced.Contains(fileName)) continue;
+
+            _thumbnails.RemoveThumbnailsForSource($"/api/artwork/custom/{fileName}");
+
+            try
+            {
+                File.Delete(path);
+                deleted++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete orphaned overlay file at {Path}.", path);
+            }
+        }
+
+        if (deleted > 0)
+        {
+            _logger.LogInformation("Swept {Count} orphaned poster-overlay file(s) from {Directory}.", deleted, _overlayDirectory);
+        }
+
+        return deleted;
+    }
+
     public async Task<bool> RunLibraryOverlaySyncAsync(Guid libraryId, CancellationToken cancellationToken = default)
     {
         var templates = await _templateRepo.GetTemplatesForLibraryAsync(libraryId);
@@ -82,7 +119,11 @@ public class PosterOverlayManager : IPosterOverlayManager
             var itemsToRevert = await _mediaRepo.GetItemsPendingOverlayGenerationAsync(libraryId, DateTime.UtcNow);
             foreach (var item in itemsToRevert.Where(m => !string.IsNullOrEmpty(m.OriginalPosterUrl)))
             {
+                CleanupOldOverlay(item.PosterUrl, item.OriginalPosterUrl);
                 item.PosterUrl = item.OriginalPosterUrl;
+
+                if (item is Episode) item.BackgroundUrl = item.OriginalPosterUrl;
+
                 item.LastOverlayGeneratedAt = null;
                 await _mediaRepo.UpdateMediaItemAsync(item);
             }

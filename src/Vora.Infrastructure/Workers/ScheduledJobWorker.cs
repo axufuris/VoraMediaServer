@@ -115,6 +115,8 @@ public class ScheduledJobWorker : BackgroundService
 
             await metadataManager.TriggerActorMetadataRefreshAsync();
 
+            taskQueue.QueueOverlayOrphanSweep();
+
             _lastNightlyScanDate = today;
         }
 
