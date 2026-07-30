@@ -21,6 +21,12 @@ public class OverlayTemplateRepository : IOverlayTemplateRepository
             .ToListAsync();
     }
 
+    public async Task<bool> AnyTemplateExistsForLibraryAsync(Guid libraryId)
+    {
+        return await _context.OverlayTemplates
+            .AnyAsync(t => t.TargetLibraryId == null || t.TargetLibraryId == Guid.Empty || t.TargetLibraryId == libraryId);
+    }
+
     public async Task<OverlayTemplate?> GetTemplateByIdAsync(Guid id)
     {
         return await _context.OverlayTemplates

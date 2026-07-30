@@ -917,6 +917,20 @@ public partial class MediaRepository : IMediaRepository
             .ToListAsync();
     }
 
+    public async Task<bool> AnyItemHasOverlayAppliedAsync(Guid libraryId)
+    {
+        var query = _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.LastOverlayGeneratedAt != null);
+
+        if (libraryId != Guid.Empty)
+        {
+            query = query.Where(m => m.LibraryId == libraryId);
+        }
+
+        return await query.AnyAsync();
+    }
+
     public async Task<string?> GetParentContentRatingAsync(Guid mediaItemId)
     {
         var item = await _context.MediaItems.FindAsync(mediaItemId);
