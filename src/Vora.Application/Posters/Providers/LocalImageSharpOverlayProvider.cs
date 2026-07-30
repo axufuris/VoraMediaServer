@@ -6,7 +6,7 @@ using SixLabors.Fonts;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Drawing;
 using SixLabors.ImageSharp.Drawing.Processing;
-using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using Vora.Application.Posters.Dtos;
@@ -29,7 +29,8 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
     private const float CompositeLogoTopPct = 0.10f;
     private const float CompositeTextYPct = 0.75f;
     private const int CompositeMaxItems = 3;
-    private const int MinPosterWidthPx = 1500;
+    private const int MaxCanvasWidthPx = 1280;
+    private const int OverlayJpegQuality = 90;
 
     private static readonly JsonSerializerOptions ConfigurationParseOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -60,7 +61,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         }
 
         var cacheKey = ComputeOverlayCacheKey(item, originalArtworkPath, templateJson);
-        var outputFileName = $"{item.Id}_overlay_{cacheKey}.png";
+        var outputFileName = $"{item.Id}_overlay_{cacheKey}.jpg";
         var outputPath = System.IO.Path.Combine(outputDirectory, outputFileName);
 
         if (File.Exists(outputPath))
@@ -70,14 +71,13 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
 
         using var baseImage = await Image.LoadAsync<Rgba32>(originalArtworkPath, cancellationToken);
 
-        if (baseImage.Width < MinPosterWidthPx)
+        if (baseImage.Width > MaxCanvasWidthPx)
         {
-            var scale = (double)MinPosterWidthPx / baseImage.Width;
-            var newWidth = MinPosterWidthPx;
+            var scale = (double)MaxCanvasWidthPx / baseImage.Width;
             var newHeight = (int)Math.Round(baseImage.Height * scale);
             baseImage.Mutate(x => x.Resize(new ResizeOptions
             {
-                Size = new Size(newWidth, newHeight),
+                Size = new Size(MaxCanvasWidthPx, newHeight),
                 Mode = ResizeMode.Stretch,
                 Sampler = KnownResamplers.Lanczos3
             }));
@@ -101,18 +101,13 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
             await DrawBadgeElementAsync(baseImage, item, element, basePath, cancellationToken);
         }
 
-        var encoder = new PngEncoder
-        {
-            CompressionLevel = PngCompressionLevel.DefaultCompression,
-            ColorType = PngColorType.Rgb,
-            BitDepth = PngBitDepth.Bit8
-        };
+        var encoder = new JpegEncoder { Quality = OverlayJpegQuality };
 
-        await baseImage.SaveAsPngAsync(outputPath, encoder, cancellationToken);
+        await baseImage.SaveAsJpegAsync(outputPath, encoder, cancellationToken);
         return $"{CustomArtworkUrlPrefix}{outputFileName}";
     }
 
-    private const string CacheKeyVersion = "v3-hires-canvas";
+    private const string CacheKeyVersion = "v4-jpeg-canvas";
 
     private static string ComputeOverlayCacheKey(OverlayMediaDto item, string originalArtworkPath, string templateJson)
     {

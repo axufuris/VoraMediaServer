@@ -931,6 +931,33 @@ public partial class MediaRepository : IMediaRepository
         return await query.AnyAsync();
     }
 
+    public async Task<HashSet<string>> GetReferencedOverlayFileNamesAsync()
+    {
+        const string overlayMarker = "_overlay_";
+
+        var urls = await _context.MediaItems
+            .AsNoTracking()
+            .Where(m =>
+                (m.PosterUrl != null && m.PosterUrl.Contains(overlayMarker)) ||
+                (m.BackgroundUrl != null && m.BackgroundUrl.Contains(overlayMarker)))
+            .Select(m => new { m.PosterUrl, m.BackgroundUrl })
+            .ToListAsync();
+
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in urls)
+        {
+            AddOverlayFileName(names, pair.PosterUrl);
+            AddOverlayFileName(names, pair.BackgroundUrl);
+        }
+        return names;
+    }
+
+    private static void AddOverlayFileName(HashSet<string> names, string? url)
+    {
+        if (string.IsNullOrEmpty(url) || !url.Contains("_overlay_", StringComparison.Ordinal)) return;
+        names.Add(url.Split('/').Last());
+    }
+
     public async Task<string?> GetParentContentRatingAsync(Guid mediaItemId)
     {
         var item = await _context.MediaItems.FindAsync(mediaItemId);

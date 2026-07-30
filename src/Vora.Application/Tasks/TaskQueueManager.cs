@@ -56,6 +56,7 @@ public interface ITaskQueueManager
     IEnumerable<QueuedTaskVM> GetAllTasks();
     void QueueGenerateAiEmbeddings();
     void QueueGenerateLibraryPosterOverlays(Guid libraryId, string? libraryName = null);
+    void QueueOverlayOrphanSweep();
     void QueueIptvEpgSync();
     void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false);
     void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
@@ -513,6 +514,15 @@ public class TaskQueueManager : ITaskQueueManager
             var manager = sp.GetRequiredService<IPosterOverlayManager>();
             await manager.RunLibraryOverlaySyncAsync(libraryId, ct);
         }, LibraryLabel(libraryId, "Generate Library Poster Overlays: {0}"));
+    }
+
+    public void QueueOverlayOrphanSweep()
+    {
+        EnqueueTask("Sweep Orphaned Poster Overlays", async (ct, sp) =>
+        {
+            var manager = sp.GetRequiredService<IPosterOverlayManager>();
+            await manager.SweepOrphanedOverlayFilesAsync(ct);
+        });
     }
 
     public void QueueIptvEpgSync()
