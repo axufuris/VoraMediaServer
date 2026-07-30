@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text.Json;
@@ -28,6 +29,8 @@ public class OmdbImdbRatingsProvider : IRatingsProvider
     public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public string RatingSourceName => "Internet Movie Database";
+
+    public bool IsCurrentlyAvailable => !OmdbCircuitBreaker.IsBlocked;
 
     public OmdbImdbRatingsProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory)
     {
@@ -75,6 +78,8 @@ public class OmdbRottenTomatoesRatingsProvider : IRatingsProvider
 
     public string RatingSourceName => "Rotten Tomatoes";
 
+    public bool IsCurrentlyAvailable => !OmdbCircuitBreaker.IsBlocked;
+
     public OmdbRottenTomatoesRatingsProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory)
     {
         _httpClient = httpClient;
@@ -111,6 +116,8 @@ public class OmdbMetacriticRatingsProvider : IRatingsProvider
     public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
     public string RatingSourceName => "Metacritic";
+
+    public bool IsCurrentlyAvailable => !OmdbCircuitBreaker.IsBlocked;
 
     public OmdbMetacriticRatingsProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory)
     {
@@ -216,6 +223,8 @@ internal static class OmdbFetcher
             if (root.TryGetProperty("Error", out var err) && err.GetString() == "Request limit reached!")
             {
                 OmdbCircuitBreaker.BlockedUntil = DateTime.UtcNow.AddDays(1);
+                scope.ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("Omdb")
+                    .LogWarning("OMDb daily request limit reached; rating lookups are paused until {BlockedUntil:u}. Existing ratings are preserved. Use a higher-quota OMDb API key or wait for the quota to reset to fill the rest.", OmdbCircuitBreaker.BlockedUntil);
             }
             return null;
         }
