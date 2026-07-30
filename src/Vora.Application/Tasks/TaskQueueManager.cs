@@ -513,7 +513,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<IPosterOverlayManager>();
             await manager.RunLibraryOverlaySyncAsync(libraryId, ct);
-        }, LibraryLabel(libraryId, "Generate Library Poster Overlays: {0}"));
+        }, LibraryLabel(libraryId, "Generate Library Poster Overlays: {0}"), resourceKey: OverlaySyncKey);
     }
 
     public void QueueOverlayOrphanSweep()
@@ -522,7 +522,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<IPosterOverlayManager>();
             await manager.SweepOrphanedOverlayFilesAsync(ct);
-        });
+        }, resourceKey: OverlaySyncKey);
     }
 
     public void QueueIptvEpgSync()
@@ -721,6 +721,14 @@ public class TaskQueueManager : ITaskQueueManager
     // and race on its rows); different libraries get different keys and can run
     // concurrently up to the global cap.
     private static string LibraryKey(Guid libraryId) => $"library:{libraryId}";
+
+    // Every poster-overlay sync and the orphan sweep share ONE key so they
+    // serialize server-wide. The frontend "update now" fires a global (all
+    // libraries) sync; without this, clicking it repeatedly — or a nightly
+    // per-library sync overlapping a global one — runs several syncs at once,
+    // and they race writing the same MediaItem rows in parallel DbContexts.
+    // The sweep shares the key too so it never deletes a file mid-generation.
+    private const string OverlaySyncKey = "poster-overlay-sync";
 
     private static string CleanUnitLabel(string label)
     {
