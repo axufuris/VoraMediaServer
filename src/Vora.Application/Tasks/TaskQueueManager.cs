@@ -688,8 +688,15 @@ public class TaskQueueManager : ITaskQueueManager
         // Overlays LAST: now the posters get every badge — resolution (scan),
         // content rating (enrich), audio/video codec + HDR (analysis), and
         // stinger (markers). Running this before analysis is what left movies
-        // with no audio-codec badge.
-        await RunStepAsync("Generating poster overlays…", () => overlayManager.RunLibraryOverlaySyncAsync(libraryId));
+        // with no audio-codec badge. Skipped entirely when no template is
+        // configured and nothing was ever overlaid — otherwise the step (and its
+        // progress label) would show on every scan even for users who never
+        // touched poster overlays. When a template was deleted, previously
+        // overlaid items still resolve as pending so their posters revert.
+        if (await overlayManager.HasPendingOverlayWorkAsync(libraryId, ct))
+        {
+            await RunStepAsync("Generating poster overlays…", () => overlayManager.RunLibraryOverlaySyncAsync(libraryId));
+        }
 
         workflowStopwatch.Stop();
         logger?.LogInformation("Full library workflow for {LibraryId} completed in {Wall:n1}s.", libraryId, workflowStopwatch.Elapsed.TotalSeconds);

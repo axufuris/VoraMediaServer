@@ -13,6 +13,7 @@ public interface IPosterOverlayManager
 {
     Task<bool> RunLibraryOverlaySyncAsync(Guid libraryId, CancellationToken cancellationToken = default);
     Task<bool> GenerateOverlaysForMediaAsync(Guid mediaItemId, CancellationToken cancellationToken = default);
+    Task<bool> HasPendingOverlayWorkAsync(Guid libraryId, CancellationToken cancellationToken = default);
 }
 
 public class PosterOverlayManager : IPosterOverlayManager
@@ -58,6 +59,13 @@ public class PosterOverlayManager : IPosterOverlayManager
             ? originalCachePath
             : Path.Combine(AppContext.BaseDirectory, "Storage", "OriginalArtworkCache");
         if (!Directory.Exists(_originalArtworkCacheDir)) Directory.CreateDirectory(_originalArtworkCacheDir);
+    }
+
+    public async Task<bool> HasPendingOverlayWorkAsync(Guid libraryId, CancellationToken cancellationToken = default)
+    {
+        if (await _templateRepo.AnyTemplateExistsForLibraryAsync(libraryId)) return true;
+
+        return await _mediaRepo.AnyItemHasOverlayAppliedAsync(libraryId);
     }
 
     public async Task<bool> RunLibraryOverlaySyncAsync(Guid libraryId, CancellationToken cancellationToken = default)
