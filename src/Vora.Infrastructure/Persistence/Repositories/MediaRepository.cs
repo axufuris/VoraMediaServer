@@ -904,15 +904,31 @@ public partial class MediaRepository : IMediaRepository
 
         return await query
             .Where(m =>
+                // Revert: previously overlaid, but its type no longer has a template.
                 (m.LastOverlayGeneratedAt != null && (
                     (m is Movie && !hasMovieTemplate) ||
                     (m is TvShow && !hasTvShowTemplate) ||
                     (m is Season && !hasSeasonTemplate) ||
                     (m is Episode && !hasEpisodeTemplate)
                 )) ||
-                m.LastOverlayGeneratedAt == null ||
-                m.LastMetadataRefresh > m.LastOverlayGeneratedAt ||
-                m.LastOverlayGeneratedAt < maxTemplateUpdatedDate
+                // Generate: only for types that HAVE a template, when never
+                // overlaid / metadata is newer / the template changed. Without
+                // the type gate every never-overlaid item on the server is
+                // returned (then no-ops), so a movie-only template would walk
+                // the entire Shows library.
+                (
+                    (
+                        (m is Movie && hasMovieTemplate) ||
+                        (m is TvShow && hasTvShowTemplate) ||
+                        (m is Season && hasSeasonTemplate) ||
+                        (m is Episode && hasEpisodeTemplate)
+                    ) &&
+                    (
+                        m.LastOverlayGeneratedAt == null ||
+                        m.LastMetadataRefresh > m.LastOverlayGeneratedAt ||
+                        m.LastOverlayGeneratedAt < maxTemplateUpdatedDate
+                    )
+                )
             )
             .ToListAsync();
     }
