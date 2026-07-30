@@ -442,10 +442,11 @@ export default function MediaDetailsPage() {
     const isEpisode = media.type === 'Episode';
     const isSeason = media.type === 'Season';
     const showParentNav = (isEpisode && !!media.seasonId) || (isSeason && !!media.tvShowId);
-    // The "Back to <show>" button jumps to the parent (season -> show,
-    // episode -> show/season) rather than browser history, so arriving from a
-    // rail on Home lands on the show instead of going back to Home.
-    const backParentId = isSeason ? media.tvShowId : isEpisode ? (media.tvShowId ?? media.seasonId) : undefined;
+    // The back button jumps to the parent (episode -> season, or the show if
+    // there's no season; season -> show) rather than browser history, so
+    // arriving from a rail on Home lands on the parent instead of going back to
+    // Home. Movies and shows have no parent and fall back to history.
+    const backParentId = isEpisode ? (media.seasonId ?? media.tvShowId) : isSeason ? media.tvShowId : undefined;
     const goBack = () => {
         if (backParentId) {
             navigate(serverId ? `/server/${serverId}/media/${backParentId}` : `/media/${backParentId}`);
