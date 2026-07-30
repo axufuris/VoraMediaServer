@@ -204,17 +204,25 @@ public class MetadataFetchService : IMetadataFetchService
         var provider2 = !string.IsNullOrEmpty(item.Library.ThirdPartyRating2ProviderId)
             ? _ratingsProviders.FirstOrDefault(p => p.Id == item.Library.ThirdPartyRating2ProviderId) : null;
 
-        Task<decimal?> task1 = provider1 != null
-            ? provider1.FetchRatingAsync(item.ImdbId, item.TmdbId, item.TvdbId, item.GetType().Name, cancellationToken)
+        // A provider that's configured but temporarily unavailable (e.g. its
+        // rate-limit circuit breaker is open) is treated as "not consulted": we
+        // skip the fetch AND return a null slot name. ApplyRatingsAsync only
+        // clears a slot when its name is non-null, so a null name leaves any
+        // existing rating in place instead of wiping it during the outage.
+        var available1 = provider1 != null && provider1.IsCurrentlyAvailable;
+        var available2 = provider2 != null && provider2.IsCurrentlyAvailable;
+
+        Task<decimal?> task1 = available1
+            ? provider1!.FetchRatingAsync(item.ImdbId, item.TmdbId, item.TvdbId, item.GetType().Name, cancellationToken)
             : Task.FromResult<decimal?>(null);
 
-        Task<decimal?> task2 = provider2 != null
-            ? provider2.FetchRatingAsync(item.ImdbId, item.TmdbId, item.TvdbId, item.GetType().Name, cancellationToken)
+        Task<decimal?> task2 = available2
+            ? provider2!.FetchRatingAsync(item.ImdbId, item.TmdbId, item.TvdbId, item.GetType().Name, cancellationToken)
             : Task.FromResult<decimal?>(null);
 
         await Task.WhenAll(task1, task2);
 
-        return (await task1, provider1?.RatingSourceName, await task2, provider2?.RatingSourceName);
+        return (await task1, available1 ? provider1!.RatingSourceName : null, await task2, available2 ? provider2!.RatingSourceName : null);
     }
 
     private async Task<List<MediaArtwork>> FetchArtworkDataAsync(MediaItem item)
