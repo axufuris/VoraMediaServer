@@ -254,14 +254,10 @@ public class MetadataMappingService : IMetadataMappingService
             }
         }
 
-        if (!item.IsLocked(nameof(item.ThirdPartyRating1)) || forceOverride)
-        {
-            if (metadata.Rating.HasValue)
-            {
-                item.ThirdPartyRating1 = metadata.Rating;
-                item.ThirdPartyRating1Name = providerName;
-            }
-        }
+        // Ratings are NOT seeded from the metadata provider (TMDB/TVDB). Both
+        // rating slots are owned entirely by the library's configured Third Party
+        // Rating providers, so movies and shows behave identically — pick "TMDB
+        // Ratings" in the dropdown to use TMDB's score as a real rating source.
 
         if (item is Movie movieItem)
         {
