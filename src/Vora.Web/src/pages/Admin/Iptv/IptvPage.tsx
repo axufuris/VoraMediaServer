@@ -10,6 +10,7 @@ import IptvEpgDiagnosticsModal from '../../../components/Admin/IptvEpgDiagnostic
 import FeatureToggle from '../../../components/Admin/Features/FeatureToggle';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../../components/Admin/Primitives/HealthBadge';
+import { COUNTRY_OPTIONS } from '../../../utils/countries';
 import { useDialog } from '../../../dialogs';
 
 interface FreePlaylist {
@@ -89,6 +90,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
     const [m3uUrl, setM3uUrl] = useState('');
     const [supportsWebPlayback, setSupportsWebPlayback] = useState(true);
     const [maxConcurrentStreams, setMaxConcurrentStreams] = useState(0);
+    const [countryFilter, setCountryFilter] = useState('');
 
     const [epgQuickAdd, setEpgQuickAdd] = useState('');
     const [epgName, setEpgName] = useState('');
@@ -187,11 +189,12 @@ export default function IptvPage({ kind }: IptvPageProps) {
 
         setIsSavingPlaylist(true);
         try {
-            await iptvAdminService.addPlaylist(playlistName, m3uUrl, supportsWebPlayback, maxConcurrentStreams, kind, serverId);
+            await iptvAdminService.addPlaylist(playlistName, m3uUrl, supportsWebPlayback, maxConcurrentStreams, kind, isRadio ? (countryFilter || null) : null, serverId);
             setPlaylistName('');
             setM3uUrl('');
             setSupportsWebPlayback(true);
             setMaxConcurrentStreams(0);
+            setCountryFilter('');
             setPlaylistQuickAdd('');
             await loadData();
         } catch (error) {
@@ -462,6 +465,23 @@ export default function IptvPage({ kind }: IptvPageProps) {
                             />
                         </div>
                     </div>
+
+                    {isRadio && (
+                        <div className="mb-5">
+                            <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">Country</label>
+                            <select
+                                value={countryFilter}
+                                onChange={e => setCountryFilter(e.target.value)}
+                                className="vora-input"
+                            >
+                                <option value="">All countries</option>
+                                {COUNTRY_OPTIONS.map(c => (
+                                    <option key={c.code} value={c.code}>{c.name} ({c.code})</option>
+                                ))}
+                            </select>
+                            <span className="text-xs text-[var(--vora-text-muted)] mt-1.5 block">When set, clients only see this playlist's stations from that country.</span>
+                        </div>
+                    )}
 
                     <div className="flex justify-end">
                         <button

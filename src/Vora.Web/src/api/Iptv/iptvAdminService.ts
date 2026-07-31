@@ -26,6 +26,7 @@ export interface IptvPlaylistVM {
     lastError?: string;
     lastSyncedAt?: string;
     defaultChannelKind: IptvChannelKind;
+    countryFilter?: string | null;
     channels?: IptvChannelVM[];
 }
 
@@ -44,11 +45,12 @@ export const iptvAdminService = {
         supportsWebPlayback: boolean,
         maxConcurrentStreams: number,
         defaultChannelKind: IptvChannelKind,
+        countryFilter?: string | null,
         serverId?: string
     ): Promise<IptvPlaylistVM> => {
         const response = await apiClient.post<IptvPlaylistVM>(
             '/iptv/admin/playlists',
-            { name, m3uUrl, supportsWebPlayback, maxConcurrentStreams, defaultChannelKind },
+            { name, m3uUrl, supportsWebPlayback, maxConcurrentStreams, defaultChannelKind, countryFilter },
             { serverId }
         );
         return response.data;
@@ -62,11 +64,12 @@ export const iptvAdminService = {
         maxConcurrentStreams: number,
         isActive: boolean,
         defaultChannelKind: IptvChannelKind,
+        countryFilter?: string | null,
         serverId?: string
     ): Promise<IptvPlaylistVM> => {
         const response = await apiClient.put<IptvPlaylistVM>(
             `/iptv/admin/playlists/${id}`,
-            { name, m3uUrl, supportsWebPlayback, maxConcurrentStreams, isActive, defaultChannelKind },
+            { name, m3uUrl, supportsWebPlayback, maxConcurrentStreams, isActive, defaultChannelKind, countryFilter },
             { serverId }
         );
         return response.data;

@@ -18,6 +18,8 @@ public class IptvPlaylist
 
     public IptvChannelKind DefaultChannelKind { get; set; }
 
+    public string? CountryFilter { get; set; }
+
     public virtual IptvTunerProfile? TunerProfile { get; set; }
     public virtual ICollection<IptvChannel> Channels { get; set; } = new List<IptvChannel>();
 }

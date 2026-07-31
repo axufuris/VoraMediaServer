@@ -1019,6 +1019,7 @@ public class VoraDbContext : DbContext
         {
             entity.Property(e => e.Name).IsRequired().HasMaxLength(128);
             entity.Property(e => e.M3uUrl).HasMaxLength(1024);
+            entity.Property(e => e.CountryFilter).HasMaxLength(8);
 
             entity.HasOne(p => p.TunerProfile)
                   .WithOne(t => t.Playlist)

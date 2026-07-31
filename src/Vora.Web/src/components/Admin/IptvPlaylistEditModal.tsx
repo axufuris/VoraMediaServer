@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { iptvAdminService, type IptvPlaylistVM, type IptvChannelKind } from '../../api/Iptv/iptvAdminService';
 import { Modal, ModalHeader } from '../Common/Modal';
+import { COUNTRY_OPTIONS } from '../../utils/countries';
 
 interface Props {
     isOpen: boolean;
@@ -38,6 +39,7 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
     const [maxConcurrentStreams, setMaxConcurrentStreams] = useState(playlist.maxConcurrentStreams);
     const [isActive, setIsActive] = useState(playlist.isActive);
     const [isRadioPlaylist, setIsRadioPlaylist] = useState(playlist.defaultChannelKind === 'Radio');
+    const [countryFilter, setCountryFilter] = useState(playlist.countryFilter ?? '');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +50,7 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
         setMaxConcurrentStreams(playlist.maxConcurrentStreams);
         setIsActive(playlist.isActive);
         setIsRadioPlaylist(playlist.defaultChannelKind === 'Radio');
+        setCountryFilter(playlist.countryFilter ?? '');
         setError(null);
     }, [playlist]);
 
@@ -69,6 +72,7 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
                 maxConcurrentStreams,
                 isActive,
                 defaultKind,
+                isRadioPlaylist ? (countryFilter || null) : null,
                 serverId
             );
             onSaved();
@@ -163,6 +167,23 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
                     hint="When on, channels from this M3U default to Radio (shown in the Audio hub) unless an individual channel is manually flipped. Saving will trigger a channel re-sync."
                     accent="purple"
                 />
+
+                {isRadioPlaylist && (
+                    <div>
+                        <FieldLabel>Country</FieldLabel>
+                        <select
+                            value={countryFilter}
+                            onChange={e => setCountryFilter(e.target.value)}
+                            className="vora-input"
+                        >
+                            <option value="">All countries</option>
+                            {COUNTRY_OPTIONS.map(c => (
+                                <option key={c.code} value={c.code}>{c.name} ({c.code})</option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-[var(--vora-text-muted)] mt-1.5">When set, clients only see this playlist's stations from that country.</p>
+                    </div>
+                )}
 
                 {error && (
                     <div className="text-sm text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] p-3 rounded-[var(--vora-radius-md)] border border-[var(--vora-danger-500)]/20">
