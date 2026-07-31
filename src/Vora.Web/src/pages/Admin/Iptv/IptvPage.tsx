@@ -739,6 +739,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                     playlistName={selectedPlaylist.name}
                     channels={selectedPlaylist.channels || []}
                     serverId={serverId}
+                    isRadio={isRadio}
                     onChannelToggled={loadData}
                 />
             )}
