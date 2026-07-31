@@ -545,7 +545,6 @@ export default function MediaDetailsPage() {
 
                         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
                             <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Your rating</span>
                                 <StarRating
                                     value={media.myRating ?? null}
                                     onChange={handleSetRating}
@@ -696,7 +695,7 @@ export default function MediaDetailsPage() {
 
                         {nextEpisode && (
                             <div
-                                className="mt-7 flex items-center gap-4 rounded-xl p-4"
+                                className="mt-7 flex w-fit max-w-3xl items-center gap-4 rounded-xl p-4"
                                 style={{
                                     background: 'var(--vora-info-soft)',
                                     border: '1px solid color-mix(in srgb, var(--vora-info-500) 35%, transparent)',
