@@ -34,6 +34,7 @@ public class ServerSetting
     public int VideoThumbnailSpriteColumns { get; set; } = 10;
 
     public TimeSpan IptvSyncTime { get; set; } = new(4, 0, 0);
+    public TimeSpan IptvHealthCheckTime { get; set; } = new(4, 30, 0);
 
     public string FolderWatcherProviderId { get; set; } = "polling_watcher";
     public int FolderWatcherPollingInterval { get; set; } = 30;

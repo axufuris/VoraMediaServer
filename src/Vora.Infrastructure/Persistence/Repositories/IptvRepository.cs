@@ -115,6 +115,15 @@ public class IptvRepository : IIptvRepository
 
             if (existingDict.TryGetValue(newChan.ExternalChannelId, out var existing))
             {
+                // A changed stream URL invalidates the prior health result, so
+                // reset it to unknown for the next check (the channel stays
+                // visible until then rather than being wrongly hidden).
+                if (!string.Equals(existing.StreamUrl, newChan.StreamUrl, StringComparison.Ordinal))
+                {
+                    existing.IsHealthy = null;
+                    existing.LastHealthCheckAt = null;
+                }
+
                 existing.Name = newChan.Name;
                 existing.LogoUrl = newChan.LogoUrl;
                 existing.GroupTitle = newChan.GroupTitle;
@@ -140,6 +149,32 @@ public class IptvRepository : IIptvRepository
             _context.IptvChannels.RemoveRange(existingDict.Values);
         }
 
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<List<(Guid Id, string StreamUrl)>> GetChannelStreamsForPlaylistAsync(Guid playlistId)
+    {
+        return await _context.IptvChannels
+            .AsNoTracking()
+            .Where(c => c.PlaylistId == playlistId)
+            .Select(c => new ValueTuple<Guid, string>(c.Id, c.StreamUrl))
+            .ToListAsync();
+    }
+
+    public async Task UpdateChannelHealthAsync(IReadOnlyDictionary<Guid, bool> results, DateTime checkedAt)
+    {
+        if (results.Count == 0) return;
+
+        var ids = results.Keys.ToList();
+        var channels = await _context.IptvChannels.Where(c => ids.Contains(c.Id)).ToListAsync();
+        foreach (var channel in channels)
+        {
+            if (results.TryGetValue(channel.Id, out var isHealthy))
+            {
+                channel.IsHealthy = isHealthy;
+                channel.LastHealthCheckAt = checkedAt;
+            }
+        }
         await _context.SaveChangesAsync();
     }
 

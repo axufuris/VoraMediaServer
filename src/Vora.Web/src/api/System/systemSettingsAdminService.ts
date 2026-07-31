@@ -13,6 +13,7 @@ export interface ServerSettings {
     episodeIntroClusterToleranceSec: number;
     episodeIntroClusterMinAgreementPct: number;
     videoThumbnailScheduleTime: string;
+    iptvHealthCheckTime: string;
     videoThumbnailIntervalSeconds: number;
     videoThumbnailWidth: number;
     videoThumbnailHeight: number;

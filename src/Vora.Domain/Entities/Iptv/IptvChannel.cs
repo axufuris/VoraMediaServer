@@ -16,6 +16,12 @@ public class IptvChannel
     public string? CountryCode { get; set; }
     public bool IsHiddenByAdmin { get; set; }
 
+    // null = never checked; true/false = last health-check result. Separate from
+    // IsHiddenByAdmin so an auto-hide never collides with a manual hide and can
+    // self-heal on the next check.
+    public bool? IsHealthy { get; set; }
+    public DateTime? LastHealthCheckAt { get; set; }
+
     public IptvChannelKind Kind { get; set; }
     public bool KindOverriddenByAdmin { get; set; }
 

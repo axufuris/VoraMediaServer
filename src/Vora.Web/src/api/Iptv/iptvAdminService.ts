@@ -14,6 +14,8 @@ export interface IptvChannelVM {
     resolution?: string;
     countryCode?: string;
     isHiddenByAdmin: boolean;
+    isHealthy?: boolean | null;
+    lastHealthCheckAt?: string | null;
     kind: IptvChannelKind;
 }
 
@@ -28,6 +30,7 @@ export interface IptvPlaylistVM {
     lastSyncedAt?: string;
     defaultChannelKind: IptvChannelKind;
     countryFilter?: string | null;
+    enableHealthCheck?: boolean;
     channels?: IptvChannelVM[];
 }
 
@@ -47,11 +50,12 @@ export const iptvAdminService = {
         maxConcurrentStreams: number,
         defaultChannelKind: IptvChannelKind,
         countryFilter?: string | null,
+        enableHealthCheck?: boolean,
         serverId?: string
     ): Promise<IptvPlaylistVM> => {
         const response = await apiClient.post<IptvPlaylistVM>(
             '/iptv/admin/playlists',
-            { name, m3uUrl, supportsWebPlayback, maxConcurrentStreams, defaultChannelKind, countryFilter },
+            { name, m3uUrl, supportsWebPlayback, maxConcurrentStreams, defaultChannelKind, countryFilter, enableHealthCheck },
             { serverId }
         );
         return response.data;
@@ -66,11 +70,12 @@ export const iptvAdminService = {
         isActive: boolean,
         defaultChannelKind: IptvChannelKind,
         countryFilter?: string | null,
+        enableHealthCheck?: boolean,
         serverId?: string
     ): Promise<IptvPlaylistVM> => {
         const response = await apiClient.put<IptvPlaylistVM>(
             `/iptv/admin/playlists/${id}`,
-            { name, m3uUrl, supportsWebPlayback, maxConcurrentStreams, isActive, defaultChannelKind, countryFilter },
+            { name, m3uUrl, supportsWebPlayback, maxConcurrentStreams, isActive, defaultChannelKind, countryFilter, enableHealthCheck },
             { serverId }
         );
         return response.data;

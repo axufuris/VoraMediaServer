@@ -16,6 +16,8 @@ public interface IIptvRepository
     Task UpdatePlaylistAsync(IptvPlaylist playlist);
     Task DeletePlaylistAsync(Guid id);
     Task UpdateChannelsAsync(Guid playlistId, List<IptvChannel> newChannels);
+    Task<List<(Guid Id, string StreamUrl)>> GetChannelStreamsForPlaylistAsync(Guid playlistId);
+    Task UpdateChannelHealthAsync(IReadOnlyDictionary<Guid, bool> results, DateTime checkedAt);
     Task ToggleChannelVisibilityAsync(Guid channelId);
     Task SetChannelKindAsync(Guid channelId, IptvChannelKind kind);
 

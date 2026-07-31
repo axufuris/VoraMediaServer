@@ -58,6 +58,7 @@ public interface ITaskQueueManager
     void QueueGenerateLibraryPosterOverlays(Guid libraryId, string? libraryName = null);
     void QueueOverlayOrphanSweep();
     void QueueIptvEpgSync();
+    void QueueIptvHealthCheck(Guid playlistId, string? playlistName = null);
     void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false);
     void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
 }
@@ -536,6 +537,19 @@ public class TaskQueueManager : ITaskQueueManager
 
             await dvrManager.ProcessSchedulesIntoSessionsAsync();
         });
+    }
+
+    public void QueueIptvHealthCheck(Guid playlistId, string? playlistName = null)
+    {
+        var label = string.IsNullOrWhiteSpace(playlistName)
+            ? "Health-check IPTV channels"
+            : $"Health-check channels: {playlistName}";
+
+        EnqueueTask(label, async (ct, sp) =>
+        {
+            var service = sp.GetRequiredService<Vora.Application.Iptv.IIptvHealthCheckService>();
+            await service.CheckPlaylistAsync(playlistId, ct);
+        }, resourceKey: $"iptv-health:{playlistId}");
     }
 
     public void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false)
