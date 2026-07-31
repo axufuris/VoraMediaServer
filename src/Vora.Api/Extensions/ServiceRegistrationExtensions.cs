@@ -602,7 +602,11 @@ public static class ServiceRegistrationExtensions
 
     private static IServiceCollection AddVoraRealtime(this IServiceCollection services)
     {
-        services.AddSignalR();
+        services.AddSignalR()
+            .AddJsonProtocol(options =>
+            {
+                options.PayloadSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+            });
         services.AddSingleton<IClientNotifier, SignalRClientNotifier>();
         return services;
     }
