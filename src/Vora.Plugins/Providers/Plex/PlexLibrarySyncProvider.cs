@@ -76,9 +76,9 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         DateTime? expiresAt = null;
         if (root.TryGetProperty("expiresAt", out var expiresProp) && expiresProp.ValueKind == JsonValueKind.String)
         {
-            if (DateTime.TryParse(expiresProp.GetString(), out var parsed))
+            if (DateTime.TryParse(expiresProp.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var parsed))
             {
-                expiresAt = DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+                expiresAt = parsed;
             }
         }
 
@@ -118,10 +118,9 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
 
         if (root.TryGetProperty("expiresAt", out var expiresProp) && expiresProp.ValueKind == JsonValueKind.String)
         {
-            if (DateTime.TryParse(expiresProp.GetString(), out var parsed))
+            if (DateTime.TryParse(expiresProp.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var parsed))
             {
-                var expiresAt = DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
-                if (expiresAt < DateTime.UtcNow)
+                if (parsed < DateTime.UtcNow)
                 {
                     return new LibrarySyncPinStatusDto { PinId = pinId, Status = LibrarySyncPinStatus.Expired };
                 }
