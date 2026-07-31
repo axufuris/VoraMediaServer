@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { iptvAdminService, type IptvChannelVM, type IptvChannelKind } from '../../api/Iptv/iptvAdminService';
+import { iptvAdminService, type IptvChannelVM } from '../../api/Iptv/iptvAdminService';
 import { Modal, ModalHeader } from '../Common/Modal';
 
 interface Props {
@@ -11,19 +11,15 @@ interface Props {
     onChannelToggled: () => void;
 }
 
-type KindFilter = 'All' | 'Tv' | 'Radio';
-
 export default function IptvChannelsModal({ isOpen, onClose, playlistName, channels, serverId, onChannelToggled }: Props) {
     const [search, setSearch] = useState('');
-    const [kindFilter, setKindFilter] = useState<KindFilter>('All');
     const [localChannels, setLocalChannels] = useState<IptvChannelVM[]>(channels);
 
     const filteredChannels = useMemo(() => {
         return localChannels
-            .filter(c => kindFilter === 'All' || c.kind === kindFilter)
             .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || (c.groupTitle || '').toLowerCase().includes(search.toLowerCase()))
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [localChannels, search, kindFilter]);
+    }, [localChannels, search]);
 
     const handleToggle = async (channelId: string, currentState: boolean) => {
         try {
@@ -33,18 +29,6 @@ export default function IptvChannelsModal({ isOpen, onClose, playlistName, chann
         } catch (error) {
             console.error('Failed to toggle channel', error);
             setLocalChannels(prev => prev.map(c => c.id === channelId ? { ...c, isHiddenByAdmin: currentState } : c));
-        }
-    };
-
-    const handleKindToggle = async (channelId: string, currentKind: IptvChannelKind) => {
-        const next: IptvChannelKind = currentKind === 'Radio' ? 'Tv' : 'Radio';
-        try {
-            setLocalChannels(prev => prev.map(c => c.id === channelId ? { ...c, kind: next } : c));
-            await iptvAdminService.setChannelKind(channelId, next, serverId);
-            onChannelToggled();
-        } catch (error) {
-            console.error('Failed to change channel kind', error);
-            setLocalChannels(prev => prev.map(c => c.id === channelId ? { ...c, kind: currentKind } : c));
         }
     };
 
@@ -76,21 +60,6 @@ export default function IptvChannelsModal({ isOpen, onClose, playlistName, chann
                     onChange={e => setSearch(e.target.value)}
                     className="vora-input flex-1"
                 />
-                <div className="flex border border-[var(--vora-border-strong)] rounded-[var(--vora-radius-md)] overflow-hidden">
-                    {(['All', 'Tv', 'Radio'] as const).map(k => {
-                        const isActive = kindFilter === k;
-                        return (
-                            <button
-                                key={k}
-                                type="button"
-                                onClick={() => setKindFilter(k)}
-                                className={`px-4 text-xs font-semibold transition-colors cursor-pointer ${isActive ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
-                            >
-                                {k === 'Tv' ? 'TV' : k}
-                            </button>
-                        );
-                    })}
-                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto pr-2 space-y-2">
@@ -116,14 +85,6 @@ export default function IptvChannelsModal({ isOpen, onClose, playlistName, chann
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => handleKindToggle(c.id, c.kind)}
-                                className={`px-3 py-1.5 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer border ${c.kind === 'Radio' ? 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-600 hover:text-[var(--vora-text-primary)] hover:border-purple-600' : 'bg-[var(--vora-info-soft)] text-[var(--vora-info-text)] border-[var(--vora-info-500)]/20 hover:bg-[var(--vora-info-500)] hover:text-[var(--vora-text-primary)] hover:border-[var(--vora-info-500)]'}`}
-                                title="Click to flip between TV and Radio"
-                            >
-                                {c.kind === 'Radio' ? 'Radio' : 'TV'}
-                            </button>
                             <button
                                 type="button"
                                 onClick={() => handleToggle(c.id, c.isHiddenByAdmin)}
