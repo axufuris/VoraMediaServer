@@ -442,6 +442,18 @@ export default function MediaDetailsPage() {
     const isEpisode = media.type === 'Episode';
     const isSeason = media.type === 'Season';
     const showParentNav = (isEpisode && !!media.seasonId) || (isSeason && !!media.tvShowId);
+    // The back button jumps to the parent (episode -> season, or the show if
+    // there's no season; season -> show) rather than browser history, so
+    // arriving from a rail on Home lands on the parent instead of going back to
+    // Home. Movies and shows have no parent and fall back to history.
+    const backParentId = isEpisode ? (media.seasonId ?? media.tvShowId) : isSeason ? media.tvShowId : undefined;
+    const goBack = () => {
+        if (backParentId) {
+            navigate(serverId ? `/server/${serverId}/media/${backParentId}` : `/media/${backParentId}`);
+        } else {
+            navigate(-1);
+        }
+    };
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = (isSeason || isEpisode) ? media.title : undefined;
     const showQualityButton = (media.type === 'Movie' || isEpisode) && (versionOptions.length > 1 || sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
@@ -476,7 +488,7 @@ export default function MediaDetailsPage() {
                 <div className="px-12">
                     <button
                         type="button"
-                        onClick={() => navigate(-1)}
+                        onClick={goBack}
                         className="inline-flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
                         style={{ background: 'rgba(20, 20, 28, 0.65)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#fafafa' }}
                     >
