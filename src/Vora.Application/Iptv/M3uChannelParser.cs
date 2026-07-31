@@ -15,9 +15,6 @@ internal static class M3uChannelParser
     private static readonly Regex ChannelIdRegex = new(@"channel-id=""([^""]*)""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex TvgLogoRegex = new(@"tvg-logo=""([^""]*)""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex GroupTitleRegex = new(@"group-title=""([^""]*)""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex RadioAttrRegex = new(@"radio=""(true|1|yes)""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex TvgTypeAudioRegex = new(@"tvg-type=""audio""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex RadioGroupRegex = new(@"\b(radio|music|fm|am)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex TvgCountryRegex = new(@"tvg-country=""([a-zA-Z]{2})""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex IdCountryRegex = new(@"\.(US|UK|GB|CA|AU|NZ|IE|FR|DE|ES|IT|MX|BR|AR|GR|IN|RU|JP|KR|CN|NL|BE|PT|PL|SE|NO|DK|FI|CH|AT|ZA)(?:@|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex IdResolutionRegex = new(@"@(1080p|720p|480p|fhd|hd|sd|4k)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -74,7 +71,7 @@ internal static class M3uChannelParser
             StreamUrl = streamUrl,
             Resolution = TruncateOrNull(resolution, 16),
             CountryCode = TruncateOrNull(countryCode, 8),
-            Kind = DetectKind(line, groupTitle, resolution, streamUrl, defaultKind)
+            Kind = defaultKind
         };
     }
 
@@ -83,29 +80,6 @@ internal static class M3uChannelParser
 
     private static string? TruncateOrNull(string? value, int max) =>
         string.IsNullOrEmpty(value) ? value : (value.Length <= max ? value : value[..max]);
-
-    private static IptvChannelKind DetectKind(string extInfLine, string? groupTitle, string? resolution, string streamUrl, IptvChannelKind defaultKind)
-    {
-        if (RadioAttrRegex.IsMatch(extInfLine)) return IptvChannelKind.Radio;
-        if (TvgTypeAudioRegex.IsMatch(extInfLine)) return IptvChannelKind.Radio;
-        if (!string.IsNullOrEmpty(groupTitle) && RadioGroupRegex.IsMatch(groupTitle)) return IptvChannelKind.Radio;
-        if (string.Equals(resolution, "audio", StringComparison.OrdinalIgnoreCase)) return IptvChannelKind.Radio;
-        if (LooksLikeAudioStream(streamUrl)) return IptvChannelKind.Radio;
-        return defaultKind;
-    }
-
-    private static bool LooksLikeAudioStream(string url)
-    {
-        var path = url;
-        var queryIdx = url.IndexOf('?');
-        if (queryIdx >= 0) path = url[..queryIdx];
-        return path.EndsWith(".aac", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith(".opus", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith(".flac", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith(".pls", StringComparison.OrdinalIgnoreCase);
-    }
 
     private static string ResolveExternalId(string line)
     {
