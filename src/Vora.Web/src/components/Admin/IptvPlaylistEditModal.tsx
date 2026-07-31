@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { iptvAdminService, type IptvPlaylistVM, type IptvChannelKind } from '../../api/Iptv/iptvAdminService';
+import { iptvAdminService, type IptvPlaylistVM } from '../../api/Iptv/iptvAdminService';
 import { Modal, ModalHeader } from '../Common/Modal';
 import { COUNTRY_OPTIONS } from '../../utils/countries';
 
@@ -38,7 +38,9 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
     const [supportsWebPlayback, setSupportsWebPlayback] = useState(playlist.supportsWebPlayback);
     const [maxConcurrentStreams, setMaxConcurrentStreams] = useState(playlist.maxConcurrentStreams);
     const [isActive, setIsActive] = useState(playlist.isActive);
-    const [isRadioPlaylist, setIsRadioPlaylist] = useState(playlist.defaultChannelKind === 'Radio');
+    // Kind is fixed by which page this playlist lives on (Live TV vs Radio), so
+    // it's preserved on save rather than being an editable checkbox here.
+    const isRadio = playlist.defaultChannelKind === 'Radio';
     const [countryFilter, setCountryFilter] = useState(playlist.countryFilter ?? '');
     const [enableHealthCheck, setEnableHealthCheck] = useState(playlist.enableHealthCheck ?? false);
     const [isSaving, setIsSaving] = useState(false);
@@ -50,7 +52,6 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
         setSupportsWebPlayback(playlist.supportsWebPlayback);
         setMaxConcurrentStreams(playlist.maxConcurrentStreams);
         setIsActive(playlist.isActive);
-        setIsRadioPlaylist(playlist.defaultChannelKind === 'Radio');
         setCountryFilter(playlist.countryFilter ?? '');
         setEnableHealthCheck(playlist.enableHealthCheck ?? false);
         setError(null);
@@ -65,7 +66,6 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
         setIsSaving(true);
         setError(null);
         try {
-            const defaultKind: IptvChannelKind = isRadioPlaylist ? 'Radio' : 'Tv';
             await iptvAdminService.updatePlaylist(
                 playlist.id,
                 name.trim(),
@@ -73,8 +73,8 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
                 supportsWebPlayback,
                 maxConcurrentStreams,
                 isActive,
-                defaultKind,
-                isRadioPlaylist ? (countryFilter || null) : null,
+                playlist.defaultChannelKind,
+                isRadio ? (countryFilter || null) : null,
                 enableHealthCheck,
                 serverId
             );
@@ -164,21 +164,13 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
                 />
 
                 <CheckboxCard
-                    checked={isRadioPlaylist}
-                    onChange={setIsRadioPlaylist}
-                    label="Radio playlist"
-                    hint="When on, channels from this M3U default to Radio (shown in the Audio hub) unless an individual channel is manually flipped. Saving will trigger a channel re-sync."
-                    accent="purple"
-                />
-
-                <CheckboxCard
                     checked={enableHealthCheck}
                     onChange={setEnableHealthCheck}
                     label="Health-check channels"
                     hint="Probe each stream on sync and nightly; dead channels are hidden from clients until they work again. Leave off for large paid providers to avoid probing bans."
                 />
 
-                {isRadioPlaylist && (
+                {isRadio && (
                     <div>
                         <FieldLabel>Country</FieldLabel>
                         <select
