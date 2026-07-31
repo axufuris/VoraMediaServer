@@ -11,5 +11,6 @@ public class IptvPlaylistVM
     public DateTime? LastSyncedAt { get; set; }
     public int MaxConcurrentStreams { get; set; }
     public string DefaultChannelKind { get; set; } = "Tv";
+    public string? CountryFilter { get; set; }
     public List<IptvChannelVM> Channels { get; set; } = new();
 }

@@ -13,8 +13,8 @@ public interface IIptvManager
 {
     Task<List<IptvPlaylistVM>> GetAllPlaylistsAsync(Vora.Domain.Enums.IptvChannelKind? kind = null);
     Task<List<IptvPlaylistVM>> GetClientPlaylistsAsync(Guid userId, Guid? profileId = null);
-    Task<IptvPlaylistVM> AddPlaylistAsync(string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, Vora.Domain.Enums.IptvChannelKind defaultKind);
-    Task<IptvPlaylistVM> UpdatePlaylistAsync(Guid id, string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, bool isActive, Vora.Domain.Enums.IptvChannelKind defaultKind);
+    Task<IptvPlaylistVM> AddPlaylistAsync(string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, Vora.Domain.Enums.IptvChannelKind defaultKind, string? countryFilter = null);
+    Task<IptvPlaylistVM> UpdatePlaylistAsync(Guid id, string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, bool isActive, Vora.Domain.Enums.IptvChannelKind defaultKind, string? countryFilter = null);
     Task DeletePlaylistAsync(Guid id);
     Task RefreshPlaylistAsync(Guid id);
 
@@ -84,10 +84,10 @@ public class IptvManager : IIptvManager
     public async Task<List<IptvPlaylistVM>> GetAllPlaylistsAsync(Vora.Domain.Enums.IptvChannelKind? kind = null)
     {
         var playlists = await _repository.GetAllPlaylistsAsync(kind);
-        return playlists.Select(MapToViewModel).ToList();
+        return playlists.Select(p => MapToViewModel(p)).ToList();
     }
 
-    public async Task<IptvPlaylistVM> AddPlaylistAsync(string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, Vora.Domain.Enums.IptvChannelKind defaultKind)
+    public async Task<IptvPlaylistVM> AddPlaylistAsync(string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, Vora.Domain.Enums.IptvChannelKind defaultKind, string? countryFilter = null)
     {
         var playlist = new IptvPlaylist
         {
@@ -96,6 +96,7 @@ public class IptvManager : IIptvManager
             IsActive = true,
             SupportsWebPlayback = supportsWebPlayback,
             DefaultChannelKind = defaultKind,
+            CountryFilter = NormalizeCountryFilter(countryFilter),
             TunerProfile = new IptvTunerProfile
             {
                 MaxConcurrentStreams = maxConcurrentStreams
@@ -110,7 +111,7 @@ public class IptvManager : IIptvManager
         return MapToViewModel(playlist);
     }
 
-    public async Task<IptvPlaylistVM> UpdatePlaylistAsync(Guid id, string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, bool isActive, Vora.Domain.Enums.IptvChannelKind defaultKind)
+    public async Task<IptvPlaylistVM> UpdatePlaylistAsync(Guid id, string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, bool isActive, Vora.Domain.Enums.IptvChannelKind defaultKind, string? countryFilter = null)
     {
         var playlist = await _repository.GetPlaylistByIdAsync(id)
             ?? throw new InvalidOperationException("Playlist not found.");
@@ -123,6 +124,7 @@ public class IptvManager : IIptvManager
         playlist.SupportsWebPlayback = supportsWebPlayback;
         playlist.IsActive = isActive;
         playlist.DefaultChannelKind = defaultKind;
+        playlist.CountryFilter = NormalizeCountryFilter(countryFilter);
 
         if (playlist.TunerProfile == null)
         {
@@ -296,7 +298,7 @@ public class IptvManager : IIptvManager
             }
         }
 
-        return allowed.Select(MapToViewModel).ToList();
+        return allowed.Select(p => MapToViewModel(p, applyCountryFilter: true)).ToList();
     }
 
     public Task<Dictionary<string, List<IptvProgramDto>>> GetFilteredGuideAsync(Guid userId, Guid profileId, List<string> requestedChannelIds, DateTime startTime, DateTime endTime) =>
@@ -526,8 +528,25 @@ public class IptvManager : IIptvManager
     private static string ConvertToRadioBrowserJsonUrl(string url) =>
         url.Replace("/m3u/", "/json/", StringComparison.OrdinalIgnoreCase);
 
-    private static IptvPlaylistVM MapToViewModel(IptvPlaylist entity) =>
-        new()
+    private static string? NormalizeCountryFilter(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var trimmed = value.Trim();
+        return string.Equals(trimmed, "All", StringComparison.OrdinalIgnoreCase) ? null : trimmed.ToUpperInvariant();
+    }
+
+    // applyCountryFilter is only set for the client-facing projection: when the
+    // playlist has a CountryFilter, viewers see just that country's channels.
+    // Admin views leave it off so channel management sees everything.
+    private static IptvPlaylistVM MapToViewModel(IptvPlaylist entity, bool applyCountryFilter = false)
+    {
+        var channels = entity.Channels?.AsEnumerable() ?? Enumerable.Empty<IptvChannel>();
+        if (applyCountryFilter && !string.IsNullOrWhiteSpace(entity.CountryFilter))
+        {
+            channels = channels.Where(c => string.Equals(c.CountryCode, entity.CountryFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return new()
         {
             Id = entity.Id,
             Name = entity.Name,
@@ -538,7 +557,8 @@ public class IptvManager : IIptvManager
             LastError = entity.LastError,
             LastSyncedAt = entity.LastSyncedAt,
             DefaultChannelKind = entity.DefaultChannelKind.ToString(),
-            Channels = entity.Channels?.Select(c => new IptvChannelVM
+            CountryFilter = entity.CountryFilter,
+            Channels = channels.Select(c => new IptvChannelVM
             {
                 Id = c.Id,
                 PlaylistId = c.PlaylistId,
@@ -552,8 +572,9 @@ public class IptvManager : IIptvManager
                 CountryCode = c.CountryCode,
                 IsHiddenByAdmin = c.IsHiddenByAdmin,
                 Kind = c.Kind.ToString()
-            }).ToList() ?? new List<IptvChannelVM>()
+            }).ToList()
         };
+    }
 
     private static IptvEpgSourceVM MapToViewModel(IptvEpgSource entity) =>
         new()
