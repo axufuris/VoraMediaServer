@@ -18,6 +18,7 @@ public class ServerSettingsVM
     public int EpisodeIntroClusterToleranceSec { get; set; } = 5;
     public int EpisodeIntroClusterMinAgreementPct { get; set; } = 70;
     public string VideoThumbnailScheduleTime { get; set; } = "04:00";
+    public string IptvHealthCheckTime { get; set; } = "04:30";
     public int VideoThumbnailIntervalSeconds { get; set; } = 10;
     public int VideoThumbnailWidth { get; set; } = 320;
     public int VideoThumbnailHeight { get; set; } = 180;
@@ -87,6 +88,7 @@ public class ServerSettingsVM
             EpisodeIntroClusterToleranceSec = s.EpisodeIntroClusterToleranceSec,
             EpisodeIntroClusterMinAgreementPct = s.EpisodeIntroClusterMinAgreementPct,
             VideoThumbnailScheduleTime = s.VideoThumbnailScheduleTime.ToString(@"hh\:mm"),
+            IptvHealthCheckTime = s.IptvHealthCheckTime.ToString(@"hh\:mm"),
             VideoThumbnailIntervalSeconds = s.VideoThumbnailIntervalSeconds,
             VideoThumbnailWidth = s.VideoThumbnailWidth,
             VideoThumbnailHeight = s.VideoThumbnailHeight,

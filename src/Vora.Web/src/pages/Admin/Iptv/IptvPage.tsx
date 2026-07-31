@@ -91,6 +91,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
     const [supportsWebPlayback, setSupportsWebPlayback] = useState(true);
     const [maxConcurrentStreams, setMaxConcurrentStreams] = useState(0);
     const [countryFilter, setCountryFilter] = useState('');
+    const [enableHealthCheck, setEnableHealthCheck] = useState(false);
 
     const [epgQuickAdd, setEpgQuickAdd] = useState('');
     const [epgName, setEpgName] = useState('');
@@ -189,12 +190,13 @@ export default function IptvPage({ kind }: IptvPageProps) {
 
         setIsSavingPlaylist(true);
         try {
-            await iptvAdminService.addPlaylist(playlistName, m3uUrl, supportsWebPlayback, maxConcurrentStreams, kind, isRadio ? (countryFilter || null) : null, serverId);
+            await iptvAdminService.addPlaylist(playlistName, m3uUrl, supportsWebPlayback, maxConcurrentStreams, kind, isRadio ? (countryFilter || null) : null, enableHealthCheck, serverId);
             setPlaylistName('');
             setM3uUrl('');
             setSupportsWebPlayback(true);
             setMaxConcurrentStreams(0);
             setCountryFilter('');
+            setEnableHealthCheck(false);
             setPlaylistQuickAdd('');
             await loadData();
         } catch (error) {
@@ -465,6 +467,19 @@ export default function IptvPage({ kind }: IptvPageProps) {
                             />
                         </div>
                     </div>
+
+                    <label className="flex items-center gap-3 cursor-pointer bg-[var(--vora-bg-sunken)] p-3 rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] select-none mb-5">
+                        <input
+                            type="checkbox"
+                            checked={enableHealthCheck}
+                            onChange={e => setEnableHealthCheck(e.target.checked)}
+                            className="w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer"
+                        />
+                        <div className="flex flex-col">
+                            <span className="text-sm font-semibold text-[var(--vora-text-primary)]">Health-check channels</span>
+                            <span className="text-xs text-[var(--vora-text-muted)]">Probe each stream on sync and nightly; dead channels are hidden from clients until they work again. Leave off for large paid providers to avoid probing bans.</span>
+                        </div>
+                    </label>
 
                     {isRadio && (
                         <div className="mb-5">

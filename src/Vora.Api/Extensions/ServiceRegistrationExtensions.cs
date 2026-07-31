@@ -391,6 +391,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IEmailTemplateManager, EmailTemplateManager>();
         services.AddScoped<IInvitationManager, InvitationManager>();
         services.AddScoped<IIptvManager, IptvManager>();
+        services.AddScoped<Vora.Application.Iptv.IIptvHealthCheckService, Vora.Application.Iptv.IptvHealthCheckService>();
         services.AddScoped<ILibraryManager, LibraryManager>();
         services.AddScoped<ILibraryMigrationManager, LibraryMigrationManager>();
         services.AddSingleton<ILibraryMigrationJobRunner, LibraryMigrationJobRunner>();

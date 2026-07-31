@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Collections;
+using Vora.Application.Iptv;
 using Vora.Application.Libraries;
 using Vora.Application.Media;
 using Vora.Application.Metadata;
@@ -24,6 +25,7 @@ public class ScheduledJobWorker : BackgroundService
     private DateTime _lastAiEmbedDate = DateTime.MinValue.Date;
     private DateTime _lastOverlaySyncDate = DateTime.MinValue.Date;
     private DateTime _lastIptvSyncDate = DateTime.MinValue.Date;
+    private DateTime _lastIptvHealthCheckDate = DateTime.MinValue.Date;
     private DateTime _lastVideoThumbnailDate = DateTime.MinValue.Date;
     private DateTime _lastTrashPurgeDate = DateTime.MinValue.Date;
 
@@ -98,6 +100,7 @@ public class ScheduledJobWorker : BackgroundService
             if (aiParsed && timeOfDay >= aiTime) _lastAiEmbedDate = today;
             if (overlayParsed && timeOfDay >= overlayTime) _lastOverlaySyncDate = today;
             if (timeOfDay >= settings.IptvSyncTime) _lastIptvSyncDate = today;
+            if (timeOfDay >= settings.IptvHealthCheckTime) _lastIptvHealthCheckDate = today;
             if (timeOfDay >= settings.VideoThumbnailScheduleTime) _lastVideoThumbnailDate = today;
             if (timeOfDay >= settings.NightlyScanTime) _lastTrashPurgeDate = today;
         }
@@ -214,6 +217,23 @@ public class ScheduledJobWorker : BackgroundService
             taskQueue.QueueIptvEpgSync();
 
             _lastIptvSyncDate = today;
+        }
+
+        if (timeOfDay >= settings.IptvHealthCheckTime && _lastIptvHealthCheckDate < today)
+        {
+            var iptvManager = scope.ServiceProvider.GetRequiredService<IIptvManager>();
+            var playlists = await iptvManager.GetAllPlaylistsAsync();
+            var enabled = playlists.Where(p => p.EnableHealthCheck).ToList();
+            if (enabled.Count > 0)
+            {
+                _logger.LogInformation("Triggering Scheduled IPTV Channel Health Check for {Count} playlist(s).", enabled.Count);
+                foreach (var pl in enabled)
+                {
+                    taskQueue.QueueIptvHealthCheck(pl.Id, pl.Name);
+                }
+            }
+
+            _lastIptvHealthCheckDate = today;
         }
 
         if (timeOfDay >= settings.VideoThumbnailScheduleTime && _lastVideoThumbnailDate < today)

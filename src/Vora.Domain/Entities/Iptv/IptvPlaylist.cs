@@ -20,6 +20,8 @@ public class IptvPlaylist
 
     public string? CountryFilter { get; set; }
 
+    public bool EnableHealthCheck { get; set; }
+
     public virtual IptvTunerProfile? TunerProfile { get; set; }
     public virtual ICollection<IptvChannel> Channels { get; set; } = new List<IptvChannel>();
 }

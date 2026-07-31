@@ -40,6 +40,7 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
     const [isActive, setIsActive] = useState(playlist.isActive);
     const [isRadioPlaylist, setIsRadioPlaylist] = useState(playlist.defaultChannelKind === 'Radio');
     const [countryFilter, setCountryFilter] = useState(playlist.countryFilter ?? '');
+    const [enableHealthCheck, setEnableHealthCheck] = useState(playlist.enableHealthCheck ?? false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +52,7 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
         setIsActive(playlist.isActive);
         setIsRadioPlaylist(playlist.defaultChannelKind === 'Radio');
         setCountryFilter(playlist.countryFilter ?? '');
+        setEnableHealthCheck(playlist.enableHealthCheck ?? false);
         setError(null);
     }, [playlist]);
 
@@ -73,6 +75,7 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
                 isActive,
                 defaultKind,
                 isRadioPlaylist ? (countryFilter || null) : null,
+                enableHealthCheck,
                 serverId
             );
             onSaved();
@@ -166,6 +169,13 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
                     label="Radio playlist"
                     hint="When on, channels from this M3U default to Radio (shown in the Audio hub) unless an individual channel is manually flipped. Saving will trigger a channel re-sync."
                     accent="purple"
+                />
+
+                <CheckboxCard
+                    checked={enableHealthCheck}
+                    onChange={setEnableHealthCheck}
+                    label="Health-check channels"
+                    hint="Probe each stream on sync and nightly; dead channels are hidden from clients until they work again. Leave off for large paid providers to avoid probing bans."
                 />
 
                 {isRadioPlaylist && (

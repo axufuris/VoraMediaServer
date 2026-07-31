@@ -101,7 +101,17 @@ export default function IptvChannelsModal({ isOpen, onClose, playlistName, chann
                                 {c.logoUrl ? <img src={c.logoUrl} alt="" className="max-w-full max-h-full object-contain" /> : <span className="text-[8px] text-[var(--vora-text-disabled)]">No logo</span>}
                             </div>
                             <div className="flex flex-col">
-                                <span className={`text-sm font-semibold ${c.isHiddenByAdmin ? 'text-[var(--vora-text-disabled)] line-through' : 'text-[var(--vora-text-primary)]'}`}>{c.name}</span>
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-sm font-semibold ${c.isHiddenByAdmin ? 'text-[var(--vora-text-disabled)] line-through' : 'text-[var(--vora-text-primary)]'}`}>{c.name}</span>
+                                    {c.isHealthy === false && (
+                                        <span
+                                            className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)] border border-[var(--vora-danger-500)]/30"
+                                            title={c.lastHealthCheckAt ? `Last checked ${new Date(c.lastHealthCheckAt).toLocaleString()}` : 'Stream did not respond'}
+                                        >
+                                            Unreachable
+                                        </span>
+                                    )}
+                                </div>
                                 <span className="text-[10px] text-[var(--vora-text-muted)]">{c.groupTitle || 'No group'}</span>
                             </div>
                         </div>

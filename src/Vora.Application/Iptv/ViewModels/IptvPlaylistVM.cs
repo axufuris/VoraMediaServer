@@ -12,5 +12,6 @@ public class IptvPlaylistVM
     public int MaxConcurrentStreams { get; set; }
     public string DefaultChannelKind { get; set; } = "Tv";
     public string? CountryFilter { get; set; }
+    public bool EnableHealthCheck { get; set; }
     public List<IptvChannelVM> Channels { get; set; } = new();
 }

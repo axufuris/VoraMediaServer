@@ -13,5 +13,7 @@ public class IptvChannelVM
     public string? Resolution { get; set; }
     public string? CountryCode { get; set; }
     public bool IsHiddenByAdmin { get; set; }
+    public bool? IsHealthy { get; set; }
+    public DateTime? LastHealthCheckAt { get; set; }
     public string Kind { get; set; } = "Tv";
 }

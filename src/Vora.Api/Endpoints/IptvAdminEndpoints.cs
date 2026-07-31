@@ -17,6 +17,7 @@ public class CreateIptvPlaylistDto
     public int MaxConcurrentStreams { get; set; }
     public string DefaultChannelKind { get; set; } = "Tv";
     public string? CountryFilter { get; set; }
+    public bool EnableHealthCheck { get; set; }
 }
 
 public class UpdateIptvPlaylistDto
@@ -28,6 +29,7 @@ public class UpdateIptvPlaylistDto
     public bool IsActive { get; set; }
     public string DefaultChannelKind { get; set; } = "Tv";
     public string? CountryFilter { get; set; }
+    public bool EnableHealthCheck { get; set; }
 }
 
 public class CreateIptvEpgSourceDto
@@ -88,7 +90,8 @@ public static class IptvAdminEndpoints
             request.SupportsWebPlayback,
             request.MaxConcurrentStreams,
             defaultKind,
-            request.CountryFilter);
+            request.CountryFilter,
+            request.EnableHealthCheck);
         return Results.Ok(playlist);
     }
 
@@ -106,7 +109,8 @@ public static class IptvAdminEndpoints
             request.MaxConcurrentStreams,
             request.IsActive,
             defaultKind,
-            request.CountryFilter);
+            request.CountryFilter,
+            request.EnableHealthCheck);
         return Results.Ok(playlist);
     }
 

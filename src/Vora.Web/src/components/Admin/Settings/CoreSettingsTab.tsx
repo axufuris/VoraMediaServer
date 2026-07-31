@@ -627,6 +627,21 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 </div>
             </SettingsCard>
 
+            <SettingsCard title="Live TV & Radio Health Check">
+                <div className="space-y-4">
+                    <div>
+                        <FieldLabel>Nightly Re-Check Time</FieldLabel>
+                        <input
+                            type="time"
+                            value={serverSettings.iptvHealthCheckTime}
+                            onChange={e => setServerSettings({ ...serverSettings, iptvHealthCheckTime: e.target.value })}
+                            className="vora-input w-40"
+                        />
+                        <FieldHint>Daily time the channel health re-check runs. Only playlists with "Health-check channels" enabled are probed; dead channels are hidden from clients and recovered ones are automatically restored.</FieldHint>
+                    </div>
+                </div>
+            </SettingsCard>
+
             <SettingsCard title="Real-Time File Watcher">
                 <div className="space-y-4">
                     <div>

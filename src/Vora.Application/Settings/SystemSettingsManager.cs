@@ -94,6 +94,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.EpisodeIntroClusterMinAgreementPct = Math.Clamp(request.EpisodeIntroClusterMinAgreementPct, 50, 100);
 
         if (TimeSpan.TryParse(request.VideoThumbnailScheduleTime, out var vtTime)) settings.VideoThumbnailScheduleTime = vtTime;
+        if (TimeSpan.TryParse(request.IptvHealthCheckTime, out var ihcTime)) settings.IptvHealthCheckTime = ihcTime;
         settings.VideoThumbnailIntervalSeconds = Math.Clamp(request.VideoThumbnailIntervalSeconds, 2, 300);
         settings.VideoThumbnailWidth = Math.Clamp(request.VideoThumbnailWidth, 80, 1280);
         settings.VideoThumbnailHeight = Math.Clamp(request.VideoThumbnailHeight, 45, 720);
