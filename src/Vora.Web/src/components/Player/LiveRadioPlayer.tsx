@@ -19,6 +19,7 @@ export default function LiveRadioPlayer() {
 
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [streamError, setStreamError] = useState<string | null>(null);
     const [channels, setChannels] = useState<IptvChannelVM[]>([]);
 
     const isPodcast = currentMedia?.playbackContextType === 'Podcast';
@@ -70,7 +71,7 @@ export default function LiveRadioPlayer() {
 
         let hls: Hls | null = null;
         let isMounted = true;
-        queueMicrotask(() => { if (isMounted) setIsLoading(true); });
+        queueMicrotask(() => { if (isMounted) { setIsLoading(true); setStreamError(null); } });
 
         if (isAudioOnDemand) {
             const startPosition = currentMedia.startPosition ?? 0;
@@ -103,6 +104,28 @@ export default function LiveRadioPlayer() {
             };
         }
 
+        // Radio streams can fail silently (dead URL, CORS block, network drop).
+        // Without these the loading spinner spins forever. Surface a message and
+        // stop the spinner on any fatal HLS error, media error, or timeout.
+        const STREAM_ERROR = 'This station could not be played. It may be offline or blocking playback.';
+        let loadTimeout: ReturnType<typeof setTimeout>;
+        const failStream = (message: string) => {
+            if (!isMounted) return;
+            clearTimeout(loadTimeout);
+            setIsLoading(false);
+            setStreamError(message);
+        };
+        const onVideoPlaying = () => {
+            if (!isMounted) return;
+            clearTimeout(loadTimeout);
+            setStreamError(null);
+            setIsLoading(false);
+        };
+        const onVideoError = () => failStream(STREAM_ERROR);
+        video.addEventListener('playing', onVideoPlaying);
+        video.addEventListener('error', onVideoError);
+        loadTimeout = setTimeout(() => failStream('This station is not responding. Try another station.'), 20000);
+
         const attachPassthrough = async () => {
             const activeServer = serverVault.getActiveServer();
             let streamUrl: string;
@@ -114,7 +137,7 @@ export default function LiveRadioPlayer() {
                 streamType = data.streamType;
             } catch (err) {
                 console.error("Failed to start radio passthrough:", err);
-                setIsLoading(false);
+                failStream(STREAM_ERROR);
                 return;
             }
 
@@ -138,6 +161,9 @@ export default function LiveRadioPlayer() {
                         video.play().catch(e => console.error(e));
                         setIsLoading(false);
                     }
+                });
+                hls.on(HlsClass.Events.ERROR, (_e, data) => {
+                    if (data.fatal) failStream(STREAM_ERROR);
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = streamUrl;
@@ -176,6 +202,9 @@ export default function LiveRadioPlayer() {
                             setIsLoading(false);
                         }
                     });
+                    hls.on(HlsClass.Events.ERROR, (_e, data) => {
+                        if (data.fatal) failStream(STREAM_ERROR);
+                    });
                 } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                     video.src = finalUrl;
                     video.play().catch(e => console.error(e));
@@ -197,6 +226,9 @@ export default function LiveRadioPlayer() {
 
         return () => {
             isMounted = false;
+            clearTimeout(loadTimeout);
+            video.removeEventListener('playing', onVideoPlaying);
+            video.removeEventListener('error', onVideoError);
             if (pingInterval) clearInterval(pingInterval);
             if (hls) hls.destroy();
             video.removeAttribute('src');
@@ -632,14 +664,23 @@ export default function LiveRadioPlayer() {
                         </div>
                     )}
 
-                    {isLoading && (
+                    {streamError ? (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center" style={{ background: 'rgba(0, 0, 0, 0.6)' }}>
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ color: 'var(--vora-accent-500)' }}>
+                                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                            </svg>
+                            <span className="text-xs font-medium" style={{ color: 'var(--vora-text-secondary)' }}>{streamError}</span>
+                        </div>
+                    ) : isLoading ? (
                         <div className="pointer-events-none absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0, 0, 0, 0.4)' }}>
                             <svg className="h-12 w-12 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style={{ color: 'var(--vora-accent-500)' }}>
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                             </svg>
                         </div>
-                    )}
+                    ) : null}
                 </div>
             ))}
         </div>
