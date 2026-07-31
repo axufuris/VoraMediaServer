@@ -4,6 +4,7 @@ public class IptvChannelVM
 {
     public Guid Id { get; set; }
     public Guid PlaylistId { get; set; }
+    public string PlaylistName { get; set; } = string.Empty;
     public string ExternalChannelId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? LogoUrl { get; set; }
