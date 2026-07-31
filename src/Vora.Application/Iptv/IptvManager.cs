@@ -542,6 +542,7 @@ public class IptvManager : IIptvManager
             {
                 Id = c.Id,
                 PlaylistId = c.PlaylistId,
+                PlaylistName = entity.Name,
                 ExternalChannelId = c.ExternalChannelId,
                 Name = c.Name,
                 LogoUrl = c.LogoUrl,

@@ -5,6 +5,7 @@ export type IptvChannelKind = 'Tv' | 'Radio';
 export interface IptvChannelVM {
     id: string;
     playlistId: string;
+    playlistName?: string;
     externalChannelId: string;
     name: string;
     logoUrl?: string;

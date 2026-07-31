@@ -91,6 +91,15 @@ export default function GuideRow({
                         )}
                     </div>
                     <div className="mt-0.5 flex items-center gap-2">
+                        {channel.playlistName && (
+                            <span
+                                className="shrink-0 truncate rounded px-1 py-0.5 text-[9px] font-medium"
+                                style={{ maxWidth: '50%', background: 'var(--vora-bg-sunken)', color: 'var(--vora-text-muted)', border: '1px solid var(--vora-border-subtle)' }}
+                                title={`Source: ${channel.playlistName}`}
+                            >
+                                {channel.playlistName}
+                            </span>
+                        )}
                         {channel.countryCode && channel.countryCode !== 'Unknown' && (
                             <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>
                                 {channel.countryCode}
