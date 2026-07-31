@@ -31,6 +31,11 @@ function sortAudioTracksByChannels(tracks: string[]) {
     return [...tracks].sort((a, b) => audioChannelCount(a) - audioChannelCount(b));
 }
 
+const TYPE_LABELS: Record<string, string> = { Movie: 'Movies', Episode: 'TV', Track: 'Music' };
+function typeLabel(t: string) {
+    return TYPE_LABELS[t] ?? t;
+}
+
 function Chip({ children, tone = 'neutral' }: { children: React.ReactNode, tone?: 'neutral' | 'highlight' }) {
     const cls = tone === 'highlight'
         ? 'bg-[var(--vora-accent-soft)] text-[var(--vora-accent-text)]'
@@ -89,6 +94,7 @@ type DialogApi = ReturnType<typeof useDialog>;
 function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: string }) {
     const [groups, setGroups] = useState<DedupeGroupVM[]>([]);
     const [loading, setLoading] = useState(true);
+    const [typeFilter, setTypeFilter] = useState<string>('All');
 
     const fetchDuplicates = useCallback(async () => {
         setLoading(true);
@@ -145,7 +151,16 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
         }
     };
 
-    const potentialSavings = groups.reduce(
+    const availableTypes = Array.from(new Set(groups.map(g => g.type))).sort();
+    const typesKey = availableTypes.join('|');
+
+    useEffect(() => {
+        if (typeFilter !== 'All' && !typesKey.split('|').includes(typeFilter)) setTypeFilter('All');
+    }, [typesKey, typeFilter]);
+
+    const filteredGroups = typeFilter === 'All' ? groups : groups.filter(g => g.type === typeFilter);
+
+    const potentialSavings = filteredGroups.reduce(
         (sum, g) => sum + g.parts.slice(1).reduce((s, p) => s + p.fileSizeBytes, 0),
         0
     );
@@ -153,7 +168,7 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
     return (
         <>
             <div className="flex justify-between items-center gap-4 mb-4 flex-wrap">
-                {groups.length > 0 ? (
+                {filteredGroups.length > 0 ? (
                     <div className="vora-card px-5 py-3 flex items-baseline gap-2">
                         <span className="text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">Potential savings</span>
                         <span className="text-xl font-bold text-[var(--vora-accent-text)]">{formatBytes(potentialSavings)}</span>
@@ -166,6 +181,28 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
                 </button>
             </div>
 
+            {availableTypes.length > 1 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                    {['All', ...availableTypes].map(t => {
+                        const active = typeFilter === t;
+                        return (
+                            <button
+                                key={t}
+                                type="button"
+                                onClick={() => setTypeFilter(t)}
+                                className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors cursor-pointer ${
+                                    active
+                                        ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)] border-[var(--vora-accent-500)]'
+                                        : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] border-[var(--vora-border-subtle)] hover:text-[var(--vora-text-primary)]'
+                                }`}
+                            >
+                                {t === 'All' ? 'All types' : typeLabel(t)}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
             {loading ? (
                 <div className="vora-skeleton h-48" />
             ) : groups.length === 0 ? (
@@ -176,9 +213,17 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
                         icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" /></svg>}
                     />
                 </div>
+            ) : filteredGroups.length === 0 ? (
+                <div className="vora-card">
+                    <EmptyState
+                        title="No duplicates of this type"
+                        description="No duplicate groups match the selected type filter."
+                        icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" /></svg>}
+                    />
+                </div>
             ) : (
                 <div className="space-y-6">
-                    {groups.map(group => (
+                    {filteredGroups.map(group => (
                         <section key={`${group.mediaItemId}|${group.resolution}`} className="vora-card overflow-hidden">
                             <div className="bg-[var(--vora-bg-sunken)] px-5 py-4 border-b border-[var(--vora-border-subtle)] flex justify-between items-center gap-3 flex-wrap">
                                 <div>
