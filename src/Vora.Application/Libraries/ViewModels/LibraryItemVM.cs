@@ -44,7 +44,7 @@ public class LibraryItemVM
                 : item is Episode ? "Episode"
                 : "Unknown",
             PosterUrl = item.PosterUrl,
-            BackgroundUrl = item.BackgroundUrl,
+            BackgroundUrl = item.BackgroundUrl ?? (item is Season ? ((Season)item).TvShow.BackgroundUrl : null),
             ContentRating = item.ContentRating,
             Resolution = item.MediaParts.FirstOrDefault() != null
                 ? item.MediaParts.FirstOrDefault()!.Resolution
