@@ -8,7 +8,7 @@ import { serverVault } from '../../../utils/serverVault';
 import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { useDialog } from '../../../dialogs';
 import GuideProgramModal from '../../../components/Iptv/GuideProgramModal';
-import { ROW_HEIGHT, PX_PER_MINUTE, HOURS_TO_SHOW, parseDate } from './guideConstants';
+import { ROW_HEIGHT, PX_PER_MINUTE, HOURS_TO_SHOW, CHANNEL_COLUMN_WIDTH, parseDate } from './guideConstants';
 import { useGuideData } from './hooks/useGuideData';
 import { useGuideVirtualization } from './hooks/useGuideVirtualization';
 import GuideRow, { type CleanedProgram } from './components/GuideRow';
@@ -36,17 +36,29 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
         }
     }, []);
 
-    const { timelineStart, timelineEnd, timeMarkers } = useMemo(() => {
+    const [containerWidth, setContainerWidth] = useState(0);
+
+    const timelineStart = useMemo(() => {
         const now = new Date();
         const startMinutes = now.getMinutes() < 30 ? 0 : 30;
         const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), startMinutes, 0);
         start.setMinutes(start.getMinutes() - 30);
-        const end = new Date(start.getTime() + HOURS_TO_SHOW * 60 * 60 * 1000);
-
-        const markers = [];
-        for (let i = 0; i <= HOURS_TO_SHOW * 2; i++) markers.push(new Date(start.getTime() + i * 30 * 60 * 1000));
-        return { timelineStart: start, timelineEnd: end, timeMarkers: markers };
+        return start;
     }, []);
+
+    const hoursToShow = useMemo(() => {
+        if (containerWidth <= 0) return HOURS_TO_SHOW;
+        const availableForTimeline = containerWidth - CHANNEL_COLUMN_WIDTH;
+        const neededHours = Math.ceil(availableForTimeline / (PX_PER_MINUTE * 60));
+        return Math.max(HOURS_TO_SHOW, neededHours);
+    }, [containerWidth]);
+
+    const { timelineEnd, timeMarkers } = useMemo(() => {
+        const end = new Date(timelineStart.getTime() + hoursToShow * 60 * 60 * 1000);
+        const markers = [];
+        for (let i = 0; i <= hoursToShow * 2; i++) markers.push(new Date(timelineStart.getTime() + i * 30 * 60 * 1000));
+        return { timelineEnd: end, timeMarkers: markers };
+    }, [timelineStart, hoursToShow]);
 
     const { channels, guideData, recordingSessions, isLoading, prefs, updatePrefs } = useGuideData(serverId, timelineStart, timelineEnd);
     const [recordingSessionsLocal, setRecordingSessionsLocal] = useState(recordingSessions);
@@ -208,6 +220,16 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
     const { setScrollTop, scrollContainerRef, handleScroll, startIndex, endIndex, offsetY, totalHeight, visibleCount } = useGuideVirtualization(filteredChannels.length);
 
     useEffect(() => {
+        const el = scrollContainerRef.current;
+        if (!el) return;
+        const measure = () => setContainerWidth(el.clientWidth);
+        measure();
+        const observer = new ResizeObserver(measure);
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [isLoading, scrollContainerRef]);
+
+    useEffect(() => {
         if (!hasAutoScrolled && !isLoading && filteredChannels.length > 0 && currentPlayingChannelId && scrollContainerRef.current) {
             const activeIndex = filteredChannels.findIndex(c => c.id === currentPlayingChannelId);
 
@@ -244,7 +266,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
     }, [guideData]);
 
     const visibleChannels = filteredChannels.slice(startIndex, endIndex);
-    const timelineWidth = HOURS_TO_SHOW * 60 * PX_PER_MINUTE;
+    const timelineWidth = hoursToShow * 60 * PX_PER_MINUTE;
 
     const handlePlayChannel = (channel: IptvChannelVM, program?: IptvProgramDto) => {
         if (onPlayChannel) { onPlayChannel(channel, program); return; }
