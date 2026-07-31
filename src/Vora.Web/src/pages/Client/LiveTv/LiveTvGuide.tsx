@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { type IptvChannelVM } from '../../../api/Iptv/iptvAdminService';
 import { type IptvProgramDto } from '../../../api/Iptv/iptvClientService';
@@ -150,6 +150,39 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
             ...sorted
         ];
     }, [channels, prefs, guideData]);
+
+    const categoryRowRef = useRef<HTMLDivElement>(null);
+    const [catCanLeft, setCatCanLeft] = useState(false);
+    const [catCanRight, setCatCanRight] = useState(false);
+
+    const updateCatArrows = useCallback(() => {
+        const el = categoryRowRef.current;
+        if (!el) return;
+        setCatCanLeft(el.scrollLeft > 4);
+        setCatCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    }, []);
+
+    useEffect(() => {
+        const el = categoryRowRef.current;
+        if (!el) return;
+        updateCatArrows();
+        const onWheel = (e: WheelEvent) => {
+            if (e.deltaY === 0) return;
+            e.preventDefault();
+            el.scrollLeft += e.deltaY;
+            updateCatArrows();
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        const observer = new ResizeObserver(updateCatArrows);
+        observer.observe(el);
+        return () => { el.removeEventListener('wheel', onWheel); observer.disconnect(); };
+    }, [updateCatArrows, categories.length]);
+
+    const scrollCategories = (direction: number) => {
+        const el = categoryRowRef.current;
+        if (!el) return;
+        el.scrollBy({ left: direction * Math.max(240, el.clientWidth * 0.7), behavior: 'smooth' });
+    };
 
     const regions = useMemo(() => Array.from(new Set(channels.map(c => c.countryCode || 'Unknown'))).sort(), [channels]);
 
@@ -553,9 +586,37 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
             )}
 
             <div
-                className="relative z-50 flex shrink-0 gap-2 overflow-x-auto px-6 py-3"
-                style={{ background: 'var(--vora-bg-surface)', borderBottom: '1px solid var(--vora-border-subtle)', scrollbarWidth: 'none' }}
+                className="relative z-50 shrink-0"
+                style={{ background: 'var(--vora-bg-surface)', borderBottom: '1px solid var(--vora-border-subtle)' }}
             >
+                {catCanLeft && (
+                    <button
+                        type="button"
+                        aria-label="Scroll categories left"
+                        onClick={() => scrollCategories(-1)}
+                        className="absolute left-1 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full"
+                        style={{ background: 'var(--vora-bg-raised)', border: '1px solid var(--vora-border-strong)', boxShadow: 'var(--vora-shadow-md)', color: 'var(--vora-text-primary)' }}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+                    </button>
+                )}
+                {catCanRight && (
+                    <button
+                        type="button"
+                        aria-label="Scroll categories right"
+                        onClick={() => scrollCategories(1)}
+                        className="absolute right-1 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full"
+                        style={{ background: 'var(--vora-bg-raised)', border: '1px solid var(--vora-border-strong)', boxShadow: 'var(--vora-shadow-md)', color: 'var(--vora-text-primary)' }}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
+                    </button>
+                )}
+                <div
+                    ref={categoryRowRef}
+                    onScroll={updateCatArrows}
+                    className="flex gap-2 overflow-x-auto px-6 py-3"
+                    style={{ scrollbarWidth: 'none' }}
+                >
                 {categories.map(cat => {
                     const isActive = activeCategory === cat.key;
                     return (
@@ -590,6 +651,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                         </button>
                     );
                 })}
+                </div>
             </div>
 
             <div
