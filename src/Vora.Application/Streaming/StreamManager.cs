@@ -327,12 +327,16 @@ public class StreamManager : IStreamManager
             // let the frontend show "—" rather than crash the whole stats endpoint.
         }
 
+        // "Used" is Vora's OWN footprint (its data directories), not the whole
+        // volume's used space. The data volume usually shares a disk with the
+        // media libraries, so whole-volume used would count the library content
+        // the admin never asked about here.
         return new SystemStatsVM
         {
             CpuUsagePercentage = Math.Round(cpu, 1),
             RamUsageGb = Math.Round(ramGb, 2),
             DiskTotalBytes = diskTotal,
-            DiskUsedBytes = diskTotal - diskFree,
+            DiskUsedBytes = GetAppStorageUsedBytes(),
             DiskFreeBytes = diskFree,
         };
     }
@@ -383,5 +387,86 @@ public class StreamManager : IStreamManager
         return string.Equals(path, normalized, StringComparison.OrdinalIgnoreCase)
             || path.StartsWith(normalized + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
             || path.StartsWith(normalized + "/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Sizing the data directories walks every file, so cache it — the dashboard
+    // polls these stats often and the footprint barely moves minute to minute.
+    private static readonly TimeSpan AppStorageCacheTtl = TimeSpan.FromMinutes(5);
+    private static readonly object AppStorageLock = new();
+    private static long _cachedAppStorageBytes = -1;
+    private static DateTime _cachedAppStorageAtUtc = DateTime.MinValue;
+
+    private long GetAppStorageUsedBytes()
+    {
+        lock (AppStorageLock)
+        {
+            if (_cachedAppStorageBytes >= 0 && DateTime.UtcNow - _cachedAppStorageAtUtc < AppStorageCacheTtl)
+            {
+                return _cachedAppStorageBytes;
+            }
+        }
+
+        var total = ComputeAppStorageUsedBytes();
+
+        lock (AppStorageLock)
+        {
+            _cachedAppStorageBytes = total;
+            _cachedAppStorageAtUtc = DateTime.UtcNow;
+        }
+        return total;
+    }
+
+    private long ComputeAppStorageUsedBytes()
+    {
+        var roots = new[]
+        {
+            _storagePaths.Metadata,
+            _storagePaths.CustomArtwork,
+            _storagePaths.OriginalArtworkCache,
+            _storagePaths.UserImages,
+            _storagePaths.Plugins,
+            _storagePaths.VideoThumbnails,
+            _storagePaths.Logs,
+            _storagePaths.Backups,
+            _storagePaths.DataProtection,
+            _storagePaths.EpgCache,
+            _storagePaths.IptvDvr,
+        }
+        .Where(p => !string.IsNullOrWhiteSpace(p))
+        .Select(p => Path.GetFullPath(p!))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+        // Drop any path nested under another so a shared base isn't double
+        // counted (Logs/Backups under the data dir, imagecache under CustomArtwork).
+        var topLevel = roots
+            .Where(p => !roots.Any(other => !string.Equals(other, p, StringComparison.OrdinalIgnoreCase) && PathIsUnder(p, other)))
+            .ToList();
+
+        long total = 0;
+        foreach (var root in topLevel)
+        {
+            total += DirectorySizeBytes(root);
+        }
+        return total;
+    }
+
+    private static long DirectorySizeBytes(string path)
+    {
+        if (!Directory.Exists(path)) return 0;
+
+        long sum = 0;
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+            {
+                try { sum += new FileInfo(file).Length; }
+                catch { }
+            }
+        }
+        catch
+        {
+        }
+        return sum;
     }
 }
