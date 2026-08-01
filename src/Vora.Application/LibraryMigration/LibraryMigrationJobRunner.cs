@@ -182,11 +182,11 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             u.RatingsFetched = userData.Ratings.Count;
         });
 
-        var tmdbIds = CollectIds(userData, e => e.TmdbId);
-        var imdbIds = CollectIds(userData, e => e.ImdbId);
-        var tvdbIds = CollectIds(userData, e => e.TvdbId);
+        var movieTmdbIds = CollectIds(userData, RemoteMediaKind.Movie, e => e.TmdbId);
+        var movieImdbIds = CollectIds(userData, RemoteMediaKind.Movie, e => e.ImdbId);
+        var movieTvdbIds = CollectIds(userData, RemoteMediaKind.Movie, e => e.TvdbId);
 
-        var matchedItems = await repository.FindMatchesAsync(tmdbIds, imdbIds, tvdbIds);
+        var matchedItems = await repository.FindMatchesAsync(movieTmdbIds, movieImdbIds, movieTvdbIds);
 
         var tmdbMap = matchedItems
             .Where(m => !string.IsNullOrEmpty(m.TmdbId))
@@ -209,8 +209,34 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             return null;
         }
 
+        var showTmdbIds = CollectIds(userData, RemoteMediaKind.Episode, e => e.TmdbId);
+        var showImdbIds = CollectIds(userData, RemoteMediaKind.Episode, e => e.ImdbId);
+        var showTvdbIds = CollectIds(userData, RemoteMediaKind.Episode, e => e.TvdbId);
+
+        var episodeRows = await repository.FindEpisodeMatchesAsync(showTmdbIds, showImdbIds, showTvdbIds);
+        var episodeMap = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in episodeRows)
+        {
+            if (!string.IsNullOrEmpty(row.ShowTmdbId)) episodeMap.TryAdd(EpisodeKey("tmdb", row.ShowTmdbId!, row.SeasonNumber, row.EpisodeNumber), row.Id);
+            if (!string.IsNullOrEmpty(row.ShowImdbId)) episodeMap.TryAdd(EpisodeKey("imdb", row.ShowImdbId!, row.SeasonNumber, row.EpisodeNumber), row.Id);
+            if (!string.IsNullOrEmpty(row.ShowTvdbId)) episodeMap.TryAdd(EpisodeKey("tvdb", row.ShowTvdbId!, row.SeasonNumber, row.EpisodeNumber), row.Id);
+        }
+
+        Guid? MatchEpisode(RemoteExternalIdsDto ids, int? season, int? episode)
+        {
+            if (season is null || episode is null) return null;
+            if (!string.IsNullOrEmpty(ids.TmdbId) && episodeMap.TryGetValue(EpisodeKey("tmdb", ids.TmdbId!, season.Value, episode.Value), out var t)) return t;
+            if (!string.IsNullOrEmpty(ids.ImdbId) && episodeMap.TryGetValue(EpisodeKey("imdb", ids.ImdbId!, season.Value, episode.Value), out var i)) return i;
+            if (!string.IsNullOrEmpty(ids.TvdbId) && episodeMap.TryGetValue(EpisodeKey("tvdb", ids.TvdbId!, season.Value, episode.Value), out var v)) return v;
+            return null;
+        }
+
+        Guid? MatchEntry(RemoteMediaKind kind, RemoteExternalIdsDto ids, int? season, int? episode)
+            => kind == RemoteMediaKind.Episode ? MatchEpisode(ids, season, episode) : Match(ids);
+
         var watchSkipped = 0;
         var ratingsSkipped = 0;
+        var skippedSamples = new List<string>();
         var watchUpserts = new List<WatchStateUpsert>();
         var ratingUpserts = new List<RatingUpsert>();
 
@@ -219,9 +245,9 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             var matchedWatch = new List<(Guid MediaItemId, RemoteWatchStateDto State)>();
             foreach (var ws in userData.WatchStates)
             {
-                var match = Match(ws.ExternalIds);
+                var match = MatchEntry(ws.Kind, ws.ExternalIds, ws.SeasonNumber, ws.EpisodeNumber);
                 if (match.HasValue) matchedWatch.Add((match.Value, ws));
-                else watchSkipped++;
+                else { watchSkipped++; RecordSkip(skippedSamples, "watch", ws.Kind, ws.ExternalIds, ws.SeasonNumber, ws.EpisodeNumber); }
             }
             watchUpserts.AddRange(matchedWatch
                 .GroupBy(p => p.MediaItemId)
@@ -234,9 +260,9 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             var matchedRatings = new List<(Guid MediaItemId, RemoteRatingDto Rating)>();
             foreach (var r in userData.Ratings)
             {
-                var match = Match(r.ExternalIds);
+                var match = MatchEntry(r.Kind, r.ExternalIds, r.SeasonNumber, r.EpisodeNumber);
                 if (match.HasValue) matchedRatings.Add((match.Value, r));
-                else ratingsSkipped++;
+                else { ratingsSkipped++; RecordSkip(skippedSamples, "rating", r.Kind, r.ExternalIds, r.SeasonNumber, r.EpisodeNumber); }
             }
             ratingUpserts.AddRange(matchedRatings
                 .GroupBy(p => p.MediaItemId)
@@ -246,6 +272,13 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             {
                 await repository.BulkSetAdminRatingsAsync(ratingUpserts);
             }
+        }
+
+        if (watchSkipped + ratingsSkipped > 0)
+        {
+            _logger.LogInformation(
+                "Library import job {JobId}: {SkipCount} entr(ies) had no Vora match. Sample: {Samples}",
+                jobId, watchSkipped + ratingsSkipped, string.Join(" | ", skippedSamples));
         }
 
         UpdateUser(jobId, mapping.AccountId, u =>
@@ -327,16 +360,32 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
         };
     }
 
-    private static List<string> CollectIds(RemoteUserDataDto data, Func<RemoteExternalIdsDto, string?> selector)
+    private static string EpisodeKey(string idType, string id, int season, int episode) => $"{idType}:{id}:{season}:{episode}";
+
+    private static void RecordSkip(List<string> samples, string kindLabel, RemoteMediaKind kind, RemoteExternalIdsDto ids, int? season, int? episode)
+    {
+        if (samples.Count >= 40) return;
+        var idPart = !string.IsNullOrEmpty(ids.TmdbId) ? $"tmdb:{ids.TmdbId}"
+            : !string.IsNullOrEmpty(ids.ImdbId) ? $"imdb:{ids.ImdbId}"
+            : !string.IsNullOrEmpty(ids.TvdbId) ? $"tvdb:{ids.TvdbId}"
+            : "no-id";
+        samples.Add(kind == RemoteMediaKind.Episode
+            ? $"{kindLabel} episode {idPart} S{season}E{episode}"
+            : $"{kindLabel} movie {idPart}");
+    }
+
+    private static List<string> CollectIds(RemoteUserDataDto data, RemoteMediaKind kind, Func<RemoteExternalIdsDto, string?> selector)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var ws in data.WatchStates)
         {
+            if (ws.Kind != kind) continue;
             var id = selector(ws.ExternalIds);
             if (!string.IsNullOrEmpty(id)) set.Add(id);
         }
         foreach (var r in data.Ratings)
         {
+            if (r.Kind != kind) continue;
             var id = selector(r.ExternalIds);
             if (!string.IsNullOrEmpty(id)) set.Add(id);
         }

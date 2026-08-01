@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.LibraryMigration;
+using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Users;
 
 namespace Vora.Infrastructure.Persistence.Repositories;
@@ -35,6 +36,35 @@ public class LibraryMigrationRepository : ILibraryMigrationRepository
                 TmdbId = m.TmdbId,
                 ImdbId = m.ImdbId,
                 TvdbId = m.TvdbId
+            })
+            .ToListAsync();
+    }
+
+    public async Task<List<EpisodeMatchRow>> FindEpisodeMatchesAsync(IReadOnlyCollection<string> showTmdbIds, IReadOnlyCollection<string> showImdbIds, IReadOnlyCollection<string> showTvdbIds)
+    {
+        if (showTmdbIds.Count == 0 && showImdbIds.Count == 0 && showTvdbIds.Count == 0)
+        {
+            return new List<EpisodeMatchRow>();
+        }
+
+        var tmdbList = showTmdbIds.ToList();
+        var imdbList = showImdbIds.ToList();
+        var tvdbList = showTvdbIds.ToList();
+
+        return await _context.MediaItems
+            .OfType<Episode>()
+            .AsNoTracking()
+            .Where(e => (e.Season.TvShow.TmdbId != null && tmdbList.Contains(e.Season.TvShow.TmdbId))
+                     || (e.Season.TvShow.ImdbId != null && imdbList.Contains(e.Season.TvShow.ImdbId))
+                     || (e.Season.TvShow.TvdbId != null && tvdbList.Contains(e.Season.TvShow.TvdbId)))
+            .Select(e => new EpisodeMatchRow
+            {
+                Id = e.Id,
+                ShowTmdbId = e.Season.TvShow.TmdbId,
+                ShowImdbId = e.Season.TvShow.ImdbId,
+                ShowTvdbId = e.Season.TvShow.TvdbId,
+                SeasonNumber = e.Season.SeasonNumber,
+                EpisodeNumber = e.EpisodeNumber
             })
             .ToListAsync();
     }

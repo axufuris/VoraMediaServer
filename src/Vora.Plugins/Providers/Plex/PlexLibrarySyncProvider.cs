@@ -323,11 +323,12 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         {
             if (section.Type == "movie")
             {
-                await WalkSectionAsync(client, baseUri, userAccessToken, clientIdentifier, section.Key, type: null, RemoteMediaKind.Movie, scope, watchStates, ratings, cancellationToken);
+                await WalkSectionAsync(client, baseUri, userAccessToken, clientIdentifier, section.Key, type: null, RemoteMediaKind.Movie, scope, showExternalIds: null, watchStates, ratings, cancellationToken);
             }
             else if (section.Type == "show")
             {
-                await WalkSectionAsync(client, baseUri, userAccessToken, clientIdentifier, section.Key, type: 4, RemoteMediaKind.Episode, scope, watchStates, ratings, cancellationToken);
+                var showExternalIds = await FetchShowExternalIdsAsync(client, baseUri, userAccessToken, clientIdentifier, section.Key, cancellationToken);
+                await WalkSectionAsync(client, baseUri, userAccessToken, clientIdentifier, section.Key, type: 4, RemoteMediaKind.Episode, scope, showExternalIds, watchStates, ratings, cancellationToken);
             }
         }
 
@@ -394,6 +395,7 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         int? type,
         RemoteMediaKind kind,
         RemoteSyncScopeDto scope,
+        IReadOnlyDictionary<string, RemoteExternalIdsDto>? showExternalIds,
         List<RemoteWatchStateDto> watchStates,
         List<RemoteRatingDto> ratings,
         CancellationToken cancellationToken)
@@ -449,7 +451,7 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
             foreach (var item in metadata.EnumerateArray())
             {
                 pageCount++;
-                ProjectMetadataItem(item, kind, scope, watchStates, ratings);
+                ProjectMetadataItem(item, kind, scope, showExternalIds, watchStates, ratings);
             }
 
             start += pageCount;
@@ -460,10 +462,32 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         }
     }
 
-    private static void ProjectMetadataItem(JsonElement item, RemoteMediaKind kind, RemoteSyncScopeDto scope, List<RemoteWatchStateDto> watchStates, List<RemoteRatingDto> ratings)
+    private static void ProjectMetadataItem(JsonElement item, RemoteMediaKind kind, RemoteSyncScopeDto scope, IReadOnlyDictionary<string, RemoteExternalIdsDto>? showExternalIds, List<RemoteWatchStateDto> watchStates, List<RemoteRatingDto> ratings)
     {
-        var externalIds = ReadGuids(item);
-        if (!externalIds.HasAny) return;
+        RemoteExternalIdsDto externalIds;
+        int? seasonNumber = null;
+        int? episodeNumber = null;
+
+        if (kind == RemoteMediaKind.Episode)
+        {
+            var showRatingKey = ReadStringProperty(item, "grandparentRatingKey");
+            if (string.IsNullOrEmpty(showRatingKey) || showExternalIds is null || !showExternalIds.TryGetValue(showRatingKey, out var showIds) || !showIds.HasAny)
+            {
+                return;
+            }
+            seasonNumber = ReadIntProperty(item, "parentIndex");
+            episodeNumber = ReadIntProperty(item, "index");
+            if (seasonNumber is null || episodeNumber is null)
+            {
+                return;
+            }
+            externalIds = showIds;
+        }
+        else
+        {
+            externalIds = ReadGuids(item);
+            if (!externalIds.HasAny) return;
+        }
 
         if (scope.IncludeWatchState)
         {
@@ -483,6 +507,8 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
                 {
                     ExternalIds = externalIds,
                     Kind = kind,
+                    SeasonNumber = seasonNumber,
+                    EpisodeNumber = episodeNumber,
                     IsPlayed = viewCount > 0,
                     ResumePositionSeconds = viewOffsetMs / 1000.0,
                     LastPlayedAt = lastViewedUnix > 0
@@ -504,6 +530,8 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
                 {
                     ExternalIds = externalIds,
                     Kind = kind,
+                    SeasonNumber = seasonNumber,
+                    EpisodeNumber = episodeNumber,
                     Rating = rating,
                     RatedAt = lastRatedUnix > 0
                         ? DateTimeOffset.FromUnixTimeSeconds(lastRatedUnix).UtcDateTime
@@ -639,6 +667,68 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         if (prop.ValueKind != JsonValueKind.String) return null;
         var value = prop.GetString();
         return string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    private static int? ReadIntProperty(JsonElement element, string name)
+    {
+        if (!element.TryGetProperty(name, out var prop)) return null;
+        if (prop.ValueKind == JsonValueKind.Number && prop.TryGetInt32(out var number)) return number;
+        if (prop.ValueKind == JsonValueKind.String && int.TryParse(prop.GetString(), out var parsed)) return parsed;
+        return null;
+    }
+
+    private async Task<IReadOnlyDictionary<string, RemoteExternalIdsDto>> FetchShowExternalIdsAsync(HttpClient client, string baseUri, string userToken, string clientIdentifier, string sectionKey, CancellationToken cancellationToken)
+    {
+        var map = new Dictionary<string, RemoteExternalIdsDto>(StringComparer.Ordinal);
+        const int pageSize = 500;
+        var start = 0;
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var uri = $"{baseUri}/library/sections/{sectionKey}/all?includeGuids=1";
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            ApplyPlexHeaders(request, clientIdentifier);
+            request.Headers.Add("X-Plex-Token", userToken);
+            request.Headers.Add("X-Plex-Container-Start", start.ToString(CultureInfo.InvariantCulture));
+            request.Headers.Add("X-Plex-Container-Size", pageSize.ToString(CultureInfo.InvariantCulture));
+
+            using var response = await client.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Plex show listing for section {SectionKey} returned {StatusCode}.", sectionKey, (int)response.StatusCode);
+                return map;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("MediaContainer", out var container)) return map;
+
+            var totalSize = container.TryGetProperty("totalSize", out var totalProp) && totalProp.ValueKind == JsonValueKind.Number
+                ? totalProp.GetInt32()
+                : 0;
+
+            if (!container.TryGetProperty("Metadata", out var metadata) || metadata.ValueKind != JsonValueKind.Array) return map;
+
+            var pageCount = 0;
+            foreach (var item in metadata.EnumerateArray())
+            {
+                pageCount++;
+                var ratingKey = ReadStringProperty(item, "ratingKey");
+                if (string.IsNullOrEmpty(ratingKey)) continue;
+                var ids = ReadGuids(item);
+                if (ids.HasAny) map[ratingKey] = ids;
+            }
+
+            start += pageCount;
+            if (pageCount == 0 || (totalSize > 0 && start >= totalSize) || pageCount < pageSize) break;
+        }
+
+        _logger.LogInformation("Plex show section {SectionKey}: resolved external ids for {Count} shows.", sectionKey, map.Count);
+        return map;
     }
 
     private static RemoteServerDto? TryProjectServer(JsonElement element)
