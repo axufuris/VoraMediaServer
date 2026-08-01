@@ -337,6 +337,16 @@ export default function LibraryMigrationPage() {
                         Ratings: {user.ratingsImported} imported / {user.ratingsFetched} fetched
                         {user.skipped > 0 && (' · ' + user.skipped + ' skipped (no match)')}
                     </div>
+                    {user.skippedSamples && user.skippedSamples.length > 0 && (
+                        <details className="mt-1">
+                            <summary className="text-xs cursor-pointer text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)]">
+                                Show unmatched sample ({user.skippedSamples.length} of {user.skipped})
+                            </summary>
+                            <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-[var(--vora-text-muted)]">
+                                {user.skippedSamples.map((s, i) => <li key={i}>{s}</li>)}
+                            </ul>
+                        </details>
+                    )}
                     {user.errorMessage && <p className="text-xs text-[var(--vora-danger-500)] mt-1">{user.errorMessage}</p>}
                 </div>
             ))}

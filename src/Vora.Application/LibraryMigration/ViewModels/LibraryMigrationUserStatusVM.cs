@@ -21,5 +21,6 @@ public class LibraryMigrationUserStatusVM
     public int RatingsFetched { get; set; }
     public int RatingsImported { get; set; }
     public int Skipped { get; set; }
+    public List<string> SkippedSamples { get; set; } = new();
     public string? ErrorMessage { get; set; }
 }

@@ -78,6 +78,7 @@ export interface LibraryMigrationUserStatusVM {
     ratingsFetched: number;
     ratingsImported: number;
     skipped: number;
+    skippedSamples: string[];
     errorMessage?: string | null;
 }
 
