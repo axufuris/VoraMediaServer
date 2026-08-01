@@ -165,7 +165,7 @@ public class MediaIngestionService : IMediaIngestionService
         return new SeasonHandle(season.Id);
     }
 
-    public async Task<MediaItemHandle> EnsureEpisodeAsync(LibraryHandle library, SeasonHandle season, int episodeNumber, string title, DateTime? airDate, string? edition = null)
+    public async Task<MediaItemHandle> EnsureEpisodeAsync(LibraryHandle library, SeasonHandle season, int episodeNumber, string title, DateTime? airDate, string? edition = null, int? endEpisodeNumber = null)
     {
         var libraryId = library.Value;
         var seasonId = season.Value;
@@ -180,6 +180,7 @@ public class MediaIngestionService : IMediaIngestionService
             LibraryId = libraryId,
             SeasonId = seasonId,
             EpisodeNumber = episodeNumber,
+            EndEpisodeNumber = endEpisodeNumber > episodeNumber ? endEpisodeNumber : null,
             AddedAt = DateTime.UtcNow,
             ReleaseDate = airDate,
             Edition = edition
