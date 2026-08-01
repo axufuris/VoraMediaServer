@@ -18,7 +18,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         _context = context;
     }
 
-    public async Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId)
+    public async Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId, Guid? profileId)
     {
         var result = new UpNextResultVM();
 
@@ -135,6 +135,52 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                     })
                     .FirstOrDefaultAsync();
             }
+        }
+        else if (currentMedia.Type == "TvShow")
+        {
+            UpNextItemVM? nextEpisode = null;
+
+            if (profileId.HasValue)
+            {
+                nextEpisode = await _context.Set<Episode>()
+                    .AsNoTracking()
+                    .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
+                    .Where(e => !_context.UserMediaStates.Any(s => s.ProfileId == profileId.Value && s.MediaItemId == e.Id && s.IsPlayed))
+                    .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
+                    .Select(e => new UpNextItemVM
+                    {
+                        Id = e.Id,
+                        Title = e.Title,
+                        TvShowTitle = e.Season.TvShow.Title,
+                        SeasonNumber = e.Season.SeasonNumber,
+                        EpisodeNumber = e.EpisodeNumber,
+                        Type = "Episode",
+                        PosterUrl = e.PosterUrl,
+                        BackgroundUrl = e.BackgroundUrl,
+                        Overview = e.Overview
+                    })
+                    .FirstOrDefaultAsync();
+            }
+
+            nextEpisode ??= await _context.Set<Episode>()
+                .AsNoTracking()
+                .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
+                .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
+                .Select(e => new UpNextItemVM
+                {
+                    Id = e.Id,
+                    Title = e.Title,
+                    TvShowTitle = e.Season.TvShow.Title,
+                    SeasonNumber = e.Season.SeasonNumber,
+                    EpisodeNumber = e.EpisodeNumber,
+                    Type = "Episode",
+                    PosterUrl = e.PosterUrl,
+                    BackgroundUrl = e.BackgroundUrl,
+                    Overview = e.Overview
+                })
+                .FirstOrDefaultAsync();
+
+            result.NextItem = nextEpisode;
         }
 
         if (currentMedia.Type == "Movie")

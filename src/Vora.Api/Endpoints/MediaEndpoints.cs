@@ -156,9 +156,10 @@ public static class MediaEndpoints
         Guid id,
         [FromQuery] string? contextType,
         [FromQuery] Guid? contextId,
+        ClaimsPrincipal user,
         IUserMediaStateManager manager)
     {
-        var result = await manager.GetUpNextAsync(id, contextType, contextId);
+        var result = await manager.GetUpNextAsync(id, contextType, contextId, user.GetProfileId());
         return Results.Ok(result);
     }
 
