@@ -16,6 +16,7 @@ public class PlaybackDecisionVM
     public int BandwidthKbps { get; set; }
     public int TargetAudioChannels { get; set; }
     public string? SourceHdrType { get; set; }
+    public int OutputHeight { get; set; }
 
     // Stream indexes inside the source file for the picked tracks. Used by
     // BuildFFmpegArguments to emit `-map 0:N` flags so FFmpeg uses the

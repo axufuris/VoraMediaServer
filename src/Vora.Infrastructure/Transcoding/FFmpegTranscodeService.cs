@@ -601,6 +601,12 @@ public class FFmpegTranscodeService : ITranscodeService
         var resolvedDownscale = ResolveDownscaleMode(settings.HdrTranscodeDownscale);
         bool downscaleForHdr = needsTonemap && resolvedDownscale == "Always";
 
+        int scaleHeight = decision.OutputHeight > 0 ? decision.OutputHeight : 0;
+        if (downscaleForHdr)
+        {
+            scaleHeight = scaleHeight > 0 ? Math.Min(scaleHeight, 1080) : 1080;
+        }
+
         if (fullGpuPipeline)
         {
             Flag("-hwaccel cuda -hwaccel_output_format cuda");
@@ -714,9 +720,9 @@ public class FFmpegTranscodeService : ITranscodeService
                 // "how does Plex do it" answer: their ffmpeg has the
                 // same filter via the same build flag.
                 var chain = new List<string>();
-                if (downscaleForHdr)
+                if (scaleHeight > 0)
                 {
-                    chain.Add("scale_cuda=-2:1080:format=p010le");
+                    chain.Add($"scale_cuda=-2:{scaleHeight}:format=p010le");
                 }
                 chain.Add($"tonemap_cuda=tonemap={settings.TonemappingAlgorithm}:format=nv12:peak=1000");
                 Flag("-vf"); args.Add(string.Join(",", chain));
@@ -733,9 +739,9 @@ public class FFmpegTranscodeService : ITranscodeService
                 //   → CPU zscale + tonemap chain
                 //   → NVENC re-uploads the CPU nv12 to GPU
                 var chain = new List<string>();
-                if (downscaleForHdr)
+                if (scaleHeight > 0)
                 {
-                    chain.Add("scale_cuda=-2:1080:format=p010le");
+                    chain.Add($"scale_cuda=-2:{scaleHeight}:format=p010le");
                 }
                 chain.Add("hwdownload");
                 chain.Add("format=p010le");
@@ -750,7 +756,8 @@ public class FFmpegTranscodeService : ITranscodeService
                 // sources; h264_nvenc wants nv12, hevc_nvenc can keep
                 // p010le. scale_cuda with iw:ih preserves resolution.
                 var targetFmt = encodeHevc ? "p010le" : "nv12";
-                Flag("-vf"); args.Add($"scale_cuda=iw:ih:format={targetFmt}");
+                var scaleSpec = scaleHeight > 0 ? $"-2:{scaleHeight}" : "iw:ih";
+                Flag("-vf"); args.Add($"scale_cuda={scaleSpec}:format={targetFmt}");
             }
             else if (needsTonemap)
             {
@@ -758,7 +765,12 @@ public class FFmpegTranscodeService : ITranscodeService
                 // UseHardwareEncoding turned off in server settings).
                 // Slow on 4K HDR, but it's the only correct thing when
                 // the user opts out of GPU.
-                Flag($"-vf zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap={settings.TonemappingAlgorithm}:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p");
+                var scalePrefix = scaleHeight > 0 ? $"scale=-2:{scaleHeight}," : "";
+                Flag($"-vf {scalePrefix}zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap={settings.TonemappingAlgorithm}:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p");
+            }
+            else if (scaleHeight > 0)
+            {
+                Flag("-vf"); args.Add($"scale=-2:{scaleHeight}");
             }
 
             if (decision.RequiresSubtitleBurnIn)

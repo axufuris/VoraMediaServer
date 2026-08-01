@@ -421,7 +421,20 @@ public static class StreamingEndpoints
         TargetAudioChannels = session.TargetAudioChannels,
         TranscodeReason = session.DecisionLog ?? string.Empty,
         SourceHdrType = session.HdrType,
+        OutputHeight = ResolveOutputHeight(session),
     };
+
+    private static int ResolveOutputHeight(Vora.Domain.Entities.Streaming.StreamSession session)
+    {
+        if (string.IsNullOrWhiteSpace(session.OutputResolution) || string.IsNullOrWhiteSpace(session.Resolution))
+        {
+            return 0;
+        }
+
+        var decidedHeight = BestPathDecisionManager.ParseHeightFromResolution(session.OutputResolution);
+        var sourceHeight = BestPathDecisionManager.ParseHeightFromResolution(session.Resolution);
+        return decidedHeight > 0 && decidedHeight < sourceHeight ? decidedHeight : 0;
+    }
 
     private static string ResolveTempDirectory(Vora.Domain.Entities.Settings.ServerSetting settings) =>
         string.IsNullOrWhiteSpace(settings.TranscoderTempDirectory) ? "/transcode" : settings.TranscoderTempDirectory;

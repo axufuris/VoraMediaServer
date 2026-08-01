@@ -331,7 +331,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         return $"{height}p";
     }
 
-    private static int ParseHeightFromResolution(string? resolution)
+    public static int ParseHeightFromResolution(string? resolution)
     {
         if (string.IsNullOrWhiteSpace(resolution)) return 480;
         if (resolution.Contains("4k", StringComparison.OrdinalIgnoreCase)
