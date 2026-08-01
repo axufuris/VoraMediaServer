@@ -372,7 +372,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         {
             var episodeMappings = await _context.Set<Episode>()
                 .AsNoTracking()
-                .Where(e => e.Season.TvShowId == vm.Id)
+                .Where(e => e.Season.TvShowId == vm.Id && e.MissingSince == null)
                 .Select(e => new { e.Id, e.SeasonId })
                 .ToListAsync();
 
@@ -536,7 +536,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         {
             var episodeMappings = await _context.Set<Episode>()
                 .AsNoTracking()
-                .Where(e => tvShowIds.Contains(e.Season.TvShowId) || seasonIds.Contains(e.SeasonId))
+                .Where(e => (tvShowIds.Contains(e.Season.TvShowId) || seasonIds.Contains(e.SeasonId)) && e.MissingSince == null)
                 .Select(e => new { e.Id, e.SeasonId, TvShowId = e.Season.TvShowId })
                 .ToListAsync();
 
