@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ocl-icd-libopencl1 \
         gnupg \
         curl \
+        gosu \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
@@ -104,8 +105,10 @@ RUN npm run build
 # Stage 5: final
 FROM base AS final
 WORKDIR /app
-COPY --from=publish --chown=app:app /app/publish .
-COPY --from=ui-build --chown=app:app /ui-src/dist ./wwwroot
-RUN mkdir -p /app/data /transcode && chown -R app:app /app/data /transcode
-USER app
-ENTRYPOINT ["dotnet", "Vora.Api.dll"]
+COPY --from=publish /app/publish .
+COPY --from=ui-build /ui-src/dist ./wwwroot
+RUN mkdir -p /app/data /transcode
+COPY src/Vora.Api/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENV PUID=99 PGID=100
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

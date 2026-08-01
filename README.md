@@ -97,6 +97,8 @@ docker run -d \
   --name vora \
   --restart unless-stopped \
   -p 8080:8080 \
+  -e PUID=99 \
+  -e PGID=100 \
   -e ASPNETCORE_HTTP_PORTS=8080 \
   -e ConnectionStrings__DefaultConnection="Host=vora-postgres;Port=5432;Database=vora;Username=vora;Password=change-me-to-a-strong-password" \
   -e Jwt__SecretKey="$(openssl rand -base64 64)" \
@@ -119,6 +121,19 @@ create through the setup flow becomes the server admin.
 
 Key environment variables:
 
+- `PUID` / `PGID` — the user and group the container runs as, just
+  like Jellyfin, Plex, and the LinuxServer images. On startup, while
+  still root, the container ensures a `vora` user/group with these
+  ids, recursively chowns the `/app/data` and `/transcode` mounts to
+  match, then drops privileges and runs the app as that user. This
+  makes bind mounts writable no matter how the host directories are
+  owned, with **no host-side `chown` needed**. The library mounts
+  under `/media` are **never** chowned — they keep their host
+  ownership (mount them `:ro` anyway). Defaults are `99` / `100`
+  (Unraid's `nobody:users`); on a plain Linux host set them to your
+  own `id -u` / `id -g`. Restarts are idempotent — the ids are
+  re-applied cleanly every time. An optional `UMASK` (default `022`)
+  controls the permissions of files the app creates.
 - `ConnectionStrings__DefaultConnection` — Npgsql connection string.
   Use the **container name** of the Postgres service as `Host` when
   both run on the same Docker network.
@@ -169,6 +184,8 @@ services:
     ports:
       - "8080:8080"
     environment:
+      PUID: 99
+      PGID: 100
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=vora;Username=vora;Password=change-me-to-a-strong-password"
       Jwt__SecretKey: "REPLACE_WITH_A_LONG_RANDOM_STRING"
@@ -249,6 +266,8 @@ Apply, then wait for the container to go green in the Docker tab.
 | Network Type | `vora` (same custom bridge as Postgres) |
 | Restart Policy | `unless-stopped` |
 | Port: container `8080` | host `8080` (or any free port) |
+| Variable: `PUID` | `99` (Unraid's `nobody`) |
+| Variable: `PGID` | `100` (Unraid's `users`) |
 | Path: `/app/data` | `/mnt/user/appdata/vora` |
 | Path: `/media/movies` | `/mnt/user/media/movies` — Access Mode `Read Only` |
 | Path: `/media/shows` | `/mnt/user/media/shows` — Access Mode `Read Only` |
@@ -263,6 +282,14 @@ Apply, then wait for the container to go green in the Docker tab.
 | Variable: `StoragePaths__UserImages` | `/app/data/users` |
 | Variable: `StoragePaths__Plugins` | `/app/data/plugins` |
 | Path: `/transcode` | `/mnt/user/appdata/vora-transcode` (or a fast scratch disk) |
+
+`PUID=99` / `PGID=100` are Unraid's `nobody:users`, which own
+everything under `/mnt/user` by default — so Vora writes to its
+`appdata` and `transcode` shares out of the box with no manual
+`chmod`/`chown`. They're already the container defaults; the rows
+above just make them visible and editable on the template. If your
+shares are owned by a different user, set these to that user's id
+instead.
 
 Apply. Vora will auto-migrate the database on first launch (watch the
 container log if you want to confirm — you should see
