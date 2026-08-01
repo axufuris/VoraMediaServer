@@ -225,6 +225,12 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         var clientIdentifier = await GetOrCreateClientIdentifierAsync();
         var client = _httpClientFactory.CreateClient(HttpClientName);
 
+        var owner = await TryFetchOwnerAccountAsync(client, adminAccessToken, clientIdentifier, cancellationToken);
+        if (owner is not null && string.Equals(owner.Id, accountId, StringComparison.Ordinal))
+        {
+            return adminAccessToken;
+        }
+
         var uri = $"{PlexApiBaseUrl}home/users/{accountId}/switch";
         if (!string.IsNullOrEmpty(pin))
         {
