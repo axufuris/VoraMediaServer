@@ -6,7 +6,7 @@ namespace Vora.Application.Media;
 
 public interface IUserMediaStateRepository
 {
-    Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId);
+    Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId, Guid? profileId);
     Task AttachUserMediaStateAsync(MediaDetailsVM vm, Guid profileId);
     Task SetMediaPlayedStateAsync(Guid mediaItemId, Guid profileId, bool isPlayed);
     Task AttachLibraryItemUserStatesAsync(IEnumerable<LibraryItemVM> items, Guid profileId);

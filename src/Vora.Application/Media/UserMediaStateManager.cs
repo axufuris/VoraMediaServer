@@ -6,7 +6,7 @@ namespace Vora.Application.Media;
 
 public interface IUserMediaStateManager
 {
-    Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId);
+    Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId, Guid? profileId);
     Task SetMediaPlayedStateAsync(Guid mediaItemId, Guid profileId, bool isPlayed);
     Task<SetMediaRatingResult> SetMediaRatingAsync(Guid mediaItemId, Guid profileId, decimal? rating, bool isAdmin);
 }
@@ -24,9 +24,9 @@ public class UserMediaStateManager : IUserMediaStateManager
         _taskQueueManager = taskQueueManager;
     }
 
-    public async Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId)
+    public async Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId, Guid? profileId)
     {
-        return await _repository.GetUpNextAsync(mediaId, contextType, contextId);
+        return await _repository.GetUpNextAsync(mediaId, contextType, contextId, profileId);
     }
 
     public async Task SetMediaPlayedStateAsync(Guid mediaItemId, Guid profileId, bool isPlayed)
