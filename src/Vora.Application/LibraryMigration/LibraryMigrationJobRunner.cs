@@ -236,6 +236,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
 
         var watchSkipped = 0;
         var ratingsSkipped = 0;
+        var skippedSamples = new List<string>();
         var watchUpserts = new List<WatchStateUpsert>();
         var ratingUpserts = new List<RatingUpsert>();
 
@@ -246,7 +247,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             {
                 var match = MatchEntry(ws.Kind, ws.ExternalIds, ws.SeasonNumber, ws.EpisodeNumber);
                 if (match.HasValue) matchedWatch.Add((match.Value, ws));
-                else watchSkipped++;
+                else { watchSkipped++; RecordSkip(skippedSamples, "watch", ws.Kind, ws.ExternalIds, ws.SeasonNumber, ws.EpisodeNumber); }
             }
             watchUpserts.AddRange(matchedWatch
                 .GroupBy(p => p.MediaItemId)
@@ -261,7 +262,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             {
                 var match = MatchEntry(r.Kind, r.ExternalIds, r.SeasonNumber, r.EpisodeNumber);
                 if (match.HasValue) matchedRatings.Add((match.Value, r));
-                else ratingsSkipped++;
+                else { ratingsSkipped++; RecordSkip(skippedSamples, "rating", r.Kind, r.ExternalIds, r.SeasonNumber, r.EpisodeNumber); }
             }
             ratingUpserts.AddRange(matchedRatings
                 .GroupBy(p => p.MediaItemId)
@@ -271,6 +272,13 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             {
                 await repository.BulkSetAdminRatingsAsync(ratingUpserts);
             }
+        }
+
+        if (watchSkipped + ratingsSkipped > 0)
+        {
+            _logger.LogInformation(
+                "Library import job {JobId}: {SkipCount} entr(ies) had no Vora match. Sample: {Samples}",
+                jobId, watchSkipped + ratingsSkipped, string.Join(" | ", skippedSamples));
         }
 
         UpdateUser(jobId, mapping.AccountId, u =>
@@ -353,6 +361,18 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
     }
 
     private static string EpisodeKey(string idType, string id, int season, int episode) => $"{idType}:{id}:{season}:{episode}";
+
+    private static void RecordSkip(List<string> samples, string kindLabel, RemoteMediaKind kind, RemoteExternalIdsDto ids, int? season, int? episode)
+    {
+        if (samples.Count >= 40) return;
+        var idPart = !string.IsNullOrEmpty(ids.TmdbId) ? $"tmdb:{ids.TmdbId}"
+            : !string.IsNullOrEmpty(ids.ImdbId) ? $"imdb:{ids.ImdbId}"
+            : !string.IsNullOrEmpty(ids.TvdbId) ? $"tvdb:{ids.TvdbId}"
+            : "no-id";
+        samples.Add(kind == RemoteMediaKind.Episode
+            ? $"{kindLabel} episode {idPart} S{season}E{episode}"
+            : $"{kindLabel} movie {idPart}");
+    }
 
     private static List<string> CollectIds(RemoteUserDataDto data, RemoteMediaKind kind, Func<RemoteExternalIdsDto, string?> selector)
     {
