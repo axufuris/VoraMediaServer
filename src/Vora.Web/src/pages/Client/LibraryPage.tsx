@@ -21,6 +21,7 @@ type SortKey =
     | 'releaseDate'
     | 'dateAdded'
     | 'adminRating'
+    | 'myRating'
     | 'criticRating'
     | 'audienceRating'
     | 'contentRating'
@@ -39,6 +40,7 @@ const SORT_LABELS: Record<SortKey, string> = {
     releaseDate: 'Release Date',
     dateAdded: 'Date Added',
     adminRating: 'Admin Rating',
+    myRating: 'My Rating',
     criticRating: 'Critic Rating',
     audienceRating: 'Audience Rating',
     contentRating: 'Content Rating',
@@ -175,7 +177,7 @@ function LibraryToolbar({
     };
     const presetOptions: FilterPreset[] = ['all', 'unwatched', 'inProgress', 'watched'];
     const categoryOptions: FilterCategory[] = ['genre', 'year', 'decade', 'contentRating'];
-    const sortOptions: SortKey[] = ['title', 'releaseDate', 'dateAdded', 'adminRating', 'criticRating', 'audienceRating', 'contentRating', 'duration', 'resolution'];
+    const sortOptions: SortKey[] = ['title', 'releaseDate', 'dateAdded', 'adminRating', 'myRating', 'criticRating', 'audienceRating', 'contentRating', 'duration', 'resolution'];
 
     const isPresetActive = (p: FilterPreset) => filter.kind === 'preset' && filter.preset === p;
     const isCategoryValueActive = (cat: FilterCategory, value: string) =>
@@ -604,6 +606,9 @@ export default function LibraryPage() {
                     break;
                 case 'adminRating':
                     cmp = (a.serverAdminRating ?? -1) - (b.serverAdminRating ?? -1);
+                    break;
+                case 'myRating':
+                    cmp = (a.myRating ?? -1) - (b.myRating ?? -1);
                     break;
                 case 'criticRating':
                     cmp = (a.thirdPartyRating1 ?? -1) - (b.thirdPartyRating1 ?? -1);
