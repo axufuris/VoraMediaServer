@@ -3,6 +3,7 @@ namespace Vora.Domain.Entities.Media;
 public class Episode : MediaItem
 {
     public int EpisodeNumber { get; set; }
+    public int? EndEpisodeNumber { get; set; }
 
     public Guid SeasonId { get; set; }
     public virtual Season Season { get; set; } = null!;

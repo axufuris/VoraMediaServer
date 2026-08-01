@@ -373,7 +373,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
     private (Regex episodeRegex, Regex showFolderRegex, Regex resolutionRegex, Regex editionRegex) BuildTvRegexes(string? customRegex)
     {
-        var episodeRegexPattern = customRegex ?? @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*(?<Absolute>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$";
+        var episodeRegexPattern = customRegex ?? @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*[eE](?<EndEpisode>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$";
         var episodeRegex = new Regex(episodeRegexPattern, RegexOptions.IgnoreCase);
         var showFolderRegex = new Regex(@"^(?<SeriesTitle>.+?)(?:\s*\((?<Year>\d{4})\))?(?:\s*\[(?<Provider>imdb|tmdb|tvdb)-(?<ProviderId>[^\]]+)\])?$", RegexOptions.IgnoreCase);
         var resolutionRegex = new Regex(@"(?<Resolution>480p|720p|1080p|4k|2160p)", RegexOptions.IgnoreCase);
@@ -460,6 +460,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
         var epMatch = episodeRegex.Match(fileName);
         int seasonNumber = 1, episodeNumber = 1;
+        int? endEpisodeNumber = null;
         string? episodeTitle = null;
         DateTime? airDate = null;
 
@@ -467,6 +468,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         {
             if (epMatch.Groups["Season"].Success && int.TryParse(epMatch.Groups["Season"].Value, out int s)) seasonNumber = s;
             if (epMatch.Groups["Episode"].Success && int.TryParse(epMatch.Groups["Episode"].Value, out int e)) episodeNumber = e;
+            if (epMatch.Groups["EndEpisode"].Success && int.TryParse(epMatch.Groups["EndEpisode"].Value, out int ee) && ee > episodeNumber) endEpisodeNumber = ee;
 
             if (epMatch.Groups["EpisodeTitle"].Success && !string.IsNullOrWhiteSpace(epMatch.Groups["EpisodeTitle"].Value))
             {
@@ -499,7 +501,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
             ? $"{showTitle} - S{seasonNumber:D2}E{episodeNumber:D2}"
             : episodeTitle;
 
-        var episodeId = await _ingestionService.EnsureEpisodeAsync(library, seasonId, episodeNumber, finalTitle, airDate, edition);
+        var episodeId = await _ingestionService.EnsureEpisodeAsync(library, seasonId, episodeNumber, finalTitle, airDate, edition, endEpisodeNumber);
 
         await _ingestionService.AddMediaPartAsync(episodeId, filePath, resolution, edition);
 

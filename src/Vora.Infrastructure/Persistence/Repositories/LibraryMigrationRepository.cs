@@ -64,7 +64,8 @@ public class LibraryMigrationRepository : ILibraryMigrationRepository
                 ShowImdbId = e.Season.TvShow.ImdbId,
                 ShowTvdbId = e.Season.TvShow.TvdbId,
                 SeasonNumber = e.Season.SeasonNumber,
-                EpisodeNumber = e.EpisodeNumber
+                EpisodeNumber = e.EpisodeNumber,
+                EndEpisodeNumber = e.EndEpisodeNumber
             })
             .ToListAsync();
     }

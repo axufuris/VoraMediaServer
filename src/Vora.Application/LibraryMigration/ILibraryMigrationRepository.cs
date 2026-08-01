@@ -16,6 +16,7 @@ public class EpisodeMatchRow
     public string? ShowTvdbId { get; set; }
     public required int SeasonNumber { get; set; }
     public required int EpisodeNumber { get; set; }
+    public int? EndEpisodeNumber { get; set; }
 }
 
 public class WatchStateUpsert

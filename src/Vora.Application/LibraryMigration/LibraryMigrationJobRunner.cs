@@ -217,9 +217,15 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
         var episodeMap = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in episodeRows)
         {
-            if (!string.IsNullOrEmpty(row.ShowTmdbId)) episodeMap.TryAdd(EpisodeKey("tmdb", row.ShowTmdbId!, row.SeasonNumber, row.EpisodeNumber), row.Id);
-            if (!string.IsNullOrEmpty(row.ShowImdbId)) episodeMap.TryAdd(EpisodeKey("imdb", row.ShowImdbId!, row.SeasonNumber, row.EpisodeNumber), row.Id);
-            if (!string.IsNullOrEmpty(row.ShowTvdbId)) episodeMap.TryAdd(EpisodeKey("tvdb", row.ShowTvdbId!, row.SeasonNumber, row.EpisodeNumber), row.Id);
+            var lastEpisode = row.EndEpisodeNumber.HasValue && row.EndEpisodeNumber.Value > row.EpisodeNumber
+                ? row.EndEpisodeNumber.Value
+                : row.EpisodeNumber;
+            for (var e = row.EpisodeNumber; e <= lastEpisode; e++)
+            {
+                if (!string.IsNullOrEmpty(row.ShowTmdbId)) episodeMap.TryAdd(EpisodeKey("tmdb", row.ShowTmdbId!, row.SeasonNumber, e), row.Id);
+                if (!string.IsNullOrEmpty(row.ShowImdbId)) episodeMap.TryAdd(EpisodeKey("imdb", row.ShowImdbId!, row.SeasonNumber, e), row.Id);
+                if (!string.IsNullOrEmpty(row.ShowTvdbId)) episodeMap.TryAdd(EpisodeKey("tvdb", row.ShowTvdbId!, row.SeasonNumber, e), row.Id);
+            }
         }
 
         Guid? MatchEpisode(RemoteExternalIdsDto ids, int? season, int? episode)
