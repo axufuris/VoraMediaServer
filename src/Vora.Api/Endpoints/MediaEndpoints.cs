@@ -32,7 +32,8 @@ public static class MediaEndpoints
             .Produces<MediaDetailsVM>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
-        readGroup.MapGet("/{id:guid}/up-next", GetUpNextAsync);
+        readGroup.MapGet("/{id:guid}/up-next", GetUpNextAsync)
+            .Produces<UpNextResultVM>(StatusCodes.Status200OK);
         readGroup.MapGet("/{id:guid}/markers", GetMarkersAsync)
             .Produces<List<MediaMarkerVM>>(StatusCodes.Status200OK);
 
