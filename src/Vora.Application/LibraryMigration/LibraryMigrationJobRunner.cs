@@ -171,7 +171,9 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
     {
         var repository = scopedServices.GetRequiredService<ILibraryMigrationRepository>();
 
-        var userToken = await provider.ResolveUserTokenAsync(input.AdminAccessToken, mapping.AccountId, mapping.Pin);
+        var userToken = input.SelfService
+            ? input.AdminAccessToken
+            : await provider.ResolveUserTokenAsync(input.AdminAccessToken, mapping.AccountId, mapping.Pin);
         var userData = await provider.FetchUserDataAsync(input.ConnectionUri, userToken, scope);
 
         UpdateUser(jobId, mapping.AccountId, u =>

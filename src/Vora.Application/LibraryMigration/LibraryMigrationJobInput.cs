@@ -11,6 +11,8 @@ public class LibraryMigrationJobInput
     public required bool IncludeRatings { get; set; }
     public required IReadOnlyList<string> LibrarySectionKeys { get; set; }
     public required List<LibraryMigrationMappingInput> Mappings { get; set; }
+
+    public bool SelfService { get; set; }
 }
 
 public class LibraryMigrationMappingInput
