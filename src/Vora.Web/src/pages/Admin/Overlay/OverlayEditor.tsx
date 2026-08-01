@@ -506,12 +506,18 @@ export default function OverlayEditor() {
                     <div className="absolute inset-0 bg-black/20 pointer-events-none rounded-md"></div>
 
                     {mockUI === 'watched' && (
-                        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full p-1 shadow-lg border border-white/10 z-10 pointer-events-none">
-                            <svg className="w-6 h-6 text-[var(--vora-text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                        <div
+                            className="absolute bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg border border-white/10 z-10 pointer-events-none"
+                            style={{ top: '4%', right: '4%', width: '14%', aspectRatio: '1' }}
+                        >
+                            <svg className="w-3/5 h-3/5 text-[var(--vora-text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                         </div>
                     )}
                     {mockUI === 'unplayed' && (
-                        <div className="absolute top-2 right-2 bg-[var(--vora-accent-500)] rounded-full w-9 h-9 flex items-center justify-center text-[var(--vora-text-primary)] font-bold text-base shadow-lg border border-orange-400/50 z-10 pointer-events-none">
+                        <div
+                            className="absolute bg-[var(--vora-accent-500)] rounded-full flex items-center justify-center text-[var(--vora-text-primary)] font-bold shadow-lg border border-orange-400/50 z-10 pointer-events-none"
+                            style={{ top: '4%', right: '4%', width: '17%', aspectRatio: '1', fontSize: 'clamp(10px, 2.2vw, 20px)' }}
+                        >
                             3
                         </div>
                     )}
