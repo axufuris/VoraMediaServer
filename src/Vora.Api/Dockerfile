@@ -111,4 +111,5 @@ RUN mkdir -p /app/data /transcode
 COPY src/Vora.Api/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 ENV PUID=99 PGID=100
+USER root
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
