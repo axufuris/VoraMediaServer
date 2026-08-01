@@ -37,6 +37,7 @@ public class MediaDetailsVM
     public int? NumberOfSeasons { get; set; }
     public int? SeasonNumber { get; set; }
     public int? EpisodeNumber { get; set; }
+    public int? EndEpisodeNumber { get; set; }
     public string? TvShowTitle { get; set; }
     public Guid? TvShowId { get; set; }
     public Guid? SeasonId { get; set; }
@@ -123,6 +124,7 @@ public class MediaDetailsVM
             SeasonNumber = item is Season ? ((Season)item).SeasonNumber :
                            item is Episode ? ((Episode)item).Season.SeasonNumber : null,
             EpisodeNumber = item is Episode ? ((Episode)item).EpisodeNumber : null,
+            EndEpisodeNumber = item is Episode ? ((Episode)item).EndEpisodeNumber : null,
             Seasons = item is TvShow ? ((TvShow)item).Seasons.Where(s => s.MissingSince == null).OrderBy(s => s.SeasonNumber).Select(s => new SeasonVM
             {
                 Id = s.Id,
@@ -145,6 +147,7 @@ public class MediaDetailsVM
             {
                 Id = e.Id,
                 EpisodeNumber = e.EpisodeNumber,
+                EndEpisodeNumber = e.EndEpisodeNumber,
                 Title = e.Title,
                 Overview = e.Overview,
                 PosterUrl = e.PosterUrl,

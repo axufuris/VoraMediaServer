@@ -45,6 +45,7 @@ public class SeasonDetailsVM
             {
                 Id = e.Id,
                 EpisodeNumber = e.EpisodeNumber,
+                EndEpisodeNumber = e.EndEpisodeNumber,
                 Title = e.Title,
                 Overview = e.Overview,
                 PosterUrl = e.PosterUrl,

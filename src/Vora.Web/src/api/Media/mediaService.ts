@@ -79,6 +79,7 @@ export interface Season {
 export interface Episode {
     id: string;
     episodeNumber: number;
+    endEpisodeNumber?: number;
     title: string;
     overview?: string;
     posterUrl?: string;
@@ -126,6 +127,7 @@ export interface MediaItem {
     numberOfSeasons?: number;
     seasonNumber?: number;
     episodeNumber?: number;
+    endEpisodeNumber?: number;
     isPlayed?: boolean;
     resumePositionSeconds?: number;
     unplayedItemCount?: number;

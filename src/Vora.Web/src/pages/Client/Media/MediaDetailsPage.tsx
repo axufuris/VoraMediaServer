@@ -225,7 +225,12 @@ export default function MediaDetailsPage() {
         if (!media) return;
 
         let subtitle = '';
-        if (media.type === 'Episode') subtitle = `S${media.seasonNumber} E${media.episodeNumber} - ${media.tvShowTitle}`;
+        if (media.type === 'Episode') {
+            const epLabel = media.endEpisodeNumber && media.endEpisodeNumber > (media.episodeNumber ?? 0)
+                ? `E${media.episodeNumber}-E${media.endEpisodeNumber}`
+                : `E${media.episodeNumber}`;
+            subtitle = `S${media.seasonNumber} ${epLabel} - ${media.tvShowTitle}`;
+        }
         else if (media.releaseDate) subtitle = new Date(media.releaseDate).getFullYear().toString();
 
         const deviceId = localStorage.getItem(StorageKeys.deviceId);
@@ -544,7 +549,9 @@ export default function MediaDetailsPage() {
                             {media.type === 'Movie' && 'Movie'}
                             {media.type === 'TvShow' && 'TV Series'}
                             {isSeason && `Season ${media.seasonNumber ?? ''}`}
-                            {isEpisode && `Season ${media.seasonNumber} · Episode ${media.episodeNumber}`}
+                            {isEpisode && (media.endEpisodeNumber && media.endEpisodeNumber > (media.episodeNumber ?? 0)
+                                ? `Season ${media.seasonNumber} · Episodes ${media.episodeNumber}-${media.endEpisodeNumber}`
+                                : `Season ${media.seasonNumber} · Episode ${media.episodeNumber}`)}
                             {media.releaseDate && ` · ${new Date(media.releaseDate).getFullYear()}`}
                         </div>
 

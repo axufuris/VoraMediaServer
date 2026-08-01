@@ -65,7 +65,7 @@ export default function MediaEpisodesList({ episodes, serverId }: Props) {
                                     className="text-lg font-bold text-[var(--vora-text-primary)] cursor-pointer transition-colors"
                                     style={{ color: 'var(--vora-text-primary)' }}
                                 >
-                                    {ep.episodeNumber}. {ep.title}
+                                    {ep.endEpisodeNumber && ep.endEpisodeNumber > ep.episodeNumber ? `${ep.episodeNumber}-${ep.endEpisodeNumber}` : ep.episodeNumber}. {ep.title}
                                 </h4>
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold mt-1 mb-2" style={{ color: 'var(--vora-text-muted)' }}>
                                     {ep.releaseDate && <span>{new Date(ep.releaseDate).toLocaleDateString()}</span>}
