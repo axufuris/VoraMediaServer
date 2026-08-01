@@ -67,6 +67,7 @@ export default function LibraryMigrationPage() {
     const [mapping, setMapping] = useState<Record<string, string>>({});
     const [pins, setPins] = useState<Record<string, string>>({});
     const [scope, setScope] = useState<ScopeState>(DEFAULT_SCOPE);
+    const [setAsAdminRatings, setSetAsAdminRatings] = useState(false);
 
     const [activeJob, setActiveJob] = useState<LibraryMigrationJobVM | null>(null);
     const [runError, setRunError] = useState<string | null>(null);
@@ -268,7 +269,8 @@ export default function LibraryMigrationPage() {
                 includeWatchState: scope.includeWatchState,
                 includeRatings: scope.includeRatings,
                 librarySectionKeys: chosenLibraryKeys,
-                mappings: inputs
+                mappings: inputs,
+                setAdminRatings: scope.includeRatings && setAsAdminRatings
             }, serverId);
             setActiveJob(job);
             localStorage.setItem(JOB_STORAGE_KEY, job.jobId);
@@ -514,6 +516,12 @@ export default function LibraryMigrationPage() {
                                                                 Ratings
                                                             </label>
                                                         </div>
+                                                        {scope.includeRatings && (
+                                                            <label className="flex items-center gap-2 mt-2 text-sm text-[var(--vora-text-primary)]">
+                                                                <input type="checkbox" checked={setAsAdminRatings} onChange={e => setSetAsAdminRatings(e.target.checked)} />
+                                                                Also set these as the server Admin Rating
+                                                            </label>
+                                                        )}
                                                     </div>
 
                                                     <div>

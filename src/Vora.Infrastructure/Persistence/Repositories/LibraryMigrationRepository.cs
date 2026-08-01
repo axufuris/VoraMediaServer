@@ -76,6 +76,30 @@ public class LibraryMigrationRepository : ILibraryMigrationRepository
         await _context.SaveChangesAsync();
     }
 
+    public async Task BulkSetAdminRatingsAsync(IReadOnlyCollection<RatingUpsert> entries)
+    {
+        if (entries.Count == 0) return;
+
+        var byItem = entries
+            .GroupBy(e => e.MediaItemId)
+            .ToDictionary(g => g.Key, g => g.First().Rating);
+
+        var targetIds = byItem.Keys.ToList();
+        var items = await _context.MediaItems
+            .Where(m => targetIds.Contains(m.Id))
+            .ToListAsync();
+
+        foreach (var item in items)
+        {
+            if (byItem.TryGetValue(item.Id, out var rating))
+            {
+                item.ServerAdminRating = rating;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     public async Task BulkUpsertRatingsAsync(Guid profileId, IReadOnlyCollection<RatingUpsert> entries)
     {
         if (entries.Count == 0) return;

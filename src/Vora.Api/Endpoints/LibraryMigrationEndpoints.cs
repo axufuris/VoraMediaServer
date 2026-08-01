@@ -32,6 +32,7 @@ public class RunLibraryMigrationRequest
     public bool IncludeRatings { get; set; } = true;
     public required List<string> LibrarySectionKeys { get; set; }
     public required List<RunLibraryMigrationMapping> Mappings { get; set; }
+    public bool SetAdminRatings { get; set; }
 }
 
 public class RunLibraryMigrationMapping
@@ -53,6 +54,7 @@ public class RunSelfLibraryImportRequest
     public bool IncludeRatings { get; set; } = true;
     public required List<string> LibrarySectionKeys { get; set; }
     public string? PlexUsername { get; set; }
+    public bool SetAdminRatings { get; set; }
 }
 
 public static class LibraryMigrationEndpoints
@@ -279,7 +281,8 @@ public static class LibraryMigrationEndpoints
                     ProfileName = m.ProfileName,
                     Pin = string.IsNullOrEmpty(m.Pin) ? null : m.Pin
                 })
-                .ToList()
+                .ToList(),
+            SetAdminRatings = request.SetAdminRatings
         };
 
         var job = runner.StartJob(input);
@@ -323,6 +326,7 @@ public static class LibraryMigrationEndpoints
             IncludeRatings = request.IncludeRatings,
             LibrarySectionKeys = request.LibrarySectionKeys,
             SelfService = true,
+            SetAdminRatings = request.SetAdminRatings && user.IsAdmin(),
             Mappings = new List<LibraryMigrationMappingInput>
             {
                 new()

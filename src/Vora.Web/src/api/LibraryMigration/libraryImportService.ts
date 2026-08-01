@@ -17,6 +17,7 @@ export interface RunSelfLibraryImportRequest {
     includeRatings: boolean;
     librarySectionKeys: string[];
     plexUsername?: string | null;
+    setAdminRatings?: boolean;
 }
 
 const BASE = '/library-import/providers';
