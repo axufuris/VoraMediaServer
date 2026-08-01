@@ -131,7 +131,7 @@ public class MediaDetailsVM
                 SeasonNumber = s.SeasonNumber,
                 Title = s.Title,
                 PosterUrl = s.PosterUrl,
-                EpisodeCount = s.Episodes.Count(e => e.MissingSince == null),
+                EpisodeCount = s.Episodes.Where(e => e.MissingSince == null).Sum(e => (e.EndEpisodeNumber ?? e.EpisodeNumber) - e.EpisodeNumber + 1),
                 ServerAdminRating = s.ServerAdminRating
             }).ToList() : new List<SeasonVM>(),
             TvShowId = item is Season ? ((Season)item).TvShowId :

@@ -34,7 +34,7 @@ public class SeasonDetailsVM
             Overview = item.Overview,
             PosterUrl = item.PosterUrl,
             ReleaseDate = item.ReleaseDate,
-            EpisodeCount = ((Season)item).Episodes.Count(e => e.MissingSince == null),
+            EpisodeCount = ((Season)item).Episodes.Where(e => e.MissingSince == null).Sum(e => (e.EndEpisodeNumber ?? e.EpisodeNumber) - e.EpisodeNumber + 1),
             LockedFields = item.LockedFields,
 
             TvShowId = ((Season)item).TvShowId,
