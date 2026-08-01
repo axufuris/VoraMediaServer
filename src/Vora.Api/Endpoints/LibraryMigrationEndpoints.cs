@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Vora.Api.Extensions;
 using Vora.Application.LibraryMigration;
 using Vora.Application.LibraryMigration.ViewModels;
 
@@ -41,6 +43,18 @@ public class RunLibraryMigrationMapping
     public string? Pin { get; set; }
 }
 
+public class RunSelfLibraryImportRequest
+{
+    public required string AccessToken { get; set; }
+    public required string ServerClientIdentifier { get; set; }
+    public required string ServerName { get; set; }
+    public required string ConnectionUri { get; set; }
+    public bool IncludeWatchState { get; set; } = true;
+    public bool IncludeRatings { get; set; } = true;
+    public required List<string> LibrarySectionKeys { get; set; }
+    public string? PlexUsername { get; set; }
+}
+
 public static class LibraryMigrationEndpoints
 {
     public static RouteGroupBuilder MapLibraryMigrationEndpoints(this IEndpointRouteBuilder routes)
@@ -81,7 +95,44 @@ public static class LibraryMigrationEndpoints
             .Produces<LibraryMigrationJobVM>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
+        MapSelfServiceImportEndpoints(routes);
+
         return group;
+    }
+
+    private static void MapSelfServiceImportEndpoints(IEndpointRouteBuilder routes)
+    {
+        var self = routes.MapGroup("/api/library-import").WithTags("Library Import (Self-Service)").RequireAuthorization();
+
+        self.MapGet("/providers", GetProviders)
+            .Produces<IEnumerable<LibrarySyncProviderVM>>(StatusCodes.Status200OK);
+
+        self.MapPost("/providers/{providerId}/pin", CreatePinAsync)
+            .Produces<LibrarySyncPinVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        self.MapGet("/providers/{providerId}/pin/{pinId}", PollPinAsync)
+            .Produces<LibrarySyncPinStatusVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        self.MapPost("/providers/{providerId}/servers", ListServersAsync)
+            .Produces<IReadOnlyList<RemoteServerVM>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        self.MapPost("/providers/{providerId}/libraries", ListLibrariesAsync)
+            .Produces<IReadOnlyList<RemoteLibraryVM>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        self.MapPost("/providers/{providerId}/run", RunSelfImportAsync)
+            .Produces<LibraryMigrationJobVM>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
+
+        self.MapGet("/jobs/{jobId:guid}", GetJob)
+            .Produces<LibraryMigrationJobVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
     }
 
     private static IResult GetProviders(ILibraryMigrationManager manager)
@@ -233,6 +284,60 @@ public static class LibraryMigrationEndpoints
 
         var job = runner.StartJob(input);
         return Results.Accepted($"/api/library-migration/jobs/{job.JobId}", job);
+    }
+
+    private static IResult RunSelfImportAsync(string providerId, [FromBody] RunSelfLibraryImportRequest request, ClaimsPrincipal user, ILibraryMigrationJobRunner runner)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId is null)
+        {
+            return Results.Unauthorized();
+        }
+        if (string.IsNullOrWhiteSpace(request.AccessToken))
+        {
+            return Results.BadRequest(new { error = "accessToken is required." });
+        }
+        if (string.IsNullOrWhiteSpace(request.ConnectionUri))
+        {
+            return Results.BadRequest(new { error = "connectionUri is required." });
+        }
+        if (!request.IncludeWatchState && !request.IncludeRatings)
+        {
+            return Results.BadRequest(new { error = "At least one of IncludeWatchState or IncludeRatings must be true." });
+        }
+        if (request.LibrarySectionKeys.Count == 0)
+        {
+            return Results.BadRequest(new { error = "At least one library section must be selected." });
+        }
+
+        var displayName = string.IsNullOrWhiteSpace(request.PlexUsername) ? "Your Plex account" : request.PlexUsername;
+
+        var input = new LibraryMigrationJobInput
+        {
+            ProviderId = providerId,
+            AdminAccessToken = request.AccessToken,
+            ServerClientIdentifier = request.ServerClientIdentifier,
+            ServerName = request.ServerName,
+            ConnectionUri = request.ConnectionUri,
+            IncludeWatchState = request.IncludeWatchState,
+            IncludeRatings = request.IncludeRatings,
+            LibrarySectionKeys = request.LibrarySectionKeys,
+            SelfService = true,
+            Mappings = new List<LibraryMigrationMappingInput>
+            {
+                new()
+                {
+                    AccountId = "self",
+                    AccountName = displayName,
+                    ProfileId = profileId.Value,
+                    ProfileName = "Your library",
+                    Pin = null
+                }
+            }
+        };
+
+        var job = runner.StartJob(input);
+        return Results.Accepted($"/api/library-import/jobs/{job.JobId}", job);
     }
 
     private static IResult GetJob(Guid jobId, ILibraryMigrationJobRunner runner)
