@@ -10,6 +10,7 @@ public interface IStreamRepository
 {
     Task<List<NowPlayingSessionDto>> GetNowPlayingSessionsAsync(DateTime cutoffTime);
     Task<MediaStreamInfoDto?> GetMediaStreamInfoAsync(Guid mediaId);
+    Task<Guid> ResolvePlayableMediaIdAsync(Guid mediaId, Guid? profileId);
     Task<ClientDevice?> GetClientDeviceAsync(string deviceId);
     Task<StreamSession> CreateSessionAsync(StreamSession session);
     Task<StreamSession?> GetSessionAsync(Guid sessionId);

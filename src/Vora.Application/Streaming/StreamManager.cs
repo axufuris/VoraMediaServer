@@ -48,6 +48,8 @@ public class StreamManager : IStreamManager
 
     public async Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null)
     {
+        mediaId = await _repository.ResolvePlayableMediaIdAsync(mediaId, profileId);
+
         var mediaInfo = await _repository.GetMediaStreamInfoAsync(mediaId);
         if (mediaInfo == null || !mediaInfo.Parts.Any()) throw new InvalidOperationException("Media not found or has no parts.");
 
