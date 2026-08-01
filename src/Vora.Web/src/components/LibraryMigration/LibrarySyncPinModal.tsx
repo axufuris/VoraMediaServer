@@ -3,6 +3,7 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from '../Common/Modal';
 import {
     libraryMigrationService,
     type LibrarySyncPinStatus,
+    type LibrarySyncPinStatusVM,
     type LibrarySyncPinVM,
     type LibrarySyncTokenVM
 } from '../../api/LibraryMigration/libraryMigrationService';
@@ -14,6 +15,8 @@ interface LibrarySyncPinModalProps {
     providerId: string;
     providerName: string;
     serverId?: string;
+    createPin?: (providerId: string, serverId?: string) => Promise<LibrarySyncPinVM>;
+    pollPin?: (providerId: string, pinId: string, serverId?: string) => Promise<LibrarySyncPinStatusVM>;
     onClose: () => void;
     onAuthorized: (token: LibrarySyncTokenVM) => void;
 }
@@ -25,6 +28,8 @@ export function LibrarySyncPinModal({
     providerId,
     providerName,
     serverId,
+    createPin = libraryMigrationService.createPin,
+    pollPin = libraryMigrationService.pollPin,
     onClose,
     onAuthorized
 }: LibrarySyncPinModalProps) {
@@ -39,7 +44,7 @@ export function LibrarySyncPinModal({
         setPin(null);
         setErrorMessage(null);
         try {
-            const created = await libraryMigrationService.createPin(providerId, serverId);
+            const created = await createPin(providerId, serverId);
             if (cancelledRef.current) return;
             setPin(created);
             setPhase('awaiting');
@@ -71,7 +76,7 @@ export function LibrarySyncPinModal({
 
         const poll = async () => {
             try {
-                const status = await libraryMigrationService.pollPin(providerId, pin.pinId, serverId);
+                const status = await pollPin(providerId, pin.pinId, serverId);
                 if (cancelledRef.current) return;
                 const resolved: LibrarySyncPinStatus = status.status;
                 if (resolved === 'Authorized' && status.token) {

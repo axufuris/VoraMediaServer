@@ -11,6 +11,7 @@ import { userImageService } from '../../api/Users/userImageService';
 import { type UserVM, userService } from '../../api/Users/userService';
 import { authService } from '../../api/Auth/authService';
 import { musicService } from '../../api/Music/musicService';
+import PlexImportPanel from '../../components/LibraryMigration/PlexImportPanel';
 export default function AccountSettingsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const [user, setUser] = useState<UserVM | null>(null);
@@ -543,11 +544,14 @@ function ProfileEditor({ profile, user, libraries, iptvPlaylists, serverId, onCl
             )}
 
             {activeTab === 'connections' && isOwnProfile && (
-                <LastFmConnectionPanel
-                    serverId={serverId}
-                    lastFmUsername={profile.lastFmUsername}
-                    onChanged={onRefresh}
-                />
+                <div className="space-y-6">
+                    <LastFmConnectionPanel
+                        serverId={serverId}
+                        lastFmUsername={profile.lastFmUsername}
+                        onChanged={onRefresh}
+                    />
+                    <PlexImportPanel serverId={serverId} />
+                </div>
             )}
 
             {activeTab === 'schedule' && showParentalTabs && (
