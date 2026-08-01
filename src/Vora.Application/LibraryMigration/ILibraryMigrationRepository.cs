@@ -37,6 +37,7 @@ public interface ILibraryMigrationRepository
 {
     Task<List<MediaItemMatchRow>> FindMatchesAsync(IReadOnlyCollection<string> tmdbIds, IReadOnlyCollection<string> imdbIds, IReadOnlyCollection<string> tvdbIds);
     Task<List<EpisodeMatchRow>> FindEpisodeMatchesAsync(IReadOnlyCollection<string> showTmdbIds, IReadOnlyCollection<string> showImdbIds, IReadOnlyCollection<string> showTvdbIds);
+    Task<List<MediaItemMatchRow>> FindEpisodeMatchesByOwnIdsAsync(IReadOnlyCollection<string> tmdbIds, IReadOnlyCollection<string> imdbIds, IReadOnlyCollection<string> tvdbIds);
     Task BulkUpsertWatchStatesAsync(Guid profileId, IReadOnlyCollection<WatchStateUpsert> entries);
     Task BulkUpsertRatingsAsync(Guid profileId, IReadOnlyCollection<RatingUpsert> entries);
     Task BulkSetAdminRatingsAsync(IReadOnlyCollection<RatingUpsert> entries);

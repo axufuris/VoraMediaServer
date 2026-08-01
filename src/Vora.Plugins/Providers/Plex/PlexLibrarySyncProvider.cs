@@ -465,6 +465,7 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
     private static void ProjectMetadataItem(JsonElement item, RemoteMediaKind kind, RemoteSyncScopeDto scope, IReadOnlyDictionary<string, RemoteExternalIdsDto>? showExternalIds, List<RemoteWatchStateDto> watchStates, List<RemoteRatingDto> ratings)
     {
         RemoteExternalIdsDto externalIds;
+        RemoteExternalIdsDto? episodeIds = null;
         int? seasonNumber = null;
         int? episodeNumber = null;
 
@@ -482,6 +483,8 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
                 return;
             }
             externalIds = showIds;
+            var ownIds = ReadGuids(item);
+            if (ownIds.HasAny) episodeIds = ownIds;
         }
         else
         {
@@ -506,6 +509,7 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
                 watchStates.Add(new RemoteWatchStateDto
                 {
                     ExternalIds = externalIds,
+                    EpisodeIds = episodeIds,
                     Kind = kind,
                     SeasonNumber = seasonNumber,
                     EpisodeNumber = episodeNumber,
@@ -529,6 +533,7 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
                 ratings.Add(new RemoteRatingDto
                 {
                     ExternalIds = externalIds,
+                    EpisodeIds = episodeIds,
                     Kind = kind,
                     SeasonNumber = seasonNumber,
                     EpisodeNumber = episodeNumber,

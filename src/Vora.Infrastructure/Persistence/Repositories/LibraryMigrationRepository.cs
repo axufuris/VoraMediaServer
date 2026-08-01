@@ -69,6 +69,33 @@ public class LibraryMigrationRepository : ILibraryMigrationRepository
             .ToListAsync();
     }
 
+    public async Task<List<MediaItemMatchRow>> FindEpisodeMatchesByOwnIdsAsync(IReadOnlyCollection<string> tmdbIds, IReadOnlyCollection<string> imdbIds, IReadOnlyCollection<string> tvdbIds)
+    {
+        if (tmdbIds.Count == 0 && imdbIds.Count == 0 && tvdbIds.Count == 0)
+        {
+            return new List<MediaItemMatchRow>();
+        }
+
+        var tmdbList = tmdbIds.ToList();
+        var imdbList = imdbIds.ToList();
+        var tvdbList = tvdbIds.ToList();
+
+        return await _context.MediaItems
+            .OfType<Episode>()
+            .AsNoTracking()
+            .Where(e => (e.TmdbId != null && tmdbList.Contains(e.TmdbId))
+                     || (e.ImdbId != null && imdbList.Contains(e.ImdbId))
+                     || (e.TvdbId != null && tvdbList.Contains(e.TvdbId)))
+            .Select(e => new MediaItemMatchRow
+            {
+                Id = e.Id,
+                TmdbId = e.TmdbId,
+                ImdbId = e.ImdbId,
+                TvdbId = e.TvdbId
+            })
+            .ToListAsync();
+    }
+
     public async Task BulkUpsertWatchStatesAsync(Guid profileId, IReadOnlyCollection<WatchStateUpsert> entries)
     {
         if (entries.Count == 0) return;
