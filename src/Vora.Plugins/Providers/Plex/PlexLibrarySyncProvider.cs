@@ -331,6 +331,10 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
             }
         }
 
+        _logger.LogInformation(
+            "Plex fetch: {SelectedSections}/{AllSections} sections matched; collected {WatchCount} watch states and {RatingCount} ratings.",
+            sections.Count, allSections.Count, watchStates.Count, ratings.Count);
+
         return new RemoteUserDataDto
         {
             WatchStates = watchStates,
@@ -401,8 +405,8 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var uri = $"{baseUri}/library/sections/{sectionKey}/all";
-            if (type.HasValue) uri += $"?type={type.Value}";
+            var uri = $"{baseUri}/library/sections/{sectionKey}/all?includeGuids=1";
+            if (type.HasValue) uri += $"&type={type.Value}";
 
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
             ApplyPlexHeaders(request, clientIdentifier);
@@ -430,6 +434,11 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
             var totalSize = container.TryGetProperty("totalSize", out var totalProp) && totalProp.ValueKind == JsonValueKind.Number
                 ? totalProp.GetInt32()
                 : 0;
+
+            if (start == 0)
+            {
+                _logger.LogInformation("Plex section {SectionKey} ({Kind}): {Total} items to scan.", sectionKey, kind, totalSize);
+            }
 
             if (!container.TryGetProperty("Metadata", out var metadata) || metadata.ValueKind != JsonValueKind.Array)
             {
