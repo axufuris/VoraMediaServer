@@ -80,8 +80,8 @@ export default function MediaEpisodesList({ episodes, serverId }: Props) {
                                         />
                                     </div>
                                     {ep.serverAdminRating != null && !isAdmin && (
-                                        <span style={{ color: 'var(--vora-accent-text)' }} title={`Server admin: ${(ep.serverAdminRating / 2).toFixed(1)} of 5 stars`}>
-                                            ★ Admin {(ep.serverAdminRating / 2).toFixed(1)}
+                                        <span style={{ color: 'var(--vora-accent-text)' }} title={`Server admin: ${Math.round(ep.serverAdminRating)} of 10`}>
+                                            ★ Admin {Math.round(ep.serverAdminRating)}
                                         </span>
                                     )}
                                 </div>

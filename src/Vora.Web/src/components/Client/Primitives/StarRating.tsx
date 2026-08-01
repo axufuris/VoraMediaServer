@@ -67,10 +67,10 @@ export default function StarRating({
             className="inline-flex items-center gap-1"
             onMouseLeave={handleMouseLeave}
             role={interactive ? 'slider' : 'img'}
-            aria-label={ariaLabel ?? (value != null ? `Rated ${(value / 2).toFixed(1)} out of 5 stars` : 'No rating')}
+            aria-label={ariaLabel ?? (value != null ? `Rated ${value} out of 10` : 'No rating')}
             aria-valuemin={interactive ? 0 : undefined}
-            aria-valuemax={interactive ? 5 : undefined}
-            aria-valuenow={interactive ? (value ?? 0) / 2 : undefined}
+            aria-valuemax={interactive ? 10 : undefined}
+            aria-valuenow={interactive ? (value ?? 0) : undefined}
             title={title}
             style={{ opacity: busy ? 0.6 : 1, transition: 'opacity 150ms ease' }}
         >
@@ -118,7 +118,7 @@ export default function StarRating({
                             <>
                                 <button
                                     type="button"
-                                    aria-label={`Rate ${(halfBackendValue / 2).toFixed(1)} stars`}
+                                    aria-label={`Rate ${halfBackendValue} of 10`}
                                     onMouseEnter={() => setHover(halfBackendValue)}
                                     onClick={() => handleClick(halfBackendValue)}
                                     style={{
@@ -135,7 +135,7 @@ export default function StarRating({
                                 />
                                 <button
                                     type="button"
-                                    aria-label={`Rate ${(fullBackendValue / 2).toFixed(1)} stars`}
+                                    aria-label={`Rate ${fullBackendValue} of 10`}
                                     onMouseEnter={() => setHover(fullBackendValue)}
                                     onClick={() => handleClick(fullBackendValue)}
                                     style={{
@@ -160,7 +160,7 @@ export default function StarRating({
                     className="ml-1 text-xs tabular-nums"
                     style={{ color: 'var(--vora-text-muted)' }}
                 >
-                    {(value / 2).toFixed(1)}
+                    {value}
                 </span>
             )}
         </div>

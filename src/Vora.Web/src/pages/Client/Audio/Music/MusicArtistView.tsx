@@ -163,7 +163,7 @@ export default function MusicArtistView({
                                         <div className="absolute left-2 bottom-2">
                                             <RatedBadge
                                                 value={(album.myRating ?? album.serverAdminRating)!}
-                                                title={album.myRating != null ? `Your rating: ${(album.myRating / 2).toFixed(1)} of 5 stars` : `Server admin rating: ${(album.serverAdminRating! / 2).toFixed(1)} of 5 stars`}
+                                                title={album.myRating != null ? `Your rating: ${Math.round(album.myRating)} of 10` : `Server admin rating: ${Math.round(album.serverAdminRating!)} of 10`}
                                             />
                                         </div>
                                     )}
