@@ -75,6 +75,8 @@ export default function MediaDetailsPage() {
     const [selectedAudioId, setSelectedAudioId] = useState<string>('');
     const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>('none');
 
+    const [qualityMedia, setQualityMedia] = useState<MediaItem | null>(null);
+
     const [thumbnailsLocked, setThumbnailsLocked] = useState<boolean | null>(null);
 
     const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
@@ -135,12 +137,31 @@ export default function MediaDetailsPage() {
     }, [id, serverId]);
 
     useEffect(() => {
-        if (media?.mediaParts?.length) {
+        if (!media) { setQualityMedia(null); return; }
+        if (media.type !== 'TvShow') { setQualityMedia(media); return; }
+
+        let cancelled = false;
+        setQualityMedia(null);
+        (async () => {
+            try {
+                const upNext = await mediaService.getUpNext(media.id, undefined, undefined, serverId);
+                if (cancelled || !upNext.nextItem) return;
+                const episode = await mediaService.getMediaItem(upNext.nextItem.id, serverId);
+                if (!cancelled) setQualityMedia(episode);
+            } catch {
+                if (!cancelled) setQualityMedia(null);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [media, serverId]);
+
+    useEffect(() => {
+        if (qualityMedia?.mediaParts?.length) {
             let bestVideoId = '';
             let lowestVideoPenalty = 9999;
-            let winningPart = media.mediaParts[0];
+            let winningPart = qualityMedia.mediaParts[0];
 
-            for (const part of media.mediaParts) {
+            for (const part of qualityMedia.mediaParts) {
                 for (const track of part.videoTracks || []) {
                     let penalty = 0;
                     const codec = track.codec?.toLowerCase() || '';
@@ -171,7 +192,7 @@ export default function MediaDetailsPage() {
                 setSelectedSubtitleId(prev => prev !== bestSubId ? bestSubId : prev);
             }, 0);
         }
-    }, [media, caps]);
+    }, [qualityMedia, caps]);
 
     useEffect(() => {
         if (!isPlaying && id) {
@@ -214,7 +235,7 @@ export default function MediaDetailsPage() {
             const startPos = resume ? (media.resumePositionSeconds || 0) : 0;
             const subId = selectedSubtitleId === 'none' ? '00000000-0000-0000-0000-000000000000' : selectedSubtitleId;
 
-            const activePart = media.mediaParts?.find(p => p.videoTracks?.some(v => v.id === selectedVideoId)) || media.mediaParts?.[0];
+            const activePart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === selectedVideoId)) || qualityMedia?.mediaParts?.[0];
 
             const sessionInfo = await streamingService.startSession(media.id, deviceId, startPos, selectedVideoId || undefined, selectedAudioId || undefined, subId, serverId, activePart?.id);
 
@@ -329,7 +350,7 @@ export default function MediaDetailsPage() {
     }, [media, isAdmin, serverId, dialog, reloadMedia]);
 
     const handleVersionChange = (partId: string) => {
-        const part = media?.mediaParts?.find(p => p.id === partId);
+        const part = qualityMedia?.mediaParts?.find(p => p.id === partId);
         if (!part) return;
         const bestVideo = part.videoTracks?.find(v => v.isDefault) || part.videoTracks?.[0];
         if (bestVideo) handleVideoChange(bestVideo.id);
@@ -337,7 +358,7 @@ export default function MediaDetailsPage() {
 
     const handleVideoChange = (newVideoId: string) => {
         setSelectedVideoId(newVideoId);
-        const newPart = media?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === newVideoId));
+        const newPart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === newVideoId));
 
         if (newPart) {
             // Switching version/video always re-selects the audio the client can
@@ -373,12 +394,12 @@ export default function MediaDetailsPage() {
         );
     }
 
-    const activePart = media.mediaParts?.find(p => p.videoTracks?.some(v => v.id === selectedVideoId)) || media.mediaParts?.[0];
+    const activePart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === selectedVideoId)) || qualityMedia?.mediaParts?.[0];
     const resumePos = media.resumePositionSeconds || 0;
     const inProgress = resumePos > 0 && !media.isPlayed;
     const isFullyPlayed = media.type === 'Episode' || media.type === 'Movie' ? media.isPlayed : media.unplayedItemCount === 0 && (media.episodes?.length || 0) > 0;
 
-    const sortedVideoTracks = media.mediaParts?.flatMap(p =>
+    const sortedVideoTracks = qualityMedia?.mediaParts?.flatMap(p =>
         (p.videoTracks || []).map(v => ({ part: p, track: v }))
     ).sort((a, b) => {
         const aIs4k = a.part.resolution?.toLowerCase().includes('4k') || a.part.resolution?.includes('2160') ? 1 : 0;
@@ -413,7 +434,7 @@ export default function MediaDetailsPage() {
         })),
     ];
     const resHeight = (res?: string) => parseInt((res || '').replace(/[^0-9]/g, ''), 10) || 0;
-    const versionOptions: QualityOption<string>[] = [...(media.mediaParts ?? [])]
+    const versionOptions: QualityOption<string>[] = [...(qualityMedia?.mediaParts ?? [])]
         .sort((a, b) => resHeight(b.resolution) - resHeight(a.resolution) || (b.bitrateKbps ?? 0) - (a.bitrateKbps ?? 0))
         .map((p, i) => {
             const displayRes = p.resolution === '2160p' ? '4K' : (p.resolution || `Version ${i + 1}`);
@@ -456,7 +477,7 @@ export default function MediaDetailsPage() {
     };
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = (isSeason || isEpisode) ? media.title : undefined;
-    const showQualityButton = (media.type === 'Movie' || isEpisode) && (versionOptions.length > 1 || sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
+    const showQualityButton = (media.type === 'Movie' || isEpisode || media.type === 'TvShow') && (versionOptions.length > 1 || sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
     const playLabel = media.type === 'TvShow' ? 'Play next' : inProgress ? 'Resume' : 'Play';
     const playRuntime = formatRuntime(media.durationMinutes);
 
