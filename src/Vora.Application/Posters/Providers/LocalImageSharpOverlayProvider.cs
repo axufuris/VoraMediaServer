@@ -107,7 +107,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         return $"{CustomArtworkUrlPrefix}{outputFileName}";
     }
 
-    private const string CacheKeyVersion = "v4-jpeg-canvas";
+    private const string CacheKeyVersion = "v5-rating-10-scale";
 
     private static string ComputeOverlayCacheKey(OverlayMediaDto item, string originalArtworkPath, string templateJson)
     {
@@ -336,7 +336,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         }
         else if (BadgeResolver.IsVoraStarLogo(rating.ImagePath))
         {
-            scoreText = (rating.Score / 2m).ToString("0.0");
+            scoreText = rating.Score.ToString("0");
         }
         else
         {
