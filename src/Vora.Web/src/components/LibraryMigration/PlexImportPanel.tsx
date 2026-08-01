@@ -9,12 +9,14 @@ import type {
     RemoteServerVM
 } from '../../api/LibraryMigration/libraryMigrationService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
+import { StorageKeys } from '../../utils/storageKeys';
 
 interface PlexImportPanelProps {
     serverId?: string;
 }
 
 export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
+    const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
     const [provider, setProvider] = useState<LibrarySyncProviderVM | null>(null);
     const [pinOpen, setPinOpen] = useState(false);
     const [token, setToken] = useState<string | null>(null);
@@ -26,6 +28,7 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
     const [selectedKeys, setSelectedKeys] = useState<Record<string, boolean>>({});
     const [includeWatch, setIncludeWatch] = useState(true);
     const [includeRatings, setIncludeRatings] = useState(true);
+    const [setAsAdminRatings, setSetAsAdminRatings] = useState(false);
 
     const [job, setJob] = useState<LibraryMigrationJobVM | null>(null);
     const [busy, setBusy] = useState(false);
@@ -122,7 +125,8 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
                 includeWatchState: includeWatch,
                 includeRatings: includeRatings,
                 librarySectionKeys: chosenKeys,
-                plexUsername: username
+                plexUsername: username,
+                setAdminRatings: isAdmin && includeRatings && setAsAdminRatings
             }, serverId);
             setJob(created);
         } catch {
@@ -223,6 +227,13 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
                                     Ratings
                                 </label>
                             </div>
+
+                            {isAdmin && includeRatings && (
+                                <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--vora-text-primary)' }}>
+                                    <input type="checkbox" checked={setAsAdminRatings} onChange={e => setSetAsAdminRatings(e.target.checked)} className="h-4 w-4 accent-[var(--vora-accent-500)]" />
+                                    Also set these as the server Admin Rating
+                                </label>
+                            )}
 
                             <div>
                                 <div className="mb-1.5 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--vora-text-muted)' }}>Libraries</div>

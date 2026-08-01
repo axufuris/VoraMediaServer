@@ -242,6 +242,10 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
                 .GroupBy(p => p.MediaItemId)
                 .Select(g => MergeRatings(g.Key, g.Select(x => x.Rating))));
             await repository.BulkUpsertRatingsAsync(mapping.ProfileId, ratingUpserts);
+            if (input.SetAdminRatings)
+            {
+                await repository.BulkSetAdminRatingsAsync(ratingUpserts);
+            }
         }
 
         UpdateUser(jobId, mapping.AccountId, u =>

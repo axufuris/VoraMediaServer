@@ -13,6 +13,7 @@ public class LibraryMigrationJobInput
     public required List<LibraryMigrationMappingInput> Mappings { get; set; }
 
     public bool SelfService { get; set; }
+    public bool SetAdminRatings { get; set; }
 }
 
 public class LibraryMigrationMappingInput

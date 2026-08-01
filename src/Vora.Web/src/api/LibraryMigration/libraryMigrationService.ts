@@ -109,6 +109,7 @@ export interface RunLibraryMigrationRequest {
     includeRatings: boolean;
     librarySectionKeys: string[];
     mappings: RunLibraryMigrationMappingInput[];
+    setAdminRatings?: boolean;
 }
 
 const BASE = '/library-migration/providers';
