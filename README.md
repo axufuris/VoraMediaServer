@@ -222,6 +222,17 @@ service:
               capabilities: [gpu, video]
 ```
 
+The image ships with `NVIDIA_VISIBLE_DEVICES=all` and
+`NVIDIA_DRIVER_CAPABILITIES=all` baked in, so on any host that launches
+it with the NVIDIA runtime, `libnvidia-container` injects `libcuda.so.1`
+plus the NVENC/NVDEC and Vulkan/OpenCL driver libraries — CUDA decode,
+NVENC encode, and the `tonemap_cuda` HDR→SDR filter all work out of the
+box. **The host only needs the NVIDIA Container Toolkit runtime
+enabled.** Don't override `NVIDIA_DRIVER_CAPABILITIES` with a narrower
+value (e.g. `utility`) — that omits `libcuda.so.1` and you'll see
+`Could not dynamically load CUDA` / `Cannot load libcuda.so.1` when a
+transcode starts.
+
 ### Unraid
 
 Unraid users typically install both containers from **Apps → Add
@@ -298,12 +309,16 @@ container log if you want to confirm — you should see
 the server admin.
 
 For NVIDIA GPU transcoding on Unraid, install the **Nvidia-Driver**
-plugin from CA, then on the Vora container template:
-
-- Set **Extra Parameters** to `--runtime=nvidia`.
-- Add a variable `NVIDIA_VISIBLE_DEVICES` with value `all` (or a
-  specific GPU UUID from `nvidia-smi`).
-- Add a variable `NVIDIA_DRIVER_CAPABILITIES` with value `all`.
+plugin from CA, then on the Vora container template set **Extra
+Parameters** to `--runtime=nvidia`. That's the only change required —
+the image already carries `NVIDIA_VISIBLE_DEVICES=all` and
+`NVIDIA_DRIVER_CAPABILITIES=all`, so you do **not** need to add those
+variables by hand (Unraid's `--runtime=nvidia` path ignores the compose
+`deploy` capabilities list, which is why baking them into the image is
+what makes CUDA work here). To pin a specific GPU, you can still add a
+`NVIDIA_VISIBLE_DEVICES` variable set to its UUID from `nvidia-smi`, but
+leave `NVIDIA_DRIVER_CAPABILITIES` alone — narrowing it drops
+`libcuda.so.1` and breaks transcoding.
 
 ### Upgrading
 

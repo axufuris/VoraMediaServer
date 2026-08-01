@@ -52,5 +52,12 @@ services:
               #     across both Linux and WSL2.
               capabilities: [gpu, video, compute, graphics]
 
-# Must add this to the Extra Parameters in Unraid: --runtime=nvidia
-# Then you must add a new variable: Key - NVIDIA_VISIBLE_DEVICES, Value - all
+# Unraid: the ONLY required Extra Parameter is --runtime=nvidia
+# The image already ships NVIDIA_VISIBLE_DEVICES=all and
+# NVIDIA_DRIVER_CAPABILITIES=all, so libnvidia-container injects
+# libcuda.so.1 + the NVENC/NVDEC and Vulkan/OpenCL driver libs on any
+# host that launches it with the NVIDIA runtime — including Unraid's
+# --runtime=nvidia path, which does NOT read the compose deploy
+# capabilities list above. Do not override NVIDIA_DRIVER_CAPABILITIES
+# with a narrower value (e.g. just "utility") — that omits libcuda and
+# breaks CUDA transcoding.
