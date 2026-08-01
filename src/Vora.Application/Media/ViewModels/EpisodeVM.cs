@@ -4,6 +4,7 @@ public class EpisodeVM
 {
     public Guid Id { get; set; }
     public int EpisodeNumber { get; set; }
+    public int? EndEpisodeNumber { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Overview { get; set; }
     public string? PosterUrl { get; set; }
