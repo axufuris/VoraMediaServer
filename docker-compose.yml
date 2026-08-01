@@ -10,6 +10,8 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
+      - PUID=${PUID:-99}
+      - PGID=${PGID:-100}
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}
