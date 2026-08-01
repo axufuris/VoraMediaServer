@@ -79,7 +79,7 @@ public class MediaItemVM
                     SeasonNumber = s.SeasonNumber,
                     Title = s.Title,
                     PosterUrl = s.PosterUrl,
-                    EpisodeCount = s.Episodes.Count(e => e.MissingSince == null)
+                    EpisodeCount = s.Episodes.Where(e => e.MissingSince == null).Sum(e => (e.EndEpisodeNumber ?? e.EpisodeNumber) - e.EpisodeNumber + 1)
                 }).ToList()
                 : new List<SeasonVM>(),
 
