@@ -287,6 +287,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             u.WatchStatesImported = watchUpserts.Count;
             u.RatingsImported = ratingUpserts.Count;
             u.Skipped = watchSkipped + ratingsSkipped;
+            u.SkippedSamples = skippedSamples;
         });
         await notifier.NotifyLibraryMigrationUpdatedAsync(GetSnapshot(jobId));
     }
@@ -467,6 +468,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
                 RatingsFetched = u.RatingsFetched,
                 RatingsImported = u.RatingsImported,
                 Skipped = u.Skipped,
+                SkippedSamples = u.SkippedSamples.ToList(),
                 ErrorMessage = u.ErrorMessage
             }).ToList()
         };

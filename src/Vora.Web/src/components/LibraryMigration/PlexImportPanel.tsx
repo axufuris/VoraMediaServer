@@ -291,6 +291,16 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
                                     {jobUser.skipped > 0 && (' · ' + jobUser.skipped + ' skipped (not in your Vora library)')}
                                 </div>
                             )}
+                            {jobUser && jobUser.skippedSamples && jobUser.skippedSamples.length > 0 && (
+                                <details className="mt-1">
+                                    <summary className="cursor-pointer text-xs" style={{ color: 'var(--vora-text-muted)' }}>
+                                        Show unmatched sample ({jobUser.skippedSamples.length} of {jobUser.skipped})
+                                    </summary>
+                                    <ul className="mt-1 space-y-0.5 font-mono text-[11px]" style={{ color: 'var(--vora-text-muted)' }}>
+                                        {jobUser.skippedSamples.map((s, i) => <li key={i}>{s}</li>)}
+                                    </ul>
+                                </details>
+                            )}
                             {job.errorMessage && <p className="mt-1 text-xs" style={{ color: 'var(--vora-danger-text)' }}>{job.errorMessage}</p>}
                         </div>
                     )}
