@@ -8,6 +8,16 @@ public class MediaItemMatchRow
     public string? TvdbId { get; set; }
 }
 
+public class EpisodeMatchRow
+{
+    public required Guid Id { get; set; }
+    public string? ShowTmdbId { get; set; }
+    public string? ShowImdbId { get; set; }
+    public string? ShowTvdbId { get; set; }
+    public required int SeasonNumber { get; set; }
+    public required int EpisodeNumber { get; set; }
+}
+
 public class WatchStateUpsert
 {
     public required Guid MediaItemId { get; set; }
@@ -26,6 +36,7 @@ public class RatingUpsert
 public interface ILibraryMigrationRepository
 {
     Task<List<MediaItemMatchRow>> FindMatchesAsync(IReadOnlyCollection<string> tmdbIds, IReadOnlyCollection<string> imdbIds, IReadOnlyCollection<string> tvdbIds);
+    Task<List<EpisodeMatchRow>> FindEpisodeMatchesAsync(IReadOnlyCollection<string> showTmdbIds, IReadOnlyCollection<string> showImdbIds, IReadOnlyCollection<string> showTvdbIds);
     Task BulkUpsertWatchStatesAsync(Guid profileId, IReadOnlyCollection<WatchStateUpsert> entries);
     Task BulkUpsertRatingsAsync(Guid profileId, IReadOnlyCollection<RatingUpsert> entries);
 }
