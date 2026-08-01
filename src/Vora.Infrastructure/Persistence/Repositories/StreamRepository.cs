@@ -10,6 +10,33 @@ namespace Vora.Infrastructure.Persistence.Repositories;
 
 public class StreamRepository(VoraDbContext context) : IStreamRepository
 {
+    public async Task<Guid> ResolvePlayableMediaIdAsync(Guid mediaId, Guid? profileId)
+    {
+        var isShow = await context.MediaItems.AsNoTracking().AnyAsync(m => m.Id == mediaId && m is TvShow);
+        if (!isShow) return mediaId;
+
+        Guid? episodeId = null;
+        if (profileId.HasValue)
+        {
+            episodeId = await context.Set<Episode>()
+                .AsNoTracking()
+                .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
+                .Where(e => !context.UserMediaStates.Any(s => s.ProfileId == profileId.Value && s.MediaItemId == e.Id && s.IsPlayed))
+                .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
+                .Select(e => (Guid?)e.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        episodeId ??= await context.Set<Episode>()
+            .AsNoTracking()
+            .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
+            .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
+            .Select(e => (Guid?)e.Id)
+            .FirstOrDefaultAsync();
+
+        return episodeId ?? mediaId;
+    }
+
     public Task<MediaStreamInfoDto?> GetMediaStreamInfoAsync(Guid mediaId) =>
         context.MediaItems
             .AsNoTracking()
