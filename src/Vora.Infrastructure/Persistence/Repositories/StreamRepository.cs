@@ -56,7 +56,8 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                         Id = vt.Id,
                         Codec = vt.Codec,
                         IsDefault = vt.IsDefault,
-                        HdrType = vt.HdrType
+                        HdrType = vt.HdrType,
+                        BitDepth = vt.BitDepth
                     }).ToList(),
                     AudioTracks = p.AudioTracks.Select(at => new TrackStreamInfoDto
                     {
@@ -208,7 +209,8 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                         Id = vt.Id,
                         Codec = vt.Codec,
                         IsDefault = vt.IsDefault,
-                        HdrType = vt.HdrType
+                        HdrType = vt.HdrType,
+                        BitDepth = vt.BitDepth
                     }).ToList(),
                     AudioTracks = p.AudioTracks.Select(at => new TrackStreamInfoDto
                     {

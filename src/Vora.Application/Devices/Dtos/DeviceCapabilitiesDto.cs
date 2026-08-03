@@ -15,4 +15,10 @@ public class DeviceCapabilitiesDto
 
     [JsonPropertyName("maxAudioChannels")]
     public int MaxAudioChannels { get; set; } = 2;
+
+    [JsonPropertyName("supportedHdrFormats")]
+    public List<string>? SupportedHdrFormats { get; set; }
+
+    [JsonPropertyName("maxVideoBitDepth")]
+    public int MaxVideoBitDepth { get; set; }
 }
