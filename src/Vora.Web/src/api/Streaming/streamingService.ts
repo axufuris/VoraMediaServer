@@ -22,7 +22,7 @@ export interface StartSessionResponse {
 
 export const streamingService = {
     startSession: async (mediaId: string, deviceId: string, startPosition: number = 0, videoTrackId?: string, audioTrackId?: string, subtitleTrackId?: string, serverId?: string, mediaPartId?: string) => {
-        const capabilities = scanDeviceCapabilities();
+        const capabilities = await scanDeviceCapabilities();
 
         const response = await apiClient.post('/streaming/start', {
             mediaId,
@@ -38,7 +38,7 @@ export const streamingService = {
         return response.data as StartSessionResponse;
     },
     startExtraSession: async (extraId: string, startPosition: number = 0, serverId?: string) => {
-        const capabilities = scanDeviceCapabilities();
+        const capabilities = await scanDeviceCapabilities();
 
         const response = await apiClient.post('/streaming/start-extra', {
             extraId,

@@ -12,7 +12,7 @@ import MediaEpisodesList from '../../../components/Media/MediaEpisodesList';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { streamingService } from '../../../api/Streaming/streamingService';
-import { scanDeviceCapabilities } from '../../../utils/hardwareScanner';
+import { scanDeviceCapabilitiesSync } from '../../../utils/hardwareScanner';
 import { useDialog } from '../../../dialogs';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
 import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
@@ -80,7 +80,7 @@ export default function MediaDetailsPage() {
     const [thumbnailsLocked, setThumbnailsLocked] = useState<boolean | null>(null);
 
     const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
-    const caps = useMemo(() => scanDeviceCapabilities(), []);
+    const caps = useMemo(() => scanDeviceCapabilitiesSync(), []);
     const { playMedia, isPlaying } = usePlayer();
 
     // Pick the audio track the client can play directly: heavily penalize codecs

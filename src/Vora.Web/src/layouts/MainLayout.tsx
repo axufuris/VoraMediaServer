@@ -323,7 +323,7 @@ export default function MainLayout() {
             sessionStorage.setItem(cacheKey, 'pending');
 
             try {
-                const capabilities = scanDeviceCapabilities();
+                const capabilities = await scanDeviceCapabilities();
                 await deviceService.updateCapabilities(capabilities, serverId);
 
                 sessionStorage.setItem(cacheKey, 'true');

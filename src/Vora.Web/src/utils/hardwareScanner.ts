@@ -57,9 +57,10 @@ const DOLBY_VISION = 'video/mp4; codecs="dvh1.05.06"';
 
 const supportsDolbyVision = (): boolean => mseSupports(DOLBY_VISION);
 
-// Best-effort synchronous fallback: used until the async MediaCapabilities
-// probe resolves, and on browsers without navigator.mediaCapabilities. Reports
-// nothing unless the display can actually render HDR (dynamic-range: high).
+// Best-effort synchronous HDR detection: gates on the display actually being
+// able to render HDR (dynamic-range: high), then assumes HDR10/HLG. Used by
+// the synchronous scan (render-time consumers, which only read codec/channel
+// fields) and as the fallback when navigator.mediaCapabilities is unavailable.
 const detectHdrFormatsSync = (): string[] => {
     if (!displayIsHdr()) return [];
     const formats = ['HDR10', 'HLG'];
@@ -67,19 +68,15 @@ const detectHdrFormatsSync = (): string[] => {
     return formats;
 };
 
-let cachedHdrFormats: string[] | null = null;
-let hdrProbeStarted = false;
-
-const probeHdrFormatsAsync = async (): Promise<void> => {
-    if (!displayIsHdr()) {
-        cachedHdrFormats = [];
-        return;
-    }
+// Precise async HDR probe via MediaCapabilities.decodingInfo. Returns [] when
+// the display can't render HDR, the decodingInfo-verified set when the API is
+// present, or the sync gate estimate when it isn't.
+const probeHdrFormats = async (): Promise<string[]> => {
+    if (!displayIsHdr()) return [];
 
     const mediaCapabilities = window.navigator.mediaCapabilities;
     if (!mediaCapabilities || typeof mediaCapabilities.decodingInfo !== 'function') {
-        cachedHdrFormats = detectHdrFormatsSync();
-        return;
+        return detectHdrFormatsSync();
     }
 
     const base: HdrVideoConfiguration = {
@@ -103,10 +100,10 @@ const probeHdrFormatsAsync = async (): Promise<void> => {
     }
     if (supportsDolbyVision()) formats.push('DolbyVision');
 
-    cachedHdrFormats = formats;
+    return formats;
 };
 
-export const scanDeviceCapabilities = (): DeviceCapabilities => {
+export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
     const videoCodecs: string[] = [];
     const audioCodecs: string[] = [];
     const containers: string[] = [];
@@ -225,11 +222,7 @@ export const scanDeviceCapabilities = (): DeviceCapabilities => {
         if (!containers.includes('hls')) containers.push('hls');
     }
 
-    if (!hdrProbeStarted) {
-        hdrProbeStarted = true;
-        void probeHdrFormatsAsync();
-    }
-    const supportedHdrFormats = cachedHdrFormats ?? detectHdrFormatsSync();
+    const supportedHdrFormats = detectHdrFormatsSync();
 
     // 10-bit decode capability (independent of whether the display is HDR):
     // HEVC Main10, VP9 Profile 2, or AV1 Main 10-bit.
@@ -254,4 +247,15 @@ export const scanDeviceCapabilities = (): DeviceCapabilities => {
     }
 
     return { videoCodecs, audioCodecs, containers, maxAudioChannels, clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, supportedHdrFormats, maxVideoBitDepth };
+};
+
+// Full capability scan. Same as the synchronous scan but replaces the HDR
+// gate estimate with the precise MediaCapabilities.decodingInfo probe. Use
+// this on the paths that report capabilities to the server (stream start,
+// device-capabilities update); use scanDeviceCapabilitiesSync where a value
+// is needed synchronously at render time.
+export const scanDeviceCapabilities = async (): Promise<DeviceCapabilities> => {
+    const base = scanDeviceCapabilitiesSync();
+    const supportedHdrFormats = await probeHdrFormats();
+    return { ...base, supportedHdrFormats };
 };
