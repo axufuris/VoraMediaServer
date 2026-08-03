@@ -19,6 +19,9 @@ public class ClientDevice
     public List<string> SupportedAudioCodecs { get; set; } = new();
     public List<string> SupportedContainers { get; set; } = new();
 
+    public List<string>? SupportedHdrFormats { get; set; }
+    public int MaxVideoBitDepth { get; set; }
+
     public Guid? LastUserId { get; set; }
     public Guid? LastProfileId { get; set; }
     public DateTime LastConnectedAt { get; set; } = DateTime.UtcNow;

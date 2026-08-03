@@ -8,7 +8,7 @@ using Vora.Domain.Entities.Streaming;
 
 namespace Vora.Application.Streaming;
 
-public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[] Containers, int MaxAudioChannels, int ClientBandwidthKbps, int RequestedClientBitrateKbps, int RequestedMaxResolution = 0);
+public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[] Containers, int MaxAudioChannels, int ClientBandwidthKbps, int RequestedClientBitrateKbps, int RequestedMaxResolution = 0, string[]? SupportedHdrFormats = null, int MaxVideoBitDepth = 0);
 
 public interface IStreamManager
 {
@@ -64,6 +64,8 @@ public class StreamManager : IStreamManager
             client.SupportedAudioCodecs = capabilities.AudioCodecs?.ToList() ?? new List<string>();
             client.SupportedContainers = capabilities.Containers?.ToList() ?? new List<string>();
             client.MaxAudioChannels = capabilities.MaxAudioChannels;
+            client.SupportedHdrFormats = capabilities.SupportedHdrFormats?.ToList();
+            client.MaxVideoBitDepth = capabilities.MaxVideoBitDepth;
         }
 
         await _repository.EndActiveSessionsForDeviceAsync(client.Id);
@@ -175,6 +177,8 @@ public class StreamManager : IStreamManager
             client.SupportedAudioCodecs = capabilities.AudioCodecs?.ToList() ?? new List<string>();
             client.SupportedContainers = capabilities.Containers?.ToList() ?? new List<string>();
             client.MaxAudioChannels = capabilities.MaxAudioChannels;
+            client.SupportedHdrFormats = capabilities.SupportedHdrFormats?.ToList();
+            client.MaxVideoBitDepth = capabilities.MaxVideoBitDepth;
         }
 
         await _repository.EndActiveSessionsForDeviceAsync(client.Id);

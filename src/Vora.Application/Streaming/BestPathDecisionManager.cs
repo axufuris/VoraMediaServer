@@ -94,13 +94,30 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             int bitrateKbps = (int)((part.OverallBitrate ?? 3000000) / 1000);
             bool exceedsBandwidth = maxAllowedBandwidthKbps > 0 && bitrateKbps > maxAllowedBandwidthKbps;
 
+            var sourceHdr = NormalizeHdr(videoTrack.HdrType);
+            bool hdrNotRenderable = false;
+            if (sourceHdr != null && client.SupportedHdrFormats != null)
+            {
+                var clientHdr = client.SupportedHdrFormats
+                    .Select(NormalizeHdr)
+                    .Where(h => h != null)
+                    .ToHashSet();
+                // TODO(DoVi profile): once the DoVi profile is surfaced, let a Profile 8
+                // ("DoVi/HDR10") source fall back to its HDR10 base layer for HDR10-capable
+                // clients instead of tonemapping. v1 treats unlisted DoVi as not-renderable.
+                hdrNotRenderable = !clientHdr.Contains(sourceHdr);
+            }
+
+            bool bitDepthTooHigh = client.MaxVideoBitDepth > 0 && (videoTrack.BitDepth ?? 8) > client.MaxVideoBitDepth;
+
             foreach (var audioTrack in audioTracksToEvaluate)
             {
                 var audioCodec = audioTrack.Codec?.ToLower() ?? "";
                 int trackChannels = audioTrack.Channels ?? 2;
                 bool isPrimaryAudio = audioTrack.Id == primaryAudioTrack?.Id;
 
-                bool needsVideoTranscode = (!string.IsNullOrEmpty(videoCodec) && !client.SupportedVideoCodecs.Contains(videoCodec)) || requiresBurnIn || exceedsBandwidth;
+                bool codecUnsupported = !string.IsNullOrEmpty(videoCodec) && !client.SupportedVideoCodecs.Contains(videoCodec);
+                bool needsVideoTranscode = codecUnsupported || requiresBurnIn || exceedsBandwidth || hdrNotRenderable || bitDepthTooHigh;
                 bool needsAudioDownmix = trackChannels > client.MaxAudioChannels;
                 bool needsAudioTranscode = (!string.IsNullOrEmpty(audioCodec) && !client.SupportedAudioCodecs.Contains(audioCodec)) || needsAudioDownmix;
                 bool needsRemux = !string.IsNullOrEmpty(container) && !client.SupportedContainers.Contains(container);
@@ -159,7 +176,10 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                         else if (exceedsBandwidth) reasons.Add($"Video Transcode: Bitrate ({(bitrateKbps / 1000.0):F1} Mbps) exceeds {bandwidthLimitSource} ({(maxAllowedBandwidthKbps / 1000.0):F1} Mbps).");
                         else if (videoCodec == "hevc" && client.DeviceType == "Browser") reasons.Add("Video Transcode: HEVC unsupported in HLS for Browsers.");
                         else if (trackHeight > clientMaxRes) { }
-                        else reasons.Add($"Video Transcode: '{videoCodec}' unsupported.");
+                        else if (codecUnsupported) reasons.Add($"Video Transcode: '{videoCodec}' unsupported.");
+
+                        if (hdrNotRenderable) reasons.Add($"Video Transcode: Source HDR ({videoTrack.HdrType}) not supported by client; tonemapping to SDR.");
+                        if (bitDepthTooHigh) reasons.Add($"Video Transcode: Source bit depth ({videoTrack.BitDepth}-bit) exceeds client maximum ({client.MaxVideoBitDepth}-bit).");
 
                         currentScore += is4k ? 200 : 50;
                     }
@@ -259,6 +279,10 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 }
 
                 int finalBandwidthKbps = exceedsBandwidth ? maxAllowedBandwidthKbps : bitrateKbps;
+                if (settings.StreamingProfile == StreamingProfile.BandwidthOptimized && (needsVideoTranscode || needsAudioTranscode))
+                {
+                    finalBandwidthKbps = Math.Min(finalBandwidthKbps, LadderKbpsForHeight(outputHeight));
+                }
                 double finalMbps = finalBandwidthKbps / 1000.0;
 
                 option.Decision.Reason = string.Join(" ", reasons);
@@ -329,6 +353,28 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         if (height >= 360) return "360p";
         if (height >= 240) return "240p";
         return $"{height}p";
+    }
+
+    private static int LadderKbpsForHeight(int height)
+    {
+        if (height >= 2160) return 20000;
+        if (height >= 1440) return 12000;
+        if (height >= 1080) return 8000;
+        if (height >= 720) return 4000;
+        if (height >= 480) return 2000;
+        return 1000;
+    }
+
+    private static string? NormalizeHdr(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var v = raw.Trim().ToUpperInvariant().Replace(" ", "").Replace("_", "").Replace("-", "");
+        if (v is "SDR" or "NONE") return null;
+        if (v.Contains("DOVI") || v.Contains("DOLBY")) return "DOLBYVISION";
+        if (v.Contains("HDR10PLUS") || v.Contains("HDR10+")) return "HDR10PLUS";
+        if (v.Contains("HDR10")) return "HDR10";
+        if (v.Contains("HLG")) return "HLG";
+        return null;
     }
 
     public static int ParseHeightFromResolution(string? resolution)

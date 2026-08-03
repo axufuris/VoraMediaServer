@@ -938,6 +938,7 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.SupportedVideoCodecs).HasConversion(converters.StringList).Metadata.SetValueComparer(converters.StringListComparer);
             entity.Property(e => e.SupportedAudioCodecs).HasConversion(converters.StringList).Metadata.SetValueComparer(converters.StringListComparer);
             entity.Property(e => e.SupportedContainers).HasConversion(converters.StringList).Metadata.SetValueComparer(converters.StringListComparer);
+            entity.Property(e => e.SupportedHdrFormats).HasConversion((ValueConverter)converters.StringList).Metadata.SetValueComparer(converters.StringListComparer);
 
             entity.HasIndex(e => e.DeviceId).IsUnique();
         });

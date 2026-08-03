@@ -63,6 +63,8 @@ public class DeviceRepository(VoraDbContext context) : IDeviceRepository
         target.SupportedAudioCodecs = source.SupportedAudioCodecs;
         target.SupportedContainers = source.SupportedContainers;
         target.MaxAudioChannels = source.MaxAudioChannels;
+        target.SupportedHdrFormats = source.SupportedHdrFormats;
+        target.MaxVideoBitDepth = source.MaxVideoBitDepth;
         target.LastConnectedAt = source.LastConnectedAt;
     }
 }
