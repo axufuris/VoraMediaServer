@@ -20,6 +20,8 @@ export interface DeviceCapabilitiesDto {
     audioCodecs: string[];
     containers: string[];
     maxAudioChannels: number;
+    supportedHdrFormats: string[];
+    maxVideoBitDepth: number;
 }
 
 export const deviceService = {

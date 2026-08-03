@@ -8,6 +8,8 @@ export interface DeviceCapabilities {
     clientBandwidthKbps: number;
     requestedClientBitrateKbps: number;
     requestedMaxResolution: number;
+    supportedHdrFormats: string[];
+    maxVideoBitDepth: number;
 }
 
 interface ExtendedWindow extends Window {
@@ -19,6 +21,90 @@ interface ExtendedNavigator extends Navigator {
         downlink?: number;
     };
 }
+
+interface HdrVideoConfiguration {
+    contentType: string;
+    width: number;
+    height: number;
+    bitrate: number;
+    framerate: number;
+    transferFunction?: string;
+    colorGamut?: string;
+}
+
+const mseSupports = (mimeType: string): boolean => {
+    try {
+        return !!(window.MediaSource && MediaSource.isTypeSupported && MediaSource.isTypeSupported(mimeType));
+    } catch (error: unknown) {
+        console.warn(`MediaSource.isTypeSupported failed for ${mimeType}`, error);
+        return false;
+    }
+};
+
+const displayIsHdr = (): boolean => {
+    try {
+        return typeof window.matchMedia === 'function' && window.matchMedia('(dynamic-range: high)').matches;
+    } catch {
+        return false;
+    }
+};
+
+// HEVC Main10 (10-bit) — the decoder HDR10/HLG playback needs.
+const HEVC_MAIN10 = 'video/mp4; codecs="hev1.2.4.L153.B0"';
+// Dolby Vision (best-effort, mostly Apple). HDR10+ has no reliable browser
+// detection API, so it is intentionally never reported.
+const DOLBY_VISION = 'video/mp4; codecs="dvh1.05.06"';
+
+const supportsDolbyVision = (): boolean => mseSupports(DOLBY_VISION);
+
+// Best-effort synchronous fallback: used until the async MediaCapabilities
+// probe resolves, and on browsers without navigator.mediaCapabilities. Reports
+// nothing unless the display can actually render HDR (dynamic-range: high).
+const detectHdrFormatsSync = (): string[] => {
+    if (!displayIsHdr()) return [];
+    const formats = ['HDR10', 'HLG'];
+    if (supportsDolbyVision()) formats.push('DolbyVision');
+    return formats;
+};
+
+let cachedHdrFormats: string[] | null = null;
+let hdrProbeStarted = false;
+
+const probeHdrFormatsAsync = async (): Promise<void> => {
+    if (!displayIsHdr()) {
+        cachedHdrFormats = [];
+        return;
+    }
+
+    const mediaCapabilities = window.navigator.mediaCapabilities;
+    if (!mediaCapabilities || typeof mediaCapabilities.decodingInfo !== 'function') {
+        cachedHdrFormats = detectHdrFormatsSync();
+        return;
+    }
+
+    const base: HdrVideoConfiguration = {
+        contentType: HEVC_MAIN10,
+        colorGamut: 'rec2020',
+        width: 3840,
+        height: 2160,
+        bitrate: 20_000_000,
+        framerate: 30,
+    };
+
+    const formats: string[] = [];
+    for (const [format, transferFunction] of [['HDR10', 'pq'], ['HLG', 'hlg']] as const) {
+        try {
+            const config = { type: 'media-source', video: { ...base, transferFunction } } as MediaDecodingConfiguration;
+            const info = await mediaCapabilities.decodingInfo(config);
+            if (info.supported) formats.push(format);
+        } catch (error: unknown) {
+            console.warn(`MediaCapabilities HDR probe failed for ${format}`, error);
+        }
+    }
+    if (supportsDolbyVision()) formats.push('DolbyVision');
+
+    cachedHdrFormats = formats;
+};
 
 export const scanDeviceCapabilities = (): DeviceCapabilities => {
     const videoCodecs: string[] = [];
@@ -139,5 +225,33 @@ export const scanDeviceCapabilities = (): DeviceCapabilities => {
         if (!containers.includes('hls')) containers.push('hls');
     }
 
-    return { videoCodecs, audioCodecs, containers, maxAudioChannels, clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution };
+    if (!hdrProbeStarted) {
+        hdrProbeStarted = true;
+        void probeHdrFormatsAsync();
+    }
+    const supportedHdrFormats = cachedHdrFormats ?? detectHdrFormatsSync();
+
+    // 10-bit decode capability (independent of whether the display is HDR):
+    // HEVC Main10, VP9 Profile 2, or AV1 Main 10-bit.
+    const supports10Bit = mseSupports(HEVC_MAIN10)
+        || mseSupports('video/webm; codecs="vp09.02.10.10.10.01.09.16.09.00"')
+        || mseSupports('video/mp4; codecs="av01.0.08M.10"');
+    const maxVideoBitDepth = supports10Bit ? 10 : 8;
+
+    // Auto-detect the display's max resolution and cap the requested output at
+    // it. Honor a lower manual preference, but never let a manual cap raise it
+    // above what the panel can show. min(width,height) picks the vertical size
+    // for both landscape and portrait; DPR converts CSS px to physical px.
+    try {
+        const displayMaxHeight = Math.round(Math.min(screen.width, screen.height) * (window.devicePixelRatio || 1));
+        if (displayMaxHeight > 0) {
+            requestedMaxResolution = requestedMaxResolution > 0
+                ? Math.min(requestedMaxResolution, displayMaxHeight)
+                : displayMaxHeight;
+        }
+    } catch (error: unknown) {
+        console.warn("Could not auto-detect display resolution.", error);
+    }
+
+    return { videoCodecs, audioCodecs, containers, maxAudioChannels, clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, supportedHdrFormats, maxVideoBitDepth };
 };
