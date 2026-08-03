@@ -5,7 +5,7 @@ import { mediaService, type MediaItem, type MediaPart, type UpNextItemVM, type U
 import { profileService, type PlaybackPreferencesVM } from '../../api/Users/profileService';
 import { streamingService } from '../../api/Streaming/streamingService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
-import { scanDeviceCapabilities } from '../../utils/hardwareScanner';
+import { scanDeviceCapabilitiesSync } from '../../utils/hardwareScanner';
 import type Hls from 'hls.js';
 import { loadHls } from '../../utils/loadHls';
 import { useDialog } from '../../dialogs';
@@ -86,7 +86,7 @@ export default function GlobalVideoPlayer() {
     const [selAudio, setSelAudio] = useState('');
     const [selSub, setSelSub] = useState('');
 
-    const caps = useMemo(() => scanDeviceCapabilities(), []);
+    const caps = useMemo(() => scanDeviceCapabilitiesSync(), []);
 
     const [isEnding, setIsEnding] = useState(false);
     const [upNextData, setUpNextData] = useState<UpNextResultVM | null>(null);
