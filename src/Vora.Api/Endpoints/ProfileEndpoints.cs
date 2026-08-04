@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 using Vora.Api.Extensions;
 using Vora.Application.Users;
 using Vora.Application.Users.ViewModels;
@@ -66,6 +67,13 @@ public class RadioPrefsResponse
 public class NavPrefsResponse
 {
     public string? NavPrefsJson { get; set; }
+}
+
+public class ClientPlaybackSettingsDto
+{
+    public int Bitrate { get; set; }
+    public int MaxResolution { get; set; }
+    public int MaxAudioChannels { get; set; }
 }
 
 public class UpdateNavPrefsDto
@@ -178,7 +186,9 @@ public static class ProfileEndpoints
             .WithName("SaveRadioPrefs")
             .Produces(StatusCodes.Status204NoContent);
 
-        group.MapGet("/playback", GetPlaybackPrefsAsync);
+        group.MapGet("/playback", GetPlaybackPrefsAsync)
+            .WithName("GetPlaybackPrefs")
+            .Produces<ClientPlaybackSettingsDto>(StatusCodes.Status200OK);
 
         group.MapGet("/discovery-layout", GetDiscoveryLayoutAsync)
             .WithName("GetDiscoveryLayout")
@@ -357,7 +367,22 @@ public static class ProfileEndpoints
     private static async Task<IResult> GetPlaybackPrefsAsync(Guid profileId, string deviceId, IUserManager manager)
     {
         var prefs = await manager.GetProfileDevicePlaybackPrefsAsync(profileId, deviceId);
-        return Results.Ok(new { PlaybackPrefs = prefs });
+        return Results.Ok(ParsePlaybackSettings(prefs));
+    }
+
+    private static ClientPlaybackSettingsDto ParsePlaybackSettings(string? prefsJson)
+    {
+        if (string.IsNullOrWhiteSpace(prefsJson)) return new ClientPlaybackSettingsDto();
+
+        try
+        {
+            return JsonSerializer.Deserialize<ClientPlaybackSettingsDto>(prefsJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? new ClientPlaybackSettingsDto();
+        }
+        catch (JsonException)
+        {
+            return new ClientPlaybackSettingsDto();
+        }
     }
 
     private static async Task<IResult> GetDiscoveryLayoutAsync(Guid profileId, string deviceId, IUserManager manager)
