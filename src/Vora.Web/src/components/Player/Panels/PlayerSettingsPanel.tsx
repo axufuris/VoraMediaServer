@@ -1,14 +1,10 @@
 import type { MediaItem, MediaPart } from '../../../api/Media/mediaService';
+import type { DeviceCapabilities } from '../../../utils/hardwareScanner';
+import { isVideoDirectPlayable, isAudioDirectPlayable } from '../../../utils/playbackDecision';
 
 type VideoTrackType = NonNullable<MediaPart['videoTracks']>[number];
 type AudioTrackType = NonNullable<MediaPart['audioTracks']>[number];
 type SubtitleTrackType = NonNullable<MediaPart['subtitleTracks']>[number];
-
-interface DeviceCapabilities {
-    videoCodecs: string[];
-    audioCodecs: string[];
-    maxAudioChannels: number;
-}
 
 interface PlayerSettingsPanelProps {
     mediaDetails: MediaItem | null;
@@ -91,8 +87,8 @@ export default function PlayerSettingsPanel({
                                     if (newPart) {
                                         if (newPart.audioTracks && newPart.audioTracks.length > 0) {
                                             const sorted = [...newPart.audioTracks].sort((a: AudioTrackType, b: AudioTrackType) => {
-                                                const aTranscode = !caps.audioCodecs.includes(a.codec?.toLowerCase() || '') || ((a.channels || 2) > caps.maxAudioChannels);
-                                                const bTranscode = !caps.audioCodecs.includes(b.codec?.toLowerCase() || '') || ((b.channels || 2) > caps.maxAudioChannels);
+                                                const aTranscode = !isAudioDirectPlayable(a, caps);
+                                                const bTranscode = !isAudioDirectPlayable(b, caps);
                                                 if (aTranscode !== bTranscode) return aTranscode ? 1 : -1;
                                                 return (b.channels || 0) - (a.channels || 0);
                                             });
@@ -108,7 +104,7 @@ export default function PlayerSettingsPanel({
                             >
                                 {mediaDetails.mediaParts.flatMap((part: MediaPart) =>
                                     part.videoTracks?.map((vt: VideoTrackType) => {
-                                        const willTranscode = !caps.videoCodecs.includes(vt.codec?.toLowerCase() || '');
+                                        const willTranscode = !isVideoDirectPlayable(vt, part, caps);
                                         const displayRes = part.resolution === '2160p' ? '4K' : (part.resolution || 'Unknown');
                                         const bitrateStr = part.bitrateKbps ? `${(part.bitrateKbps / 1000).toFixed(1)} Mbps` : 'Unknown Mbps';
                                         return (
@@ -129,7 +125,7 @@ export default function PlayerSettingsPanel({
                                 style={selectStyle}
                             >
                                 {sortedAudioTracks.map((at: AudioTrackType) => {
-                                    const willTranscode = !caps.audioCodecs.includes(at.codec?.toLowerCase() || '') || ((at.channels || 2) > caps.maxAudioChannels);
+                                    const willTranscode = !isAudioDirectPlayable(at, caps);
                                     const name = at.title || at.language || 'Unknown';
                                     return (
                                         <option key={at.id} value={at.id}>

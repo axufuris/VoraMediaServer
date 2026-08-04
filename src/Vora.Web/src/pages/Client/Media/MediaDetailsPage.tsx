@@ -12,7 +12,8 @@ import MediaEpisodesList from '../../../components/Media/MediaEpisodesList';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { streamingService } from '../../../api/Streaming/streamingService';
-import { scanDeviceCapabilitiesSync } from '../../../utils/hardwareScanner';
+import { getEffectiveCapabilities } from '../../../utils/hardwareScanner';
+import { isVideoDirectPlayable, isAudioDirectPlayable, parseResolutionHeight } from '../../../utils/playbackDecision';
 import { useDialog } from '../../../dialogs';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
 import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
@@ -21,7 +22,7 @@ import MediaRail from '../../../components/Client/Primitives/MediaRail';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import QualityPanel, { QualityPanelSection, type QualityOption } from '../../../components/Client/Primitives/QualityPanel';
 import StarRating from '../../../components/Client/Primitives/StarRating';
-import { StorageKeys } from '../../../utils/storageKeys';
+import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -80,22 +81,26 @@ export default function MediaDetailsPage() {
     const [thumbnailsLocked, setThumbnailsLocked] = useState<boolean | null>(null);
 
     const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
-    const caps = useMemo(() => scanDeviceCapabilitiesSync(), []);
+    const caps = useMemo(() => {
+        const profileToken = localStorage.getItem(StorageKeys.profileToken);
+        const profileId = (profileToken ? getProfileIdFromToken(profileToken) : null) || 'unknown';
+        const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
+        return getEffectiveCapabilities(profileId, deviceId);
+    }, []);
     const { playMedia, isPlaying } = usePlayer();
 
-    // Pick the audio track the client can play directly: heavily penalize codecs
-    // the device can't decode or channel counts it can't handle, then prefer more
-    // channels among the playable ones (commentary tracks deprioritized).
+    // Pick the audio track the client can play directly under the effective
+    // caps: prefer a directly-playable track (codec + channels within the
+    // Max Audio Channels cap), then prefer more channels among the playable
+    // ones (commentary tracks deprioritized). Never picks on IsDefault alone.
     const pickBestAudioId = useCallback((part?: MediaPart): string => {
         if (!part?.audioTracks?.length) return '';
         let bestId = '';
         let lowest = Number.POSITIVE_INFINITY;
         for (const track of part.audioTracks) {
             let penalty = 0;
-            const codec = track.codec?.toLowerCase() || '';
             const channels = track.channels || 2;
-            const needsDownmix = channels > caps.maxAudioChannels;
-            if (!caps.audioCodecs.includes(codec) || needsDownmix) penalty += 1000;
+            if (!isAudioDirectPlayable(track, caps)) penalty += 1000;
             penalty -= channels * 10;
             if (track.title?.toLowerCase().includes('commentary')) penalty += 500;
             if (penalty < lowest) { lowest = penalty; bestId = track.id; }
@@ -157,26 +162,24 @@ export default function MediaDetailsPage() {
 
     useEffect(() => {
         if (qualityMedia?.mediaParts?.length) {
-            let bestVideoId = '';
-            let lowestVideoPenalty = 9999;
-            let winningPart = qualityMedia.mediaParts[0];
+            const parts = qualityMedia.mediaParts;
+            const partHeight = (p: MediaPart) => parseResolutionHeight(p.resolution);
 
-            for (const part of qualityMedia.mediaParts) {
-                for (const track of part.videoTracks || []) {
-                    let penalty = 0;
-                    const codec = track.codec?.toLowerCase() || '';
-                    const is4k = part.resolution?.toLowerCase().includes('4k') || part.resolution?.includes('2160');
-
-                    if (codec && !caps.videoCodecs.includes(codec)) penalty += 1000;
-                    if (!is4k) penalty += 50;
-
-                    if (penalty < lowestVideoPenalty) {
-                        lowestVideoPenalty = penalty;
-                        bestVideoId = track.id;
-                        winningPart = part;
-                    }
-                }
+            // Prefer the highest-resolution part that fits under the effective
+            // Max Resolution cap (unknown height counts as fitting). If every
+            // part exceeds the cap, still pick the highest — the server will
+            // transcode it down.
+            const withinCap = parts.filter(p => partHeight(p) === 0 || partHeight(p) <= caps.requestedMaxResolution);
+            const pool = withinCap.length ? withinCap : parts;
+            let winningPart = pool[0];
+            for (const p of pool) {
+                if (partHeight(p) > partHeight(winningPart)) winningPart = p;
             }
+
+            const videoTracks = winningPart.videoTracks || [];
+            const directVideo = videoTracks.find(t => isVideoDirectPlayable(t, winningPart, caps));
+            const defaultVideo = videoTracks.find(t => t.isDefault) || videoTracks[0];
+            const bestVideoId = (directVideo || defaultVideo)?.id || '';
 
             const bestAudioId = pickBestAudioId(winningPart);
 
@@ -419,16 +422,17 @@ export default function MediaDetailsPage() {
 
     const videoOptions: QualityOption<string>[] = sortedVideoTracks.map(v => {
         const displayRes = v.part.resolution === '2160p' ? '4K' : (v.part.resolution || 'Unknown');
+        const playbackBadge = isVideoDirectPlayable(v.track, v.part, caps) ? 'Direct Play' : 'Transcode';
         return {
             value: v.track.id,
             label: `${displayRes} · ${v.track.codec?.toUpperCase() ?? '—'}`,
-            sublabel: [v.track.hdrType, v.track.isDefault ? 'Default' : null].filter(Boolean).join(' · ') || undefined,
+            sublabel: [v.track.hdrType, v.track.isDefault ? 'Default' : null, playbackBadge].filter(Boolean).join(' · ') || undefined,
         };
     });
     const audioOptions: QualityOption<string>[] = sortedAudioTracks.map(a => ({
         value: a.id,
         label: `${a.language || 'Unknown'} · ${a.codec?.toUpperCase() ?? '—'}${a.channels ? ` · ${a.channels}ch` : ''}`,
-        sublabel: [a.title, a.isDefault ? 'Default' : null].filter(Boolean).join(' · ') || undefined,
+        sublabel: [a.title, a.isDefault ? 'Default' : null, isAudioDirectPlayable(a, caps) ? 'Direct Play' : 'Transcode'].filter(Boolean).join(' · ') || undefined,
     }));
     const subtitleOptions: QualityOption<string>[] = [
         { value: 'none', label: 'Off' },
@@ -438,15 +442,16 @@ export default function MediaDetailsPage() {
             sublabel: [s.title, s.isForced ? 'Forced' : null, s.isDefault ? 'Default' : null].filter(Boolean).join(' · ') || undefined,
         })),
     ];
-    const resHeight = (res?: string) => parseInt((res || '').replace(/[^0-9]/g, ''), 10) || 0;
     const versionOptions: QualityOption<string>[] = [...(qualityMedia?.mediaParts ?? [])]
-        .sort((a, b) => resHeight(b.resolution) - resHeight(a.resolution) || (b.bitrateKbps ?? 0) - (a.bitrateKbps ?? 0))
+        .sort((a, b) => parseResolutionHeight(b.resolution) - parseResolutionHeight(a.resolution) || (b.bitrateKbps ?? 0) - (a.bitrateKbps ?? 0))
         .map((p, i) => {
             const displayRes = p.resolution === '2160p' ? '4K' : (p.resolution || `Version ${i + 1}`);
+            const partVideo = (p.videoTracks || []).find(t => t.isDefault) || (p.videoTracks || [])[0];
+            const playbackBadge = partVideo && isVideoDirectPlayable(partVideo, p, caps) ? 'Direct Play' : 'Transcode';
             return {
                 value: p.id,
                 label: p.edition || displayRes,
-                sublabel: [p.edition ? displayRes : null, p.bitrateKbps ? `${Math.round(p.bitrateKbps / 1000)} Mbps` : null].filter(Boolean).join(' · ') || undefined,
+                sublabel: [p.edition ? displayRes : null, p.bitrateKbps ? `${Math.round(p.bitrateKbps / 1000)} Mbps` : null, playbackBadge].filter(Boolean).join(' · ') || undefined,
             };
         });
 
