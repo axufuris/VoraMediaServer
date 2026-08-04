@@ -5,7 +5,8 @@ import { mediaService, type MediaItem, type MediaPart, type UpNextItemVM, type U
 import { profileService, type PlaybackPreferencesVM } from '../../api/Users/profileService';
 import { streamingService } from '../../api/Streaming/streamingService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
-import { scanDeviceCapabilitiesSync } from '../../utils/hardwareScanner';
+import { getEffectiveCapabilities } from '../../utils/hardwareScanner';
+import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 import type Hls from 'hls.js';
 import { loadHls } from '../../utils/loadHls';
 import { useDialog } from '../../dialogs';
@@ -86,7 +87,12 @@ export default function GlobalVideoPlayer() {
     const [selAudio, setSelAudio] = useState('');
     const [selSub, setSelSub] = useState('');
 
-    const caps = useMemo(() => scanDeviceCapabilitiesSync(), []);
+    const caps = useMemo(() => {
+        const profileToken = localStorage.getItem(StorageKeys.profileToken);
+        const profileId = (profileToken ? getProfileIdFromToken(profileToken) : null) || 'unknown';
+        const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
+        return getEffectiveCapabilities(profileId, deviceId);
+    }, []);
 
     const [isEnding, setIsEnding] = useState(false);
     const [upNextData, setUpNextData] = useState<UpNextResultVM | null>(null);

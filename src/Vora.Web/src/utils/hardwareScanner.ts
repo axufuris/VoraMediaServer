@@ -112,25 +112,22 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
 
     let requestedClientBitrateKbps = 0;
     let requestedMaxResolution = 0;
-    let requestedMaxAudioChannels = 0;
 
+    // Only the bitrate preference is folded into the raw scan (it's a plain
+    // request, not a device capability). The Max Resolution / Max Audio
+    // Channels caps are applied separately via applyUserCaps so the raw
+    // auto-detected device values stay intact.
     try {
-        const token = localStorage.getItem(StorageKeys.profileToken);
-        if (token) {
-            const profileId = getProfileIdFromToken(token);
-            const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
-            const savedPref = localStorage.getItem(`playback_prefs_${profileId}_${deviceId}`);
+        const { profileId, deviceId } = getCurrentProfileDeviceIds();
+        const savedPref = localStorage.getItem(`playback_prefs_${profileId}_${deviceId}`);
 
-            if (savedPref) {
-                try {
-                    const parsed = JSON.parse(savedPref);
-                    if (parsed.bitrate) requestedClientBitrateKbps = parsed.bitrate * 1000;
-                    if (parsed.maxResolution !== undefined) requestedMaxResolution = parsed.maxResolution;
-                    if (parsed.maxAudioChannels !== undefined) requestedMaxAudioChannels = parsed.maxAudioChannels;
-                } catch (error: unknown) {
-                    console.warn("Failed to parse playback prefs JSON, falling back to legacy format.", error);
-                    requestedClientBitrateKbps = parseInt(savedPref, 10) * 1000 || 0;
-                }
+        if (savedPref) {
+            try {
+                const parsed = JSON.parse(savedPref);
+                if (parsed.bitrate) requestedClientBitrateKbps = parsed.bitrate * 1000;
+            } catch (error: unknown) {
+                console.warn("Failed to parse playback prefs JSON, falling back to legacy format.", error);
+                requestedClientBitrateKbps = parseInt(savedPref, 10) * 1000 || 0;
             }
         }
     } catch (error: unknown) {
@@ -156,10 +153,6 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
         }
     } catch (error: unknown) {
         console.warn("Could not check audio capabilities.", error);
-    }
-
-    if (requestedMaxAudioChannels > 0) {
-        maxAudioChannels = requestedMaxAudioChannels;
     }
 
     const videoTests = {
@@ -231,17 +224,13 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
         || mseSupports('video/mp4; codecs="av01.0.08M.10"');
     const maxVideoBitDepth = supports10Bit ? 10 : 8;
 
-    // Auto-detect the display's max resolution and cap the requested output at
-    // it. Honor a lower manual preference, but never let a manual cap raise it
-    // above what the panel can show. min(width,height) picks the vertical size
-    // for both landscape and portrait; DPR converts CSS px to physical px.
+    // Auto-detected raw display max height (device capability). The user's
+    // Max Resolution preference is applied later in applyUserCaps, never here.
+    // min(width,height) picks the vertical size for both landscape and
+    // portrait; DPR converts CSS px to physical px.
     try {
         const displayMaxHeight = Math.round(Math.min(screen.width, screen.height) * (window.devicePixelRatio || 1));
-        if (displayMaxHeight > 0) {
-            requestedMaxResolution = requestedMaxResolution > 0
-                ? Math.min(requestedMaxResolution, displayMaxHeight)
-                : displayMaxHeight;
-        }
+        if (displayMaxHeight > 0) requestedMaxResolution = displayMaxHeight;
     } catch (error: unknown) {
         console.warn("Could not auto-detect display resolution.", error);
     }
@@ -249,13 +238,70 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
     return { videoCodecs, audioCodecs, containers, maxAudioChannels, clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, supportedHdrFormats, maxVideoBitDepth };
 };
 
-// Full capability scan. Same as the synchronous scan but replaces the HDR
-// gate estimate with the precise MediaCapabilities.decodingInfo probe. Use
-// this on the paths that report capabilities to the server (stream start,
-// device-capabilities update); use scanDeviceCapabilitiesSync where a value
-// is needed synchronously at render time.
+export interface PlaybackPrefs {
+    maxResolution: number;
+    maxAudioChannels: number;
+}
+
+function getCurrentProfileDeviceIds(): { profileId: string; deviceId: string } {
+    let profileId = 'unknown';
+    try {
+        const token = localStorage.getItem(StorageKeys.profileToken);
+        if (token) profileId = getProfileIdFromToken(token) || 'unknown';
+    } catch (error: unknown) {
+        console.warn("Could not resolve profile id from token.", error);
+    }
+    const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
+    return { profileId, deviceId };
+}
+
+// Read the saved Max Resolution / Max Audio Channels for a profile+device.
+// Missing/absent prefs default to 0 ("Original / device limit").
+export function readPlaybackPrefs(profileId: string, deviceId: string): PlaybackPrefs {
+    try {
+        const saved = localStorage.getItem(`playback_prefs_${profileId}_${deviceId}`);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            return {
+                maxResolution: typeof parsed.maxResolution === 'number' ? parsed.maxResolution : 0,
+                maxAudioChannels: typeof parsed.maxAudioChannels === 'number' ? parsed.maxAudioChannels : 0,
+            };
+        }
+    } catch (error: unknown) {
+        console.warn("Could not read playback prefs.", error);
+    }
+    return { maxResolution: 0, maxAudioChannels: 0 };
+}
+
+// Apply the user's caps to a raw device profile. A value of 0 means
+// "Original / device limit" (use the device value); a specific value caps to
+// min(userVal, deviceVal) so a preference can only lower capability. HDR
+// formats and bit depth pass through unchanged. requestedMaxResolution holds
+// the resolution height. Matches the Android semantics exactly.
+export function applyUserCaps(device: DeviceCapabilities, prefs: PlaybackPrefs): DeviceCapabilities {
+    const effRes = prefs.maxResolution > 0
+        ? Math.min(prefs.maxResolution, device.requestedMaxResolution)
+        : device.requestedMaxResolution;
+    const effCh = prefs.maxAudioChannels > 0
+        ? Math.min(prefs.maxAudioChannels, device.maxAudioChannels)
+        : device.maxAudioChannels;
+    return { ...device, requestedMaxResolution: effRes, maxAudioChannels: effCh };
+}
+
+// Single entry point for client-side track selection: raw device scan with the
+// user's caps applied. Use this anywhere the client pre-picks tracks or shows
+// a direct-play/transcode badge.
+export function getEffectiveCapabilities(profileId: string, deviceId: string): DeviceCapabilities {
+    return applyUserCaps(scanDeviceCapabilitiesSync(), readPlaybackPrefs(profileId, deviceId));
+}
+
+// Full capability scan for the paths that REPORT capabilities to the server
+// (stream start, device-capabilities update). Replaces the HDR gate estimate
+// with the precise MediaCapabilities.decodingInfo probe and applies the user's
+// caps so the server sees the effective values.
 export const scanDeviceCapabilities = async (): Promise<DeviceCapabilities> => {
     const base = scanDeviceCapabilitiesSync();
     const supportedHdrFormats = await probeHdrFormats();
-    return { ...base, supportedHdrFormats };
+    const { profileId, deviceId } = getCurrentProfileDeviceIds();
+    return applyUserCaps({ ...base, supportedHdrFormats }, readPlaybackPrefs(profileId, deviceId));
 };
