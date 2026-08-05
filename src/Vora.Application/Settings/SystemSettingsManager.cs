@@ -111,6 +111,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.RegistrationMode = (RegistrationMode)request.RegistrationMode;
         settings.InternetUploadSpeedMbps = request.InternetUploadSpeedMbps;
         settings.MaxRemoteStreamBitrateMbps = request.MaxRemoteStreamBitrateMbps;
+        settings.StreamingProfile = (StreamingProfile)request.StreamingProfile;
         settings.TranscodeQuality = request.TranscodeQuality;
         settings.TranscoderTempDirectory = string.IsNullOrWhiteSpace(request.TranscoderTempDirectory) ? "/transcode" : request.TranscoderTempDirectory;
         settings.BackgroundX264Preset = request.BackgroundX264Preset;
