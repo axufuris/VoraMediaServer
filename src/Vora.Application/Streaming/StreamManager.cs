@@ -5,6 +5,7 @@ using Vora.Application.Settings;
 using Vora.Application.Streaming.Dtos;
 using Vora.Application.Streaming.ViewModels;
 using Vora.Domain.Entities.Streaming;
+using Vora.Domain.Entities.Users;
 
 namespace Vora.Application.Streaming;
 
@@ -13,6 +14,7 @@ public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[]
 public interface IStreamManager
 {
     Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
+    Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
     Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null);
     Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search);
     Task PingSessionAsync(Guid sessionId, double currentPosition, double duration, bool isPaused);
@@ -48,6 +50,57 @@ public class StreamManager : IStreamManager
 
     public async Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null)
     {
+        var (decision, mediaInfo, client, resolvedMediaId) = await ComputeDecisionAsync(mediaId, deviceId, profileId, videoTrackId, audioTrackId, subtitleTrackId, capabilities, mediaPartId);
+
+        await _repository.EndActiveSessionsForDeviceAsync(client.Id);
+
+        var selectedPart = mediaInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);
+        var selectedVideo = selectedPart?.VideoTracks.FirstOrDefault(v => v.Id == decision.SelectedVideoTrackId);
+
+        var session = new StreamSession
+        {
+            ClientDeviceId = client.Id,
+            MediaItemId = resolvedMediaId,
+            UserId = userId,
+            UserProfileId = profileId,
+            Strategy = decision.Strategy.ToString(),
+            VideoStrategy = decision.VideoStrategy,
+            AudioStrategy = decision.AudioStrategy,
+            SubtitleStrategy = decision.SubtitleStrategy,
+            VideoCodec = decision.TargetVideoCodec,
+            AudioCodec = decision.TargetAudioCodec,
+            Container = decision.TargetContainer,
+            Resolution = selectedPart?.Resolution,
+            HdrType = selectedVideo?.HdrType,
+            OutputResolution = decision.OutputResolution,
+            OutputHdrType = decision.OutputHdrType,
+            StartPosition = startPosition,
+            CurrentPosition = startPosition,
+            MediaPartId = decision.SelectedMediaPartId,
+            VideoTrackId = decision.SelectedVideoTrackId,
+            AudioTrackId = decision.SelectedAudioTrackId,
+            SubtitleTrackId = decision.SelectedSubtitleTrackId,
+            TargetAudioChannels = decision.TargetAudioChannels,
+            IsSubtitleBurnIn = decision.RequiresSubtitleBurnIn,
+            Quality = decision.Quality,
+            BandwidthKbps = decision.BandwidthKbps,
+            DecisionLog = decision.GetDecisionLogJson()
+        };
+
+        var createdSession = await _repository.CreateSessionAsync(session);
+
+        var playToken = _tokenSigner.Sign(PlayTokenScope, createdSession.Id.ToString(), PlayTokenTtl);
+        return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}");
+    }
+
+    public async Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null)
+    {
+        var (decision, _, _, _) = await ComputeDecisionAsync(mediaId, deviceId, profileId, videoTrackId, audioTrackId, subtitleTrackId, capabilities, mediaPartId);
+        return decision;
+    }
+
+    private async Task<(StreamDecisionDto Decision, MediaStreamInfoDto MediaInfo, ClientDevice Client, Guid MediaId)> ComputeDecisionAsync(Guid mediaId, string deviceId, Guid? profileId, Guid? videoTrackId, Guid? audioTrackId, Guid? subtitleTrackId, DeviceCapsDto? capabilities, Guid? mediaPartId)
+    {
         mediaId = await _repository.ResolvePlayableMediaIdAsync(mediaId, profileId);
 
         var mediaInfo = await _repository.GetMediaStreamInfoAsync(mediaId);
@@ -67,8 +120,6 @@ public class StreamManager : IStreamManager
             client.SupportedHdrFormats = capabilities.SupportedHdrFormats?.ToList();
             client.MaxVideoBitDepth = capabilities.MaxVideoBitDepth;
         }
-
-        await _repository.EndActiveSessionsForDeviceAsync(client.Id);
 
         bool isRemote = !IsLocalIp(client.LastIpAddress);
         int maxAllowedBandwidthKbps = 0;
@@ -121,43 +172,7 @@ public class StreamManager : IStreamManager
 
         var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId);
 
-        var selectedPart = mediaInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);
-        var selectedVideo = selectedPart?.VideoTracks.FirstOrDefault(v => v.Id == decision.SelectedVideoTrackId);
-
-        var session = new StreamSession
-        {
-            ClientDeviceId = client.Id,
-            MediaItemId = mediaId,
-            UserId = userId,
-            UserProfileId = profileId,
-            Strategy = decision.Strategy.ToString(),
-            VideoStrategy = decision.VideoStrategy,
-            AudioStrategy = decision.AudioStrategy,
-            SubtitleStrategy = decision.SubtitleStrategy,
-            VideoCodec = decision.TargetVideoCodec,
-            AudioCodec = decision.TargetAudioCodec,
-            Container = decision.TargetContainer,
-            Resolution = selectedPart?.Resolution,
-            HdrType = selectedVideo?.HdrType,
-            OutputResolution = decision.OutputResolution,
-            OutputHdrType = decision.OutputHdrType,
-            StartPosition = startPosition,
-            CurrentPosition = startPosition,
-            MediaPartId = decision.SelectedMediaPartId,
-            VideoTrackId = decision.SelectedVideoTrackId,
-            AudioTrackId = decision.SelectedAudioTrackId,
-            SubtitleTrackId = decision.SelectedSubtitleTrackId,
-            TargetAudioChannels = decision.TargetAudioChannels,
-            IsSubtitleBurnIn = decision.RequiresSubtitleBurnIn,
-            Quality = decision.Quality,
-            BandwidthKbps = decision.BandwidthKbps,
-            DecisionLog = decision.GetDecisionLogJson()
-        };
-
-        var createdSession = await _repository.CreateSessionAsync(session);
-
-        var playToken = _tokenSigner.Sign(PlayTokenScope, createdSession.Id.ToString(), PlayTokenTtl);
-        return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}");
+        return (decision, mediaInfo, client, mediaId);
     }
 
     public async Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null)
