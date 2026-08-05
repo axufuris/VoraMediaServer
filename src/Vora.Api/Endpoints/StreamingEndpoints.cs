@@ -25,6 +25,24 @@ public record StartExtraStreamRequest(Guid ExtraId, double StartPosition, Device
 
 public record StreamPingRequest(double CurrentPosition, double Duration, bool IsPaused);
 
+public record StreamDecisionResponse(
+    Guid MediaPartId,
+    Guid VideoTrackId,
+    Guid AudioTrackId,
+    Guid? SubtitleTrackId,
+    string Strategy,
+    string VideoStrategy,
+    string AudioStrategy,
+    string SubtitleStrategy,
+    string VideoCodec,
+    string AudioCodec,
+    string Container,
+    int TargetAudioChannels,
+    int BandwidthKbps,
+    string OutputResolution,
+    string OutputHdrType,
+    string Quality);
+
 public static class StreamingEndpoints
 {
     private const string PlayTokenScope = "play";
@@ -38,6 +56,10 @@ public static class StreamingEndpoints
         group.MapPost("/start", StartSessionAsync)
             .WithName("StartStream")
             .Produces<StartStreamResponse>(StatusCodes.Status200OK)
+            .RequireAuthorization();
+        group.MapPost("/decision", PreviewDecisionAsync)
+            .WithName("PreviewStreamDecision")
+            .Produces<StreamDecisionResponse>(StatusCodes.Status200OK)
             .RequireAuthorization();
         group.MapPost("/start-extra", StartExtraSessionAsync)
             .WithName("StartExtraStream")
@@ -104,6 +126,58 @@ public static class StreamingEndpoints
                 OutputResolution = result.Session.OutputResolution,
                 OutputHdrType = result.Session.OutputHdrType,
             });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(ex.Message);
+        }
+    }
+
+    private static async Task<IResult> PreviewDecisionAsync(
+        HttpContext context,
+        ClaimsPrincipal user,
+        IStreamManager streamManager,
+        [FromBody] StartStreamRequest req)
+    {
+        try
+        {
+            var accountId = user.GetAccountId() ?? Guid.Empty;
+            var profileId = user.GetProfileId();
+
+            var deviceId = context.Request.Headers["X-Vora-Device-Id"].FirstOrDefault();
+            if (string.IsNullOrEmpty(deviceId))
+            {
+                return Results.BadRequest("Missing X-Vora-Device-Id header");
+            }
+
+            var d = await streamManager.PreviewDecisionAsync(
+                req.MediaId,
+                deviceId,
+                accountId,
+                profileId,
+                req.VideoTrackId,
+                req.AudioTrackId,
+                req.SubtitleTrackId,
+                req.Capabilities,
+                req.MediaPartId);
+
+            return Results.Ok(new StreamDecisionResponse(
+                d.SelectedMediaPartId,
+                d.SelectedVideoTrackId,
+                d.SelectedAudioTrackId,
+                d.SelectedSubtitleTrackId,
+                d.Strategy.ToString(),
+                d.VideoStrategy,
+                d.AudioStrategy,
+                d.SubtitleStrategy,
+                d.TargetVideoCodec,
+                d.TargetAudioCodec,
+                d.TargetContainer,
+                d.TargetAudioChannels,
+                d.BandwidthKbps,
+                d.OutputResolution,
+                d.OutputHdrType,
+                d.Quality));
         }
         catch (Exception ex)
         {
