@@ -94,18 +94,18 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             int bitrateKbps = (int)((part.OverallBitrate ?? 3000000) / 1000);
             bool exceedsBandwidth = maxAllowedBandwidthKbps > 0 && bitrateKbps > maxAllowedBandwidthKbps;
 
-            var sourceHdr = NormalizeHdr(videoTrack.HdrType);
+            var renderable = RenderableHdrFormats(videoTrack.HdrType);
             bool hdrNotRenderable = false;
-            if (sourceHdr != null && client.SupportedHdrFormats != null)
+            if (renderable.Count > 0 && client.SupportedHdrFormats != null)
             {
                 var clientHdr = client.SupportedHdrFormats
                     .Select(NormalizeHdr)
                     .Where(h => h != null)
+                    .Select(h => h!)
                     .ToHashSet();
-                // TODO(DoVi profile): once the DoVi profile is surfaced, let a Profile 8
-                // ("DoVi/HDR10") source fall back to its HDR10 base layer for HDR10-capable
-                // clients instead of tonemapping. v1 treats unlisted DoVi as not-renderable.
-                hdrNotRenderable = !clientHdr.Contains(sourceHdr);
+                // Renderable if the client supports the source's format OR any
+                // cross-compatible base layer it carries (Profile 8 DoVi, HDR10+).
+                hdrNotRenderable = !renderable.Overlaps(clientHdr);
             }
 
             bool bitDepthTooHigh = client.MaxVideoBitDepth > 0 && (videoTrack.BitDepth ?? 8) > client.MaxVideoBitDepth;
@@ -375,6 +375,32 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         if (v.Contains("HDR10")) return "HDR10";
         if (v.Contains("HLG")) return "HLG";
         return null;
+    }
+
+    // The set of client HDR formats that can natively render a given source. A
+    // Dolby Vision Profile 8 source ("DoVi/HDR10" = 8.1, "DoVi/HLG" = 8.4) carries a
+    // cross-compatible base layer, so an HDR10- or HLG-capable client can display it
+    // even without Dolby Vision support — we return DolbyVision PLUS the base format.
+    // A bare "DoVi" (Profile 5, no base) needs true Dolby Vision. HDR10+ is
+    // backward-compatible with HDR10 (HDR10 clients ignore the dynamic metadata).
+    private static HashSet<string> RenderableHdrFormats(string? raw)
+    {
+        var set = new HashSet<string>();
+        if (string.IsNullOrWhiteSpace(raw)) return set;
+        var v = raw.Trim().ToUpperInvariant().Replace(" ", "").Replace("_", "").Replace("-", "");
+        if (v is "SDR" or "NONE") return set;
+
+        if (v.Contains("DOVI") || v.Contains("DOLBY"))
+        {
+            set.Add("DOLBYVISION");
+            if (v.Contains("HDR10PLUS") || v.Contains("HDR10+")) { set.Add("HDR10PLUS"); set.Add("HDR10"); }
+            else if (v.Contains("HDR10")) set.Add("HDR10");
+            if (v.Contains("HLG")) set.Add("HLG");
+        }
+        else if (v.Contains("HDR10PLUS") || v.Contains("HDR10+")) { set.Add("HDR10PLUS"); set.Add("HDR10"); }
+        else if (v.Contains("HDR10")) set.Add("HDR10");
+        else if (v.Contains("HLG")) set.Add("HLG");
+        return set;
     }
 
     public static int ParseHeightFromResolution(string? resolution)
