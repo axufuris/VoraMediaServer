@@ -19,8 +19,8 @@ public class TraktCollectionSyncProvider : ICollectionSyncProvider
     public string DeveloperName => "Andy Xufuris";
     public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
-    public string ExternalIdLabel => "Trakt List ID or Slug";
-    public string ExternalIdPlaceholder => "e.g., marvel-cinematic-universe";
+    public string ExternalIdLabel => "Trakt List URL, username/slug, or numeric ID";
+    public string ExternalIdPlaceholder => "e.g., https://trakt.tv/users/yourname/lists/mcu-complete-chronologically";
 
     public TraktCollectionSyncProvider(HttpClient httpClient, IPluginSettingsProvider settings)
     {
@@ -41,33 +41,7 @@ public class TraktCollectionSyncProvider : ICollectionSyncProvider
         var clientId = await _settings.GetSettingAsync(Id, "client_id");
         if (string.IsNullOrEmpty(clientId)) throw new InvalidOperationException("Trakt Client ID is missing.");
 
-        var listUrl = $"https://api.trakt.tv/lists/{externalId}";
-        using var listRequest = new HttpRequestMessage(HttpMethod.Get, listUrl);
-        listRequest.Headers.Add("trakt-api-version", "2");
-        listRequest.Headers.Add("trakt-api-key", clientId);
-        listRequest.Headers.Add("User-Agent", "VoraMediaServer/1.0");
-
-        var listResponse = await _httpClient.SendAsync(listRequest);
-        listResponse.EnsureSuccessStatusCode();
-
-        using var listDoc = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync());
-        var root = listDoc.RootElement;
-
-        string? username = null;
-        if (root.TryGetProperty("user", out var userProp) && userProp.TryGetProperty("ids", out var userIdsProp) && userIdsProp.TryGetProperty("slug", out var userSlugProp))
-        {
-            username = userSlugProp.GetString();
-        }
-
-        string? listSlug = null;
-        if (root.TryGetProperty("ids", out var idsProp) && idsProp.TryGetProperty("slug", out var slugProp))
-        {
-            listSlug = slugProp.GetString();
-        }
-
-        var itemsUrl = !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(listSlug)
-            ? $"https://api.trakt.tv/users/{username}/lists/{listSlug}/items"
-            : $"https://api.trakt.tv/lists/{listSlug ?? externalId}/items";
+        var itemsUrl = TraktListResolver.BuildItemsUrl(externalId);
 
         using var itemsRequest = new HttpRequestMessage(HttpMethod.Get, itemsUrl);
         itemsRequest.Headers.Add("trakt-api-version", "2");
