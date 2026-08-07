@@ -57,6 +57,20 @@ function formatThirdPartyRating(value: number, providerName?: string): string {
     return value.toFixed(1);
 }
 
+const audioCodecRank = (codec?: string): number => {
+    switch ((codec ?? '').toLowerCase()) {
+        case 'truehd': return 6;
+        case 'dts':
+        case 'flac': return 5;
+        case 'eac3': return 4;
+        case 'ac3': return 3;
+        case 'aac':
+        case 'opus': return 2;
+        case 'mp3': return 1;
+        default: return 0;
+    }
+};
+
 export default function MediaDetailsPage() {
     const dialog = useDialog();
     const { serverId, id } = useParams<{ serverId?: string, id: string }>();
@@ -102,6 +116,7 @@ export default function MediaDetailsPage() {
             const channels = track.channels || 2;
             if (!isAudioDirectPlayable(track, caps)) penalty += 1000;
             penalty -= channels * 10;
+            penalty -= audioCodecRank(track.codec);
             if (track.title?.toLowerCase().includes('commentary')) penalty += 500;
             if (penalty < lowest) { lowest = penalty; bestId = track.id; }
         }
