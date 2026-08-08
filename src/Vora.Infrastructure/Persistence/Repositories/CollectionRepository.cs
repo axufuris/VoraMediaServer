@@ -63,6 +63,23 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
             .Select(CollectionScheduleDto.Projection)
             .ToListAsync();
 
+    public Task<List<CollectionMembershipCacheDto>> GetContentSyncMembershipsAsync() =>
+        context.Collections
+            .AsNoTracking()
+            .Where(c => !string.IsNullOrEmpty(c.ContentSyncProviderId) && c.ContentSyncCacheJson != null)
+            .Select(c => new CollectionMembershipCacheDto { Id = c.Id, ContentSyncCacheJson = c.ContentSyncCacheJson })
+            .ToListAsync();
+
+    public Task UpdateChronologySignatureAsync(Guid collectionId, string signature) =>
+        context.Collections
+            .Where(c => c.Id == collectionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.ChronologyItemsSignature, signature));
+
+    public Task UpdateContentSyncCacheAsync(Guid collectionId, string cacheJson) =>
+        context.Collections
+            .Where(c => c.Id == collectionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.ContentSyncCacheJson, cacheJson));
+
     public async Task<IEnumerable<CollectionArtwork>> GetCollectionArtworkAsync(Guid collectionId) =>
         await context.Set<CollectionArtwork>()
             .AsNoTracking()

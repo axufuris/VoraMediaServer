@@ -461,6 +461,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IYouTubeDataApiClient, YouTubeDataApiClient>();
         services.AddScoped<CollectionOrderingService>();
         services.AddScoped<CollectionSyncService>();
+        services.AddScoped<CollectionMembershipService>();
 
         services.AddSingleton<IDvrRecordingService, DvrRecordingService>();
         services.AddSingleton<IFileSystemBrowserService, FileSystemBrowserService>();

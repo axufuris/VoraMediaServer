@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Plugins.Interfaces;
 
@@ -45,6 +47,7 @@ public class CollectionOrderingService(
             }
 
             await repository.UpdateCollectionItemsAsync(collectionItems);
+            await repository.UpdateChronologySignatureAsync(collectionId, ComputeSignature(collectionItems.Select(i => i.MediaItemId)));
         }
         catch (Exception ex)
         {
@@ -55,13 +58,31 @@ public class CollectionOrderingService(
 
     public async Task ReevaluateOrderOnItemAddedAsync(Guid collectionId, CancellationToken cancellationToken = default)
     {
-        var sortProviderId = await repository.GetProjectedByIdAsync(collectionId, c => c.SortProviderId);
-        if (string.IsNullOrEmpty(sortProviderId))
+        var config = await repository.GetProjectedByIdAsync(collectionId, c => new { c.SortProviderId, c.ChronologyItemsSignature });
+        if (config == null || string.IsNullOrEmpty(config.SortProviderId))
+        {
+            return;
+        }
+
+        // Only re-run the ordering provider when the collection's item set has
+        // actually changed since the last order. Unchanged set → the previous
+        // order still holds, so skip the (often remote) provider call. The
+        // manual "Sync Timeline" path calls ApplyChronologicalOrderAsync
+        // directly and is never gated, so remote list re-orders can still be
+        // pulled on demand.
+        var currentSignature = ComputeSignature(await repository.GetCollectionMediaIdsAsync(collectionId));
+        if (currentSignature == config.ChronologyItemsSignature)
         {
             return;
         }
 
         await ApplyChronologicalOrderAsync(collectionId, cancellationToken);
         await notifier.NotifyCollectionUpdatedAsync(collectionId);
+    }
+
+    private static string ComputeSignature(IEnumerable<Guid> mediaItemIds)
+    {
+        var joined = string.Join(",", mediaItemIds.OrderBy(x => x));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(joined)));
     }
 }
