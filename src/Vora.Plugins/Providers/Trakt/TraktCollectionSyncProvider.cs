@@ -49,7 +49,7 @@ public class TraktCollectionSyncProvider : ICollectionSyncProvider
         itemsRequest.Headers.Add("User-Agent", "VoraMediaServer/1.0");
 
         var itemsResponse = await _httpClient.SendAsync(itemsRequest);
-        itemsResponse.EnsureSuccessStatusCode();
+        TraktListResolver.EnsureListResponse(itemsResponse);
 
         var response = await itemsResponse.Content.ReadAsStringAsync();
 

@@ -1,7 +1,31 @@
+using System.Net;
+
 namespace Vora.Plugins.Providers.Trakt;
 
 internal static class TraktListResolver
 {
+    // Turn Trakt's terse status codes into actionable messages. A 403 almost
+    // always means the Client ID is wrong (e.g. the Client Secret was pasted
+    // instead) rather than anything about the list itself.
+    public static void EnsureListResponse(HttpResponseMessage response)
+    {
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException(
+                "Trakt rejected the request (403 Forbidden). This usually means the Trakt Client ID is invalid or the app is unapproved — " +
+                "in the plugin settings, enter the application's Client ID (not the Client Secret) from https://trakt.tv/oauth/applications. " +
+                "A private list also can't be fetched with a Client ID alone.");
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException(
+                "Trakt could not find that list (404). Check the list URL / username-slug is correct and that the list is public.");
+        }
+
+        response.EnsureSuccessStatusCode();
+    }
+
     // Turn a user-supplied Trakt list identifier into the API "items" URL.
     // Accepts a full trakt.tv list URL, a "trakt.tv/..." host-relative string,
     // "username/list-slug", or a numeric Trakt list id. A bare non-numeric slug
