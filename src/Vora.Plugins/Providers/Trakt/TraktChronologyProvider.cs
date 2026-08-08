@@ -60,7 +60,7 @@ public class TraktChronologyProvider : IChronologyProvider
         itemsRequest.Headers.Add("User-Agent", "VoraMediaServer/1.0");
 
         var itemsResponse = await client.SendAsync(itemsRequest, cancellationToken);
-        itemsResponse.EnsureSuccessStatusCode();
+        TraktListResolver.EnsureListResponse(itemsResponse);
 
         using var stream = await itemsResponse.Content.ReadAsStreamAsync(cancellationToken);
 

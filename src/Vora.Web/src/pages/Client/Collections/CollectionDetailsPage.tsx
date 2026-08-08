@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { isAxiosError } from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collectionService, type CollectionDetails, type CollectionSortOrder } from '../../../api/Collections/collectionService';
 import { collectionAdminService } from '../../../api/Collections/collectionAdminService';
@@ -89,8 +90,14 @@ export default function CollectionDetailsPage() {
         try {
             await collectionAdminService.syncChronology(collection.id);
             fetchCollection();
-        } catch {
-            await dialog.alert('Failed to sync timeline. Check provider settings.');
+        } catch (err) {
+            let message = 'Failed to sync timeline. Check the provider settings and try again.';
+            if (isAxiosError(err)) {
+                const data = err.response?.data as { error?: string; message?: string } | undefined;
+                if (data?.error) message = data.error;
+                else if (data?.message) message = data.message;
+            }
+            await dialog.alert(message);
         } finally {
             setIsSyncing(false);
         }

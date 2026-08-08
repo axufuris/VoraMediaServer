@@ -32,7 +32,7 @@ public class TraktCollectionSyncProvider : ICollectionSyncProvider
     {
         return new List<PluginSettingDefinitionDto>
         {
-            new PluginSettingDefinitionDto { Key = "client_id", Label = "Trakt Client ID", Type = "password", Description = "Trakt API Client ID (free). Create a Trakt account at https://trakt.tv, then register a new application at https://trakt.tv/oauth/applications/new (any Name; set Redirect URI to 'urn:ietf:wg:oauth:2.0:oob'). After saving, copy the 'Client ID' value shown on the app page — the Client Secret is not needed. This same Client ID is also used by the Trakt chronology provider." }
+            new PluginSettingDefinitionDto { Key = "client_id", Label = "Trakt Client ID", Type = "password", Description = "Trakt API Client ID. Heads up: Trakt now limits free accounts to a single connected app and appears to require Trakt VIP to create new API applications, so this may not work on a free account (you'll see a 403). If you can create an app: register it at https://trakt.tv/oauth/applications/new (any Name; Redirect URI 'urn:ietf:wg:oauth:2.0:oob'), then copy the 'Client ID' (not the Client Secret). The same Client ID is used by the Trakt chronology provider. If you don't have Trakt VIP, use the free MDbList provider instead." }
         };
     }
 
@@ -49,7 +49,7 @@ public class TraktCollectionSyncProvider : ICollectionSyncProvider
         itemsRequest.Headers.Add("User-Agent", "VoraMediaServer/1.0");
 
         var itemsResponse = await _httpClient.SendAsync(itemsRequest);
-        itemsResponse.EnsureSuccessStatusCode();
+        TraktListResolver.EnsureListResponse(itemsResponse);
 
         var response = await itemsResponse.Content.ReadAsStringAsync();
 
