@@ -194,6 +194,9 @@ public class TaskQueueManager : ITaskQueueManager
             // scan and the full-library workflow.
             await overlayManager.GenerateOverlaysForMediaAsync(itemId);
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(itemId, null, isAdditionTrigger: true);
+
+            var collectionMembership = sp.GetRequiredService<CollectionMembershipService>();
+            await collectionMembership.CheckMediaItemForCollectionsAsync(itemId);
         }, resourceKey: LibraryKey(libraryId));
     }
 

@@ -1,5 +1,6 @@
 ﻿using System.Linq.Expressions;
 using Vora.Application.Libraries.ViewModels;
+using Vora.Application.Media.Dtos;
 using Vora.Application.Media.ViewModels;
 using Vora.Domain.Entities.Actors;
 using Vora.Domain.Entities.Media;
@@ -8,6 +9,7 @@ namespace Vora.Application.Media;
 
 public interface IMediaRepository
 {
+    Task<MediaMatchInfoDto?> GetMediaMatchInfoAsync(Guid mediaItemId);
     Task<List<Guid>> GetEpisodeIdsForSeasonAsync(Guid seasonId);
     Task<List<Guid>> GetEpisodeIdsForShowAsync(Guid tvShowId);
     Task<Guid?> GetMovieIdByTitleAndYearAsync(string title, int? year, Guid libraryId);

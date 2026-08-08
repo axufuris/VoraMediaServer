@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
 using Vora.Domain.Entities.Collections;
@@ -44,6 +45,14 @@ public class CollectionSyncService(
             {
                 return;
             }
+
+            var membership = externalItems.Select(x => new CollectionMembershipEntry
+            {
+                TmdbId = x.TmdbId,
+                ImdbId = x.ImdbId,
+                MediaType = x.MediaType
+            }).ToList();
+            await collectionRepo.UpdateContentSyncCacheAsync(collection.Id, JsonSerializer.Serialize(membership));
 
             var tmdbIds = externalItems.Where(x => !string.IsNullOrEmpty(x.TmdbId)).Select(x => x.TmdbId!).ToList();
             var imdbIds = externalItems.Where(x => !string.IsNullOrEmpty(x.ImdbId)).Select(x => x.ImdbId!).ToList();

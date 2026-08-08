@@ -13,6 +13,9 @@ public interface ICollectionRepository
 
     Task<List<CollectionScheduleDto>> GetContentSyncCollectionsAsync();
     Task<List<CollectionScheduleDto>> GetAutoSyncCollectionsAsync();
+    Task<List<CollectionMembershipCacheDto>> GetContentSyncMembershipsAsync();
+    Task UpdateChronologySignatureAsync(Guid collectionId, string signature);
+    Task UpdateContentSyncCacheAsync(Guid collectionId, string cacheJson);
 
     Task<IEnumerable<CollectionArtwork>> GetCollectionArtworkAsync(Guid collectionId);
     Task<CollectionArtwork?> GetCollectionArtworkByIdAsync(Guid id);

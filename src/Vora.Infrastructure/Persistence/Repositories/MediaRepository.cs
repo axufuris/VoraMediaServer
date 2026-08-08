@@ -160,6 +160,20 @@ public partial class MediaRepository : IMediaRepository
             .ToListAsync();
     }
 
+    public Task<Vora.Application.Media.Dtos.MediaMatchInfoDto?> GetMediaMatchInfoAsync(Guid mediaItemId) =>
+        _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == mediaItemId && (m is Movie || m is TvShow))
+            .Select(m => new Vora.Application.Media.Dtos.MediaMatchInfoDto
+            {
+                TmdbId = m.TmdbId,
+                ImdbId = m.ImdbId,
+                Title = m.Title,
+                Year = m.ReleaseDate != null ? m.ReleaseDate.Value.Year : (int?)null,
+                MediaType = m is Movie ? "Movie" : "TvShow"
+            })
+            .FirstOrDefaultAsync();
+
     public async Task<List<Guid>> GetMediaIdsByExternalIdsAsync(List<string> tmdbIds, List<string> imdbIds)
     {
         return await _context.MediaItems

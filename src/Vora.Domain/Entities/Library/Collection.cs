@@ -27,6 +27,9 @@ public class Collection : LockableEntity
     public string? ContentSyncProviderId { get; set; }
     public string? ContentSyncExternalId { get; set; }
 
+    public string? ChronologyItemsSignature { get; set; }
+    public string? ContentSyncCacheJson { get; set; }
+
     public CollectionSortOrder DefaultSort { get; set; } = CollectionSortOrder.ReleaseDateDesc;
 
     public DateTime? VisibleStartDate { get; set; }
