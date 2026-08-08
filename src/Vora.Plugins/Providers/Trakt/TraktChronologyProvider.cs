@@ -35,7 +35,7 @@ public class TraktChronologyProvider : IChronologyProvider
         return new List<PluginSettingDefinitionDto>();
     }
 
-    public async Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, CancellationToken cancellationToken = default)
+    public async Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, IReadOnlyList<CollectionOrderingItemDto>? orderingItems = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(externalId))
             throw new ArgumentException("Trakt requires an externalId (the Trakt List ID) to fetch the timeline.");

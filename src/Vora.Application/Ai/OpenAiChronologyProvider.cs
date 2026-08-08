@@ -1,0 +1,99 @@
+using System.Text.Json;
+using Vora.Plugins.Dtos;
+using Vora.Plugins.Interfaces;
+
+namespace Vora.Application.Ai;
+
+public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvider
+{
+    public string Id => "openai_chronology";
+    public string Name => "AI Chronological Order";
+    public string Version => "1.0.0";
+    public string Description => "Orders a collection chronologically using AI. Instead of a list URL, describe the collection and how it should be ordered.";
+    public bool IsSystemPlugin => true;
+    public bool IsAiPlugin => true;
+    public string Type => "Chronology";
+    public string DeveloperName => "Andy Xufuris";
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
+
+    public string ProviderId => "openai";
+    public string ProviderName => "AI Chronological Order";
+
+    public string ExternalIdLabel => "Describe the collection and ordering";
+    public string ExternalIdPlaceholder => "e.g., DC Extended Universe films & shows in in-universe chronological order";
+
+    public bool OrdersLocalItemsOnly => true;
+
+    public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>();
+
+    public async Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, IReadOnlyList<CollectionOrderingItemDto>? items = null, CancellationToken cancellationToken = default)
+    {
+        if (items == null || items.Count == 0)
+        {
+            return new List<ChronologyResult>();
+        }
+
+        var description = string.IsNullOrWhiteSpace(externalId) ? collectionName : externalId;
+        var lines = items.Select(i => $"{i.Index}: {i.Title}{(i.Year.HasValue ? $" ({i.Year})" : string.Empty)} [{i.MediaType}]");
+
+        var prompt =
+            $"You are ordering a media collection. The collection is described as: \"{description}\".\n" +
+            "Here are the items, one per line as `index: Title (Year) [Type]`:\n" +
+            string.Join("\n", lines) + "\n\n" +
+            "Return ONLY valid JSON of the form {\"order\": [<index>, <index>, ...]} listing every index above exactly once, " +
+            "sorted into the correct chronological order for this collection. Do not invent, omit, or duplicate indices.";
+
+        var json = await openAi.CompleteJsonAsync(Id, prompt, cancellationToken);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return new List<ChronologyResult>();
+        }
+
+        int[]? order;
+        try
+        {
+            order = JsonSerializer.Deserialize<OrderResult>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })?.Order;
+        }
+        catch (JsonException)
+        {
+            return new List<ChronologyResult>();
+        }
+
+        if (order == null || order.Length == 0)
+        {
+            return new List<ChronologyResult>();
+        }
+
+        var byIndex = items.ToDictionary(i => i.Index);
+        var results = new List<ChronologyResult>();
+        var placed = new HashSet<int>();
+        decimal position = 1;
+
+        foreach (var index in order)
+        {
+            if (!placed.Add(index) || !byIndex.TryGetValue(index, out var item)) continue;
+            results.Add(ToResult(item, position++));
+        }
+
+        // Anything the model dropped keeps its original relative order at the end.
+        foreach (var item in items)
+        {
+            if (placed.Add(item.Index)) results.Add(ToResult(item, position++));
+        }
+
+        return results;
+    }
+
+    private static ChronologyResult ToResult(CollectionOrderingItemDto item, decimal sortOrder) => new()
+    {
+        TmdbId = item.TmdbId,
+        ImdbId = item.ImdbId,
+        MediaType = item.MediaType,
+        SortOrder = sortOrder
+    };
+
+    private class OrderResult
+    {
+        public int[]? Order { get; set; }
+    }
+}
