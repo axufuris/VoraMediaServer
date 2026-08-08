@@ -185,6 +185,67 @@ public partial class MediaRepository : IMediaRepository
             .ToListAsync();
     }
 
+    public async Task<Vora.Application.Media.Dtos.CollectionMatchCandidatesDto> GetCollectionMatchCandidatesAsync(Guid? libraryId)
+    {
+        var movies = await _context.Set<Movie>()
+            .AsNoTracking()
+            .Where(m => libraryId == null || m.LibraryId == libraryId)
+            .Select(m => new Vora.Application.Media.Dtos.MediaTitleCandidateDto
+            {
+                Id = m.Id,
+                Title = m.Title,
+                Year = m.ReleaseDate != null ? m.ReleaseDate.Value.Year : (int?)null
+            })
+            .ToListAsync();
+
+        var shows = await _context.Set<TvShow>()
+            .AsNoTracking()
+            .Where(t => libraryId == null || t.LibraryId == libraryId)
+            .Select(t => new Vora.Application.Media.Dtos.MediaTitleCandidateDto
+            {
+                Id = t.Id,
+                Title = t.Title,
+                Year = t.ReleaseDate != null ? t.ReleaseDate.Value.Year : (int?)null
+            })
+            .ToListAsync();
+
+        var seasons = await _context.Set<Season>()
+            .AsNoTracking()
+            .Where(s => libraryId == null || s.LibraryId == libraryId)
+            .Select(s => new Vora.Application.Media.Dtos.SeasonMatchCandidateDto
+            {
+                Id = s.Id,
+                TvShowId = s.TvShowId,
+                SeasonNumber = s.SeasonNumber
+            })
+            .ToListAsync();
+
+        return new Vora.Application.Media.Dtos.CollectionMatchCandidatesDto
+        {
+            Movies = movies,
+            Shows = shows,
+            Seasons = seasons
+        };
+    }
+
+    public async Task<Dictionary<Guid, Vora.Application.Media.Dtos.SeasonShowInfoDto>> GetSeasonShowInfoAsync(IReadOnlyCollection<Guid> seasonIds)
+    {
+        if (seasonIds.Count == 0) return new Dictionary<Guid, Vora.Application.Media.Dtos.SeasonShowInfoDto>();
+
+        var rows = await _context.Set<Season>()
+            .AsNoTracking()
+            .Where(s => seasonIds.Contains(s.Id))
+            .Select(s => new Vora.Application.Media.Dtos.SeasonShowInfoDto
+            {
+                SeasonId = s.Id,
+                ShowTitle = s.TvShow.Title,
+                SeasonNumber = s.SeasonNumber
+            })
+            .ToListAsync();
+
+        return rows.ToDictionary(r => r.SeasonId);
+    }
+
     public async Task<IEnumerable<Guid>> GetAllMediaItemIdsByLibraryAsync(Guid libraryId)
     {
         return await _context.MediaItems
