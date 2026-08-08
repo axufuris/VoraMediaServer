@@ -781,7 +781,7 @@ export default function MediaDetailsPage() {
                                 return (
                                     <div key={season.id} style={{ scrollSnapAlign: 'start', flex: 'none' }}>
                                         <MediaPoster
-                                            imageUrl={season.posterUrl}
+                                            imageUrl={season.posterUrl || media.posterUrl}
                                             title={season.title || `Season ${season.seasonNumber}`}
                                             subtitle={`${season.episodeCount || 0} episode${season.episodeCount === 1 ? '' : 's'}`}
                                             onClick={onOpen}
