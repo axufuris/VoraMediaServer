@@ -11,6 +11,7 @@ interface MediaPosterProps {
     badge?: ReactNode;
     bottomLeftBadge?: ReactNode;
     progressPercent?: number;
+    isPlayed?: boolean;
     onClick?: () => void;
     variant?: PosterVariant;
     width?: number;
@@ -30,7 +31,7 @@ const DEFAULT_WIDTH_BY_VARIANT: Record<PosterVariant, number> = {
     actor: 96,
 };
 
-export default function MediaPoster({ imageUrl, title, subtitle, badge, bottomLeftBadge, progressPercent, onClick, variant = 'standard', width, fill, className }: MediaPosterProps) {
+export default function MediaPoster({ imageUrl, title, subtitle, badge, bottomLeftBadge, progressPercent, isPlayed, onClick, variant = 'standard', width, fill, className }: MediaPosterProps) {
     const aspect = ASPECT_BY_VARIANT[variant];
     const round = variant === 'actor';
     const widthStyle = fill ? '100%' : (width ?? DEFAULT_WIDTH_BY_VARIANT[variant]);
@@ -82,11 +83,18 @@ export default function MediaPoster({ imageUrl, title, subtitle, badge, bottomLe
                 ) : (
                     <MediaPlaceholder title={title} variant={round ? 'actor' : 'poster'} />
                 )}
-                {badge && (
+                {badge ? (
                     <div className="absolute right-2 top-2">
                         {badge}
                     </div>
-                )}
+                ) : isPlayed ? (
+                    <div
+                        className="absolute right-2 top-2 rounded-full p-1 backdrop-blur-sm"
+                        style={{ background: 'var(--vora-bg-overlay)', border: '1px solid var(--vora-border-subtle)', boxShadow: 'var(--vora-shadow-md)' }}
+                    >
+                        <svg className="h-5 w-5" style={{ color: 'var(--vora-accent-500)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                    </div>
+                ) : null}
                 {bottomLeftBadge && (
                     <div className="absolute left-2 bottom-2">
                         {bottomLeftBadge}

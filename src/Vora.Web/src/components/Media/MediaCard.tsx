@@ -78,7 +78,7 @@ export default function MediaCard({
 
                 {isPlayed && (
                     <div className="absolute top-2 right-2 bg-[var(--vora-bg-overlay)] backdrop-blur-sm rounded-full p-1 shadow-[var(--vora-shadow-md)] border border-[var(--vora-border-subtle)] z-10">
-                        <svg className="w-5 h-5 text-[var(--vora-accent-contrast)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                        <svg className="w-5 h-5 text-[var(--vora-accent-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                     </div>
                 )}
 
