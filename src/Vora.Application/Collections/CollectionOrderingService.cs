@@ -16,13 +16,7 @@ public class CollectionOrderingService(
 {
     public async Task ApplyChronologicalOrderAsync(Guid collectionId, CancellationToken cancellationToken = default)
     {
-        var config = await repository.GetProjectedByIdAsync(collectionId, c => new
-        {
-            c.Title,
-            c.SortProviderId,
-            c.ExternalListId,
-            c.ChronologyItemsSignature
-        });
+        var config = await repository.GetChronologyConfigAsync(collectionId);
 
         if (config == null || string.IsNullOrEmpty(config.SortProviderId))
         {
@@ -83,7 +77,7 @@ public class CollectionOrderingService(
 
     public async Task ReevaluateOrderOnItemAddedAsync(Guid collectionId, CancellationToken cancellationToken = default)
     {
-        var config = await repository.GetProjectedByIdAsync(collectionId, c => new { c.SortProviderId, c.ChronologyItemsSignature });
+        var config = await repository.GetChronologyConfigAsync(collectionId);
         if (config == null || string.IsNullOrEmpty(config.SortProviderId))
         {
             return;
