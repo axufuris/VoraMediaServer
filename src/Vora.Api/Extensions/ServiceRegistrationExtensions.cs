@@ -350,6 +350,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMusicRepository, MusicRepository>();
         services.AddScoped<IMusicRecommendationRepository, MusicRecommendationRepository>();
         services.AddScoped<IOpenAiRecommendationRepository, OpenAiRecommendationRepository>();
+        services.AddScoped<IAiUsageRepository, AiUsageRepository>();
+        services.AddScoped<IOpenAiClient, OpenAiClient>();
         services.AddScoped<IOverlayTemplateRepository, OverlayTemplateRepository>();
         services.AddScoped<IPlaylistRepository, PlaylistRepository>();
         services.AddScoped<IPodcastRepository, PodcastRepository>();

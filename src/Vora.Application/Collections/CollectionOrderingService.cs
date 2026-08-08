@@ -2,6 +2,8 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
+using Vora.Domain.Entities.Media;
+using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Collections;
@@ -18,7 +20,8 @@ public class CollectionOrderingService(
         {
             c.Title,
             c.SortProviderId,
-            c.ExternalListId
+            c.ExternalListId,
+            c.ChronologyItemsSignature
         });
 
         if (config == null || string.IsNullOrEmpty(config.SortProviderId))
@@ -31,8 +34,29 @@ public class CollectionOrderingService(
 
         try
         {
-            var remoteOrder = await provider.GetChronologicalOrderAsync(config.Title, config.ExternalListId, cancellationToken);
             var collectionItems = await repository.GetCollectionItemsWithMediaAsync(collectionId);
+            var signature = ComputeSignature(collectionItems.Select(i => i.MediaItemId));
+
+            // A provider that orders the collection's own items (AI) yields the
+            // same result while the item set is unchanged, so skip the paid call.
+            if (provider.OrdersLocalItemsOnly && signature == config.ChronologyItemsSignature)
+            {
+                return;
+            }
+
+            var orderingItems = collectionItems
+                .Select((i, idx) => new CollectionOrderingItemDto
+                {
+                    Index = idx,
+                    Title = i.MediaItem.Title,
+                    Year = i.MediaItem.ReleaseDate?.Year,
+                    MediaType = i.MediaItem is Movie ? "Movie" : i.MediaItem is TvShow ? "TvShow" : "Movie",
+                    TmdbId = i.MediaItem.TmdbId,
+                    ImdbId = i.MediaItem.ImdbId
+                })
+                .ToList();
+
+            var remoteOrder = await provider.GetChronologicalOrderAsync(config.Title, config.ExternalListId, orderingItems, cancellationToken);
 
             foreach (var item in collectionItems)
             {
@@ -47,7 +71,7 @@ public class CollectionOrderingService(
             }
 
             await repository.UpdateCollectionItemsAsync(collectionItems);
-            await repository.UpdateChronologySignatureAsync(collectionId, ComputeSignature(collectionItems.Select(i => i.MediaItemId)));
+            await repository.UpdateChronologySignatureAsync(collectionId, signature);
         }
         catch (Exception ex)
         {

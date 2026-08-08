@@ -1,4 +1,6 @@
-﻿namespace Vora.Plugins.Interfaces;
+﻿using Vora.Plugins.Dtos;
+
+namespace Vora.Plugins.Interfaces;
 
 public interface IChronologyProvider : IVoraPlugin
 {
@@ -7,7 +9,13 @@ public interface IChronologyProvider : IVoraPlugin
     string ExternalIdLabel { get; }
     string ExternalIdPlaceholder { get; }
 
-    Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, CancellationToken cancellationToken = default);
+    // True when the order is derived purely from the collection's own items
+    // (e.g. AI sorting), so the caller can skip re-running it while the item
+    // set is unchanged. False for providers whose order comes from an external
+    // list that can change independently (Trakt/MDbList/IMDb).
+    bool OrdersLocalItemsOnly => false;
+
+    Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, IReadOnlyList<CollectionOrderingItemDto>? items = null, CancellationToken cancellationToken = default);
 }
 
 public class ChronologyResult

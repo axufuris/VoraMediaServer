@@ -35,7 +35,7 @@ public class MdbListChronologyProvider : IChronologyProvider
         return new List<PluginSettingDefinitionDto>();
     }
 
-    public async Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, CancellationToken cancellationToken = default)
+    public async Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, IReadOnlyList<CollectionOrderingItemDto>? items = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(externalId))
             throw new ArgumentException("MDbList requires an externalId to fetch the timeline.");
