@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Vora.Application.Ai;
 using Vora.Application.FileSystem;
 using Vora.Application.Plugins;
 using Vora.Application.Settings;
@@ -12,15 +13,18 @@ public class PluginManagerTests
 {
     private readonly ISystemSettingsRepository _settings;
     private readonly IOptions<StoragePathsOptions> _storage;
+    private readonly IOpenAiClient _openAi;
 
     public PluginManagerTests()
     {
         _settings = Substitute.For<ISystemSettingsRepository>();
         _storage = Options.Create(new StoragePathsOptions());
+        _openAi = Substitute.For<IOpenAiClient>();
+        _openAi.IsConfiguredAsync().Returns(true);
     }
 
     private PluginManager Build(params IVoraPlugin[] plugins) =>
-        new(plugins, _settings, _storage, NullLogger<PluginManager>.Instance);
+        new(plugins, _settings, _storage, _openAi, NullLogger<PluginManager>.Instance);
 
     private static IVoraPlugin MakePlugin(string id, string type = "Metadata", bool isSystem = false, bool isAi = false,
         List<PluginSettingDefinitionDto>? definitions = null)
@@ -169,6 +173,29 @@ public class PluginManagerTests
     }
 
     [Fact]
+    public async Task GetPluginOptionsAsync_excludes_ai_plugin_when_openai_key_not_configured()
+    {
+        _openAi.IsConfiguredAsync().Returns(false);
+        var plugin = MakePlugin("ai", type: "Metadata", isSystem: true, isAi: true);
+
+        var result = (await Build(plugin).GetPluginOptionsAsync("Metadata")).ToList();
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetPluginOptionsAsync_includes_ai_plugin_when_openai_key_configured()
+    {
+        _openAi.IsConfiguredAsync().Returns(true);
+        var plugin = MakePlugin("ai", type: "Metadata", isSystem: true, isAi: true);
+
+        var result = (await Build(plugin).GetPluginOptionsAsync("Metadata")).ToList();
+
+        result.Should().ContainSingle();
+        result[0].Id.Should().Be("ai");
+    }
+
+    [Fact]
     public async Task GetPluginOptionsAsync_uses_chronology_provider_label_when_plugin_is_chronology_provider()
     {
         var plugin = Substitute.For<IChronologyProvider>();
@@ -208,7 +235,7 @@ public class PluginManagerTests
         try
         {
             var options = Options.Create(new StoragePathsOptions { Plugins = tempDir });
-            var manager = new PluginManager(Array.Empty<IVoraPlugin>(), _settings, options, NullLogger<PluginManager>.Instance);
+            var manager = new PluginManager(Array.Empty<IVoraPlugin>(), _settings, options, _openAi, NullLogger<PluginManager>.Instance);
 
             var content = new byte[] { 1, 2, 3, 4 };
             await using var stream = new MemoryStream(content);

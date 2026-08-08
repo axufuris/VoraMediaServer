@@ -18,6 +18,8 @@ public interface IMediaRepository
     Task<Guid?> GetSeasonIdByNumberAsync(Guid tvShowId, int seasonNumber);
     Task<Guid?> GetEpisodeIdByNumberAsync(Guid seasonId, int episodeNumber);
     Task<List<Guid>> GetMediaIdsByExternalIdsAsync(List<string> tmdbIds, List<string> imdbIds);
+    Task<CollectionMatchCandidatesDto> GetCollectionMatchCandidatesAsync(Guid? libraryId);
+    Task<Dictionary<Guid, SeasonShowInfoDto>> GetSeasonShowInfoAsync(IReadOnlyCollection<Guid> seasonIds);
     Task<HashSet<string>> GetExistingLibraryPathsAsync(Guid libraryId);
     Task<List<string>> GetLibraryItemFilePathsAsync(Guid libraryId);
     Task<IEnumerable<Guid>> GetAllMediaItemIdsByLibraryAsync(Guid libraryId);

@@ -22,7 +22,8 @@ public class CollectionSyncService(
             c.Title,
             c.ContentSyncProviderId,
             c.ContentSyncExternalId,
-            c.MirrorList
+            c.MirrorList,
+            c.LibraryId
         });
 
         if (collection == null
@@ -51,14 +52,29 @@ public class CollectionSyncService(
             {
                 TmdbId = x.TmdbId,
                 ImdbId = x.ImdbId,
-                MediaType = x.MediaType
+                MediaType = x.MediaType,
+                Title = x.Title,
+                Year = x.Year,
+                ShowTitle = x.ShowTitle,
+                SeasonNumber = x.SeasonNumber
             }).ToList();
             await collectionRepo.UpdateContentSyncCacheAsync(collection.Id, JsonSerializer.Serialize(membership));
 
             var tmdbIds = externalItems.Where(x => !string.IsNullOrEmpty(x.TmdbId)).Select(x => x.TmdbId!).ToList();
             var imdbIds = externalItems.Where(x => !string.IsNullOrEmpty(x.ImdbId)).Select(x => x.ImdbId!).ToList();
 
-            var matchingLocalMediaIds = await mediaRepo.GetMediaIdsByExternalIdsAsync(tmdbIds, imdbIds);
+            var matchedIds = new HashSet<Guid>(await mediaRepo.GetMediaIdsByExternalIdsAsync(tmdbIds, imdbIds));
+
+            if (membership.Any(NeedsTitleMatch))
+            {
+                var candidates = await mediaRepo.GetCollectionMatchCandidatesAsync(collection.LibraryId);
+                foreach (var id in CollectionMembershipResolver.Resolve(membership.Where(NeedsTitleMatch), candidates))
+                {
+                    matchedIds.Add(id);
+                }
+            }
+
+            var matchingLocalMediaIds = matchedIds.ToList();
             if (matchingLocalMediaIds.Count == 0)
             {
                 return;
@@ -106,4 +122,9 @@ public class CollectionSyncService(
             logger.LogError(ex, "Failed to sync content for collection '{Title}'.", collection.Title);
         }
     }
+
+    private static bool NeedsTitleMatch(CollectionMembershipEntry entry) =>
+        string.IsNullOrEmpty(entry.TmdbId)
+        && string.IsNullOrEmpty(entry.ImdbId)
+        && (!string.IsNullOrWhiteSpace(entry.Title) || !string.IsNullOrWhiteSpace(entry.ShowTitle));
 }

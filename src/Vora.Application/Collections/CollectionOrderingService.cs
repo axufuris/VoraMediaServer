@@ -10,6 +10,7 @@ namespace Vora.Application.Collections;
 
 public class CollectionOrderingService(
     ICollectionRepository repository,
+    Vora.Application.Media.IMediaRepository mediaRepository,
     IEnumerable<IChronologyProvider> providers,
     IClientNotifier notifier,
     ILogger<CollectionOrderingService> logger)
@@ -39,15 +40,24 @@ public class CollectionOrderingService(
                 return;
             }
 
+            var seasonInfo = await mediaRepository.GetSeasonShowInfoAsync(
+                collectionItems.Where(i => i.MediaItem is Season).Select(i => i.MediaItemId).ToList());
+
             var orderingItems = collectionItems
                 .Select((i, idx) => new CollectionOrderingItemDto
                 {
                     Index = idx,
+                    LocalId = i.MediaItemId,
                     Title = i.MediaItem.Title,
                     Year = i.MediaItem.ReleaseDate?.Year,
-                    MediaType = i.MediaItem is Movie ? "Movie" : i.MediaItem is TvShow ? "TvShow" : "Movie",
+                    MediaType = i.MediaItem is Movie ? "Movie"
+                        : i.MediaItem is Season ? "Season"
+                        : i.MediaItem is TvShow ? "TvShow"
+                        : "Movie",
                     TmdbId = i.MediaItem.TmdbId,
-                    ImdbId = i.MediaItem.ImdbId
+                    ImdbId = i.MediaItem.ImdbId,
+                    ShowTitle = seasonInfo.TryGetValue(i.MediaItemId, out var si) ? si.ShowTitle : null,
+                    SeasonNumber = seasonInfo.TryGetValue(i.MediaItemId, out var sn) ? sn.SeasonNumber : (int?)null
                 })
                 .ToList();
 
@@ -56,7 +66,8 @@ public class CollectionOrderingService(
             foreach (var item in collectionItems)
             {
                 var match = remoteOrder.FirstOrDefault(r =>
-                    (!string.IsNullOrEmpty(r.TmdbId) && r.TmdbId == item.MediaItem.TmdbId)
+                    (r.LocalId != null && r.LocalId == item.MediaItemId)
+                    || (!string.IsNullOrEmpty(r.TmdbId) && r.TmdbId == item.MediaItem.TmdbId)
                     || (!string.IsNullOrEmpty(r.ImdbId) && r.ImdbId == item.MediaItem.ImdbId));
 
                 if (match != null)

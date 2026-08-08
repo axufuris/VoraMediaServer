@@ -19,6 +19,7 @@ public class PluginManager(
     IEnumerable<IVoraPlugin> plugins,
     ISystemSettingsRepository settingsRepo,
     IOptions<StoragePathsOptions> storagePaths,
+    Vora.Application.Ai.IOpenAiClient openAi,
     ILogger<PluginManager> logger) : IPluginManager
 {
     private const string EnabledSettingKey = "is_enabled";
@@ -60,11 +61,17 @@ public class PluginManager(
             .ToList();
 
         var validOptions = new List<PluginOptionVM>();
+        var aiConfigured = targetPlugins.Any(p => p.IsAiPlugin) && await openAi.IsConfiguredAsync();
 
         foreach (var plugin in targetPlugins)
         {
             var isEnabledStr = await settingsRepo.GetPluginSettingAsync(plugin.Id, EnabledSettingKey);
             if (isEnabledStr == DisabledValue)
+            {
+                continue;
+            }
+
+            if (plugin.IsAiPlugin && !aiConfigured)
             {
                 continue;
             }
