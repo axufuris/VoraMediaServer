@@ -65,6 +65,12 @@ public class ScheduledJobWorker : BackgroundService
         }
     }
 
+    private static bool IsCollectionSyncDue(DateTime? lastSyncedAt, int intervalDays)
+    {
+        var interval = Math.Max(1, intervalDays);
+        return lastSyncedAt == null || (DateTime.UtcNow - lastSyncedAt.Value).TotalDays >= interval;
+    }
+
     private async Task CheckAndRunSchedulesAsync(CancellationToken stoppingToken)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -160,7 +166,10 @@ public class ScheduledJobWorker : BackgroundService
 
             foreach (var collection in autoSyncCollections)
             {
-                taskQueue.QueueCollectionChronologySync(collection.Id, collection.Title);
+                if (IsCollectionSyncDue(collection.ChronologySyncedAt, collection.SyncIntervalDays))
+                {
+                    taskQueue.QueueCollectionChronologySync(collection.Id, collection.Title);
+                }
             }
 
             _lastChronologySyncDate = today;
@@ -174,7 +183,10 @@ public class ScheduledJobWorker : BackgroundService
 
             foreach (var collection in contentSyncCollections)
             {
-                taskQueue.QueueCollectionContentSync(collection.Id, collection.Title);
+                if (IsCollectionSyncDue(collection.ContentSyncedAt, collection.SyncIntervalDays))
+                {
+                    taskQueue.QueueCollectionContentSync(collection.Id, collection.Title);
+                }
             }
 
             _lastContentSyncDate = today;

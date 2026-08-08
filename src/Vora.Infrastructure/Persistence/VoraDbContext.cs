@@ -686,6 +686,7 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.ExternalListId).HasMaxLength(128);
             entity.Property(e => e.ContentSyncProviderId).HasMaxLength(64);
             entity.Property(e => e.ContentSyncExternalId).HasMaxLength(128);
+            entity.Property(e => e.SyncIntervalDays).HasDefaultValue(1);
 
             entity.Property(e => e.LockedFields)
                   .HasConversion(converters.StringList)

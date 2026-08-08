@@ -99,7 +99,9 @@ public class CollectionManager : ICollectionManager
             SystemGenerated = request.SystemGenerated,
             LibraryId = request.LibraryId,
             ContentSyncProviderId = request.ContentSyncProviderId,
-            ContentSyncExternalId = request.ContentSyncExternalId
+            ContentSyncExternalId = request.ContentSyncExternalId,
+            SyncIntervalDays = Math.Max(1, request.SyncIntervalDays),
+            MirrorList = request.MirrorList
         };
 
         var id = await _repository.CreateCollectionAsync(collection);
@@ -131,6 +133,8 @@ public class CollectionManager : ICollectionManager
         collection.SortTitle = request.SortTitle;
         collection.ContentSyncExternalId = request.ContentSyncExternalId;
         collection.ContentSyncProviderId = request.ContentSyncProviderId;
+        collection.SyncIntervalDays = Math.Max(1, request.SyncIntervalDays);
+        collection.MirrorList = request.MirrorList;
         collection.VisibleStartDate = request.VisibleStartDate.HasValue ? DateTime.SpecifyKind(request.VisibleStartDate.Value, DateTimeKind.Utc) : null;
         collection.VisibleEndDate = request.VisibleEndDate.HasValue ? DateTime.SpecifyKind(request.VisibleEndDate.Value, DateTimeKind.Utc) : null;
 

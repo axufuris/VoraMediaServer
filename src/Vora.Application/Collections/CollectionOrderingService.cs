@@ -41,6 +41,7 @@ public class CollectionOrderingService(
             // same result while the item set is unchanged, so skip the paid call.
             if (provider.OrdersLocalItemsOnly && signature == config.ChronologyItemsSignature)
             {
+                await repository.TouchChronologySyncedAtAsync(collectionId);
                 return;
             }
 

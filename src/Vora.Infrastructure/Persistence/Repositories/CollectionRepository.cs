@@ -73,12 +73,31 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
     public Task UpdateChronologySignatureAsync(Guid collectionId, string signature) =>
         context.Collections
             .Where(c => c.Id == collectionId)
-            .ExecuteUpdateAsync(s => s.SetProperty(c => c.ChronologyItemsSignature, signature));
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(c => c.ChronologyItemsSignature, signature)
+                .SetProperty(c => c.ChronologySyncedAt, DateTime.UtcNow));
+
+    public Task TouchChronologySyncedAtAsync(Guid collectionId) =>
+        context.Collections
+            .Where(c => c.Id == collectionId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(c => c.ChronologySyncedAt, DateTime.UtcNow));
 
     public Task UpdateContentSyncCacheAsync(Guid collectionId, string cacheJson) =>
         context.Collections
             .Where(c => c.Id == collectionId)
-            .ExecuteUpdateAsync(s => s.SetProperty(c => c.ContentSyncCacheJson, cacheJson));
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(c => c.ContentSyncCacheJson, cacheJson)
+                .SetProperty(c => c.ContentSyncedAt, DateTime.UtcNow));
+
+    public Task RemoveItemsFromCollectionAsync(Guid collectionId, IEnumerable<Guid> mediaItemIds)
+    {
+        var ids = mediaItemIds.ToList();
+        if (ids.Count == 0) return Task.CompletedTask;
+        return context.Set<CollectionItem>()
+            .Where(ci => ci.CollectionId == collectionId && ids.Contains(ci.MediaItemId))
+            .ExecuteDeleteAsync();
+    }
 
     public async Task<IEnumerable<CollectionArtwork>> GetCollectionArtworkAsync(Guid collectionId) =>
         await context.Set<CollectionArtwork>()

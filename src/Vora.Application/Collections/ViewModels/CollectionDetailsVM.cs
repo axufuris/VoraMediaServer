@@ -26,6 +26,8 @@ public class CollectionDetailsVM
     public bool SystemGenerated { get; set; }
     public string? ContentSyncProviderId { get; set; }
     public string? ContentSyncExternalId { get; set; }
+    public int SyncIntervalDays { get; set; }
+    public bool MirrorList { get; set; }
     public bool IsPlayed { get; set; }
     public int? UnplayedItemcount { get; set; }
     public List<string> LockedFields { get; set; } = new();
@@ -54,6 +56,8 @@ public class CollectionDetailsVM
             LockedFields = c.LockedFields,
             ContentSyncProviderId = c.ContentSyncProviderId,
             ContentSyncExternalId = c.ContentSyncExternalId,
+            SyncIntervalDays = c.SyncIntervalDays,
+            MirrorList = c.MirrorList,
             IsPlayed = false,
             UnplayedItemcount = null,
             Items = c.Items.Select(item => new CollectionDetailsLibraryItemVM

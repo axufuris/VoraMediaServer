@@ -42,6 +42,8 @@ export interface CollectionDetails {
     systemGenerated: boolean;
     contentSyncProviderId?: string;
     contentSyncExternalId?: string;
+    syncIntervalDays: number;
+    mirrorList: boolean;
 }
 
 export interface CollectionDetailsLibraryItem {
