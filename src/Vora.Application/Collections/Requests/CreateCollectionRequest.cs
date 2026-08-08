@@ -18,5 +18,7 @@ public class CreateCollectionRequest
     public bool SystemGenerated { get; set; }
     public string? ContentSyncProviderId { get; set; }
     public string? ContentSyncExternalId { get; set; }
+    public int SyncIntervalDays { get; set; } = 1;
+    public bool MirrorList { get; set; }
     public Guid? LibraryId { get; set; }
 }

@@ -48,6 +48,8 @@ export default function EditCollectionModal({
     const [syncProviders, setSyncProviders] = useState<PluginOptionVM[]>([]);
     const [contentSyncProviderId, setContentSyncProviderId] = useState(collection.contentSyncProviderId || '');
     const [contentSyncExternalId, setContentSyncExternalId] = useState(collection.contentSyncExternalId || '');
+    const [syncIntervalDays, setSyncIntervalDays] = useState(collection.syncIntervalDays || 1);
+    const [mirrorList, setMirrorList] = useState(collection.mirrorList || false);
     const [artworkProviders, setArtworkProviders] = useState<PluginOptionVM[]>([]);
     const [selectedProviderId, setSelectedProviderId] = useState('tmdb_artwork');
 
@@ -78,6 +80,8 @@ export default function EditCollectionModal({
             setVisibleEndDate(formatDateForInput(collection.visibleEndDate));
             setContentSyncProviderId(collection.contentSyncProviderId || '');
             setContentSyncExternalId(collection.contentSyncExternalId || '');
+            setSyncIntervalDays(collection.syncIntervalDays || 1);
+            setMirrorList(collection.mirrorList || false);
             setLockedFields(collection.lockedFields || []);
             setActiveTab('general');
 
@@ -164,7 +168,9 @@ export default function EditCollectionModal({
                 autoSyncChronology: sortProviderId ? autoSyncChronology : false,
                 sortTitle: sortTitle.trim() || undefined,
                 visibleStartDate: visibleStartDate || undefined, visibleEndDate: visibleEndDate || undefined,
-                contentSyncProviderId, contentSyncExternalId
+                contentSyncProviderId, contentSyncExternalId,
+                syncIntervalDays: Math.max(1, syncIntervalDays),
+                mirrorList: contentSyncProviderId ? mirrorList : false
             }, serverId);
             onSaved();
             onClose();
@@ -274,6 +280,43 @@ export default function EditCollectionModal({
                                             </div>
                                         )}
                                     </div>
+
+                                    {contentSyncProviderId && (
+                                        <div className="pt-3 mt-3 border-t border-[var(--vora-border-subtle)]/50">
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id="mirrorListEdit"
+                                                    checked={mirrorList}
+                                                    onChange={e => setMirrorList(e.target.checked)}
+                                                    className="w-4 h-4 accent-orange-500 rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)]"
+                                                />
+                                                <label htmlFor="mirrorListEdit" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">
+                                                    Mirror the list exactly
+                                                </label>
+                                            </div>
+                                            <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-2">
+                                                Remove items from this collection when they're no longer on the external list. Manually added items will also be removed on the next sync.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {(contentSyncProviderId || sortProviderId) && (
+                                        <div className="pt-3 mt-3 border-t border-[var(--vora-border-subtle)]/50">
+                                            <label htmlFor="syncIntervalEdit" className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Recheck every (days)</label>
+                                            <input
+                                                id="syncIntervalEdit"
+                                                type="number"
+                                                min={1}
+                                                value={syncIntervalDays}
+                                                onChange={e => setSyncIntervalDays(Math.max(1, Number(e.target.value) || 1))}
+                                                className="w-32 bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none"
+                                            />
+                                            <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-2">
+                                                How often the background sync rechecks the list and re-evaluates ordering. Higher values reduce provider/API usage.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

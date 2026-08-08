@@ -21,7 +21,8 @@ public class CollectionSyncService(
             c.Id,
             c.Title,
             c.ContentSyncProviderId,
-            c.ContentSyncExternalId
+            c.ContentSyncExternalId,
+            c.MirrorList
         });
 
         if (collection == null
@@ -64,6 +65,22 @@ public class CollectionSyncService(
             }
 
             var existingMediaIds = await collectionRepo.GetCollectionMediaIdsAsync(collection.Id);
+
+            // Mirror mode: drop items no longer in the list. Guarded by the
+            // "no matches → return" above, so a total match failure can't wipe
+            // the collection; a manual add to a mirrored collection is expected
+            // to be removed on the next sync.
+            if (collection.MirrorList)
+            {
+                var desired = matchingLocalMediaIds.ToHashSet();
+                var toRemove = existingMediaIds.Where(id => !desired.Contains(id)).ToList();
+                if (toRemove.Count > 0)
+                {
+                    await collectionRepo.RemoveItemsFromCollectionAsync(collection.Id, toRemove);
+                    await notifier.NotifyCollectionUpdatedAsync(collection.Id);
+                    logger.LogInformation("Mirror sync removed {Count} item(s) no longer in the list from '{Title}'.", toRemove.Count, collection.Title);
+                }
+            }
 
             var itemsToAdd = matchingLocalMediaIds
                 .Where(id => !existingMediaIds.Contains(id))

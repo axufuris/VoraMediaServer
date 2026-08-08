@@ -30,6 +30,11 @@ public class Collection : LockableEntity
     public string? ChronologyItemsSignature { get; set; }
     public string? ContentSyncCacheJson { get; set; }
 
+    public int SyncIntervalDays { get; set; } = 1;
+    public bool MirrorList { get; set; }
+    public DateTime? ContentSyncedAt { get; set; }
+    public DateTime? ChronologySyncedAt { get; set; }
+
     public CollectionSortOrder DefaultSort { get; set; } = CollectionSortOrder.ReleaseDateDesc;
 
     public DateTime? VisibleStartDate { get; set; }

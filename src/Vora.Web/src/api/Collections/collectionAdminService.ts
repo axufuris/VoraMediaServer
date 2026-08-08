@@ -18,6 +18,8 @@ export interface UpdateCollectionRequest {
     visibleEndDate?: string;
     contentSyncProviderId?: string;
     contentSyncExternalId?: string;
+    syncIntervalDays?: number;
+    mirrorList?: boolean;
 }
 
 export interface CreateCollectionRequest {
@@ -36,6 +38,8 @@ export interface CreateCollectionRequest {
     libraryId?: string;
     contentSyncProviderId?: string;
     contentSyncExternalId?: string;
+    syncIntervalDays?: number;
+    mirrorList?: boolean;
 }
 
 export const collectionAdminService = {
