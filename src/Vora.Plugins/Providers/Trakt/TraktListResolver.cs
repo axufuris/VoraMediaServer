@@ -11,10 +11,11 @@ internal static class TraktListResolver
         if (response.StatusCode == HttpStatusCode.Forbidden)
         {
             throw new InvalidOperationException(
-                "Trakt rejected the request (403 Forbidden) — the Client ID / app is not accepted. Trakt now restricts third-party API access: " +
-                "free accounts are limited to a single connected app and creating new API applications may require Trakt VIP, so a new app is often " +
-                "rejected as unapproved. Otherwise, verify the plugin setting holds the app's Client ID (not the Client Secret) from " +
-                "https://trakt.tv/oauth/applications. A private list also can't be fetched with a Client ID alone. MDbList is a free alternative for list sync.");
+                "Trakt rejected the request (403 Forbidden) — this Client ID isn't accepted for API calls (it fails even on Trakt's public endpoints), " +
+                "which means the API application behind it isn't valid or approved. This is not about OAuth 'connected apps' — reading a public list uses " +
+                "only the Client ID, no account connection. Trakt now appears to require VIP to create a working API application, so free-account keys are " +
+                "rejected as unapproved. Verify the setting holds the Client ID (not the Client Secret) from https://trakt.tv/oauth/applications; if you " +
+                "don't have Trakt VIP, use the free MDbList provider instead.");
         }
 
         if (response.StatusCode == HttpStatusCode.NotFound)
