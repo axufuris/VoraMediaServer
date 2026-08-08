@@ -4,17 +4,17 @@ namespace Vora.Plugins.Providers.Trakt;
 
 internal static class TraktListResolver
 {
-    // Turn Trakt's terse status codes into actionable messages. A 403 almost
-    // always means the Client ID is wrong (e.g. the Client Secret was pasted
-    // instead) rather than anything about the list itself.
+    // Turn Trakt's terse status codes into actionable messages. A 403 means
+    // Trakt rejected the API key/app, not anything about the list itself.
     public static void EnsureListResponse(HttpResponseMessage response)
     {
         if (response.StatusCode == HttpStatusCode.Forbidden)
         {
             throw new InvalidOperationException(
-                "Trakt rejected the request (403 Forbidden). This usually means the Trakt Client ID is invalid or the app is unapproved — " +
-                "in the plugin settings, enter the application's Client ID (not the Client Secret) from https://trakt.tv/oauth/applications. " +
-                "A private list also can't be fetched with a Client ID alone.");
+                "Trakt rejected the request (403 Forbidden) — the Client ID / app is not accepted. Trakt now restricts third-party API access: " +
+                "free accounts are limited to a single connected app and creating new API applications may require Trakt VIP, so a new app is often " +
+                "rejected as unapproved. Otherwise, verify the plugin setting holds the app's Client ID (not the Client Secret) from " +
+                "https://trakt.tv/oauth/applications. A private list also can't be fetched with a Client ID alone. MDbList is a free alternative for list sync.");
         }
 
         if (response.StatusCode == HttpStatusCode.NotFound)
