@@ -249,7 +249,7 @@ function SmartListRow({ list, serverId }: { list: SmartListClientDto, serverId?:
                         {isEpisode ? (
                             <MediaStill imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} />
                         ) : (
-                            <MediaPoster imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} />
+                            <MediaPoster imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} isPlayed={item.isPlayed} onClick={onOpen} />
                         )}
                     </div>
                 );
