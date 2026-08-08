@@ -10,6 +10,9 @@ public class CollectionMembershipEntry
     public string? Title { get; set; }
     public int? Year { get; set; }
     public string MediaType { get; set; } = "Movie";
+
+    public string? ShowTitle { get; set; }
+    public int? SeasonNumber { get; set; }
 }
 
 public static class TitleMatch

@@ -34,7 +34,7 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         }
 
         var description = string.IsNullOrWhiteSpace(externalId) ? collectionName : externalId;
-        var lines = items.Select(i => $"{i.Index}: {i.Title}{(i.Year.HasValue ? $" ({i.Year})" : string.Empty)} [{i.MediaType}]");
+        var lines = items.Select(i => $"{i.Index}: {DescribeItem(i)}");
 
         var prompt =
             $"You are ordering a media collection. The collection is described as: \"{description}\".\n" +
@@ -84,8 +84,22 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         return results;
     }
 
+    private static string DescribeItem(CollectionOrderingItemDto item)
+    {
+        if (string.Equals(item.MediaType, "Season", StringComparison.OrdinalIgnoreCase))
+        {
+            var show = string.IsNullOrWhiteSpace(item.ShowTitle) ? item.Title : item.ShowTitle;
+            var season = item.SeasonNumber.HasValue ? $" Season {item.SeasonNumber}" : string.Empty;
+            return $"{show}{season} [Season]";
+        }
+
+        var year = item.Year.HasValue ? $" ({item.Year})" : string.Empty;
+        return $"{item.Title}{year} [{item.MediaType}]";
+    }
+
     private static ChronologyResult ToResult(CollectionOrderingItemDto item, decimal sortOrder) => new()
     {
+        LocalId = item.LocalId,
         TmdbId = item.TmdbId,
         ImdbId = item.ImdbId,
         MediaType = item.MediaType,
