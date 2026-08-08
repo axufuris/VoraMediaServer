@@ -57,9 +57,8 @@ public class MdbListChronologyProvider : IChronologyProvider
         }
 
         var client = _httpClientFactory.CreateClient();
-        var results = new List<ChronologyResult>();
+        var rawItems = new List<(string? ImdbId, string? TmdbId, string MediaType, decimal Rank, bool HasRank)>();
         string? nextCursor = null;
-        decimal position = 1;
 
         do
         {
@@ -140,20 +139,77 @@ public class MdbListChronologyProvider : IChronologyProvider
                 if (string.IsNullOrEmpty(tmdbId) && item.TryGetProperty("tmdb_id", out var rootTmdb))
                     tmdbId = rootTmdb.ToString();
 
+                decimal rank = 0;
+                bool hasRank = false;
+                if (item.TryGetProperty("rank", out var rankProp) && rankProp.ValueKind == JsonValueKind.Number && rankProp.TryGetDecimal(out var rankVal))
+                {
+                    rank = rankVal;
+                    hasRank = true;
+                }
+
                 if (!string.IsNullOrEmpty(imdbId) || !string.IsNullOrEmpty(tmdbId))
                 {
-                    results.Add(new ChronologyResult
-                    {
-                        ImdbId = imdbId,
-                        TmdbId = tmdbId,
-                        MediaType = mediaType,
-                        SortOrder = position++
-                    });
+                    rawItems.Add((imdbId, tmdbId, mediaType, rank, hasRank));
                 }
             }
 
         } while (!string.IsNullOrEmpty(nextCursor));
 
-        return results;
+        return BuildOrderedResults(rawItems);
+    }
+
+    // MDbList splits a list into per-type arrays (movies, shows, …), each already
+    // in the list's display order, plus a global "rank" per item. Concatenating
+    // the arrays would dump every show after every movie, so instead keep the
+    // movie array in its display order (rank can be stale when an item was
+    // re-added) and interleave the other types into it by rank.
+    private static List<ChronologyResult> BuildOrderedResults(List<(string? ImdbId, string? TmdbId, string MediaType, decimal Rank, bool HasRank)> items)
+    {
+        static ChronologyResult ToResult((string? ImdbId, string? TmdbId, string MediaType, decimal Rank, bool HasRank) it)
+            => new() { ImdbId = it.ImdbId, TmdbId = it.TmdbId, MediaType = it.MediaType };
+
+        if (items.Count == 0) return new List<ChronologyResult>();
+
+        if (items.All(i => !i.HasRank))
+        {
+            decimal p = 1;
+            return items.Select(i => { var r = ToResult(i); r.SortOrder = p++; return r; }).ToList();
+        }
+
+        var movies = items.Where(i => i.MediaType == "Movie").ToList();
+        var others = items.Where(i => i.MediaType != "Movie").ToList();
+
+        if (movies.Count == 0)
+        {
+            decimal p = 1;
+            return items.OrderBy(i => i.Rank).Select(i => { var r = ToResult(i); r.SortOrder = p++; return r; }).ToList();
+        }
+
+        var maxRank = items.Max(i => i.Rank) + 1m;
+        var keyed = new List<(decimal Key, ChronologyResult Result)>();
+
+        for (var i = 0; i < movies.Count; i++)
+        {
+            keyed.Add((i, ToResult(movies[i])));
+        }
+
+        foreach (var other in others)
+        {
+            var lastSmaller = -1;
+            for (var i = 0; i < movies.Count; i++)
+            {
+                if (movies[i].Rank < other.Rank) lastSmaller = i;
+            }
+            keyed.Add((lastSmaller + (other.Rank / maxRank), ToResult(other)));
+        }
+
+        keyed.Sort((a, b) => a.Key.CompareTo(b.Key));
+
+        decimal pos = 1;
+        foreach (var k in keyed)
+        {
+            k.Result.SortOrder = pos++;
+        }
+        return keyed.Select(k => k.Result).ToList();
     }
 }
