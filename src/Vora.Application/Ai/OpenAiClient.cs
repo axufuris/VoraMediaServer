@@ -43,13 +43,21 @@ public class OpenAiClient(
         var model = await settings.GetPluginSettingAsync(KeyPluginId, "chat_model");
         if (string.IsNullOrWhiteSpace(model)) model = "gpt-4o-mini";
 
+        var guardrails = await settings.GetPluginSettingAsync(KeyPluginId, "guardrails");
+        var messages = new List<object>();
+        if (!string.IsNullOrWhiteSpace(guardrails))
+        {
+            messages.Add(new { role = "system", content = guardrails });
+        }
+        messages.Add(new { role = "user", content = prompt });
+
         var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         request.Content = JsonContent.Create(new
         {
             model,
-            messages = new[] { new { role = "user", content = prompt } },
+            messages,
             response_format = new { type = "json_object" }
         });
 

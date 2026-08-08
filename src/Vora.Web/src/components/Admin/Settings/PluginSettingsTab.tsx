@@ -157,6 +157,13 @@ export function PluginSection({ serverId, plugin, showModal, onAfterChange }: { 
                                     serverId={serverId}
                                     modalTitle={`Select folder for ${field.label}`}
                                 />
+                            ) : field.type === 'textarea' ? (
+                                <textarea
+                                    value={pluginValues[field.key] || ''}
+                                    onChange={e => handlePluginValueChange(field.key, e.target.value)}
+                                    rows={4}
+                                    className="vora-input text-sm resize-y"
+                                />
                             ) : (
                                 <input
                                     type={field.type}
