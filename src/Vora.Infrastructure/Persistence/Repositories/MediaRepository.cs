@@ -108,23 +108,41 @@ public partial class MediaRepository : IMediaRepository
         return sb.ToString();
     }
 
-    public async Task<Guid?> GetTvShowIdByTitleAsync(string title, Guid libraryId)
+    public async Task<Guid?> GetTvShowIdByTitleAndYearAsync(string title, int? year, Guid libraryId)
     {
-        var exact = await _context.Set<TvShow>()
-            .AsNoTracking()
-            .Where(t => t.Title == title && t.LibraryId == libraryId)
-            .Select(t => (Guid?)t.Id)
-            .FirstOrDefaultAsync();
-        if (exact.HasValue) return exact;
-
-        var normalized = NormalizeTitle(title);
+        var normalized = NormalizeTitle(StripTrailingYear(title));
         var candidates = await _context.Set<TvShow>()
             .AsNoTracking()
             .Where(t => t.LibraryId == libraryId)
-            .Select(t => new { t.Id, t.Title })
+            .Select(t => new { t.Id, t.Title, Year = t.ReleaseDate != null ? (int?)t.ReleaseDate.Value.Year : null })
             .ToListAsync();
 
-        return candidates.FirstOrDefault(c => NormalizeTitle(c.Title) == normalized)?.Id;
+        var titleMatches = candidates
+            .Where(c => NormalizeTitle(StripTrailingYear(c.Title)) == normalized)
+            .ToList();
+        if (titleMatches.Count == 0) return null;
+
+        if (year != null)
+        {
+            var exact = titleMatches.FirstOrDefault(c => c.Year == year);
+            if (exact != null) return exact.Id;
+        }
+
+        return titleMatches.Count == 1 ? titleMatches[0].Id : (Guid?)null;
+    }
+
+    private static string StripTrailingYear(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return string.Empty;
+
+        var trimmed = title.TrimEnd();
+        if (trimmed.Length >= 6 && trimmed[^1] == ')' && trimmed[^6] == '(' &&
+            trimmed[^5..^1].All(char.IsDigit))
+        {
+            return trimmed[..^6].TrimEnd();
+        }
+
+        return trimmed;
     }
 
     public Task<Guid?> GetTvShowIdByExternalIdAsync(string? tmdbId, string? imdbId, Guid libraryId)
