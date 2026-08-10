@@ -27,9 +27,9 @@ export interface AiStatsDashboardVM {
 // Friendly names for the AI plugins that log usage, so the log shows which
 // feature made each call rather than only the raw model.
 export const AI_FEATURE_OPTIONS: { id: string; label: string }[] = [
+    { id: 'openai_chronology', label: 'Chronology Sync' },
+    { id: 'openai_list', label: 'Auto-Fill Content' },
     { id: 'openai_recommendations', label: 'Recommendations' },
-    { id: 'openai_chronology', label: 'Collection Ordering' },
-    { id: 'openai_list', label: 'Collection List' },
 ];
 
 export function aiFeatureLabel(pluginId: string): string {
