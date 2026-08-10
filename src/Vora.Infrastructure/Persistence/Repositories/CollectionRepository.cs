@@ -90,6 +90,17 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
                 .SetProperty(c => c.ChronologyItemsSignature, signature)
                 .SetProperty(c => c.ChronologySyncedAt, DateTime.UtcNow));
 
+    public async Task ResetChronologyCacheAsync(Guid collectionId)
+    {
+        await context.Set<CollectionItem>()
+            .Where(ci => ci.CollectionId == collectionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(ci => ci.InUniverseYear, (double?)null));
+
+        await context.Collections
+            .Where(c => c.Id == collectionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.ChronologyItemsSignature, string.Empty));
+    }
+
     public Task TouchChronologySyncedAtAsync(Guid collectionId) =>
         context.Collections
             .Where(c => c.Id == collectionId)

@@ -16,6 +16,7 @@ public interface ICollectionRepository
     Task<List<CollectionScheduleDto>> GetAutoSyncCollectionsAsync();
     Task<List<CollectionMembershipCacheDto>> GetContentSyncMembershipsAsync();
     Task UpdateChronologySignatureAsync(Guid collectionId, string signature);
+    Task ResetChronologyCacheAsync(Guid collectionId);
     Task TouchChronologySyncedAtAsync(Guid collectionId);
     Task UpdateContentSyncCacheAsync(Guid collectionId, string cacheJson);
     Task RemoveItemsFromCollectionAsync(Guid collectionId, IEnumerable<Guid> mediaItemIds);

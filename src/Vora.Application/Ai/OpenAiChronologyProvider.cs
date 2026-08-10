@@ -24,12 +24,10 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
 
     public bool OrdersLocalItemsOnly => true;
 
-    // Ask for setYears in modestly-sized batches. A model reliably scores a
-    // couple dozen items in one JSON response but starts dropping entries from a
-    // long exhaustive list. Because each setYear is an absolute per-item value,
-    // batches can be scored independently and merged into one global order.
     private const int BatchSize = 25;
     private const int MaxAttemptsPerBatch = 3;
+    private const double MaxSeasonGap = 15.0;
+    private const double SeasonStep = 1.0;
 
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>();
 
@@ -44,6 +42,16 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         var byIndex = items.ToDictionary(i => i.Index);
         var setYears = new Dictionary<int, double>();
 
+        foreach (var cached in items)
+        {
+            if (cached.KnownSetYear.HasValue)
+            {
+                setYears[cached.Index] = cached.KnownSetYear.Value;
+            }
+        }
+
+        var newlyScored = new HashSet<int>();
+
         foreach (var batch in items.Chunk(BatchSize))
         {
             for (var attempt = 0; attempt < MaxAttemptsPerBatch; attempt++)
@@ -54,7 +62,7 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
                     break;
                 }
 
-                var json = await openAi.CompleteJsonAsync(Id, BuildPrompt(description, pending), cancellationToken, temperature: 0.2, modelSettingKey: "collections_model");
+                var json = await openAi.CompleteJsonAsync(Id, BuildScoringPrompt(description, pending), cancellationToken, temperature: 0.2, modelSettingKey: "collections_model");
                 var parsed = TryParse(json);
                 if (parsed?.Items == null)
                 {
@@ -66,11 +74,11 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
                 {
                     if (entry.SetYear.HasValue && byIndex.ContainsKey(entry.Index) && setYears.TryAdd(entry.Index, entry.SetYear.Value))
                     {
+                        newlyScored.Add(entry.Index);
                         scoredSomething = true;
                     }
                 }
 
-                // Nothing new landed — retrying the same batch won't help.
                 if (!scoredSomething)
                 {
                     break;
@@ -78,14 +86,19 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             }
         }
 
-        // Sort by the AI's in-universe setYear. Only items the AI never scored
-        // after retries fall back to their release year, then original position.
+        if (newlyScored.Count > 0)
+        {
+            await VerifyPlacementAsync(description, items, setYears, newlyScored, cancellationToken);
+        }
+
+        RepairSeasonYears(items, setYears);
+
         var ranked = items
             .Select((item, position) => (
-                SetYear: setYears.TryGetValue(item.Index, out var sy) ? sy : (item.Year ?? double.MaxValue),
+                SortKey: setYears.TryGetValue(item.Index, out var sy) ? sy : (item.Year ?? double.MaxValue),
                 Position: position,
                 Item: item))
-            .OrderBy(r => r.SetYear)
+            .OrderBy(r => r.SortKey)
             .ThenBy(r => r.Position)
             .ToList();
 
@@ -93,13 +106,73 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         decimal sortOrder = 1;
         foreach (var r in ranked)
         {
-            results.Add(ToResult(r.Item, sortOrder++));
+            var stored = setYears.TryGetValue(r.Item.Index, out var fy) ? fy : (double?)null;
+            results.Add(ToResult(r.Item, sortOrder++, stored));
         }
 
         return results;
     }
 
-    private static string BuildPrompt(string description, IReadOnlyList<CollectionOrderingItemDto> batch)
+    private async Task VerifyPlacementAsync(string description, IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears, HashSet<int> toVerify, CancellationToken cancellationToken)
+    {
+        var ordered = items
+            .Where(i => setYears.ContainsKey(i.Index))
+            .OrderBy(i => setYears[i.Index])
+            .ToList();
+
+        if (ordered.Count < 2)
+        {
+            return;
+        }
+
+        var json = await openAi.CompleteJsonAsync(Id, BuildVerificationPrompt(description, ordered, setYears, toVerify), cancellationToken, temperature: 0.2, modelSettingKey: "collections_model");
+        var parsed = TryParse(json);
+        if (parsed?.Items == null)
+        {
+            return;
+        }
+
+        foreach (var entry in parsed.Items)
+        {
+            if (entry.SetYear.HasValue && toVerify.Contains(entry.Index))
+            {
+                setYears[entry.Index] = entry.SetYear.Value;
+            }
+        }
+    }
+
+    private static void RepairSeasonYears(IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears)
+    {
+        var showGroups = items
+            .Where(i => string.Equals(i.MediaType, "Season", StringComparison.OrdinalIgnoreCase)
+                && i.SeasonNumber.HasValue
+                && !string.IsNullOrWhiteSpace(i.ShowTitle))
+            .GroupBy(i => i.ShowTitle!);
+
+        foreach (var group in showGroups)
+        {
+            var seasons = group.OrderBy(s => s.SeasonNumber!.Value).ToList();
+            if (seasons.Count < 2)
+            {
+                continue;
+            }
+
+            double? previous = null;
+            foreach (var season in seasons)
+            {
+                var year = setYears.TryGetValue(season.Index, out var sy) ? sy : (season.Year ?? double.MaxValue);
+                if (previous.HasValue && (year < previous.Value || year > previous.Value + MaxSeasonGap))
+                {
+                    year = previous.Value + SeasonStep;
+                    setYears[season.Index] = year;
+                }
+
+                previous = year;
+            }
+        }
+    }
+
+    private static string BuildScoringPrompt(string description, IReadOnlyList<CollectionOrderingItemDto> batch)
     {
         var lines = batch.Select(i => $"{i.Index}: {DescribeItem(i)}");
 
@@ -116,10 +189,29 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             "or flashback is set earlier than a film released before it — a 1940s-set wartime origin comes very early, a 1990s-set " +
             "prequel comes before later-released present-day films. This also applies to a title released years AFTER the events it " +
             "depicts — a prequel or a gap-filler set between two earlier stories takes its story year, not its release year. For an " +
-            "item spanning multiple periods, use its main present-day storyline. Use the widely-published in-universe timeline for " +
-            "established franchises.\n" +
+            "item spanning multiple periods, use its main present-day storyline. A television season takes the story year of its " +
+            "own episodes, so later seasons of a show never move earlier than their earlier seasons. Use the widely-published " +
+            "in-universe timeline for established franchises.\n" +
             "Return ONLY valid JSON of the form {\"items\": [{\"index\": <index>, \"setYear\": <decimal>}, ...]}. You MUST give a " +
             "setYear for EVERY index shown above — never omit, invent, or duplicate an index.";
+    }
+
+    private static string BuildVerificationPrompt(string description, IReadOnlyList<CollectionOrderingItemDto> ordered, Dictionary<int, double> setYears, HashSet<int> toVerify)
+    {
+        var lines = ordered.Select(i => $"{i.Index}: {DescribeItem(i)} — setYear {setYears[i.Index]:0.0}");
+        var review = string.Join(", ", toVerify.OrderBy(x => x));
+
+        return
+            $"You are auditing the in-universe chronological order of a media collection described as: \"{description}\".\n" +
+            "Below is the current order, earliest first, one per line as `index: Title (ReleaseYear) [Type] — setYear <value>`:\n" +
+            string.Join("\n", lines) + "\n\n" +
+            $"Review ONLY these indices, which were just placed: {review}. For each, decide whether its setYear puts it at the " +
+            "correct point in this in-universe timeline relative to its neighbours. A period piece, prequel, flashback, or origin " +
+            "story belongs at its story year, not its release year; a television season belongs with its own show's other seasons " +
+            "and never earlier than an earlier season of the same show. If an index is clearly out of place, return a corrected " +
+            "DECIMAL setYear for it; if it is already correct, omit it.\n" +
+            "Return ONLY valid JSON of the form {\"items\": [{\"index\": <index>, \"setYear\": <decimal>}, ...]}, containing only the " +
+            "indices you are correcting. Return {\"items\": []} if every reviewed index is already correct.";
     }
 
     private static OrderResult? TryParse(string? json)
@@ -152,13 +244,14 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         return $"{item.Title}{year} [{item.MediaType}]";
     }
 
-    private static ChronologyResult ToResult(CollectionOrderingItemDto item, decimal sortOrder) => new()
+    private static ChronologyResult ToResult(CollectionOrderingItemDto item, decimal sortOrder, double? setYear) => new()
     {
         LocalId = item.LocalId,
         TmdbId = item.TmdbId,
         ImdbId = item.ImdbId,
         MediaType = item.MediaType,
-        SortOrder = sortOrder
+        SortOrder = sortOrder,
+        SetYear = setYear
     };
 
     private class OrderResult

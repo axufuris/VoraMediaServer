@@ -122,6 +122,9 @@ public class CollectionManager : ICollectionManager
         var collection = await _repository.GetForUpdateAsync(id);
         if (collection == null) throw new InvalidOperationException("Collection not found");
 
+        var orderingChanged = collection.SortProviderId != request.SortProviderId
+            || collection.ExternalListId != request.ExternalListId;
+
         collection.Title = request.Title;
         collection.Description = request.Description;
         collection.PosterUrl = request.PosterUrl;
@@ -145,6 +148,11 @@ public class CollectionManager : ICollectionManager
         }
 
         await _repository.UpdateCollectionAsync(collection);
+
+        if (orderingChanged)
+        {
+            await _repository.ResetChronologyCacheAsync(id);
+        }
 
         TriggerCollectionSyncTasks(id, request.Title, request.ContentSyncProviderId, request.SortProviderId);
 

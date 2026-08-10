@@ -129,10 +129,77 @@ public class CollectionOrderingServiceTests
         await _repo.DidNotReceive().TouchChronologySyncedAtAsync(Arg.Any<Guid>());
     }
 
+    [Fact]
+    public async Task ApplyChronologicalOrderAsync_persists_in_universe_year_and_forwards_cached_year()
+    {
+        var collectionId = Guid.NewGuid();
+        var mediaId = Guid.NewGuid();
+        var item = new CollectionItem { MediaItemId = mediaId, MediaItem = new Movie { Id = mediaId, Title = "M" }, InUniverseYear = 1943 };
+        var provider = new CapturingChronologyProvider();
+        provider.Result.Add(new ChronologyResult { LocalId = mediaId, SortOrder = 5, SetYear = 1943 });
+        _providers.Add(provider);
+
+        _repo.GetChronologyConfigAsync(collectionId)
+            .Returns(new CollectionChronologyConfigDto { SortProviderId = "capturing_chrono", ChronologyItemsSignature = "stale" });
+        _repo.GetCollectionItemsWithMediaAsync(collectionId).Returns(new List<CollectionItem> { item });
+
+        await _service.ApplyChronologicalOrderAsync(collectionId, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(1943.0, provider.LastItems!.Single().KnownSetYear);
+        Assert.Equal(5m, item.SortOrder);
+        Assert.Equal(1943.0, item.InUniverseYear);
+        await _repo.Received(1).UpdateCollectionItemsAsync(Arg.Any<IEnumerable<CollectionItem>>());
+    }
+
+    [Fact]
+    public async Task ApplyChronologicalOrderAsync_force_ignores_the_cached_year()
+    {
+        var collectionId = Guid.NewGuid();
+        var mediaId = Guid.NewGuid();
+        var item = new CollectionItem { MediaItemId = mediaId, MediaItem = new Movie { Id = mediaId, Title = "M" }, InUniverseYear = 1943 };
+        var provider = new CapturingChronologyProvider();
+        provider.Result.Add(new ChronologyResult { LocalId = mediaId, SortOrder = 1, SetYear = 2012 });
+        _providers.Add(provider);
+
+        _repo.GetChronologyConfigAsync(collectionId)
+            .Returns(new CollectionChronologyConfigDto { SortProviderId = "capturing_chrono", ChronologyItemsSignature = "whatever" });
+        _repo.GetCollectionItemsWithMediaAsync(collectionId).Returns(new List<CollectionItem> { item });
+
+        await _service.ApplyChronologicalOrderAsync(collectionId, force: true, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Null(provider.LastItems!.Single().KnownSetYear);
+        Assert.Equal(2012.0, item.InUniverseYear);
+    }
+
     private static string ComputeSignature(IEnumerable<Guid> mediaItemIds)
     {
         var joined = string.Join(",", mediaItemIds.OrderBy(x => x));
         return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(joined)));
+    }
+
+    private sealed class CapturingChronologyProvider : IChronologyProvider
+    {
+        public IReadOnlyList<CollectionOrderingItemDto>? LastItems { get; private set; }
+        public List<ChronologyResult> Result { get; } = new();
+
+        public string Id => "capturing_chrono";
+        public string Name => "Capturing";
+        public string Version => "1.0.0";
+        public string Description => "Captures the items it was given.";
+        public bool IsSystemPlugin => true;
+        public string Type => "Chronology";
+        public string ProviderId => "capturing_chrono";
+        public bool OrdersLocalItemsOnly => true;
+        public string ExternalIdLabel => "List";
+        public string ExternalIdPlaceholder => "id";
+
+        public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>();
+
+        public Task<List<ChronologyResult>> GetChronologicalOrderAsync(string collectionName, string? externalId = null, IReadOnlyList<CollectionOrderingItemDto>? items = null, CancellationToken cancellationToken = default)
+        {
+            LastItems = items;
+            return Task.FromResult(Result);
+        }
     }
 
     private sealed class FakeChronologyProvider(string id, bool ordersLocalItemsOnly = false) : IChronologyProvider
