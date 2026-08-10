@@ -78,6 +78,8 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             }
         }
 
+        RepairSeasonYears(items, setYears);
+
         // Sort by the AI's in-universe setYear. Only items the AI never scored
         // after retries fall back to their release year, then original position.
         var ranked = items
@@ -116,8 +118,10 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             "or flashback is set earlier than a film released before it — a 1940s-set wartime origin comes very early, a 1990s-set " +
             "prequel comes before later-released present-day films. This also applies to a title released years AFTER the events it " +
             "depicts — a prequel or a gap-filler set between two earlier stories takes its story year, not its release year. For an " +
-            "item spanning multiple periods, use its main present-day storyline. Use the widely-published in-universe timeline for " +
-            "established franchises.\n" +
+            "item spanning multiple periods, use its main present-day storyline. A show's seasons are set in season order and stay " +
+            "in the same era — Season 2 comes right after Season 1 (usually within a year or so), never decades later; a period " +
+            "show set in the past keeps ALL its seasons in that past era (a 1940s show's later seasons are also 1940s, not their " +
+            "modern release year). Use the widely-published in-universe timeline for established franchises.\n" +
             "Return ONLY valid JSON of the form {\"items\": [{\"index\": <index>, \"setYear\": <decimal>}, ...]}. You MUST give a " +
             "setYear for EVERY index shown above — never omit, invent, or duplicate an index.";
     }
@@ -136,6 +140,48 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         catch (JsonException)
         {
             return null;
+        }
+    }
+
+    // A model occasionally scores one season of a show wildly wrong (e.g. a
+    // 1940s period show's Season 2 gets its modern release year). A show's
+    // seasons are always in season order and don't leap decades between
+    // consecutive seasons, so treat an out-of-order or implausibly large jump
+    // as an error and advance ~1 year from the previous season instead. The gap
+    // threshold is generous so shows that legitimately span years (a season per
+    // in-universe year) are left untouched.
+    private static void RepairSeasonYears(IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears)
+    {
+        const double maxSeasonGap = 15.0;
+        const double seasonStep = 1.0;
+
+        var showGroups = items
+            .Where(i => string.Equals(i.MediaType, "Season", StringComparison.OrdinalIgnoreCase)
+                        && i.SeasonNumber.HasValue
+                        && !string.IsNullOrWhiteSpace(i.ShowTitle))
+            .GroupBy(i => i.ShowTitle!);
+
+        foreach (var group in showGroups)
+        {
+            var seasons = group.OrderBy(s => s.SeasonNumber!.Value).ToList();
+            if (seasons.Count < 2)
+            {
+                continue;
+            }
+
+            double? previous = null;
+            foreach (var season in seasons)
+            {
+                var year = setYears.TryGetValue(season.Index, out var sy) ? sy : (season.Year ?? double.MaxValue);
+
+                if (previous.HasValue && (year < previous.Value || year > previous.Value + maxSeasonGap))
+                {
+                    year = previous.Value + seasonStep;
+                    setYears[season.Index] = year;
+                }
+
+                previous = year;
+            }
         }
     }
 
