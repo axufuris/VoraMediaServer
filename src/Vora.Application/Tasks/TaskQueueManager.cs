@@ -589,6 +589,7 @@ public class TaskQueueManager : ITaskQueueManager
         var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
         var libraryManager = sp.GetRequiredService<ILibraryManager>();
         var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
+        var dedupeManager = sp.GetRequiredService<Vora.Application.Media.IMediaDedupeManager>();
         var progress = sp.GetRequiredService<ITaskProgressReporter>();
         var logger = sp.GetService<ILogger<TaskQueueManager>>();
 
@@ -710,6 +711,17 @@ public class TaskQueueManager : ITaskQueueManager
         // an already-enriched item; force stays off here so a force rescan the
         // units already handled isn't re-run).
         await RunStepAsync("Fetching details…", () => metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false));
+
+        // A show scanned across two resolution folders (e.g. .../TV/1080p/Show
+        // and .../TV/4K/Show) lands as two show rows until enrichment stamps the
+        // shared external id. Now that ids are set, fold the duplicates together
+        // so a 4K episode becomes a second part on its 1080p episode instead of a
+        // parallel show — the same multi-version result movies get. No-op when
+        // there are no duplicates.
+        if (libraryType == LibraryType.TvShow)
+        {
+            await RunStepAsync("Merging duplicate shows…", () => dedupeManager.MergeDuplicateTvShowsAsync(libraryId));
+        }
 
         await RunStepAsync("Refreshing actor metadata…", () => metadataManager.TriggerActorMetadataRefreshAsync());
 
