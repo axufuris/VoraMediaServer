@@ -33,7 +33,7 @@ export default function CreateCollectionModal({
     const [syncProviders, setSyncProviders] = useState<PluginOptionVM[]>([]);
     const [contentSyncProviderId, setContentSyncProviderId] = useState('');
     const [contentSyncExternalId, setContentSyncExternalId] = useState('');
-    const [syncIntervalDays, setSyncIntervalDays] = useState(1);
+    const [syncIntervalDays, setSyncIntervalDays] = useState(30);
     const [mirrorList, setMirrorList] = useState(false);
 
     const [sortProviderId, setSortProviderId] = useState('');
@@ -60,7 +60,7 @@ export default function CreateCollectionModal({
 
             setContentSyncProviderId('');
             setContentSyncExternalId('');
-            setSyncIntervalDays(1);
+            setSyncIntervalDays(30);
             setMirrorList(false);
 
             pluginAdminService.getChronologyProviders(serverId)

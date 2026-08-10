@@ -17,7 +17,7 @@ public class UpdateCollectionRequest
     public string? SortTitle { get; set; }
     public string? ContentSyncProviderId { get; set; }
     public string? ContentSyncExternalId { get; set; }
-    public int SyncIntervalDays { get; set; } = 1;
+    public int SyncIntervalDays { get; set; } = 30;
     public bool MirrorList { get; set; }
     public DateTime? VisibleStartDate { get; set; }
     public DateTime? VisibleEndDate { get; set; }
