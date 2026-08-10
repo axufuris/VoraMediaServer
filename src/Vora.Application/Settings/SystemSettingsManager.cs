@@ -65,7 +65,8 @@ public class SystemSettingsManager : ISystemSettingsManager
                 Label = def.Label,
                 Type = def.Type,
                 Description = def.Description,
-                Value = savedValue ?? def.DefaultValue
+                Value = savedValue ?? def.DefaultValue,
+                Options = def.Options
             });
         }
 
