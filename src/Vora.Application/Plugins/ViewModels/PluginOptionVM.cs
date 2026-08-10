@@ -6,5 +6,6 @@ public class PluginOptionVM
     public string Name { get; set; } = string.Empty;
     public string ExternalIdLabel { get; set; } = string.Empty;
     public string ExternalIdPlaceholder { get; set; } = string.Empty;
+    public bool IsAiPlugin { get; set; }
     public IEnumerable<string> SupportedLibraryTypes { get; set; } = Array.Empty<string>();
 }

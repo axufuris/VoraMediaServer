@@ -87,6 +87,7 @@ public class PluginManager(
                 Name = plugin.Name,
                 ExternalIdLabel = ResolveExternalIdLabel(plugin),
                 ExternalIdPlaceholder = ResolveExternalIdPlaceholder(plugin),
+                IsAiPlugin = plugin.IsAiPlugin,
                 SupportedLibraryTypes = plugin.SupportedLibraryTypes
             });
         }

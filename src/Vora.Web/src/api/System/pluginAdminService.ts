@@ -20,6 +20,7 @@ export interface PluginOptionVM {
     name: string;
     externalIdLabel: string;
     externalIdPlaceholder: string;
+    isAiPlugin: boolean;
     supportedLibraryTypes: string[];
 }
 

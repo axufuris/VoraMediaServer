@@ -270,6 +270,15 @@ export default function EditCollectionModal({
                                                 <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">
                                                     {syncProviders.find(p => p.id === contentSyncProviderId)?.externalIdLabel || 'List ID'}
                                                 </label>
+                                                {syncProviders.find(p => p.id === contentSyncProviderId)?.isAiPlugin ? (
+                                                    <textarea
+                                                        value={contentSyncExternalId}
+                                                        onChange={e => setContentSyncExternalId(e.target.value)}
+                                                        placeholder={syncProviders.find(p => p.id === contentSyncProviderId)?.externalIdPlaceholder || 'Describe the list'}
+                                                        rows={4}
+                                                        className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none resize-y"
+                                                    />
+                                                ) : (
                                                 <input
                                                     type="text"
                                                     value={contentSyncExternalId}
@@ -277,6 +286,7 @@ export default function EditCollectionModal({
                                                     placeholder={syncProviders.find(p => p.id === contentSyncProviderId)?.externalIdPlaceholder || 'Enter ID'}
                                                     className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none"
                                                 />
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -361,6 +371,15 @@ export default function EditCollectionModal({
                                                 <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">
                                                     {chronologyProviders.find(p => p.id === sortProviderId)?.externalIdLabel || 'List ID'}
                                                 </label>
+                                                {chronologyProviders.find(p => p.id === sortProviderId)?.isAiPlugin ? (
+                                                    <textarea
+                                                        value={externalListId}
+                                                        onChange={e => setExternalListId(e.target.value)}
+                                                        placeholder={chronologyProviders.find(p => p.id === sortProviderId)?.externalIdPlaceholder || 'Describe the ordering'}
+                                                        rows={4}
+                                                        className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none resize-y"
+                                                    />
+                                                ) : (
                                                 <input
                                                     type="text"
                                                     value={externalListId}
@@ -368,6 +387,7 @@ export default function EditCollectionModal({
                                                     placeholder={chronologyProviders.find(p => p.id === sortProviderId)?.externalIdPlaceholder || 'Enter ID'}
                                                     className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none"
                                                 />
+                                                )}
                                             </div>
                                         )}
                                     </div>

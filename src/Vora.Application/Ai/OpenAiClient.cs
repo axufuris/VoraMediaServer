@@ -22,7 +22,7 @@ public class OpenAiClient(
     public async Task<bool> IsConfiguredAsync()
         => !string.IsNullOrWhiteSpace(await settings.GetPluginSettingAsync(KeyPluginId, "api_key"));
 
-    public async Task<string?> CompleteJsonAsync(string pluginId, string prompt, CancellationToken cancellationToken = default)
+    public async Task<string?> CompleteJsonAsync(string pluginId, string prompt, CancellationToken cancellationToken = default, double? temperature = null)
     {
         var apiKey = await settings.GetPluginSettingAsync(KeyPluginId, "api_key");
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -51,15 +51,21 @@ public class OpenAiClient(
         }
         messages.Add(new { role = "user", content = prompt });
 
+        var payload = new Dictionary<string, object>
+        {
+            ["model"] = model,
+            ["messages"] = messages,
+            ["response_format"] = new { type = "json_object" }
+        };
+        if (temperature.HasValue)
+        {
+            payload["temperature"] = temperature.Value;
+        }
+
         var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        request.Content = JsonContent.Create(new
-        {
-            model,
-            messages,
-            response_format = new { type = "json_object" }
-        });
+        request.Content = JsonContent.Create(payload);
 
         var response = await client.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
