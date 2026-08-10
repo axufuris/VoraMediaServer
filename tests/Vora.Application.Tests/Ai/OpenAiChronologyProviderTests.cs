@@ -42,20 +42,49 @@ public class OpenAiChronologyProviderTests
     }
 
     [Fact]
-    public async Task Appends_indices_the_model_dropped_at_the_end()
+    public async Task Retries_to_score_items_the_first_response_dropped()
     {
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
-        var items = new List<CollectionOrderingItemDto> { Item(0, a, "A"), Item(1, b, "B") };
+        var c = Guid.NewGuid();
+        var items = new List<CollectionOrderingItemDto> { Item(0, a, "A"), Item(1, b, "B"), Item(2, c, "C") };
 
         var openAi = Substitute.For<IOpenAiClient>();
+        // First response drops index 1; the retry scores it. Merged by setYear
+        // the order is A(2000), B(2005), C(2010) — nothing left unscored.
         openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>())
-            .Returns("{\"items\":[{\"index\":1,\"setYear\":2000}]}"); // drops index 0
+            .Returns(
+                "{\"items\":[{\"index\":0,\"setYear\":2000},{\"index\":2,\"setYear\":2010}]}",
+                "{\"items\":[{\"index\":1,\"setYear\":2005}]}");
 
         var provider = new OpenAiChronologyProvider(openAi);
         var result = await provider.GetChronologicalOrderAsync("c", null, items, TestContext.Current.CancellationToken);
 
         var ordered = result.OrderBy(r => r.SortOrder).Select(r => r.LocalId!.Value).ToList();
-        Assert.Equal(new[] { b, a }, ordered);
+        Assert.Equal(new[] { a, b, c }, ordered);
+    }
+
+    [Fact]
+    public async Task Falls_back_to_release_year_only_when_ai_never_scores_an_item()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var items = new List<CollectionOrderingItemDto>
+        {
+            new() { Index = 0, LocalId = a, Title = "A", Year = 1990, MediaType = "Movie" },
+            new() { Index = 1, LocalId = b, Title = "B", Year = 2020, MediaType = "Movie" },
+        };
+
+        var openAi = Substitute.For<IOpenAiClient>();
+        // Every attempt scores only index 1; index 0 is never scored and must
+        // fall back to its release year (1990, so it still sorts first).
+        openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>())
+            .Returns("{\"items\":[{\"index\":1,\"setYear\":2020}]}");
+
+        var provider = new OpenAiChronologyProvider(openAi);
+        var result = await provider.GetChronologicalOrderAsync("c", null, items, TestContext.Current.CancellationToken);
+
+        var ordered = result.OrderBy(r => r.SortOrder).Select(r => r.LocalId!.Value).ToList();
+        Assert.Equal(new[] { a, b }, ordered);
     }
 }
