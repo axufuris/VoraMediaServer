@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
+using Vora.Application.Tasks;
 using Vora.Domain.Entities.Collections;
 using Vora.Plugins.Interfaces;
 
@@ -12,6 +13,7 @@ public class CollectionSyncService(
     IMediaRepository mediaRepo,
     IEnumerable<ICollectionSyncProvider> providers,
     IClientNotifier notifier,
+    ITaskQueueManager taskQueue,
     ILogger<CollectionSyncService> logger)
 {
     public async Task SyncCollectionContentAsync(Guid collectionId)
@@ -81,6 +83,7 @@ public class CollectionSyncService(
             }
 
             var existingMediaIds = await collectionRepo.GetCollectionMediaIdsAsync(collection.Id);
+            var membershipChanged = false;
 
             // Mirror mode: drop items no longer in the list. Guarded by the
             // "no matches → return" above, so a total match failure can't wipe
@@ -95,6 +98,7 @@ public class CollectionSyncService(
                     await collectionRepo.RemoveItemsFromCollectionAsync(collection.Id, toRemove);
                     await notifier.NotifyCollectionUpdatedAsync(collection.Id);
                     logger.LogInformation("Mirror sync removed {Count} item(s) no longer in the list from '{Title}'.", toRemove.Count, collection.Title);
+                    membershipChanged = true;
                 }
             }
 
@@ -107,15 +111,22 @@ public class CollectionSyncService(
                 })
                 .ToList();
 
-            if (itemsToAdd.Count == 0)
+            if (itemsToAdd.Count > 0)
             {
-                return;
+                await collectionRepo.AddItemsToCollectionAsync(itemsToAdd);
+                logger.LogInformation("Auto-synced {Count} new items to collection '{Title}'.", itemsToAdd.Count, collection.Title);
+
+                await notifier.NotifyCollectionUpdatedAsync(collection.Id);
+                membershipChanged = true;
             }
 
-            await collectionRepo.AddItemsToCollectionAsync(itemsToAdd);
-            logger.LogInformation("Auto-synced {Count} new items to collection '{Title}'.", itemsToAdd.Count, collection.Title);
-
-            await notifier.NotifyCollectionUpdatedAsync(collection.Id);
+            // The item set changed, so any chronology ordering is now stale and
+            // the new items sit unordered. Re-evaluate the order; it no-ops when
+            // the collection has no chronology provider or the set is unchanged.
+            if (membershipChanged)
+            {
+                taskQueue.QueueReevaluateCollectionOrder(collection.Id);
+            }
         }
         catch (Exception ex)
         {

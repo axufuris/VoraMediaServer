@@ -81,6 +81,8 @@ public class CollectionOrderingService(
 
             await repository.UpdateCollectionItemsAsync(collectionItems);
             await repository.UpdateChronologySignatureAsync(collectionId, signature);
+
+            await notifier.NotifyCollectionUpdatedAsync(collectionId);
         }
         catch (Exception ex)
         {
@@ -110,7 +112,6 @@ public class CollectionOrderingService(
         }
 
         await ApplyChronologicalOrderAsync(collectionId, force: false, cancellationToken);
-        await notifier.NotifyCollectionUpdatedAsync(collectionId);
     }
 
     private static string ComputeSignature(IEnumerable<Guid> mediaItemIds)

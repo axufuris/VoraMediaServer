@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Analysis;
 using Vora.Application.Collections;
 using Vora.Application.Media;
+using Vora.Application.Tasks;
 using Vora.Domain.Entities.Collections;
 using Vora.Plugins.Interfaces;
 
@@ -19,6 +20,7 @@ public class CollectionSyncServiceTests
     private readonly ICollectionRepository _collectionRepo;
     private readonly IMediaRepository _mediaRepo;
     private readonly IClientNotifier _notifier;
+    private readonly ITaskQueueManager _taskQueue;
     private readonly List<ICollectionSyncProvider> _providers;
     private readonly CollectionSyncService _service;
 
@@ -27,8 +29,9 @@ public class CollectionSyncServiceTests
         _collectionRepo = Substitute.For<ICollectionRepository>();
         _mediaRepo = Substitute.For<IMediaRepository>();
         _notifier = Substitute.For<IClientNotifier>();
+        _taskQueue = Substitute.For<ITaskQueueManager>();
         _providers = new List<ICollectionSyncProvider>();
-        _service = new CollectionSyncService(_collectionRepo, _mediaRepo, _providers, _notifier,
+        _service = new CollectionSyncService(_collectionRepo, _mediaRepo, _providers, _notifier, _taskQueue,
             NullLogger<CollectionSyncService>.Instance);
     }
 
