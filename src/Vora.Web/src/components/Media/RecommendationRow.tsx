@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import MediaCard from './MediaCard';
 import MediaRow from '../Common/MediaRow';
+import { posterTitle } from '../../utils/posterTitle';
 import type { RecommendationListVM } from '../../api/Discovery/recommendationService';
 
 interface RecommendationRowProps {
@@ -19,7 +20,7 @@ export default function RecommendationRow({ list, serverId }: RecommendationRowP
                 <div key={item.id} className="flex-none w-40 sm:w-48 snap-start">
                     <MediaCard
                         id={item.id}
-                        title={item.title}
+                        title={posterTitle(item)}
                         subtitle={item.releaseDate ? new Date(item.releaseDate).getFullYear().toString() : item.type}
                         imageUrl={item.posterUrl}
                         type={item.type}
