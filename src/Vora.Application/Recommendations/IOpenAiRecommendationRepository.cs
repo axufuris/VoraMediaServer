@@ -12,5 +12,5 @@ public interface IOpenAiRecommendationRepository
     Task<List<MediaItemForEmbeddingDto>> GetMediaItemsMissingEmbeddingsAsync(int batchSize);
     Task SaveEmbeddingsAsync(List<MediaItemEmbedding> embeddings);
     Task<bool> IsAiEnabledForProfileAsync(Guid profileId);
-    Task<AiStatsDashboardVM> GetAiStatsDashboardAsync(DateTime? startDate, DateTime? endDate, int page, int pageSize);
+    Task<AiStatsDashboardVM> GetAiStatsDashboardAsync(DateTime? startDate, DateTime? endDate, int page, int pageSize, string? pluginId);
 }

@@ -73,7 +73,7 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
             .Select(p => p.User.EnableAiRecommendations)
             .FirstOrDefaultAsync();
 
-    public async Task<AiStatsDashboardVM> GetAiStatsDashboardAsync(DateTime? startDate, DateTime? endDate, int page, int pageSize)
+    public async Task<AiStatsDashboardVM> GetAiStatsDashboardAsync(DateTime? startDate, DateTime? endDate, int page, int pageSize, string? pluginId)
     {
         var query = context.AiUsageLogs.AsNoTracking().AsQueryable();
 
@@ -85,6 +85,11 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
         if (endDate.HasValue)
         {
             query = query.Where(l => l.Timestamp < endDate.Value.AddDays(1).ToUniversalTime());
+        }
+
+        if (!string.IsNullOrEmpty(pluginId))
+        {
+            query = query.Where(l => l.PluginId == pluginId);
         }
 
         var dailyStats = await query

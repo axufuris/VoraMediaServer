@@ -118,9 +118,10 @@ public static class RecommendationEndpoints
         DateTime? endDate,
         int page,
         int pageSize,
+        string? pluginId,
         IAiStatsManager manager)
     {
-        var dashboard = await manager.GetDashboardAsync(startDate, endDate, page, pageSize);
+        var dashboard = await manager.GetDashboardAsync(startDate, endDate, page, pageSize, pluginId);
         return Results.Ok(dashboard);
     }
 

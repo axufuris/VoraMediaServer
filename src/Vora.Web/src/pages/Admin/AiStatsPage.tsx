@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { aiStatsService, type AiStatsDashboardVM } from '../../api/System/aiStatsService';
+import { aiStatsService, type AiStatsDashboardVM, AI_FEATURE_OPTIONS, aiFeatureLabel } from '../../api/System/aiStatsService';
 import { useDialog } from '../../dialogs';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import StatCard from '../../components/Admin/Primitives/StatCard';
@@ -28,18 +28,19 @@ export default function AiStatsPage() {
     const [endDate, setEndDate] = useState(getLocalDateString(today));
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
+    const [feature, setFeature] = useState('');
 
     const fetchStats = useCallback(async () => {
         setLoading(true);
         try {
-            const dashboard = await aiStatsService.getDashboard(startDate || undefined, endDate || undefined, page, pageSize, serverId);
+            const dashboard = await aiStatsService.getDashboard(startDate || undefined, endDate || undefined, page, pageSize, feature || undefined, serverId);
             setData(dashboard);
         } catch (error) {
             console.error('Failed to fetch AI stats', error);
         } finally {
             setLoading(false);
         }
-    }, [startDate, endDate, page, pageSize, serverId]);
+    }, [startDate, endDate, page, pageSize, feature, serverId]);
 
     useEffect(() => {
         fetchStats();
@@ -85,9 +86,19 @@ export default function AiStatsPage() {
             prompt += stat.promptTokens;
             comp += stat.completionTokens;
 
-            if (stat.modelUsed.includes('gpt-4o-mini')) {
+            // Approximate OpenAI list prices per token (input, output). Check the
+            // "-mini"/"-nano" variants before their base model since the base name
+            // is a substring of the variant.
+            const m = stat.modelUsed;
+            if (m.includes('gpt-4o-mini')) {
                 totalCost += (stat.promptTokens * 0.00000015) + (stat.completionTokens * 0.00000060);
-            } else if (stat.modelUsed.includes('embedding')) {
+            } else if (m.includes('gpt-4.1-mini') || m.includes('gpt-4.1-nano')) {
+                totalCost += (stat.promptTokens * 0.00000040) + (stat.completionTokens * 0.00000160);
+            } else if (m.includes('gpt-4.1')) {
+                totalCost += (stat.promptTokens * 0.00000200) + (stat.completionTokens * 0.00000800);
+            } else if (m.includes('gpt-4o')) {
+                totalCost += (stat.promptTokens * 0.00000250) + (stat.completionTokens * 0.00001000);
+            } else if (m.includes('embedding')) {
                 totalCost += (stat.promptTokens * 0.00000002);
             }
         });
@@ -133,6 +144,17 @@ export default function AiStatsPage() {
                             className="vora-input"
                         />
                     </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1">Feature</label>
+                        <select
+                            value={feature}
+                            onChange={e => { setFeature(e.target.value); setPage(1); }}
+                            className="vora-input cursor-pointer"
+                        >
+                            <option value="">All features</option>
+                            {AI_FEATURE_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                        </select>
+                    </div>
                     <div className="flex gap-2">
                         <button type="submit" className="vora-button-primary">Apply filter</button>
                         <button type="button" onClick={resetFilters} className="vora-button-secondary">Current month</button>
@@ -169,6 +191,7 @@ export default function AiStatsPage() {
                             <thead>
                                 <tr className="bg-[var(--vora-bg-sunken)] border-b border-[var(--vora-border-subtle)] text-[11px] uppercase tracking-wider text-[var(--vora-text-muted)]">
                                     <th className="px-5 py-3 font-semibold">Timestamp</th>
+                                    <th className="px-5 py-3 font-semibold">Feature</th>
                                     <th className="px-5 py-3 font-semibold">Profile</th>
                                     <th className="px-5 py-3 font-semibold">Model</th>
                                     <th className="px-5 py-3 font-semibold text-right">Prompt</th>
@@ -179,11 +202,11 @@ export default function AiStatsPage() {
                             <tbody className="divide-y divide-[var(--vora-border-subtle)]">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={6} className="p-8 text-center text-[var(--vora-text-muted)]">Loading…</td>
+                                        <td colSpan={7} className="p-8 text-center text-[var(--vora-text-muted)]">Loading…</td>
                                     </tr>
                                 ) : data?.logs.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="p-0">
+                                        <td colSpan={7} className="p-0">
                                             <EmptyState
                                                 title="No usage in this period"
                                                 description="Adjust the date range above to see other periods, or kick off a vector generation task."
@@ -194,6 +217,7 @@ export default function AiStatsPage() {
                                     data?.logs.map(log => (
                                         <tr key={log.id} className="hover:bg-[var(--vora-bg-sunken)]/50 transition-colors">
                                             <td className="px-5 py-2.5 text-sm text-[var(--vora-text-secondary)]">{new Date(log.timestamp).toLocaleString()}</td>
+                                            <td className="px-5 py-2.5 text-sm font-medium text-[var(--vora-text-primary)]">{aiFeatureLabel(log.pluginId)}</td>
                                             <td className="px-5 py-2.5 text-sm font-semibold text-[var(--vora-text-primary)]">
                                                 {log.profileName}
                                                 {log.profileName === 'System Task' && (

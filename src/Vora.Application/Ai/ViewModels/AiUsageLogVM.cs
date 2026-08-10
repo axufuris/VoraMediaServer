@@ -18,7 +18,7 @@ public class AiUsageLogVM
         l => new AiUsageLogVM
         {
             Id = l.Id,
-            ProfileName = l.Profile != null ? l.Profile.Name : "Unknown",
+            ProfileName = l.Profile != null ? l.Profile.Name : "System Task",
             Timestamp = l.Timestamp,
             PluginId = l.PluginId,
             ModelUsed = l.ModelUsed,
