@@ -16,6 +16,38 @@ public class CollectionMembershipResolverTests
         };
 
     [Fact]
+    public void Matches_season_when_library_show_has_a_studio_possessive_prefix()
+    {
+        var showId = Guid.NewGuid();
+        var seasonId = Guid.NewGuid();
+        var candidates = Candidates(
+            shows: new() { new MediaTitleCandidateDto { Id = showId, Title = "Marvel's Agents of S.H.I.E.L.D." } },
+            seasons: new() { new SeasonMatchCandidateDto { Id = seasonId, TvShowId = showId, SeasonNumber = 3 } });
+        var entries = new List<CollectionMembershipEntry>
+        {
+            new() { MediaType = "Season", ShowTitle = "Agents of S.H.I.E.L.D.", SeasonNumber = 3 }
+        };
+
+        CollectionMembershipResolver.Resolve(entries, candidates).Should().Equal(seasonId);
+    }
+
+    [Fact]
+    public void Matches_movie_when_library_title_has_a_studio_possessive_prefix()
+    {
+        var id = Guid.NewGuid();
+        var candidates = Candidates(movies: new()
+        {
+            new MediaTitleCandidateDto { Id = id, Title = "Marvel's The Avengers", Year = 2012 }
+        });
+        var entries = new List<CollectionMembershipEntry>
+        {
+            new() { MediaType = "Movie", Title = "The Avengers", Year = 2012 }
+        };
+
+        CollectionMembershipResolver.Resolve(entries, candidates).Should().Equal(id);
+    }
+
+    [Fact]
     public void Matches_movie_by_normalized_title_and_year()
     {
         var id = Guid.NewGuid();
