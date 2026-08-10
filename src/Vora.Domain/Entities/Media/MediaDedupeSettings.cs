@@ -34,6 +34,7 @@ public class MediaDedupeSettings
 
     public int ScoreHdrDolbyVision { get; set; } = 500;
     public int ScoreHdr { get; set; } = 300;
+    public int ScoreHdr10PlusBonus { get; set; } = 100;
 
     public int ScoreAudioLossless { get; set; } = 400;
     public int ScoreAudioSurround { get; set; } = 200;

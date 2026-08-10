@@ -47,6 +47,7 @@ export interface DedupeSettingsVM {
     scoreCodecH264: number;
     scoreHdrDolbyVision: number;
     scoreHdr: number;
+    scoreHdr10PlusBonus: number;
     scoreAudioLossless: number;
     scoreAudioSurround: number;
     scoreAudioBase: number;

@@ -524,10 +524,11 @@ function RulesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: string }
                         </div>
                     </SettingsSection>
 
-                    <SettingsSection title="Video score — HDR">
+                    <SettingsSection title="Video score — HDR" description="HDR10+ adds its bonus on top of the Dolby Vision or HDR10 score, so a version carrying HDR10+ is preferred over an otherwise identical HDR10 one.">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <NumberField label="Dolby Vision" value={editing.scoreHdrDolbyVision} onChange={v => setEditing({ ...editing, scoreHdrDolbyVision: v })} />
                             <NumberField label="HDR10 / HDR" value={editing.scoreHdr} onChange={v => setEditing({ ...editing, scoreHdr: v })} />
+                            <NumberField label="HDR10+ bonus" value={editing.scoreHdr10PlusBonus} onChange={v => setEditing({ ...editing, scoreHdr10PlusBonus: v })} />
                         </div>
                     </SettingsSection>
 
