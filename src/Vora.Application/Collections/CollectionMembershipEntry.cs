@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace Vora.Application.Collections;
@@ -49,5 +50,33 @@ public static class TitleMatch
         }
 
         return builder.ToString().Trim().Normalize(NormalizationForm.FormC);
+    }
+
+    // The set of normalized forms a title can match on. Always includes the
+    // plain normalized title, plus a variant with a leading possessive prefix
+    // removed so a library entry stored under its official studio title (e.g.
+    // "Marvel's Agent Carter" -> "marvel s agent carter") also matches a short
+    // title an AI or list uses ("Agent Carter" -> "agent carter"). The
+    // apostrophe-s of a possessive normalizes to a standalone "s" token, so the
+    // prefix appears as "<word> s <rest>".
+    public static IEnumerable<string> MatchKeys(string? title)
+    {
+        var normalized = Normalize(title);
+        if (normalized.Length == 0)
+        {
+            yield break;
+        }
+
+        yield return normalized;
+
+        var parts = normalized.Split(' ');
+        if (parts.Length >= 3 && parts[1] == "s")
+        {
+            var stripped = string.Join(' ', parts.Skip(2));
+            if (stripped.Length > 0 && stripped != normalized)
+            {
+                yield return stripped;
+            }
+        }
     }
 }

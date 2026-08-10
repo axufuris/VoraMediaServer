@@ -20,16 +20,21 @@ public static class CollectionMembershipResolver
             {
                 if (entry.SeasonNumber == null) continue;
 
-                var showKey = TitleMatch.Normalize(entry.ShowTitle);
-                if (showKey.Length == 0 || !showLookup.TryGetValue(showKey, out var showMatches)) continue;
-
-                foreach (var (_, showId) in showMatches)
+                var seasonMatched = false;
+                foreach (var showKey in TitleMatch.MatchKeys(entry.ShowTitle))
                 {
-                    if (seasonLookup.TryGetValue((showId, entry.SeasonNumber.Value), out var seasonId))
+                    if (!showLookup.TryGetValue(showKey, out var showMatches)) continue;
+
+                    foreach (var (_, showId) in showMatches)
                     {
-                        matched.Add(seasonId);
-                        break;
+                        if (seasonLookup.TryGetValue((showId, entry.SeasonNumber.Value), out var seasonId))
+                        {
+                            matched.Add(seasonId);
+                            seasonMatched = true;
+                            break;
+                        }
                     }
+                    if (seasonMatched) break;
                 }
                 continue;
             }
@@ -53,23 +58,32 @@ public static class CollectionMembershipResolver
         var lookup = new Dictionary<string, List<(int? Year, Guid Id)>>();
         foreach (var candidate in candidates)
         {
-            var key = TitleMatch.Normalize(candidate.Title);
-            if (key.Length == 0) continue;
-
-            if (!lookup.TryGetValue(key, out var list))
+            foreach (var key in TitleMatch.MatchKeys(candidate.Title))
             {
-                list = new List<(int?, Guid)>();
-                lookup[key] = list;
+                if (!lookup.TryGetValue(key, out var list))
+                {
+                    list = new List<(int?, Guid)>();
+                    lookup[key] = list;
+                }
+                list.Add((candidate.Year, candidate.Id));
             }
-            list.Add((candidate.Year, candidate.Id));
         }
         return lookup;
     }
 
     private static Guid? ResolveTitle(Dictionary<string, List<(int? Year, Guid Id)>> lookup, string? title, int? year)
     {
-        var key = TitleMatch.Normalize(title);
-        if (key.Length == 0 || !lookup.TryGetValue(key, out var matches) || matches.Count == 0)
+        var matches = new List<(int? Year, Guid Id)>();
+        foreach (var key in TitleMatch.MatchKeys(title))
+        {
+            if (lookup.TryGetValue(key, out var list))
+            {
+                matches.AddRange(list);
+            }
+        }
+
+        matches = matches.Distinct().ToList();
+        if (matches.Count == 0)
         {
             return null;
         }
