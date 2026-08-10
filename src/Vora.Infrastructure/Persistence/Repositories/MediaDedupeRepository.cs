@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.Media;
+using Vora.Application.Media.ViewModels;
 using Vora.Domain.Entities.Media;
+using Vora.Domain.Entities.Users;
 
 namespace Vora.Infrastructure.Persistence.Repositories;
 
@@ -11,6 +13,177 @@ public class MediaDedupeRepository : IMediaDedupeRepository
     public MediaDedupeRepository(VoraDbContext context)
     {
         _context = context;
+    }
+
+    public async Task<TvShowMergeResultVM> MergeDuplicateTvShowsAsync(Guid? libraryId)
+    {
+        var result = new TvShowMergeResultVM();
+
+        var shows = await _context.Set<TvShow>()
+            .Where(t => libraryId == null || t.LibraryId == libraryId)
+            .Select(t => new { t.Id, t.LibraryId, t.TmdbId, t.ImdbId, t.AddedAt })
+            .ToListAsync();
+
+        var groups = shows
+            .Select(s => new
+            {
+                s.Id,
+                s.LibraryId,
+                s.AddedAt,
+                Key = !string.IsNullOrEmpty(s.TmdbId) ? "tmdb:" + s.TmdbId
+                    : !string.IsNullOrEmpty(s.ImdbId) ? "imdb:" + s.ImdbId
+                    : null
+            })
+            .Where(s => s.Key != null)
+            .GroupBy(s => new { s.LibraryId, s.Key })
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        if (groups.Count == 0) return result;
+
+        var groupShowIds = groups.SelectMany(g => g.Select(x => x.Id)).ToList();
+        var episodeCounts = (await _context.Set<Episode>()
+                .Where(e => groupShowIds.Contains(e.Season.TvShowId))
+                .GroupBy(e => e.Season.TvShowId)
+                .Select(g => new { ShowId = g.Key, Count = g.Count() })
+                .ToListAsync())
+            .ToDictionary(x => x.ShowId, x => x.Count);
+
+        foreach (var group in groups)
+        {
+            var ordered = group
+                .OrderByDescending(s => episodeCounts.TryGetValue(s.Id, out var c) ? c : 0)
+                .ThenBy(s => s.AddedAt)
+                .ToList();
+
+            var keeperId = ordered[0].Id;
+            foreach (var drop in ordered.Skip(1))
+            {
+                result.PartsMoved += await MergeShowIntoAsync(keeperId, drop.Id, result.AffectedEpisodeIds);
+                result.ShowsRemoved++;
+            }
+            result.GroupsMerged++;
+        }
+
+        return result;
+    }
+
+    private async Task<int> MergeShowIntoAsync(Guid keeperId, Guid dropId, List<Guid> affectedEpisodeIds)
+    {
+        var keeperSeasons = await _context.Set<Season>()
+            .Where(s => s.TvShowId == keeperId)
+            .Include(s => s.Episodes)
+            .ToListAsync();
+
+        var dropSeasons = await _context.Set<Season>()
+            .Where(s => s.TvShowId == dropId)
+            .Include(s => s.Episodes).ThenInclude(e => e.MediaParts)
+            .ToListAsync();
+
+        var keeperSeasonByNumber = keeperSeasons
+            .GroupBy(s => s.SeasonNumber)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var partsMoved = 0;
+
+        foreach (var dropSeason in dropSeasons)
+        {
+            if (!keeperSeasonByNumber.TryGetValue(dropSeason.SeasonNumber, out var keeperSeason))
+            {
+                dropSeason.TvShowId = keeperId;
+                continue;
+            }
+
+            var keeperEpisodeByNumber = keeperSeason.Episodes
+                .GroupBy(e => e.EpisodeNumber)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            foreach (var dropEpisode in dropSeason.Episodes.ToList())
+            {
+                if (keeperEpisodeByNumber.TryGetValue(dropEpisode.EpisodeNumber, out var keeperEpisode))
+                {
+                    foreach (var part in dropEpisode.MediaParts.ToList())
+                    {
+                        dropEpisode.MediaParts.Remove(part);
+                        keeperEpisode.MediaParts.Add(part);
+                        part.MediaItemId = keeperEpisode.Id;
+                        partsMoved++;
+                    }
+
+                    await MergeUserDataAsync(dropEpisode.Id, keeperEpisode.Id);
+                    affectedEpisodeIds.Add(keeperEpisode.Id);
+
+                    dropSeason.Episodes.Remove(dropEpisode);
+                    _context.Remove(dropEpisode);
+                }
+                else
+                {
+                    dropSeason.Episodes.Remove(dropEpisode);
+                    dropEpisode.SeasonId = keeperSeason.Id;
+                    keeperSeason.Episodes.Add(dropEpisode);
+                }
+            }
+
+            await MergeUserDataAsync(dropSeason.Id, keeperSeason.Id);
+            _context.Remove(dropSeason);
+        }
+
+        await MergeUserDataAsync(dropId, keeperId);
+
+        var dropShow = await _context.Set<TvShow>().FirstAsync(t => t.Id == dropId);
+        _context.Remove(dropShow);
+
+        await _context.SaveChangesAsync();
+        return partsMoved;
+    }
+
+    private async Task MergeUserDataAsync(Guid fromItemId, Guid toItemId)
+    {
+        var fromStates = await _context.Set<UserMediaState>().Where(u => u.MediaItemId == fromItemId).ToListAsync();
+        if (fromStates.Count > 0)
+        {
+            var toStates = (await _context.Set<UserMediaState>().Where(u => u.MediaItemId == toItemId).ToListAsync())
+                .GroupBy(u => u.ProfileId).ToDictionary(g => g.Key, g => g.First());
+
+            foreach (var from in fromStates)
+            {
+                if (toStates.TryGetValue(from.ProfileId, out var to))
+                {
+                    to.IsPlayed = to.IsPlayed || from.IsPlayed;
+                    to.ResumePositionSeconds = Math.Max(to.ResumePositionSeconds, from.ResumePositionSeconds);
+                    to.LastPlayedAt = to.LastPlayedAt >= from.LastPlayedAt ? to.LastPlayedAt : from.LastPlayedAt;
+                    to.IsHiddenFromContinueWatching = to.IsHiddenFromContinueWatching && from.IsHiddenFromContinueWatching;
+                    _context.Remove(from);
+                }
+                else
+                {
+                    from.MediaItemId = toItemId;
+                    toStates[from.ProfileId] = from;
+                }
+            }
+        }
+
+        var fromRatings = await _context.Set<UserMediaRating>().Where(u => u.MediaItemId == fromItemId).ToListAsync();
+        if (fromRatings.Count > 0)
+        {
+            var toRatings = (await _context.Set<UserMediaRating>().Where(u => u.MediaItemId == toItemId).ToListAsync())
+                .GroupBy(u => u.ProfileId).ToDictionary(g => g.Key, g => g.First());
+
+            foreach (var from in fromRatings)
+            {
+                if (toRatings.TryGetValue(from.ProfileId, out var to))
+                {
+                    to.Rating = Math.Max(to.Rating, from.Rating);
+                    to.RatedAt = to.RatedAt >= from.RatedAt ? to.RatedAt : from.RatedAt;
+                    _context.Remove(from);
+                }
+                else
+                {
+                    from.MediaItemId = toItemId;
+                    toRatings[from.ProfileId] = from;
+                }
+            }
+        }
     }
 
     public async Task<List<MediaItem>> GetMediaItemsWithMultiplePartsAsync()

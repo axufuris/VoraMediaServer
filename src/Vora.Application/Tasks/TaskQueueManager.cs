@@ -38,6 +38,7 @@ public interface ITaskQueueManager
     void QueueRefreshAlbumArtwork(Guid albumId, string? albumName = null, bool forceOverride = false);
     void QueueRefreshAllActorMetadata();
     void QueueResolveTvdbIds();
+    void QueueMergeDuplicateShows();
     void QueueRemoveOrphanedMedia(string filePath);
     void QueueCollectionChronologySync(Guid collectionId, string title);
     void QueueCollectionContentSync(Guid collectionId, string title);
@@ -301,6 +302,15 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             await metadataManager.TriggerMediaTvdbResolutionAsync();
+        });
+    }
+
+    public void QueueMergeDuplicateShows()
+    {
+        EnqueueTask("Merge Duplicate TV Shows", async (ct, sp) =>
+        {
+            var dedupeManager = sp.GetRequiredService<Vora.Application.Media.IMediaDedupeManager>();
+            await dedupeManager.MergeDuplicateTvShowsAsync();
         });
     }
 
