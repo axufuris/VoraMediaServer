@@ -29,6 +29,7 @@ public class DedupeSettingsVM
 
     public int ScoreHdrDolbyVision { get; set; }
     public int ScoreHdr { get; set; }
+    public int ScoreHdr10PlusBonus { get; set; }
 
     public int ScoreAudioLossless { get; set; }
     public int ScoreAudioSurround { get; set; }

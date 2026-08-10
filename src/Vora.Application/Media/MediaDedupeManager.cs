@@ -321,9 +321,8 @@ public class MediaDedupeManager : IMediaDedupeManager
         else if (codec.Contains("vp9")) score += settings.ScoreCodecVp9;
         else if (codec.Contains("h264") || codec.Contains("x264") || codec.Contains("avc")) score += settings.ScoreCodecH264;
 
-        var hdr = video?.HdrType?.ToLowerInvariant() ?? string.Empty;
-        if (hdr.Contains("dovi") || hdr.Contains("dolby vision")) score += settings.ScoreHdrDolbyVision;
-        else if (hdr.Contains("hdr")) score += settings.ScoreHdr;
+        var (hdrPoints, hdrLabel) = ScoreHdr(video?.HdrType, part.FilePath, settings);
+        score += hdrPoints;
 
         long maxAudioScore = 0;
         var audioDescriptions = new List<string>();
@@ -358,12 +357,42 @@ public class MediaDedupeManager : IMediaDedupeManager
             FileSizeBytes = part.FileSizeBytes ?? 0,
             VideoCodec = codec.ToUpperInvariant(),
             Source = sourceLabel,
-            HdrFormat = string.IsNullOrWhiteSpace(hdr) ? "SDR" : hdr.ToUpperInvariant(),
+            HdrFormat = hdrLabel,
             AudioTracks = audioDescriptions,
             QualityScore = score,
             Container = part.Container?.ToUpperInvariant() ?? "UNKNOWN",
             Bitrate = part.OverallBitrate
         };
+    }
+
+    internal static (long Points, string Label) ScoreHdr(string? hdrType, string? filePath, MediaDedupeSettings settings)
+    {
+        var hdr = hdrType?.ToLowerInvariant() ?? string.Empty;
+        var isDolbyVision = hdr.Contains("dovi") || hdr.Contains("dolby vision");
+        var isBaseHdr = isDolbyVision || hdr.Contains("hdr");
+
+        long points = 0;
+        if (isDolbyVision) points += settings.ScoreHdrDolbyVision;
+        else if (hdr.Contains("hdr")) points += settings.ScoreHdr;
+
+        var isHdr10Plus = isBaseHdr && (hdr.Contains("hdr10plus") || hdr.Contains("hdr10+") || FileNameSignalsHdr10Plus(filePath));
+        if (isHdr10Plus) points += settings.ScoreHdr10PlusBonus;
+
+        if (!isBaseHdr) return (points, "SDR");
+
+        var label = (hdrType ?? string.Empty).ToUpperInvariant();
+        if (isHdr10Plus && !label.Contains("PLUS") && !label.Contains("+"))
+        {
+            label = label.Contains("HDR10") ? label.Replace("HDR10", "HDR10+") : $"{label}/HDR10+";
+        }
+
+        return (points, label);
+    }
+
+    private static bool FileNameSignalsHdr10Plus(string? filePath)
+    {
+        var name = Path.GetFileName(filePath)?.ToLowerInvariant() ?? string.Empty;
+        return name.Contains("hdr10plus") || name.Contains("hdr10+") || name.Contains("hdr10 plus");
     }
 
     private static (string? Label, int Score) DetectSource(string filePath, MediaDedupeSettings settings)
@@ -551,6 +580,7 @@ public class MediaDedupeManager : IMediaDedupeManager
             ScoreCodecH264 = entity.ScoreCodecH264,
             ScoreHdrDolbyVision = entity.ScoreHdrDolbyVision,
             ScoreHdr = entity.ScoreHdr,
+            ScoreHdr10PlusBonus = entity.ScoreHdr10PlusBonus,
             ScoreAudioLossless = entity.ScoreAudioLossless,
             ScoreAudioSurround = entity.ScoreAudioSurround,
             ScoreAudioBase = entity.ScoreAudioBase,
@@ -591,6 +621,7 @@ public class MediaDedupeManager : IMediaDedupeManager
             ScoreCodecH264 = vm.ScoreCodecH264,
             ScoreHdrDolbyVision = vm.ScoreHdrDolbyVision,
             ScoreHdr = vm.ScoreHdr,
+            ScoreHdr10PlusBonus = vm.ScoreHdr10PlusBonus,
             ScoreAudioLossless = vm.ScoreAudioLossless,
             ScoreAudioSurround = vm.ScoreAudioSurround,
             ScoreAudioBase = vm.ScoreAudioBase,
