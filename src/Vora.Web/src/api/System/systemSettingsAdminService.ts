@@ -74,6 +74,7 @@ export interface PluginSettingField {
     type: string;
     description: string;
     value: string;
+    options: string[];
 }
 
 export const systemSettingsAdminService = {

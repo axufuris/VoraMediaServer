@@ -164,6 +164,19 @@ export function PluginSection({ serverId, plugin, showModal, onAfterChange }: { 
                                     rows={4}
                                     className="vora-input text-sm resize-y"
                                 />
+                            ) : field.type === 'select' ? (
+                                <select
+                                    value={pluginValues[field.key] || ''}
+                                    onChange={e => handlePluginValueChange(field.key, e.target.value)}
+                                    className="vora-input text-sm cursor-pointer"
+                                >
+                                    {!field.options.includes(pluginValues[field.key] || '') && (
+                                        <option value={pluginValues[field.key] || ''}>{pluginValues[field.key] || 'Select…'}</option>
+                                    )}
+                                    {field.options.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
                             ) : (
                                 <input
                                     type={field.type}
