@@ -11,6 +11,7 @@ public interface ICollectionRepository
     Task<T?> GetProjectedByIdAsync<T>(Guid id, Expression<Func<Collection, T>> projection, bool hasAllAccess = true, List<Guid>? allowedLibs = null);
     Task<IEnumerable<T>> GetAllProjectedAsync<T>(Expression<Func<Collection, T>> projection, Guid? libraryId = null, bool globalOnly = false, bool hasAllAccess = true, List<Guid>? allowedLibs = null);
 
+    Task<CollectionChronologyConfigDto?> GetChronologyConfigAsync(Guid collectionId);
     Task<List<CollectionScheduleDto>> GetContentSyncCollectionsAsync();
     Task<List<CollectionScheduleDto>> GetAutoSyncCollectionsAsync();
     Task<List<CollectionMembershipCacheDto>> GetContentSyncMembershipsAsync();

@@ -49,6 +49,19 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
         return await query.Select(projection).ToListAsync();
     }
 
+    public Task<CollectionChronologyConfigDto?> GetChronologyConfigAsync(Guid collectionId) =>
+        context.Collections
+            .AsNoTracking()
+            .Where(c => c.Id == collectionId)
+            .Select(c => new CollectionChronologyConfigDto
+            {
+                Title = c.Title,
+                SortProviderId = c.SortProviderId,
+                ExternalListId = c.ExternalListId,
+                ChronologyItemsSignature = c.ChronologyItemsSignature
+            })
+            .FirstOrDefaultAsync();
+
     public Task<List<CollectionScheduleDto>> GetContentSyncCollectionsAsync() =>
         context.Collections
             .AsNoTracking()
