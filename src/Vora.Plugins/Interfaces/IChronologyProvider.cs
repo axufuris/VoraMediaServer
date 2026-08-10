@@ -20,6 +20,7 @@ public interface IChronologyProvider : IVoraPlugin
 
 public class ChronologyResult
 {
+    public Guid? LocalId { get; set; }
     public string? TmdbId { get; set; }
     public string? ImdbId { get; set; }
     public string MediaType { get; set; } = "Movie";

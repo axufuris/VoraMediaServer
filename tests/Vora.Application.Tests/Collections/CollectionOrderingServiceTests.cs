@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Analysis;
 using Vora.Application.Collections;
 using Vora.Application.Collections.Dtos;
+using Vora.Application.Media;
+using Vora.Application.Media.Dtos;
 using Vora.Domain.Entities.Collections;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
@@ -11,6 +13,7 @@ namespace Vora.Application.Tests.Collections;
 public class CollectionOrderingServiceTests
 {
     private readonly ICollectionRepository _repo;
+    private readonly IMediaRepository _mediaRepo;
     private readonly IClientNotifier _notifier;
     private readonly CollectionOrderingService _service;
     private readonly List<IChronologyProvider> _providers;
@@ -18,9 +21,12 @@ public class CollectionOrderingServiceTests
     public CollectionOrderingServiceTests()
     {
         _repo = Substitute.For<ICollectionRepository>();
+        _mediaRepo = Substitute.For<IMediaRepository>();
+        _mediaRepo.GetSeasonShowInfoAsync(Arg.Any<IReadOnlyCollection<Guid>>())
+            .Returns(new Dictionary<Guid, SeasonShowInfoDto>());
         _notifier = Substitute.For<IClientNotifier>();
         _providers = new List<IChronologyProvider>();
-        _service = new CollectionOrderingService(_repo, _providers, _notifier, NullLogger<CollectionOrderingService>.Instance);
+        _service = new CollectionOrderingService(_repo, _mediaRepo, _providers, _notifier, NullLogger<CollectionOrderingService>.Instance);
     }
 
     [Fact]
