@@ -101,6 +101,44 @@ public class OpenAiChronologyProviderTests
     }
 
     [Fact]
+    public async Task Verification_pass_breaks_a_same_year_tie_into_distinct_ordered_fractions()
+    {
+        var blackWidow = Guid.NewGuid();
+        var civilWar = Guid.NewGuid();
+        var items = new List<CollectionOrderingItemDto>
+        {
+            Item(0, blackWidow, "Black Widow"),
+            Item(1, civilWar, "Captain America: Civil War"),
+        };
+
+        var openAi = AiReturning(
+            "{\"items\":[{\"index\":0,\"setYear\":2016.1},{\"index\":1,\"setYear\":2016.1}]}",
+            "{\"items\":[{\"index\":0,\"setYear\":2016.6},{\"index\":1,\"setYear\":2016.3}]}");
+        var provider = new OpenAiChronologyProvider(openAi);
+        var result = await provider.GetChronologicalOrderAsync("MCU", null, items, TestContext.Current.CancellationToken);
+
+        var ordered = result.OrderBy(r => r.SortOrder).Select(r => r.LocalId!.Value).ToList();
+        Assert.Equal(new[] { civilWar, blackWidow }, ordered);
+        Assert.NotEqual(result.Single(r => r.LocalId == civilWar).SetYear, result.Single(r => r.LocalId == blackWidow).SetYear);
+    }
+
+    [Fact]
+    public async Task No_two_items_keep_the_same_set_year_even_if_the_ai_leaves_a_tie()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var items = new List<CollectionOrderingItemDto> { Item(0, a, "A"), Item(1, b, "B") };
+
+        var openAi = AiReturning(
+            "{\"items\":[{\"index\":0,\"setYear\":2016.1},{\"index\":1,\"setYear\":2016.1}]}",
+            "{\"items\":[]}");
+        var provider = new OpenAiChronologyProvider(openAi);
+        var result = await provider.GetChronologicalOrderAsync("c", null, items, TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(result.Single(r => r.LocalId == a).SetYear, result.Single(r => r.LocalId == b).SetYear);
+    }
+
+    [Fact]
     public async Task Repairs_a_season_the_model_scored_decades_off_from_its_show()
     {
         var s1 = Guid.NewGuid();
