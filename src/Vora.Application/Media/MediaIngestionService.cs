@@ -24,6 +24,7 @@ public class MediaIngestionService : IMediaIngestionService
     private readonly IMusicRepository _musicRepository;
     private readonly ITaskQueueManager _taskQueue;
     private readonly IMediaAnalyzerService _analyzerService;
+    private readonly Vora.Application.Metadata.ReferenceWriteGate _writeGate;
     private readonly ILogger<MediaIngestionService> _logger;
     private readonly string _artworkBasePath;
 
@@ -34,6 +35,7 @@ public class MediaIngestionService : IMediaIngestionService
         IMusicRepository musicRepository,
         ITaskQueueManager taskQueue,
         IMediaAnalyzerService analyzerService,
+        Vora.Application.Metadata.ReferenceWriteGate writeGate,
         IOptions<StoragePathsOptions> storagePaths,
         ILogger<MediaIngestionService> logger)
     {
@@ -43,6 +45,7 @@ public class MediaIngestionService : IMediaIngestionService
         _musicRepository = musicRepository;
         _taskQueue = taskQueue;
         _analyzerService = analyzerService;
+        _writeGate = writeGate;
         _logger = logger;
 
         var configured = storagePaths.Value.CustomArtwork;
@@ -114,29 +117,43 @@ public class MediaIngestionService : IMediaIngestionService
     public async Task<MediaItemHandle> EnsureTvShowAsync(LibraryHandle library, string title, int? year, string? tmdbId, string? imdbId, string? tvdbId = null)
     {
         var libraryId = library.Value;
-        var showId = await _repository.GetTvShowIdByTitleAsync(title, libraryId);
-        if (showId.HasValue) return new MediaItemHandle(showId.Value);
 
-        var show = new TvShow
-        {
-            Title = title,
-            SortTitle = title,
-            OriginalTitle = title,
-            LibraryId = libraryId,
-            AddedAt = DateTime.UtcNow,
-            ReleaseDate = year.HasValue ? new DateTime(year.Value, 1, 1, 0, 0, 0, DateTimeKind.Utc) : null,
-            TmdbId = tmdbId,
-            ImdbId = imdbId,
-            TvdbId = tvdbId
-        };
-        await _repository.AddMediaItemAsync(show);
+        var resultId = Guid.Empty;
+        var createdId = (Guid?)null;
 
-        if (!string.IsNullOrWhiteSpace(tmdbId))
+        await _writeGate.RunAsync(async () =>
         {
-            await _requestManager.ResolveRequestAsync(tmdbId, "TvShow", show.Id);
+            var showId = await _repository.GetTvShowIdByExternalIdAsync(tmdbId, imdbId, libraryId)
+                ?? await _repository.GetTvShowIdByTitleAsync(title, libraryId);
+            if (showId.HasValue)
+            {
+                resultId = showId.Value;
+                return;
+            }
+
+            var show = new TvShow
+            {
+                Title = title,
+                SortTitle = title,
+                OriginalTitle = title,
+                LibraryId = libraryId,
+                AddedAt = DateTime.UtcNow,
+                ReleaseDate = year.HasValue ? new DateTime(year.Value, 1, 1, 0, 0, 0, DateTimeKind.Utc) : null,
+                TmdbId = tmdbId,
+                ImdbId = imdbId,
+                TvdbId = tvdbId
+            };
+            await _repository.AddMediaItemAsync(show);
+            resultId = show.Id;
+            createdId = show.Id;
+        });
+
+        if (createdId.HasValue && !string.IsNullOrWhiteSpace(tmdbId))
+        {
+            await _requestManager.ResolveRequestAsync(tmdbId, "TvShow", createdId.Value);
         }
 
-        return new MediaItemHandle(show.Id);
+        return new MediaItemHandle(resultId);
     }
 
     public async Task<bool> SeasonExistsAsync(MediaItemHandle tvShow, int seasonNumber)
@@ -149,20 +166,32 @@ public class MediaIngestionService : IMediaIngestionService
     {
         var libraryId = library.Value;
         var tvShowId = tvShow.Value;
-        var seasonId = await _repository.GetSeasonIdByNumberAsync(tvShowId, seasonNumber);
-        if (seasonId.HasValue) return new SeasonHandle(seasonId.Value);
 
-        var season = new Season
+        var resultId = Guid.Empty;
+
+        await _writeGate.RunAsync(async () =>
         {
-            Title = $"Season {seasonNumber}",
-            SortTitle = $"Season {seasonNumber}",
-            OriginalTitle = $"Season {seasonNumber}",
-            SeasonNumber = seasonNumber,
-            TvShowId = tvShowId,
-            LibraryId = libraryId
-        };
-        await _repository.AddMediaItemAsync(season);
-        return new SeasonHandle(season.Id);
+            var seasonId = await _repository.GetSeasonIdByNumberAsync(tvShowId, seasonNumber);
+            if (seasonId.HasValue)
+            {
+                resultId = seasonId.Value;
+                return;
+            }
+
+            var season = new Season
+            {
+                Title = $"Season {seasonNumber}",
+                SortTitle = $"Season {seasonNumber}",
+                OriginalTitle = $"Season {seasonNumber}",
+                SeasonNumber = seasonNumber,
+                TvShowId = tvShowId,
+                LibraryId = libraryId
+            };
+            await _repository.AddMediaItemAsync(season);
+            resultId = season.Id;
+        });
+
+        return new SeasonHandle(resultId);
     }
 
     public async Task<MediaItemHandle> EnsureEpisodeAsync(LibraryHandle library, SeasonHandle season, int episodeNumber, string title, DateTime? airDate, string? edition = null, int? endEpisodeNumber = null)
