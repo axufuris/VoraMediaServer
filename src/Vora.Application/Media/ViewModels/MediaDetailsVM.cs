@@ -63,7 +63,7 @@ public class MediaDetailsVM
                    item is TvShow ? "TvShow" :
                    item is Season ? "Season" :
                    item is Episode ? "Episode" : "Unknown",
-            PosterUrl = item.PosterUrl,
+            PosterUrl = item.PosterUrl ?? (item is Season ? ((Season)item).TvShow.PosterUrl : null),
             BackgroundUrl = item.BackgroundUrl,
             ContentRating = item is Episode ? ((Episode)item).Season.TvShow.ContentRating : item.ContentRating,
             Resolution = item.MediaParts.FirstOrDefault() != null ? item.MediaParts.FirstOrDefault()!.Resolution : null,

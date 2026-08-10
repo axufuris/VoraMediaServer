@@ -71,7 +71,7 @@ public class CollectionDetailsVM
                     : item is Episode ? "Episode"
                     : "Unknown",
                 TvShowTitle = item is Season ? ((Season)item).TvShow.Title : null,
-                PosterUrl = item.PosterUrl,
+                PosterUrl = item.PosterUrl ?? (item is Season ? ((Season)item).TvShow.PosterUrl : null),
                 ReleaseDate = item.ReleaseDate,
                 AddedAt = item.AddedAt,
                 IsPlayed = false,
