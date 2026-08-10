@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Vora.Application.Analysis;
 using Vora.Application.Libraries;
 using Vora.Application.Media;
+using Vora.Application.Metadata;
 using Vora.Application.Requests;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
@@ -42,6 +43,7 @@ public class MediaIngestionServiceTests : IDisposable
             _musicRepo,
             _taskQueue,
             _analyzerService,
+            new ReferenceWriteGate(),
             options,
             NullLogger<MediaIngestionService>.Instance);
     }
@@ -118,6 +120,38 @@ public class MediaIngestionServiceTests : IDisposable
 
         handle.Value.Should().Be(existing);
         await _mediaRepo.DidNotReceive().AddMediaItemAsync(Arg.Any<MediaItem>());
+    }
+
+    [Fact]
+    public async Task EnsureTvShowAsync_dedups_by_external_id_before_title()
+    {
+        var existing = Guid.NewGuid();
+        _mediaRepo.GetTvShowIdByExternalIdAsync("1396", null, Arg.Any<Guid>())
+            .Returns((Guid?)existing);
+
+        var handle = await _service.EnsureTvShowAsync(LibraryHandle.FromGuid(Guid.NewGuid()), "Breaking Bad", 2008, tmdbId: "1396", imdbId: null);
+
+        handle.Value.Should().Be(existing);
+        await _mediaRepo.DidNotReceive().GetTvShowIdByTitleAsync(Arg.Any<string>(), Arg.Any<Guid>());
+        await _mediaRepo.DidNotReceive().AddMediaItemAsync(Arg.Any<MediaItem>());
+    }
+
+    [Fact]
+    public async Task EnsureTvShowAsync_creates_new_show_when_no_id_or_title_match()
+    {
+        _mediaRepo.GetTvShowIdByExternalIdAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid>())
+            .Returns((Guid?)null);
+        _mediaRepo.GetTvShowIdByTitleAsync(Arg.Any<string>(), Arg.Any<Guid>())
+            .Returns((Guid?)null);
+
+        var library = LibraryHandle.FromGuid(Guid.NewGuid());
+        await _service.EnsureTvShowAsync(library, "Severance", 2022, tmdbId: "95396", imdbId: null);
+
+        await _mediaRepo.Received(1).AddMediaItemAsync(Arg.Is<TvShow>(t =>
+            t.Title == "Severance" &&
+            t.TmdbId == "95396" &&
+            t.LibraryId == library.Value));
+        await _requestManager.Received(1).ResolveRequestAsync("95396", "TvShow", Arg.Any<Guid>());
     }
 
     [Fact]

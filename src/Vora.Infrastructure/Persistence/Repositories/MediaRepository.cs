@@ -110,8 +110,34 @@ public partial class MediaRepository : IMediaRepository
 
     public async Task<Guid?> GetTvShowIdByTitleAsync(string title, Guid libraryId)
     {
-        return await _context.Set<TvShow>()
+        var exact = await _context.Set<TvShow>()
+            .AsNoTracking()
             .Where(t => t.Title == title && t.LibraryId == libraryId)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync();
+        if (exact.HasValue) return exact;
+
+        var normalized = NormalizeTitle(title);
+        var candidates = await _context.Set<TvShow>()
+            .AsNoTracking()
+            .Where(t => t.LibraryId == libraryId)
+            .Select(t => new { t.Id, t.Title })
+            .ToListAsync();
+
+        return candidates.FirstOrDefault(c => NormalizeTitle(c.Title) == normalized)?.Id;
+    }
+
+    public Task<Guid?> GetTvShowIdByExternalIdAsync(string? tmdbId, string? imdbId, Guid libraryId)
+    {
+        if (string.IsNullOrWhiteSpace(tmdbId) && string.IsNullOrWhiteSpace(imdbId))
+        {
+            return Task.FromResult<Guid?>(null);
+        }
+
+        return _context.Set<TvShow>()
+            .AsNoTracking()
+            .Where(t => t.LibraryId == libraryId
+                && ((tmdbId != null && t.TmdbId == tmdbId) || (imdbId != null && t.ImdbId == imdbId)))
             .Select(t => (Guid?)t.Id)
             .FirstOrDefaultAsync();
     }
