@@ -20,12 +20,16 @@ public static class CollectionMembershipResolver
             {
                 if (entry.SeasonNumber == null) continue;
 
-                var showId = ResolveTitle(showLookup, entry.ShowTitle, null);
-                if (showId == null) continue;
+                var showKey = TitleMatch.Normalize(entry.ShowTitle);
+                if (showKey.Length == 0 || !showLookup.TryGetValue(showKey, out var showMatches)) continue;
 
-                if (seasonLookup.TryGetValue((showId.Value, entry.SeasonNumber.Value), out var seasonId))
+                foreach (var (_, showId) in showMatches)
                 {
-                    matched.Add(seasonId);
+                    if (seasonLookup.TryGetValue((showId, entry.SeasonNumber.Value), out var seasonId))
+                    {
+                        matched.Add(seasonId);
+                        break;
+                    }
                 }
                 continue;
             }

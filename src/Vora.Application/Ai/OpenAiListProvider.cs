@@ -34,11 +34,13 @@ public class OpenAiListProvider(IOpenAiClient openAi) : ICollectionSyncProvider
             "{\"items\": [ {\"type\": \"movie\", \"title\": \"...\", \"year\": 2008}, " +
             "{\"type\": \"season\", \"show\": \"...\", \"season\": 1} ]}.\n" +
             "Rules: use \"movie\" for films (include the release year) and \"season\" for a single season of a TV show " +
-            "(give the show's title and the season number as an integer). Represent a show as one entry per season, " +
-            "not a single whole-show entry. Do not include episodes. Do not invent titles that do not exist. " +
-            "Use the widely-recognized English title for each item.";
+            "(give the show's title and the season number as an integer). For every TV show that belongs, output a SEPARATE " +
+            "entry for EACH season it has — season 1, season 2, season 3, and so on. Do NOT collapse a multi-season show into " +
+            "one entry and do NOT stop at season 1 (e.g. a show with three seasons yields three entries). Be exhaustive and " +
+            "include everything that belongs, even lesser-known titles. Do not include individual episodes. Do not invent " +
+            "titles that do not exist. Use the widely-recognized English title for each show and movie.";
 
-        var json = await openAi.CompleteJsonAsync(Id, prompt);
+        var json = await openAi.CompleteJsonAsync(Id, prompt, temperature: 0.2, modelSettingKey: "collections_model");
         if (string.IsNullOrWhiteSpace(json))
         {
             return new List<CollectionSyncItemDto>();

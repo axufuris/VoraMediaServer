@@ -38,12 +38,16 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
 
         var prompt =
             $"You are ordering a media collection. The collection is described as: \"{description}\".\n" +
-            "Here are the items, one per line as `index: Title (Year) [Type]`:\n" +
+            "Here are the items, one per line as `index: Title (Year) [Type]`. The year shown is the RELEASE year.\n" +
             string.Join("\n", lines) + "\n\n" +
-            "Return ONLY valid JSON of the form {\"order\": [<index>, <index>, ...]} listing every index above exactly once, " +
-            "sorted into the correct chronological order for this collection. Do not invent, omit, or duplicate indices.";
+            "Sort them into the collection's intended chronological order. Unless the description explicitly asks for release " +
+            "order, order by the IN-UNIVERSE story timeline (when the events take place within the story), which often differs " +
+            "from the release year — a prequel, flashback, or origin story is placed earlier than a later-set film released before " +
+            "it. Use the well-known franchise timeline where one exists.\n" +
+            "Return ONLY valid JSON of the form {\"order\": [<index>, <index>, ...]}. You MUST include EVERY index shown above " +
+            "exactly once — never omit, invent, or duplicate an index.";
 
-        var json = await openAi.CompleteJsonAsync(Id, prompt, cancellationToken);
+        var json = await openAi.CompleteJsonAsync(Id, prompt, cancellationToken, temperature: 0.2, modelSettingKey: "collections_model");
         if (string.IsNullOrWhiteSpace(json))
         {
             return new List<ChronologyResult>();
