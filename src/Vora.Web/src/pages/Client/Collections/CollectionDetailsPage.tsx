@@ -6,6 +6,7 @@ import { collectionAdminService } from '../../../api/Collections/collectionAdmin
 import EditCollectionModal from '../../../components/Collections/EditCollectionModal';
 import ReorderCollectionModal from '../../../components/Collections/ReorderCollectionModal';
 import MediaCard from '../../../components/Media/MediaCard';
+import { posterTitle } from '../../../utils/posterTitle';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { useDialog } from '../../../dialogs';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
@@ -248,7 +249,7 @@ export default function CollectionDetailsPage() {
                             <MediaCard
                                 key={item.id}
                                 id={item.id}
-                                title={item.title}
+                                title={posterTitle(item)}
                                 subtitle={item.releaseDate ? new Date(item.releaseDate).getFullYear() : 'Unknown Year'}
                                 imageUrl={item.posterUrl}
                                 type={item.type}

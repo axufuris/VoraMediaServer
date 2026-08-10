@@ -40,6 +40,7 @@ export interface LibraryItem {
     releaseDate?: string;
     addedAt?: string;
     type: string;
+    tvShowTitle?: string;
     posterUrl?: string;
     backgroundUrl?: string;
     contentRating?: string;

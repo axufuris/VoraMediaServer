@@ -11,6 +11,7 @@ import EmptyState from '../../components/Client/Primitives/EmptyState';
 import Tabs from '../../components/Client/Primitives/Tabs';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
 import MediaStill from '../../components/Client/Primitives/MediaStill';
+import { posterTitle } from '../../utils/posterTitle';
 import LetterRail from '../../components/Client/Primitives/LetterRail';
 import { StorageKeys } from '../../utils/storageKeys';
 
@@ -105,7 +106,7 @@ function renderLibraryCard(
     const card = isEpisode ? (
         <MediaStill imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} badge={unplayedBadge} fill />
     ) : (
-        <MediaPoster imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} badge={unplayedBadge} fill />
+        <MediaPoster imageUrl={item.posterUrl} title={posterTitle(item)} subtitle={subtitle} onClick={onOpen} badge={unplayedBadge} fill />
     );
 
     if (!isAdmin) return <div key={item.id} className="[content-visibility:auto] [contain-intrinsic-size:180px_320px]">{card}</div>;

@@ -14,6 +14,7 @@ import PlaylistsPage from './Playlists/PlaylistsPage';
 import MediaRail from '../../components/Client/Primitives/MediaRail';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
 import MediaStill from '../../components/Client/Primitives/MediaStill';
+import { posterTitle } from '../../utils/posterTitle';
 import Hero from '../../components/Client/Primitives/Hero';
 import { useDialog } from '../../dialogs';
 
@@ -249,7 +250,7 @@ function SmartListRow({ list, serverId }: { list: SmartListClientDto, serverId?:
                         {isEpisode ? (
                             <MediaStill imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} />
                         ) : (
-                            <MediaPoster imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} isPlayed={item.isPlayed} onClick={onOpen} />
+                            <MediaPoster imageUrl={item.posterUrl} title={posterTitle(item)} subtitle={subtitle} isPlayed={item.isPlayed} onClick={onOpen} />
                         )}
                     </div>
                 );

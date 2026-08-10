@@ -52,6 +52,7 @@ export interface CollectionDetailsLibraryItem {
     sortTitle?: string;
     releaseDate?: string;
     type: string;
+    tvShowTitle?: string;
     posterUrl?: string;
     isPlayed?: boolean;
     unplayedItemCount?: number;
