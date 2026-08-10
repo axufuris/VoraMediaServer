@@ -1,9 +1,11 @@
+using Vora.Application.Media.ViewModels;
 using Vora.Domain.Entities.Media;
 
 namespace Vora.Application.Media;
 
 public interface IMediaDedupeRepository
 {
+    Task<TvShowMergeResultVM> MergeDuplicateTvShowsAsync(Guid? libraryId);
     Task<List<MediaItem>> GetMediaItemsWithMultiplePartsAsync();
     Task<MediaPart?> GetMediaPartByIdAsync(Guid partId);
     Task DeleteMediaPartAsync(MediaPart part);

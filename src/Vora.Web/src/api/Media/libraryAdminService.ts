@@ -103,6 +103,10 @@ export const libraryAdminService = {
         await apiClient.post('/metadata/resolve-tvdb-ids', null, { serverId });
     },
 
+    mergeDuplicateShows: async (serverId?: string): Promise<void> => {
+        await apiClient.post('/admin/dedupe/merge-duplicate-shows', null, { serverId });
+    },
+
     toggleWatch: async (libraryId: string, enable: boolean, serverId?: string): Promise<void> => {
         await apiClient.post(`/libraries/${libraryId}/watchfolder?enable=${enable}`, null, { serverId });
     },

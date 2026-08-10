@@ -21,6 +21,9 @@ public static class AdminEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest);
 
+        dedupeGroup.MapPost("/merge-duplicate-shows", QueueMergeDuplicateShowsAsync)
+            .Produces(StatusCodes.Status202Accepted);
+
         dedupeGroup.MapGet("/settings", GetGlobalSettingsAsync)
             .Produces<DedupeSettingsVM>(StatusCodes.Status200OK);
 
@@ -59,6 +62,12 @@ public static class AdminEndpoints
     {
         var duplicates = await manager.GetDuplicateMediaAsync();
         return Results.Ok(duplicates);
+    }
+
+    private static IResult QueueMergeDuplicateShowsAsync(Vora.Application.Tasks.ITaskQueueManager taskQueue)
+    {
+        taskQueue.QueueMergeDuplicateShows();
+        return Results.Accepted();
     }
 
     private static async Task<IResult> DeleteDuplicatePartAsync(Guid partId, bool deletePhysical, IMediaDedupeManager manager)

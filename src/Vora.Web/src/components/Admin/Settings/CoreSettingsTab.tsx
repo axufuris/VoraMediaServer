@@ -409,6 +409,28 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 </div>
             </SettingsCard>
 
+            <SettingsCard title="Merge duplicate TV shows">
+                <FieldHint>
+                    If the same show was scanned into two entries (for example a 1080p and a 4K copy in separate folders), this consolidates them into one show. Each episode keeps every file version as a selectable quality, and watch progress and ratings from both copies are merged. Nothing on disk is deleted. Runs across all libraries in the background.
+                </FieldHint>
+                <div className="mt-4">
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            try {
+                                await libraryAdminService.mergeDuplicateShows(serverId);
+                                showModal('Task queued', 'Merging duplicate TV shows — watch progress under Background Tasks.');
+                            } catch {
+                                showModal('Failed', 'Could not queue the duplicate-show merge.', true);
+                            }
+                        }}
+                        className="vora-button-secondary"
+                    >
+                        Merge duplicate shows now
+                    </button>
+                </div>
+            </SettingsCard>
+
             {scanners.length > 1 && (
                 <SettingsCard title="Local Media Scanner Engine">
                     <FieldLabel>Active Scanner Plugin</FieldLabel>

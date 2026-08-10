@@ -8,6 +8,7 @@ public interface IMediaDedupeManager
 {
     Task<List<DedupeGroupVM>> GetDuplicateMediaAsync();
     Task DeleteDuplicatePartAsync(Guid partId, bool deletePhysicalFile);
+    Task<TvShowMergeResultVM> MergeDuplicateTvShowsAsync(Guid? libraryId = null);
 
     Task<DedupeSettingsVM> GetGlobalSettingsAsync();
     Task<DedupeSettingsVM> GetEffectiveLibrarySettingsAsync(Guid libraryId);
@@ -25,12 +26,33 @@ public interface IMediaDedupeManager
 public class MediaDedupeManager : IMediaDedupeManager
 {
     private readonly IMediaDedupeRepository _repository;
+    private readonly IMediaRepository _mediaRepository;
     private readonly ILogger<MediaDedupeManager> _logger;
 
-    public MediaDedupeManager(IMediaDedupeRepository repository, ILogger<MediaDedupeManager> logger)
+    public MediaDedupeManager(IMediaDedupeRepository repository, IMediaRepository mediaRepository, ILogger<MediaDedupeManager> logger)
     {
         _repository = repository;
+        _mediaRepository = mediaRepository;
         _logger = logger;
+    }
+
+    public async Task<TvShowMergeResultVM> MergeDuplicateTvShowsAsync(Guid? libraryId = null)
+    {
+        var result = await _repository.MergeDuplicateTvShowsAsync(libraryId);
+
+        foreach (var episodeId in result.AffectedEpisodeIds.Distinct())
+        {
+            await _mediaRepository.SyncItemEditionFromPartsAsync(episodeId);
+        }
+
+        if (result.ShowsRemoved > 0)
+        {
+            _logger.LogInformation(
+                "Merged duplicate TV shows: {Groups} group(s), removed {Shows} duplicate show row(s), moved {Parts} file part(s).",
+                result.GroupsMerged, result.ShowsRemoved, result.PartsMoved);
+        }
+
+        return result;
     }
 
     public async Task<List<DedupeGroupVM>> GetDuplicateMediaAsync()
