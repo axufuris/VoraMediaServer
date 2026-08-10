@@ -4,5 +4,5 @@ namespace Vora.Application.Ai;
 
 public interface IAiStatsManager
 {
-    Task<AiStatsDashboardVM> GetDashboardAsync(DateTime? startDate, DateTime? endDate, int page, int pageSize);
+    Task<AiStatsDashboardVM> GetDashboardAsync(DateTime? startDate, DateTime? endDate, int page, int pageSize, string? pluginId = null);
 }

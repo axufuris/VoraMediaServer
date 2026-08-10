@@ -24,10 +24,22 @@ export interface AiStatsDashboardVM {
     totalLogs: number;
 }
 
+// Friendly names for the AI plugins that log usage, so the log shows which
+// feature made each call rather than only the raw model.
+export const AI_FEATURE_OPTIONS: { id: string; label: string }[] = [
+    { id: 'openai_recommendations', label: 'Recommendations' },
+    { id: 'openai_chronology', label: 'Collection Ordering' },
+    { id: 'openai_list', label: 'Collection List' },
+];
+
+export function aiFeatureLabel(pluginId: string): string {
+    return AI_FEATURE_OPTIONS.find(o => o.id === pluginId)?.label ?? pluginId;
+}
+
 export const aiStatsService = {
-    getDashboard: async (startDate?: string, endDate?: string, page: number = 1, pageSize: number = 50, serverId?: string): Promise<AiStatsDashboardVM> => {
+    getDashboard: async (startDate?: string, endDate?: string, page: number = 1, pageSize: number = 50, pluginId?: string, serverId?: string): Promise<AiStatsDashboardVM> => {
         const response = await apiClient.get<AiStatsDashboardVM>('/admin/ai-stats', {
-            params: { startDate, endDate, page, pageSize },
+            params: { startDate, endDate, page, pageSize, pluginId: pluginId || undefined },
             serverId
         });
         return response.data;

@@ -15,10 +15,10 @@ public class AiStatsManager : IAiStatsManager
         _repository = repository;
     }
 
-    public Task<AiStatsDashboardVM> GetDashboardAsync(DateTime? startDate, DateTime? endDate, int page, int pageSize)
+    public Task<AiStatsDashboardVM> GetDashboardAsync(DateTime? startDate, DateTime? endDate, int page, int pageSize, string? pluginId = null)
     {
         var normalizedPage = page < 1 ? 1 : page;
         var normalizedPageSize = pageSize < 1 ? DefaultPageSize : Math.Min(pageSize, MaxPageSize);
-        return _repository.GetAiStatsDashboardAsync(startDate, endDate, normalizedPage, normalizedPageSize);
+        return _repository.GetAiStatsDashboardAsync(startDate, endDate, normalizedPage, normalizedPageSize, pluginId);
     }
 }
