@@ -22,7 +22,7 @@ public class OpenAiClient(
     public async Task<bool> IsConfiguredAsync()
         => !string.IsNullOrWhiteSpace(await settings.GetPluginSettingAsync(KeyPluginId, "api_key"));
 
-    public async Task<string?> CompleteJsonAsync(string pluginId, string prompt, CancellationToken cancellationToken = default, double? temperature = null)
+    public async Task<string?> CompleteJsonAsync(string pluginId, string prompt, CancellationToken cancellationToken = default, double? temperature = null, string? modelSettingKey = null)
     {
         var apiKey = await settings.GetPluginSettingAsync(KeyPluginId, "api_key");
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -41,6 +41,11 @@ public class OpenAiClient(
         }
 
         var model = await settings.GetPluginSettingAsync(KeyPluginId, "chat_model");
+        if (!string.IsNullOrWhiteSpace(modelSettingKey))
+        {
+            var overrideModel = await settings.GetPluginSettingAsync(KeyPluginId, modelSettingKey);
+            if (!string.IsNullOrWhiteSpace(overrideModel)) model = overrideModel;
+        }
         if (string.IsNullOrWhiteSpace(model)) model = "gpt-4o-mini";
 
         var guardrails = await settings.GetPluginSettingAsync(KeyPluginId, "guardrails");

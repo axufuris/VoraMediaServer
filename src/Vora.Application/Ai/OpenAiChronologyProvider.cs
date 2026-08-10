@@ -47,7 +47,7 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             "Return ONLY valid JSON of the form {\"order\": [<index>, <index>, ...]}. You MUST include EVERY index shown above " +
             "exactly once — never omit, invent, or duplicate an index.";
 
-        var json = await openAi.CompleteJsonAsync(Id, prompt, cancellationToken, temperature: 0.2);
+        var json = await openAi.CompleteJsonAsync(Id, prompt, cancellationToken, temperature: 0.2, modelSettingKey: "collections_model");
         if (string.IsNullOrWhiteSpace(json))
         {
             return new List<ChronologyResult>();

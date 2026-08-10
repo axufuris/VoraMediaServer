@@ -40,7 +40,7 @@ public class OpenAiListProvider(IOpenAiClient openAi) : ICollectionSyncProvider
             "include everything that belongs, even lesser-known titles. Do not include individual episodes. Do not invent " +
             "titles that do not exist. Use the widely-recognized English title for each show and movie.";
 
-        var json = await openAi.CompleteJsonAsync(Id, prompt, temperature: 0.2);
+        var json = await openAi.CompleteJsonAsync(Id, prompt, temperature: 0.2, modelSettingKey: "collections_model");
         if (string.IsNullOrWhiteSpace(json))
         {
             return new List<CollectionSyncItemDto>();
