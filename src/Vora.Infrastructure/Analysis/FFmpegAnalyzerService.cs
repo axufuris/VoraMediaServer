@@ -275,11 +275,106 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
                     }
                 }
             }
+
+            await UpgradeHdr10PlusAsync(filePath, result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "FFprobe analysis failed for {FilePath}.", filePath);
             throw;
+        }
+    }
+
+    private async Task UpgradeHdr10PlusAsync(string filePath, MediaAnalysisResult result)
+    {
+        var hdr10Tracks = result.VideoTracks
+            .Where(t => t.HdrType == "HDR10" || t.HdrType == "DoVi/HDR10")
+            .ToList();
+
+        if (hdr10Tracks.Count == 0) return;
+        if (!await HasHdr10PlusMetadataAsync(filePath)) return;
+
+        foreach (var track in hdr10Tracks)
+        {
+            track.HdrType = track.HdrType == "DoVi/HDR10" ? "DoVi/HDR10Plus" : "HDR10Plus";
+        }
+    }
+
+    private async Task<bool> HasHdr10PlusMetadataAsync(string filePath)
+    {
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "ffprobe",
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        processInfo.ArgumentList.Add("-v");
+        processInfo.ArgumentList.Add("quiet");
+        processInfo.ArgumentList.Add("-print_format");
+        processInfo.ArgumentList.Add("json");
+        processInfo.ArgumentList.Add("-select_streams");
+        processInfo.ArgumentList.Add("v:0");
+        processInfo.ArgumentList.Add("-read_intervals");
+        processInfo.ArgumentList.Add("%+#5");
+        processInfo.ArgumentList.Add("-show_frames");
+        processInfo.ArgumentList.Add("-show_entries");
+        processInfo.ArgumentList.Add("frame=side_data_list");
+        processInfo.ArgumentList.Add(filePath);
+
+        try
+        {
+            using var process = Process.Start(processInfo);
+            if (process == null) return false;
+
+            string jsonOutput = await process.StandardOutput.ReadToEndAsync();
+            await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger);
+
+            return Hdr10PlusJsonIndicatesDynamicMetadata(jsonOutput);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "HDR10+ frame probe failed for {FilePath}; leaving it as HDR10.", filePath);
+            return false;
+        }
+    }
+
+    internal static bool Hdr10PlusJsonIndicatesDynamicMetadata(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return false;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("frames", out var frames) || frames.ValueKind != JsonValueKind.Array)
+            {
+                return false;
+            }
+
+            foreach (var frame in frames.EnumerateArray())
+            {
+                if (!frame.TryGetProperty("side_data_list", out var list) || list.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (var sideData in list.EnumerateArray())
+                {
+                    if (!sideData.TryGetProperty("side_data_type", out var typeProp)) continue;
+
+                    var type = typeProp.GetString()?.ToLowerInvariant() ?? string.Empty;
+                    if (type.Contains("2094") || type.Contains("hdr10+") || type.Contains("dynamic metadata"))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 
