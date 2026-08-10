@@ -63,7 +63,8 @@ public class CollectionManager : ICollectionManager
         collection.Items = effectiveSort switch
         {
             CollectionSortOrder.Chronological => collection.Items
-                .OrderBy(i => sortOrders != null && sortOrders.TryGetValue(i.Id, out var order) ? order : decimal.MaxValue)
+                .OrderBy(i => sortOrders != null && sortOrders.TryGetValue(i.Id, out var order) && order > 0 ? order : decimal.MaxValue)
+                .ThenBy(i => i.ReleaseDate)
                 .ToList(),
 
             CollectionSortOrder.ReleaseDateDesc => collection.Items.OrderByDescending(i => i.ReleaseDate).ToList(),
