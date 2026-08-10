@@ -5,6 +5,7 @@ using Vora.Application.Collections.Dtos;
 using Vora.Application.Media;
 using Vora.Application.Media.Dtos;
 using Vora.Domain.Entities.Collections;
+using Vora.Domain.Entities.Media;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -35,7 +36,7 @@ public class CollectionOrderingServiceTests
         var collectionId = Guid.NewGuid();
         _repo.GetChronologyConfigAsync(collectionId).Returns((CollectionChronologyConfigDto?)null);
 
-        await _service.ApplyChronologicalOrderAsync(collectionId, TestContext.Current.CancellationToken);
+        await _service.ApplyChronologicalOrderAsync(collectionId, cancellationToken: TestContext.Current.CancellationToken);
 
         await _repo.DidNotReceive().GetCollectionItemsWithMediaAsync(Arg.Any<Guid>());
         await _repo.DidNotReceive().UpdateCollectionItemsAsync(Arg.Any<IEnumerable<CollectionItem>>());
@@ -90,13 +91,51 @@ public class CollectionOrderingServiceTests
         await _notifier.Received(1).NotifyCollectionUpdatedAsync(collectionId);
     }
 
+    [Fact]
+    public async Task ApplyChronologicalOrderAsync_skips_when_ai_signature_unchanged_and_not_forced()
+    {
+        var collectionId = Guid.NewGuid();
+        var mediaId = Guid.NewGuid();
+        var items = new List<CollectionItem> { new() { MediaItemId = mediaId, MediaItem = new Movie { Id = mediaId, Title = "M" } } };
+        var signature = ComputeSignature(new[] { mediaId });
+
+        _providers.Add(new FakeChronologyProvider("fake_chrono", ordersLocalItemsOnly: true));
+        _repo.GetChronologyConfigAsync(collectionId)
+            .Returns(new CollectionChronologyConfigDto { SortProviderId = "fake_chrono", ChronologyItemsSignature = signature });
+        _repo.GetCollectionItemsWithMediaAsync(collectionId).Returns(items);
+
+        await _service.ApplyChronologicalOrderAsync(collectionId, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _repo.Received(1).TouchChronologySyncedAtAsync(collectionId);
+        await _repo.DidNotReceive().UpdateChronologySignatureAsync(Arg.Any<Guid>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task ApplyChronologicalOrderAsync_reorders_when_forced_even_if_signature_unchanged()
+    {
+        var collectionId = Guid.NewGuid();
+        var mediaId = Guid.NewGuid();
+        var items = new List<CollectionItem> { new() { MediaItemId = mediaId, MediaItem = new Movie { Id = mediaId, Title = "M" } } };
+        var signature = ComputeSignature(new[] { mediaId });
+
+        _providers.Add(new FakeChronologyProvider("fake_chrono", ordersLocalItemsOnly: true));
+        _repo.GetChronologyConfigAsync(collectionId)
+            .Returns(new CollectionChronologyConfigDto { SortProviderId = "fake_chrono", ChronologyItemsSignature = signature });
+        _repo.GetCollectionItemsWithMediaAsync(collectionId).Returns(items);
+
+        await _service.ApplyChronologicalOrderAsync(collectionId, force: true, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _repo.Received(1).UpdateChronologySignatureAsync(collectionId, signature);
+        await _repo.DidNotReceive().TouchChronologySyncedAtAsync(Arg.Any<Guid>());
+    }
+
     private static string ComputeSignature(IEnumerable<Guid> mediaItemIds)
     {
         var joined = string.Join(",", mediaItemIds.OrderBy(x => x));
         return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(joined)));
     }
 
-    private sealed class FakeChronologyProvider(string id) : IChronologyProvider
+    private sealed class FakeChronologyProvider(string id, bool ordersLocalItemsOnly = false) : IChronologyProvider
     {
         public string Id => id;
         public string Name => "Fake";
@@ -105,6 +144,7 @@ public class CollectionOrderingServiceTests
         public bool IsSystemPlugin => true;
         public string Type => "Chronology";
         public string ProviderId => id;
+        public bool OrdersLocalItemsOnly => ordersLocalItemsOnly;
         public string ExternalIdLabel => "List";
         public string ExternalIdPlaceholder => "id";
 

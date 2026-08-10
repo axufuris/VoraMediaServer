@@ -97,7 +97,7 @@ public static class CollectionEndpoints
     {
         try
         {
-            await orderingService.ApplyChronologicalOrderAsync(id);
+            await orderingService.ApplyChronologicalOrderAsync(id, force: true);
             return Results.NoContent();
         }
         catch (Exception ex)
