@@ -15,7 +15,7 @@ public class CollectionOrderingService(
     IClientNotifier notifier,
     ILogger<CollectionOrderingService> logger)
 {
-    public async Task ApplyChronologicalOrderAsync(Guid collectionId, CancellationToken cancellationToken = default)
+    public async Task ApplyChronologicalOrderAsync(Guid collectionId, bool force = false, CancellationToken cancellationToken = default)
     {
         var config = await repository.GetChronologyConfigAsync(collectionId);
 
@@ -33,8 +33,11 @@ public class CollectionOrderingService(
             var signature = ComputeSignature(collectionItems.Select(i => i.MediaItemId));
 
             // A provider that orders the collection's own items (AI) yields the
-            // same result while the item set is unchanged, so skip the paid call.
-            if (provider.OrdersLocalItemsOnly && signature == config.ChronologyItemsSignature)
+            // same result while the item set is unchanged, so skip the paid call
+            // on scheduled/background runs. A forced run (the admin explicitly
+            // clicking "Sync Timeline") re-orders even when nothing changed, so a
+            // new model or updated guardrails can be applied on demand.
+            if (!force && provider.OrdersLocalItemsOnly && signature == config.ChronologyItemsSignature)
             {
                 await repository.TouchChronologySyncedAtAsync(collectionId);
                 return;
@@ -106,7 +109,7 @@ public class CollectionOrderingService(
             return;
         }
 
-        await ApplyChronologicalOrderAsync(collectionId, cancellationToken);
+        await ApplyChronologicalOrderAsync(collectionId, force: false, cancellationToken);
         await notifier.NotifyCollectionUpdatedAsync(collectionId);
     }
 

@@ -37,15 +37,17 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         var lines = items.Select(i => $"{i.Index}: {DescribeItem(i)}");
 
         var prompt =
-            $"You are ordering a media collection. The collection is described as: \"{description}\".\n" +
-            "Here are the items, one per line as `index: Title (Year) [Type]`. The year shown is the RELEASE year.\n" +
+            $"You are ordering a media collection. It is described as: \"{description}\".\n" +
+            "Items, one per line as `index: Title (ReleaseYear) [Type]` — the year shown is the RELEASE year:\n" +
             string.Join("\n", lines) + "\n\n" +
-            "Sort them into the collection's intended chronological order. Unless the description explicitly asks for release " +
-            "order, order by the IN-UNIVERSE story timeline (when the events take place within the story), which often differs " +
-            "from the release year — a prequel, flashback, or origin story is placed earlier than a later-set film released before " +
-            "it. Use the well-known franchise timeline where one exists.\n" +
-            "Return ONLY valid JSON of the form {\"order\": [<index>, <index>, ...]}. You MUST include EVERY index shown above " +
-            "exactly once — never omit, invent, or duplicate an index.";
+            "Unless the description explicitly asks for release order, order by the IN-UNIVERSE story timeline. For EVERY index, " +
+            "give the year in which its story PRIMARILY takes place within the fictional world (its in-universe setting year). " +
+            "This is frequently NOT the release year: an origin story, prequel, period piece, or flashback is set earlier than a " +
+            "film released before it — e.g. a 1940s-set wartime origin comes very early, and a 1990s-set prequel comes before " +
+            "later-released films set in the present day. For an item spanning multiple periods, use the year of its main " +
+            "present-day storyline. Use the widely-published in-universe timeline for established franchises.\n" +
+            "Return ONLY valid JSON of the form {\"items\": [{\"index\": <index>, \"setYear\": <YYYY>}, ...]}, listing EVERY index " +
+            "above exactly once, ordered by setYear ascending. Never omit, invent, or duplicate an index.";
 
         var json = await openAi.CompleteJsonAsync(Id, prompt, cancellationToken, temperature: 0.2, modelSettingKey: "collections_model");
         if (string.IsNullOrWhiteSpace(json))
@@ -53,36 +55,42 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             return new List<ChronologyResult>();
         }
 
-        int[]? order;
+        OrderResult? parsed;
         try
         {
-            order = JsonSerializer.Deserialize<OrderResult>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })?.Order;
+            parsed = JsonSerializer.Deserialize<OrderResult>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
         catch (JsonException)
         {
             return new List<ChronologyResult>();
         }
 
-        if (order == null || order.Length == 0)
+        if (parsed?.Items == null || parsed.Items.Count == 0)
         {
             return new List<ChronologyResult>();
         }
 
         var byIndex = items.ToDictionary(i => i.Index);
-        var results = new List<ChronologyResult>();
-        var placed = new HashSet<int>();
-        decimal position = 1;
+        var seen = new HashSet<int>();
+        var ranked = new List<(int SetYear, int Position, CollectionOrderingItemDto Item)>();
 
-        foreach (var index in order)
+        for (var position = 0; position < parsed.Items.Count; position++)
         {
-            if (!placed.Add(index) || !byIndex.TryGetValue(index, out var item)) continue;
-            results.Add(ToResult(item, position++));
+            var entry = parsed.Items[position];
+            if (!seen.Add(entry.Index) || !byIndex.TryGetValue(entry.Index, out var item)) continue;
+            ranked.Add((entry.SetYear ?? int.MaxValue, position, item));
         }
 
+        var ordered = ranked.OrderBy(r => r.SetYear).ThenBy(r => r.Position).Select(r => r.Item).ToList();
+
         // Anything the model dropped keeps its original relative order at the end.
-        foreach (var item in items)
+        ordered.AddRange(items.Where(i => !seen.Contains(i.Index)));
+
+        var results = new List<ChronologyResult>();
+        decimal sortOrder = 1;
+        foreach (var item in ordered)
         {
-            if (placed.Add(item.Index)) results.Add(ToResult(item, position++));
+            results.Add(ToResult(item, sortOrder++));
         }
 
         return results;
@@ -112,6 +120,12 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
 
     private class OrderResult
     {
-        public int[]? Order { get; set; }
+        public List<OrderedItem>? Items { get; set; }
+    }
+
+    private class OrderedItem
+    {
+        public int Index { get; set; }
+        public int? SetYear { get; set; }
     }
 }
