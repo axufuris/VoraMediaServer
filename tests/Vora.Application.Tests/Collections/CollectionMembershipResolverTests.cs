@@ -80,6 +80,53 @@ public class CollectionMembershipResolverTests
     }
 
     [Fact]
+    public void Matches_short_film_stored_under_a_one_shot_designation_prefix()
+    {
+        var id = Guid.NewGuid();
+        var candidates = Candidates(movies: new()
+        {
+            new MediaTitleCandidateDto { Id = id, Title = "Marvel One-Shot: Item 47", Year = 2012 }
+        });
+        var entries = new List<CollectionMembershipEntry>
+        {
+            new() { MediaType = "Movie", Title = "Item 47", Year = 2012 }
+        };
+
+        CollectionMembershipResolver.Resolve(entries, candidates).Should().Equal(id);
+    }
+
+    [Fact]
+    public void Still_matches_a_short_film_by_its_full_designation_title()
+    {
+        var id = Guid.NewGuid();
+        var candidates = Candidates(movies: new()
+        {
+            new MediaTitleCandidateDto { Id = id, Title = "Marvel One-Shot: Item 47", Year = 2012 }
+        });
+        var entries = new List<CollectionMembershipEntry>
+        {
+            new() { MediaType = "Movie", Title = "Marvel One-Shot: Item 47", Year = 2012 }
+        };
+
+        CollectionMembershipResolver.Resolve(entries, candidates).Should().Equal(id);
+    }
+
+    [Fact]
+    public void Does_not_strip_a_regular_subtitle_prefix()
+    {
+        var candidates = Candidates(movies: new()
+        {
+            new MediaTitleCandidateDto { Id = Guid.NewGuid(), Title = "Spider-Man: Homecoming", Year = 2017 }
+        });
+        var entries = new List<CollectionMembershipEntry>
+        {
+            new() { MediaType = "Movie", Title = "Homecoming", Year = 2017 }
+        };
+
+        CollectionMembershipResolver.Resolve(entries, candidates).Should().BeEmpty();
+    }
+
+    [Fact]
     public void Matches_season_by_show_title_and_number()
     {
         var showId = Guid.NewGuid();

@@ -61,6 +61,11 @@ public static class TitleMatch
     // prefix appears as "<word> s <rest>".
     public static IEnumerable<string> MatchKeys(string? title)
     {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            yield break;
+        }
+
         var normalized = Normalize(title);
         if (normalized.Length == 0)
         {
@@ -78,5 +83,21 @@ public static class TitleMatch
                 yield return stripped;
             }
         }
+
+        var colon = title.IndexOf(':');
+        if (colon > 0 && colon < title.Length - 1)
+        {
+            var normalizedPrefix = Normalize(title[..colon]);
+            if (DesignationPrefixes.Any(d => normalizedPrefix.Contains(d)))
+            {
+                var suffix = Normalize(title[(colon + 1)..]);
+                if (suffix.Length > 0 && suffix != normalized)
+                {
+                    yield return suffix;
+                }
+            }
+        }
     }
+
+    private static readonly string[] DesignationPrefixes = { "one shot", "presents" };
 }

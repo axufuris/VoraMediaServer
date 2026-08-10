@@ -30,7 +30,8 @@ public class OpenAiListProvider(IOpenAiClient openAi) : ICollectionSyncProvider
 
         var prompt =
             $"You are building a media collection described as: \"{externalId}\".\n" +
-            "List every movie and TV season that belongs in it. Return ONLY valid JSON of the form " +
+            "List every movie and TV season that belongs in it. Treat short films, one-shots, TV specials, and " +
+            "featurettes that are officially part of it as movies and include them too. Return ONLY valid JSON of the form " +
             "{\"items\": [ {\"type\": \"movie\", \"title\": \"...\", \"year\": 2008}, " +
             "{\"type\": \"season\", \"show\": \"...\", \"season\": 1} ]}.\n" +
             "Rules: use \"movie\" for films (include the release year) and \"season\" for a single season of a TV show " +
