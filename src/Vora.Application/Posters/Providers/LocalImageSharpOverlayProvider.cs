@@ -31,6 +31,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
     private const int CompositeMaxItems = 3;
     private const int MaxCanvasWidthPx = 1280;
     private const int OverlayJpegQuality = 90;
+    private const double PosterAspect = 2.0 / 3.0;
 
     private static readonly JsonSerializerOptions ConfigurationParseOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -71,6 +72,8 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
 
         using var baseImage = await Image.LoadAsync<Rgba32>(originalArtworkPath, cancellationToken);
 
+        NormalizeToPosterAspect(baseImage);
+
         if (baseImage.Width > MaxCanvasWidthPx)
         {
             var scale = (double)MaxCanvasWidthPx / baseImage.Width;
@@ -107,7 +110,37 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         return $"{CustomArtworkUrlPrefix}{outputFileName}";
     }
 
-    private const string CacheKeyVersion = "v5-rating-10-scale";
+    // Clients render posters at a 2:3 aspect with object-cover (center crop).
+    // Badges are placed as percentages of the base image, so on source art that
+    // isn't 2:3 they land where the client then crops — clipped off the side or
+    // overlapping other UI. Center-crop the base to 2:3 first so the baked
+    // overlay matches exactly what the client shows.
+    private static void NormalizeToPosterAspect(Image<Rgba32> image)
+    {
+        var currentAspect = (double)image.Width / image.Height;
+        if (Math.Abs(currentAspect - PosterAspect) < 0.001)
+        {
+            return;
+        }
+
+        int cropWidth, cropHeight;
+        if (currentAspect > PosterAspect)
+        {
+            cropHeight = image.Height;
+            cropWidth = (int)Math.Round(image.Height * PosterAspect);
+        }
+        else
+        {
+            cropWidth = image.Width;
+            cropHeight = (int)Math.Round(image.Width / PosterAspect);
+        }
+
+        var cropX = Math.Max(0, (image.Width - cropWidth) / 2);
+        var cropY = Math.Max(0, (image.Height - cropHeight) / 2);
+        image.Mutate(x => x.Crop(new Rectangle(cropX, cropY, cropWidth, cropHeight)));
+    }
+
+    private const string CacheKeyVersion = "v6-poster-aspect-2x3";
 
     private static string ComputeOverlayCacheKey(OverlayMediaDto item, string originalArtworkPath, string templateJson)
     {
