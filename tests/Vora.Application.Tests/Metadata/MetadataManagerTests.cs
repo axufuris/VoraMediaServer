@@ -150,6 +150,76 @@ public class MetadataManagerTests
     }
 
     [Fact]
+    public async Task RefreshMetadataAsync_reenriches_enriched_show_when_a_season_lacks_a_poster()
+    {
+        var showId = Guid.NewGuid();
+        var show = new Vora.Domain.Entities.Media.TvShow
+        {
+            Id = showId,
+            Title = "Marvel's Agent Carter",
+            PosterUrl = "poster.jpg",
+            LastMetadataRefresh = new DateTime(2026, 1, 1),
+            Seasons =
+            {
+                new Vora.Domain.Entities.Media.Season { Title = "Season 1", SeasonNumber = 1, PosterUrl = "s1.jpg" },
+                new Vora.Domain.Entities.Media.Season { Title = "Season 2", SeasonNumber = 2, PosterUrl = null }
+            }
+        };
+        _media.GetForMetadataSyncAsync(showId).Returns(show);
+        _fetch.GetTextMetadataAsync(show).Returns(((MetadataResult?)null, string.Empty, string.Empty));
+
+        await _manager.RefreshMetadataAsync(showId);
+
+        await _fetch.Received(1).GetTextMetadataAsync(show);
+    }
+
+    [Fact]
+    public async Task RefreshMetadataAsync_skips_enriched_show_when_every_season_has_a_poster()
+    {
+        var showId = Guid.NewGuid();
+        var show = new Vora.Domain.Entities.Media.TvShow
+        {
+            Id = showId,
+            Title = "Marvel's Agents of S.H.I.E.L.D.",
+            PosterUrl = "poster.jpg",
+            LastMetadataRefresh = new DateTime(2026, 1, 1),
+            Seasons =
+            {
+                new Vora.Domain.Entities.Media.Season { Title = "Season 1", SeasonNumber = 1, PosterUrl = "s1.jpg" },
+                new Vora.Domain.Entities.Media.Season { Title = "Season 2", SeasonNumber = 2, PosterUrl = "s2.jpg" }
+            }
+        };
+        _media.GetForMetadataSyncAsync(showId).Returns(show);
+
+        await _manager.RefreshMetadataAsync(showId);
+
+        await _fetch.DidNotReceiveWithAnyArgs().GetTextMetadataAsync(default!);
+    }
+
+    [Fact]
+    public async Task RefreshMetadataAsync_ignores_missing_seasons_without_posters()
+    {
+        var showId = Guid.NewGuid();
+        var show = new Vora.Domain.Entities.Media.TvShow
+        {
+            Id = showId,
+            Title = "Show With A Trashed Season",
+            PosterUrl = "poster.jpg",
+            LastMetadataRefresh = new DateTime(2026, 1, 1),
+            Seasons =
+            {
+                new Vora.Domain.Entities.Media.Season { Title = "Season 1", SeasonNumber = 1, PosterUrl = "s1.jpg" },
+                new Vora.Domain.Entities.Media.Season { Title = "Season 2", SeasonNumber = 2, PosterUrl = null, MissingSince = new DateTime(2026, 1, 2) }
+            }
+        };
+        _media.GetForMetadataSyncAsync(showId).Returns(show);
+
+        await _manager.RefreshMetadataAsync(showId);
+
+        await _fetch.DidNotReceiveWithAnyArgs().GetTextMetadataAsync(default!);
+    }
+
+    [Fact]
     public async Task TriggerLibraryRatingsRefreshAsync_calls_repository_for_each_id_and_notifies()
     {
         var libId = Guid.NewGuid();
