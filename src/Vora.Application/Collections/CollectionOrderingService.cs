@@ -60,7 +60,8 @@ public class CollectionOrderingService(
                     TmdbId = i.MediaItem.TmdbId,
                     ImdbId = i.MediaItem.ImdbId,
                     ShowTitle = seasonInfo.TryGetValue(i.MediaItemId, out var si) ? si.ShowTitle : null,
-                    SeasonNumber = seasonInfo.TryGetValue(i.MediaItemId, out var sn) ? sn.SeasonNumber : (int?)null
+                    SeasonNumber = seasonInfo.TryGetValue(i.MediaItemId, out var sn) ? sn.SeasonNumber : (int?)null,
+                    KnownSetYear = force ? null : i.InUniverseYear
                 })
                 .ToList();
 
@@ -76,6 +77,7 @@ public class CollectionOrderingService(
                 if (match != null)
                 {
                     item.SortOrder = match.SortOrder;
+                    item.InUniverseYear = match.SetYear ?? item.InUniverseYear;
                 }
             }
 

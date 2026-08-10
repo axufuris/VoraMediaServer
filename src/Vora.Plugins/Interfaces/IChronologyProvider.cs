@@ -25,4 +25,5 @@ public class ChronologyResult
     public string? ImdbId { get; set; }
     public string MediaType { get; set; } = "Movie";
     public decimal SortOrder { get; set; }
+    public double? SetYear { get; set; }
 }

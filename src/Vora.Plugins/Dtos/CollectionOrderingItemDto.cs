@@ -11,4 +11,5 @@ public class CollectionOrderingItemDto
     public string? ImdbId { get; set; }
     public string? ShowTitle { get; set; }
     public int? SeasonNumber { get; set; }
+    public double? KnownSetYear { get; set; }
 }
