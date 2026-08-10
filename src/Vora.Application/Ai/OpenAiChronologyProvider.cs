@@ -86,12 +86,10 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             }
         }
 
-        if (newlyScored.Count > 0)
-        {
-            await VerifyPlacementAsync(description, items, setYears, newlyScored, cancellationToken);
-        }
+        await VerifyPlacementAsync(description, items, setYears, newlyScored, cancellationToken);
 
         RepairSeasonYears(items, setYears);
+        EnforceDistinctSetYears(items, setYears);
 
         var ranked = items
             .Select((item, position) => (
@@ -125,7 +123,20 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             return;
         }
 
-        var json = await openAi.CompleteJsonAsync(Id, BuildVerificationPrompt(description, ordered, setYears, toVerify), cancellationToken, temperature: 0.2, modelSettingKey: "collections_model");
+        var tied = setYears
+            .GroupBy(kv => kv.Value)
+            .Where(g => g.Count() > 1)
+            .SelectMany(g => g.Select(kv => kv.Key))
+            .ToHashSet();
+
+        var review = new HashSet<int>(toVerify);
+        review.UnionWith(tied);
+        if (review.Count == 0)
+        {
+            return;
+        }
+
+        var json = await openAi.CompleteJsonAsync(Id, BuildVerificationPrompt(description, ordered, setYears, review), cancellationToken, temperature: 0.2, modelSettingKey: "collections_model");
         var parsed = TryParse(json);
         if (parsed?.Items == null)
         {
@@ -134,10 +145,35 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
 
         foreach (var entry in parsed.Items)
         {
-            if (entry.SetYear.HasValue && toVerify.Contains(entry.Index))
+            if (entry.SetYear.HasValue && review.Contains(entry.Index))
             {
                 setYears[entry.Index] = entry.SetYear.Value;
             }
+        }
+    }
+
+    private static void EnforceDistinctSetYears(IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears)
+    {
+        const double epsilon = 0.001;
+
+        var ordered = items
+            .Select((item, position) => (item, position))
+            .Where(x => setYears.ContainsKey(x.item.Index))
+            .OrderBy(x => setYears[x.item.Index])
+            .ThenBy(x => x.position)
+            .ToList();
+
+        double? previous = null;
+        foreach (var (item, _) in ordered)
+        {
+            var year = setYears[item.Index];
+            if (previous.HasValue && year <= previous.Value)
+            {
+                year = previous.Value + epsilon;
+                setYears[item.Index] = year;
+            }
+
+            previous = year;
         }
     }
 
@@ -184,8 +220,10 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             "Unless the description explicitly asks for release order, place each by the IN-UNIVERSE story timeline. For EVERY " +
             "index above give a DECIMAL setYear whose whole part is the year the story PRIMARILY takes place within the fictional " +
             "world and whose fractional part sequences events WITHIN that year (e.g. an event early in 2012 is 2012.1, one later in " +
-            "2012 is 2012.8). Use the fraction to break same-year ties — two films both set in 2012 where one clearly follows the " +
-            "other get 2012.3 and 2012.7. The setYear is frequently NOT the release year: an origin story, prequel, period piece, " +
+            "2012 is 2012.8). Every setYear MUST be UNIQUE — never give two items the same value. When several items share a year, " +
+            "spread them across DISTINCT fractions ordered by their exact in-universe sequence (e.g. three items set in 2016 become " +
+            "2016.2, 2016.5 and 2016.8, the one that happens first getting the smallest fraction). The setYear is frequently NOT " +
+            "the release year: an origin story, prequel, period piece, " +
             "or flashback is set earlier than a film released before it — a 1940s-set wartime origin comes very early, a 1990s-set " +
             "prequel comes before later-released present-day films. This also applies to a title released years AFTER the events it " +
             "depicts — a prequel or a gap-filler set between two earlier stories takes its story year, not its release year. For an " +
@@ -193,25 +231,28 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             "own episodes, so later seasons of a show never move earlier than their earlier seasons. Use the widely-published " +
             "in-universe timeline for established franchises.\n" +
             "Return ONLY valid JSON of the form {\"items\": [{\"index\": <index>, \"setYear\": <decimal>}, ...]}. You MUST give a " +
-            "setYear for EVERY index shown above — never omit, invent, or duplicate an index.";
+            "setYear for EVERY index shown above — never omit, invent, or duplicate an index, and never repeat a setYear value.";
     }
 
-    private static string BuildVerificationPrompt(string description, IReadOnlyList<CollectionOrderingItemDto> ordered, Dictionary<int, double> setYears, HashSet<int> toVerify)
+    private static string BuildVerificationPrompt(string description, IReadOnlyList<CollectionOrderingItemDto> ordered, Dictionary<int, double> setYears, HashSet<int> review)
     {
-        var lines = ordered.Select(i => $"{i.Index}: {DescribeItem(i)} — setYear {setYears[i.Index]:0.0}");
-        var review = string.Join(", ", toVerify.OrderBy(x => x));
+        var lines = ordered.Select(i => $"{i.Index}: {DescribeItem(i)} — setYear {setYears[i.Index]:0.00}");
+        var reviewList = string.Join(", ", review.OrderBy(x => x));
 
         return
             $"You are auditing the in-universe chronological order of a media collection described as: \"{description}\".\n" +
             "Below is the current order, earliest first, one per line as `index: Title (ReleaseYear) [Type] — setYear <value>`:\n" +
             string.Join("\n", lines) + "\n\n" +
-            $"Review ONLY these indices, which were just placed: {review}. For each, decide whether its setYear puts it at the " +
+            $"Review these indices: {reviewList}. For each, decide whether its setYear puts it at the " +
             "correct point in this in-universe timeline relative to its neighbours. A period piece, prequel, flashback, or origin " +
             "story belongs at its story year, not its release year; a television season belongs with its own show's other seasons " +
-            "and never earlier than an earlier season of the same show. If an index is clearly out of place, return a corrected " +
-            "DECIMAL setYear for it; if it is already correct, omit it.\n" +
+            "and never earlier than an earlier season of the same show. Additionally, NO two items may share the same setYear: " +
+            "wherever the list above shows a repeated setYear, give those items DISTINCT decimal fractions within that year, " +
+            "ordered by their exact in-universe sequence (the one that happens first getting the smaller fraction). If an index is " +
+            "out of place or shares a setYear with another, return a corrected DECIMAL setYear for it; if it is already correct and " +
+            "unique, omit it.\n" +
             "Return ONLY valid JSON of the form {\"items\": [{\"index\": <index>, \"setYear\": <decimal>}, ...]}, containing only the " +
-            "indices you are correcting. Return {\"items\": []} if every reviewed index is already correct.";
+            "indices you are correcting. Return {\"items\": []} if every reviewed index is already correct and unique.";
     }
 
     private static OrderResult? TryParse(string? json)
