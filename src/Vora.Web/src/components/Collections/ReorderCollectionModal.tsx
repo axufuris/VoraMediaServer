@@ -103,7 +103,7 @@ export default function ReorderCollectionModal({
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} size="xl" cardClassName="flex flex-col max-h-[85vh]">
+        <Modal isOpen={isOpen} onClose={onClose} size="4xl" cardClassName="flex flex-col max-h-[85vh]">
             <ModalHeader
                 title="Manual Sort Order"
                 subtitle={isChronology
@@ -130,7 +130,7 @@ export default function ReorderCollectionModal({
                         </div>
 
                         <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-[var(--vora-text-secondary)] text-sm truncate">{item.title}</h4>
+                            <h4 className="font-bold text-[var(--vora-text-secondary)] text-sm truncate">{item.tvShowTitle ? `${item.tvShowTitle}: ${item.title}` : item.title}</h4>
                             <p className="text-xs text-[var(--vora-text-muted)]">{item.releaseDate ? new Date(item.releaseDate).getFullYear() : 'Unknown'}</p>
                         </div>
 
@@ -150,7 +150,7 @@ export default function ReorderCollectionModal({
                                     onChange={(e) => setYear(item.id, e.target.value)}
                                     onBlur={() => commitYear(item.id)}
                                     onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                                    className="w-20 px-2 py-1 text-sm rounded bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none"
+                                    className="w-28 px-3 py-1.5 text-sm rounded bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none"
                                     title="In-universe (story) year used to order this item"
                                 />
                                 <button
