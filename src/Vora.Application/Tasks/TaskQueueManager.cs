@@ -329,7 +329,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var orderingService = sp.GetRequiredService<CollectionOrderingService>();
             await orderingService.ApplyChronologicalOrderAsync(collectionId);
-        });
+        }, resourceKey: CollectionKey(collectionId));
     }
 
     public void QueueCollectionContentSync(Guid collectionId, string title)
@@ -338,7 +338,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var syncService = sp.GetRequiredService<CollectionSyncService>();
             await syncService.SyncCollectionContentAsync(collectionId);
-        });
+        }, resourceKey: CollectionKey(collectionId));
     }
 
     public void QueueGeneratePosterOverlays(Guid mediaItemId)
@@ -368,7 +368,7 @@ public class TaskQueueManager : ITaskQueueManager
                 var orderingService = sp.GetRequiredService<CollectionOrderingService>();
                 await orderingService.ApplyChronologicalOrderAsync(collectionId);
             }
-        });
+        }, resourceKey: CollectionKey(collectionId));
     }
 
     public void QueueReevaluateCollectionOrder(Guid collectionId)
@@ -377,7 +377,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var orderingService = sp.GetRequiredService<CollectionOrderingService>();
             await orderingService.ReevaluateOrderOnItemAddedAsync(collectionId, ct);
-        });
+        }, resourceKey: CollectionKey(collectionId));
     }
 
     public Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null)
@@ -760,6 +760,13 @@ public class TaskQueueManager : ITaskQueueManager
     // and race on its rows); different libraries get different keys and can run
     // concurrently up to the global cap.
     private static string LibraryKey(Guid libraryId) => $"library:{libraryId}";
+
+    // All of a collection's sync/order tasks share one key so they serialize:
+    // a content sync (which itself queues a reorder), the chronology sort, and a
+    // reevaluate can never run at the same time on one collection and race each
+    // other's writes or double-spend the AI. The deferred one runs after and
+    // no-ops via the chronology signature. Different collections stay parallel.
+    private static string CollectionKey(Guid collectionId) => $"collection:{collectionId}";
 
     // Every poster-overlay sync and the orphan sweep share ONE key so they
     // serialize server-wide. The frontend "update now" fires a global (all
