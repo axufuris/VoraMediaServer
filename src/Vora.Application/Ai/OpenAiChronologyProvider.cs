@@ -88,6 +88,7 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
 
         await VerifyPlacementAsync(description, items, setYears, newlyScored, cancellationToken);
 
+        AnchorContemporarySeasons(items, setYears);
         RepairSeasonYears(items, setYears);
         EnforceDistinctSetYears(items, setYears);
 
@@ -174,6 +175,41 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             }
 
             previous = year;
+        }
+    }
+
+    private static void AnchorContemporarySeasons(IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears)
+    {
+        const double contemporaryTolerance = 2.0;
+        const double maxDrift = 4.0;
+
+        var showGroups = items
+            .Where(i => string.Equals(i.MediaType, "Season", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(i.ShowTitle))
+            .GroupBy(i => i.ShowTitle!);
+
+        foreach (var group in showGroups)
+        {
+            var seasons = group.Where(s => s.Year.HasValue && setYears.ContainsKey(s.Index)).ToList();
+            if (seasons.Count == 0)
+            {
+                continue;
+            }
+
+            var isContemporary = seasons.Any(s => Math.Abs(setYears[s.Index] - s.Year!.Value) <= contemporaryTolerance);
+            if (!isContemporary)
+            {
+                continue;
+            }
+
+            foreach (var season in seasons)
+            {
+                var setYear = setYears[season.Index];
+                if (Math.Abs(setYear - season.Year!.Value) > maxDrift)
+                {
+                    setYears[season.Index] = season.Year.Value + (setYear - Math.Floor(setYear));
+                }
+            }
         }
     }
 
@@ -278,7 +314,8 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         {
             var show = string.IsNullOrWhiteSpace(item.ShowTitle) ? item.Title : item.ShowTitle;
             var season = item.SeasonNumber.HasValue ? $" Season {item.SeasonNumber}" : string.Empty;
-            return $"{show}{season} [Season]";
+            var aired = item.Year.HasValue ? $" (aired {item.Year})" : string.Empty;
+            return $"{show}{season}{aired} [Season]";
         }
 
         var year = item.Year.HasValue ? $" ({item.Year})" : string.Empty;
