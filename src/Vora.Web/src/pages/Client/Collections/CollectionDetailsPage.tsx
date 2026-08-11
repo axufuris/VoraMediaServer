@@ -107,7 +107,10 @@ export default function CollectionDetailsPage() {
     const handleRemoveItem = async (e: React.MouseEvent, mediaId: string) => {
         e.stopPropagation();
 
-        if (!await dialog.confirm("Are you sure you want to remove this item from the collection?")) {
+        const message = collection?.contentSyncProviderId
+            ? "Remove this item from the collection? It will also be excluded from future syncs, so the list sync won't add it back."
+            : "Are you sure you want to remove this item from the collection?";
+        if (!await dialog.confirm(message)) {
             return;
         }
 
@@ -257,7 +260,7 @@ export default function CollectionDetailsPage() {
                                 isPlayed={item.isPlayed}
                                 unplayedCount={item.unplayedItemCount}
                                 onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
-                                onHide={isAdmin && !collection.contentSyncProviderId && !collection.systemGenerated ? (e) => handleRemoveItem(e, item.id) : undefined}
+                                onHide={isAdmin && !collection.systemGenerated ? (e) => handleRemoveItem(e, item.id) : undefined}
                             />
                         ))}
                     </div>

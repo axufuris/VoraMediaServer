@@ -195,6 +195,7 @@ public class CollectionManager : ICollectionManager
     public async Task AddMediaToCollectionAsync(Guid collectionId, Guid mediaItemId)
     {
         await _repository.AddItemToCollectionAsync(collectionId, mediaItemId);
+        await _repository.RemoveExcludedMediaIdAsync(collectionId, mediaItemId);
 
         await _notifier.NotifyCollectionUpdatedAsync(collectionId);
 
@@ -225,6 +226,7 @@ public class CollectionManager : ICollectionManager
     public async Task RemoveMediaFromCollectionAsync(Guid collectionId, Guid mediaItemId)
     {
         await _repository.RemoveItemFromCollectionAsync(collectionId, mediaItemId);
+        await _repository.AddExcludedMediaIdAsync(collectionId, mediaItemId);
 
         await _notifier.NotifyCollectionUpdatedAsync(collectionId);
     }
