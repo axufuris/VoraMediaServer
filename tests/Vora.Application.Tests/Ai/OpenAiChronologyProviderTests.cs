@@ -187,6 +187,28 @@ public class OpenAiChronologyProviderTests
     }
 
     [Fact]
+    public async Task A_locked_item_keeps_its_set_year_even_when_the_model_would_move_it()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var items = new List<CollectionOrderingItemDto>
+        {
+            new() { Index = 0, LocalId = a, Title = "A", MediaType = "Movie", KnownSetYear = 1990.0, SetYearLocked = true },
+            new() { Index = 1, LocalId = b, Title = "B", MediaType = "Movie" },
+        };
+
+        var openAi = AiReturning(
+            "{\"items\":[{\"index\":1,\"setYear\":1980}]}",
+            "{\"items\":[{\"index\":0,\"setYear\":2000}]}");
+        var provider = new OpenAiChronologyProvider(openAi);
+        var result = await provider.GetChronologicalOrderAsync("c", null, items, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1990.0, result.Single(r => r.LocalId == a).SetYear);
+        var ordered = result.OrderBy(r => r.SortOrder).Select(r => r.LocalId!.Value).ToList();
+        Assert.Equal(new[] { b, a }, ordered);
+    }
+
+    [Fact]
     public async Task Repairs_a_season_the_model_scored_decades_off_from_its_show()
     {
         var s1 = Guid.NewGuid();

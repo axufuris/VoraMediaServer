@@ -19,6 +19,7 @@ public interface ICollectionManager
     Task<IEnumerable<CollectionSummaryVM>> GetAllCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs);
     Task<IEnumerable<CollectionSummaryVM>> GetGlobalCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs);
     Task UpdateCollectionAsync(Guid id, UpdateCollectionRequest request);
+    Task SetItemInUniverseYearAsync(Guid collectionId, Guid mediaItemId, double? year, bool locked);
     Task RemoveMediaFromCollectionAsync(Guid collectionId, Guid mediaItemId);
     Task ReorderCollectionItemsAsync(Guid collectionId, List<Guid> orderedMediaItemIds);
     Task DeleteCollectionAsync(Guid id);
@@ -73,6 +74,19 @@ public class CollectionManager : ICollectionManager
             CollectionSortOrder.Alphabetical => collection.Items.OrderBy(i => i.SortTitle ?? i.Title).ToList(),
             _ => collection.Items
         };
+
+        var chronology = await _repository.GetCollectionItemChronologyAsync(id);
+        if (chronology != null)
+        {
+            foreach (var item in collection.Items)
+            {
+                if (chronology.TryGetValue(item.Id, out var chr))
+                {
+                    item.InUniverseYear = chr.Year;
+                    item.InUniverseYearLocked = chr.Locked;
+                }
+            }
+        }
 
         if (profileId.HasValue)
         {
@@ -168,6 +182,14 @@ public class CollectionManager : ICollectionManager
         {
             _taskQueueManager.QueueFullCollectionSync(collectionId, title, hasContentSync, hasChronologySort);
         }
+    }
+
+    public async Task SetItemInUniverseYearAsync(Guid collectionId, Guid mediaItemId, double? year, bool locked)
+    {
+        await _repository.SetItemInUniverseYearAsync(collectionId, mediaItemId, year, locked);
+        await _repository.UpdateChronologySignatureAsync(collectionId, string.Empty);
+        _taskQueueManager.QueueReevaluateCollectionOrder(collectionId);
+        await _notifier.NotifyCollectionUpdatedAsync(collectionId);
     }
 
     public async Task AddMediaToCollectionAsync(Guid collectionId, Guid mediaItemId)

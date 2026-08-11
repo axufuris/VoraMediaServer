@@ -41,12 +41,17 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         var description = string.IsNullOrWhiteSpace(externalId) ? collectionName : externalId;
         var byIndex = items.ToDictionary(i => i.Index);
         var setYears = new Dictionary<int, double>();
+        var locked = new HashSet<int>();
 
         foreach (var cached in items)
         {
             if (cached.KnownSetYear.HasValue)
             {
                 setYears[cached.Index] = cached.KnownSetYear.Value;
+                if (cached.SetYearLocked)
+                {
+                    locked.Add(cached.Index);
+                }
             }
         }
 
@@ -86,11 +91,11 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             }
         }
 
-        await VerifyPlacementAsync(description, items, setYears, newlyScored, cancellationToken);
+        await VerifyPlacementAsync(description, items, setYears, newlyScored, locked, cancellationToken);
 
-        AnchorContemporarySeasons(items, setYears);
-        RepairSeasonYears(items, setYears);
-        EnforceDistinctSetYears(items, setYears);
+        AnchorContemporarySeasons(items, setYears, locked);
+        RepairSeasonYears(items, setYears, locked);
+        EnforceDistinctSetYears(items, setYears, locked);
 
         var ranked = items
             .Select((item, position) => (
@@ -112,7 +117,7 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         return results;
     }
 
-    private async Task VerifyPlacementAsync(string description, IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears, HashSet<int> toVerify, CancellationToken cancellationToken)
+    private async Task VerifyPlacementAsync(string description, IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears, HashSet<int> toVerify, HashSet<int> locked, CancellationToken cancellationToken)
     {
         var ordered = items
             .Where(i => setYears.ContainsKey(i.Index))
@@ -132,6 +137,7 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
 
         var review = new HashSet<int>(toVerify);
         review.UnionWith(tied);
+        review.ExceptWith(locked);
         if (review.Count == 0)
         {
             return;
@@ -153,7 +159,7 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         }
     }
 
-    private static void EnforceDistinctSetYears(IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears)
+    private static void EnforceDistinctSetYears(IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears, HashSet<int> locked)
     {
         const double epsilon = 0.001;
 
@@ -168,6 +174,12 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         foreach (var (item, _) in ordered)
         {
             var year = setYears[item.Index];
+            if (locked.Contains(item.Index))
+            {
+                previous = previous.HasValue ? Math.Max(previous.Value, year) : year;
+                continue;
+            }
+
             if (previous.HasValue && year <= previous.Value)
             {
                 year = previous.Value + epsilon;
@@ -178,7 +190,7 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         }
     }
 
-    private static void AnchorContemporarySeasons(IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears)
+    private static void AnchorContemporarySeasons(IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears, HashSet<int> locked)
     {
         const double contemporaryTolerance = 2.0;
         const double maxDrift = 4.0;
@@ -204,6 +216,11 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
 
             foreach (var season in seasons)
             {
+                if (locked.Contains(season.Index))
+                {
+                    continue;
+                }
+
                 var setYear = setYears[season.Index];
                 if (Math.Abs(setYear - season.Year!.Value) > maxDrift)
                 {
@@ -213,7 +230,7 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         }
     }
 
-    private static void RepairSeasonYears(IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears)
+    private static void RepairSeasonYears(IReadOnlyList<CollectionOrderingItemDto> items, Dictionary<int, double> setYears, HashSet<int> locked)
     {
         var showGroups = items
             .Where(i => string.Equals(i.MediaType, "Season", StringComparison.OrdinalIgnoreCase)
@@ -233,7 +250,7 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             foreach (var season in seasons)
             {
                 var year = setYears.TryGetValue(season.Index, out var sy) ? sy : (season.Year ?? double.MaxValue);
-                if (previous.HasValue && (year < previous.Value || year > previous.Value + MaxSeasonGap))
+                if (!locked.Contains(season.Index) && previous.HasValue && (year < previous.Value || year > previous.Value + MaxSeasonGap))
                 {
                     year = previous.Value + SeasonStep;
                     setYears[season.Index] = year;

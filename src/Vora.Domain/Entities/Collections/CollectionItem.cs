@@ -7,6 +7,7 @@ public class CollectionItem
 {
     public decimal SortOrder { get; set; }
     public double? InUniverseYear { get; set; }
+    public bool InUniverseYearLocked { get; set; }
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
 
     public Guid CollectionId { get; set; }

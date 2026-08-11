@@ -56,6 +56,8 @@ export interface CollectionDetailsLibraryItem {
     posterUrl?: string;
     isPlayed?: boolean;
     unplayedItemCount?: number;
+    inUniverseYear?: number | null;
+    inUniverseYearLocked?: boolean;
 }
 
 export const collectionService = {

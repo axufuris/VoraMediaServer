@@ -68,6 +68,10 @@ export const collectionAdminService = {
         await apiClient.put(`/collections/${collectionId}/items/reorder`, { mediaItemIds }, { serverId });
     },
 
+    setItemChronology: async (collectionId: string, mediaItemId: string, inUniverseYear: number | null, locked: boolean, serverId?: string): Promise<void> => {
+        await apiClient.put(`/collections/${collectionId}/items/${mediaItemId}/chronology`, { inUniverseYear, locked }, { serverId });
+    },
+
     deleteCollection: async (id: string, serverId?: string): Promise<void> => {
         await apiClient.delete(`/collections/${id}`, { serverId });
     },
