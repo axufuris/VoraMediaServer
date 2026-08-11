@@ -124,7 +124,7 @@ public class MediaIngestionService : IMediaIngestionService
         await _writeGate.RunAsync(async () =>
         {
             var showId = await _repository.GetTvShowIdByExternalIdAsync(tmdbId, imdbId, libraryId)
-                ?? await _repository.GetTvShowIdByTitleAsync(title, libraryId);
+                ?? await _repository.GetTvShowIdByTitleAndYearAsync(title, year, libraryId);
             if (showId.HasValue)
             {
                 resultId = showId.Value;
@@ -408,7 +408,7 @@ public class MediaIngestionService : IMediaIngestionService
 
     public async Task AttachTvShowLocalExtraAsync(LibraryHandle library, string showTitle, string filePath, string extraType, string title)
     {
-        var showId = await _repository.GetTvShowIdByTitleAsync(showTitle, library.Value);
+        var showId = await _repository.GetTvShowIdByTitleAndYearAsync(showTitle, null, library.Value);
         if (showId == null) return;
         await CreateAndAnalyzeExtraAsync(showId.Value, filePath, extraType, title);
     }

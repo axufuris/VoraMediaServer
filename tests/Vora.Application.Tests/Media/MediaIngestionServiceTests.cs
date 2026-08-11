@@ -113,7 +113,7 @@ public class MediaIngestionServiceTests : IDisposable
     public async Task EnsureTvShowAsync_dedups_by_title()
     {
         var existing = Guid.NewGuid();
-        _mediaRepo.GetTvShowIdByTitleAsync("Breaking Bad", Arg.Any<Guid>())
+        _mediaRepo.GetTvShowIdByTitleAndYearAsync("Breaking Bad", 2008, Arg.Any<Guid>())
             .Returns((Guid?)existing);
 
         var handle = await _service.EnsureTvShowAsync(LibraryHandle.FromGuid(Guid.NewGuid()), "Breaking Bad", 2008, null, null);
@@ -132,7 +132,7 @@ public class MediaIngestionServiceTests : IDisposable
         var handle = await _service.EnsureTvShowAsync(LibraryHandle.FromGuid(Guid.NewGuid()), "Breaking Bad", 2008, tmdbId: "1396", imdbId: null);
 
         handle.Value.Should().Be(existing);
-        await _mediaRepo.DidNotReceive().GetTvShowIdByTitleAsync(Arg.Any<string>(), Arg.Any<Guid>());
+        await _mediaRepo.DidNotReceive().GetTvShowIdByTitleAndYearAsync(Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<Guid>());
         await _mediaRepo.DidNotReceive().AddMediaItemAsync(Arg.Any<MediaItem>());
     }
 
@@ -141,7 +141,7 @@ public class MediaIngestionServiceTests : IDisposable
     {
         _mediaRepo.GetTvShowIdByExternalIdAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid>())
             .Returns((Guid?)null);
-        _mediaRepo.GetTvShowIdByTitleAsync(Arg.Any<string>(), Arg.Any<Guid>())
+        _mediaRepo.GetTvShowIdByTitleAndYearAsync(Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<Guid>())
             .Returns((Guid?)null);
 
         var library = LibraryHandle.FromGuid(Guid.NewGuid());
