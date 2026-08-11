@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Vora.Domain.Entities.Collections;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Users;
@@ -85,6 +86,60 @@ public class MediaDedupeRepositoryMergeTests
         Assert.True(e2.IsPlayed);
         Assert.Equal(300, e2.ResumePositionSeconds);
         Assert.False(await db.Set<UserMediaState>().AnyAsync(s => s.MediaItemId == d2.Id));
+    }
+
+    [Fact]
+    public async Task Merge_re_points_collection_membership_from_the_dropped_episode_to_the_keeper()
+    {
+        using var db = NewContext();
+        var libraryId = Guid.NewGuid();
+        db.Add(new MediaLibrary { Id = libraryId, Name = "Shows", Type = LibraryType.TvShow, FolderPaths = new List<string> { "/tv" } });
+
+        var keep = AddShow(db, libraryId, "88329", new DateTime(2026, 7, 30, 0, 0, 0, DateTimeKind.Utc));
+        var k1 = AddEpisode(db, libraryId, keep, 1, 1, "/tv/1080p/Hawkeye/S01E01.mkv", "1080p");
+        var drop = AddShow(db, libraryId, "88329", new DateTime(2026, 7, 31, 0, 0, 0, DateTimeKind.Utc));
+        var d1 = AddEpisode(db, libraryId, drop, 1, 1, "/tv/4K/Hawkeye/S01E01.mkv", "2160p");
+
+        var collectionId = Guid.NewGuid();
+        db.Add(new Collection { Id = collectionId, Title = "MCU" });
+        db.Add(new CollectionItem { CollectionId = collectionId, MediaItemId = d1.Id, SortOrder = 5m, InUniverseYear = 2024.0 });
+        db.SaveChanges();
+
+        var k1Id = k1.Id;
+        var d1Id = d1.Id;
+        await new MediaDedupeRepository(db).MergeDuplicateTvShowsAsync(libraryId);
+
+        Assert.False(await db.Set<CollectionItem>().AnyAsync(ci => ci.MediaItemId == d1Id));
+        var moved = await db.Set<CollectionItem>().SingleAsync(ci => ci.CollectionId == collectionId && ci.MediaItemId == k1Id);
+        Assert.Equal(5m, moved.SortOrder);
+        Assert.Equal(2024.0, moved.InUniverseYear);
+    }
+
+    [Fact]
+    public async Task Merge_drops_the_duplicate_membership_when_the_keeper_is_already_in_the_collection()
+    {
+        using var db = NewContext();
+        var libraryId = Guid.NewGuid();
+        db.Add(new MediaLibrary { Id = libraryId, Name = "Shows", Type = LibraryType.TvShow, FolderPaths = new List<string> { "/tv" } });
+
+        var keep = AddShow(db, libraryId, "88329", new DateTime(2026, 7, 30, 0, 0, 0, DateTimeKind.Utc));
+        var k1 = AddEpisode(db, libraryId, keep, 1, 1, "/tv/1080p/Hawkeye/S01E01.mkv", "1080p");
+        var drop = AddShow(db, libraryId, "88329", new DateTime(2026, 7, 31, 0, 0, 0, DateTimeKind.Utc));
+        var d1 = AddEpisode(db, libraryId, drop, 1, 1, "/tv/4K/Hawkeye/S01E01.mkv", "2160p");
+
+        var collectionId = Guid.NewGuid();
+        db.Add(new Collection { Id = collectionId, Title = "MCU" });
+        db.Add(new CollectionItem { CollectionId = collectionId, MediaItemId = k1.Id, SortOrder = 3m });
+        db.Add(new CollectionItem { CollectionId = collectionId, MediaItemId = d1.Id, SortOrder = 5m });
+        db.SaveChanges();
+
+        var k1Id = k1.Id;
+        var d1Id = d1.Id;
+        await new MediaDedupeRepository(db).MergeDuplicateTvShowsAsync(libraryId);
+
+        Assert.False(await db.Set<CollectionItem>().AnyAsync(ci => ci.MediaItemId == d1Id));
+        Assert.Equal(1, await db.Set<CollectionItem>().CountAsync(ci => ci.CollectionId == collectionId));
+        Assert.True(await db.Set<CollectionItem>().AnyAsync(ci => ci.CollectionId == collectionId && ci.MediaItemId == k1Id));
     }
 
     [Fact]

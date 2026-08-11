@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.Media;
 using Vora.Application.Media.ViewModels;
+using Vora.Domain.Entities.Collections;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Users;
 
@@ -111,6 +112,7 @@ public class MediaDedupeRepository : IMediaDedupeRepository
                     }
 
                     await MergeUserDataAsync(dropEpisode.Id, keeperEpisode.Id);
+                    await MergeCollectionMembershipsAsync(dropEpisode.Id, keeperEpisode.Id);
                     affectedEpisodeIds.Add(keeperEpisode.Id);
 
                     dropSeason.Episodes.Remove(dropEpisode);
@@ -125,10 +127,12 @@ public class MediaDedupeRepository : IMediaDedupeRepository
             }
 
             await MergeUserDataAsync(dropSeason.Id, keeperSeason.Id);
+            await MergeCollectionMembershipsAsync(dropSeason.Id, keeperSeason.Id);
             _context.Remove(dropSeason);
         }
 
         await MergeUserDataAsync(dropId, keeperId);
+        await MergeCollectionMembershipsAsync(dropId, keeperId);
 
         var dropShow = await _context.Set<TvShow>().FirstAsync(t => t.Id == dropId);
         _context.Remove(dropShow);
@@ -182,6 +186,39 @@ public class MediaDedupeRepository : IMediaDedupeRepository
                     from.MediaItemId = toItemId;
                     toRatings[from.ProfileId] = from;
                 }
+            }
+        }
+    }
+
+    private async Task MergeCollectionMembershipsAsync(Guid fromItemId, Guid toItemId)
+    {
+        var fromMemberships = await _context.Set<CollectionItem>()
+            .Where(ci => ci.MediaItemId == fromItemId)
+            .ToListAsync();
+        if (fromMemberships.Count == 0)
+        {
+            return;
+        }
+
+        var keeperCollections = (await _context.Set<CollectionItem>()
+            .Where(ci => ci.MediaItemId == toItemId)
+            .Select(ci => ci.CollectionId)
+            .ToListAsync()).ToHashSet();
+
+        foreach (var membership in fromMemberships)
+        {
+            _context.Remove(membership);
+
+            if (keeperCollections.Add(membership.CollectionId))
+            {
+                _context.Add(new CollectionItem
+                {
+                    CollectionId = membership.CollectionId,
+                    MediaItemId = toItemId,
+                    SortOrder = membership.SortOrder,
+                    InUniverseYear = membership.InUniverseYear,
+                    AddedAt = membership.AddedAt
+                });
             }
         }
     }
