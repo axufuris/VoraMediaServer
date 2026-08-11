@@ -503,6 +503,27 @@ public partial class MediaRepository : IMediaRepository
         return flags == null ? (false, false) : (flags.HasMidCreditsStinger, flags.HasPostCreditsStinger);
     }
 
+    public async Task<(int Total, int WithThumbnails)> GetVideoThumbnailCoverageAsync(Guid libraryId)
+    {
+        var playable = _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m is Movie || m is Episode)
+            .Where(m =>
+                (m is Movie && m.LibraryId == libraryId) ||
+                (m is Episode && ((Episode)m).Season.TvShow.LibraryId == libraryId));
+
+        var counts = await playable
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                WithThumbnails = g.Sum(m => m.LastVideoThumbnailGenerationAt != null ? 1 : 0)
+            })
+            .FirstOrDefaultAsync();
+
+        return (counts?.Total ?? 0, counts?.WithThumbnails ?? 0);
+    }
+
     public async Task<MarkerCoverageVM> GetMarkerCoverageAsync(Guid libraryId)
     {
         var libraryName = await _context.MediaLibraries
