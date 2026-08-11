@@ -139,6 +139,54 @@ public class OpenAiChronologyProviderTests
     }
 
     [Fact]
+    public async Task Anchors_an_overshot_contemporary_season_back_toward_its_air_year()
+    {
+        var show = "Agents of S.H.I.E.L.D.";
+        var s1 = Guid.NewGuid();
+        var s2 = Guid.NewGuid();
+        var s3 = Guid.NewGuid();
+        var items = new List<CollectionOrderingItemDto>
+        {
+            new() { Index = 0, LocalId = s1, ShowTitle = show, SeasonNumber = 1, Year = 2013, MediaType = "Season", Title = $"{show} S1" },
+            new() { Index = 1, LocalId = s2, ShowTitle = show, SeasonNumber = 2, Year = 2014, MediaType = "Season", Title = $"{show} S2" },
+            new() { Index = 2, LocalId = s3, ShowTitle = show, SeasonNumber = 3, Year = 2015, MediaType = "Season", Title = $"{show} S3" },
+        };
+
+        var openAi = AiReturning(
+            "{\"items\":[{\"index\":0,\"setYear\":2013.1},{\"index\":1,\"setYear\":2014.1},{\"index\":2,\"setYear\":2023.3}]}",
+            "{\"items\":[]}");
+        var provider = new OpenAiChronologyProvider(openAi);
+        var result = await provider.GetChronologicalOrderAsync("MCU", null, items, TestContext.Current.CancellationToken);
+
+        var s3Year = result.Single(r => r.LocalId == s3).SetYear;
+        Assert.True(s3Year.HasValue && s3Year < 2016, $"expected S3 anchored near its 2015 air year, got {s3Year}");
+        var ordered = result.OrderBy(r => r.SortOrder).Select(r => r.LocalId!.Value).ToList();
+        Assert.Equal(new[] { s1, s2, s3 }, ordered);
+    }
+
+    [Fact]
+    public async Task Leaves_a_period_show_season_at_its_in_universe_year()
+    {
+        var show = "Marvel's Agent Carter";
+        var s1 = Guid.NewGuid();
+        var s2 = Guid.NewGuid();
+        var items = new List<CollectionOrderingItemDto>
+        {
+            new() { Index = 0, LocalId = s1, ShowTitle = show, SeasonNumber = 1, Year = 2015, MediaType = "Season", Title = $"{show} S1" },
+            new() { Index = 1, LocalId = s2, ShowTitle = show, SeasonNumber = 2, Year = 2016, MediaType = "Season", Title = $"{show} S2" },
+        };
+
+        var openAi = AiReturning(
+            "{\"items\":[{\"index\":0,\"setYear\":1946.1},{\"index\":1,\"setYear\":1947.1}]}",
+            "{\"items\":[]}");
+        var provider = new OpenAiChronologyProvider(openAi);
+        var result = await provider.GetChronologicalOrderAsync("MCU", null, items, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1946.1, result.Single(r => r.LocalId == s1).SetYear);
+        Assert.Equal(1947.1, result.Single(r => r.LocalId == s2).SetYear);
+    }
+
+    [Fact]
     public async Task Repairs_a_season_the_model_scored_decades_off_from_its_show()
     {
         var s1 = Guid.NewGuid();
