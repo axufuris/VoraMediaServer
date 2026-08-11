@@ -142,9 +142,9 @@ public static class LibraryEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> DeleteLibraryAsync(Guid id, ILibraryManager manager)
+    private static IResult DeleteLibraryAsync(Guid id, Vora.Application.Tasks.ITaskQueueManager taskQueue)
     {
-        await manager.DeleteLibraryAsync(id);
-        return Results.NoContent();
+        taskQueue.QueueDeleteLibrary(id);
+        return Results.Accepted();
     }
 }

@@ -267,13 +267,13 @@ export default function ManageLibrary() {
     const handleDelete = () => {
         showConfirm(
             'Delete library',
-            'Are you absolutely sure you want to delete this library?\n\nThis will remove all associated media records from Vora (your physical files on disk will NOT be touched).',
+            'Are you absolutely sure you want to delete this library?\n\nThis will remove all associated media records from Vora (your physical files on disk will NOT be touched).\n\nDeletion runs in the background — for a large library it may take a little while to fully disappear. You can watch its progress under Background Tasks.',
             async () => {
                 try {
                     await libraryAdminService.deleteLibrary(library.id, serverId);
                     navigate(serverId ? `/admin/server/${serverId}/libraries` : '/admin/libraries');
                 } catch (err) {
-                    showAlert('Error', 'Failed to delete library. Please check the console.');
+                    showAlert('Error', 'Failed to start library deletion. Please check the console.');
                     console.error(err);
                 }
             },
