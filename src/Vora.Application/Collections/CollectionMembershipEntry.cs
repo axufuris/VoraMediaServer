@@ -84,6 +84,15 @@ public static class TitleMatch
             }
         }
 
+        if (parts.Length >= 2 && parts[^1].Length == 4 && parts[^1].All(char.IsDigit))
+        {
+            var withoutYear = string.Join(' ', parts[..^1]);
+            if (withoutYear.Length > 0)
+            {
+                yield return withoutYear;
+            }
+        }
+
         var colon = title.IndexOf(':');
         if (colon > 0 && colon < title.Length - 1)
         {

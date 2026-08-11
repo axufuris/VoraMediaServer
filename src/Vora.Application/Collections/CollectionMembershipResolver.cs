@@ -91,7 +91,7 @@ public static class CollectionMembershipResolver
         if (year != null)
         {
             var exact = matches.FirstOrDefault(m => m.Year == year);
-            if (exact.Id != Guid.Empty) return exact.Id;
+            return exact.Id != Guid.Empty ? exact.Id : (Guid?)null;
         }
 
         return matches.Count == 1 ? matches[0].Id : (Guid?)null;

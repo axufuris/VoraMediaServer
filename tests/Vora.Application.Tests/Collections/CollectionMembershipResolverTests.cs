@@ -127,6 +127,37 @@ public class CollectionMembershipResolverTests
     }
 
     [Fact]
+    public void Does_not_match_a_same_titled_movie_of_a_different_year()
+    {
+        var candidates = Candidates(movies: new()
+        {
+            new MediaTitleCandidateDto { Id = Guid.NewGuid(), Title = "Daredevil", Year = 2003 }
+        });
+        var entries = new List<CollectionMembershipEntry>
+        {
+            new() { MediaType = "Movie", Title = "Daredevil", Year = 2015 }
+        };
+
+        CollectionMembershipResolver.Resolve(entries, candidates).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Matches_a_season_whose_show_title_carries_a_trailing_year()
+    {
+        var showId = Guid.NewGuid();
+        var seasonId = Guid.NewGuid();
+        var candidates = Candidates(
+            shows: new() { new MediaTitleCandidateDto { Id = showId, Title = "Hawkeye (2021)" } },
+            seasons: new() { new SeasonMatchCandidateDto { Id = seasonId, TvShowId = showId, SeasonNumber = 1 } });
+        var entries = new List<CollectionMembershipEntry>
+        {
+            new() { MediaType = "Season", ShowTitle = "Hawkeye", SeasonNumber = 1 }
+        };
+
+        CollectionMembershipResolver.Resolve(entries, candidates).Should().Equal(seasonId);
+    }
+
+    [Fact]
     public void Matches_season_by_show_title_and_number()
     {
         var showId = Guid.NewGuid();
