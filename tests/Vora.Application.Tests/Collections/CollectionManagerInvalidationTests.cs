@@ -37,6 +37,30 @@ public class CollectionManagerInvalidationTests
     };
 
     [Fact]
+    public async Task Removing_an_item_excludes_it_from_future_syncs()
+    {
+        var collectionId = Guid.NewGuid();
+        var mediaId = Guid.NewGuid();
+
+        await _manager.RemoveMediaFromCollectionAsync(collectionId, mediaId);
+
+        await _repo.Received(1).RemoveItemFromCollectionAsync(collectionId, mediaId);
+        await _repo.Received(1).AddExcludedMediaIdAsync(collectionId, mediaId);
+    }
+
+    [Fact]
+    public async Task Manually_adding_an_item_clears_any_prior_exclusion()
+    {
+        var collectionId = Guid.NewGuid();
+        var mediaId = Guid.NewGuid();
+
+        await _manager.AddMediaToCollectionAsync(collectionId, mediaId);
+
+        await _repo.Received(1).AddItemToCollectionAsync(collectionId, mediaId);
+        await _repo.Received(1).RemoveExcludedMediaIdAsync(collectionId, mediaId);
+    }
+
+    [Fact]
     public async Task UpdateCollectionAsync_resets_cached_years_when_ordering_description_changes()
     {
         var collection = Existing("openai_chronology", "MCU in release order");

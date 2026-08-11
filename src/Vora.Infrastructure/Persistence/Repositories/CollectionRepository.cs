@@ -260,9 +260,69 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
         {
             CollectionId = collectionId,
             MediaItemId = mediaItemId,
-            SortOrder = (maxSortOrder ?? 0) + 1
+            SortOrder = (maxSortOrder ?? 0) + 1,
+            ManuallyAdded = true
         });
         await context.SaveChangesAsync();
+    }
+
+    public async Task<HashSet<Guid>> GetManuallyAddedMediaIdsAsync(Guid collectionId)
+    {
+        var ids = await context.Set<CollectionItem>()
+            .AsNoTracking()
+            .Where(ci => ci.CollectionId == collectionId && ci.ManuallyAdded)
+            .Select(ci => ci.MediaItemId)
+            .ToListAsync();
+        return ids.ToHashSet();
+    }
+
+    public async Task<HashSet<Guid>> GetExcludedMediaIdsAsync(Guid collectionId)
+    {
+        var json = await context.Collections
+            .AsNoTracking()
+            .Where(c => c.Id == collectionId)
+            .Select(c => c.ExcludedMediaIdsJson)
+            .FirstOrDefaultAsync();
+        return ParseExcluded(json);
+    }
+
+    public async Task AddExcludedMediaIdAsync(Guid collectionId, Guid mediaItemId)
+    {
+        var collection = await context.Collections.FirstOrDefaultAsync(c => c.Id == collectionId);
+        if (collection == null) return;
+
+        var set = ParseExcluded(collection.ExcludedMediaIdsJson);
+        if (set.Add(mediaItemId))
+        {
+            collection.ExcludedMediaIdsJson = System.Text.Json.JsonSerializer.Serialize(set);
+            await context.SaveChangesAsync();
+        }
+    }
+
+    public async Task RemoveExcludedMediaIdAsync(Guid collectionId, Guid mediaItemId)
+    {
+        var collection = await context.Collections.FirstOrDefaultAsync(c => c.Id == collectionId);
+        if (collection == null) return;
+
+        var set = ParseExcluded(collection.ExcludedMediaIdsJson);
+        if (set.Remove(mediaItemId))
+        {
+            collection.ExcludedMediaIdsJson = set.Count == 0 ? null : System.Text.Json.JsonSerializer.Serialize(set);
+            await context.SaveChangesAsync();
+        }
+    }
+
+    private static HashSet<Guid> ParseExcluded(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new HashSet<Guid>();
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<HashSet<Guid>>(json) ?? new HashSet<Guid>();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return new HashSet<Guid>();
+        }
     }
 
     public async Task RemoveItemFromCollectionAsync(Guid collectionId, Guid mediaItemId)

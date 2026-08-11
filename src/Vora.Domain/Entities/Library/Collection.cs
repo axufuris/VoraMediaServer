@@ -29,6 +29,7 @@ public class Collection : LockableEntity
 
     public string? ChronologyItemsSignature { get; set; }
     public string? ContentSyncCacheJson { get; set; }
+    public string? ExcludedMediaIdsJson { get; set; }
 
     public int SyncIntervalDays { get; set; } = 1;
     public bool MirrorList { get; set; }

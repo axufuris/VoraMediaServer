@@ -42,6 +42,10 @@ public interface ICollectionRepository
     Task AddItemsToCollectionAsync(List<CollectionItem> items);
     Task AddItemToCollectionAsync(Guid collectionId, Guid mediaItemId);
     Task RemoveItemFromCollectionAsync(Guid collectionId, Guid mediaItemId);
+    Task<HashSet<Guid>> GetManuallyAddedMediaIdsAsync(Guid collectionId);
+    Task<HashSet<Guid>> GetExcludedMediaIdsAsync(Guid collectionId);
+    Task AddExcludedMediaIdAsync(Guid collectionId, Guid mediaItemId);
+    Task RemoveExcludedMediaIdAsync(Guid collectionId, Guid mediaItemId);
     Task DeleteCollectionAsync(Guid id);
 
     Task AddCollectionArtworkAsync(CollectionArtwork artwork);
