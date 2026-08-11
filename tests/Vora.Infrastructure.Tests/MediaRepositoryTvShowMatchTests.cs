@@ -67,6 +67,19 @@ public class MediaRepositoryTvShowMatchTests
     }
 
     [Fact]
+    public async Task Does_not_match_a_reboot_scanned_with_a_different_year()
+    {
+        using var db = NewContext();
+        var libraryId = Guid.NewGuid();
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+        AddShow(db, libraryId, "The Powerpuff Girls", 1998);
+
+        var match = await repo.GetTvShowIdByTitleAndYearAsync("The Powerpuff Girls", 2016, libraryId);
+
+        Assert.Null(match);
+    }
+
+    [Fact]
     public async Task Does_not_match_a_show_in_a_different_library()
     {
         using var db = NewContext();
