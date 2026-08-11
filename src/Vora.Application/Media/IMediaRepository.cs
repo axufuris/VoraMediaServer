@@ -42,6 +42,7 @@ public interface IMediaRepository
     Task<List<MediaItemMarker>> GetMarkersAsync(Guid mediaItemId);
     Task<(bool MidStinger, bool PostStinger)> GetStingerFlagsAsync(Guid mediaItemId);
     Task<MarkerCoverageVM> GetMarkerCoverageAsync(Guid libraryId);
+    Task<(int Total, int WithThumbnails)> GetVideoThumbnailCoverageAsync(Guid libraryId);
     Task<bool> AreMarkersLockedAsync(Guid mediaItemId);
     Task SetMarkersLockedAsync(Guid mediaItemId, bool locked);
     Task<bool> AreThumbnailsLockedAsync(Guid mediaItemId);

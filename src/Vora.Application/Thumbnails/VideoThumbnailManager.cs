@@ -97,19 +97,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         var (libraryType, _) = await GetLibraryThumbnailStateAsync(libraryId);
         if (!IsVideoBearingLibrary(libraryType)) return (0, 0);
 
-        var counts = await _mediaRepository.GetAllProjectedAsync(
-            m => new
-            {
-                Type = m.GetType().Name,
-                Has = m.LastVideoThumbnailGenerationAt != null
-            },
-            libraryId: libraryId);
-
-        var list = counts
-            .Where(c => c.Type == nameof(Movie) || c.Type == nameof(Episode))
-            .ToList();
-
-        return (list.Count, list.Count(c => c.Has));
+        return await _mediaRepository.GetVideoThumbnailCoverageAsync(libraryId);
     }
 
     private async Task PurgeMediaItemThumbnailsAsync(Guid mediaItemId)
