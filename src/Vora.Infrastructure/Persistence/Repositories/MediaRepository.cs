@@ -124,8 +124,7 @@ public partial class MediaRepository : IMediaRepository
 
         if (year != null)
         {
-            var exact = titleMatches.FirstOrDefault(c => c.Year == year);
-            if (exact != null) return exact.Id;
+            return titleMatches.FirstOrDefault(c => c.Year == year)?.Id;
         }
 
         return titleMatches.Count == 1 ? titleMatches[0].Id : (Guid?)null;
