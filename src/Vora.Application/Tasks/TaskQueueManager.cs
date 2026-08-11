@@ -25,6 +25,7 @@ public interface ITaskQueueManager
     void QueueLibraryAdded(Guid libraryId, string? libraryName = null, bool forceOverride = false);
     void QueueLibraryUpdated(Guid libraryId, string? libraryName = null, bool forceOverride = false);
     void QueueScanLibrary(Guid libraryId, string? libraryName = null, bool forceOverride = false);
+    void QueueDeleteLibrary(Guid libraryId, string? libraryName = null);
     void QueueRefreshLibraryMetadata(Guid libraryId, string? libraryName = null, bool forceOverride = false);
     void QueueAnalyzeLibraryMediaContent(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false);
     void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
@@ -108,6 +109,17 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Scan Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
             RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, isAdditionTrigger: false, ct),
             libraryName == null ? LibraryLabel(libraryId, "Scan Library: {0}") : null,
+            resourceKey: LibraryKey(libraryId));
+    }
+
+    public void QueueDeleteLibrary(Guid libraryId, string? libraryName = null)
+    {
+        EnqueueTask($"Delete Library: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
+            {
+                var manager = sp.GetRequiredService<Vora.Application.Libraries.ILibraryManager>();
+                await manager.DeleteLibraryAsync(libraryId);
+            },
+            libraryName == null ? LibraryLabel(libraryId, "Delete Library: {0}") : null,
             resourceKey: LibraryKey(libraryId));
     }
 
