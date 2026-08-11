@@ -90,6 +90,13 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
                 .SetProperty(c => c.ChronologyItemsSignature, signature)
                 .SetProperty(c => c.ChronologySyncedAt, DateTime.UtcNow));
 
+    public Task SetItemInUniverseYearAsync(Guid collectionId, Guid mediaItemId, double? year, bool locked) =>
+        context.Set<CollectionItem>()
+            .Where(ci => ci.CollectionId == collectionId && ci.MediaItemId == mediaItemId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(ci => ci.InUniverseYear, year)
+                .SetProperty(ci => ci.InUniverseYearLocked, locked));
+
     public async Task ResetChronologyCacheAsync(Guid collectionId)
     {
         await context.Set<CollectionItem>()
@@ -154,6 +161,17 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
             .AsNoTracking()
             .Where(ci => ci.CollectionId == collectionId)
             .ToDictionaryAsync(ci => ci.MediaItemId, ci => ci.SortOrder);
+
+    public async Task<Dictionary<Guid, (double? Year, bool Locked)>> GetCollectionItemChronologyAsync(Guid collectionId)
+    {
+        var rows = await context.Set<CollectionItem>()
+            .AsNoTracking()
+            .Where(ci => ci.CollectionId == collectionId)
+            .Select(ci => new { ci.MediaItemId, ci.InUniverseYear, ci.InUniverseYearLocked })
+            .ToListAsync();
+
+        return rows.ToDictionary(r => r.MediaItemId, r => (r.InUniverseYear, r.InUniverseYearLocked));
+    }
 
     public async Task<int> GetLibraryMinimumCollectionSizeAsync(Guid libraryId)
     {

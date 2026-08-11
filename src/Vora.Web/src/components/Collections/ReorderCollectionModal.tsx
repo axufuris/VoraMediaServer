@@ -18,6 +18,13 @@ export default function ReorderCollectionModal({
     const { serverId } = useParams<{ serverId?: string }>();
     const [items, setItems] = useState<CollectionDetailsLibraryItem[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+    const [chrono, setChrono] = useState<Record<string, { year: string, locked: boolean }>>({});
+    const [savingItemId, setSavingItemId] = useState<string | null>(null);
+
+    // A chronology-driven collection derives its order from each item's
+    // in-universe year, so a drag-and-drop order is overwritten on the next
+    // sync. Editing + locking the in-universe year is what survives a re-sync.
+    const isChronology = !!collection.sortProviderId;
 
     const dragItem = useRef<number | null>(null);
     const dragOverItem = useRef<number | null>(null);
@@ -25,6 +32,14 @@ export default function ReorderCollectionModal({
     useEffect(() => {
         if (isOpen) {
             setItems([...collection.items]);
+            const map: Record<string, { year: string, locked: boolean }> = {};
+            for (const item of collection.items) {
+                map[item.id] = {
+                    year: item.inUniverseYear != null ? String(item.inUniverseYear) : '',
+                    locked: !!item.inUniverseYearLocked,
+                };
+            }
+            setChrono(map);
         }
     }, [isOpen, collection]);
 
@@ -38,6 +53,38 @@ export default function ReorderCollectionModal({
         dragItem.current = null;
         dragOverItem.current = null;
         setItems(_items);
+    };
+
+    const persistChrono = async (itemId: string, next: { year: string, locked: boolean }) => {
+        setSavingItemId(itemId);
+        try {
+            const parsed = next.year.trim() === '' ? null : Number(next.year);
+            const year = parsed != null && !Number.isNaN(parsed) ? parsed : null;
+            await collectionAdminService.setItemChronology(collection.id, itemId, year, next.locked, serverId);
+            onSaved();
+        } catch (error) {
+            await dialog.alert('Failed to update the in-universe year.');
+            console.error(error);
+        } finally {
+            setSavingItemId(null);
+        }
+    };
+
+    const setYear = (itemId: string, year: string) => {
+        setChrono(prev => ({ ...prev, [itemId]: { ...prev[itemId], year } }));
+    };
+
+    const commitYear = (itemId: string) => {
+        const current = chrono[itemId];
+        if (!current) return;
+        void persistChrono(itemId, current);
+    };
+
+    const toggleLock = (itemId: string) => {
+        const current = chrono[itemId] ?? { year: '', locked: false };
+        const next = { ...current, locked: !current.locked };
+        setChrono(prev => ({ ...prev, [itemId]: next }));
+        void persistChrono(itemId, next);
     };
 
     const handleSave = async () => {
@@ -59,7 +106,9 @@ export default function ReorderCollectionModal({
         <Modal isOpen={isOpen} onClose={onClose} size="xl" cardClassName="flex flex-col max-h-[85vh]">
             <ModalHeader
                 title="Manual Sort Order"
-                subtitle="Drag and drop items to set their custom chronological timeline."
+                subtitle={isChronology
+                    ? "Set and lock an item's in-universe year — a locked year is never changed by the AI on a re-sync."
+                    : "Drag and drop items to set their custom chronological timeline."}
                 onClose={onClose}
             />
 
@@ -80,10 +129,43 @@ export default function ReorderCollectionModal({
                             {item.posterUrl && <img src={item.posterUrl} alt="" className="w-full h-full object-cover" />}
                         </div>
 
-                        <div className="flex-1">
-                            <h4 className="font-bold text-[var(--vora-text-secondary)] text-sm">{item.title}</h4>
+                        <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-[var(--vora-text-secondary)] text-sm truncate">{item.title}</h4>
                             <p className="text-xs text-[var(--vora-text-muted)]">{item.releaseDate ? new Date(item.releaseDate).getFullYear() : 'Unknown'}</p>
                         </div>
+
+                        {isChronology && (
+                            <div
+                                className="flex items-center gap-2"
+                                draggable={false}
+                                onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                onMouseDown={(e) => e.stopPropagation()}
+                            >
+                                <label className="text-[10px] uppercase tracking-widest text-[var(--vora-text-muted)]">Set year</label>
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    value={chrono[item.id]?.year ?? ''}
+                                    placeholder="—"
+                                    onChange={(e) => setYear(item.id, e.target.value)}
+                                    onBlur={() => commitYear(item.id)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                    className="w-20 px-2 py-1 text-sm rounded bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none"
+                                    title="In-universe (story) year used to order this item"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => toggleLock(item.id)}
+                                    disabled={savingItemId === item.id}
+                                    title={chrono[item.id]?.locked ? 'Locked — the AI will not change this year' : 'Unlocked — the AI may re-score this year'}
+                                    className={`px-2 py-1 rounded text-sm transition-colors ${chrono[item.id]?.locked
+                                        ? 'bg-[var(--vora-accent-soft)] text-[var(--vora-accent-text)]'
+                                        : 'bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)]'}`}
+                                >
+                                    {chrono[item.id]?.locked ? '🔒' : '🔓'}
+                                </button>
+                            </div>
+                        )}
 
                         <div className="text-[var(--vora-text-muted)]">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
@@ -94,10 +176,12 @@ export default function ReorderCollectionModal({
 
             <ModalFooter className="flex justify-between items-center">
                 <span className="text-xs text-[var(--vora-accent-500)] font-medium bg-[var(--vora-accent-500)]/10 px-3 py-1 rounded">
-                    Note: Collection Default Sort must be set to 'Chronological' for this to apply.
+                    {isChronology
+                        ? "Locked years survive AI re-syncs. Drag order is a fallback and is replaced on the next timeline sync."
+                        : "Note: Collection Default Sort must be set to 'Chronological' for this to apply."}
                 </span>
                 <div className="flex gap-3">
-                    <button onClick={onClose} className="px-5 py-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] font-medium transition-colors cursor-pointer">Cancel</button>
+                    <button onClick={onClose} className="px-5 py-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] font-medium transition-colors cursor-pointer">Close</button>
                     <button onClick={handleSave} disabled={isSaving} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors cursor-pointer">
                         {isSaving ? 'Saving...' : 'Save Order'}
                     </button>

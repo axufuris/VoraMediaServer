@@ -12,4 +12,6 @@ public class CollectionDetailsLibraryItemVM
     public string? PosterUrl { get; set; }
     public bool IsPlayed { get; set; }
     public int? UnplayedItemCount { get; set; }
+    public double? InUniverseYear { get; set; }
+    public bool InUniverseYearLocked { get; set; }
 }

@@ -17,6 +17,7 @@ public interface ICollectionRepository
     Task<List<CollectionMembershipCacheDto>> GetContentSyncMembershipsAsync();
     Task UpdateChronologySignatureAsync(Guid collectionId, string signature);
     Task ResetChronologyCacheAsync(Guid collectionId);
+    Task SetItemInUniverseYearAsync(Guid collectionId, Guid mediaItemId, double? year, bool locked);
     Task TouchChronologySyncedAtAsync(Guid collectionId);
     Task UpdateContentSyncCacheAsync(Guid collectionId, string cacheJson);
     Task RemoveItemsFromCollectionAsync(Guid collectionId, IEnumerable<Guid> mediaItemIds);
@@ -26,6 +27,7 @@ public interface ICollectionRepository
     Task<HashSet<Guid>> GetCollectionMediaIdsAsync(Guid collectionId);
     Task<List<CollectionItem>> GetCollectionItemsWithMediaAsync(Guid collectionId);
     Task<Dictionary<Guid, decimal>> GetCollectionItemSortOrdersAsync(Guid collectionId);
+    Task<Dictionary<Guid, (double? Year, bool Locked)>> GetCollectionItemChronologyAsync(Guid collectionId);
     Task<int> GetLibraryMinimumCollectionSizeAsync(Guid libraryId);
     Task<Dictionary<Guid, int>> GetAllLibraryMinimumSizesAsync();
 

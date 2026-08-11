@@ -47,6 +47,9 @@ public static class CollectionEndpoints
         group.MapPut("/{id:guid}/items/reorder", ReorderItemsAsync)
             .Produces(StatusCodes.Status204NoContent);
 
+        group.MapPut("/{id:guid}/items/{mediaId:guid}/chronology", SetItemChronologyAsync)
+            .Produces(StatusCodes.Status204NoContent);
+
         group.MapDelete("/{id:guid}/items/{mediaId:guid}", RemoveItemAsync)
             .Produces(StatusCodes.Status204NoContent);
 
@@ -115,6 +118,12 @@ public static class CollectionEndpoints
     private static async Task<IResult> ReorderItemsAsync(Guid id, [FromBody] ReorderCollectionRequest request, ICollectionManager manager)
     {
         await manager.ReorderCollectionItemsAsync(id, request.MediaItemIds);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> SetItemChronologyAsync(Guid id, Guid mediaId, [FromBody] SetItemChronologyRequest request, ICollectionManager manager)
+    {
+        await manager.SetItemInUniverseYearAsync(id, mediaId, request.InUniverseYear, request.Locked);
         return Results.NoContent();
     }
 
