@@ -110,7 +110,7 @@ public class MetadataManager : IMetadataManager
 
     public async Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false)
     {
-        // Non-force runs only fetch items still missing their primary rating, so
+        // Non-force runs fetch items still missing any configured rating slot, so
         // re-runs fill in items skipped when the provider's daily quota tripped
         // — instead of re-spending the quota on already-rated items every pass.
         var ids = forceOverride

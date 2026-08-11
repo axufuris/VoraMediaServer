@@ -426,10 +426,21 @@ public partial class MediaRepository : IMediaRepository
 
     public async Task<IEnumerable<Guid>> GetMediaIdsMissingRatingsAsync(Guid libraryId)
     {
+        var providers = await _context.MediaLibraries
+            .AsNoTracking()
+            .Where(l => l.Id == libraryId)
+            .Select(l => new { l.ThirdPartyRating1ProviderId, l.ThirdPartyRating2ProviderId })
+            .FirstOrDefaultAsync();
+        if (providers == null) return Array.Empty<Guid>();
+
+        var wantsRating1 = !string.IsNullOrWhiteSpace(providers.ThirdPartyRating1ProviderId);
+        var wantsRating2 = !string.IsNullOrWhiteSpace(providers.ThirdPartyRating2ProviderId);
+        if (!wantsRating1 && !wantsRating2) return Array.Empty<Guid>();
+
         return await _context.MediaItems
             .Where(m => m.LibraryId == libraryId
                 && (m is Movie || m is TvShow)
-                && m.ThirdPartyRating1 == null)
+                && ((wantsRating1 && m.ThirdPartyRating1 == null) || (wantsRating2 && m.ThirdPartyRating2 == null)))
             .Select(m => m.Id)
             .ToListAsync();
     }
