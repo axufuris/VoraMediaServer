@@ -45,7 +45,6 @@ export default function MainLayoutSidebar({
                             </linearGradient>
                         </defs>
                         <path d="M6 8 L18 8 L32 40 L46 8 L58 8 L32 60 Z" fill="url(#sidebar-vora-v)" />
-                        <circle cx="52" cy="6" r="2.6" fill="var(--vora-accent-text)" />
                     </svg>
                     <h1
                         className="m-0 text-2xl font-semibold tracking-wide"

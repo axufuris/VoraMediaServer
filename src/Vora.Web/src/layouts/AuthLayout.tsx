@@ -42,7 +42,6 @@ export default function AuthLayout({ title, subtitle, children }: AuthLayoutProp
                             </linearGradient>
                         </defs>
                         <path d="M6 8 L18 8 L32 40 L46 8 L58 8 L32 60 Z" fill="url(#auth-v)" />
-                        <circle cx="52" cy="6" r="2.6" fill="#fbbf24" />
                     </svg>
                     <h1 className="text-3xl font-bold tracking-wider mb-2" style={{ color: 'var(--vora-accent-text)' }}>{title}</h1>
                     <p className="text-sm" style={{ color: 'var(--vora-text-muted)' }}>{subtitle}</p>

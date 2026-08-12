@@ -39,7 +39,6 @@ export default function MediaPlaceholder({ title, variant = 'poster' }: { title?
                     </linearGradient>
                 </defs>
                 <path d="M6 8 L18 8 L32 40 L46 8 L58 8 L32 60 Z" fill={`url(#${gradientId})`} />
-                <circle cx="52" cy="6" r="2.6" fill="var(--vora-accent-400, var(--vora-accent-500))" />
             </svg>
         </div>
     );
