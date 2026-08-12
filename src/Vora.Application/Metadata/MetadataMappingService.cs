@@ -292,7 +292,8 @@ public class MetadataMappingService : IMetadataMappingService
                 PosterUrl = metadata.Collection.PosterUrl,
                 BackdropUrl = metadata.Collection.BackdropUrl,
                 LibraryId = item.LibraryId,
-                SystemGenerated = true
+                SystemGenerated = true,
+                DefaultSort = CollectionSortOrder.ReleaseDateAsc
             };
             await _collectionRepository.AddCollectionAsync(existingCollection);
         }
