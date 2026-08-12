@@ -11,7 +11,7 @@ namespace Vora.Application.Recommendations.Providers;
 
 public class OpenAiRecommendationProvider : IRecommendationProvider
 {
-    private static readonly List<string> ChatModels = new() { "gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1" };
+    private static readonly List<string> ChatModels = new() { "gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "gpt-5-nano", "gpt-5-mini", "gpt-5" };
 
     private readonly IOpenAiRecommendationRepository _repository;
     private readonly ISystemSettingsRepository _settings;
@@ -40,7 +40,7 @@ public class OpenAiRecommendationProvider : IRecommendationProvider
         {
             new PluginSettingDefinitionDto { Key = "api_key", Label = "OpenAI API Key", Type = "password", Description = "OpenAI secret key (sk-...). Create one at https://platform.openai.com/api-keys. Requires an OpenAI account with billing enabled (https://platform.openai.com/account/billing) — usage is metered. Used only for the nightly category-generation pass; cost is typically a few cents per refresh with the default gpt-4o-mini model." },
             new PluginSettingDefinitionDto { Key = "chat_model", Label = "Chat Model", Type = "select", DefaultValue = "gpt-4o-mini", Options = ChatModels, Description = "Model used for the nightly 'For You' recommendation generation. gpt-4o-mini is a good, inexpensive default for this batch job." },
-            new PluginSettingDefinitionDto { Key = "collections_model", Label = "AI Collections Model", Type = "select", DefaultValue = "gpt-4o", Options = ChatModels, Description = "Model used for AI collection lists and chronological ordering, which benefit from stronger reasoning. gpt-4o is recommended; gpt-4o-mini is cheaper but weaker at ordering." },
+            new PluginSettingDefinitionDto { Key = "collections_model", Label = "AI Collections Model", Type = "select", DefaultValue = "gpt-5", Options = ChatModels, Description = "Model used for AI collection lists and chronological ordering, which benefit from stronger reasoning and up-to-date knowledge. gpt-5 is recommended for best accuracy; gpt-5-mini is a cheaper alternative; the gpt-4.x models also work. The gpt-5 models manage their own temperature." },
             new PluginSettingDefinitionDto { Key = "schedule_time", Label = "Nightly Vector Generation Time", Type = "time", DefaultValue = "02:00", Description = "Time to run the nightly AI vector generation (HH:mm format)." },
             new PluginSettingDefinitionDto { Key = "monthly_token_limit", Label = "Monthly Token Limit", Type = "number", DefaultValue = "0", Description = "Optional ceiling on total OpenAI tokens used per calendar month across ALL AI features (recommendations, AI collections). 0 = no limit. When the limit is reached, further AI calls are refused with a clear message until the next month. gpt-4o-mini is inexpensive, but this protects against runaway spend." },
             new PluginSettingDefinitionDto { Key = "guardrails", Label = "Guardrails", Type = "textarea", Description = "Optional house rules added to EVERY AI request across all AI features (recommendations, AI collections & ordering). Use it to steer results — e.g. 'Only suggest titles I could reasonably own', 'Exclude adult content', 'Prefer official English titles', 'When ordering, favour in-universe chronology over release order.' Leave blank for none." }

@@ -62,7 +62,7 @@ public class OpenAiClient(
             ["messages"] = messages,
             ["response_format"] = new { type = "json_object" }
         };
-        if (temperature.HasValue)
+        if (temperature.HasValue && SupportsCustomTemperature(model))
         {
             payload["temperature"] = temperature.Value;
         }
@@ -97,6 +97,12 @@ public class OpenAiClient(
 
         return data.Choices[0].Message?.Content;
     }
+
+    private static bool SupportsCustomTemperature(string model)
+        => !model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase)
+        && !model.StartsWith("o1", StringComparison.OrdinalIgnoreCase)
+        && !model.StartsWith("o3", StringComparison.OrdinalIgnoreCase)
+        && !model.StartsWith("o4", StringComparison.OrdinalIgnoreCase);
 
     private class ChatResponse
     {
