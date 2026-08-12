@@ -44,6 +44,8 @@ export interface CollectionDetails {
     contentSyncExternalId?: string;
     syncIntervalDays: number;
     mirrorList: boolean;
+    rulesJson?: string;
+    smartMediaType?: 'Mixed' | 'Music' | 'Movies' | 'Shows';
 }
 
 export interface CollectionDetailsLibraryItem {
