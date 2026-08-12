@@ -226,6 +226,12 @@ export default function CreateCollectionModal({
                             )}
                         </div>
 
+                        {contentSyncProviderId && syncProviders.find(p => p.id === contentSyncProviderId)?.isAiPlugin && (
+                            <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-2">
+                                Name a specific franchise or shared universe — e.g. <span className="text-[var(--vora-text-secondary)]">Marvel Cinematic Universe</span>, <span className="text-[var(--vora-text-secondary)]">DC Extended Universe</span>, or <span className="text-[var(--vora-text-secondary)]">Star Wars</span>. Every movie and season is pulled in automatically, so the universe name alone is enough (no need to add movies and shows, and don&apos;t narrow it to films only). For a genre or mood like all your kung-fu movies, use a Smart Playlist instead.
+                            </p>
+                        )}
+
                         {contentSyncProviderId && (
                             <div className="pt-3 mt-3 border-t border-[var(--vora-border-subtle)]/50">
                                 <div className="flex items-center gap-2">
@@ -329,6 +335,12 @@ export default function CreateCollectionModal({
                                     </div>
                                 )}
                             </div>
+
+                            {sortProviderId && chronologyProviders.find(p => p.id === sortProviderId)?.isAiPlugin && (
+                                <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">
+                                    Name the universe and how it should be ordered — e.g. <span className="text-[var(--vora-text-secondary)]">Marvel Cinematic Universe in in-universe chronological order</span>. Left blank, the collection title is used.
+                                </p>
+                            )}
 
                             {sortProviderId && (
                                 <div className="pt-2 border-t border-[var(--vora-border-subtle)]/50">
