@@ -91,6 +91,41 @@ changed by any pass.**
   ordering intent, e.g. `Marvel Cinematic Universe in in-universe chronological
   order`. Left blank, it falls back to the collection's title.
 
+## AI model, freshness, and accuracy
+
+The AI providers share one model setting — `collections_model` on the
+`openai_recommendations` plugin (`OpenAiRecommendationProvider`). It defaults to
+**`gpt-5`** and also offers `gpt-5-mini`/`gpt-5-nano` and the older
+`gpt-4o`/`gpt-4.1` families. The `gpt-5` and `o*` families are reasoning models
+that reject a custom sampling temperature, so `OpenAiClient` omits the
+`temperature` parameter for them and keeps sending it (`0.2`) for the `gpt-4.x`
+models. Cost is a few thousand tokens per sync — pennies on any of these.
+
+Accuracy measures already in place: the list prompt tells the model to **stay
+within one continuity** (so an "Arrowverse" list doesn't sweep in the separate DC
+Animated Movie Universe films), the completeness passes catch missing entries,
+and matched shows expand to all their library seasons.
+
+**The freshness limit — worth remembering.** Every LLM is frozen at a training
+cutoff, so *no* OpenAI model reliably knows very recent content (e.g. James
+Gunn's DCU / Superman 2025) — the collection comes back empty or thin and the
+sync raises the "got no titles" admin alert. Switching to Claude or Gemini does
+**not** fix this; it is a cutoff problem, not a vendor problem. Two ways to get
+current/accurate results:
+
+- **Curated providers, already built:** the Trakt, MDbList, and IMDb list +
+  chronology providers pull human-maintained lists that, for popular franchises,
+  are more accurate and current than any LLM — and cost nothing (IMDb needs no
+  key). Prefer these when a good curated list exists.
+- **A web-search-grounded provider — not built yet, a future option for more
+  accuracy.** A model that searches the web at query time stays current.
+  **Perplexity Sonar** is the cost-effective fit (per-token cheaper than gpt-5,
+  plus a small ~\$0.005/request search fee → still pennies per sync); OpenAI's,
+  Gemini's, or Claude's web-search tools would also work but add a larger
+  per-search fee. Adding one means a new `ICollectionSyncProvider` /
+  `IChronologyProvider` plus an API key. Revisit this if collections need live,
+  up-to-the-minute coverage.
+
 ## Tasks
 
 Full sync, content sync, reorder, and reevaluate-order are queued through
