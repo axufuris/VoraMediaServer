@@ -43,6 +43,27 @@ public class OpenAiListProviderTests
     }
 
     [Fact]
+    public async Task Generates_a_universe_description_from_the_ai_response()
+    {
+        var openAi = AiReturning("{\"description\":\"A shared superhero universe of interconnected films and series.\"}");
+
+        var result = await new OpenAiListProvider(openAi).GenerateDescriptionAsync("Marvel Cinematic Universe");
+
+        Assert.Equal("A shared superhero universe of interconnected films and series.", result);
+    }
+
+    [Fact]
+    public async Task Does_not_call_the_ai_for_a_blank_description_request()
+    {
+        var openAi = Substitute.For<IOpenAiClient>();
+
+        var result = await new OpenAiListProvider(openAi).GenerateDescriptionAsync("   ");
+
+        Assert.Null(result);
+        await openAi.DidNotReceiveWithAnyArgs().CompleteJsonAsync(default!, default!, default, default, default);
+    }
+
+    [Fact]
     public async Task Skips_completeness_when_the_first_list_is_empty()
     {
         var openAi = Substitute.For<IOpenAiClient>();

@@ -121,6 +121,11 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
                 .SetProperty(c => c.ContentSyncCacheJson, cacheJson)
                 .SetProperty(c => c.ContentSyncedAt, DateTime.UtcNow));
 
+    public Task UpdateDescriptionAsync(Guid collectionId, string description) =>
+        context.Collections
+            .Where(c => c.Id == collectionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Description, description));
+
     public Task RemoveItemsFromCollectionAsync(Guid collectionId, IEnumerable<Guid> mediaItemIds)
     {
         var ids = mediaItemIds.ToList();

@@ -24,6 +24,11 @@ the model and it doesn't know your library — use a **Smart Playlist** instead
 normalized dedup key; it stops when a pass adds nothing. Output is movies
 (title + year) and per-season entries (show + season number).
 
+`GenerateDescriptionAsync` (a default no-op on `ICollectionSyncProvider`, so
+other providers are unaffected) returns a short blurb about the universe. The
+sync fills the collection's `Description` with it **only when that field is
+blank**, so a description an admin typed is never overwritten.
+
 ## Matching the list to the library (`CollectionMembershipResolver`)
 
 External ids (TMDB/IMDb) match first; everything else matches by title

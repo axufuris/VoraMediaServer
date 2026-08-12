@@ -53,6 +53,35 @@ public class OpenAiListProvider(IOpenAiClient openAi) : ICollectionSyncProvider
         return results;
     }
 
+    public async Task<string?> GenerateDescriptionAsync(string externalId)
+    {
+        if (string.IsNullOrWhiteSpace(externalId))
+        {
+            return null;
+        }
+
+        var json = await openAi.CompleteJsonAsync(Id, BuildDescriptionPrompt(externalId), temperature: 0.3, modelSettingKey: "collections_model");
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<DescriptionResult>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return string.IsNullOrWhiteSpace(parsed?.Description) ? null : parsed.Description.Trim();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string BuildDescriptionPrompt(string externalId) =>
+        $"Write a concise, engaging 1-2 sentence description of the film and TV franchise or shared universe known as: \"{externalId}\". " +
+        "It should read as the description of a media library collection — say what the universe is, not how to watch it. No preamble, no title prefix, " +
+        "just the description prose. Return ONLY valid JSON of the form {\"description\": \"...\"}.";
+
     private static string BuildListPrompt(string externalId) =>
         $"You are building a media collection described as: \"{externalId}\".\n" +
         "List every movie and TV season that belongs in it. Treat short films, one-shots, TV specials, and " +
@@ -155,6 +184,11 @@ public class OpenAiListProvider(IOpenAiClient openAi) : ICollectionSyncProvider
     private class ListResult
     {
         public List<ListItem>? Items { get; set; }
+    }
+
+    private class DescriptionResult
+    {
+        public string? Description { get; set; }
     }
 
     private class ListItem
