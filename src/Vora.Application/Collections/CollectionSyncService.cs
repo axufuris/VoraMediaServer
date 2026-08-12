@@ -2,8 +2,10 @@
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
+using Vora.Application.Notifications;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Collections;
+using Vora.Domain.Enums;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Collections;
@@ -14,6 +16,7 @@ public class CollectionSyncService(
     IEnumerable<ICollectionSyncProvider> providers,
     IClientNotifier notifier,
     ITaskQueueManager taskQueue,
+    IAdminNotificationManager adminNotifications,
     ILogger<CollectionSyncService> logger)
 {
     public async Task SyncCollectionContentAsync(Guid collectionId)
@@ -44,9 +47,18 @@ public class CollectionSyncService(
 
         try
         {
+            var existingMediaIds = await collectionRepo.GetCollectionMediaIdsAsync(collection.Id);
+            var collectionIsEmpty = existingMediaIds.Count == 0;
+
             var externalItems = await provider.FetchItemsAsync(collection.ContentSyncExternalId);
             if (externalItems == null || !externalItems.Any())
             {
+                if (collectionIsEmpty)
+                {
+                    await adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning,
+                        $"'{collection.Title}' got no titles from the AI",
+                        "The AI List works best for a specific franchise or shared universe (e.g. \"Marvel Cinematic Universe\"). A broad genre or mood (e.g. \"kung fu movies\") often returns nothing — build those with a Smart Playlist instead.");
+                }
                 return;
             }
 
@@ -82,17 +94,18 @@ public class CollectionSyncService(
             var matchingLocalMediaIds = matchedIds.ToList();
             if (matchingLocalMediaIds.Count == 0)
             {
+                if (collectionIsEmpty)
+                {
+                    await adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning,
+                        $"'{collection.Title}' matched nothing in your library",
+                        $"The AI listed {externalItems.Count} title(s) for this collection, but none matched an item in your library. Check the description names the right franchise, or that the titles are in a scanned library.");
+                }
                 return;
             }
 
-            var existingMediaIds = await collectionRepo.GetCollectionMediaIdsAsync(collection.Id);
             var manuallyAddedIds = await collectionRepo.GetManuallyAddedMediaIdsAsync(collection.Id);
             var membershipChanged = false;
 
-            // Mirror mode: drop items no longer in the list. Guarded by the
-            // "no matches → return" above, so a total match failure can't wipe
-            // the collection. Admin-added items are kept, and items the admin
-            // removed stay out via the exclusion list subtracted above.
             if (collection.MirrorList)
             {
                 var desired = matchingLocalMediaIds.ToHashSet();
@@ -124,9 +137,6 @@ public class CollectionSyncService(
                 membershipChanged = true;
             }
 
-            // The item set changed, so any chronology ordering is now stale and
-            // the new items sit unordered. Re-evaluate the order; it no-ops when
-            // the collection has no chronology provider or the set is unchanged.
             if (membershipChanged)
             {
                 taskQueue.QueueReevaluateCollectionOrder(collection.Id);
