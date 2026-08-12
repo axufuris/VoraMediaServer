@@ -50,6 +50,9 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
         return ids.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
     }
 
+    public Task<List<Guid>> EvaluateIdsAsync(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, MusicAccessFilter access) =>
+        BuildIdQuery(definition, mediaType, profileId, access).ToListAsync();
+
     public Task<int> CountAsync(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, MusicAccessFilter access) =>
         mediaType switch
         {

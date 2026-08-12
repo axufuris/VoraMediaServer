@@ -1,5 +1,6 @@
 using Vora.Domain.Entities.Common;
 using Vora.Domain.Entities.Media;
+using Vora.Domain.Entities.Playlists;
 using Vora.Domain.Enums;
 
 namespace Vora.Domain.Entities.Library;
@@ -26,6 +27,9 @@ public class Collection : LockableEntity
     public string? ExternalListId { get; set; }
     public string? ContentSyncProviderId { get; set; }
     public string? ContentSyncExternalId { get; set; }
+
+    public string? RulesJson { get; set; }
+    public PlaylistMediaType? SmartMediaType { get; set; }
 
     public string? ChronologyItemsSignature { get; set; }
     public string? ContentSyncCacheJson { get; set; }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Analysis;
 using Vora.Application.Collections;
 using Vora.Application.Media;
+using Vora.Application.Media.SmartPlaylists;
 using Vora.Application.Notifications;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Collections;
@@ -23,6 +24,7 @@ public class CollectionSyncServiceTests
     private readonly IClientNotifier _notifier;
     private readonly ITaskQueueManager _taskQueue;
     private readonly IAdminNotificationManager _adminNotifications;
+    private readonly ISmartPlaylistEvaluator _smartEvaluator;
     private readonly List<ICollectionSyncProvider> _providers;
     private readonly CollectionSyncService _service;
 
@@ -33,8 +35,9 @@ public class CollectionSyncServiceTests
         _notifier = Substitute.For<IClientNotifier>();
         _taskQueue = Substitute.For<ITaskQueueManager>();
         _adminNotifications = Substitute.For<IAdminNotificationManager>();
+        _smartEvaluator = Substitute.For<ISmartPlaylistEvaluator>();
         _providers = new List<ICollectionSyncProvider>();
-        _service = new CollectionSyncService(_collectionRepo, _mediaRepo, _providers, _notifier, _taskQueue,
+        _service = new CollectionSyncService(_collectionRepo, _mediaRepo, _providers, _smartEvaluator, _notifier, _taskQueue,
             _adminNotifications, NullLogger<CollectionSyncService>.Instance);
     }
 

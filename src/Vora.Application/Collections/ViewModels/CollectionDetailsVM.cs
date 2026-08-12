@@ -1,6 +1,7 @@
 ﻿using System.Linq.Expressions;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
+using Vora.Domain.Entities.Playlists;
 using Vora.Domain.Enums;
 
 namespace Vora.Application.Collections.ViewModels;
@@ -28,6 +29,8 @@ public class CollectionDetailsVM
     public string? ContentSyncExternalId { get; set; }
     public int SyncIntervalDays { get; set; }
     public bool MirrorList { get; set; }
+    public string? RulesJson { get; set; }
+    public PlaylistMediaType? SmartMediaType { get; set; }
     public bool IsPlayed { get; set; }
     public int? UnplayedItemcount { get; set; }
     public List<string> LockedFields { get; set; } = new();
@@ -58,6 +61,8 @@ public class CollectionDetailsVM
             ContentSyncExternalId = c.ContentSyncExternalId,
             SyncIntervalDays = c.SyncIntervalDays,
             MirrorList = c.MirrorList,
+            RulesJson = c.RulesJson,
+            SmartMediaType = c.SmartMediaType,
             IsPlayed = false,
             UnplayedItemcount = null,
             Items = c.Items.Select(item => new CollectionDetailsLibraryItemVM

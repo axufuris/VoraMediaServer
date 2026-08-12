@@ -1,10 +1,13 @@
-﻿using System.Text.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
+using Vora.Application.Media.SmartPlaylists;
 using Vora.Application.Notifications;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Collections;
+using Vora.Domain.Entities.Playlists;
 using Vora.Domain.Enums;
 using Vora.Plugins.Interfaces;
 
@@ -14,11 +17,17 @@ public class CollectionSyncService(
     ICollectionRepository collectionRepo,
     IMediaRepository mediaRepo,
     IEnumerable<ICollectionSyncProvider> providers,
+    ISmartPlaylistEvaluator smartEvaluator,
     IClientNotifier notifier,
     ITaskQueueManager taskQueue,
     IAdminNotificationManager adminNotifications,
     ILogger<CollectionSyncService> logger)
 {
+    private static readonly JsonSerializerOptions SmartRuleJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
+
     public async Task SyncCollectionContentAsync(Guid collectionId)
     {
         var collection = await collectionRepo.GetProjectedByIdAsync(collectionId, c => new
@@ -28,37 +37,55 @@ public class CollectionSyncService(
             c.Description,
             c.ContentSyncProviderId,
             c.ContentSyncExternalId,
+            c.RulesJson,
+            c.SmartMediaType,
             c.MirrorList,
             c.LibraryId
         });
 
-        if (collection == null
-            || string.IsNullOrEmpty(collection.ContentSyncProviderId)
-            || string.IsNullOrEmpty(collection.ContentSyncExternalId))
+        if (collection == null)
         {
             return;
         }
 
-        var provider = providers.FirstOrDefault(p => p.Id == collection.ContentSyncProviderId);
-        if (provider == null)
+        var isSmart = !string.IsNullOrWhiteSpace(collection.RulesJson);
+        var hasProvider = !string.IsNullOrEmpty(collection.ContentSyncProviderId) && !string.IsNullOrEmpty(collection.ContentSyncExternalId);
+        if (!isSmart && !hasProvider)
         {
-            logger.LogWarning("Collection Sync Provider '{ProviderId}' not found.", collection.ContentSyncProviderId);
             return;
         }
 
         try
         {
             var existingMediaIds = await collectionRepo.GetCollectionMediaIdsAsync(collection.Id);
+
+            if (isSmart)
+            {
+                var ruleMatches = await EvaluateSmartMembership(collection.RulesJson!, collection.SmartMediaType, collection.LibraryId);
+                var excluded = await collectionRepo.GetExcludedMediaIdsAsync(collection.Id);
+                ruleMatches.ExceptWith(excluded);
+                await ReconcileMembershipAsync(collection.Id, collection.Title, true, ruleMatches, existingMediaIds);
+                await collectionRepo.TouchContentSyncedAtAsync(collection.Id);
+                return;
+            }
+
+            var provider = providers.FirstOrDefault(p => p.Id == collection.ContentSyncProviderId);
+            if (provider == null)
+            {
+                logger.LogWarning("Collection Sync Provider '{ProviderId}' not found.", collection.ContentSyncProviderId);
+                return;
+            }
+
             var collectionIsEmpty = existingMediaIds.Count == 0;
 
-            var externalItems = await provider.FetchItemsAsync(collection.ContentSyncExternalId);
+            var externalItems = await provider.FetchItemsAsync(collection.ContentSyncExternalId!);
             if (externalItems == null || !externalItems.Any())
             {
                 if (collectionIsEmpty)
                 {
                     await adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning,
                         $"'{collection.Title}' got no titles from the AI",
-                        "The AI List works best for a specific franchise or shared universe (e.g. \"Marvel Cinematic Universe\"). A broad genre or mood (e.g. \"kung fu movies\") often returns nothing — build those with a Smart Playlist instead.");
+                        "The AI List works best for a specific franchise or shared universe (e.g. \"Marvel Cinematic Universe\"). A broad genre or mood (e.g. \"kung fu movies\") often returns nothing — build those with a Smart Collection instead.");
                 }
                 return;
             }
@@ -77,7 +104,7 @@ public class CollectionSyncService(
 
             if (string.IsNullOrWhiteSpace(collection.Description))
             {
-                var generatedDescription = await provider.GenerateDescriptionAsync(collection.ContentSyncExternalId);
+                var generatedDescription = await provider.GenerateDescriptionAsync(collection.ContentSyncExternalId!);
                 if (!string.IsNullOrWhiteSpace(generatedDescription))
                 {
                     await collectionRepo.UpdateDescriptionAsync(collection.Id, generatedDescription.Trim());
@@ -102,8 +129,7 @@ public class CollectionSyncService(
             var excludedIds = await collectionRepo.GetExcludedMediaIdsAsync(collection.Id);
             matchedIds.ExceptWith(excludedIds);
 
-            var matchingLocalMediaIds = matchedIds.ToList();
-            if (matchingLocalMediaIds.Count == 0)
+            if (matchedIds.Count == 0)
             {
                 if (collectionIsEmpty)
                 {
@@ -114,48 +140,67 @@ public class CollectionSyncService(
                 return;
             }
 
-            var manuallyAddedIds = await collectionRepo.GetManuallyAddedMediaIdsAsync(collection.Id);
-            var membershipChanged = false;
-
-            if (collection.MirrorList)
-            {
-                var desired = matchingLocalMediaIds.ToHashSet();
-                var toRemove = existingMediaIds.Where(id => !desired.Contains(id) && !manuallyAddedIds.Contains(id)).ToList();
-                if (toRemove.Count > 0)
-                {
-                    await collectionRepo.RemoveItemsFromCollectionAsync(collection.Id, toRemove);
-                    await notifier.NotifyCollectionUpdatedAsync(collection.Id);
-                    logger.LogInformation("Mirror sync removed {Count} item(s) no longer in the list from '{Title}'.", toRemove.Count, collection.Title);
-                    membershipChanged = true;
-                }
-            }
-
-            var itemsToAdd = matchingLocalMediaIds
-                .Where(id => !existingMediaIds.Contains(id))
-                .Select(id => new CollectionItem
-                {
-                    CollectionId = collection.Id,
-                    MediaItemId = id
-                })
-                .ToList();
-
-            if (itemsToAdd.Count > 0)
-            {
-                await collectionRepo.AddItemsToCollectionAsync(itemsToAdd);
-                logger.LogInformation("Auto-synced {Count} new items to collection '{Title}'.", itemsToAdd.Count, collection.Title);
-
-                await notifier.NotifyCollectionUpdatedAsync(collection.Id);
-                membershipChanged = true;
-            }
-
-            if (membershipChanged)
-            {
-                taskQueue.QueueReevaluateCollectionOrder(collection.Id);
-            }
+            await ReconcileMembershipAsync(collection.Id, collection.Title, collection.MirrorList, matchedIds, existingMediaIds);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to sync content for collection '{Title}'.", collection.Title);
+        }
+    }
+
+    private async Task<HashSet<Guid>> EvaluateSmartMembership(string rulesJson, PlaylistMediaType? smartMediaType, Guid? libraryId)
+    {
+        var definition = JsonSerializer.Deserialize<SmartPlaylistDefinition>(rulesJson, SmartRuleJsonOptions);
+        if (definition?.Root == null)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var access = libraryId.HasValue
+            ? new MusicAccessFilter { HasAllLibraryAccess = false, AllowedLibraryIds = new List<Guid> { libraryId.Value } }
+            : MusicAccessFilter.Unrestricted;
+
+        var ids = await smartEvaluator.EvaluateIdsAsync(definition, smartMediaType ?? PlaylistMediaType.Movies, Guid.Empty, access);
+        return ids.ToHashSet();
+    }
+
+    private async Task ReconcileMembershipAsync(Guid collectionId, string title, bool mirror, HashSet<Guid> desiredIds, HashSet<Guid> existingMediaIds)
+    {
+        var manuallyAddedIds = await collectionRepo.GetManuallyAddedMediaIdsAsync(collectionId);
+        var membershipChanged = false;
+
+        if (mirror)
+        {
+            var toRemove = existingMediaIds.Where(id => !desiredIds.Contains(id) && !manuallyAddedIds.Contains(id)).ToList();
+            if (toRemove.Count > 0)
+            {
+                await collectionRepo.RemoveItemsFromCollectionAsync(collectionId, toRemove);
+                await notifier.NotifyCollectionUpdatedAsync(collectionId);
+                logger.LogInformation("Sync removed {Count} item(s) no longer matching from '{Title}'.", toRemove.Count, title);
+                membershipChanged = true;
+            }
+        }
+
+        var itemsToAdd = desiredIds
+            .Where(id => !existingMediaIds.Contains(id))
+            .Select(id => new CollectionItem
+            {
+                CollectionId = collectionId,
+                MediaItemId = id
+            })
+            .ToList();
+
+        if (itemsToAdd.Count > 0)
+        {
+            await collectionRepo.AddItemsToCollectionAsync(itemsToAdd);
+            logger.LogInformation("Auto-synced {Count} new items to collection '{Title}'.", itemsToAdd.Count, title);
+            await notifier.NotifyCollectionUpdatedAsync(collectionId);
+            membershipChanged = true;
+        }
+
+        if (membershipChanged)
+        {
+            taskQueue.QueueReevaluateCollectionOrder(collectionId);
         }
     }
 

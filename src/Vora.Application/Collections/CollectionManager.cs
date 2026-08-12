@@ -116,12 +116,14 @@ public class CollectionManager : ICollectionManager
             ContentSyncProviderId = request.ContentSyncProviderId,
             ContentSyncExternalId = request.ContentSyncExternalId,
             SyncIntervalDays = Math.Max(1, request.SyncIntervalDays),
-            MirrorList = request.MirrorList
+            MirrorList = request.MirrorList,
+            RulesJson = request.RulesJson,
+            SmartMediaType = request.SmartMediaType
         };
 
         var id = await _repository.CreateCollectionAsync(collection);
 
-        TriggerCollectionSyncTasks(id, request.Title, request.ContentSyncProviderId, request.SortProviderId);
+        TriggerCollectionSyncTasks(id, request.Title, request.ContentSyncProviderId, request.SortProviderId, request.RulesJson);
 
         if (request.LibraryId.HasValue)
         {
@@ -153,6 +155,8 @@ public class CollectionManager : ICollectionManager
         collection.ContentSyncProviderId = request.ContentSyncProviderId;
         collection.SyncIntervalDays = Math.Max(1, request.SyncIntervalDays);
         collection.MirrorList = request.MirrorList;
+        collection.RulesJson = request.RulesJson;
+        collection.SmartMediaType = request.SmartMediaType;
         collection.VisibleStartDate = request.VisibleStartDate.HasValue ? DateTime.SpecifyKind(request.VisibleStartDate.Value, DateTimeKind.Utc) : null;
         collection.VisibleEndDate = request.VisibleEndDate.HasValue ? DateTime.SpecifyKind(request.VisibleEndDate.Value, DateTimeKind.Utc) : null;
 
@@ -168,14 +172,14 @@ public class CollectionManager : ICollectionManager
             await _repository.ResetChronologyCacheAsync(id);
         }
 
-        TriggerCollectionSyncTasks(id, request.Title, request.ContentSyncProviderId, request.SortProviderId);
+        TriggerCollectionSyncTasks(id, request.Title, request.ContentSyncProviderId, request.SortProviderId, request.RulesJson);
 
         await _notifier.NotifyCollectionUpdatedAsync(id);
     }
 
-    private void TriggerCollectionSyncTasks(Guid collectionId, string title, string? contentProvider, string? sortProvider)
+    private void TriggerCollectionSyncTasks(Guid collectionId, string title, string? contentProvider, string? sortProvider, string? rulesJson)
     {
-        bool hasContentSync = !string.IsNullOrEmpty(contentProvider);
+        bool hasContentSync = !string.IsNullOrEmpty(contentProvider) || !string.IsNullOrWhiteSpace(rulesJson);
         bool hasChronologySort = !string.IsNullOrEmpty(sortProvider);
 
         if (hasContentSync || hasChronologySort)

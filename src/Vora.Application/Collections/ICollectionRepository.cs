@@ -20,6 +20,7 @@ public interface ICollectionRepository
     Task SetItemInUniverseYearAsync(Guid collectionId, Guid mediaItemId, double? year, bool locked);
     Task TouchChronologySyncedAtAsync(Guid collectionId);
     Task UpdateContentSyncCacheAsync(Guid collectionId, string cacheJson);
+    Task TouchContentSyncedAtAsync(Guid collectionId);
     Task UpdateDescriptionAsync(Guid collectionId, string description);
     Task RemoveItemsFromCollectionAsync(Guid collectionId, IEnumerable<Guid> mediaItemIds);
 
