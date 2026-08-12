@@ -10,15 +10,15 @@ public class OpenAiListProvider(IOpenAiClient openAi) : ICollectionSyncProvider
     public string Id => "openai_list";
     public string Name => "AI List";
     public string Version => "1.0.0";
-    public string Description => "Fills a collection from an AI-generated list. Instead of a list URL, describe the movies and shows you want and Vora matches them to your library.";
+    public string Description => "Fills a collection from an AI-generated list. Best for a specific franchise or shared universe: name it (e.g. \"Marvel Cinematic Universe\", \"DC Extended Universe\") and Vora lists every movie and season in it and matches them to your library. For a genre or mood grouping (all your kung-fu movies, all your horror), use a Smart Playlist instead.";
     public bool IsSystemPlugin => true;
     public bool IsAiPlugin => true;
     public string Type => "Collection_Sync";
     public string DeveloperName => "Andy Xufuris";
     public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
 
-    public string ExternalIdLabel => "Describe the list";
-    public string ExternalIdPlaceholder => "e.g., Every Marvel Cinematic Universe movie and Disney+ series";
+    public string ExternalIdLabel => "Franchise or universe";
+    public string ExternalIdPlaceholder => "e.g., Marvel Cinematic Universe, DC Extended Universe, Star Wars";
 
     private const int MaxCompletenessPasses = 2;
 
