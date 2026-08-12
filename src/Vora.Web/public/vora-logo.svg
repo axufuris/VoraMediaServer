@@ -7,6 +7,5 @@
         </linearGradient>
     </defs>
     <path d="M8 14 L22 14 L40 50 L58 14 L72 14 L40 78 Z" fill="url(#vora-logo-v)" />
-    <circle cx="64" cy="11" r="3" fill="#fbbf24" />
     <text x="86" y="68" font-family="Inter, 'Segoe UI', system-ui, -apple-system, sans-serif" font-weight="900" font-size="64" fill="#ffffff" letter-spacing="-2.5">ora</text>
 </svg>
