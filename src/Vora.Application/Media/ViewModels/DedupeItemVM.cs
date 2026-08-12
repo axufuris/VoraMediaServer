@@ -15,4 +15,5 @@ public class DedupeItemVM
     public long QualityScore { get; set; }
     public string Container { get; set; } = string.Empty;
     public long? Bitrate { get; set; }
+    public DateTime? FileCreatedAt { get; set; }
 }

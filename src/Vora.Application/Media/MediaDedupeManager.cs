@@ -361,7 +361,8 @@ public class MediaDedupeManager : IMediaDedupeManager
             AudioTracks = audioDescriptions,
             QualityScore = score,
             Container = part.Container?.ToUpperInvariant() ?? "UNKNOWN",
-            Bitrate = part.OverallBitrate
+            Bitrate = part.OverallBitrate,
+            FileCreatedAt = GetFileCreatedAtUtc(part.FilePath)
         };
     }
 
@@ -452,8 +453,26 @@ public class MediaDedupeManager : IMediaDedupeManager
             AudioTracks = new List<string>(),
             QualityScore = score,
             Container = part.Container?.ToUpperInvariant() ?? "UNKNOWN",
-            Bitrate = bitrateBps > 0 ? bitrateBps : null
+            Bitrate = bitrateBps > 0 ? bitrateBps : null,
+            FileCreatedAt = GetFileCreatedAtUtc(part.FilePath)
         };
+    }
+
+    private static DateTime? GetFileCreatedAtUtc(string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            return File.GetCreationTimeUtc(filePath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private static long ResolveAudioBitrateBps(MediaPart part, Track track)

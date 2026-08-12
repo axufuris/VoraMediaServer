@@ -14,6 +14,7 @@ export interface DedupeItemVM {
     qualityScore: number;
     container: string;
     bitrate?: number;
+    fileCreatedAt?: string | null;
 }
 
 export interface DedupeGroupVM {

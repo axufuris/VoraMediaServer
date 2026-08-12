@@ -264,6 +264,7 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
                                             <div className="flex flex-wrap gap-1.5">
                                                 <Chip>Score: <span className="text-[var(--vora-text-primary)] font-bold ml-0.5">{part.qualityScore}</span></Chip>
                                                 <Chip>{formatBytes(part.fileSizeBytes)}</Chip>
+                                                {part.fileCreatedAt && <Chip>Created: <span className="text-[var(--vora-text-primary)] font-medium ml-0.5">{new Date(part.fileCreatedAt).toLocaleString()}</span></Chip>}
                                                 {group.mediaKind === 'audio' ? (
                                                     <>
                                                         {part.bitrate && <Chip>{Math.round(part.bitrate / 1000)} kbps</Chip>}
