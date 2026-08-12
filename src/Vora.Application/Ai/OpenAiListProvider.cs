@@ -63,8 +63,11 @@ public class OpenAiListProvider(IOpenAiClient openAi) : ICollectionSyncProvider
         "(give the show's title and the season number as an integer). For every TV show that belongs, output a SEPARATE " +
         "entry for EACH season it has — season 1, season 2, season 3, and so on. Do NOT collapse a multi-season show into " +
         "one entry and do NOT stop at season 1 (e.g. a show with three seasons yields three entries). Be exhaustive and " +
-        "include everything that belongs, even lesser-known titles. Do not include individual episodes. Do not invent " +
-        "titles that do not exist. Use the widely-recognized English title for each show and movie.";
+        "include everything that belongs, even lesser-known titles. Stay strictly within the ONE continuity named above: " +
+        "include only titles that are canonically part of it, and EXCLUDE titles from a separate or adjacent universe that " +
+        "merely shares characters, branding, or a studio — for example a different animated film line, a live-action reboot, " +
+        "a rival studio's version, or a one-off crossover from another franchise. Do not include individual episodes. Do not " +
+        "invent titles that do not exist. Use the widely-recognized English title for each show and movie.";
 
     private static string BuildCompletenessPrompt(string externalId, List<CollectionSyncItemDto> current)
     {
@@ -82,7 +85,9 @@ public class OpenAiListProvider(IOpenAiClient openAi) : ICollectionSyncProvider
             lines +
             "\nName every movie and TV season that BELONGS in the collection but is MISSING from the list above — including " +
             "later seasons of a show that only has some seasons listed, short films, one-shots, and specials. Apply the same " +
-            "rules: one entry per season, treat shorts/specials as movies, never invent a title that does not exist. Return " +
+            "rules: one entry per season, treat shorts/specials as movies, never invent a title that does not exist, and stay " +
+            "within the SAME single continuity — do not suggest titles from a separate or adjacent universe that only shares " +
+            "characters, branding, or a studio. Return " +
             "ONLY the missing entries as valid JSON of the form {\"items\": [ {\"type\": \"movie\", \"title\": \"...\", " +
             "\"year\": 2008}, {\"type\": \"season\", \"show\": \"...\", \"season\": 1} ]}. Return {\"items\": []} if nothing is missing.";
     }
