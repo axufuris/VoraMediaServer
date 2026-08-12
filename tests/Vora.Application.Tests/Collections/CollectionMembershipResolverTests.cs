@@ -174,6 +174,27 @@ public class CollectionMembershipResolverTests
     }
 
     [Fact]
+    public void Includes_every_library_season_of_a_matched_show_even_when_the_list_names_only_one()
+    {
+        var showId = Guid.NewGuid();
+        var seasonOne = Guid.NewGuid();
+        var seasonTwo = Guid.NewGuid();
+        var candidates = Candidates(
+            shows: new() { new MediaTitleCandidateDto { Id = showId, Title = "Peacemaker" } },
+            seasons: new()
+            {
+                new SeasonMatchCandidateDto { Id = seasonOne, TvShowId = showId, SeasonNumber = 1 },
+                new SeasonMatchCandidateDto { Id = seasonTwo, TvShowId = showId, SeasonNumber = 2 }
+            });
+        var entries = new List<CollectionMembershipEntry>
+        {
+            new() { MediaType = "Season", ShowTitle = "Peacemaker", SeasonNumber = 1 }
+        };
+
+        CollectionMembershipResolver.Resolve(entries, candidates).Should().BeEquivalentTo(new[] { seasonOne, seasonTwo });
+    }
+
+    [Fact]
     public void Matches_season_even_when_show_title_has_duplicate_rows()
     {
         var showA = Guid.NewGuid();

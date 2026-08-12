@@ -8,9 +8,9 @@ public static class CollectionMembershipResolver
     {
         var movieLookup = BuildTitleLookup(candidates.Movies);
         var showLookup = BuildTitleLookup(candidates.Shows);
-        var seasonLookup = candidates.Seasons
-            .GroupBy(s => (s.TvShowId, s.SeasonNumber))
-            .ToDictionary(g => g.Key, g => g.First().Id);
+        var seasonsByShow = candidates.Seasons
+            .GroupBy(s => s.TvShowId)
+            .ToDictionary(g => g.Key, g => g.Select(s => s.Id).ToList());
 
         var matched = new List<Guid>();
 
@@ -18,23 +18,17 @@ public static class CollectionMembershipResolver
         {
             if (string.Equals(entry.MediaType, "Season", StringComparison.OrdinalIgnoreCase))
             {
-                if (entry.SeasonNumber == null) continue;
-
-                var seasonMatched = false;
                 foreach (var showKey in TitleMatch.MatchKeys(entry.ShowTitle))
                 {
                     if (!showLookup.TryGetValue(showKey, out var showMatches)) continue;
 
                     foreach (var (_, showId) in showMatches)
                     {
-                        if (seasonLookup.TryGetValue((showId, entry.SeasonNumber.Value), out var seasonId))
+                        if (seasonsByShow.TryGetValue(showId, out var showSeasons))
                         {
-                            matched.Add(seasonId);
-                            seasonMatched = true;
-                            break;
+                            matched.AddRange(showSeasons);
                         }
                     }
-                    if (seasonMatched) break;
                 }
                 continue;
             }
