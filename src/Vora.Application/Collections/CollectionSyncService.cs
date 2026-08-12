@@ -25,6 +25,7 @@ public class CollectionSyncService(
         {
             c.Id,
             c.Title,
+            c.Description,
             c.ContentSyncProviderId,
             c.ContentSyncExternalId,
             c.MirrorList,
@@ -73,6 +74,16 @@ public class CollectionSyncService(
                 SeasonNumber = x.SeasonNumber
             }).ToList();
             await collectionRepo.UpdateContentSyncCacheAsync(collection.Id, JsonSerializer.Serialize(membership));
+
+            if (string.IsNullOrWhiteSpace(collection.Description))
+            {
+                var generatedDescription = await provider.GenerateDescriptionAsync(collection.ContentSyncExternalId);
+                if (!string.IsNullOrWhiteSpace(generatedDescription))
+                {
+                    await collectionRepo.UpdateDescriptionAsync(collection.Id, generatedDescription.Trim());
+                    await notifier.NotifyCollectionUpdatedAsync(collection.Id);
+                }
+            }
 
             var tmdbIds = externalItems.Where(x => !string.IsNullOrEmpty(x.TmdbId)).Select(x => x.TmdbId!).ToList();
             var imdbIds = externalItems.Where(x => !string.IsNullOrEmpty(x.ImdbId)).Select(x => x.ImdbId!).ToList();

@@ -8,4 +8,6 @@ public interface ICollectionSyncProvider : IVoraPlugin
     string ExternalIdPlaceholder { get; }
 
     Task<List<CollectionSyncItemDto>> FetchItemsAsync(string externalId);
+
+    Task<string?> GenerateDescriptionAsync(string externalId) => Task.FromResult<string?>(null);
 }
