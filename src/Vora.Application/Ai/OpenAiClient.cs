@@ -62,12 +62,17 @@ public class OpenAiClient(
             ["messages"] = messages,
             ["response_format"] = new { type = "json_object" }
         };
-        if (temperature.HasValue && SupportsCustomTemperature(model))
+        if (IsReasoningModel(model))
+        {
+            payload["reasoning_effort"] = "low";
+        }
+        else if (temperature.HasValue)
         {
             payload["temperature"] = temperature.Value;
         }
 
         var client = httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromMinutes(5);
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         request.Content = JsonContent.Create(payload);
@@ -98,11 +103,11 @@ public class OpenAiClient(
         return data.Choices[0].Message?.Content;
     }
 
-    private static bool SupportsCustomTemperature(string model)
-        => !model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase)
-        && !model.StartsWith("o1", StringComparison.OrdinalIgnoreCase)
-        && !model.StartsWith("o3", StringComparison.OrdinalIgnoreCase)
-        && !model.StartsWith("o4", StringComparison.OrdinalIgnoreCase);
+    private static bool IsReasoningModel(string model)
+        => model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase)
+        || model.StartsWith("o1", StringComparison.OrdinalIgnoreCase)
+        || model.StartsWith("o3", StringComparison.OrdinalIgnoreCase)
+        || model.StartsWith("o4", StringComparison.OrdinalIgnoreCase);
 
     private class ChatResponse
     {
