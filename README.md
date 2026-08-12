@@ -520,6 +520,9 @@ Project documentation lives under [`docs/`](docs/). Highlights:
   architecture
 - [`docs/music-and-audio.md`](docs/music-and-audio.md) — music subsystem
 - [`docs/playlists.md`](docs/playlists.md) — manual and smart playlists
+- [`docs/collections.md`](docs/collections.md) — collection content
+  sync, the AI List (franchise/universe) provider, and AI chronological
+  ordering
 - [`docs/redesign/`](docs/redesign/) — client templates, scheduling, and
   design language
 
