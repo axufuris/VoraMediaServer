@@ -32,6 +32,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
     private const int MaxCanvasWidthPx = 1280;
     private const int OverlayJpegQuality = 90;
     private const double PosterAspect = 2.0 / 3.0;
+    private const double StillAspect = 16.0 / 9.0;
 
     private static readonly JsonSerializerOptions ConfigurationParseOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -72,7 +73,8 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
 
         using var baseImage = await Image.LoadAsync<Rgba32>(originalArtworkPath, cancellationToken);
 
-        NormalizeToPosterAspect(baseImage);
+        var targetAspect = string.Equals(item.MediaType, "Episode", StringComparison.OrdinalIgnoreCase) ? StillAspect : PosterAspect;
+        NormalizeToTargetAspect(baseImage, targetAspect);
 
         if (baseImage.Width > MaxCanvasWidthPx)
         {
@@ -110,29 +112,29 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         return $"{CustomArtworkUrlPrefix}{outputFileName}";
     }
 
-    // Clients render posters at a 2:3 aspect with object-cover (center crop).
-    // Badges are placed as percentages of the base image, so on source art that
-    // isn't 2:3 they land where the client then crops — clipped off the side or
-    // overlapping other UI. Center-crop the base to 2:3 first so the baked
-    // overlay matches exactly what the client shows.
-    private static void NormalizeToPosterAspect(Image<Rgba32> image)
+    // Clients render posters at 2:3 and episode stills at 16:9, both with badges
+    // placed as percentages of the base image. Center-crop the base to the aspect
+    // the client will show (2:3 for posters, 16:9 for episode stills) so the baked
+    // overlay matches exactly — otherwise a 16:9 still forced to 2:3 gets its sides
+    // chopped off and then pillarboxes in the still container.
+    private static void NormalizeToTargetAspect(Image<Rgba32> image, double targetAspect)
     {
         var currentAspect = (double)image.Width / image.Height;
-        if (Math.Abs(currentAspect - PosterAspect) < 0.001)
+        if (Math.Abs(currentAspect - targetAspect) < 0.001)
         {
             return;
         }
 
         int cropWidth, cropHeight;
-        if (currentAspect > PosterAspect)
+        if (currentAspect > targetAspect)
         {
             cropHeight = image.Height;
-            cropWidth = (int)Math.Round(image.Height * PosterAspect);
+            cropWidth = (int)Math.Round(image.Height * targetAspect);
         }
         else
         {
             cropWidth = image.Width;
-            cropHeight = (int)Math.Round(image.Width / PosterAspect);
+            cropHeight = (int)Math.Round(image.Width / targetAspect);
         }
 
         var cropX = Math.Max(0, (image.Width - cropWidth) / 2);
@@ -140,7 +142,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         image.Mutate(x => x.Crop(new Rectangle(cropX, cropY, cropWidth, cropHeight)));
     }
 
-    private const string CacheKeyVersion = "v6-poster-aspect-2x3";
+    private const string CacheKeyVersion = "v7-episode-still-16x9";
 
     private static string ComputeOverlayCacheKey(OverlayMediaDto item, string originalArtworkPath, string templateJson)
     {
