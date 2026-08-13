@@ -1,6 +1,7 @@
 import { apiClient } from '../client';
 import type { ArtworkResult } from '../Media/artworkService';
 import type { CollectionSortOrder } from './collectionService';
+import type { PlaylistMediaType } from '../Music/smartPlaylistService';
 
 export interface UpdateCollectionRequest {
     title: string;
@@ -20,6 +21,8 @@ export interface UpdateCollectionRequest {
     contentSyncExternalId?: string;
     syncIntervalDays?: number;
     mirrorList?: boolean;
+    rulesJson?: string;
+    smartMediaType?: PlaylistMediaType;
 }
 
 export interface CreateCollectionRequest {
@@ -40,6 +43,8 @@ export interface CreateCollectionRequest {
     contentSyncExternalId?: string;
     syncIntervalDays?: number;
     mirrorList?: boolean;
+    rulesJson?: string;
+    smartMediaType?: PlaylistMediaType;
 }
 
 export const collectionAdminService = {

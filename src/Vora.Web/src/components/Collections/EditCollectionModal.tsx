@@ -6,8 +6,22 @@ import type { ArtworkResult } from '../../api/Media/artworkService';
 import { Modal } from '../Common/Modal';
 import ArtworkPicker from '../Common/ArtworkPicker';
 import { pluginAdminService, type PluginOptionVM } from '../../api/System/pluginAdminService';
+import { emptyDefinition, type SmartPlaylistDefinition } from '../../api/Music/smartPlaylistService';
+import RuleTreeEditor from '../Common/RuleTreeEditor';
 import { apiClient } from '../../api/client';
 import { useDialog } from '../../dialogs';
+
+const SMART_CONTENT = '__smart__';
+const defaultSmartDefinition = (): SmartPlaylistDefinition => ({ ...emptyDefinition(), limit: 2000, sortBy: 'DateAdded', sortDirection: 'Desc' });
+const parseSmartDefinition = (rulesJson?: string): SmartPlaylistDefinition => {
+    if (!rulesJson) return defaultSmartDefinition();
+    try {
+        const parsed = JSON.parse(rulesJson) as SmartPlaylistDefinition;
+        return parsed?.root ? parsed : defaultSmartDefinition();
+    } catch {
+        return defaultSmartDefinition();
+    }
+};
 
 interface EditCollectionModalProps {
     isOpen: boolean;
@@ -46,10 +60,11 @@ export default function EditCollectionModal({
     const [externalListId, setExternalListId] = useState(collection.externalListId || '');
     const [chronologyProviders, setChronologyProviders] = useState<PluginOptionVM[]>([]);
     const [syncProviders, setSyncProviders] = useState<PluginOptionVM[]>([]);
-    const [contentSyncProviderId, setContentSyncProviderId] = useState(collection.contentSyncProviderId || '');
+    const [contentSyncProviderId, setContentSyncProviderId] = useState(collection.rulesJson ? SMART_CONTENT : (collection.contentSyncProviderId || ''));
     const [contentSyncExternalId, setContentSyncExternalId] = useState(collection.contentSyncExternalId || '');
     const [syncIntervalDays, setSyncIntervalDays] = useState(collection.syncIntervalDays || 1);
     const [mirrorList, setMirrorList] = useState(collection.mirrorList || false);
+    const [smartDefinition, setSmartDefinition] = useState<SmartPlaylistDefinition>(() => parseSmartDefinition(collection.rulesJson));
     const [artworkProviders, setArtworkProviders] = useState<PluginOptionVM[]>([]);
     const [selectedProviderId, setSelectedProviderId] = useState('tmdb_artwork');
 
@@ -78,10 +93,11 @@ export default function EditCollectionModal({
             setSortTitle(collection.sortTitle || '');
             setVisibleStartDate(formatDateForInput(collection.visibleStartDate));
             setVisibleEndDate(formatDateForInput(collection.visibleEndDate));
-            setContentSyncProviderId(collection.contentSyncProviderId || '');
+            setContentSyncProviderId(collection.rulesJson ? SMART_CONTENT : (collection.contentSyncProviderId || ''));
             setContentSyncExternalId(collection.contentSyncExternalId || '');
             setSyncIntervalDays(collection.syncIntervalDays || 1);
             setMirrorList(collection.mirrorList || false);
+            setSmartDefinition(parseSmartDefinition(collection.rulesJson));
             setLockedFields(collection.lockedFields || []);
             setActiveTab('general');
 
@@ -168,9 +184,12 @@ export default function EditCollectionModal({
                 autoSyncChronology: sortProviderId ? autoSyncChronology : false,
                 sortTitle: sortTitle.trim() || undefined,
                 visibleStartDate: visibleStartDate || undefined, visibleEndDate: visibleEndDate || undefined,
-                contentSyncProviderId, contentSyncExternalId,
+                contentSyncProviderId: contentSyncProviderId === SMART_CONTENT ? undefined : contentSyncProviderId,
+                contentSyncExternalId: contentSyncProviderId === SMART_CONTENT ? undefined : contentSyncExternalId,
                 syncIntervalDays: Math.max(1, syncIntervalDays),
-                mirrorList: contentSyncProviderId ? mirrorList : false
+                mirrorList: contentSyncProviderId === SMART_CONTENT ? true : (contentSyncProviderId ? mirrorList : false),
+                rulesJson: contentSyncProviderId === SMART_CONTENT ? JSON.stringify(smartDefinition) : undefined,
+                smartMediaType: contentSyncProviderId === SMART_CONTENT ? 'Movies' : undefined
             }, serverId);
             onSaved();
             onClose();
@@ -257,6 +276,7 @@ export default function EditCollectionModal({
                                                 className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none"
                                             >
                                                 <option value="">Manual Management (None)</option>
+                                                <option value={SMART_CONTENT}>Smart (rule-based)</option>
                                                 {syncProviders.map(provider => (
                                                     <option key={provider.id} value={provider.id}>
                                                         {provider.name}
@@ -265,7 +285,7 @@ export default function EditCollectionModal({
                                             </select>
                                         </div>
 
-                                        {contentSyncProviderId && (
+                                        {contentSyncProviderId && contentSyncProviderId !== SMART_CONTENT && (
                                             <div>
                                                 <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">
                                                     {syncProviders.find(p => p.id === contentSyncProviderId)?.externalIdLabel || 'List ID'}
@@ -291,13 +311,22 @@ export default function EditCollectionModal({
                                         )}
                                     </div>
 
-                                    {contentSyncProviderId && syncProviders.find(p => p.id === contentSyncProviderId)?.isAiPlugin && (
+                                    {contentSyncProviderId && contentSyncProviderId !== SMART_CONTENT && syncProviders.find(p => p.id === contentSyncProviderId)?.isAiPlugin && (
                                         <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-2">
-                                            Name a specific franchise or shared universe — e.g. <span className="text-[var(--vora-text-secondary)]">Marvel Cinematic Universe</span>, <span className="text-[var(--vora-text-secondary)]">DC Extended Universe</span>, or <span className="text-[var(--vora-text-secondary)]">Star Wars</span>. Every movie and season is pulled in automatically, so the universe name alone is enough (no need to add movies and shows, and don&apos;t narrow it to films only). For a genre or mood like all your kung-fu movies, use a Smart Playlist instead.
+                                            Name a specific franchise or shared universe — e.g. <span className="text-[var(--vora-text-secondary)]">Marvel Cinematic Universe</span>, <span className="text-[var(--vora-text-secondary)]">DC Extended Universe</span>, or <span className="text-[var(--vora-text-secondary)]">Star Wars</span>. Every movie and season is pulled in automatically, so the universe name alone is enough (no need to add movies and shows, and don&apos;t narrow it to films only). For a genre or mood like all your kung-fu movies, use a Smart Collection instead.
                                         </p>
                                     )}
 
-                                    {contentSyncProviderId && (
+                                    {contentSyncProviderId === SMART_CONTENT && (
+                                        <div className="pt-3 mt-3 border-t border-[var(--vora-border-subtle)]/50 space-y-3">
+                                            <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">
+                                                Build a rule-based collection of <span className="text-[var(--vora-text-secondary)]">movies</span> from your library — e.g. Genre contains Horror, and Year between 2010 and 2019. Membership updates automatically as your library changes. (Shows &amp; music coming soon.)
+                                            </p>
+                                            <RuleTreeEditor mediaType="Movies" value={smartDefinition.root} onChange={root => setSmartDefinition(d => ({ ...d, root }))} />
+                                        </div>
+                                    )}
+
+                                    {contentSyncProviderId && contentSyncProviderId !== SMART_CONTENT && (
                                         <div className="pt-3 mt-3 border-t border-[var(--vora-border-subtle)]/50">
                                             <div className="flex items-center gap-2">
                                                 <input

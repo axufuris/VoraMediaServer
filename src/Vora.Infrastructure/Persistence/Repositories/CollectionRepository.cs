@@ -65,9 +65,15 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
     public Task<List<CollectionScheduleDto>> GetContentSyncCollectionsAsync() =>
         context.Collections
             .AsNoTracking()
-            .Where(c => !string.IsNullOrEmpty(c.ContentSyncProviderId) && !string.IsNullOrEmpty(c.ContentSyncExternalId))
+            .Where(c => (!string.IsNullOrEmpty(c.ContentSyncProviderId) && !string.IsNullOrEmpty(c.ContentSyncExternalId))
+                || !string.IsNullOrEmpty(c.RulesJson))
             .Select(CollectionScheduleDto.Projection)
             .ToListAsync();
+
+    public Task TouchContentSyncedAtAsync(Guid collectionId) =>
+        context.Collections
+            .Where(c => c.Id == collectionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.ContentSyncedAt, DateTime.UtcNow));
 
     public Task<List<CollectionScheduleDto>> GetAutoSyncCollectionsAsync() =>
         context.Collections

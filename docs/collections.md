@@ -29,6 +29,28 @@ other providers are unaffected) returns a short blurb about the universe. The
 sync fills the collection's `Description` with it **only when that field is
 blank**, so a description an admin typed is never overwritten.
 
+## Smart collections (rule-based)
+
+A collection can instead be filled by a **rule** rather than a provider list.
+It stores a `SmartPlaylistDefinition` in `Collection.RulesJson` plus a
+`SmartMediaType`, and reuses the smart-playlist engine: `CollectionSyncService`
+calls `ISmartPlaylistEvaluator.EvaluateIdsAsync` to get the matching
+`MediaItem` ids, then feeds them through the same membership reconciliation as a
+provider sync (mirror always on for smart, so membership tracks the rule, while
+manual adds and exclusions still win). The rule builder is the shared
+`RuleTreeEditor` component (content-only fields — no profile-scoped
+watched/rating), surfaced as a **Smart (rule-based)** option in the collection
+create/edit modals.
+
+**Phase 1 is Movies only** — the evaluator's Movies path returns `Movie`
+entities, which map 1:1 to collection membership; its Shows path returns
+episodes and Music returns tracks, so those need a show/album-level evaluator
+before they fit a collection (a fast-follow). Freshness: smart collections join
+the scheduled content-sync sweep (gated by a stamped `ContentSyncedAt`) and
+re-sync immediately on save; on-scan re-evaluation is a deferred enhancement.
+Use a smart collection for a **genre / decade / rating** grouping and the AI
+List for a **franchise** — the two are complementary.
+
 ## Matching the list to the library (`CollectionMembershipResolver`)
 
 External ids (TMDB/IMDb) match first; everything else matches by title

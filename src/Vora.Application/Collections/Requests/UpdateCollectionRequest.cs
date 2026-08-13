@@ -1,4 +1,5 @@
-﻿using Vora.Domain.Enums;
+﻿using Vora.Domain.Entities.Playlists;
+using Vora.Domain.Enums;
 
 namespace Vora.Application.Collections.Requests;
 
@@ -21,4 +22,6 @@ public class UpdateCollectionRequest
     public bool MirrorList { get; set; }
     public DateTime? VisibleStartDate { get; set; }
     public DateTime? VisibleEndDate { get; set; }
+    public string? RulesJson { get; set; }
+    public PlaylistMediaType? SmartMediaType { get; set; }
 }
