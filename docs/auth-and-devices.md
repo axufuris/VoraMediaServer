@@ -68,7 +68,7 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 
 | Key | Purpose | Set by |
 | --- | --- | --- |
-| `device_id` | Per-browser stable UUID. Created in `App.tsx` on first load if missing. **Survives logout.** | `App.tsx` |
+| `device_id` | Per-browser stable UUID. Resolved by `getOrCreateDeviceId()` (`utils/deviceId.ts`) on first load, **mirrored into a long-lived `vora_device_id` cookie** so clearing localStorage or storage eviction restores the same id instead of minting a new device record. **Survives logout.** | `App.tsx` / `utils/deviceId.ts` |
 | `account_token` | Account JWT after login | `LoginPage`, `RegisterPage` |
 | `profile_token` | Profile JWT after profile selection | `ProfileSelectionPage` |
 | `user_id` | Account user ID | `LoginPage`, `RegisterPage` |
@@ -118,6 +118,13 @@ Every authenticated request goes through `Vora.Api/Middleware/DeviceTrackingMidd
 `DeviceEndpoints.UpdateCapabilitiesAsync` (`PUT /api/devices/capabilities`) reads the same `X-Vora-Device-Id` header to attach codec/container/audio-channel capabilities to the device row. `StreamingEndpoints` start-session does the same.
 
 **Header naming is universal: `X-Vora-Device-Id`.** Older code may reference `X-Device-Id`; treat any sighting as a bug and fix it.
+
+### Device identity durability & native clients
+
+`DeviceId` is an **opaque string** — the middleware upserts on whatever the client sends, so identity is entirely the client's choice of value; the server needs no change to accept a different kind of id.
+
+- **Web** can't read any hardware identifier (browsers block MAC/serial for privacy), so it uses a generated UUID. That id is only as durable as browser storage, hence the `vora_device_id` cookie backup above. A full site-data clear or a different browser is still a new device row — an inherent web limitation.
+- **Native clients** should send a **platform-stable device id** as `X-Vora-Device-Id` instead of a random UUID — Apple `identifierForVendor`, an app-scoped stable id on Android (e.g. a UUID persisted in app storage, optionally seeded from `Settings.Secure.ANDROID_ID`). These survive reinstalls/cache-clears far better than web storage, so a physical device maps to one `ClientDevice` row. No MAC anywhere — Apple and Google both hide/randomize it. Native clients send the same companion `X-Vora-*` headers (Client / Device / Device-Type / OS) as the web client.
 
 ## Per-profile data preservation across purge
 
