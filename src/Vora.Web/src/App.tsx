@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams, Outlet } from 'react
 import { useEffect, lazy, Suspense, type ReactElement } from 'react';
 import { serverVault } from './utils/serverVault';
 import { StorageKeys, getProfileIdFromToken } from './utils/storageKeys';
+import { getOrCreateDeviceId } from './utils/deviceId';
 import MainLayout from './layouts/MainLayout';
 import AdminShell from './components/Admin/Shell/AdminShell';
 import { PlayerProvider } from './contexts/PlayerContext';
@@ -77,9 +78,7 @@ const RadioPage = lazy(() => import('./pages/Client/Audio/RadioPage'));
 const DiscoverHubPage = lazy(() => import('./pages/Client/Discovery/DiscoverHubPage'));
 const LiveTvHubPage = lazy(() => import('./pages/Client/LiveTv/LiveTvHubPage'));
 
-if (!localStorage.getItem(StorageKeys.deviceId)) {
-    localStorage.setItem(StorageKeys.deviceId, crypto.randomUUID());
-}
+getOrCreateDeviceId();
 
 if (serverVault.getServers().length === 0 && localStorage.getItem(StorageKeys.profileToken)) {
     try {
