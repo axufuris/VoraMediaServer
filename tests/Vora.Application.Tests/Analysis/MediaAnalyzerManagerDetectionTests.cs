@@ -64,9 +64,8 @@ public class MediaAnalyzerManagerDetectionTests
         _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns("Movie");
         _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
         { EnableIntroDetection = true, EnableCreditsDetection = true });
-        _media.GetMediaFilePathsAsync(id).Returns(new List<string> { filePath });
-        _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, TimeSpan?>>>()).Returns(duration);
-        _media.GetStingerFlagsAsync(id).Returns((false, false));
+        _media.GetSilenceDetectionInputsAsync(id).Returns(new SilenceDetectionInputsDto
+        { FilePaths = new List<string> { filePath }, Duration = duration });
         _analyzer.ProbeMeanVolumeDbAsync(filePath, Arg.Any<CancellationToken>()).Returns(meanDb);
         _analyzer.AnalyzeSilenceDetectionsAsync(filePath, Arg.Any<SilenceDetectionParameters>(), Arg.Any<CancellationToken>())
             .Returns(new MediaAnalysisResult { Duration = duration });
@@ -110,11 +109,8 @@ public class MediaAnalyzerManagerDetectionTests
         _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns("Movie");
         _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
         { EnableIntroDetection = true, EnableCreditsDetection = true });
-        _media.GetMediaFilePathsAsync(id).Returns(new List<string> { "/m/a.mkv" });
-        _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, TimeSpan?>>>()).Returns((TimeSpan?)null);
-        _analyzer.ProbeMeanVolumeDbAsync("/m/a.mkv").Returns(-20);
-        _analyzer.AnalyzeSilenceDetectionsAsync("/m/a.mkv", Arg.Any<SilenceDetectionParameters>())
-            .Returns(new MediaAnalysisResult());
+        _media.GetSilenceDetectionInputsAsync(id).Returns(new SilenceDetectionInputsDto
+        { FilePaths = new List<string> { "/m/a.mkv" }, Duration = null });
 
         await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: true);
 
@@ -156,7 +152,8 @@ public class MediaAnalyzerManagerDetectionTests
         _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns("Movie");
         _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
         { EnableIntroDetection = true, EnableCreditsDetection = true });
-        _media.GetMediaFilePathsAsync(id).Returns(new List<string>());
+        _media.GetSilenceDetectionInputsAsync(id).Returns(new SilenceDetectionInputsDto
+        { FilePaths = new List<string>() });
 
         await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: true);
 
@@ -189,6 +186,35 @@ public class MediaAnalyzerManagerDetectionTests
         await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: true);
 
         await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/a.mkv", Arg.Any<SilenceDetectionParameters>());
+    }
+
+    [Fact]
+    public async Task RunMediaItemSilenceDetectionAsync_windows_the_decode_for_long_items()
+    {
+        // 90 min: head = IntroWindow (480) + 120 margin = 600; tail = 5400*0.6 - 60 = 3180.
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/a.mkv", TimeSpan.FromMinutes(90), meanDb: -20);
+
+        await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: true);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/a.mkv",
+            Arg.Is<SilenceDetectionParameters>(p => p.HeadWindowEndSeconds == 600 && p.TailWindowStartSeconds == 3180),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunMediaItemSilenceDetectionAsync_uses_full_pass_when_windows_would_overlap()
+    {
+        // 10 min: tail (600*0.6 - 60 = 300) falls before head end (600), so a split
+        // would gain nothing — both windows null → single full-file pass.
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/a.mkv", TimeSpan.FromMinutes(10), meanDb: -20);
+
+        await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: true);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/a.mkv",
+            Arg.Is<SilenceDetectionParameters>(p => p.HeadWindowEndSeconds == null && p.TailWindowStartSeconds == null),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

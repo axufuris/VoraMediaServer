@@ -26,6 +26,11 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     // pegs every core; capped low so an analyze run leaves the box responsive.
     private const int AnalysisParallelism = 2;
 
+    // Buffers added to the decode windows so a black/silence gap straddling a
+    // window edge is still captured whole before the marker assembler reads it.
+    private const double HeadWindowMarginSeconds = 120;
+    private const double TailWindowMarginSeconds = 60;
+
     private readonly IMediaRepository _mediaRepository;
     private readonly IMediaAnalyzerService _analyzerService;
     private readonly IMarkerAssembler _markerAssembler;
@@ -320,6 +325,19 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
     }
 
+    // The marker assembler only reads gaps from the intro/recap head window and
+    // the credits tail (>= CreditsSearchStartFraction of runtime); the middle is
+    // decoded and thrown away. Return the two decode windows so the analyzer can
+    // skip that middle. Null when they'd overlap (short item) → one full pass.
+    private static (double? HeadEnd, double? TailStart) ComputeDecodeWindows(TimeSpan duration)
+    {
+        var headEnd = MarkerAssembler.IntroWindow.TotalSeconds + HeadWindowMarginSeconds;
+        var tailStart = duration.TotalSeconds * MarkerAssembler.CreditsSearchStartFraction - TailWindowMarginSeconds;
+
+        if (tailStart <= headEnd) return (null, null);
+        return (headEnd, tailStart);
+    }
+
     private async Task RunMediaItemSilenceDetectionAsync(Guid mediaItemId, ServerSetting settings, bool isEpisode, bool forceOverride, CancellationToken cancellationToken = default)
     {
         // One round-trip for the whole skip decision (lock + already-analyzed +
@@ -349,10 +367,20 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             if (!detectIntro && !detectCredits) return;
         }
 
-        var filePaths = await _mediaRepository.GetMediaFilePathsAsync(mediaItemId);
-        if (filePaths == null || !filePaths.Any()) return;
+        // Paths + duration + stinger flags in one round-trip instead of three.
+        // Duration is needed up front now (to size the decode windows and to bail
+        // before any FFmpeg when it's missing, rather than decoding then discarding).
+        var inputs = await _mediaRepository.GetSilenceDetectionInputsAsync(mediaItemId);
+        if (inputs == null || inputs.FilePaths.Count == 0) return;
 
-        var primaryPath = filePaths.First();
+        var duration = inputs.Duration;
+        if (duration == null || duration == TimeSpan.Zero)
+        {
+            _logger.LogWarning("Skipping marker assembly for {MediaItemId}: no duration available. Run file analysis first.", mediaItemId);
+            return;
+        }
+
+        var primaryPath = inputs.FilePaths[0];
 
         var meanDb = await _analyzerService.ProbeMeanVolumeDbAsync(primaryPath, cancellationToken);
         var threshold = meanDb.HasValue
@@ -360,11 +388,15 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             : -40d;
         var minSilence = isEpisode ? settings.SilenceMinDurationEpisodeSec : settings.SilenceMinDurationMovieSec;
 
+        var (headEnd, tailStart) = ComputeDecodeWindows(duration.Value);
+
         var parameters = new SilenceDetectionParameters
         {
             NoiseThresholdDb = threshold,
             MinSilenceDurationSec = minSilence,
-            MinBlackFrameDurationSec = settings.BlackFrameMinDurationSec
+            MinBlackFrameDurationSec = settings.BlackFrameMinDurationSec,
+            HeadWindowEndSeconds = headEnd,
+            TailWindowStartSeconds = tailStart
         };
 
         var detection = await _analyzerService.AnalyzeSilenceDetectionsAsync(primaryPath, parameters, cancellationToken);
@@ -373,22 +405,13 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // partial — don't persist markers from it.
         cancellationToken.ThrowIfCancellationRequested();
 
-        var duration = await _mediaRepository.GetProjectedAsync(mediaItemId, m => m.Analysis.Duration);
-        if (duration == null || duration == TimeSpan.Zero)
-        {
-            _logger.LogWarning("Skipping marker assembly for {MediaItemId}: no duration available. Run file analysis first.", mediaItemId);
-            return;
-        }
-
-        var (midStinger, postStinger) = await _mediaRepository.GetStingerFlagsAsync(mediaItemId);
-
         var assembled = _markerAssembler.Assemble(new MarkerAssemblerInput
         {
             Duration = duration.Value,
             SilenceIntervals = detection.SilenceIntervals,
             BlackIntervals = detection.BlackIntervals,
-            ExpectsMidCreditsStinger = midStinger,
-            ExpectsPostCreditsStinger = postStinger,
+            ExpectsMidCreditsStinger = inputs.HasMidCreditsStinger,
+            ExpectsPostCreditsStinger = inputs.HasPostCreditsStinger,
             IsEpisode = isEpisode,
             DetectIntro = detectIntro,
             DetectCredits = detectCredits
