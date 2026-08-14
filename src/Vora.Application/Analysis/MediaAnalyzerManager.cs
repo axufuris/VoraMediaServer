@@ -14,10 +14,10 @@ public interface IMediaAnalyzerManager
 {
     Task TriggerMediaItemFileAnalysisAsync(Guid mediaItemId, string? name = null);
     Task AnalyzeMediaFileAsync(Guid mediaItemId);
-    Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride);
+    Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride, CancellationToken cancellationToken = default);
     Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null);
-    Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false);
-    Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false);
+    Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default);
+    Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default);
 }
 
 public class MediaAnalyzerManager : IMediaAnalyzerManager
@@ -110,7 +110,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     private static string ProgressTitle(IReadOnlyDictionary<Guid, string> titles, Guid id) =>
         titles.TryGetValue(id, out var t) && !string.IsNullOrWhiteSpace(t) ? t : "…";
 
-    public async Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false)
+    public async Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
         if (!forceOverride)
@@ -128,20 +128,21 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             seasonIds ??= new List<Guid>();
             foreach (var seasonId in seasonIds)
             {
-                await RunSeasonSilenceDetectionAsync(seasonId, settings, forceOverride);
+                cancellationToken.ThrowIfCancellationRequested();
+                await RunSeasonSilenceDetectionAsync(seasonId, settings, forceOverride, cancellationToken);
             }
         }
         else if (itemType == nameof(Season))
         {
-            await RunSeasonSilenceDetectionAsync(mediaItemId, settings, forceOverride);
+            await RunSeasonSilenceDetectionAsync(mediaItemId, settings, forceOverride, cancellationToken);
         }
         else
         {
-            await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode: false, forceOverride);
+            await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode: false, forceOverride, cancellationToken);
         }
     }
 
-    public async Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false)
+    public async Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
         if (!forceOverride)
@@ -172,6 +173,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
 
         foreach (var id in mediaIds)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             count++;
             try
             {
@@ -181,7 +183,11 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
                     continue;
                 }
                 _progress.Report($"Detecting intro/credit markers — {ProgressTitle(titles, id)} ({count}/{total})");
-                await TriggerMediaItemSilenceDetectionAsync(id, forceOverride: forceOverride);
+                await TriggerMediaItemSilenceDetectionAsync(id, forceOverride: forceOverride, cancellationToken: cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -260,13 +266,13 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
     }
 
-    public async Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride)
+    public async Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride, CancellationToken cancellationToken = default)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
-        await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode, forceOverride);
+        await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode, forceOverride, cancellationToken);
     }
 
-    private async Task RunSeasonSilenceDetectionAsync(Guid seasonId, ServerSetting settings, bool forceOverride)
+    private async Task RunSeasonSilenceDetectionAsync(Guid seasonId, ServerSetting settings, bool forceOverride, CancellationToken cancellationToken = default)
     {
         var episodeIds = await _mediaRepository.GetEpisodeIdsForSeasonAsync(seasonId);
         if (episodeIds.Count == 0) return;
@@ -278,20 +284,26 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         var parallelism = Math.Clamp(Environment.ProcessorCount, 2, 6);
         await Parallel.ForEachAsync(
             episodeIds,
-            new ParallelOptions { MaxDegreeOfParallelism = parallelism },
+            new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
             async (epId, ct) =>
             {
                 try
                 {
                     using var scope = _scopeFactory.CreateScope();
                     var analyzer = scope.ServiceProvider.GetRequiredService<IMediaAnalyzerManager>();
-                    await analyzer.AnalyzeMediaItemMarkersAsync(epId, isEpisode: true, forceOverride);
+                    await analyzer.AnalyzeMediaItemMarkersAsync(epId, isEpisode: true, forceOverride, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Episode silence detection failed for {EpisodeId}.", epId);
                 }
             });
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         try
         {
@@ -303,7 +315,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
     }
 
-    private async Task RunMediaItemSilenceDetectionAsync(Guid mediaItemId, ServerSetting settings, bool isEpisode, bool forceOverride)
+    private async Task RunMediaItemSilenceDetectionAsync(Guid mediaItemId, ServerSetting settings, bool isEpisode, bool forceOverride, CancellationToken cancellationToken = default)
     {
         if (await _mediaRepository.AreMarkersLockedAsync(mediaItemId))
         {
@@ -332,7 +344,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
 
         var primaryPath = filePaths.First();
 
-        var meanDb = await _analyzerService.ProbeMeanVolumeDbAsync(primaryPath);
+        var meanDb = await _analyzerService.ProbeMeanVolumeDbAsync(primaryPath, cancellationToken);
         var threshold = meanDb.HasValue
             ? meanDb.Value + settings.SilenceThresholdOffsetDb
             : -40d;
@@ -345,7 +357,11 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             MinBlackFrameDurationSec = settings.BlackFrameMinDurationSec
         };
 
-        var detection = await _analyzerService.AnalyzeSilenceDetectionsAsync(primaryPath, parameters);
+        var detection = await _analyzerService.AnalyzeSilenceDetectionsAsync(primaryPath, parameters, cancellationToken);
+
+        // If cancelled mid-run the FFmpeg process was killed, so the detection is
+        // partial — don't persist markers from it.
+        cancellationToken.ThrowIfCancellationRequested();
 
         var duration = await _mediaRepository.GetProjectedAsync(mediaItemId, m => m.Analysis.Duration);
         if (duration == null || duration == TimeSpan.Zero)

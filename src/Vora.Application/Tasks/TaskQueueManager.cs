@@ -144,7 +144,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Analyze Library Media: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
         {
             var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
-            await analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger);
+            await analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger, cancellationToken: ct);
         }, resourceKey: LibraryKey(libraryId));
     }
 
@@ -167,7 +167,7 @@ public class TaskQueueManager : ITaskQueueManager
 
             await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId);
 
-            await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, isAdditionTrigger: true);
+            await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, isAdditionTrigger: true, cancellationToken: ct);
         });
     }
 
@@ -206,7 +206,7 @@ public class TaskQueueManager : ITaskQueueManager
             // metadata refresh above; actor entities are enriched by the nightly
             // scan and the full-library workflow.
             await overlayManager.GenerateOverlaysForMediaAsync(itemId);
-            await analyzerManager.TriggerMediaItemSilenceDetectionAsync(itemId, null, isAdditionTrigger: true);
+            await analyzerManager.TriggerMediaItemSilenceDetectionAsync(itemId, null, isAdditionTrigger: true, cancellationToken: ct);
 
             var collectionMembership = sp.GetRequiredService<CollectionMembershipService>();
             await collectionMembership.CheckMediaItemForCollectionsAsync(itemId);
@@ -234,7 +234,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Analyze Media Item: {ResolveDisplayName(mediaItemId, mediaItemName)}", async (ct, sp) =>
         {
             var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
-            await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride);
+            await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, cancellationToken: ct);
         });
     }
 
@@ -757,7 +757,7 @@ public class TaskQueueManager : ITaskQueueManager
         // detection runs here too so the stinger badge is available.
         await RunStepAsync("Analyzing media…", () => analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName));
 
-        await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: isAdditionTrigger));
+        await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: isAdditionTrigger, cancellationToken: ct));
 
         // Overlays LAST: now the posters get every badge — resolution (scan),
         // content rating (enrich), audio/video codec + HDR (analysis), and
