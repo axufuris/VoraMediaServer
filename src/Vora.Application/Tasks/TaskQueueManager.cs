@@ -131,12 +131,12 @@ public class TaskQueueManager : ITaskQueueManager
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
-            await metadataManager.TriggerLibraryMetadataRefreshAsync(libraryId, forceOverride: forceOverride);
-            await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, forceOverride: forceOverride);
-            await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, forceOverride: forceOverride);
-            await metadataManager.TriggerActorMetadataRefreshAsync();
+            await metadataManager.TriggerLibraryMetadataRefreshAsync(libraryId, forceOverride: forceOverride, cancellationToken: ct);
+            await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, forceOverride: forceOverride, cancellationToken: ct);
+            await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, forceOverride: forceOverride, cancellationToken: ct);
+            await metadataManager.TriggerActorMetadataRefreshAsync(ct);
 
-            await overlayManager.RunLibraryOverlaySyncAsync(libraryId);
+            await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
         }, resourceKey: LibraryKey(libraryId));
     }
 
@@ -161,14 +161,14 @@ public class TaskQueueManager : ITaskQueueManager
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
             await mediaManager.TriggerTargetedScanAsync(mediaItemId);
-            await analyzerManager.TriggerMediaItemFileAnalysisAsync(mediaItemId, mediaItemName);
+            await analyzerManager.TriggerMediaItemFileAnalysisAsync(mediaItemId, mediaItemName, ct);
 
-            await metadataManager.TriggerMediaItemMetadataRefreshAsync(mediaItemId, forceOverride);
-            await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, forceOverride);
-            await metadataManager.TriggerMediaItemRatingsRefreshAsync(mediaItemId, forceOverride);
-            await metadataManager.TriggerActorMetadataRefreshAsync();
+            await metadataManager.TriggerMediaItemMetadataRefreshAsync(mediaItemId, forceOverride, ct);
+            await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, forceOverride, ct);
+            await metadataManager.TriggerMediaItemRatingsRefreshAsync(mediaItemId, forceOverride, ct);
+            await metadataManager.TriggerActorMetadataRefreshAsync(ct);
 
-            await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId);
+            await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
 
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, isAdditionTrigger: true, cancellationToken: ct);
         });
@@ -188,18 +188,18 @@ public class TaskQueueManager : ITaskQueueManager
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
             ct.ThrowIfCancellationRequested();
-            await analyzerManager.TriggerMediaItemFileAnalysisAsync(itemId, null);
+            await analyzerManager.TriggerMediaItemFileAnalysisAsync(itemId, null, ct);
 
-            await metadataManager.TriggerMediaItemMetadataRefreshAsync(itemId, false);
-            await metadataManager.TriggerMediaItemArtworkRefreshAsync(itemId, false);
-            await metadataManager.TriggerMediaItemRatingsRefreshAsync(itemId, false);
+            await metadataManager.TriggerMediaItemMetadataRefreshAsync(itemId, false, ct);
+            await metadataManager.TriggerMediaItemArtworkRefreshAsync(itemId, false, ct);
+            await metadataManager.TriggerMediaItemRatingsRefreshAsync(itemId, false, ct);
 
             // A brand-new season's poster/episode-count come from the parent
             // show's mapping — refresh the show ONCE, only when a new season was
             // created, so a season-folder copy doesn't trigger a metadata flood.
             if (result.NewSeasonCreated && result.ParentShowId.HasValue)
             {
-                await metadataManager.TriggerMediaItemMetadataRefreshAsync(result.ParentShowId.Value, false);
+                await metadataManager.TriggerMediaItemMetadataRefreshAsync(result.ParentShowId.Value, false, ct);
             }
 
             // Actor entity metadata (bios, photos) is NOT refreshed per file:
@@ -208,7 +208,7 @@ public class TaskQueueManager : ITaskQueueManager
             // file at a time. The item's own cast is already linked by the
             // metadata refresh above; actor entities are enriched by the nightly
             // scan and the full-library workflow.
-            await overlayManager.GenerateOverlaysForMediaAsync(itemId);
+            await overlayManager.GenerateOverlaysForMediaAsync(itemId, ct);
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(itemId, null, isAdditionTrigger: true, cancellationToken: ct);
 
             var collectionMembership = sp.GetRequiredService<CollectionMembershipService>();
@@ -223,12 +223,12 @@ public class TaskQueueManager : ITaskQueueManager
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
-            await metadataManager.TriggerMediaItemMetadataRefreshAsync(mediaItemId, forceOverride);
-            await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, forceOverride);
-            await metadataManager.TriggerMediaItemRatingsRefreshAsync(mediaItemId, forceOverride);
-            await metadataManager.TriggerActorMetadataRefreshAsync();
+            await metadataManager.TriggerMediaItemMetadataRefreshAsync(mediaItemId, forceOverride, ct);
+            await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, forceOverride, ct);
+            await metadataManager.TriggerMediaItemRatingsRefreshAsync(mediaItemId, forceOverride, ct);
+            await metadataManager.TriggerActorMetadataRefreshAsync(ct);
 
-            await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId);
+            await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
         });
     }
 
@@ -250,9 +250,9 @@ public class TaskQueueManager : ITaskQueueManager
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
             await artworkRepo.ClearArtworkForLibraryAsync(libraryId);
-            await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, forceOverride: true);
+            await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, forceOverride: true, cancellationToken: ct);
 
-            await overlayManager.RunLibraryOverlaySyncAsync(libraryId);
+            await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
         });
     }
 
@@ -263,9 +263,9 @@ public class TaskQueueManager : ITaskQueueManager
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
-            await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, null, forceOverride);
+            await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, null, forceOverride, ct);
 
-            await overlayManager.RunLibraryOverlaySyncAsync(libraryId);
+            await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
         }, LibraryLabel(libraryId, "Refresh Ratings for Library: {0}"));
     }
 
@@ -276,9 +276,9 @@ public class TaskQueueManager : ITaskQueueManager
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
-            await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, forceOverride);
+            await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, forceOverride, ct);
 
-            await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId);
+            await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
         }, MediaLabel(mediaItemId, "Refresh Artwork for Media Item: {0}"));
     }
 
@@ -307,7 +307,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask("Refresh All Actor Metadata", async (ct, sp) =>
         {
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
-            await metadataManager.TriggerActorMetadataRefreshAsync();
+            await metadataManager.TriggerActorMetadataRefreshAsync(ct);
         });
     }
 
@@ -316,7 +316,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask("Resolve TVDB Ids", async (ct, sp) =>
         {
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
-            await metadataManager.TriggerMediaTvdbResolutionAsync();
+            await metadataManager.TriggerMediaTvdbResolutionAsync(ct);
         });
     }
 
@@ -325,7 +325,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask("Merge Duplicate TV Shows", async (ct, sp) =>
         {
             var dedupeManager = sp.GetRequiredService<Vora.Application.Media.IMediaDedupeManager>();
-            await dedupeManager.MergeDuplicateTvShowsAsync();
+            await dedupeManager.MergeDuplicateTvShowsAsync(cancellationToken: ct);
         });
     }
 
@@ -343,7 +343,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Chronological Collection Sync: {title}", async (ct, sp) =>
         {
             var orderingService = sp.GetRequiredService<CollectionOrderingService>();
-            await orderingService.ApplyChronologicalOrderAsync(collectionId);
+            await orderingService.ApplyChronologicalOrderAsync(collectionId, cancellationToken: ct);
         }, resourceKey: CollectionKey(collectionId));
     }
 
@@ -361,7 +361,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Generate Poster Overlays: {mediaItemId}", async (ct, sp) =>
         {
             var manager = sp.GetRequiredService<IPosterOverlayManager>();
-            await manager.GenerateOverlaysForMediaAsync(mediaItemId);
+            await manager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
 
             var notifier = sp.GetRequiredService<IClientNotifier>();
             await notifier.NotifyMediaItemUpdatedAsync(mediaItemId);
@@ -381,7 +381,7 @@ public class TaskQueueManager : ITaskQueueManager
             if (hasChronologySort)
             {
                 var orderingService = sp.GetRequiredService<CollectionOrderingService>();
-                await orderingService.ApplyChronologicalOrderAsync(collectionId);
+                await orderingService.ApplyChronologicalOrderAsync(collectionId, cancellationToken: ct);
             }
         }, resourceKey: CollectionKey(collectionId));
     }
@@ -583,7 +583,7 @@ public class TaskQueueManager : ITaskQueueManager
 
             await epgService.SyncEpgDataAsync(ct);
 
-            await dvrManager.ProcessSchedulesIntoSessionsAsync();
+            await dvrManager.ProcessSchedulesIntoSessionsAsync(ct);
         });
     }
 
@@ -712,7 +712,7 @@ public class TaskQueueManager : ITaskQueueManager
             // Music (or nothing discovered): whole-library scan then enrich.
             var musicStopwatch = Stopwatch.StartNew();
             await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId);
-            await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false);
+            await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false, cancellationToken: ct);
             logger?.LogInformation("Scan+enrich (whole-library) for {LibraryId} took {Wall:n1}s.", libraryId, musicStopwatch.Elapsed.TotalSeconds);
         }
 
@@ -745,7 +745,7 @@ public class TaskQueueManager : ITaskQueueManager
         // Safety net for anything the per-unit path missed (never double-fetches
         // an already-enriched item; force stays off here so a force rescan the
         // units already handled isn't re-run).
-        await RunStepAsync("Fetching details…", () => metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false));
+        await RunStepAsync("Fetching details…", () => metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false, cancellationToken: ct));
 
         // A show scanned across two resolution folders (e.g. .../TV/1080p/Show
         // and .../TV/4K/Show) lands as two show rows until enrichment stamps the
@@ -755,17 +755,17 @@ public class TaskQueueManager : ITaskQueueManager
         // there are no duplicates.
         if (libraryType == LibraryType.TvShow)
         {
-            await RunStepAsync("Merging duplicate shows…", () => dedupeManager.MergeDuplicateTvShowsAsync(libraryId));
+            await RunStepAsync("Merging duplicate shows…", () => dedupeManager.MergeDuplicateTvShowsAsync(libraryId, ct));
         }
 
-        await RunStepAsync("Refreshing actor metadata…", () => metadataManager.TriggerActorMetadataRefreshAsync());
+        await RunStepAsync("Refreshing actor metadata…", () => metadataManager.TriggerActorMetadataRefreshAsync(ct));
 
         // Analysis populates each part's audio/video tracks (codec, HDR). The
         // overlay badges read that data, so analysis MUST run before overlays —
         // otherwise the audio-codec / HDR badges have nothing to draw and the
         // poster is overlaid with only the scan-time data (resolution). Marker
         // detection runs here too so the stinger badge is available.
-        await RunStepAsync("Analyzing media…", () => analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName));
+        await RunStepAsync("Analyzing media…", () => analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName, ct));
 
         await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: isAdditionTrigger, cancellationToken: ct));
 
@@ -779,7 +779,7 @@ public class TaskQueueManager : ITaskQueueManager
         // overlaid items still resolve as pending so their posters revert.
         if (await overlayManager.HasPendingOverlayWorkAsync(libraryId, ct))
         {
-            await RunStepAsync("Generating poster overlays…", () => overlayManager.RunLibraryOverlaySyncAsync(libraryId));
+            await RunStepAsync("Generating poster overlays…", () => overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct));
         }
 
         workflowStopwatch.Stop();

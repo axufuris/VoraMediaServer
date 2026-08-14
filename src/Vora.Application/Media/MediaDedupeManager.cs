@@ -8,7 +8,7 @@ public interface IMediaDedupeManager
 {
     Task<List<DedupeGroupVM>> GetDuplicateMediaAsync();
     Task DeleteDuplicatePartAsync(Guid partId, bool deletePhysicalFile);
-    Task<TvShowMergeResultVM> MergeDuplicateTvShowsAsync(Guid? libraryId = null);
+    Task<TvShowMergeResultVM> MergeDuplicateTvShowsAsync(Guid? libraryId = null, CancellationToken cancellationToken = default);
 
     Task<DedupeSettingsVM> GetGlobalSettingsAsync();
     Task<DedupeSettingsVM> GetEffectiveLibrarySettingsAsync(Guid libraryId);
@@ -36,12 +36,13 @@ public class MediaDedupeManager : IMediaDedupeManager
         _logger = logger;
     }
 
-    public async Task<TvShowMergeResultVM> MergeDuplicateTvShowsAsync(Guid? libraryId = null)
+    public async Task<TvShowMergeResultVM> MergeDuplicateTvShowsAsync(Guid? libraryId = null, CancellationToken cancellationToken = default)
     {
         var result = await _repository.MergeDuplicateTvShowsAsync(libraryId);
 
         foreach (var episodeId in result.AffectedEpisodeIds.Distinct())
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await _mediaRepository.SyncItemEditionFromPartsAsync(episodeId);
         }
 

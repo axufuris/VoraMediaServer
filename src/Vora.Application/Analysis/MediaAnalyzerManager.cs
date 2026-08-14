@@ -12,10 +12,10 @@ namespace Vora.Application.Analysis;
 
 public interface IMediaAnalyzerManager
 {
-    Task TriggerMediaItemFileAnalysisAsync(Guid mediaItemId, string? name = null);
-    Task AnalyzeMediaFileAsync(Guid mediaItemId);
+    Task TriggerMediaItemFileAnalysisAsync(Guid mediaItemId, string? name = null, CancellationToken cancellationToken = default);
+    Task AnalyzeMediaFileAsync(Guid mediaItemId, CancellationToken cancellationToken = default);
     Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride, CancellationToken cancellationToken = default);
-    Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null);
+    Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null, CancellationToken cancellationToken = default);
     Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default);
     Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default);
 }
@@ -63,27 +63,35 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         _logger = logger;
     }
 
-    public async Task TriggerMediaItemFileAnalysisAsync(Guid mediaItemId, string? name = null)
+    public async Task TriggerMediaItemFileAnalysisAsync(Guid mediaItemId, string? name = null, CancellationToken cancellationToken = default)
     {
         var itemType = await _mediaRepository.GetProjectedAsync(mediaItemId, m => m.GetType().Name);
 
         if (itemType == nameof(TvShow))
         {
             var epIds = await _mediaRepository.GetEpisodeIdsForShowAsync(mediaItemId);
-            foreach (var epId in epIds) await RunFileAnalysisAsync(epId);
+            foreach (var epId in epIds)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await RunFileAnalysisAsync(epId, cancellationToken);
+            }
         }
         else if (itemType == nameof(Season))
         {
             var epIds = await _mediaRepository.GetEpisodeIdsForSeasonAsync(mediaItemId);
-            foreach (var epId in epIds) await RunFileAnalysisAsync(epId);
+            foreach (var epId in epIds)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await RunFileAnalysisAsync(epId, cancellationToken);
+            }
         }
         else
         {
-            await RunFileAnalysisAsync(mediaItemId);
+            await RunFileAnalysisAsync(mediaItemId, cancellationToken);
         }
     }
 
-    public async Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null)
+    public async Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null, CancellationToken cancellationToken = default)
     {
         var mediaIds = (await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId)).ToList();
         var titles = await _mediaRepository.GetDisplayTitlesByIdsAsync(mediaIds);
@@ -97,14 +105,18 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         var parallelism = AnalysisParallelism;
         await Parallel.ForEachAsync(
             mediaIds,
-            new ParallelOptions { MaxDegreeOfParallelism = parallelism },
+            new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
             async (id, ct) =>
             {
                 try
                 {
                     using var scope = _scopeFactory.CreateScope();
                     var analyzer = scope.ServiceProvider.GetRequiredService<IMediaAnalyzerManager>();
-                    await analyzer.AnalyzeMediaFileAsync(id);
+                    await analyzer.AnalyzeMediaFileAsync(id, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -206,7 +218,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
     }
 
-    private async Task RunFileAnalysisAsync(Guid mediaItemId)
+    private async Task RunFileAnalysisAsync(Guid mediaItemId, CancellationToken cancellationToken = default)
     {
         var item = await _mediaRepository.GetForAnalysisAsync(mediaItemId);
         if (item == null || item.MediaParts.Count == 0) return;
@@ -223,8 +235,9 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         foreach (var part in item.MediaParts)
         {
             if (!partsToAnalyze.Contains(part)) continue;
+            cancellationToken.ThrowIfCancellationRequested();
 
-            var analysis = await _analyzerService.AnalyzeFileAsync(part.FilePath);
+            var analysis = await _analyzerService.AnalyzeFileAsync(part.FilePath, cancellationToken);
             if (analysis == null) continue;
 
             if (analysis.Duration != null && !item.IsLocked("Duration") && (part == primaryPart || item.Analysis?.Duration == null))
@@ -260,7 +273,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         await _notifier.NotifyMediaAnalysisUpdatedAsync(mediaItemId);
     }
 
-    public Task AnalyzeMediaFileAsync(Guid mediaItemId) => RunFileAnalysisAsync(mediaItemId);
+    public Task AnalyzeMediaFileAsync(Guid mediaItemId, CancellationToken cancellationToken = default) => RunFileAnalysisAsync(mediaItemId, cancellationToken);
 
     private static bool PartNeedsAnalysis(MediaPart part)
     {
