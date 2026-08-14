@@ -41,11 +41,21 @@ public class MediaAnalyzerManagerDetectionTests
             EpisodeIntroClusterMinAgreementPct = 60
         });
 
+        var scopeFactory = Substitute.For<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>();
+        var scope = Substitute.For<Microsoft.Extensions.DependencyInjection.IServiceScope>();
+        var scopedProvider = Substitute.For<IServiceProvider>();
+        scopeFactory.CreateScope().Returns(scope);
+        scope.ServiceProvider.Returns(scopedProvider);
+
         _manager = new MediaAnalyzerManager(
             _media, _analyzer, _assembler, _settings, _queue, _notifier,
             new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
-            Substitute.For<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(),
+            scopeFactory,
             NullLogger<MediaAnalyzerManager>.Instance);
+
+        // The season path fans out episode detection through a DI scope; resolve
+        // it back to this same manager so the parallel branch exercises the SUT.
+        scopedProvider.GetService(typeof(IMediaAnalyzerManager)).Returns(_manager);
     }
 
     private void StubMovieReady(Guid id, string filePath, TimeSpan duration, double? meanDb)
