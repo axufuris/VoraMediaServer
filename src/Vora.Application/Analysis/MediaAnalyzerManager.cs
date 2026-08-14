@@ -14,6 +14,7 @@ public interface IMediaAnalyzerManager
 {
     Task TriggerMediaItemFileAnalysisAsync(Guid mediaItemId, string? name = null);
     Task AnalyzeMediaFileAsync(Guid mediaItemId);
+    Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride);
     Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null);
     Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false);
     Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false);
@@ -254,22 +255,38 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
     }
 
+    public async Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride)
+    {
+        var settings = await _settingsRepo.GetSettingsAsync();
+        await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode, forceOverride);
+    }
+
     private async Task RunSeasonSilenceDetectionAsync(Guid seasonId, ServerSetting settings, bool forceOverride)
     {
         var episodeIds = await _mediaRepository.GetEpisodeIdsForSeasonAsync(seasonId);
         if (episodeIds.Count == 0) return;
 
-        foreach (var epId in episodeIds)
-        {
-            try
+        // Each episode's FFmpeg pass is independent and CPU-bound, so run several
+        // at once — each in its own DI scope (own DbContext) so parallel writes
+        // don't share a context — then finalize the season once they've all
+        // committed their markers. Mirrors the file-analysis/overlay fan-out.
+        var parallelism = Math.Clamp(Environment.ProcessorCount, 2, 6);
+        await Parallel.ForEachAsync(
+            episodeIds,
+            new ParallelOptions { MaxDegreeOfParallelism = parallelism },
+            async (epId, ct) =>
             {
-                await RunMediaItemSilenceDetectionAsync(epId, settings, isEpisode: true, forceOverride);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Episode silence detection failed for {EpisodeId}.", epId);
-            }
-        }
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var analyzer = scope.ServiceProvider.GetRequiredService<IMediaAnalyzerManager>();
+                    await analyzer.AnalyzeMediaItemMarkersAsync(epId, isEpisode: true, forceOverride);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Episode silence detection failed for {EpisodeId}.", epId);
+                }
+            });
 
         try
         {

@@ -12,6 +12,7 @@ namespace Vora.Infrastructure.Analysis;
 public class FFmpegAnalyzerService : IMediaAnalyzerService
 {
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromHours(2);
+    private const int MeanVolumeSampleSeconds = 600;
     private static readonly Regex SilenceStartRegex = new(@"silence_start:\s*(?<Time>-?\d+(\.\d+)?)", RegexOptions.Compiled);
     private static readonly Regex SilenceEndRegex = new(@"silence_end:\s*(?<Time>-?\d+(\.\d+)?)", RegexOptions.Compiled);
     private static readonly Regex BlackStartRegex = new(@"black_start[:=]\s*(?<Time>\d+(\.\d+)?)", RegexOptions.Compiled);
@@ -45,6 +46,11 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         };
         processInfo.ArgumentList.Add("-i");
         processInfo.ArgumentList.Add(filePath);
+        // Only decode the first few minutes: this pass exists solely to pick a
+        // noise threshold from the audio's mean level, which a short head sample
+        // represents fine — no need to decode the whole file's audio just for that.
+        processInfo.ArgumentList.Add("-t");
+        processInfo.ArgumentList.Add(MeanVolumeSampleSeconds.ToString(CultureInfo.InvariantCulture));
         processInfo.ArgumentList.Add("-af");
         processInfo.ArgumentList.Add("volumedetect");
         processInfo.ArgumentList.Add("-vn");
