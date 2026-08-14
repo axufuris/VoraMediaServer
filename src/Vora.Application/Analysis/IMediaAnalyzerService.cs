@@ -12,6 +12,6 @@ public class SilenceDetectionParameters
 public interface IMediaAnalyzerService
 {
     Task<MediaAnalysisResult> AnalyzeFileAsync(string filePath);
-    Task<double?> ProbeMeanVolumeDbAsync(string filePath);
-    Task<MediaAnalysisResult> AnalyzeSilenceDetectionsAsync(string filePath, SilenceDetectionParameters parameters);
+    Task<double?> ProbeMeanVolumeDbAsync(string filePath, CancellationToken cancellationToken = default);
+    Task<MediaAnalysisResult> AnalyzeSilenceDetectionsAsync(string filePath, SilenceDetectionParameters parameters, CancellationToken cancellationToken = default);
 }

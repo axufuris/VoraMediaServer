@@ -33,7 +33,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         return result;
     }
 
-    public async Task<double?> ProbeMeanVolumeDbAsync(string filePath)
+    public async Task<double?> ProbeMeanVolumeDbAsync(string filePath, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Probing mean volume for {FilePath}.", filePath);
 
@@ -75,15 +75,15 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
 
         process.Start();
         process.BeginErrorReadLine();
-        await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger);
+        await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger, cancellationToken);
 
         return meanDb;
     }
 
-    public async Task<MediaAnalysisResult> AnalyzeSilenceDetectionsAsync(string filePath, SilenceDetectionParameters parameters)
+    public async Task<MediaAnalysisResult> AnalyzeSilenceDetectionsAsync(string filePath, SilenceDetectionParameters parameters, CancellationToken cancellationToken = default)
     {
         var result = new MediaAnalysisResult();
-        await RunFFmpegSilenceAndBlackDetectionAsync(filePath, parameters, result);
+        await RunFFmpegSilenceAndBlackDetectionAsync(filePath, parameters, result, cancellationToken);
         return result;
     }
 
@@ -384,7 +384,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         }
     }
 
-    private async Task RunFFmpegSilenceAndBlackDetectionAsync(string filePath, SilenceDetectionParameters parameters, MediaAnalysisResult result)
+    private async Task RunFFmpegSilenceAndBlackDetectionAsync(string filePath, SilenceDetectionParameters parameters, MediaAnalysisResult result, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
             "Running FFmpeg silence+black detection on {FilePath} (silence threshold {Threshold} dB / {SilenceMin}s, black {BlackMin}s).",
@@ -441,7 +441,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
 
         process.Start();
         process.BeginErrorReadLine();
-        await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger);
+        await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger, cancellationToken);
 
         result.SilenceIntervals = ZipIntervals(silenceStarts, silenceEnds);
         result.BlackIntervals = ZipIntervals(blackStarts, blackEnds);

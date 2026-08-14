@@ -67,8 +67,8 @@ public class MediaAnalyzerManagerDetectionTests
         _media.GetMediaFilePathsAsync(id).Returns(new List<string> { filePath });
         _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, TimeSpan?>>>()).Returns(duration);
         _media.GetStingerFlagsAsync(id).Returns((false, false));
-        _analyzer.ProbeMeanVolumeDbAsync(filePath).Returns(meanDb);
-        _analyzer.AnalyzeSilenceDetectionsAsync(filePath, Arg.Any<SilenceDetectionParameters>())
+        _analyzer.ProbeMeanVolumeDbAsync(filePath, Arg.Any<CancellationToken>()).Returns(meanDb);
+        _analyzer.AnalyzeSilenceDetectionsAsync(filePath, Arg.Any<SilenceDetectionParameters>(), Arg.Any<CancellationToken>())
             .Returns(new MediaAnalysisResult { Duration = duration });
         _assembler.Assemble(Arg.Any<MarkerAssemblerInput>()).Returns(new List<DetectedMarker>
         {
@@ -208,7 +208,7 @@ public class MediaAnalyzerManagerDetectionTests
         await _manager.TriggerMediaItemSilenceDetectionAsync(seasonId, forceOverride: true);
 
         await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/ep.mkv",
-            Arg.Is<SilenceDetectionParameters>(p => p.MinSilenceDurationSec == 2));
+            Arg.Is<SilenceDetectionParameters>(p => p.MinSilenceDurationSec == 2), Arg.Any<CancellationToken>());
     }
 
     [Fact]
