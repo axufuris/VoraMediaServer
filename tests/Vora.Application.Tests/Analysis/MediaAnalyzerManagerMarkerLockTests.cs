@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Analysis;
+using Vora.Application.Analysis.Results;
 using Vora.Application.Media;
 using Vora.Application.Media.Dtos;
 using Vora.Application.Settings;
@@ -78,15 +79,15 @@ public class MediaAnalyzerManagerMarkerLockTests
             .Returns("Movie");
         _media.GetMarkerDetectionGateAsync(mediaItemId).Returns(new MarkerDetectionGateDto
         { EnableIntroDetection = true, EnableCreditsDetection = true });
-        _media.GetMediaFilePathsAsync(mediaItemId)
-            .Returns(new List<string> { "/media/movies/Sample.mkv" });
-        _media.GetProjectedAsync(mediaItemId, Arg.Any<Expression<Func<MediaItem, TimeSpan?>>>())
-            .Returns((TimeSpan?)null);
+        _media.GetSilenceDetectionInputsAsync(mediaItemId).Returns(new SilenceDetectionInputsDto
+        { FilePaths = new List<string> { "/media/movies/Sample.mkv" }, Duration = TimeSpan.FromMinutes(90) });
+        _analyzer.AnalyzeSilenceDetectionsAsync("/media/movies/Sample.mkv", Arg.Any<SilenceDetectionParameters>(), Arg.Any<CancellationToken>())
+            .Returns(new MediaAnalysisResult());
+        _assembler.Assemble(Arg.Any<MarkerAssemblerInput>()).Returns(new List<DetectedMarker>());
 
         await _manager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, forceOverride: true);
 
-        await _analyzer.Received(1).ProbeMeanVolumeDbAsync("/media/movies/Sample.mkv");
-        await _media.DidNotReceive().ReplaceMarkersAsync(Arg.Any<Guid>(), Arg.Any<List<MediaItemMarker>>());
+        await _analyzer.Received(1).ProbeMeanVolumeDbAsync("/media/movies/Sample.mkv", Arg.Any<CancellationToken>());
     }
 
     [Fact]

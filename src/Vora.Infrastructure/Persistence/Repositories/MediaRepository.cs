@@ -322,6 +322,21 @@ public partial class MediaRepository : IMediaRepository
             .FirstOrDefaultAsync();
     }
 
+    public async Task<Vora.Application.Media.Dtos.SilenceDetectionInputsDto?> GetSilenceDetectionInputsAsync(Guid mediaItemId)
+    {
+        return await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == mediaItemId)
+            .Select(m => new Vora.Application.Media.Dtos.SilenceDetectionInputsDto
+            {
+                FilePaths = m.MediaParts.Select(p => p.FilePath).ToList(),
+                Duration = m.Analysis.Duration,
+                HasMidCreditsStinger = m.HasMidCreditsStinger,
+                HasPostCreditsStinger = m.HasPostCreditsStinger
+            })
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<List<string>> GetMediaFilePathsAsync(Guid mediaItemId)
     {
         return await _context.MediaItems

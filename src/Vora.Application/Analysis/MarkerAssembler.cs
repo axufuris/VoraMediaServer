@@ -30,7 +30,11 @@ public interface IMarkerAssembler
 
 public class MarkerAssembler : IMarkerAssembler
 {
-    private static readonly TimeSpan IntroWindow = TimeSpan.FromMinutes(8);
+    // Head window the intro/recap search reads from, and the fraction of runtime
+    // the credits search starts at — exposed so the analyzer can decode only these
+    // regions instead of the whole file (everything between is read by nothing).
+    public static readonly TimeSpan IntroWindow = TimeSpan.FromMinutes(8);
+    public const double CreditsSearchStartFraction = 0.6;
     private static readonly TimeSpan EpisodeRecapWindow = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan CreditsRollMinLength = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MinStingerLength = TimeSpan.FromSeconds(8);
@@ -153,7 +157,7 @@ public class MarkerAssembler : IMarkerAssembler
 
     private static TimeSpan? FindCreditsRollStart(List<DetectedInterval> jointGaps, MarkerAssemblerInput input)
     {
-        var minStart = TimeSpan.FromSeconds(input.Duration.TotalSeconds * 0.6);
+        var minStart = TimeSpan.FromSeconds(input.Duration.TotalSeconds * CreditsSearchStartFraction);
         var creditsCandidates = jointGaps
             .Where(g => g.Start >= minStart)
             .OrderBy(g => g.Start)

@@ -386,10 +386,48 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
 
     private async Task RunFFmpegSilenceAndBlackDetectionAsync(string filePath, SilenceDetectionParameters parameters, MediaAnalysisResult result, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation(
-            "Running FFmpeg silence+black detection on {FilePath} (silence threshold {Threshold} dB / {SilenceMin}s, black {BlackMin}s).",
-            filePath, parameters.NoiseThresholdDb, parameters.MinSilenceDurationSec, parameters.MinBlackFrameDurationSec);
+        // blackdetect forces a full-frame video decode. The marker assembler only
+        // reads gaps from the head (intro/recap) and tail (credits), so when those
+        // windows are supplied, decode just [0, headEnd] and [tailStart, end] and
+        // skip the middle. Both windows must be set (and disjoint) or we fall back
+        // to a single full-file pass.
+        if (parameters.HeadWindowEndSeconds is double headEnd &&
+            parameters.TailWindowStartSeconds is double tailStart &&
+            tailStart > headEnd)
+        {
+            _logger.LogInformation(
+                "Running windowed silence+black detection on {FilePath} (head 0–{HeadEnd}s, tail {TailStart}s–end; threshold {Threshold} dB / {SilenceMin}s, black {BlackMin}s).",
+                filePath, headEnd, tailStart, parameters.NoiseThresholdDb, parameters.MinSilenceDurationSec, parameters.MinBlackFrameDurationSec);
 
+            var head = await RunDetectionPassAsync(filePath, parameters, seekSeconds: null, limitSeconds: headEnd, cancellationToken);
+            var tail = await RunDetectionPassAsync(filePath, parameters, seekSeconds: tailStart, limitSeconds: null, cancellationToken);
+
+            result.SilenceIntervals = head.Silence.Concat(tail.Silence).ToList();
+            result.BlackIntervals = head.Black.Concat(tail.Black).ToList();
+        }
+        else
+        {
+            _logger.LogInformation(
+                "Running full-file silence+black detection on {FilePath} (threshold {Threshold} dB / {SilenceMin}s, black {BlackMin}s).",
+                filePath, parameters.NoiseThresholdDb, parameters.MinSilenceDurationSec, parameters.MinBlackFrameDurationSec);
+
+            var full = await RunDetectionPassAsync(filePath, parameters, seekSeconds: null, limitSeconds: null, cancellationToken);
+            result.SilenceIntervals = full.Silence;
+            result.BlackIntervals = full.Black;
+        }
+
+        _logger.LogInformation(
+            "Detection complete: {SilenceCount} silence interval(s), {BlackCount} black interval(s).",
+            result.SilenceIntervals.Count, result.BlackIntervals.Count);
+    }
+
+    // Runs one ffmpeg silence+black pass over an optional [seekSeconds, +limitSeconds]
+    // slice and returns the zipped intervals with absolute timestamps. Input seeking
+    // (-ss before -i) is what actually skips the decode; -copyts keeps the reported
+    // times on the file's own timeline.
+    private async Task<(List<DetectedInterval> Silence, List<DetectedInterval> Black)> RunDetectionPassAsync(
+        string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, CancellationToken cancellationToken)
+    {
         var silenceStarts = new List<double>();
         var silenceEnds = new List<double>();
         var blackStarts = new List<double>();
@@ -406,8 +444,19 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        if (seekSeconds.HasValue)
+        {
+            processInfo.ArgumentList.Add("-ss");
+            processInfo.ArgumentList.Add(seekSeconds.Value.ToString(CultureInfo.InvariantCulture));
+            processInfo.ArgumentList.Add("-copyts");
+        }
         processInfo.ArgumentList.Add("-i");
         processInfo.ArgumentList.Add(filePath);
+        if (limitSeconds.HasValue)
+        {
+            processInfo.ArgumentList.Add("-t");
+            processInfo.ArgumentList.Add(limitSeconds.Value.ToString(CultureInfo.InvariantCulture));
+        }
         processInfo.ArgumentList.Add("-af");
         processInfo.ArgumentList.Add($"silencedetect=noise={noiseArg}dB:d={silenceMin}");
         processInfo.ArgumentList.Add("-vf");
@@ -443,12 +492,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         process.BeginErrorReadLine();
         await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger, cancellationToken);
 
-        result.SilenceIntervals = ZipIntervals(silenceStarts, silenceEnds);
-        result.BlackIntervals = ZipIntervals(blackStarts, blackEnds);
-
-        _logger.LogInformation(
-            "Detection complete: {SilenceCount} silence interval(s), {BlackCount} black interval(s).",
-            result.SilenceIntervals.Count, result.BlackIntervals.Count);
+        return (ZipIntervals(silenceStarts, silenceEnds), ZipIntervals(blackStarts, blackEnds));
     }
 
     private static List<DetectedInterval> ZipIntervals(List<double> starts, List<double> ends)
