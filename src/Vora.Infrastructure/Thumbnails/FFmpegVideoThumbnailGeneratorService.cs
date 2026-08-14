@@ -114,6 +114,14 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
 
         process.Start();
         process.BeginErrorReadLine();
+        // WaitForExitAsync only stops awaiting on cancel — it leaves ffmpeg
+        // running. Kill the process tree when the token fires so a cancelled
+        // generation doesn't leave a full-file decode churning in the background.
+        await using var kill = cancellationToken.Register(() =>
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+            catch { }
+        });
         await process.WaitForExitAsync(cancellationToken);
 
         if (process.ExitCode != 0 || !File.Exists(tempSpritePath))

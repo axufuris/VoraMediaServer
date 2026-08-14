@@ -597,7 +597,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Generate Video Thumbnails: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
         {
             var manager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
-            await manager.TriggerLibraryThumbnailGenerationAsync(libraryId, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger);
+            await manager.TriggerLibraryThumbnailGenerationAsync(libraryId, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger, cancellationToken: ct);
         }, resourceKey: LibraryKey(libraryId));
     }
 
@@ -606,7 +606,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Generate Video Thumbnails: {ResolveDisplayName(mediaItemId, mediaItemName)}", async (ct, sp) =>
         {
             var manager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
-            await manager.TriggerMediaItemThumbnailGenerationAsync(mediaItemId, forceOverride: forceOverride);
+            await manager.TriggerMediaItemThumbnailGenerationAsync(mediaItemId, forceOverride: forceOverride, cancellationToken: ct);
         });
     }
 
