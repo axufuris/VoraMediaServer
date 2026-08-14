@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
+using Vora.Application.Media.Dtos;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
@@ -57,7 +58,8 @@ public class MediaAnalyzerManagerMarkerLockTests
 
         _media.GetProjectedAsync(mediaItemId, Arg.Any<Expression<Func<MediaItem, string>>>())
             .Returns("Movie");
-        _media.AreMarkersLockedAsync(mediaItemId).Returns(true);
+        _media.GetMarkerDetectionGateAsync(mediaItemId).Returns(new MarkerDetectionGateDto
+        { LockedFields = new List<string> { "Markers" } });
 
         await _manager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, forceOverride: true);
 
@@ -74,9 +76,8 @@ public class MediaAnalyzerManagerMarkerLockTests
 
         _media.GetProjectedAsync(mediaItemId, Arg.Any<Expression<Func<MediaItem, string>>>())
             .Returns("Movie");
-        _media.AreMarkersLockedAsync(mediaItemId).Returns(false);
-        _media.GetProjectedAsync(mediaItemId, Arg.Any<Expression<Func<MediaItem, bool>>>())
-            .Returns(true);
+        _media.GetMarkerDetectionGateAsync(mediaItemId).Returns(new MarkerDetectionGateDto
+        { EnableIntroDetection = true, EnableCreditsDetection = true });
         _media.GetMediaFilePathsAsync(mediaItemId)
             .Returns(new List<string> { "/media/movies/Sample.mkv" });
         _media.GetProjectedAsync(mediaItemId, Arg.Any<Expression<Func<MediaItem, TimeSpan?>>>())
@@ -100,7 +101,7 @@ public class MediaAnalyzerManagerMarkerLockTests
 
         await _manager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, forceOverride: false, isAdditionTrigger: true);
 
-        await _media.DidNotReceiveWithAnyArgs().AreMarkersLockedAsync(default);
+        await _media.DidNotReceiveWithAnyArgs().GetMarkerDetectionGateAsync(default);
         await _analyzer.DidNotReceiveWithAnyArgs().ProbeMeanVolumeDbAsync(default!);
     }
 
@@ -115,11 +116,12 @@ public class MediaAnalyzerManagerMarkerLockTests
         var mediaItemId = Guid.NewGuid();
         _media.GetProjectedAsync(mediaItemId, Arg.Any<Expression<Func<MediaItem, string>>>())
             .Returns("Movie");
-        _media.AreMarkersLockedAsync(mediaItemId).Returns(true);
+        _media.GetMarkerDetectionGateAsync(mediaItemId).Returns(new MarkerDetectionGateDto
+        { LockedFields = new List<string> { "Markers" } });
 
         await _manager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, forceOverride: true);
 
-        await _media.Received(1).AreMarkersLockedAsync(mediaItemId);
+        await _media.Received(1).GetMarkerDetectionGateAsync(mediaItemId);
     }
 
     [Theory]
@@ -135,7 +137,8 @@ public class MediaAnalyzerManagerMarkerLockTests
         var mediaItemId = Guid.NewGuid();
         _media.GetProjectedAsync(mediaItemId, Arg.Any<Expression<Func<MediaItem, string>>>())
             .Returns("Movie");
-        _media.AreMarkersLockedAsync(mediaItemId).Returns(true);
+        _media.GetMarkerDetectionGateAsync(mediaItemId).Returns(new MarkerDetectionGateDto
+        { LockedFields = new List<string> { "Markers" } });
 
         await _manager.TriggerMediaItemSilenceDetectionAsync(
             mediaItemId,
@@ -143,6 +146,6 @@ public class MediaAnalyzerManagerMarkerLockTests
             isAdditionTrigger: isAddition,
             isScheduleTrigger: isSchedule);
 
-        await _media.Received(1).AreMarkersLockedAsync(mediaItemId);
+        await _media.Received(1).GetMarkerDetectionGateAsync(mediaItemId);
     }
 }

@@ -298,6 +298,30 @@ public partial class MediaRepository : IMediaRepository
             .ToListAsync();
     }
 
+    public async Task<List<Guid>> GetTopLevelMediaItemIdsByLibraryAsync(Guid libraryId)
+    {
+        return await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.LibraryId == libraryId && !(m is Episode) && !(m is Season))
+            .Select(m => m.Id)
+            .ToListAsync();
+    }
+
+    public async Task<Vora.Application.Media.Dtos.MarkerDetectionGateDto?> GetMarkerDetectionGateAsync(Guid mediaItemId)
+    {
+        return await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == mediaItemId)
+            .Select(m => new Vora.Application.Media.Dtos.MarkerDetectionGateDto
+            {
+                LockedFields = m.LockedFields,
+                MarkersAnalyzedAt = m.MarkersAnalyzedAt,
+                EnableIntroDetection = m.Library.EnableIntroDetection,
+                EnableCreditsDetection = m.Library.EnableCreditsDetection
+            })
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<List<string>> GetMediaFilePathsAsync(Guid mediaItemId)
     {
         return await _context.MediaItems

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Analysis;
 using Vora.Application.Analysis.Results;
 using Vora.Application.Media;
+using Vora.Application.Media.Dtos;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
@@ -61,8 +62,8 @@ public class MediaAnalyzerManagerDetectionTests
     private void StubMovieReady(Guid id, string filePath, TimeSpan duration, double? meanDb)
     {
         _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns("Movie");
-        _media.AreMarkersLockedAsync(id).Returns(false);
-        _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, bool>>>()).Returns(true);
+        _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
+        { EnableIntroDetection = true, EnableCreditsDetection = true });
         _media.GetMediaFilePathsAsync(id).Returns(new List<string> { filePath });
         _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, TimeSpan?>>>()).Returns(duration);
         _media.GetStingerFlagsAsync(id).Returns((false, false));
@@ -107,8 +108,8 @@ public class MediaAnalyzerManagerDetectionTests
     {
         var id = Guid.NewGuid();
         _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns("Movie");
-        _media.AreMarkersLockedAsync(id).Returns(false);
-        _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, bool>>>()).Returns(true);
+        _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
+        { EnableIntroDetection = true, EnableCreditsDetection = true });
         _media.GetMediaFilePathsAsync(id).Returns(new List<string> { "/m/a.mkv" });
         _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, TimeSpan?>>>()).Returns((TimeSpan?)null);
         _analyzer.ProbeMeanVolumeDbAsync("/m/a.mkv").Returns(-20);
@@ -139,8 +140,8 @@ public class MediaAnalyzerManagerDetectionTests
     {
         var id = Guid.NewGuid();
         _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns("Movie");
-        _media.AreMarkersLockedAsync(id).Returns(false);
-        _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, bool>>>()).Returns(false);
+        _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
+        { EnableIntroDetection = false, EnableCreditsDetection = false });
 
         await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: false);
 
@@ -153,8 +154,8 @@ public class MediaAnalyzerManagerDetectionTests
     {
         var id = Guid.NewGuid();
         _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns("Movie");
-        _media.AreMarkersLockedAsync(id).Returns(false);
-        _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, bool>>>()).Returns(true);
+        _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
+        { EnableIntroDetection = true, EnableCreditsDetection = true });
         _media.GetMediaFilePathsAsync(id).Returns(new List<string>());
 
         await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: true);
@@ -168,8 +169,8 @@ public class MediaAnalyzerManagerDetectionTests
     {
         var id = Guid.NewGuid();
         _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns("Movie");
-        _media.AreMarkersLockedAsync(id).Returns(false);
-        _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, DateTime?>>>()).Returns(DateTime.UtcNow);
+        _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
+        { MarkersAnalyzedAt = DateTime.UtcNow, EnableIntroDetection = true, EnableCreditsDetection = true });
 
         await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: false);
 
@@ -182,7 +183,8 @@ public class MediaAnalyzerManagerDetectionTests
     {
         var id = Guid.NewGuid();
         StubMovieReady(id, "/m/a.mkv", TimeSpan.FromMinutes(90), meanDb: -20);
-        _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, DateTime?>>>()).Returns(DateTime.UtcNow);
+        _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
+        { MarkersAnalyzedAt = DateTime.UtcNow, EnableIntroDetection = true, EnableCreditsDetection = true });
 
         await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: true);
 
