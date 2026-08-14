@@ -33,7 +33,7 @@ export default function TaskDashboard() {
 
     const handleCancel = async (taskId: string) => {
         try {
-            setTasks(tasks.filter(t => t.id !== taskId));
+            setTasks(tasks.map(t => t.id === taskId ? { ...t, status: 'Cancelling' } : t));
             await taskService.cancelTask(taskId, serverId);
         } catch (error) {
             console.error('Failed to cancel task', error);
@@ -92,6 +92,8 @@ export default function TaskDashboard() {
                                                     </span>
                                                     Running
                                                 </HealthBadge>
+                                            ) : task.status === 'Cancelling' ? (
+                                                <HealthBadge tone="warn">Cancelling…</HealthBadge>
                                             ) : (
                                                 <HealthBadge tone="neutral">Pending</HealthBadge>
                                             )}
@@ -103,13 +105,17 @@ export default function TaskDashboard() {
                                             )}
                                         </td>
                                         <td className="px-5 py-3 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleCancel(task.id)}
-                                                className="px-3 py-1 rounded-[var(--vora-radius-md)] text-xs font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer"
-                                            >
-                                                Cancel
-                                            </button>
+                                            {task.status === 'Cancelling' ? (
+                                                <span className="px-3 py-1 text-xs font-semibold text-[var(--vora-text-muted)]">Cancelling…</span>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCancel(task.id)}
+                                                    className="px-3 py-1 rounded-[var(--vora-radius-md)] text-xs font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
