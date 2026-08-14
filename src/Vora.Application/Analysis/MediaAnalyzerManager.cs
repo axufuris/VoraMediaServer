@@ -150,11 +150,17 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             if (isScheduleTrigger && settings.RunDetections != DetectionTrigger.OnSchedule && settings.RunDetections != DetectionTrigger.OnAdditionAndSchedule) return;
         }
 
-        var mediaIds = (await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId)).ToList();
+        // Only iterate the library's top-level items (shows + movies). Seasons and
+        // episodes are reached by recursing into each show, so pulling the whole
+        // library here meant a per-item type round-trip for every episode just to
+        // skip it — and every season's episodes were then detected twice (once via
+        // the show, once via the season). For a large TV library that's tens of
+        // thousands of wasted queries before any real work starts.
+        var mediaIds = await _mediaRepository.GetTopLevelMediaItemIdsByLibraryAsync(libraryId);
         if (mediaIds.Count == 0) return;
 
         // Both marker toggles off → there's nothing to detect. Bail before the
-        // per-item loop so the task doesn't iterate the whole library (and show
+        // per-item loop so the task doesn't iterate the library (and show
         // "Detecting intro/credit markers …") when the library has detection
         // disabled. The per-item path also checks these flags, but only after
         // loading each item — this skips the work and the misleading progress.
@@ -175,11 +181,6 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             count++;
             try
             {
-                var itemType = await _mediaRepository.GetProjectedAsync(id, m => m.GetType().Name);
-                if (itemType == nameof(Episode))
-                {
-                    continue;
-                }
                 _progress.Report($"Detecting intro/credit markers — {ProgressTitle(titles, id)} ({count}/{total})");
                 await TriggerMediaItemSilenceDetectionAsync(id, forceOverride: forceOverride);
             }
@@ -305,7 +306,14 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
 
     private async Task RunMediaItemSilenceDetectionAsync(Guid mediaItemId, ServerSetting settings, bool isEpisode, bool forceOverride)
     {
-        if (await _mediaRepository.AreMarkersLockedAsync(mediaItemId))
+        // One round-trip for the whole skip decision (lock + already-analyzed +
+        // per-library toggles) instead of three sequential queries per item —
+        // this runs once for every episode in the library, so the round-trip
+        // count matters.
+        var gate = await _mediaRepository.GetMarkerDetectionGateAsync(mediaItemId);
+        if (gate == null) return;
+
+        if (gate.AreMarkersLocked)
         {
             _logger.LogInformation("Skipping silence detection for {MediaItemId}: markers are locked.", mediaItemId);
             return;
@@ -318,12 +326,10 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             // nightly run only needs to process new/never-analyzed items, so the
             // FFmpeg passes aren't re-run over the whole library every time. A
             // manual per-item/library force re-runs by passing forceOverride.
-            var analyzedAt = await _mediaRepository.GetProjectedAsync(mediaItemId, m => m.MarkersAnalyzedAt);
-            if (analyzedAt != null) return;
+            if (gate.MarkersAnalyzedAt != null) return;
 
-            var flags = await _mediaRepository.GetProjectedAsync(mediaItemId, m => new { m.Library.EnableIntroDetection, m.Library.EnableCreditsDetection });
-            detectIntro = flags?.EnableIntroDetection ?? false;
-            detectCredits = flags?.EnableCreditsDetection ?? false;
+            detectIntro = gate.EnableIntroDetection;
+            detectCredits = gate.EnableCreditsDetection;
             if (!detectIntro && !detectCredits) return;
         }
 

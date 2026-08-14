@@ -24,6 +24,8 @@ public interface IMediaRepository
     Task<HashSet<string>> GetExistingLibraryPathsAsync(Guid libraryId);
     Task<List<string>> GetLibraryItemFilePathsAsync(Guid libraryId);
     Task<IEnumerable<Guid>> GetAllMediaItemIdsByLibraryAsync(Guid libraryId);
+    Task<List<Guid>> GetTopLevelMediaItemIdsByLibraryAsync(Guid libraryId);
+    Task<MarkerDetectionGateDto?> GetMarkerDetectionGateAsync(Guid mediaItemId);
     Task<List<string>> GetMediaFilePathsAsync(Guid mediaItemId);
     Task<Dictionary<Guid, string>> GetDisplayTitlesByIdsAsync(IReadOnlyCollection<Guid> ids);
     Task<T?> GetProjectedAsync<T>(Guid id, Expression<Func<MediaItem, T>> projection, bool hasAllAccess = true, List<Guid>? allowedLibs = null, bool hasAllRatings = true, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false);
