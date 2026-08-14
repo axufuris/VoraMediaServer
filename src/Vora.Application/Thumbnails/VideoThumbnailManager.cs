@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Libraries;
@@ -21,6 +22,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
     private readonly IVideoThumbnailStorageService _storage;
     private readonly IVideoThumbnailGeneratorService _generator;
     private readonly IClientNotifier _notifier;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<VideoThumbnailManager> _logger;
 
     public VideoThumbnailManager(
@@ -30,6 +32,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         IVideoThumbnailStorageService storage,
         IVideoThumbnailGeneratorService generator,
         IClientNotifier notifier,
+        IServiceScopeFactory scopeFactory,
         ILogger<VideoThumbnailManager> logger)
     {
         _mediaRepository = mediaRepository;
@@ -38,58 +41,78 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         _storage = storage;
         _generator = generator;
         _notifier = notifier;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
-    public async Task TriggerMediaItemThumbnailGenerationAsync(Guid mediaItemId, bool forceOverride = false, bool isScheduleTrigger = false)
+    public async Task TriggerMediaItemThumbnailGenerationAsync(Guid mediaItemId, bool forceOverride = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default)
     {
         var itemType = await _mediaRepository.GetProjectedAsync(mediaItemId, m => m.GetType().Name);
 
         if (itemType == nameof(TvShow))
         {
             var epIds = await _mediaRepository.GetEpisodeIdsForShowAsync(mediaItemId);
-            foreach (var epId in epIds)
-            {
-                await RunSingleAsync(epId, forceOverride);
-            }
+            await GenerateManyAsync(epIds, forceOverride, cancellationToken);
             return;
         }
 
         if (itemType == nameof(Season))
         {
             var epIds = await _mediaRepository.GetEpisodeIdsForSeasonAsync(mediaItemId);
-            foreach (var epId in epIds)
-            {
-                await RunSingleAsync(epId, forceOverride);
-            }
+            await GenerateManyAsync(epIds, forceOverride, cancellationToken);
             return;
         }
 
         if (itemType != nameof(Movie) && itemType != nameof(Episode)) return;
 
-        await RunSingleAsync(mediaItemId, forceOverride);
+        await RunSingleAsync(mediaItemId, forceOverride, cancellationToken);
     }
 
-    public async Task TriggerLibraryThumbnailGenerationAsync(Guid libraryId, bool forceOverride = false, bool isScheduleTrigger = false)
+    public async Task TriggerLibraryThumbnailGenerationAsync(Guid libraryId, bool forceOverride = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default)
     {
         var (libraryType, enabled) = await GetLibraryThumbnailStateAsync(libraryId);
         if (!IsVideoBearingLibrary(libraryType)) return;
         if (!enabled && !forceOverride) return;
 
         var ids = await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId);
-        foreach (var id in ids)
-        {
-            try
+        await GenerateManyAsync(ids, forceOverride, cancellationToken);
+    }
+
+    public Task GenerateForItemAsync(Guid mediaItemId, bool forceOverride, CancellationToken cancellationToken = default) =>
+        RunSingleAsync(mediaItemId, forceOverride, cancellationToken);
+
+    // Each item's ffmpeg pass is an independent full-file decode, so run several
+    // at once — each in its own DI scope (own DbContext) so parallel writes don't
+    // share a context. Mirrors the file-analysis/overlay/marker fan-out.
+    private async Task GenerateManyAsync(IEnumerable<Guid> idsSource, bool forceOverride, CancellationToken cancellationToken)
+    {
+        var ids = idsSource as IReadOnlyList<Guid> ?? idsSource.ToList();
+        if (ids.Count == 0) return;
+
+        var parallelism = Math.Clamp(Environment.ProcessorCount, 2, 6);
+        await Parallel.ForEachAsync(
+            ids,
+            new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
+            async (id, ct) =>
             {
-                var itemType = await _mediaRepository.GetProjectedAsync(id, m => m.GetType().Name);
-                if (itemType != nameof(Movie) && itemType != nameof(Episode)) continue;
-                await RunSingleAsync(id, forceOverride);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Video thumbnail generation failed for {MediaItemId}.", id);
-            }
-        }
+                try
+                {
+                    var itemType = await _mediaRepository.GetProjectedAsync(id, m => m.GetType().Name);
+                    if (itemType != nameof(Movie) && itemType != nameof(Episode)) return;
+
+                    using var scope = _scopeFactory.CreateScope();
+                    var manager = scope.ServiceProvider.GetRequiredService<IVideoThumbnailManager>();
+                    await manager.GenerateForItemAsync(id, forceOverride, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Video thumbnail generation failed for {MediaItemId}.", id);
+                }
+            });
     }
 
     public async Task<(int Total, int WithThumbnails)> GetCoverageAsync(Guid libraryId)
@@ -134,7 +157,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         }
     }
 
-    private async Task RunSingleAsync(Guid mediaItemId, bool forceOverride)
+    private async Task RunSingleAsync(Guid mediaItemId, bool forceOverride, CancellationToken cancellationToken = default)
     {
         var meta = await _mediaRepository.GetProjectedAsync(mediaItemId, m => new
         {
@@ -185,7 +208,8 @@ public class VideoThumbnailManager : IVideoThumbnailManager
                     SpriteColumns = settings.VideoThumbnailSpriteColumns
                 },
                 spritePath,
-                vttPath);
+                vttPath,
+                cancellationToken);
         }
         catch (Exception ex)
         {

@@ -48,6 +48,7 @@ public class VideoThumbnailManagerTests
 
         _manager = new VideoThumbnailManager(
             _media, _library, _settings, _storage, _generator, _notifier,
+            Substitute.For<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(),
             NullLogger<VideoThumbnailManager>.Instance);
     }
 
