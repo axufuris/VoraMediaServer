@@ -234,6 +234,11 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             await _mediaRepository.SyncMediaTracksAsync(part.Id, incomingVideo, incomingAudio, incomingSubtitles);
         }
 
+        // A part was (re)probed here (an added or replaced file — unchanged files
+        // returned above), so any existing intro/credit markers are stale. Clear
+        // the marker-analysis stamp so the skip-gate re-detects them next pass.
+        item.MarkersAnalyzedAt = null;
+
         await _mediaRepository.UpdateMediaItemAsync(item);
 
         await _notifier.NotifyMediaAnalysisUpdatedAsync(mediaItemId);
