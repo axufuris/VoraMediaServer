@@ -145,7 +145,9 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
             await analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger);
-        }, resourceKey: LibraryKey(libraryId));
+        },
+        libraryName == null ? LibraryLabel(libraryId, "Analyze Library Media: {0}") : null,
+        resourceKey: LibraryKey(libraryId));
     }
 
     public void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
@@ -235,7 +237,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride);
-        });
+        }, mediaItemName == null ? MediaLabel(mediaItemId, "Analyze Media Item: {0}") : null);
     }
 
     public void QueueArtworkProviderSwap(Guid libraryId, string libraryName)
