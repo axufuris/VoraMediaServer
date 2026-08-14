@@ -234,6 +234,11 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             await _mediaRepository.SyncMediaTracksAsync(part.Id, incomingVideo, incomingAudio, incomingSubtitles);
         }
 
+        // A part was (re)probed here (an added or replaced file — unchanged files
+        // returned above), so any existing intro/credit markers are stale. Clear
+        // the marker-analysis stamp so the skip-gate re-detects them next pass.
+        item.MarkersAnalyzedAt = null;
+
         await _mediaRepository.UpdateMediaItemAsync(item);
 
         await _notifier.NotifyMediaAnalysisUpdatedAsync(mediaItemId);
@@ -309,6 +314,13 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         bool detectIntro = true, detectCredits = true;
         if (!forceOverride)
         {
+            // Skip items already analyzed: a non-forced "Analyze library" or the
+            // nightly run only needs to process new/never-analyzed items, so the
+            // FFmpeg passes aren't re-run over the whole library every time. A
+            // manual per-item/library force re-runs by passing forceOverride.
+            var analyzedAt = await _mediaRepository.GetProjectedAsync(mediaItemId, m => m.MarkersAnalyzedAt);
+            if (analyzedAt != null) return;
+
             var flags = await _mediaRepository.GetProjectedAsync(mediaItemId, m => new { m.Library.EnableIntroDetection, m.Library.EnableCreditsDetection });
             detectIntro = flags?.EnableIntroDetection ?? false;
             detectCredits = flags?.EnableCreditsDetection ?? false;

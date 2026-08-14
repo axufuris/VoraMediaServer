@@ -164,6 +164,32 @@ public class MediaAnalyzerManagerDetectionTests
     }
 
     [Fact]
+    public async Task RunMediaItemSilenceDetectionAsync_skips_already_analyzed_item_when_not_forced()
+    {
+        var id = Guid.NewGuid();
+        _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns("Movie");
+        _media.AreMarkersLockedAsync(id).Returns(false);
+        _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, DateTime?>>>()).Returns(DateTime.UtcNow);
+
+        await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: false);
+
+        await _media.DidNotReceive().GetMediaFilePathsAsync(Arg.Any<Guid>());
+        await _analyzer.DidNotReceiveWithAnyArgs().ProbeMeanVolumeDbAsync(string.Empty);
+    }
+
+    [Fact]
+    public async Task RunMediaItemSilenceDetectionAsync_reanalyzes_already_analyzed_item_when_forced()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/a.mkv", TimeSpan.FromMinutes(90), meanDb: -20);
+        _media.GetProjectedAsync(id, Arg.Any<Expression<Func<MediaItem, DateTime?>>>()).Returns(DateTime.UtcNow);
+
+        await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: true);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/a.mkv", Arg.Any<SilenceDetectionParameters>());
+    }
+
+    [Fact]
     public async Task RunMediaItemSilenceDetectionAsync_uses_episode_silence_duration_for_episodes()
     {
         // Routed via Season → Episode path; the manager should pass the EpisodeSilence duration setting
