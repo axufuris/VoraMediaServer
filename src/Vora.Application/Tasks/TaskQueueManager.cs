@@ -531,15 +531,28 @@ public class TaskQueueManager : ITaskQueueManager
 
     public void QueueGenerateLibraryPosterOverlays(Guid libraryId, string? libraryName = null)
     {
-        var label = string.IsNullOrWhiteSpace(libraryName)
-            ? "Generate Library Poster Overlays"
-            : $"Generate Library Poster Overlays: {libraryName}";
+        string label;
+        Func<IServiceProvider, Task<string?>>? nameResolver = null;
+
+        if (libraryId == Guid.Empty)
+        {
+            label = "Generate Poster Overlays: All Libraries";
+        }
+        else if (!string.IsNullOrWhiteSpace(libraryName))
+        {
+            label = $"Generate Poster Overlays: {libraryName}";
+        }
+        else
+        {
+            label = "Generate Poster Overlays";
+            nameResolver = LibraryLabel(libraryId, "Generate Poster Overlays: {0}");
+        }
 
         EnqueueTask(label, async (ct, sp) =>
         {
             var manager = sp.GetRequiredService<IPosterOverlayManager>();
             await manager.RunLibraryOverlaySyncAsync(libraryId, ct);
-        }, LibraryLabel(libraryId, "Generate Library Poster Overlays: {0}"), resourceKey: OverlaySyncKey);
+        }, nameResolver, resourceKey: OverlaySyncKey);
     }
 
     public void QueueOverlayOrphanSweep()
