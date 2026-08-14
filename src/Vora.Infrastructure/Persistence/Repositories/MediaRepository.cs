@@ -475,6 +475,10 @@ public partial class MediaRepository : IMediaRepository
                 await _context.SaveChangesAsync();
             }
 
+            await _context.Set<MediaItem>()
+                .Where(m => m.Id == mediaItemId)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.MarkersAnalyzedAt, DateTime.UtcNow));
+
             await tx.CommitAsync();
         }
         catch

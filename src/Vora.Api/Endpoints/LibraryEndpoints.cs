@@ -114,7 +114,7 @@ public static class LibraryEndpoints
 
     private static IResult QueueAnalyzeAsync(Guid id, ITaskQueueManager taskQueue)
     {
-        taskQueue.QueueAnalyzeLibraryMediaContent(id, forceOverride: true);
+        taskQueue.QueueAnalyzeLibraryMediaContent(id, forceOverride: false);
         return Results.Accepted();
     }
 

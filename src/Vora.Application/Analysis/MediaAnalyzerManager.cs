@@ -309,6 +309,13 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         bool detectIntro = true, detectCredits = true;
         if (!forceOverride)
         {
+            // Skip items already analyzed: a non-forced "Analyze library" or the
+            // nightly run only needs to process new/never-analyzed items, so the
+            // FFmpeg passes aren't re-run over the whole library every time. A
+            // manual per-item/library force re-runs by passing forceOverride.
+            var analyzedAt = await _mediaRepository.GetProjectedAsync(mediaItemId, m => m.MarkersAnalyzedAt);
+            if (analyzedAt != null) return;
+
             var flags = await _mediaRepository.GetProjectedAsync(mediaItemId, m => new { m.Library.EnableIntroDetection, m.Library.EnableCreditsDetection });
             detectIntro = flags?.EnableIntroDetection ?? false;
             detectCredits = flags?.EnableCreditsDetection ?? false;
