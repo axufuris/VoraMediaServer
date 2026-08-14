@@ -142,7 +142,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         image.Mutate(x => x.Crop(new Rectangle(cropX, cropY, cropWidth, cropHeight)));
     }
 
-    private const string CacheKeyVersion = "v7-episode-still-16x9";
+    private const string CacheKeyVersion = "v8-badge-per-axis-padding";
 
     private static string ComputeOverlayCacheKey(OverlayMediaDto item, string originalArtworkPath, string templateJson)
     {
@@ -184,10 +184,11 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         var targetX = (int)(baseImage.Width * element.XPct);
         var targetY = (int)(baseImage.Height * element.YPct);
 
-        var padding = (int)Math.Max(5, targetWidth * 0.1f);
-        var radius = padding * 0.8f;
-        var maxBadgeW = Math.Max(1, targetWidth - (padding * 2));
-        var maxBadgeH = Math.Max(1, targetHeight - (padding * 2));
+        var paddingX = (int)Math.Max(3, targetWidth * 0.1f);
+        var paddingY = (int)Math.Max(3, targetHeight * 0.1f);
+        var radius = Math.Min(paddingX, paddingY) * 0.8f;
+        var maxBadgeW = Math.Max(1, targetWidth - (paddingX * 2));
+        var maxBadgeH = Math.Max(1, targetHeight - (paddingY * 2));
 
         badgeImage.Mutate(x => x.Resize(new ResizeOptions
         {
@@ -196,8 +197,8 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
             Sampler = KnownResamplers.Lanczos3
         }));
 
-        var finalX = targetX + padding + ((maxBadgeW - badgeImage.Width) / 2);
-        var finalY = targetY + padding + ((maxBadgeH - badgeImage.Height) / 2);
+        var finalX = targetX + paddingX + ((maxBadgeW - badgeImage.Width) / 2);
+        var finalY = targetY + paddingY + ((maxBadgeH - badgeImage.Height) / 2);
 
         baseImage.Mutate(x =>
         {

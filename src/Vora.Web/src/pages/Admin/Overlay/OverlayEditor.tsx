@@ -522,58 +522,78 @@ export default function OverlayEditor() {
                         </div>
                     )}
 
-                    {canvasSize.width > 0 && elements.map((el, index) => (
-                        <Rnd
-                            key={el.id}
-                            bounds="parent"
-                            size={{ width: el.widthPct * canvasSize.width, height: el.heightPct * canvasSize.height }}
-                            position={{ x: el.xPct * canvasSize.width, y: el.yPct * canvasSize.height }}
-                            onDragStop={(_e, d) => {
-                                const newEls = [...elements];
-                                newEls[index].xPct = d.x / canvasSize.width;
-                                newEls[index].yPct = d.y / canvasSize.height;
-                                setElements(newEls);
-                            }}
-                            onResizeStop={(_e, _dir, ref, _delta, position) => {
-                                const newEls = [...elements];
-                                newEls[index].widthPct = parseFloat(ref.style.width) / canvasSize.width;
-                                newEls[index].heightPct = parseFloat(ref.style.height) / canvasSize.height;
-                                newEls[index].xPct = position.x / canvasSize.width;
-                                newEls[index].yPct = position.y / canvasSize.height;
-                                setElements(newEls);
-                            }}
-                            className="group cursor-move absolute"
-                        >
-                            {el.type === 'composite_ratings' ? (
-                                <div className="w-full h-full flex flex-col gap-1.5 sm:gap-2 pointer-events-none">
-                                    {el.previewImages?.map((img, i) => {
-                                        const imgLower = (img ?? '').toLowerCase();
-                                        const isRottenTomatoes = imgLower.includes('rt-') || imgLower.includes('rotten');
-                                        const isStar = imgLower.endsWith('star.png');
-                                        const dummyLabel = isStar ? "4.0" : isRottenTomatoes ? "82%" : "7.0";
-                                        return (
-                                            <div key={i} className="flex-1 bg-black/65 rounded-xl p-1.5 flex flex-col items-center justify-center min-h-0 w-full">
-                                                <div className="h-1/2 w-full flex items-center justify-center">
-                                                    <img src={img} className="max-h-full max-w-full object-contain" alt={`Slot ${i}`} />
-                                                </div>
-                                                <div className="h-1/2 w-full flex items-center justify-center">
-                                                    <span className="text-[var(--vora-text-primary)] font-bold leading-tight drop-shadow-md text-sm sm:text-base md:text-xl">
-                                                        {dummyLabel}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="w-full h-full bg-black/65 rounded-xl p-2 flex flex-col items-center justify-center pointer-events-none">
-                                    <img src={el.previewImage} alt={el.type} className="max-w-full max-h-full object-contain" />
-                                </div>
-                            )}
+                    {canvasSize.width > 0 && elements.map((el, index) => {
+                        // Match the baked overlay math exactly: badge inner sizing is
+                        // proportional to the badge box (percent of measured canvas),
+                        // with per-axis padding, so the preview equals the bake on any
+                        // aspect and doesn't jump when the browser is zoomed. The
+                        // absolute clamps are scaled from the backend's 1280px canvas.
+                        const scale = canvasSize.width / 1280;
+                        const boxW = el.widthPct * canvasSize.width;
+                        const boxH = el.heightPct * canvasSize.height;
+                        return (
+                            <Rnd
+                                key={el.id}
+                                bounds="parent"
+                                size={{ width: boxW, height: boxH }}
+                                position={{ x: el.xPct * canvasSize.width, y: el.yPct * canvasSize.height }}
+                                onDragStop={(_e, d) => {
+                                    const newEls = [...elements];
+                                    newEls[index].xPct = d.x / canvasSize.width;
+                                    newEls[index].yPct = d.y / canvasSize.height;
+                                    setElements(newEls);
+                                }}
+                                onResizeStop={(_e, _dir, ref, _delta, position) => {
+                                    const newEls = [...elements];
+                                    newEls[index].widthPct = parseFloat(ref.style.width) / canvasSize.width;
+                                    newEls[index].heightPct = parseFloat(ref.style.height) / canvasSize.height;
+                                    newEls[index].xPct = position.x / canvasSize.width;
+                                    newEls[index].yPct = position.y / canvasSize.height;
+                                    setElements(newEls);
+                                }}
+                                className="group cursor-move absolute"
+                            >
+                                {el.type === 'composite_ratings' ? (() => {
+                                    const gap = Math.max(2 * scale, boxH * 0.04);
+                                    const rowH = (boxH - gap * 2) / 3;
+                                    const padX = Math.max(4 * scale, boxW * 0.1);
+                                    const innerW = Math.max(1, boxW - padX * 2);
+                                    const radius = boxW * 0.1;
+                                    const logoMaxH = rowH * 0.40;
+                                    const font = Math.max(10 * scale, Math.min(rowH * 0.35, innerW * 0.45));
+                                    return (
+                                        <div className="w-full h-full flex flex-col pointer-events-none" style={{ gap: `${gap}px` }}>
+                                            {el.previewImages?.map((img, i) => {
+                                                const imgLower = (img ?? '').toLowerCase();
+                                                const isRottenTomatoes = imgLower.includes('rt-') || imgLower.includes('rotten');
+                                                const isStar = imgLower.endsWith('star.png');
+                                                const dummyLabel = isStar ? "4.0" : isRottenTomatoes ? "82%" : "7.0";
+                                                return (
+                                                    <div key={i} className="bg-black/65 flex flex-col items-center justify-center w-full" style={{ height: `${rowH}px`, borderRadius: `${radius}px`, paddingLeft: `${padX}px`, paddingRight: `${padX}px` }}>
+                                                        <img src={img} className="object-contain" style={{ maxHeight: `${logoMaxH}px`, maxWidth: `${innerW}px` }} alt={`Slot ${i}`} />
+                                                        <span className="text-[var(--vora-text-primary)] font-bold leading-none drop-shadow-md" style={{ fontSize: `${font}px` }}>
+                                                            {dummyLabel}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })() : (() => {
+                                    const padX = Math.max(3 * scale, boxW * 0.1);
+                                    const padY = Math.max(3 * scale, boxH * 0.1);
+                                    const radius = Math.min(padX, padY) * 0.8;
+                                    return (
+                                        <div className="w-full h-full bg-black/65 flex items-center justify-center pointer-events-none" style={{ borderRadius: `${radius}px`, padding: `${padY}px ${padX}px` }}>
+                                            <img src={el.previewImage} alt={el.type} className="max-w-full max-h-full object-contain" />
+                                        </div>
+                                    );
+                                })()}
 
-                            <div className="absolute inset-0 border-2 border-dashed border-orange-500 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
-                        </Rnd>
-                    ))}
+                                <div className="absolute inset-0 border-2 border-dashed border-orange-500 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                            </Rnd>
+                        );
+                    })}
                 </div>
                 </div>
 
