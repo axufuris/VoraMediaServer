@@ -10,15 +10,15 @@ namespace Vora.Application.Metadata;
 
 public interface IMetadataManager
 {
-    Task TriggerLibraryMetadataRefreshAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false);
-    Task TriggerLibraryEnrichmentAsync(Guid libraryId, bool forceOverride = false);
-    Task TriggerActorMetadataRefreshAsync();
-    Task TriggerMediaTvdbResolutionAsync();
-    Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false);
-    Task TriggerMediaItemArtworkRefreshAsync(Guid mediaItemId, bool forceOverride = false);
-    Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false);
-    Task TriggerLibraryArtworkRefreshAsync(Guid libraryId, bool forceOverride = false);
-    Task TriggerMediaItemRatingsRefreshAsync(Guid mediaItemId, bool forceOverride = false);
+    Task TriggerLibraryMetadataRefreshAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, CancellationToken cancellationToken = default);
+    Task TriggerLibraryEnrichmentAsync(Guid libraryId, bool forceOverride = false, CancellationToken cancellationToken = default);
+    Task TriggerActorMetadataRefreshAsync(CancellationToken cancellationToken = default);
+    Task TriggerMediaTvdbResolutionAsync(CancellationToken cancellationToken = default);
+    Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false, CancellationToken cancellationToken = default);
+    Task TriggerMediaItemArtworkRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default);
+    Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default);
+    Task TriggerLibraryArtworkRefreshAsync(Guid libraryId, bool forceOverride = false, CancellationToken cancellationToken = default);
+    Task TriggerMediaItemRatingsRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default);
     Task RefreshMetadataAsync(Guid mediaItemId, bool forceOverride = false, bool notify = true);
 }
 
@@ -65,11 +65,12 @@ public class MetadataManager : IMetadataManager
         _logger = logger;
     }
 
-    public async Task TriggerActorMetadataRefreshAsync()
+    public async Task TriggerActorMetadataRefreshAsync(CancellationToken cancellationToken = default)
     {
         var ids = await _actorRepository.GetActorIdsMissingMetadataAsync(ActorBatchSize);
         foreach (var id in ids)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var actor = await _actorRepository.GetActorByIdAsync(id);
@@ -94,7 +95,7 @@ public class MetadataManager : IMetadataManager
         }
     }
 
-    public async Task TriggerLibraryMetadataRefreshAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false)
+    public async Task TriggerLibraryMetadataRefreshAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, CancellationToken cancellationToken = default)
     {
         var ids = forceOverride
             ? await _repository.GetAllProjectedAsync(n => n.Id, libraryId)
@@ -105,10 +106,10 @@ public class MetadataManager : IMetadataManager
             using var scope = _scopeFactory.CreateScope();
             var scopedManager = scope.ServiceProvider.GetRequiredService<IMetadataManager>();
             await scopedManager.RefreshMetadataAsync(id, forceOverride);
-        });
+        }, cancellationToken);
     }
 
-    public async Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false)
+    public async Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false, CancellationToken cancellationToken = default)
     {
         // Non-force runs fetch items still missing any configured rating slot, so
         // re-runs fill in items skipped when the provider's daily quota tripped
@@ -117,10 +118,10 @@ public class MetadataManager : IMetadataManager
             ? await _repository.GetAllProjectedAsync(n => n.Id, libraryId)
             : await _repository.GetMediaIdsMissingRatingsAsync(libraryId);
 
-        await ProcessLibraryItemsAsync(libraryId, ids, "ratings", id => RefreshRatingsAsync(id, forceOverride));
+        await ProcessLibraryItemsAsync(libraryId, ids, "ratings", id => RefreshRatingsAsync(id, forceOverride), cancellationToken);
     }
 
-    public async Task TriggerLibraryArtworkRefreshAsync(Guid libraryId, bool forceOverride = false)
+    public async Task TriggerLibraryArtworkRefreshAsync(Guid libraryId, bool forceOverride = false, CancellationToken cancellationToken = default)
     {
         // Non-force runs only fetch items missing a poster, so adding a folder (or
         // the nightly scan) doesn't re-pull artwork for the whole library — only
@@ -128,10 +129,10 @@ public class MetadataManager : IMetadataManager
         var ids = forceOverride
             ? await _repository.GetAllProjectedAsync(n => n.Id, libraryId)
             : await _repository.GetMediaIdsMissingArtworkAsync(libraryId);
-        await ProcessLibraryItemsAsync(libraryId, ids, "artwork", id => RefreshArtworkAsync(id, forceOverride));
+        await ProcessLibraryItemsAsync(libraryId, ids, "artwork", id => RefreshArtworkAsync(id, forceOverride), cancellationToken);
     }
 
-    public async Task TriggerLibraryEnrichmentAsync(Guid libraryId, bool forceOverride = false)
+    public async Task TriggerLibraryEnrichmentAsync(Guid libraryId, bool forceOverride = false, CancellationToken cancellationToken = default)
     {
         // Enrich each item fully (metadata → artwork → ratings) before moving to
         // the next, so posters fill in progressively during a first scan instead
@@ -171,10 +172,10 @@ public class MetadataManager : IMetadataManager
             }
             if (forceOverride || artSet.Contains(id)) await RefreshArtworkAsync(id, forceOverride);
             if (forceOverride || ratSet.Contains(id)) await RefreshRatingsAsync(id, forceOverride);
-        });
+        }, cancellationToken);
     }
 
-    public async Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false)
+    public async Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default)
     {
         var itemInfo = await _repository.GetProjectedAsync(mediaItemId, m => new { m.Id, Type = m.GetType().Name });
         if (itemInfo == null) return;
@@ -182,7 +183,7 @@ public class MetadataManager : IMetadataManager
         if (itemInfo.Type == nameof(Season))
         {
             var season = await _repository.GetForBasicUpdateAsync(mediaItemId) as Season;
-            if (season != null) await TriggerMediaItemMetadataRefreshAsync(season.TvShowId, forceOverride);
+            if (season != null) await TriggerMediaItemMetadataRefreshAsync(season.TvShowId, forceOverride, cancellationToken);
             return;
         }
 
@@ -195,6 +196,7 @@ public class MetadataManager : IMetadataManager
             {
                 foreach (var season in tvShow.Seasons)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     await RefreshArtworkAsync(season.Id, forceOverride);
                     await RefreshRatingsAsync(season.Id, forceOverride);
                 }
@@ -208,6 +210,7 @@ public class MetadataManager : IMetadataManager
             // failing episode is isolated so it can't abort the rest of the show.
             foreach (var epId in episodeIds)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
                     // Suppress the per-episode SignalR fan-out (episode + season +
@@ -226,7 +229,7 @@ public class MetadataManager : IMetadataManager
         }
     }
 
-    public async Task TriggerMediaItemArtworkRefreshAsync(Guid mediaItemId, bool forceOverride = false)
+    public async Task TriggerMediaItemArtworkRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default)
     {
         var itemInfo = await _repository.GetProjectedAsync(mediaItemId, m => new { m.Id, Type = m.GetType().Name });
         if (itemInfo == null) return;
@@ -235,11 +238,11 @@ public class MetadataManager : IMetadataManager
 
         if (itemInfo.Type == nameof(TvShow))
         {
-            await RefreshChildSeasonsAsync(mediaItemId, forceOverride, RefreshArtworkAsync);
+            await RefreshChildSeasonsAsync(mediaItemId, forceOverride, RefreshArtworkAsync, cancellationToken);
         }
     }
 
-    public async Task TriggerMediaItemRatingsRefreshAsync(Guid mediaItemId, bool forceOverride = false)
+    public async Task TriggerMediaItemRatingsRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default)
     {
         var itemInfo = await _repository.GetProjectedAsync(mediaItemId, m => new { m.Id, Type = m.GetType().Name });
         if (itemInfo == null) return;
@@ -248,7 +251,7 @@ public class MetadataManager : IMetadataManager
 
         if (itemInfo.Type == nameof(TvShow))
         {
-            await RefreshChildSeasonsAsync(mediaItemId, forceOverride, RefreshRatingsAsync);
+            await RefreshChildSeasonsAsync(mediaItemId, forceOverride, RefreshRatingsAsync, cancellationToken);
         }
     }
 
@@ -321,13 +324,14 @@ public class MetadataManager : IMetadataManager
         await NotifyItemAndParentsAsync(item);
     }
 
-    private async Task RefreshChildSeasonsAsync(Guid showId, bool forceOverride, Func<Guid, bool, Task> refreshFn)
+    private async Task RefreshChildSeasonsAsync(Guid showId, bool forceOverride, Func<Guid, bool, Task> refreshFn, CancellationToken cancellationToken = default)
     {
         var tvShow = await _repository.GetForMetadataSyncAsync(showId) as TvShow;
         if (tvShow == null) return;
 
         foreach (var season in tvShow.Seasons)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await refreshFn(season.Id, forceOverride);
         }
     }
@@ -401,7 +405,7 @@ public class MetadataManager : IMetadataManager
     // Triggered explicitly by the admin "Resolve now" button, so it runs
     // regardless of the persisted toggle (which only gates the automatic,
     // during-refresh path) — otherwise clicking before saving silently no-ops.
-    public async Task TriggerMediaTvdbResolutionAsync()
+    public async Task TriggerMediaTvdbResolutionAsync(CancellationToken cancellationToken = default)
     {
         var ids = await _repository.GetMediaIdsMissingTvdbIdAsync();
         var total = ids.Count;
@@ -409,6 +413,7 @@ public class MetadataManager : IMetadataManager
 
         foreach (var id in ids)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             count++;
             var item = await _repository.GetForBasicUpdateAsync(id);
             if (item == null || !string.IsNullOrWhiteSpace(item.TvdbId) || item.IsLocked(nameof(item.TvdbId))) continue;
@@ -427,7 +432,7 @@ public class MetadataManager : IMetadataManager
         _progress.Report(null);
     }
 
-    private async Task ProcessLibraryItemsAsync(Guid libraryId, IEnumerable<Guid> ids, string operation, Func<Guid, Task> refreshFn)
+    private async Task ProcessLibraryItemsAsync(Guid libraryId, IEnumerable<Guid> ids, string operation, Func<Guid, Task> refreshFn, CancellationToken cancellationToken = default)
     {
         var idList = ids as IReadOnlyList<Guid> ?? ids.ToList();
         var total = idList.Count;
@@ -437,6 +442,7 @@ public class MetadataManager : IMetadataManager
         var count = 0;
         foreach (var id in idList)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             count++;
             var title = titles.TryGetValue(id, out var t) && !string.IsNullOrWhiteSpace(t) ? t : "…";
             _progress.Report($"{label} — {title} ({count}/{total})");

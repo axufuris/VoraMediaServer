@@ -26,10 +26,10 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         _logger = logger;
     }
 
-    public async Task<MediaAnalysisResult> AnalyzeFileAsync(string filePath)
+    public async Task<MediaAnalysisResult> AnalyzeFileAsync(string filePath, CancellationToken cancellationToken = default)
     {
         var result = new MediaAnalysisResult();
-        await RunFFprobeAsync(filePath, result);
+        await RunFFprobeAsync(filePath, result, cancellationToken);
         return result;
     }
 
@@ -125,7 +125,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         return foundValue;
     }
 
-    private async Task RunFFprobeAsync(string filePath, MediaAnalysisResult result)
+    private async Task RunFFprobeAsync(string filePath, MediaAnalysisResult result, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Extracting technical metadata via FFprobe for {FilePath}.", filePath);
 
@@ -149,8 +149,8 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             using var process = Process.Start(processInfo);
             if (process == null) throw new InvalidOperationException("Failed to start FFprobe process.");
 
-            string jsonOutput = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger);
+            string jsonOutput = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger, cancellationToken);
 
             if (string.IsNullOrWhiteSpace(jsonOutput)) return;
 
@@ -282,7 +282,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
                 }
             }
 
-            await UpgradeHdr10PlusAsync(filePath, result);
+            await UpgradeHdr10PlusAsync(filePath, result, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -291,14 +291,14 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         }
     }
 
-    private async Task UpgradeHdr10PlusAsync(string filePath, MediaAnalysisResult result)
+    private async Task UpgradeHdr10PlusAsync(string filePath, MediaAnalysisResult result, CancellationToken cancellationToken = default)
     {
         var hdr10Tracks = result.VideoTracks
             .Where(t => t.HdrType == "HDR10" || t.HdrType == "DoVi/HDR10")
             .ToList();
 
         if (hdr10Tracks.Count == 0) return;
-        if (!await HasHdr10PlusMetadataAsync(filePath)) return;
+        if (!await HasHdr10PlusMetadataAsync(filePath, cancellationToken)) return;
 
         foreach (var track in hdr10Tracks)
         {
@@ -306,7 +306,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         }
     }
 
-    private async Task<bool> HasHdr10PlusMetadataAsync(string filePath)
+    private async Task<bool> HasHdr10PlusMetadataAsync(string filePath, CancellationToken cancellationToken = default)
     {
         var processInfo = new ProcessStartInfo
         {
@@ -333,8 +333,8 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             using var process = Process.Start(processInfo);
             if (process == null) return false;
 
-            string jsonOutput = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger);
+            string jsonOutput = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger, cancellationToken);
 
             return Hdr10PlusJsonIndicatesDynamicMetadata(jsonOutput);
         }

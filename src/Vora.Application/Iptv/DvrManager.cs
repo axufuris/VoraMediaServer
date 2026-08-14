@@ -11,7 +11,7 @@ public interface IDvrManager
 {
     Task<IptvRecordingSchedule> ScheduleRecordingAsync(Guid profileId, Guid channelId, string title, string? programId, bool isSeries, int keepMaxEpisodes = 0);
     Task MarkSessionFailedAsync(Guid sessionId, string reason);
-    Task ProcessSchedulesIntoSessionsAsync();
+    Task ProcessSchedulesIntoSessionsAsync(CancellationToken cancellationToken = default);
     Task EnforceRetentionPolicyAsync(Guid scheduleId);
     Task DeleteRecordingAsync(Guid sessionId);
     Task CancelSeriesAsync(Guid sessionId);
@@ -70,7 +70,7 @@ public class DvrManager : IDvrManager
     public Task MarkSessionFailedAsync(Guid sessionId, string reason) =>
         _repository.MarkSessionFailedAsync(sessionId, reason);
 
-    public async Task ProcessSchedulesIntoSessionsAsync()
+    public async Task ProcessSchedulesIntoSessionsAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("[DVR] Starting EPG-to-Session translation.");
 
@@ -91,6 +91,7 @@ public class DvrManager : IDvrManager
 
         foreach (var channelGroup in schedulesByChannel)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!epgData.TryGetValue(channelGroup.Key, out var programs)) continue;
 
             foreach (var schedule in channelGroup)

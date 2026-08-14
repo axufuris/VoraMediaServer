@@ -16,6 +16,10 @@ public class VideoThumbnailManager : IVideoThumbnailManager
 {
     public const string ThumbnailsLockField = "Thumbnails";
 
+    // Each item's sprite pass is a full-file FFmpeg decode; keep concurrency low so
+    // a thumbnail run doesn't peg every core (mirrors the analyzer's cap).
+    private const int ThumbnailParallelism = 2;
+
     private readonly IMediaRepository _mediaRepository;
     private readonly ILibraryRepository _libraryRepository;
     private readonly ISystemSettingsRepository _settingsRepo;
@@ -89,7 +93,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         var ids = idsSource as IReadOnlyList<Guid> ?? idsSource.ToList();
         if (ids.Count == 0) return;
 
-        var parallelism = Math.Clamp(Environment.ProcessorCount, 2, 6);
+        var parallelism = ThumbnailParallelism;
         await Parallel.ForEachAsync(
             ids,
             new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
