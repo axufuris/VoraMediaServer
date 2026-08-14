@@ -540,9 +540,10 @@ export default function IptvPage({ kind }: IptvPageProps) {
                                 {sortedPlaylists.map(p => (
                                     <tr key={p.id} className="hover:bg-[var(--vora-bg-sunken)]/40 transition-colors">
                                         <td className="px-4 py-3 align-top">
-                                            <div className="flex items-center gap-2 font-semibold text-[var(--vora-text-primary)]">
+                                            <div className="flex flex-wrap items-center gap-2 font-semibold text-[var(--vora-text-primary)]">
                                                 {p.name}
                                                 {!p.supportsWebPlayback && <HealthBadge tone="neutral" showDot={false}>Native only</HealthBadge>}
+                                                {p.enableHealthCheck && <HealthBadge tone="ok">Health check</HealthBadge>}
                                             </div>
                                             {p.lastError && (
                                                 <div className="text-[var(--vora-danger-text)] text-xs mt-1.5 bg-[var(--vora-danger-soft)] p-1.5 rounded border border-[var(--vora-danger-500)]/20">
