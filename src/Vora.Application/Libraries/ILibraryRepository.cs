@@ -12,5 +12,5 @@ public interface ILibraryRepository
     Task<IEnumerable<MediaLibrary>> GetAllLibrariesAsync();
     Task UpdateLibraryAsync(MediaLibrary library);
     Task CleanUpOrphanedMediaAsync(Guid libraryId);
-    Task DeleteLibraryAsync(Guid id);
+    Task DeleteLibraryAsync(Guid id, CancellationToken cancellationToken = default);
 }

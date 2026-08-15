@@ -118,7 +118,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Delete Library: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
             {
                 var manager = sp.GetRequiredService<Vora.Application.Libraries.ILibraryManager>();
-                await manager.DeleteLibraryAsync(libraryId);
+                await manager.DeleteLibraryAsync(libraryId, ct);
             },
             libraryName == null ? LibraryLabel(libraryId, "Delete Library: {0}") : null,
             resourceKey: LibraryKey(libraryId));
@@ -160,7 +160,7 @@ public class TaskQueueManager : ITaskQueueManager
             var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
-            await mediaManager.TriggerTargetedScanAsync(mediaItemId);
+            await mediaManager.TriggerTargetedScanAsync(mediaItemId, ct);
             await analyzerManager.TriggerMediaItemFileAnalysisAsync(mediaItemId, mediaItemName, ct);
 
             await metadataManager.TriggerMediaItemMetadataRefreshAsync(mediaItemId, forceOverride, ct);
@@ -179,7 +179,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Scan File: {Path.GetFileName(filePath)}", async (ct, sp) =>
         {
             var libraryManager = sp.GetRequiredService<ILibraryManager>();
-            var result = await libraryManager.TriggerFileScanAsync(libraryId, filePath);
+            var result = await libraryManager.TriggerFileScanAsync(libraryId, filePath, ct);
             if (result.MediaItemId == null) return;
             var itemId = result.MediaItemId.Value;
 
@@ -212,7 +212,7 @@ public class TaskQueueManager : ITaskQueueManager
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(itemId, null, isAdditionTrigger: true, cancellationToken: ct);
 
             var collectionMembership = sp.GetRequiredService<CollectionMembershipService>();
-            await collectionMembership.CheckMediaItemForCollectionsAsync(itemId);
+            await collectionMembership.CheckMediaItemForCollectionsAsync(itemId, ct);
         }, resourceKey: LibraryKey(libraryId));
     }
 
@@ -352,7 +352,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Content Sync: {title}", async (ct, sp) =>
         {
             var syncService = sp.GetRequiredService<CollectionSyncService>();
-            await syncService.SyncCollectionContentAsync(collectionId);
+            await syncService.SyncCollectionContentAsync(collectionId, ct);
         }, resourceKey: CollectionKey(collectionId));
     }
 
@@ -375,7 +375,7 @@ public class TaskQueueManager : ITaskQueueManager
             if (hasContentSync)
             {
                 var syncService = sp.GetRequiredService<CollectionSyncService>();
-                await syncService.SyncCollectionContentAsync(collectionId);
+                await syncService.SyncCollectionContentAsync(collectionId, ct);
             }
 
             if (hasChronologySort)
@@ -655,7 +655,7 @@ public class TaskQueueManager : ITaskQueueManager
         };
 
         var units = libraryType.HasValue
-            ? await libraryManager.DiscoverScanUnitsAsync(libraryId)
+            ? await libraryManager.DiscoverScanUnitsAsync(libraryId, ct)
             : new List<ScanUnit>();
 
         var workflowStopwatch = Stopwatch.StartNew();
@@ -676,7 +676,7 @@ public class TaskQueueManager : ITaskQueueManager
                     var unitStopwatch = Stopwatch.StartNew();
                     try
                     {
-                        var unitTask = libraryManager.ScanAndEnrichUnitAsync(libraryId, libraryType.Value, unit.FilePaths, forceOverride);
+                        var unitTask = libraryManager.ScanAndEnrichUnitAsync(libraryId, libraryType.Value, unit.FilePaths, forceOverride, unitCt);
                         var finished = await Task.WhenAny(unitTask, Task.Delay(unitTimeout, unitCt));
                         if (finished == unitTask)
                         {
@@ -711,7 +711,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             // Music (or nothing discovered): whole-library scan then enrich.
             var musicStopwatch = Stopwatch.StartNew();
-            await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId);
+            await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId, ct);
             await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false, cancellationToken: ct);
             logger?.LogInformation("Scan+enrich (whole-library) for {LibraryId} took {Wall:n1}s.", libraryId, musicStopwatch.Elapsed.TotalSeconds);
         }

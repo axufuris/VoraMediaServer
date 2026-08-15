@@ -28,7 +28,7 @@ public class CollectionSyncService(
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public async Task SyncCollectionContentAsync(Guid collectionId)
+    public async Task SyncCollectionContentAsync(Guid collectionId, CancellationToken cancellationToken = default)
     {
         var collection = await collectionRepo.GetProjectedByIdAsync(collectionId, c => new
         {
@@ -78,6 +78,10 @@ public class CollectionSyncService(
 
             var collectionIsEmpty = existingMediaIds.Count == 0;
 
+            // The provider contract has no token, so the fetch itself runs to
+            // completion; checkpoint on either side so a cancel between the fetch
+            // and the (possibly second) description call is honored.
+            cancellationToken.ThrowIfCancellationRequested();
             var externalItems = await provider.FetchItemsAsync(collection.ContentSyncExternalId!);
             if (externalItems == null || !externalItems.Any())
             {
@@ -104,6 +108,7 @@ public class CollectionSyncService(
 
             if (string.IsNullOrWhiteSpace(collection.Description))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var generatedDescription = await provider.GenerateDescriptionAsync(collection.ContentSyncExternalId!);
                 if (!string.IsNullOrWhiteSpace(generatedDescription))
                 {
