@@ -19,11 +19,11 @@ public interface ILibraryManager
     Task<IEnumerable<LibrarySummaryVM>> GetLibrariesAsync(bool hasAllAccess, List<Guid> allowedLibs);
     Task<MediaLibraryVM?> GetLibraryByIdAsync(Guid id);
     Task UpdateLibraryAsync(Guid id, UpdateLibraryRequest request);
-    Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId);
-    Task<List<ScanUnit>> DiscoverScanUnitsAsync(Guid libraryId);
-    Task<Guid?> ScanAndEnrichUnitAsync(Guid libraryId, LibraryType libraryType, IReadOnlyList<string> filePaths, bool forceOverride);
-    Task<ScanFileResult> TriggerFileScanAsync(Guid libraryId, string filePath);
-    Task DeleteLibraryAsync(Guid id);
+    Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId, CancellationToken cancellationToken = default);
+    Task<List<ScanUnit>> DiscoverScanUnitsAsync(Guid libraryId, CancellationToken cancellationToken = default);
+    Task<Guid?> ScanAndEnrichUnitAsync(Guid libraryId, LibraryType libraryType, IReadOnlyList<string> filePaths, bool forceOverride, CancellationToken cancellationToken = default);
+    Task<ScanFileResult> TriggerFileScanAsync(Guid libraryId, string filePath, CancellationToken cancellationToken = default);
+    Task DeleteLibraryAsync(Guid id, CancellationToken cancellationToken = default);
     Task ToggleWatchingAsync(Guid libraryId, bool enable);
 }
 
@@ -194,16 +194,17 @@ public class LibraryManager : ILibraryManager
         }
     }
 
-    public async Task DeleteLibraryAsync(Guid id)
+    public async Task DeleteLibraryAsync(Guid id, CancellationToken cancellationToken = default)
     {
         using var scope = _serviceProvider.CreateScope();
         var thumbnailManager = scope.ServiceProvider.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
         await thumbnailManager.PurgeLibraryThumbnailsAsync(id);
 
-        await _repository.DeleteLibraryAsync(id);
+        cancellationToken.ThrowIfCancellationRequested();
+        await _repository.DeleteLibraryAsync(id, cancellationToken);
     }
 
-    public async Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId)
+    public async Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId, CancellationToken cancellationToken = default)
     {
         var library = await _repository.GetProjectedByIdAsync(libraryId, l => new { l.Id, l.Name, l.Type });
         if (library == null) return;
@@ -220,6 +221,9 @@ public class LibraryManager : ILibraryManager
 
         if (scanner == null) throw new InvalidOperationException("No Local Media Scanner plugins are installed!");
 
+        // The scanner plugin contract has no cancellation token, so the in-flight
+        // whole-library scan runs to completion; cancel is honored up to here.
+        cancellationToken.ThrowIfCancellationRequested();
         if (library.Type == LibraryType.Movie)
             await scanner.ScanMovieLibraryAsync(library.Id);
         else if (library.Type == LibraryType.TvShow)
@@ -230,7 +234,7 @@ public class LibraryManager : ILibraryManager
         await notifier.NotifyLibraryUpdatedAsync(library.Id);
     }
 
-    public async Task<List<ScanUnit>> DiscoverScanUnitsAsync(Guid libraryId)
+    public async Task<List<ScanUnit>> DiscoverScanUnitsAsync(Guid libraryId, CancellationToken cancellationToken = default)
     {
         var library = await _repository.GetProjectedByIdAsync(libraryId, l => new { l.Type });
         if (library == null) return new List<ScanUnit>();
@@ -239,6 +243,7 @@ public class LibraryManager : ILibraryManager
         var scanner = await ResolveScannerAsync(scope.ServiceProvider);
         if (scanner == null) return new List<ScanUnit>();
 
+        cancellationToken.ThrowIfCancellationRequested();
         return library.Type switch
         {
             LibraryType.Movie => await scanner.DiscoverMovieScanUnitsAsync(libraryId),
@@ -247,7 +252,7 @@ public class LibraryManager : ILibraryManager
         };
     }
 
-    public async Task<Guid?> ScanAndEnrichUnitAsync(Guid libraryId, LibraryType libraryType, IReadOnlyList<string> filePaths, bool forceOverride)
+    public async Task<Guid?> ScanAndEnrichUnitAsync(Guid libraryId, LibraryType libraryType, IReadOnlyList<string> filePaths, bool forceOverride, CancellationToken cancellationToken = default)
     {
         // One scope for the whole unit: the scanner (which creates the show/
         // seasons/episodes or movie) and the metadata manager (which fills the
@@ -259,6 +264,10 @@ public class LibraryManager : ILibraryManager
         var scanner = await ResolveScannerAsync(sp);
         if (scanner == null) return null;
 
+        // Scanner plugin can't observe the token; checkpoint before it so a
+        // cancelled unit doesn't start scanning, then thread the token through the
+        // enrich half (which does accept it) so a long enrichment stops promptly.
+        cancellationToken.ThrowIfCancellationRequested();
         var itemId = libraryType switch
         {
             LibraryType.Movie => await scanner.ScanMovieUnitAsync(libraryId, filePaths),
@@ -267,10 +276,11 @@ public class LibraryManager : ILibraryManager
         };
         if (itemId == null) return null;
 
+        cancellationToken.ThrowIfCancellationRequested();
         var metadata = sp.GetRequiredService<IMetadataManager>();
-        await metadata.TriggerMediaItemMetadataRefreshAsync(itemId.Value, forceOverride);
-        await metadata.TriggerMediaItemArtworkRefreshAsync(itemId.Value, forceOverride);
-        await metadata.TriggerMediaItemRatingsRefreshAsync(itemId.Value, forceOverride);
+        await metadata.TriggerMediaItemMetadataRefreshAsync(itemId.Value, forceOverride, cancellationToken);
+        await metadata.TriggerMediaItemArtworkRefreshAsync(itemId.Value, forceOverride, cancellationToken);
+        await metadata.TriggerMediaItemRatingsRefreshAsync(itemId.Value, forceOverride, cancellationToken);
         return itemId;
     }
 
@@ -282,7 +292,7 @@ public class LibraryManager : ILibraryManager
         return scanners.FirstOrDefault(s => s.Id == settings.LocalMediaScannerProviderId) ?? scanners.FirstOrDefault();
     }
 
-    public async Task<ScanFileResult> TriggerFileScanAsync(Guid libraryId, string filePath)
+    public async Task<ScanFileResult> TriggerFileScanAsync(Guid libraryId, string filePath, CancellationToken cancellationToken = default)
     {
         var library = await _repository.GetProjectedByIdAsync(libraryId, l => new { l.Id, l.Type });
         if (library == null) return ScanFileResult.None;
@@ -298,6 +308,7 @@ public class LibraryManager : ILibraryManager
         var scanner = scanners.FirstOrDefault(s => s.Id == activeScannerId) ?? scanners.FirstOrDefault();
         if (scanner == null) return ScanFileResult.None;
 
+        cancellationToken.ThrowIfCancellationRequested();
         ScanFileResult result;
         if (library.Type == LibraryType.Movie)
         {

@@ -26,7 +26,7 @@ public interface IMediaManager
     Task UpdateMediaMetadataAsync(Guid id, UpdateMediaRequest request);
     Task UpdateSeasonMetadataAsync(Guid id, UpdateSeasonRequest request);
     Task DeleteMediaAsync(Guid id);
-    Task TriggerTargetedScanAsync(Guid id);
+    Task TriggerTargetedScanAsync(Guid id, CancellationToken cancellationToken = default);
     Task<List<TrashMediaItemVM>> GetTrashAsync();
     Task RestoreFromTrashAsync(Guid id);
     Task<int> PurgeExpiredTrashAsync(int retentionDays);
@@ -236,7 +236,7 @@ public class MediaManager : IMediaManager
         return expiredIds.Count;
     }
 
-    public async Task TriggerTargetedScanAsync(Guid id)
+    public async Task TriggerTargetedScanAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var item = await _repository.GetForBasicUpdateAsync(id);
         if (item == null) return;
@@ -253,6 +253,7 @@ public class MediaManager : IMediaManager
             throw new InvalidOperationException("No Local Media Scanner plugins are installed.");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         if (item is Movie) await scanner.ScanMovieAsync(id);
         else if (item is TvShow) await scanner.ScanTvShowAsync(id);
         else if (item is Season) await scanner.ScanSeasonAsync(id);

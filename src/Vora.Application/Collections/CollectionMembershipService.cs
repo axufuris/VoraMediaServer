@@ -19,7 +19,7 @@ public class CollectionMembershipService(
     // re-fetching the external list or calling AI. This closes the gap where a
     // collection couldn't pick up an item that was added to the library after the
     // collection was last synced.
-    public async Task CheckMediaItemForCollectionsAsync(Guid mediaItemId)
+    public async Task CheckMediaItemForCollectionsAsync(Guid mediaItemId, CancellationToken cancellationToken = default)
     {
         var info = await mediaRepo.GetMediaMatchInfoAsync(mediaItemId);
         if (info == null)
@@ -37,6 +37,7 @@ public class CollectionMembershipService(
 
         foreach (var membership in memberships)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(membership.ContentSyncCacheJson))
             {
                 continue;

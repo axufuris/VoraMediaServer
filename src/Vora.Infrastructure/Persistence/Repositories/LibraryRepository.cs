@@ -218,16 +218,16 @@ public class LibraryRepository : ILibraryRepository
             .ExecuteDeleteAsync();
     }
 
-    public async Task DeleteLibraryAsync(Guid id)
+    public async Task DeleteLibraryAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var library = await _context.MediaLibraries.FindAsync(id);
+        var library = await _context.MediaLibraries.FindAsync(new object?[] { id }, cancellationToken);
         if (library == null) return;
 
         var itemsToDelete = await _context.MediaItems
             .AsNoTracking()
             .Where(m => m.LibraryId == id)
             .Select(m => new { m.PosterUrl, m.BackgroundUrl })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         _overlaySweep.SweepPhysicalOverlays(itemsToDelete.Select(i => i.PosterUrl).Concat(itemsToDelete.Select(i => i.BackgroundUrl)));
 
@@ -235,21 +235,21 @@ public class LibraryRepository : ILibraryRepository
             .AsNoTracking()
             .Where(m => m.LibraryId == id && m is TvShow)
             .Select(m => m.Id)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         if (showIds.Any())
         {
             await _context.Set<Season>()
                 .Where(s => showIds.Contains(s.TvShowId))
-                .ExecuteDeleteAsync();
+                .ExecuteDeleteAsync(cancellationToken);
         }
 
         await _context.MediaItems
             .Where(m => m.LibraryId == id)
-            .ExecuteDeleteAsync();
+            .ExecuteDeleteAsync(cancellationToken);
 
         _context.MediaLibraries.Remove(library);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
 }
