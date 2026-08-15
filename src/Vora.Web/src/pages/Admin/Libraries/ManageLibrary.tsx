@@ -367,8 +367,8 @@ export default function ManageLibrary() {
                         type="button"
                         onClick={async () => {
                             try {
-                                await libraryAdminService.analyzeLibrary(library.id, serverId);
-                                showAlert('Analysis started', 'Marker detection queued for every item in this library. Use the coverage card below to track progress.');
+                                await libraryAdminService.analyzeLibrary(library.id, false, serverId);
+                                showAlert('Analysis started', 'Marker detection queued for items not yet analyzed. Use the coverage card below to track progress.');
                             } catch (err) {
                                 console.error(err);
                                 showAlert('Error', 'Failed to trigger library analysis.');
@@ -377,6 +377,27 @@ export default function ManageLibrary() {
                         className="vora-button-secondary text-xs"
                     >
                         Analyze library
+                    </button>
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            const ok = await dialog.confirm({
+                                title: 'Re-analyze everything?',
+                                message: 'This re-runs marker detection on every item in this library, including ones already analyzed — it discards existing detected markers and can take a long time. Manually locked markers are kept. Continue?',
+                                confirmText: 'Re-analyze all',
+                            });
+                            if (!ok) return;
+                            try {
+                                await libraryAdminService.analyzeLibrary(library.id, true, serverId);
+                                showAlert('Re-analysis started', 'Marker detection queued for every item in this library.');
+                            } catch (err) {
+                                console.error(err);
+                                showAlert('Error', 'Failed to trigger library re-analysis.');
+                            }
+                        }}
+                        className="vora-button-secondary text-xs"
+                    >
+                        Re-analyze all
                     </button>
                     <div className="ml-auto">
                         <button

@@ -135,8 +135,8 @@ export const libraryAdminService = {
         await apiClient.post(`/media/${mediaItemId}/scan`, null, { serverId });
     },
 
-    analyzeLibrary: async (libraryId: string, serverId?: string): Promise<void> => {
-        await apiClient.post(`/libraries/${libraryId}/analyze`, null, { serverId });
+    analyzeLibrary: async (libraryId: string, force: boolean = false, serverId?: string): Promise<void> => {
+        await apiClient.post(`/libraries/${libraryId}/analyze?force=${force}`, null, { serverId });
     },
 
     getLibraryMarkerCoverage: async (libraryId: string, serverId?: string): Promise<MarkerCoverageVM> => {

@@ -112,9 +112,9 @@ public static class LibraryEndpoints
         return Results.Accepted();
     }
 
-    private static IResult QueueAnalyzeAsync(Guid id, ITaskQueueManager taskQueue)
+    private static IResult QueueAnalyzeAsync(Guid id, [FromQuery] bool force, ITaskQueueManager taskQueue)
     {
-        taskQueue.QueueAnalyzeLibraryMediaContent(id, forceOverride: false);
+        taskQueue.QueueAnalyzeLibraryMediaContent(id, forceOverride: force);
         return Results.Accepted();
     }
 
