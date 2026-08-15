@@ -19,13 +19,16 @@ export default function TaskDashboard() {
         }
     }, [serverId]);
 
+    // SignalR pushes TasksUpdated for instant updates, but a single event missed
+    // during a connection blip (or after auto-reconnect gives up) would otherwise
+    // leave the page stale until a manual refresh — the task label only changes
+    // once per show, so the next event can be ~45 min away. Poll on a short
+    // interval as a freshness backstop so progress advances on its own.
     useEffect(() => {
-        let cancelled = false;
-        taskService.getTasks(serverId)
-            .then(data => { if (!cancelled) setTasks(data); })
-            .catch(error => { if (!cancelled) console.error('Failed to fetch tasks', error); });
-        return () => { cancelled = true; };
-    }, [serverId]);
+        fetchTasks();
+        const interval = setInterval(fetchTasks, 5000);
+        return () => clearInterval(interval);
+    }, [fetchTasks]);
 
     useSignalREvent('TasksUpdated', useCallback(() => {
         fetchTasks();
