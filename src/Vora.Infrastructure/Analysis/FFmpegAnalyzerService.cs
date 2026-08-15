@@ -428,6 +428,23 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
     private async Task<(List<DetectedInterval> Silence, List<DetectedInterval> Black)> RunDetectionPassAsync(
         string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, CancellationToken cancellationToken)
     {
+        var (ok, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, parameters.UseHardwareDecode, cancellationToken);
+
+        // -hwaccel auto usually falls back to software internally, but if the
+        // process still errored out (a codec/profile NVDEC can't handle), retry
+        // the pass in pure software so a GPU quirk never drops an item's markers.
+        if (!ok && parameters.UseHardwareDecode && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("Hardware-accelerated detection pass failed for {Input}; retrying in software.", filePath);
+            (_, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, useHardware: false, cancellationToken);
+        }
+
+        return result;
+    }
+
+    private async Task<(bool Ok, (List<DetectedInterval> Silence, List<DetectedInterval> Black) Result)> RunDetectionProcessAsync(
+        string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, bool useHardware, CancellationToken cancellationToken)
+    {
         var silenceStarts = new List<double>();
         var silenceEnds = new List<double>();
         var blackStarts = new List<double>();
@@ -444,6 +461,13 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        // -hwaccel is an input option and must precede -ss/-i. blackdetect is a CPU
+        // filter, so frames download to system memory automatically (no
+        // -hwaccel_output_format); we only want the NVDEC decode speedup.
+        if (useHardware)
+        {
+            AppendHardwareDecodeArgs(processInfo, parameters.HardwareDevice);
+        }
         if (seekSeconds.HasValue)
         {
             processInfo.ArgumentList.Add("-ss");
@@ -490,9 +514,21 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
 
         process.Start();
         process.BeginErrorReadLine();
-        await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger, cancellationToken);
+        var exited = await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger, cancellationToken);
+        var ok = exited && process.ExitCode == 0;
 
-        return (ZipIntervals(silenceStarts, silenceEnds), ZipIntervals(blackStarts, blackEnds));
+        return (ok, (ZipIntervals(silenceStarts, silenceEnds), ZipIntervals(blackStarts, blackEnds)));
+    }
+
+    private static void AppendHardwareDecodeArgs(ProcessStartInfo processInfo, string? device)
+    {
+        processInfo.ArgumentList.Add("-hwaccel");
+        processInfo.ArgumentList.Add("auto");
+        if (!string.IsNullOrWhiteSpace(device) && device != "Auto")
+        {
+            processInfo.ArgumentList.Add("-hwaccel_device");
+            processInfo.ArgumentList.Add(device);
+        }
     }
 
     private static List<DetectedInterval> ZipIntervals(List<double> starts, List<double> ends)

@@ -409,7 +409,9 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             MinSilenceDurationSec = minSilence,
             MinBlackFrameDurationSec = settings.BlackFrameMinDurationSec,
             HeadWindowEndSeconds = headEnd,
-            TailWindowStartSeconds = tailStart
+            TailWindowStartSeconds = tailStart,
+            UseHardwareDecode = settings.UseHardwareAcceleration,
+            HardwareDevice = settings.HardwareTranscodingDevice
         };
 
         var detection = await _analyzerService.AnalyzeSilenceDetectionsAsync(primaryPath, parameters, cancellationToken);
