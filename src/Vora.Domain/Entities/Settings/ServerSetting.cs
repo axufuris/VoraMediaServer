@@ -26,12 +26,19 @@ public class ServerSetting
     public int EpisodeIntroClusterToleranceSec { get; set; } = 5;
     public int EpisodeIntroClusterMinAgreementPct { get; set; } = 70;
 
+    // How many media items an Analyze run processes in parallel. Each item is a
+    // full-file FFmpeg decode, so this trades CPU/GPU load for throughput.
+    public int AnalyzeConcurrency { get; set; } = 2;
+
     public TimeSpan VideoThumbnailScheduleTime { get; set; } = new(4, 0, 0);
     public int VideoThumbnailIntervalSeconds { get; set; } = 10;
     public int VideoThumbnailWidth { get; set; } = 320;
     public int VideoThumbnailHeight { get; set; } = 180;
     public int VideoThumbnailJpegQuality { get; set; } = 5;
     public int VideoThumbnailSpriteColumns { get; set; } = 10;
+
+    // How many media items thumbnail generation processes in parallel.
+    public int VideoThumbnailConcurrency { get; set; } = 2;
 
     public TimeSpan IptvSyncTime { get; set; } = new(4, 0, 0);
     public TimeSpan IptvHealthCheckTime { get; set; } = new(4, 30, 0);

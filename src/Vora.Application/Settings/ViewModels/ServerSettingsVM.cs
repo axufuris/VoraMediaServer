@@ -17,6 +17,7 @@ public class ServerSettingsVM
     public double BlackFrameMinDurationSec { get; set; } = 0.5;
     public int EpisodeIntroClusterToleranceSec { get; set; } = 5;
     public int EpisodeIntroClusterMinAgreementPct { get; set; } = 70;
+    public int AnalyzeConcurrency { get; set; } = 2;
     public string VideoThumbnailScheduleTime { get; set; } = "04:00";
     public string IptvHealthCheckTime { get; set; } = "04:30";
     public int VideoThumbnailIntervalSeconds { get; set; } = 10;
@@ -24,6 +25,7 @@ public class ServerSettingsVM
     public int VideoThumbnailHeight { get; set; } = 180;
     public int VideoThumbnailJpegQuality { get; set; } = 5;
     public int VideoThumbnailSpriteColumns { get; set; } = 10;
+    public int VideoThumbnailConcurrency { get; set; } = 2;
     public string FolderWatcherProviderId { get; set; } = "polling_watcher";
     public int FolderWatcherPollingInterval { get; set; } = 30;
     public string LocalMediaScannerProviderId { get; set; } = "Vora_scanner";
@@ -87,6 +89,7 @@ public class ServerSettingsVM
             BlackFrameMinDurationSec = s.BlackFrameMinDurationSec,
             EpisodeIntroClusterToleranceSec = s.EpisodeIntroClusterToleranceSec,
             EpisodeIntroClusterMinAgreementPct = s.EpisodeIntroClusterMinAgreementPct,
+            AnalyzeConcurrency = s.AnalyzeConcurrency,
             VideoThumbnailScheduleTime = s.VideoThumbnailScheduleTime.ToString(@"hh\:mm"),
             IptvHealthCheckTime = s.IptvHealthCheckTime.ToString(@"hh\:mm"),
             VideoThumbnailIntervalSeconds = s.VideoThumbnailIntervalSeconds,
@@ -94,6 +97,7 @@ public class ServerSettingsVM
             VideoThumbnailHeight = s.VideoThumbnailHeight,
             VideoThumbnailJpegQuality = s.VideoThumbnailJpegQuality,
             VideoThumbnailSpriteColumns = s.VideoThumbnailSpriteColumns,
+            VideoThumbnailConcurrency = s.VideoThumbnailConcurrency,
             FolderWatcherProviderId = s.FolderWatcherProviderId,
             FolderWatcherPollingInterval = s.FolderWatcherPollingInterval,
             LocalMediaScannerProviderId = s.LocalMediaScannerProviderId,

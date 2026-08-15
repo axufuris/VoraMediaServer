@@ -12,6 +12,7 @@ export interface ServerSettings {
     blackFrameMinDurationSec: number;
     episodeIntroClusterToleranceSec: number;
     episodeIntroClusterMinAgreementPct: number;
+    analyzeConcurrency: number;
     videoThumbnailScheduleTime: string;
     iptvHealthCheckTime: string;
     videoThumbnailIntervalSeconds: number;
@@ -19,6 +20,7 @@ export interface ServerSettings {
     videoThumbnailHeight: number;
     videoThumbnailJpegQuality: number;
     videoThumbnailSpriteColumns: number;
+    videoThumbnailConcurrency: number;
     folderWatcherProviderId: string;
     folderWatcherPollingInterval: number;
     localMediaScannerProviderId: string;

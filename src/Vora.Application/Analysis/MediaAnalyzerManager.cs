@@ -22,9 +22,11 @@ public interface IMediaAnalyzerManager
 
 public class MediaAnalyzerManager : IMediaAnalyzerManager
 {
-    // Each unit's FFmpeg pass is a full-file decode. Running six of those at once
-    // pegs every core; capped low so an analyze run leaves the box responsive.
-    private const int AnalysisParallelism = 2;
+    // Each unit's FFmpeg pass is a full-file decode. The admin-configurable
+    // AnalyzeConcurrency governs how many run at once; clamp it to a sane range and
+    // fall back to 2 for an unset (0) value.
+    private const int MaxAnalysisParallelism = 16;
+    private static int ResolveParallelism(int configured) => Math.Clamp(configured <= 0 ? 2 : configured, 1, MaxAnalysisParallelism);
 
     // Buffers added to the decode windows so a black/silence gap straddling a
     // window edge is still captured whole before the marker assembler reads it.
@@ -93,6 +95,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
 
     public async Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null, CancellationToken cancellationToken = default)
     {
+        var settings = await _settingsRepo.GetSettingsAsync();
         var mediaIds = (await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId)).ToList();
         var titles = await _mediaRepository.GetDisplayTitlesByIdsAsync(mediaIds);
         var total = mediaIds.Count;
@@ -102,7 +105,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // own scope (its own DbContext + analyzer) so parallel probes don't share
         // a context. The part-level skip guard means an already-analyzed library
         // costs only a cheap file-size check per part.
-        var parallelism = AnalysisParallelism;
+        var parallelism = ResolveParallelism(settings.AnalyzeConcurrency);
         await Parallel.ForEachAsync(
             mediaIds,
             new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
@@ -304,7 +307,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // at once — each in its own DI scope (own DbContext) so parallel writes
         // don't share a context — then finalize the season once they've all
         // committed their markers. Mirrors the file-analysis/overlay fan-out.
-        var parallelism = AnalysisParallelism;
+        var parallelism = ResolveParallelism(settings.AnalyzeConcurrency);
         await Parallel.ForEachAsync(
             episodeIds,
             new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },

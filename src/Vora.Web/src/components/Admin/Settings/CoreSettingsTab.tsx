@@ -568,6 +568,18 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                             <FieldHint>Episodes must agree within tolerance this often before the season median wins.</FieldHint>
                         </div>
                     </div>
+                    <div>
+                        <FieldLabel>Parallel items during Analyze</FieldLabel>
+                        <input
+                            type="number"
+                            min={1}
+                            max={16}
+                            value={serverSettings.analyzeConcurrency}
+                            onChange={e => setServerSettings({ ...serverSettings, analyzeConcurrency: parseInt(e.target.value) || 2 })}
+                            className="vora-input w-32"
+                        />
+                        <FieldHint>How many media items an Analyze run decodes at once. Higher is faster but uses more CPU/GPU; raise it if you have hardware acceleration or spare cores.</FieldHint>
+                    </div>
                 </div>
             </SettingsCard>
 
@@ -646,6 +658,18 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                         </div>
                     </div>
                     <FieldHint>Changing any of these values invalidates existing sprites — the next scheduled pass regenerates affected items (locked items are skipped).</FieldHint>
+                    <div>
+                        <FieldLabel>Parallel items during generation</FieldLabel>
+                        <input
+                            type="number"
+                            min={1}
+                            max={16}
+                            value={serverSettings.videoThumbnailConcurrency}
+                            onChange={e => setServerSettings({ ...serverSettings, videoThumbnailConcurrency: parseInt(e.target.value) || 2 })}
+                            className="vora-input w-32"
+                        />
+                        <FieldHint>How many videos generate thumbnails at once. Higher is faster but uses more CPU/GPU.</FieldHint>
+                    </div>
                 </div>
             </SettingsCard>
 
