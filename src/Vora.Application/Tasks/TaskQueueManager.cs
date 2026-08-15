@@ -148,7 +148,7 @@ public class TaskQueueManager : ITaskQueueManager
             await analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger, cancellationToken: ct);
         },
         libraryName == null ? LibraryLabel(libraryId, "Analyze Library Media: {0}") : null,
-        resourceKey: LibraryKey(libraryId));
+        resourceKey: LibraryMaintenanceKey(libraryId));
     }
 
     public void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
@@ -606,7 +606,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
             await manager.TriggerLibraryThumbnailGenerationAsync(libraryId, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger, cancellationToken: ct);
-        }, resourceKey: LibraryKey(libraryId));
+        }, resourceKey: LibraryMaintenanceKey(libraryId));
     }
 
     public void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
@@ -795,6 +795,13 @@ public class TaskQueueManager : ITaskQueueManager
     // and race on its rows); different libraries get different keys and can run
     // concurrently up to the global cap.
     private static string LibraryKey(Guid libraryId) => $"library:{libraryId}";
+
+    // The long maintenance jobs (Analyze, Thumbnails) get a separate key from the
+    // LibraryKey ingestion work, so a multi-day analyze no longer blocks new-file
+    // scans and metadata refreshes for the same library — they run in another
+    // concurrency slot. Analyze and Thumbnails still share THIS key so the two
+    // heavy FFmpeg/GPU jobs on one library don't run at once and double the load.
+    private static string LibraryMaintenanceKey(Guid libraryId) => $"library-maint:{libraryId}";
 
     // All of a collection's sync/order tasks share one key so they serialize:
     // a content sync (which itself queues a reorder), the chronology sort, and a
