@@ -13,6 +13,11 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
 {
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromHours(2);
     private const int MeanVolumeSampleSeconds = 600;
+    // Black-frame detection only needs to know a frame is (nearly) all black, which
+    // is resolution-independent. Downscaling to this height on the GPU before
+    // pulling frames back shrinks the GPU→CPU copy ~30x and makes the CPU
+    // blackdetect filter cheap — that CPU filtering, not the decode, was the wall.
+    private const int BlackDetectHeight = 240;
     private static readonly Regex SilenceStartRegex = new(@"silence_start:\s*(?<Time>-?\d+(\.\d+)?)", RegexOptions.Compiled);
     private static readonly Regex SilenceEndRegex = new(@"silence_end:\s*(?<Time>-?\d+(\.\d+)?)", RegexOptions.Compiled);
     private static readonly Regex BlackStartRegex = new(@"black_start[:=]\s*(?<Time>\d+(\.\d+)?)", RegexOptions.Compiled);
@@ -430,9 +435,9 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
     {
         var (ok, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, parameters.UseHardwareDecode, cancellationToken);
 
-        // -hwaccel auto usually falls back to software internally, but if the
-        // process still errored out (a codec/profile NVDEC can't handle), retry
-        // the pass in pure software so a GPU quirk never drops an item's markers.
+        // The hardware path forces CUDA/NVDEC, so a codec/profile it can't handle
+        // (or a box without an NVIDIA GPU) errors the pass — retry in pure software
+        // so a GPU quirk never drops an item's markers.
         if (!ok && parameters.UseHardwareDecode && !cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning("Hardware-accelerated detection pass failed for {Input}; retrying in software.", filePath);
@@ -461,12 +466,21 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             UseShellExecute = false,
             CreateNoWindow = true
         };
-        // -hwaccel is an input option and must precede -ss/-i. blackdetect is a CPU
-        // filter, so frames download to system memory automatically (no
-        // -hwaccel_output_format); we only want the NVDEC decode speedup.
+        // Hardware path: decode on NVDEC, keep frames on the GPU, downscale +
+        // convert to 8-bit there, THEN pull the small frames back for the CPU
+        // blackdetect. This is the win — the CPU was filtering full-res frames.
+        // -hwaccel is an input option and must precede -ss/-i.
         if (useHardware)
         {
-            AppendHardwareDecodeArgs(processInfo, parameters.HardwareDevice);
+            processInfo.ArgumentList.Add("-hwaccel");
+            processInfo.ArgumentList.Add("cuda");
+            processInfo.ArgumentList.Add("-hwaccel_output_format");
+            processInfo.ArgumentList.Add("cuda");
+            if (!string.IsNullOrWhiteSpace(parameters.HardwareDevice) && parameters.HardwareDevice != "Auto")
+            {
+                processInfo.ArgumentList.Add("-hwaccel_device");
+                processInfo.ArgumentList.Add(parameters.HardwareDevice);
+            }
         }
         if (seekSeconds.HasValue)
         {
@@ -483,8 +497,11 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         }
         processInfo.ArgumentList.Add("-af");
         processInfo.ArgumentList.Add($"silencedetect=noise={noiseArg}dB:d={silenceMin}");
+        var blackFilter = $"blackdetect=d={blackMin}:pix_th=0.10";
         processInfo.ArgumentList.Add("-vf");
-        processInfo.ArgumentList.Add($"blackdetect=d={blackMin}:pix_th=0.10");
+        processInfo.ArgumentList.Add(useHardware
+            ? $"scale_cuda=-2:{BlackDetectHeight}:format=nv12,hwdownload,format=nv12,{blackFilter}"
+            : blackFilter);
         processInfo.ArgumentList.Add("-f");
         processInfo.ArgumentList.Add("null");
         processInfo.ArgumentList.Add("-");
@@ -518,17 +535,6 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         var ok = exited && process.ExitCode == 0;
 
         return (ok, (ZipIntervals(silenceStarts, silenceEnds), ZipIntervals(blackStarts, blackEnds)));
-    }
-
-    private static void AppendHardwareDecodeArgs(ProcessStartInfo processInfo, string? device)
-    {
-        processInfo.ArgumentList.Add("-hwaccel");
-        processInfo.ArgumentList.Add("auto");
-        if (!string.IsNullOrWhiteSpace(device) && device != "Auto")
-        {
-            processInfo.ArgumentList.Add("-hwaccel_device");
-            processInfo.ArgumentList.Add(device);
-        }
     }
 
     private static List<DetectedInterval> ZipIntervals(List<double> starts, List<double> ends)
