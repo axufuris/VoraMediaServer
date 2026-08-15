@@ -81,6 +81,49 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
         var filter = string.Create(CultureInfo.InvariantCulture,
             $"fps=1/{parameters.IntervalSeconds},scale={parameters.Width}:{parameters.Height}:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad={parameters.Width}:{parameters.Height}:(ow-iw)/2:(oh-ih)/2:color=black,tile={spriteColumns}x{spriteRows}");
 
+        var (ok, exitCode, stderrTail) = await RunSpriteProcessAsync(parameters, filter, tempSpritePath, parameters.UseHardwareDecode, cancellationToken);
+
+        // Retry in software if the hardware decode pass failed on a codec/profile
+        // NVDEC couldn't handle, so a GPU quirk never blocks a whole library's
+        // thumbnails.
+        if ((!ok || !File.Exists(tempSpritePath)) && parameters.UseHardwareDecode && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("Hardware-accelerated sprite generation failed for {Input}; retrying in software.", parameters.InputPath);
+            (ok, exitCode, stderrTail) = await RunSpriteProcessAsync(parameters, filter, tempSpritePath, useHardware: false, cancellationToken);
+        }
+
+        if (!ok || !File.Exists(tempSpritePath))
+        {
+            _logger.LogError("ffmpeg sprite generation failed for {Input}. ExitCode={ExitCode}. Stderr tail: {Stderr}",
+                parameters.InputPath, exitCode, stderrTail);
+            throw new InvalidOperationException($"ffmpeg sprite generation failed for {parameters.InputPath}");
+        }
+
+        var vtt = BuildVtt(spriteCount, spriteColumns, parameters.Width, parameters.Height, parameters.IntervalSeconds, Path.GetFileName(finalSpritePath));
+        await File.WriteAllTextAsync(tempVttPath, vtt, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
+
+        if (File.Exists(finalSpritePath)) File.Delete(finalSpritePath);
+        if (File.Exists(finalVttPath)) File.Delete(finalVttPath);
+        File.Move(tempSpritePath, finalSpritePath);
+        File.Move(tempVttPath, finalVttPath);
+
+        return new VideoThumbnailGenerationResult
+        {
+            SpriteOutputPath = finalSpritePath,
+            VttOutputPath = finalVttPath,
+            SpriteCount = spriteCount,
+            SpriteColumns = spriteColumns,
+            SpriteRows = spriteRows,
+            Width = parameters.Width,
+            Height = parameters.Height,
+            IntervalSeconds = parameters.IntervalSeconds,
+            SourceDuration = duration
+        };
+    }
+
+    private async Task<(bool Ok, int ExitCode, string StderrTail)> RunSpriteProcessAsync(
+        VideoThumbnailGenerationParameters parameters, string filter, string tempSpritePath, bool useHardware, CancellationToken cancellationToken)
+    {
         var startInfo = new ProcessStartInfo
         {
             FileName = "ffmpeg",
@@ -89,6 +132,18 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
             CreateNoWindow = true
         };
         startInfo.ArgumentList.Add("-y");
+        // -hwaccel is an input option (must precede -i). We keep the mjpeg tiles on
+        // the CPU side, so decode on the GPU and let frames download to system RAM.
+        if (useHardware)
+        {
+            startInfo.ArgumentList.Add("-hwaccel");
+            startInfo.ArgumentList.Add("auto");
+            if (!string.IsNullOrWhiteSpace(parameters.HardwareDevice) && parameters.HardwareDevice != "Auto")
+            {
+                startInfo.ArgumentList.Add("-hwaccel_device");
+                startInfo.ArgumentList.Add(parameters.HardwareDevice);
+            }
+        }
         startInfo.ArgumentList.Add("-i");
         startInfo.ArgumentList.Add(parameters.InputPath);
         startInfo.ArgumentList.Add("-vf");
@@ -124,33 +179,7 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
         });
         await process.WaitForExitAsync(cancellationToken);
 
-        if (process.ExitCode != 0 || !File.Exists(tempSpritePath))
-        {
-            _logger.LogError("ffmpeg sprite generation failed for {Input}. ExitCode={ExitCode}. Stderr tail: {Stderr}",
-                parameters.InputPath, process.ExitCode, Tail(stderrBuilder.ToString(), 1000));
-            throw new InvalidOperationException($"ffmpeg sprite generation failed for {parameters.InputPath}");
-        }
-
-        var vtt = BuildVtt(spriteCount, spriteColumns, parameters.Width, parameters.Height, parameters.IntervalSeconds, Path.GetFileName(finalSpritePath));
-        await File.WriteAllTextAsync(tempVttPath, vtt, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
-
-        if (File.Exists(finalSpritePath)) File.Delete(finalSpritePath);
-        if (File.Exists(finalVttPath)) File.Delete(finalVttPath);
-        File.Move(tempSpritePath, finalSpritePath);
-        File.Move(tempVttPath, finalVttPath);
-
-        return new VideoThumbnailGenerationResult
-        {
-            SpriteOutputPath = finalSpritePath,
-            VttOutputPath = finalVttPath,
-            SpriteCount = spriteCount,
-            SpriteColumns = spriteColumns,
-            SpriteRows = spriteRows,
-            Width = parameters.Width,
-            Height = parameters.Height,
-            IntervalSeconds = parameters.IntervalSeconds,
-            SourceDuration = duration
-        };
+        return (process.ExitCode == 0, process.ExitCode, Tail(stderrBuilder.ToString(), 1000));
     }
 
     private static string BuildVtt(int spriteCount, int columns, int width, int height, int intervalSeconds, string spriteFileName)

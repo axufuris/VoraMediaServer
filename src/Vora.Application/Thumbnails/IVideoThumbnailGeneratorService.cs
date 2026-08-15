@@ -8,6 +8,12 @@ public class VideoThumbnailGenerationParameters
     public int Height { get; init; }
     public int JpegQuality { get; init; }
     public int SpriteColumns { get; init; }
+
+    // Decode on the GPU (NVDEC via -hwaccel) when hardware acceleration is on;
+    // the sprite extraction decodes the whole file, so 10-bit HEVC benefits a lot.
+    // Falls back to software if the hardware pass fails.
+    public bool UseHardwareDecode { get; init; }
+    public string? HardwareDevice { get; init; }
 }
 
 public class VideoThumbnailGenerationResult

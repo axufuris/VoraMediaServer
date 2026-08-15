@@ -209,7 +209,9 @@ public class VideoThumbnailManager : IVideoThumbnailManager
                     Width = settings.VideoThumbnailWidth,
                     Height = settings.VideoThumbnailHeight,
                     JpegQuality = settings.VideoThumbnailJpegQuality,
-                    SpriteColumns = settings.VideoThumbnailSpriteColumns
+                    SpriteColumns = settings.VideoThumbnailSpriteColumns,
+                    UseHardwareDecode = settings.UseHardwareAcceleration,
+                    HardwareDevice = settings.HardwareTranscodingDevice
                 },
                 spritePath,
                 vttPath,
