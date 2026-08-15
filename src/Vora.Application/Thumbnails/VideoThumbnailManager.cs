@@ -16,9 +16,9 @@ public class VideoThumbnailManager : IVideoThumbnailManager
 {
     public const string ThumbnailsLockField = "Thumbnails";
 
-    // Each item's sprite pass is a full-file FFmpeg decode; keep concurrency low so
-    // a thumbnail run doesn't peg every core (mirrors the analyzer's cap).
-    private const int ThumbnailParallelism = 2;
+    // Each item's sprite pass is a full-file FFmpeg decode. The admin-configurable
+    // VideoThumbnailConcurrency governs how many run at once, clamped to this ceiling.
+    private const int MaxThumbnailParallelism = 16;
 
     private readonly IMediaRepository _mediaRepository;
     private readonly ILibraryRepository _libraryRepository;
@@ -93,7 +93,8 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         var ids = idsSource as IReadOnlyList<Guid> ?? idsSource.ToList();
         if (ids.Count == 0) return;
 
-        var parallelism = ThumbnailParallelism;
+        var settings = await _settingsRepo.GetSettingsAsync();
+        var parallelism = Math.Clamp(settings.VideoThumbnailConcurrency <= 0 ? 2 : settings.VideoThumbnailConcurrency, 1, MaxThumbnailParallelism);
         await Parallel.ForEachAsync(
             ids,
             new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },

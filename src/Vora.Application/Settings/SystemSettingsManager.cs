@@ -93,6 +93,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.BlackFrameMinDurationSec = Math.Clamp(request.BlackFrameMinDurationSec, 0.1, 10.0);
         settings.EpisodeIntroClusterToleranceSec = Math.Clamp(request.EpisodeIntroClusterToleranceSec, 1, 60);
         settings.EpisodeIntroClusterMinAgreementPct = Math.Clamp(request.EpisodeIntroClusterMinAgreementPct, 50, 100);
+        settings.AnalyzeConcurrency = Math.Clamp(request.AnalyzeConcurrency, 1, 16);
 
         if (TimeSpan.TryParse(request.VideoThumbnailScheduleTime, out var vtTime)) settings.VideoThumbnailScheduleTime = vtTime;
         if (TimeSpan.TryParse(request.IptvHealthCheckTime, out var ihcTime)) settings.IptvHealthCheckTime = ihcTime;
@@ -101,6 +102,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.VideoThumbnailHeight = Math.Clamp(request.VideoThumbnailHeight, 45, 720);
         settings.VideoThumbnailJpegQuality = Math.Clamp(request.VideoThumbnailJpegQuality, 2, 31);
         settings.VideoThumbnailSpriteColumns = Math.Clamp(request.VideoThumbnailSpriteColumns, 1, 20);
+        settings.VideoThumbnailConcurrency = Math.Clamp(request.VideoThumbnailConcurrency, 1, 16);
 
         settings.FolderWatcherProviderId = request.FolderWatcherProviderId;
         settings.FolderWatcherPollingInterval = request.FolderWatcherPollingInterval;
