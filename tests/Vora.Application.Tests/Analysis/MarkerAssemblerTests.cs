@@ -159,6 +159,41 @@ public class MarkerAssemblerTests
     }
 
     [Fact]
+    public void Credits_skips_a_late_act_break_and_lands_on_the_real_credits_roll()
+    {
+        // ~22.5-min episode (Batman: TAS shape): a commercial act break (~15:45)
+        // and a scene fade (~17:34) both fall past the 60% mark, but the real
+        // credits roll is the gap near the very end (~21:51). The old "first gap
+        // past 60%" grabbed the act break and mislabeled 6 min of episode as
+        // credits — auto-skipping real content and carving a bogus preview.
+        var result = _assembler.Assemble(new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(1347),
+            IsEpisode = true,
+            SilenceIntervals = new List<DetectedInterval>
+            {
+                Interval(30, 90),      // intro
+                Interval(945, 950),    // act break ~15:45
+                Interval(1054, 1058),  // scene fade ~17:34
+                Interval(1311, 1315)   // real credits ~21:51
+            },
+            BlackIntervals = new List<DetectedInterval>
+            {
+                Interval(30, 90),
+                Interval(945, 950),
+                Interval(1054, 1058),
+                Interval(1311, 1315)
+            }
+        });
+
+        var credits = result.Single(m => m.Type == MarkerType.Credits);
+        credits.Start.Should().Be(TimeSpan.FromSeconds(1311));
+        credits.End.Should().Be(TimeSpan.FromSeconds(1347));
+        // No bogus mid-episode "preview" carved out of the act-break region.
+        result.Where(m => m.Type == MarkerType.Preview).Should().BeEmpty();
+    }
+
+    [Fact]
     public void DetectCredits_false_suppresses_credits_but_keeps_intro()
     {
         var result = _assembler.Assemble(new MarkerAssemblerInput
