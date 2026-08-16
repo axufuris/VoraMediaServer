@@ -162,10 +162,19 @@ export default function GlobalVideoPlayer() {
             .catch(err => console.error('Failed to refresh markers', err));
     });
 
-    const activeSkipPrompt = useMemo<{ label: string; target: number; kind: 'intro' | 'credits-to-scene' | 'credits-to-end' } | null>(() => {
-        if (!markers.length || !duration || !isFinite(duration)) return null;
+    // Next-episode previews are always detected and stored; the per-library
+    // "preview detection" toggle only controls whether the player surfaces them.
+    // When it's off, hide Preview markers so no band or "Skip to Preview" button
+    // shows — instant, no re-analyze. The credits marker still covers that stretch.
+    const visibleMarkers = useMemo(
+        () => (mediaDetails?.enablePreviewDetection ? markers : markers.filter(m => m.type !== 'Preview')),
+        [markers, mediaDetails?.enablePreviewDetection]
+    );
 
-        const introOrRecap = markers.find(m =>
+    const activeSkipPrompt = useMemo<{ label: string; target: number; kind: 'intro' | 'credits-to-scene' | 'credits-to-end' } | null>(() => {
+        if (!visibleMarkers.length || !duration || !isFinite(duration)) return null;
+
+        const introOrRecap = visibleMarkers.find(m =>
             (m.type === 'Intro' || m.type === 'Recap') &&
             currentTime >= m.startSeconds && currentTime < m.endSeconds
         );
@@ -177,17 +186,17 @@ export default function GlobalVideoPlayer() {
             };
         }
 
-        const inScene = markers.some(m =>
+        const inScene = visibleMarkers.some(m =>
             (m.type === 'CreditsScene' || m.type === 'Preview') &&
             currentTime >= m.startSeconds && currentTime < m.endSeconds
         );
         if (inScene) return null;
 
-        const credits = markers.find(m =>
+        const credits = visibleMarkers.find(m =>
             m.type === 'Credits' && currentTime >= m.startSeconds && currentTime < m.endSeconds
         );
         if (credits) {
-            const nextScene = markers
+            const nextScene = visibleMarkers
                 .filter(m => (m.type === 'CreditsScene' || m.type === 'Preview') && m.startSeconds > currentTime)
                 .sort((a, b) => a.startSeconds - b.startSeconds)[0];
 
@@ -207,7 +216,7 @@ export default function GlobalVideoPlayer() {
         }
 
         return null;
-    }, [markers, currentTime, duration, playbackPrefs.minimumCreditsSceneSeconds]);
+    }, [visibleMarkers, currentTime, duration, playbackPrefs.minimumCreditsSceneSeconds]);
 
     const autoSkippedRef = useRef<string | null>(null);
     useEffect(() => {
@@ -536,7 +545,7 @@ export default function GlobalVideoPlayer() {
                                 onMouseLeave={handleProgressLeave}
                                 style={{ background: 'rgba(255, 255, 255, 0.12)' }}
                             >
-                                <MarkerBands markers={markers} duration={duration} />
+                                <MarkerBands markers={visibleMarkers} duration={duration} />
                                 <div className="absolute left-0 top-0 h-full rounded-full" style={{ width: `${progressPercent}%`, background: 'var(--vora-accent-500)' }} />
                                 <div
                                     className="absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full opacity-0 shadow group-hover:opacity-100"
@@ -654,7 +663,7 @@ export default function GlobalVideoPlayer() {
                                 onMouseLeave={handleProgressLeave}
                                 style={{ background: 'rgba(255, 255, 255, 0.18)' }}
                             >
-                                <MarkerBands markers={markers} duration={duration} />
+                                <MarkerBands markers={visibleMarkers} duration={duration} />
                                 <div className="absolute left-0 top-0 h-full rounded-full transition-all" style={{ width: `${progressPercent}%`, background: 'var(--vora-accent-500)' }} />
                                 <div
                                     className="absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full opacity-0 shadow-lg transition-opacity group-hover:opacity-100"

@@ -21,6 +21,7 @@ public class MediaDetailsVM
     public string? Resolution { get; set; }
     public Guid LibraryId { get; set; }
     public string? LibraryArtworkProviderId { get; set; }
+    public bool EnablePreviewDetection { get; set; }
     public List<Guid> CollectionIds { get; set; } = new();
     public List<string> LockedFields { get; set; } = new();
     public decimal? ThirdPartyRating1 { get; set; }
@@ -70,6 +71,7 @@ public class MediaDetailsVM
             LockedFields = item.LockedFields,
             LibraryId = item.LibraryId,
             LibraryArtworkProviderId = item.Library != null ? item.Library.ArtworkProviderId : null,
+            EnablePreviewDetection = item.Library != null && item.Library.EnablePreviewDetection,
             ThirdPartyRating1 = item.ThirdPartyRating1,
             ThirdPartyRating1Name = item.ThirdPartyRating1Name,
             ThirdPartyRating2 = item.ThirdPartyRating2,

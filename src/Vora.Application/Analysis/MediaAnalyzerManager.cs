@@ -370,9 +370,6 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
 
         bool detectIntro = true, detectCredits = true;
-        // Preview is opt-in per library (off by default) and honored even on a
-        // forced re-analyze — a force shouldn't add previews a library disabled.
-        var detectPreview = gate.EnablePreviewDetection;
         if (!forceOverride)
         {
             // Skip items already analyzed: a non-forced "Analyze library" or the
@@ -435,8 +432,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             ExpectsPostCreditsStinger = inputs.HasPostCreditsStinger,
             IsEpisode = isEpisode,
             DetectIntro = detectIntro,
-            DetectCredits = detectCredits,
-            DetectPreview = detectPreview
+            DetectCredits = detectCredits
         });
 
         var markers = assembled.Select(m => new MediaItemMarker

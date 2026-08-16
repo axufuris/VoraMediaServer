@@ -21,7 +21,6 @@ public class MarkerAssemblerInput
     public bool IsEpisode { get; init; }
     public bool DetectIntro { get; init; } = true;
     public bool DetectCredits { get; init; } = true;
-    public bool DetectPreview { get; init; } = true;
 }
 
 public interface IMarkerAssembler
@@ -92,8 +91,11 @@ public class MarkerAssembler : IMarkerAssembler
                     }
                 }
             }
-            else if (input.DetectPreview)
+            else
             {
+                // Previews are always computed and stored; the per-library toggle
+                // only controls whether the player surfaces them (a "Skip Preview"
+                // button), so turning it on/off never needs a re-analyze.
                 var preview = FindEpisodePreview(jointGaps, creditsRollStart.Value, input.Duration);
                 if (preview != null) markers.Add(preview);
             }
