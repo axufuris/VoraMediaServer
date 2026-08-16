@@ -44,6 +44,12 @@ public class MarkerAssembler : IMarkerAssembler
     // an intro — emitting it just flashes a "Skip Intro" button at 0:00.
     private static readonly TimeSpan MinIntroDuration = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan MinRecapDuration = TimeSpan.FromSeconds(5);
+    // An intro (recap + title sequence) is never longer than this. A joint gap that
+    // would push the intro past it is a mid-episode scene fade, not the end of the
+    // opening — the old "last gap within 8 minutes" logic grabbed those and marked
+    // the first 7-8 minutes as intro. Beyond this cap, emit no intro rather than a
+    // wrong one (a fingerprint/chapter tier is where an accurate intro comes from).
+    private static readonly TimeSpan MaxIntroDuration = TimeSpan.FromSeconds(150);
     // Credits run to (near) the end, so the credits-start gap leaves only a short
     // tail. A gap that leaves more than this behind it is an act break / scene
     // fade, not the credits roll — skip past it. Episodes get a tight absolute cap
@@ -131,14 +137,16 @@ public class MarkerAssembler : IMarkerAssembler
     {
         // Intro means "skip past the opening into the real content". When an episode
         // has a "Previously on..." recap followed by a title sequence, both produce
-        // joint silence+black gaps within the IntroWindow. We want the intro to cover
-        // EVERYTHING leading up to actual content, so use the LAST gap in the window.
-        var gapsInWindow = jointGaps
-            .Where(g => g.Start <= IntroWindow)
+        // joint silence+black gaps, so use the LAST gap that still keeps the intro
+        // within MaxIntroDuration — that covers recap+theme without letting a later
+        // scene fade balloon the intro to several minutes. If every gap sits past the
+        // cap there's no detectable intro here (emit none rather than a wrong one).
+        var introCandidates = jointGaps
+            .Where(g => g.End <= MaxIntroDuration)
             .ToList();
-        if (gapsInWindow.Count == 0) return null;
+        if (introCandidates.Count == 0) return null;
 
-        var introEnd = gapsInWindow[^1].End;
+        var introEnd = introCandidates[^1].End;
         if (introEnd < MinIntroDuration) return null;
 
         return new DetectedMarker
@@ -191,7 +199,17 @@ public class MarkerAssembler : IMarkerAssembler
             ? MaxEpisodeCreditsRoll
             : TimeSpan.FromSeconds(input.Duration.TotalSeconds * MaxCreditsRollFraction);
         var creditsStart = creditsCandidates.FirstOrDefault(g => input.Duration - g.Start <= maxTail);
-        var chosen = (creditsStart ?? creditsCandidates[^1]).Start;
+        if (creditsStart == null)
+        {
+            // No gap leaves a plausible credits-length tail. For an episode that
+            // means the real credits roll wasn't detectable (e.g. credits over music,
+            // no black) and the only late gaps are act breaks / scene fades — emit no
+            // credits rather than mislabeling minutes of the episode as credits.
+            // Movies legitimately have long credits, so fall back to the latest gap.
+            if (input.IsEpisode) return null;
+            creditsStart = creditsCandidates[^1];
+        }
+        var chosen = creditsStart.Start;
 
         // Credits are frequently black text/roll over MUSIC (no silence), so the
         // only silence∩black gap is the final fade and `chosen` lands a second
