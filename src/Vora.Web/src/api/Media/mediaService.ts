@@ -133,6 +133,7 @@ export interface MediaItem {
     unplayedItemCount?: number;
     libraryId: string;
     libraryArtworkProviderId?: string;
+    enablePreviewDetection?: boolean;
     upcomingEpisodesJson?: string;
     collectionIds: string[];
     genres?: string[];
