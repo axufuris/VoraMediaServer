@@ -112,10 +112,11 @@ public class MarkerAssemblerTests
     }
 
     [Fact]
-    public void Recap_is_skipped_when_no_gap_starts_within_recap_window()
+    public void No_intro_or_recap_when_the_only_gaps_are_past_the_intro_cap()
     {
-        // First gap is at 300s (outside the 90s EpisodeRecapWindow) so we can't
-        // confidently call it a recap. Intro still detected on the second gap.
+        // Gaps at 300s and 400s are both well past MaxIntroDuration (150s), so they
+        // are mid-episode scene fades, not the opening. Neither an intro nor a recap
+        // should be emitted — a 5-7 minute "intro" is the bug we're guarding against.
         var result = _assembler.Assemble(new MarkerAssemblerInput
         {
             Duration = TimeSpan.FromMinutes(40),
@@ -125,7 +126,40 @@ public class MarkerAssemblerTests
         });
 
         result.Where(m => m.Type == MarkerType.Recap).Should().BeEmpty();
-        result.Single(m => m.Type == MarkerType.Intro).End.Should().Be(TimeSpan.FromSeconds(410));
+        result.Where(m => m.Type == MarkerType.Intro).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Intro_is_capped_and_ignores_a_later_mid_episode_scene_fade()
+    {
+        // Real opening ends at 95s; a scene fade at ~4 min also produces a joint gap.
+        // The intro must land on the 95s gap, not balloon out to the 4-minute fade.
+        var result = _assembler.Assemble(new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromMinutes(45),
+            IsEpisode = true,
+            SilenceIntervals = new List<DetectedInterval> { Interval(30, 95), Interval(240, 245) },
+            BlackIntervals = new List<DetectedInterval> { Interval(30, 95), Interval(240, 245) }
+        });
+
+        result.Single(m => m.Type == MarkerType.Intro).End.Should().Be(TimeSpan.FromSeconds(95));
+    }
+
+    [Fact]
+    public void Episode_gets_no_credits_when_the_only_late_gap_is_an_act_break()
+    {
+        // 30-min episode whose real credits roll (over music, no black) is invisible
+        // to silence/black; the only gap past 60% is an act break at ~20 min leaving
+        // a ~10-minute tail. Better to emit no credits than to mislabel 10 minutes.
+        var result = _assembler.Assemble(new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromMinutes(30),
+            IsEpisode = true,
+            SilenceIntervals = new List<DetectedInterval> { Interval(1200, 1205) },
+            BlackIntervals = new List<DetectedInterval> { Interval(1200, 1205) }
+        });
+
+        result.Where(m => m.Type == MarkerType.Credits).Should().BeEmpty();
     }
 
     [Fact]

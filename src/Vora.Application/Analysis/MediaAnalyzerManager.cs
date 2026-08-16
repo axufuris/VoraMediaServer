@@ -404,7 +404,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // enabled marker types do we fall through to Tier 3 (silence/black below).
         // Tier 2 (season-relative audio fingerprinting) slots in here in a later build.
         var chapters = await _analyzerService.ReadChaptersAsync(primaryPath, cancellationToken) ?? new List<MediaChapter>();
-        var chapterResult = ChapterMarkerMapper.Map(chapters, duration.Value, isEpisode, detectIntro, detectCredits, detectPreview);
+        var chapterResult = ChapterMarkerMapper.Map(chapters, duration.Value, isEpisode, detectIntro, detectCredits, detectPreview: true);
         if (chapterResult.Covers(detectIntro, detectCredits))
         {
             cancellationToken.ThrowIfCancellationRequested();
