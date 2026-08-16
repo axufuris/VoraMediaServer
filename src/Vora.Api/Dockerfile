@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         gnupg \
         curl \
         gosu \
+        libchromaprint-tools \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 

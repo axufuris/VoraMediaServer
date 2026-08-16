@@ -55,6 +55,7 @@ public class VoraDbContext : DbContext
     public DbSet<MediaExtra> MediaExtras { get; set; }
     public DbSet<MediaItemAnalysis> MediaItemAnalysis { get; set; }
     public DbSet<MediaItemMarker> MediaItemMarkers { get; set; }
+    public DbSet<MediaItemAudioFingerprint> MediaItemAudioFingerprints { get; set; }
     public DbSet<Genre> Genres { get; set; }
     public DbSet<Company> Companies { get; set; }
     public DbSet<Country> Countries { get; set; }
@@ -163,6 +164,7 @@ public class VoraDbContext : DbContext
         ConfigureMediaExtra(modelBuilder);
         ConfigureMediaItemAnalysis(modelBuilder);
         ConfigureMediaItemMarkers(modelBuilder);
+        ConfigureMediaItemAudioFingerprints(modelBuilder);
         ConfigureMediaItemRelationships(modelBuilder, converters);
         ConfigureReferenceTables(modelBuilder);
 
@@ -544,6 +546,21 @@ public class VoraDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => new { e.MediaItemId, e.Type, e.Order });
+        });
+    }
+
+    private static void ConfigureMediaItemAudioFingerprints(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<MediaItemAudioFingerprint>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.HasOne(e => e.MediaItem)
+                  .WithOne()
+                  .HasForeignKey<MediaItemAudioFingerprint>(e => e.MediaItemId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.MediaItemId).IsUnique();
         });
     }
 
