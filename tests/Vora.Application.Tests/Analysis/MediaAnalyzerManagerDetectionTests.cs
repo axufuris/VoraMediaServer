@@ -241,6 +241,38 @@ public class MediaAnalyzerManagerDetectionTests
     }
 
     [Fact]
+    public async Task Fingerprint_intro_skips_the_head_decode_and_overrides_the_intro()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/ep.mkv", TimeSpan.FromMinutes(45), meanDb: -20);
+        var fingerprintIntro = new DetectedMarker
+        {
+            Type = MarkerType.Intro,
+            Start = TimeSpan.FromSeconds(90),
+            End = TimeSpan.FromSeconds(150)
+        };
+
+        await _manager.AnalyzeMediaItemMarkersAsync(id, isEpisode: true, forceOverride: true, fingerprintIntro);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/ep.mkv",
+            Arg.Is<SilenceDetectionParameters>(p => p.SkipHeadWindow), Arg.Any<CancellationToken>());
+        await _media.Received().ReplaceMarkersAsync(id, Arg.Is<IEnumerable<MediaItemMarker>>(ms =>
+            ms.Any(m => m.Type == MarkerType.Intro && m.Start == TimeSpan.FromSeconds(90) && m.End == TimeSpan.FromSeconds(150))));
+    }
+
+    [Fact]
+    public async Task No_fingerprint_intro_keeps_the_head_decode()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/ep.mkv", TimeSpan.FromMinutes(45), meanDb: -20);
+
+        await _manager.AnalyzeMediaItemMarkersAsync(id, isEpisode: true, forceOverride: true, fingerprintIntro: null);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/ep.mkv",
+            Arg.Is<SilenceDetectionParameters>(p => !p.SkipHeadWindow), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task FinalizeSeasonMarkersAsync_snaps_intro_ends_to_canonical_median_when_agreement_met()
     {
         var seasonId = Guid.NewGuid();

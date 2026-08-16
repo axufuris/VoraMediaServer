@@ -590,14 +590,22 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             tailStart > headEnd)
         {
             _logger.LogInformation(
-                "Running windowed silence+black detection on {FilePath} (head 0–{HeadEnd}s, tail {TailStart}s–end; threshold {Threshold} dB / {SilenceMin}s, black {BlackMin}s).",
-                filePath, headEnd, tailStart, parameters.NoiseThresholdDb, parameters.MinSilenceDurationSec, parameters.MinBlackFrameDurationSec);
+                "Running windowed silence+black detection on {FilePath} ({Head}, tail {TailStart}s–end; threshold {Threshold} dB / {SilenceMin}s, black {BlackMin}s).",
+                filePath, parameters.SkipHeadWindow ? "head skipped" : $"head 0–{headEnd}s", tailStart, parameters.NoiseThresholdDb, parameters.MinSilenceDurationSec, parameters.MinBlackFrameDurationSec);
 
-            var head = await RunDetectionPassAsync(filePath, parameters, seekSeconds: null, limitSeconds: headEnd, cancellationToken);
             var tail = await RunDetectionPassAsync(filePath, parameters, seekSeconds: tailStart, limitSeconds: null, cancellationToken);
 
-            result.SilenceIntervals = head.Silence.Concat(tail.Silence).ToList();
-            result.BlackIntervals = head.Black.Concat(tail.Black).ToList();
+            if (parameters.SkipHeadWindow)
+            {
+                result.SilenceIntervals = tail.Silence;
+                result.BlackIntervals = tail.Black;
+            }
+            else
+            {
+                var head = await RunDetectionPassAsync(filePath, parameters, seekSeconds: null, limitSeconds: headEnd, cancellationToken);
+                result.SilenceIntervals = head.Silence.Concat(tail.Silence).ToList();
+                result.BlackIntervals = head.Black.Concat(tail.Black).ToList();
+            }
         }
         else
         {

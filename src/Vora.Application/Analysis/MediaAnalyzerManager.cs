@@ -447,6 +447,13 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             return;
         }
 
+        // The season fingerprint pass already found this episode's intro, so the
+        // head decode (intro/recap region) has nothing left to contribute — its
+        // silence/black intro would just be superseded. Skip it and decode only the
+        // tail for credits/preview. This is the fingerprint tier's performance win:
+        // the head video decode is replaced by the far cheaper audio fingerprint.
+        var useFingerprintIntro = detectIntro && fingerprintIntro != null;
+
         var meanDb = await _analyzerService.ProbeMeanVolumeDbAsync(primaryPath, cancellationToken);
         var threshold = meanDb.HasValue
             ? meanDb.Value + settings.SilenceThresholdOffsetDb
@@ -462,6 +469,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             MinBlackFrameDurationSec = settings.BlackFrameMinDurationSec,
             HeadWindowEndSeconds = headEnd,
             TailWindowStartSeconds = tailStart,
+            SkipHeadWindow = useFingerprintIntro,
             UseHardwareDecode = settings.UseHardwareAcceleration,
             HardwareDevice = settings.HardwareTranscodingDevice
         };
@@ -480,7 +488,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             ExpectsMidCreditsStinger = inputs.HasMidCreditsStinger,
             ExpectsPostCreditsStinger = inputs.HasPostCreditsStinger,
             IsEpisode = isEpisode,
-            DetectIntro = detectIntro,
+            DetectIntro = detectIntro && !useFingerprintIntro,
             DetectCredits = detectCredits
         });
 

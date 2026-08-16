@@ -15,6 +15,12 @@ public class SilenceDetectionParameters
     public double? HeadWindowEndSeconds { get; set; }
     public double? TailWindowStartSeconds { get; set; }
 
+    // When a higher tier (audio fingerprint / chapters) already supplied the intro,
+    // the head decode has nothing left to find — recap and the silence/black intro
+    // are the only things it produces, and both are superseded. Skip it and decode
+    // only the tail (credits/preview). Ignored on a single full-file pass.
+    public bool SkipHeadWindow { get; set; }
+
     // Decode on the GPU (NVDEC via -hwaccel) when the server has hardware
     // acceleration enabled — 10-bit HEVC (~all of a modern library) decodes far
     // faster there. Frames still land in system memory for the CPU black/silence
