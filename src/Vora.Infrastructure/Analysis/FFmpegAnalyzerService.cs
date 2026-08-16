@@ -161,6 +161,126 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         return double.TryParse(property.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out seconds);
     }
 
+    public async Task<AudioFingerprintResult?> ExtractAudioFingerprintAsync(string filePath, double startSeconds, double lengthSeconds, string workingDirectory, CancellationToken cancellationToken = default)
+    {
+        Directory.CreateDirectory(workingDirectory);
+        var tempWav = Path.Combine(workingDirectory, $"fp_{Guid.NewGuid():N}.wav");
+
+        try
+        {
+            if (!await ExtractAudioWindowAsync(filePath, startSeconds, lengthSeconds, tempWav, cancellationToken))
+            {
+                return null;
+            }
+
+            var points = await RunFpcalcAsync(tempWav, lengthSeconds, cancellationToken);
+            if (points == null || points.Length == 0) return null;
+
+            return new AudioFingerprintResult
+            {
+                Points = points,
+                PointDurationSeconds = lengthSeconds / points.Length
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Audio fingerprint extraction failed for {FilePath}; intro falls back to silence/black.", filePath);
+            return null;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempWav)) File.Delete(tempWav);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not delete temp fingerprint file {TempWav}.", tempWav);
+            }
+        }
+    }
+
+    private async Task<bool> ExtractAudioWindowAsync(string filePath, double startSeconds, double lengthSeconds, string outputWav, CancellationToken cancellationToken)
+    {
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "ffmpeg",
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        processInfo.ArgumentList.Add("-y");
+        processInfo.ArgumentList.Add("-ss");
+        processInfo.ArgumentList.Add(startSeconds.ToString(CultureInfo.InvariantCulture));
+        processInfo.ArgumentList.Add("-t");
+        processInfo.ArgumentList.Add(lengthSeconds.ToString(CultureInfo.InvariantCulture));
+        processInfo.ArgumentList.Add("-i");
+        processInfo.ArgumentList.Add(filePath);
+        processInfo.ArgumentList.Add("-vn");
+        processInfo.ArgumentList.Add("-sn");
+        // Chromaprint works on downmixed low-rate mono; this shrinks the decode and
+        // makes fingerprints comparable regardless of the source's channel layout.
+        processInfo.ArgumentList.Add("-ac");
+        processInfo.ArgumentList.Add("1");
+        processInfo.ArgumentList.Add("-ar");
+        processInfo.ArgumentList.Add("11025");
+        processInfo.ArgumentList.Add("-f");
+        processInfo.ArgumentList.Add("wav");
+        processInfo.ArgumentList.Add(outputWav);
+
+        using var process = new Process { StartInfo = processInfo };
+        process.ErrorDataReceived += (_, _) => { };
+        process.Start();
+        process.BeginErrorReadLine();
+        var exitedCleanly = await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger, cancellationToken);
+
+        return exitedCleanly && process.ExitCode == 0 && File.Exists(outputWav);
+    }
+
+    private async Task<uint[]?> RunFpcalcAsync(string wavPath, double lengthSeconds, CancellationToken cancellationToken)
+    {
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "fpcalc",
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        processInfo.ArgumentList.Add("-raw");
+        processInfo.ArgumentList.Add("-json");
+        // fpcalc fingerprints only the first 120s by default; raise the cap to the
+        // whole extracted window.
+        processInfo.ArgumentList.Add("-length");
+        processInfo.ArgumentList.Add(Math.Ceiling(lengthSeconds + 1).ToString(CultureInfo.InvariantCulture));
+        processInfo.ArgumentList.Add(wavPath);
+
+        using var process = Process.Start(processInfo);
+        if (process == null) return null;
+
+        var json = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger, cancellationToken);
+
+        if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(json)) return null;
+
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("fingerprint", out var fingerprint) || fingerprint.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var points = new uint[fingerprint.GetArrayLength()];
+        var index = 0;
+        foreach (var element in fingerprint.EnumerateArray())
+        {
+            points[index++] = unchecked((uint)element.GetInt64());
+        }
+        return points;
+    }
+
     private static string? GetTagValue(JsonElement tags, string keyToFind)
     {
         if (tags.ValueKind != JsonValueKind.Object) return null;
