@@ -28,4 +28,5 @@ public interface IMediaAnalyzerService
     Task<MediaAnalysisResult> AnalyzeFileAsync(string filePath, CancellationToken cancellationToken = default);
     Task<double?> ProbeMeanVolumeDbAsync(string filePath, CancellationToken cancellationToken = default);
     Task<MediaAnalysisResult> AnalyzeSilenceDetectionsAsync(string filePath, SilenceDetectionParameters parameters, CancellationToken cancellationToken = default);
+    Task<AudioFingerprintResult?> ExtractAudioFingerprintAsync(string filePath, double startSeconds, double lengthSeconds, string workingDirectory, CancellationToken cancellationToken = default);
 }

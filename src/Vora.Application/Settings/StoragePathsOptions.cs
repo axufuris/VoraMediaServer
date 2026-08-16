@@ -15,4 +15,5 @@ public class StoragePathsOptions
     public string? EpgCache { get; set; }
     public string? IptvDvr { get; set; }
     public string? Metadata { get; set; }
+    public string? AudioFingerprints { get; set; }
 }

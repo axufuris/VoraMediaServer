@@ -399,6 +399,8 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<ILibraryMigrationJobRunner, LibraryMigrationJobRunner>();
         services.AddScoped<IMediaAnalyzerManager, MediaAnalyzerManager>();
         services.AddScoped<IMarkerAssembler, MarkerAssembler>();
+        services.AddScoped<IAudioFingerprintComparer, AudioFingerprintComparer>();
+        services.AddScoped<IAudioIntroDetector, AudioIntroDetector>();
         services.AddScoped<Vora.Application.Thumbnails.IVideoThumbnailManager, Vora.Application.Thumbnails.VideoThumbnailManager>();
         services.AddScoped<IMediaDedupeManager, MediaDedupeManager>();
         services.AddScoped<IMediaManager, MediaManager>();
