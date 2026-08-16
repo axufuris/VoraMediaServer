@@ -33,6 +33,7 @@ export interface CreateLibraryRequest {
     onlyShowTrailers: boolean;
     enableVideoPreviewThumbnails: boolean;
     enableCreditsDetection: boolean;
+    enablePreviewDetection: boolean;
     minimumCollectionSize: number;
     metadataProviderId: string;
     thirdPartyRating1ProviderId?: string;

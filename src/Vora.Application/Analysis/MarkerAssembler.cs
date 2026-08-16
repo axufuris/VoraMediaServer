@@ -21,6 +21,7 @@ public class MarkerAssemblerInput
     public bool IsEpisode { get; init; }
     public bool DetectIntro { get; init; } = true;
     public bool DetectCredits { get; init; } = true;
+    public bool DetectPreview { get; init; } = true;
 }
 
 public interface IMarkerAssembler
@@ -87,7 +88,7 @@ public class MarkerAssembler : IMarkerAssembler
                     }
                 }
             }
-            else
+            else if (input.DetectPreview)
             {
                 var preview = FindEpisodePreview(jointGaps, creditsRollStart.Value, input.Duration);
                 if (preview != null) markers.Add(preview);

@@ -6,6 +6,7 @@ public class MarkerDetectionGateDto
     public DateTime? MarkersAnalyzedAt { get; set; }
     public bool EnableIntroDetection { get; set; }
     public bool EnableCreditsDetection { get; set; }
+    public bool EnablePreviewDetection { get; set; }
 
     public bool AreMarkersLocked =>
         LockedFields != null && LockedFields.Contains("Markers", StringComparer.OrdinalIgnoreCase);

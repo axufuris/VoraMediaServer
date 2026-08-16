@@ -12,6 +12,7 @@ export interface MediaLibrary {
     onlyShowTrailers: boolean;
     enableVideoPreviewThumbnails: boolean;
     enableCreditsDetection: boolean;
+    enablePreviewDetection: boolean;
     episodeSorting: number;
     episodeOrder: number;
     useSeasonTitles: boolean;
