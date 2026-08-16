@@ -39,6 +39,11 @@ public class MarkerAssembler : IMarkerAssembler
     private static readonly TimeSpan CreditsRollMinLength = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MinStingerLength = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan BoundaryProximity = TimeSpan.FromSeconds(3);
+    // A real title sequence / "previously on" runs longer than this. A shorter
+    // black+silence blip at the very start is a studio-logo ident (HBO, etc.), not
+    // an intro — emitting it just flashes a "Skip Intro" button at 0:00.
+    private static readonly TimeSpan MinIntroDuration = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan MinRecapDuration = TimeSpan.FromSeconds(5);
     // Credits run to (near) the end, so the credits-start gap leaves only a short
     // tail. A gap that leaves more than this behind it is an act break / scene
     // fade, not the credits roll — skip past it. Episodes get a tight absolute cap
@@ -134,7 +139,7 @@ public class MarkerAssembler : IMarkerAssembler
         if (gapsInWindow.Count == 0) return null;
 
         var introEnd = gapsInWindow[^1].End;
-        if (introEnd <= TimeSpan.Zero) return null;
+        if (introEnd < MinIntroDuration) return null;
 
         return new DetectedMarker
         {
@@ -156,7 +161,7 @@ public class MarkerAssembler : IMarkerAssembler
         var earlyGap = jointGaps.FirstOrDefault(g =>
             g.Start <= EpisodeRecapWindow && g.End < intro.End);
         if (earlyGap == null) return null;
-        if (earlyGap.End <= TimeSpan.Zero) return null;
+        if (earlyGap.End < MinRecapDuration) return null;
 
         return new DetectedMarker
         {
@@ -186,7 +191,21 @@ public class MarkerAssembler : IMarkerAssembler
             ? MaxEpisodeCreditsRoll
             : TimeSpan.FromSeconds(input.Duration.TotalSeconds * MaxCreditsRollFraction);
         var creditsStart = creditsCandidates.FirstOrDefault(g => input.Duration - g.Start <= maxTail);
-        return (creditsStart ?? creditsCandidates[^1]).Start;
+        var chosen = (creditsStart ?? creditsCandidates[^1]).Start;
+
+        // Credits are frequently black text/roll over MUSIC (no silence), so the
+        // only silence∩black gap is the final fade and `chosen` lands a second
+        // from the end. Extend the start back to the beginning of the black region
+        // it sits in (clamped to the search window) so the whole black credits
+        // roll is covered instead of just the last second.
+        var containingBlack = input.BlackIntervals
+            .Where(b => b.Start <= chosen && b.End >= chosen)
+            .OrderBy(b => b.Start)
+            .FirstOrDefault();
+        if (containingBlack != null && containingBlack.Start > minStart && containingBlack.Start < chosen)
+            chosen = containingBlack.Start;
+
+        return chosen;
     }
 
     private static IEnumerable<DetectedMarker> FindCreditsScenes(List<DetectedInterval> jointGaps, TimeSpan creditsStart, TimeSpan duration)

@@ -159,6 +159,58 @@ public class MarkerAssemblerTests
     }
 
     [Fact]
+    public void Intro_is_suppressed_when_only_a_studio_logo_blip_is_found()
+    {
+        // A ~2s black+silence blip at 0:00 (an HBO/studio ident) is not a title
+        // sequence — emitting a 0→2s intro just flashes a "Skip Intro" at the start.
+        var result = _assembler.Assemble(new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromMinutes(44),
+            IsEpisode = true,
+            SilenceIntervals = new List<DetectedInterval> { Interval(0, 2) },
+            BlackIntervals = new List<DetectedInterval> { Interval(0, 2) }
+        });
+
+        result.Where(m => m.Type == MarkerType.Intro).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Recap_is_suppressed_when_the_early_gap_is_too_short()
+    {
+        // A ~2s ident blip before the real title sequence shouldn't become a
+        // "Skip Recap" — recaps are meaningful "previously on" segments.
+        var result = _assembler.Assemble(new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromMinutes(44),
+            IsEpisode = true,
+            SilenceIntervals = new List<DetectedInterval> { Interval(0, 2), Interval(60, 120) },
+            BlackIntervals = new List<DetectedInterval> { Interval(0, 2), Interval(60, 120) }
+        });
+
+        result.Where(m => m.Type == MarkerType.Recap).Should().BeEmpty();
+        result.Single(m => m.Type == MarkerType.Intro).End.Should().Be(TimeSpan.FromSeconds(120));
+    }
+
+    [Fact]
+    public void Credits_extend_over_a_black_credits_roll_with_music()
+    {
+        // HBO-style credits (House of the Dragon): black roll with music, so the
+        // only silence∩black gap is the final 1s fade. The credits start should
+        // extend back over the whole black region, not sit at the last second.
+        var result = _assembler.Assemble(new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(3938),  // 65:38
+            IsEpisode = true,
+            SilenceIntervals = new List<DetectedInterval> { Interval(3937, 3938) },
+            BlackIntervals = new List<DetectedInterval> { Interval(3809, 3938) }
+        });
+
+        var credits = result.Single(m => m.Type == MarkerType.Credits);
+        credits.Start.Should().Be(TimeSpan.FromSeconds(3809));
+        credits.End.Should().Be(TimeSpan.FromSeconds(3938));
+    }
+
+    [Fact]
     public void Credits_skips_a_late_act_break_and_lands_on_the_real_credits_roll()
     {
         // ~22.5-min episode (Batman: TAS shape): a commercial act break (~15:45)
