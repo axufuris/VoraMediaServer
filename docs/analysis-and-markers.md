@@ -18,7 +18,13 @@ Id (Guid), MediaItemId (Guid, FK + cascade), Type (enum string), Start (TimeSpan
 
 `MediaAnalyzerManager.TriggerMediaItemSilenceDetectionAsync` runs the pipeline. Trigger sources: schedule (`DetectionTrigger.OnSchedule` / `OnAdditionAndSchedule`), media-add hook, or an admin "Analyze media" click on the per-item page (always force-runs regardless of the trigger setting).
 
-Per file the pipeline is:
+Detection runs as a **tiered fallback**: the cheapest authoritative source wins, and only when it can't produce the wanted markers does the pipeline fall through to the next tier.
+
+- **Tier 1 — embedded chapters** (`FFmpegAnalyzerService.ReadChaptersAsync` → `ChapterMarkerMapper`). A metadata-only `ffprobe -show_chapters` (no decode). When a release ships named intro/credits chapters ("Opening Titles", "End Credits", "Previously On", "Next Episode Preview") they're mapped to markers by title keyword and used as-is, skipping the FFmpeg decode entirely. Chapters are only trusted when they cover **every** enabled marker type (`ChapterMarkerResult.Covers`); a partial cover, unnamed scene chapters ("Chapter 1"…), or no chapters falls through to Tier 3. Intro/recap chapters must sit in the first 8 min and credits/preview chapters in the last 60% — an out-of-place title is ignored. "Opening credits" classifies as intro (not the credits roll); "next episode preview" as preview.
+- **Tier 2 — audio fingerprinting** (season-relative recurring-audio detection, Jellyfin Intro-Skipper style). *Not yet built* — reserved slot between chapters and silence/black.
+- **Tier 3 — silence/black detection** (the pass below). The universal fallback that runs when no earlier tier can supply the markers.
+
+The silence/black tier per file is:
 
 1. **Noise-floor probe** (`FFmpegAnalyzerService.ProbeMeanVolumeDbAsync`) — runs `ffmpeg -af volumedetect -vn -sn` and parses `mean_volume` from stderr.
 2. **Dynamic silence threshold** — `threshold = mean_volume + SilenceThresholdOffsetDb` (default offset −12 dB; admin-tunable). If the probe fails it falls back to a fixed −40 dB.

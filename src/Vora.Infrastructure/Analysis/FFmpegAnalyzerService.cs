@@ -92,6 +92,75 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         return result;
     }
 
+    public async Task<List<MediaChapter>> ReadChaptersAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        var chapters = new List<MediaChapter>();
+
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "ffprobe",
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        processInfo.ArgumentList.Add("-v");
+        processInfo.ArgumentList.Add("quiet");
+        processInfo.ArgumentList.Add("-print_format");
+        processInfo.ArgumentList.Add("json");
+        processInfo.ArgumentList.Add("-show_chapters");
+        processInfo.ArgumentList.Add(filePath);
+
+        try
+        {
+            using var process = Process.Start(processInfo);
+            if (process == null) return chapters;
+
+            string jsonOutput = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger, cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(jsonOutput)) return chapters;
+
+            using var doc = JsonDocument.Parse(jsonOutput);
+            if (!doc.RootElement.TryGetProperty("chapters", out var chaptersBlock)
+                || chaptersBlock.ValueKind != JsonValueKind.Array)
+            {
+                return chapters;
+            }
+
+            foreach (var element in chaptersBlock.EnumerateArray())
+            {
+                if (!TryReadSeconds(element, "start_time", out var start)) continue;
+                if (!TryReadSeconds(element, "end_time", out var end)) continue;
+
+                string? title = null;
+                if (element.TryGetProperty("tags", out var tags))
+                {
+                    title = GetTagValue(tags, "title");
+                }
+
+                chapters.Add(new MediaChapter
+                {
+                    Start = TimeSpan.FromSeconds(start),
+                    End = TimeSpan.FromSeconds(end),
+                    Title = title
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read chapters for {FilePath}; marker detection will fall back to silence/black.", filePath);
+        }
+
+        return chapters;
+    }
+
+    private static bool TryReadSeconds(JsonElement element, string propertyName, out double seconds)
+    {
+        seconds = 0;
+        if (!element.TryGetProperty(propertyName, out var property)) return false;
+        return double.TryParse(property.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out seconds);
+    }
+
     public async Task<AudioFingerprintResult?> ExtractAudioFingerprintAsync(string filePath, double startSeconds, double lengthSeconds, string workingDirectory, CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(workingDirectory);
