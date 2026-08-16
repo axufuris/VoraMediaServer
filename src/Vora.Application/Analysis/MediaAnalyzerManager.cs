@@ -398,6 +398,21 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
 
         var primaryPath = inputs.FilePaths[0];
 
+        // Tier 1 — embedded chapters. A release that ships named intro/credits
+        // chapters is authoritative and free (a metadata probe, no decode), so use
+        // it and skip the FFmpeg passes entirely. Only when chapters can't cover the
+        // enabled marker types do we fall through to Tier 3 (silence/black below).
+        // Tier 2 (season-relative audio fingerprinting) slots in here in a later build.
+        var chapters = await _analyzerService.ReadChaptersAsync(primaryPath, cancellationToken) ?? new List<MediaChapter>();
+        var chapterResult = ChapterMarkerMapper.Map(chapters, duration.Value, isEpisode, detectIntro, detectCredits, detectPreview);
+        if (chapterResult.Covers(detectIntro, detectCredits))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _logger.LogInformation("Detected markers for {MediaItemId} from {Count} embedded chapter(s); skipped silence/black decode.", mediaItemId, chapterResult.Markers.Count);
+            await PersistMarkersAsync(mediaItemId, chapterResult.Markers);
+            return;
+        }
+
         var meanDb = await _analyzerService.ProbeMeanVolumeDbAsync(primaryPath, cancellationToken);
         var threshold = meanDb.HasValue
             ? meanDb.Value + settings.SilenceThresholdOffsetDb
@@ -435,6 +450,11 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             DetectCredits = detectCredits
         });
 
+        await PersistMarkersAsync(mediaItemId, assembled);
+    }
+
+    private async Task PersistMarkersAsync(Guid mediaItemId, List<DetectedMarker> assembled)
+    {
         var markers = assembled.Select(m => new MediaItemMarker
         {
             MediaItemId = mediaItemId,
