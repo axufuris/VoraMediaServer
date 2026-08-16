@@ -21,6 +21,7 @@ public class MediaLibraryVM
     public bool OnlyShowTrailers { get; set; }
     public bool EnableVideoPreviewThumbnails { get; set; }
     public bool EnableCreditsDetection { get; set; }
+    public bool EnablePreviewDetection { get; set; }
     public string? ThirdPartyRating1ProviderId { get; set; }
     public string? ThirdPartyRating2ProviderId { get; set; }
     public string? ArtworkProviderId { get; set; }
@@ -50,6 +51,7 @@ public class MediaLibraryVM
             OnlyShowTrailers = l.OnlyShowTrailers,
             EnableVideoPreviewThumbnails = l.EnableVideoPreviewThumbnails,
             EnableCreditsDetection = l.EnableCreditsDetection,
+            EnablePreviewDetection = l.EnablePreviewDetection,
             EpisodeSorting = (int)l.EpisodeSorting,
             EpisodeOrder = (int)l.EpisodeOrder,
             UseSeasonTitles = l.UseSeasonTitles,

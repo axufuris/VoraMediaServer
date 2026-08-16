@@ -29,6 +29,7 @@ public class MediaLibrary
     public int MinimumCollectionSize { get; set; } = 1;
 
     public bool EnableCreditsDetection { get; set; }
+    public bool EnablePreviewDetection { get; set; }
     public bool EnableIntroDetection { get; set; } = true;
 
     public EpisodeSortOrder EpisodeSorting { get; set; } = EpisodeSortOrder.OldestFirst;
