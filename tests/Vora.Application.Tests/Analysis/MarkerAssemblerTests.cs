@@ -194,6 +194,34 @@ public class MarkerAssemblerTests
     }
 
     [Fact]
+    public void Credits_skips_a_late_act_break_on_a_longer_episode()
+    {
+        // ~44-min episode (The Orville shape): the last act break (~38:54) leaves a
+        // ~5-min tail — only ~11% of runtime, so a fraction cap alone would still
+        // grab it. The episode-length absolute cap lands on the real credits
+        // (~43:17) instead.
+        var result = _assembler.Assemble(new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(2637),
+            IsEpisode = true,
+            SilenceIntervals = new List<DetectedInterval>
+            {
+                Interval(2334, 2338),  // act break ~38:54
+                Interval(2597, 2601)   // real credits ~43:17
+            },
+            BlackIntervals = new List<DetectedInterval>
+            {
+                Interval(2334, 2338),
+                Interval(2597, 2601)
+            }
+        });
+
+        var credits = result.Single(m => m.Type == MarkerType.Credits);
+        credits.Start.Should().Be(TimeSpan.FromSeconds(2597));
+        result.Where(m => m.Type == MarkerType.Preview).Should().BeEmpty();
+    }
+
+    [Fact]
     public void DetectCredits_false_suppresses_credits_but_keeps_intro()
     {
         var result = _assembler.Assemble(new MarkerAssemblerInput
