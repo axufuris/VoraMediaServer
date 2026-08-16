@@ -49,9 +49,12 @@ public class MediaAnalyzerManagerDetectionTests
         scope.ServiceProvider.Returns(scopedProvider);
 
         _manager = new MediaAnalyzerManager(
-            _media, _analyzer, _assembler, _settings, _queue, _notifier,
+            _media, _analyzer, _assembler,
+            new AudioIntroDetector(new AudioFingerprintComparer()),
+            _settings, _queue, _notifier,
             new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
             scopeFactory,
+            Microsoft.Extensions.Options.Options.Create(new Vora.Application.Settings.StoragePathsOptions()),
             NullLogger<MediaAnalyzerManager>.Instance);
 
         // The season path fans out episode detection through a DI scope; resolve

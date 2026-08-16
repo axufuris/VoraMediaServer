@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Vora.Application.Analysis.Results;
 using Vora.Application.Media;
 using Vora.Application.Settings;
@@ -14,7 +15,7 @@ public interface IMediaAnalyzerManager
 {
     Task TriggerMediaItemFileAnalysisAsync(Guid mediaItemId, string? name = null, CancellationToken cancellationToken = default);
     Task AnalyzeMediaFileAsync(Guid mediaItemId, CancellationToken cancellationToken = default);
-    Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride, CancellationToken cancellationToken = default);
+    Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride, DetectedMarker? fingerprintIntro = null, CancellationToken cancellationToken = default);
     Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null, CancellationToken cancellationToken = default);
     Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default);
     Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default);
@@ -33,35 +34,48 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     private const double HeadWindowMarginSeconds = 120;
     private const double TailWindowMarginSeconds = 60;
 
+    // Audio-fingerprint intro detection (Tier 2). The head window is what gets
+    // fingerprinted per episode; a season needs at least a few episodes for the
+    // recurring theme to be distinguishable from coincidence.
+    private const int FingerprintHeadWindowMinutes = 10;
+    private const int FingerprintMinSeasonEpisodes = 3;
+    private static readonly AudioIntroDetectionOptions FingerprintOptions = new();
+
     private readonly IMediaRepository _mediaRepository;
     private readonly IMediaAnalyzerService _analyzerService;
     private readonly IMarkerAssembler _markerAssembler;
+    private readonly IAudioIntroDetector _audioIntroDetector;
     private readonly ISystemSettingsRepository _settingsRepo;
     private readonly ITaskQueueManager _taskQueueManager;
     private readonly IClientNotifier _notifier;
     private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IOptions<StoragePathsOptions> _storagePaths;
     private readonly ILogger<MediaAnalyzerManager> _logger;
 
     public MediaAnalyzerManager(
         IMediaRepository mediaRepository,
         IMediaAnalyzerService analyzerService,
         IMarkerAssembler markerAssembler,
+        IAudioIntroDetector audioIntroDetector,
         ISystemSettingsRepository settingsRepo,
         ITaskQueueManager taskQueueManager,
         IClientNotifier notifier,
         Vora.Plugins.Interfaces.ITaskProgressReporter progress,
         IServiceScopeFactory scopeFactory,
+        IOptions<StoragePathsOptions> storagePaths,
         ILogger<MediaAnalyzerManager> logger)
     {
         _mediaRepository = mediaRepository;
         _analyzerService = analyzerService;
         _markerAssembler = markerAssembler;
+        _audioIntroDetector = audioIntroDetector;
         _settingsRepo = settingsRepo;
         _taskQueueManager = taskQueueManager;
         _notifier = notifier;
         _progress = progress;
         _scopeFactory = scopeFactory;
+        _storagePaths = storagePaths;
         _logger = logger;
     }
 
@@ -162,7 +176,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
         else
         {
-            await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode: false, forceOverride, cancellationToken);
+            await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode: false, forceOverride, fingerprintIntro: null, cancellationToken);
         }
     }
 
@@ -292,16 +306,35 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
     }
 
-    public async Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride, CancellationToken cancellationToken = default)
+    public async Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride, DetectedMarker? fingerprintIntro = null, CancellationToken cancellationToken = default)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
-        await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode, forceOverride, cancellationToken);
+        await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode, forceOverride, fingerprintIntro, cancellationToken);
     }
 
     private async Task RunSeasonSilenceDetectionAsync(Guid seasonId, ServerSetting settings, bool forceOverride, CancellationToken cancellationToken = default)
     {
         var episodeIds = await _mediaRepository.GetEpisodeIdsForSeasonAsync(seasonId);
         if (episodeIds.Count == 0) return;
+
+        // Tier 2 — season-relative audio fingerprinting. Runs once up front (it
+        // needs every episode together) and yields a per-episode intro marker where
+        // the recurring theme is found; each episode's detection then prefers that
+        // over the silence/black intro. Failures fall back silently.
+        IReadOnlyDictionary<Guid, DetectedMarker> fingerprintIntros;
+        try
+        {
+            fingerprintIntros = await ComputeSeasonFingerprintIntrosAsync(seasonId, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Season audio-fingerprint pass failed for {SeasonId}; intros fall back to silence/black.", seasonId);
+            fingerprintIntros = new Dictionary<Guid, DetectedMarker>();
+        }
 
         // Each episode's FFmpeg pass is independent and CPU-bound, so run several
         // at once — each in its own DI scope (own DbContext) so parallel writes
@@ -315,9 +348,10 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             {
                 try
                 {
+                    fingerprintIntros.TryGetValue(epId, out var fingerprintIntro);
                     using var scope = _scopeFactory.CreateScope();
                     var analyzer = scope.ServiceProvider.GetRequiredService<IMediaAnalyzerManager>();
-                    await analyzer.AnalyzeMediaItemMarkersAsync(epId, isEpisode: true, forceOverride, ct);
+                    await analyzer.AnalyzeMediaItemMarkersAsync(epId, isEpisode: true, forceOverride, fingerprintIntro, ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -354,7 +388,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         return (headEnd, tailStart);
     }
 
-    private async Task RunMediaItemSilenceDetectionAsync(Guid mediaItemId, ServerSetting settings, bool isEpisode, bool forceOverride, CancellationToken cancellationToken = default)
+    private async Task RunMediaItemSilenceDetectionAsync(Guid mediaItemId, ServerSetting settings, bool isEpisode, bool forceOverride, DetectedMarker? fingerprintIntro = null, CancellationToken cancellationToken = default)
     {
         // One round-trip for the whole skip decision (lock + already-analyzed +
         // per-library toggles) instead of three sequential queries per item —
@@ -450,7 +484,102 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             DetectCredits = detectCredits
         });
 
-        await PersistMarkersAsync(mediaItemId, assembled);
+        // Precedence: chapters (already resolved above when they fully covered) win
+        // per type, then the season fingerprint intro, then silence/black. The
+        // fingerprint only supplies a better intro; recap/credits/preview/scenes
+        // still come from chapters or silence/black.
+        var merged = MarkerMerge.Resolve(chapterResult.Markers, fingerprintIntro, assembled, detectIntro);
+        await PersistMarkersAsync(mediaItemId, merged);
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, DetectedMarker>> ComputeSeasonFingerprintIntrosAsync(Guid seasonId, CancellationToken cancellationToken)
+    {
+        var empty = (IReadOnlyDictionary<Guid, DetectedMarker>)new Dictionary<Guid, DetectedMarker>();
+
+        var inputs = await _mediaRepository.GetSeasonFingerprintInputsAsync(seasonId) ?? new List<Vora.Application.Media.Dtos.FingerprintInputDto>();
+        var valid = inputs
+            .Where(i => !string.IsNullOrEmpty(i.FilePath) && i.Duration is { } d && d > TimeSpan.Zero)
+            .ToList();
+        if (valid.Count < FingerprintMinSeasonEpisodes) return empty;
+
+        var cached = await _mediaRepository.GetAudioFingerprintsForEpisodesAsync(valid.Select(v => v.MediaItemId).ToList());
+        var workingDirectory = ResolveFingerprintWorkingDirectory();
+
+        var fingerprints = new List<EpisodeFingerprint>();
+        foreach (var episode in valid)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var identity = ComputeFileIdentity(episode.FilePath!);
+            uint[]? points = null;
+            double pointDuration = 0;
+
+            if (cached.TryGetValue(episode.MediaItemId, out var stored)
+                && stored.HeadFingerprint is { Length: > 0 }
+                && stored.FileIdentity == identity)
+            {
+                points = DeserializeFingerprint(stored.HeadFingerprint);
+                pointDuration = stored.HeadPointDurationSeconds;
+            }
+            else
+            {
+                var windowSeconds = Math.Min(FingerprintHeadWindowMinutes * 60, episode.Duration!.Value.TotalSeconds);
+                var extracted = await _analyzerService.ExtractAudioFingerprintAsync(episode.FilePath!, 0, windowSeconds, workingDirectory, cancellationToken);
+                if (extracted == null || extracted.Points.Length == 0) continue;
+
+                points = extracted.Points;
+                pointDuration = extracted.PointDurationSeconds;
+                await _mediaRepository.SaveAudioFingerprintAsync(episode.MediaItemId, SerializeFingerprint(points), pointDuration, identity);
+            }
+
+            if (points == null || pointDuration <= 0) continue;
+
+            fingerprints.Add(new EpisodeFingerprint
+            {
+                MediaItemId = episode.MediaItemId,
+                Points = points,
+                PointDurationSeconds = pointDuration,
+                Duration = episode.Duration!.Value
+            });
+        }
+
+        if (fingerprints.Count < FingerprintMinSeasonEpisodes) return empty;
+        return _audioIntroDetector.DetectIntros(fingerprints, FingerprintOptions);
+    }
+
+    private string ResolveFingerprintWorkingDirectory()
+    {
+        var configured = _storagePaths.Value.AudioFingerprints;
+        return string.IsNullOrWhiteSpace(configured)
+            ? Path.Combine(AppContext.BaseDirectory, "data", "audiofingerprints")
+            : configured;
+    }
+
+    private static string ComputeFileIdentity(string filePath)
+    {
+        try
+        {
+            var info = new FileInfo(filePath);
+            return $"{filePath}|{info.Length}";
+        }
+        catch
+        {
+            return filePath;
+        }
+    }
+
+    private static byte[] SerializeFingerprint(uint[] points)
+    {
+        var bytes = new byte[points.Length * sizeof(uint)];
+        Buffer.BlockCopy(points, 0, bytes, 0, bytes.Length);
+        return bytes;
+    }
+
+    private static uint[] DeserializeFingerprint(byte[] bytes)
+    {
+        var points = new uint[bytes.Length / sizeof(uint)];
+        Buffer.BlockCopy(bytes, 0, points, 0, points.Length * sizeof(uint));
+        return points;
     }
 
     private async Task PersistMarkersAsync(Guid mediaItemId, List<DetectedMarker> assembled)

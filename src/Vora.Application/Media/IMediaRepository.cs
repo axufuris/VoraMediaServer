@@ -27,6 +27,9 @@ public interface IMediaRepository
     Task<List<Guid>> GetTopLevelMediaItemIdsByLibraryAsync(Guid libraryId);
     Task<MarkerDetectionGateDto?> GetMarkerDetectionGateAsync(Guid mediaItemId);
     Task<SilenceDetectionInputsDto?> GetSilenceDetectionInputsAsync(Guid mediaItemId);
+    Task<List<FingerprintInputDto>> GetSeasonFingerprintInputsAsync(Guid seasonId);
+    Task<Dictionary<Guid, StoredAudioFingerprintDto>> GetAudioFingerprintsForEpisodesAsync(IReadOnlyCollection<Guid> mediaItemIds);
+    Task SaveAudioFingerprintAsync(Guid mediaItemId, byte[] headFingerprint, double headPointDurationSeconds, string fileIdentity);
     Task<List<string>> GetMediaFilePathsAsync(Guid mediaItemId);
     Task<Dictionary<Guid, string>> GetDisplayTitlesByIdsAsync(IReadOnlyCollection<Guid> ids);
     Task<T?> GetProjectedAsync<T>(Guid id, Expression<Func<MediaItem, T>> projection, bool hasAllAccess = true, List<Guid>? allowedLibs = null, bool hasAllRatings = true, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false);
