@@ -40,8 +40,12 @@ public class MarkerAssembler : IMarkerAssembler
     private static readonly TimeSpan MinStingerLength = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan BoundaryProximity = TimeSpan.FromSeconds(3);
     // Credits run to (near) the end, so the credits-start gap leaves only a short
-    // tail. A gap that leaves more than this fraction of the runtime after it is an
-    // act break / scene fade, not the credits roll — skip past it.
+    // tail. A gap that leaves more than this behind it is an act break / scene
+    // fade, not the credits roll — skip past it. Episodes get a tight absolute cap
+    // (TV credits are short, and a late act break leaves an act-length tail of a
+    // few minutes that a runtime fraction wouldn't catch on a longer episode);
+    // movies keep the fraction since their credits are legitimately long.
+    private static readonly TimeSpan MaxEpisodeCreditsRoll = TimeSpan.FromMinutes(4);
     private const double MaxCreditsRollFraction = 0.2;
 
     public List<DetectedMarker> Assemble(MarkerAssemblerInput input)
@@ -170,12 +174,14 @@ public class MarkerAssembler : IMarkerAssembler
         if (creditsCandidates.Count == 0) return null;
 
         // Pick the earliest gap that leaves only a plausible credits-length tail.
-        // The naive "first gap past 60%" caught a commercial act break on longer
-        // episodes and mislabeled the last several minutes of the episode as
-        // credits (auto-skipping real content). Act breaks leave a long tail, so
+        // The naive "first gap past 60%" caught a commercial act break and
+        // mislabeled the last several minutes of the episode as credits
+        // (auto-skipping real content). Act breaks leave a longer tail, so
         // skipping over-long candidates lands on the real credits roll near the
         // end. Fall back to the last candidate if none fit (unusual structure).
-        var maxTail = TimeSpan.FromSeconds(input.Duration.TotalSeconds * MaxCreditsRollFraction);
+        var maxTail = input.IsEpisode
+            ? MaxEpisodeCreditsRoll
+            : TimeSpan.FromSeconds(input.Duration.TotalSeconds * MaxCreditsRollFraction);
         var creditsStart = creditsCandidates.FirstOrDefault(g => input.Duration - g.Start <= maxTail);
         return (creditsStart ?? creditsCandidates[^1]).Start;
     }
