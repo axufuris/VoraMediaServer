@@ -31,12 +31,14 @@ const chipStyle: React.CSSProperties = {
     WebkitBackdropFilter: 'blur(8px)',
 };
 
+// Fixed hues, independent of the template accent — the progress fill IS the
+// accent, so a marker band tinted with the accent is invisible against it.
 const markerBandColors: Record<string, string> = {
     Intro: 'rgba(255, 255, 255, 0.22)',
     Recap: 'rgba(255, 255, 255, 0.22)',
     Credits: 'rgba(120, 170, 255, 0.32)',
-    CreditsScene: 'var(--vora-accent-500)',
-    Preview: 'var(--vora-accent-500)',
+    CreditsScene: 'rgba(120, 170, 255, 0.32)',
+    Preview: 'rgba(180, 140, 255, 0.38)',
 };
 
 function MarkerBands({ markers, duration }: { markers: MediaMarker[]; duration: number }) {
@@ -656,7 +658,7 @@ export default function GlobalVideoPlayer() {
                                 <div className="absolute left-0 top-0 h-full rounded-full transition-all" style={{ width: `${progressPercent}%`, background: 'var(--vora-accent-500)' }} />
                                 <div
                                     className="absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
-                                    style={{ left: `calc(${progressPercent}% - 6px)`, background: 'var(--vora-accent-500)' }}
+                                    style={{ left: `calc(${progressPercent}% - 6px)`, background: '#ffffff', boxShadow: '0 0 0 1.5px rgba(0,0,0,0.45)' }}
                                 />
                             </div>
                             <span>{formatTime(duration)}</span>
