@@ -26,6 +26,7 @@ public class RemoteAccessManager(
     private const int UpnpDiscoveryTimeoutMs = 5000;
     private const int UpnpCleanupTimeoutMs = 3000;
     private const int PublicIpFallbackTimeoutSeconds = 3;
+    private const int ProbeTimeoutSeconds = 5;
 
     public async Task<RemoteAccessStatusVM> GetStatusAsync()
     {
@@ -34,6 +35,7 @@ public class RemoteAccessManager(
             settings.EnableRemoteAccess,
             settings.ManuallySpecifyPublicPort,
             settings.PublicPort > 0 ? settings.PublicPort : DefaultPublicPort,
+            settings.ExternalUrl,
             forceUpdate: false);
     }
 
@@ -45,9 +47,10 @@ public class RemoteAccessManager(
             settings.EnableRemoteAccess = request.IsEnabled;
             settings.ManuallySpecifyPublicPort = request.ManuallySpecifyPort;
             settings.PublicPort = request.PublicPort > 0 ? request.PublicPort : DefaultPublicPort;
+            settings.RemoteAccessExternalUrl = string.IsNullOrWhiteSpace(request.ExternalUrl) ? null : request.ExternalUrl.Trim();
             await settingsRepo.SaveChangesAsync();
 
-            return await CheckAndMapPortAsync(settings.EnableRemoteAccess, settings.ManuallySpecifyPublicPort, settings.PublicPort, forceUpdate: true);
+            return await CheckAndMapPortAsync(settings.EnableRemoteAccess, settings.ManuallySpecifyPublicPort, settings.PublicPort, settings.RemoteAccessExternalUrl, forceUpdate: true);
         }
         catch (Exception ex)
         {
@@ -68,23 +71,37 @@ public class RemoteAccessManager(
             isEnabled: true,
             settings.ManuallySpecifyPublicPort,
             settings.PublicPort > 0 ? settings.PublicPort : DefaultPublicPort,
+            settings.ExternalUrl,
             forceUpdate: true);
     }
 
-    private async Task<RemoteAccessStatusVM> CheckAndMapPortAsync(bool isEnabled, bool manualPort, int publicPort, bool forceUpdate)
+    private async Task<RemoteAccessStatusVM> CheckAndMapPortAsync(bool isEnabled, bool manualPort, int publicPort, string? externalUrl, bool forceUpdate)
     {
+        var normalizedUrl = NormalizeExternalUrl(externalUrl);
         var status = new RemoteAccessStatusVM
         {
             IsEnabled = isEnabled,
             ManuallySpecifyPort = manualPort,
             PublicPort = publicPort,
             LocalIp = GetLocalIpAddress(),
-            LocalPort = config.GetValue("InternalPort", DefaultLocalPort)
+            LocalPort = config.GetValue("InternalPort", DefaultLocalPort),
+            ExternalUrl = normalizedUrl
         };
 
         if (!isEnabled)
         {
             await RemoveExistingMappingsAsync(status.LocalPort);
+            return status;
+        }
+
+        // Reverse proxy / tunnel mode: an external URL means the user exposes Vora
+        // themselves, so UPnP is irrelevant. Decide the status purely by whether that
+        // URL actually answers over the internet.
+        if (!string.IsNullOrWhiteSpace(normalizedUrl))
+        {
+            status.PublicIp = await GetPublicIpFallbackAsync();
+            status.AccessUrl = normalizedUrl;
+            status.Reachable = await ProbeReachableAsync(normalizedUrl);
             return status;
         }
 
@@ -103,7 +120,7 @@ public class RemoteAccessManager(
         catch (NatDeviceNotFoundException)
         {
             status.UpnpSupported = false;
-            status.ErrorMessage = "Your router does not support UPnP, or it is disabled. You will need to manually configure port forwarding in your router's admin panel.";
+            status.ErrorMessage = "Your router does not support UPnP, or it is disabled. Configure port forwarding on your router, or set an external URL below if you reach Vora through a reverse proxy.";
             status.PublicIp = await GetPublicIpFallbackAsync();
         }
         catch (Exception ex)
@@ -114,7 +131,47 @@ public class RemoteAccessManager(
             status.PublicIp = await GetPublicIpFallbackAsync();
         }
 
+        // Whichever way the port was opened (UPnP or a manual forward), confirm it's
+        // actually reachable rather than assuming success from the mapping alone.
+        if (!string.IsNullOrWhiteSpace(status.PublicIp))
+        {
+            status.AccessUrl = $"http://{status.PublicIp}:{status.PublicPort}";
+            status.Reachable = await ProbeReachableAsync(status.AccessUrl);
+        }
+
         return status;
+    }
+
+    private async Task<bool> ProbeReachableAsync(string url)
+    {
+        try
+        {
+            var client = httpClientFactory.CreateClient("RemoteAccessProbe");
+            client.Timeout = TimeSpan.FromSeconds(ProbeTimeoutSeconds);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            // Any HTTP response — even a 4xx/5xx — means the endpoint answered over
+            // the network. That's the reachability signal; the status code doesn't
+            // matter (Vora's own root requires auth, so a 401 still proves the path).
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Remote-access reachability probe to {Url} failed.", url);
+            return false;
+        }
+    }
+
+    private static string? NormalizeExternalUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        var trimmed = url.Trim();
+        if (!trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            && !trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = "https://" + trimmed;
+        }
+        return trimmed.TrimEnd('/');
     }
 
     private async Task RemoveExistingMappingsAsync(int localPort, NatDevice? specificDevice = null)

@@ -8,6 +8,9 @@ export interface RemoteAccessStatus {
     publicIp: string;
     publicPort: number;
     manuallySpecifyPort: boolean;
+    externalUrl?: string | null;
+    reachable: boolean;
+    accessUrl: string;
     errorMessage: string;
 }
 
@@ -15,6 +18,7 @@ export interface UpdateRemoteAccessRequest {
     isEnabled: boolean;
     manuallySpecifyPort: boolean;
     publicPort: number;
+    externalUrl?: string | null;
 }
 
 export const remoteAccessService = {

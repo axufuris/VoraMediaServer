@@ -501,6 +501,15 @@ public static class ServiceRegistrationExtensions
     private static IServiceCollection AddVoraInfrastructure(this IServiceCollection services)
     {
         services.AddHttpClient();
+        // Remote-access reachability probe: a plain GET to the server's own public
+        // endpoint. We only care that the connection completes, not that the TLS
+        // certificate validates (a reverse proxy may present any cert), so accept
+        // any server certificate for this client only.
+        services.AddHttpClient("RemoteAccessProbe")
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            });
         services.AddHttpClient(SafeImageDownloader.HttpClientName, client =>
         {
             client.Timeout = TimeSpan.FromSeconds(15);

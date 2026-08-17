@@ -53,6 +53,7 @@ export default function RemoteAccessTab({ serverId, showModal }: RemoteAccessTab
                 isEnabled: remoteStatus.isEnabled,
                 manuallySpecifyPort: remoteStatus.manuallySpecifyPort,
                 publicPort: remoteStatus.publicPort,
+                externalUrl: remoteStatus.externalUrl,
             }, serverId);
             setRemoteStatus(updatedStatus);
             showModal('Success', 'Remote access settings applied successfully.');
@@ -74,6 +75,7 @@ export default function RemoteAccessTab({ serverId, showModal }: RemoteAccessTab
                 isEnabled: newEnabledState,
                 manuallySpecifyPort: remoteStatus.manuallySpecifyPort,
                 publicPort: remoteStatus.publicPort,
+                externalUrl: remoteStatus.externalUrl,
             }, serverId);
             setRemoteStatus(updatedStatus);
         } catch {
@@ -88,17 +90,25 @@ export default function RemoteAccessTab({ serverId, showModal }: RemoteAccessTab
 
     let statusTone: 'ok' | 'warn' | 'error' | 'neutral' = 'neutral';
     let statusTitle = 'Remote access is disabled';
+    let statusSubtitle: string | null = null;
 
     if (remoteStatus.isEnabled) {
-        if (remoteStatus.upnpSupported) {
+        if (remoteStatus.reachable) {
             statusTone = 'ok';
             statusTitle = 'Fully accessible outside your network';
-        } else if (remoteStatus.manuallySpecifyPort) {
-            statusTone = 'ok';
-            statusTitle = 'Manual port forwarding active';
+            statusSubtitle = remoteStatus.accessUrl ? `Reachable at ${remoteStatus.accessUrl}` : null;
+        } else if (remoteStatus.externalUrl) {
+            statusTone = 'warn';
+            statusTitle = "Couldn't reach your external URL";
+            statusSubtitle = `Vora couldn't reach ${remoteStatus.externalUrl} from the server. It may still work from outside — a self-test from inside your network can fail if your router doesn't loop traffic back. Check the address and that your proxy is running.`;
+        } else if (remoteStatus.upnpSupported || remoteStatus.manuallySpecifyPort) {
+            statusTone = 'warn';
+            statusTitle = 'Port is set up, but not verified';
+            statusSubtitle = "Vora couldn't confirm the port is reachable from the internet. It may still work — a self-test from inside can fail if your router doesn't loop traffic back.";
         } else {
             statusTone = 'error';
             statusTitle = 'Not accessible outside your network';
+            statusSubtitle = remoteStatus.errorMessage || null;
         }
     }
 
@@ -125,8 +135,8 @@ export default function RemoteAccessTab({ serverId, showModal }: RemoteAccessTab
                             {statusTitle}
                             <HealthBadge tone={statusTone}>{remoteStatus.isEnabled ? 'On' : 'Off'}</HealthBadge>
                         </h3>
-                        {remoteStatus.isEnabled && remoteStatus.errorMessage && !remoteStatus.manuallySpecifyPort && (
-                            <p className="text-sm text-[var(--vora-danger-text)] mt-1 max-w-xl">{remoteStatus.errorMessage}</p>
+                        {statusSubtitle && (
+                            <p className={`text-sm mt-1 max-w-xl ${statusTone === 'error' ? 'text-[var(--vora-danger-text)]' : statusTone === 'warn' ? 'text-[var(--vora-warning-text)]' : 'text-[var(--vora-text-muted)]'}`}>{statusSubtitle}</p>
                         )}
                     </div>
                 </div>
@@ -162,6 +172,20 @@ export default function RemoteAccessTab({ serverId, showModal }: RemoteAccessTab
                 <FieldHint>
                     Vora attempts to automatically map the port via UPnP. If your router requires manual port forwarding, check the box above and configure your router to forward traffic to the private IP and port shown.
                 </FieldHint>
+
+                <div className="mt-6 pt-6 border-t border-[var(--vora-border-subtle)]">
+                    <FieldLabel>External URL (reverse proxy / tunnel)</FieldLabel>
+                    <input
+                        type="text"
+                        value={remoteStatus.externalUrl ?? ''}
+                        onChange={e => setRemoteStatus({ ...remoteStatus, externalUrl: e.target.value })}
+                        placeholder="https://vora.example.com"
+                        className="vora-input w-full max-w-md"
+                    />
+                    <FieldHint>
+                        If you reach Vora through a reverse proxy, tunnel, or custom domain, enter its public address here. Vora will verify that URL is reachable and skip UPnP — you don't need port forwarding.
+                    </FieldHint>
+                </div>
             </section>
 
             <section className="vora-card p-6">

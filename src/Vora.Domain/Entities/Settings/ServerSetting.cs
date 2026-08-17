@@ -57,6 +57,10 @@ public class ServerSetting
     public bool EnableRemoteAccess { get; set; } = true;
     public bool ManuallySpecifyPublicPort { get; set; }
     public int PublicPort { get; set; } = 32080;
+    // When set (a reverse proxy / tunnel domain like https://vora.example.com),
+    // remote access is considered handled by the user: UPnP is skipped and status
+    // is decided by whether that URL is actually reachable.
+    public string? RemoteAccessExternalUrl { get; set; }
 
     public int InternetUploadSpeedMbps { get; set; } = 1000;
     public int MaxRemoteStreamBitrateMbps { get; set; }
