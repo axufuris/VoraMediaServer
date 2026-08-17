@@ -32,6 +32,30 @@ function Checkbox({ checked, onChange, label }: { checked: boolean, onChange: (v
 function MarkerCoverageCard({ libraryId, serverId }: { libraryId: string, serverId?: string }) {
     const [coverage, setCoverage] = useState<MarkerCoverageVM | null>(null);
     const [loading, setLoading] = useState(false);
+    const dialog = useDialog();
+
+    const analyze = async (force: boolean) => {
+        if (force) {
+            const ok = await dialog.confirm({
+                title: 'Re-analyze everything?',
+                message: 'This re-runs marker detection on every item in this library, including ones already analyzed — it discards existing detected markers and can take a long time. Manually locked markers are kept. Continue?',
+                confirmText: 'Re-analyze all',
+            });
+            if (!ok) return;
+        }
+        try {
+            await libraryAdminService.analyzeLibrary(libraryId, force, serverId);
+            void dialog.alert({
+                title: force ? 'Re-analysis started' : 'Analysis started',
+                message: force
+                    ? 'Marker detection queued for every item in this library.'
+                    : 'Marker detection queued for items not yet analyzed. Use the coverage below to track progress.',
+            });
+        } catch (err) {
+            console.error(err);
+            void dialog.alert({ title: 'Error', message: `Failed to trigger library ${force ? 're-analysis' : 'analysis'}.` });
+        }
+    };
 
     const load = async () => {
         setLoading(true);
@@ -62,16 +86,20 @@ function MarkerCoverageCard({ libraryId, serverId }: { libraryId: string, server
 
     return (
         <div className="vora-card p-5 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
                 <h2 className="text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Marker coverage</h2>
-                <button
-                    type="button"
-                    onClick={load}
-                    disabled={loading}
-                    className="vora-button-secondary text-xs disabled:opacity-50"
-                >
-                    {loading ? 'Refreshing…' : 'Refresh'}
-                </button>
+                <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => analyze(false)} className="vora-button-secondary text-xs">Analyze library</button>
+                    <button type="button" onClick={() => analyze(true)} className="vora-button-secondary text-xs">Re-analyze all</button>
+                    <button
+                        type="button"
+                        onClick={load}
+                        disabled={loading}
+                        className="vora-button-secondary text-xs disabled:opacity-50"
+                    >
+                        {loading ? 'Refreshing…' : 'Refresh'}
+                    </button>
+                </div>
             </div>
             {coverage && coverage.totalItems === 0 ? (
                 <p className="text-sm" style={{ color: 'var(--vora-text-muted)' }}>This library has no movies or episodes yet.</p>
@@ -369,42 +397,6 @@ export default function ManageLibrary() {
                         className="vora-button-secondary text-xs"
                     >
                         Refresh metadata
-                    </button>
-                    <button
-                        type="button"
-                        onClick={async () => {
-                            try {
-                                await libraryAdminService.analyzeLibrary(library.id, false, serverId);
-                                showAlert('Analysis started', 'Marker detection queued for items not yet analyzed. Use the coverage card below to track progress.');
-                            } catch (err) {
-                                console.error(err);
-                                showAlert('Error', 'Failed to trigger library analysis.');
-                            }
-                        }}
-                        className="vora-button-secondary text-xs"
-                    >
-                        Analyze library
-                    </button>
-                    <button
-                        type="button"
-                        onClick={async () => {
-                            const ok = await dialog.confirm({
-                                title: 'Re-analyze everything?',
-                                message: 'This re-runs marker detection on every item in this library, including ones already analyzed — it discards existing detected markers and can take a long time. Manually locked markers are kept. Continue?',
-                                confirmText: 'Re-analyze all',
-                            });
-                            if (!ok) return;
-                            try {
-                                await libraryAdminService.analyzeLibrary(library.id, true, serverId);
-                                showAlert('Re-analysis started', 'Marker detection queued for every item in this library.');
-                            } catch (err) {
-                                console.error(err);
-                                showAlert('Error', 'Failed to trigger library re-analysis.');
-                            }
-                        }}
-                        className="vora-button-secondary text-xs"
-                    >
-                        Re-analyze all
                     </button>
                     <div className="ml-auto">
                         <button
