@@ -126,10 +126,14 @@ function ThumbnailCoverageCard({ libraryId, libraryType, enabled, serverId }: { 
         void loadRef.current();
     }, [libraryId, serverId, isVideoType]);
 
-    const regenerate = async () => {
+    const regenerate = async (force: boolean) => {
+        if (force) {
+            const ok = await dialog.confirm('Regenerate ALL thumbnails for this library? This redoes every item, including ones that already have thumbnails.');
+            if (!ok) return;
+        }
         setRegenerating(true);
         try {
-            await libraryAdminService.regenerateLibraryThumbnails(libraryId, serverId);
+            await libraryAdminService.regenerateLibraryThumbnails(libraryId, force, serverId);
             await dialog.alert('Video thumbnail generation started in the background!');
             void load();
         } catch (err) {
@@ -153,8 +157,11 @@ function ThumbnailCoverageCard({ libraryId, libraryType, enabled, serverId }: { 
                     <button type="button" onClick={load} disabled={loading} className="vora-button-secondary text-xs disabled:opacity-50">
                         {loading ? 'Refreshing…' : 'Refresh'}
                     </button>
-                    <button type="button" onClick={regenerate} disabled={regenerating || !enabled} className="vora-button-secondary text-xs disabled:opacity-50" title={enabled ? '' : 'Enable the checkbox in library settings first'}>
+                    <button type="button" onClick={() => regenerate(false)} disabled={regenerating || !enabled} className="vora-button-secondary text-xs disabled:opacity-50" title={enabled ? '' : 'Enable the checkbox in library settings first'}>
                         {regenerating ? 'Queued…' : 'Regenerate missing'}
+                    </button>
+                    <button type="button" onClick={() => regenerate(true)} disabled={regenerating || !enabled} className="vora-button-secondary text-xs disabled:opacity-50" title={enabled ? 'Redo every item, including ones that already have thumbnails' : 'Enable the checkbox in library settings first'}>
+                        {regenerating ? 'Queued…' : 'Regenerate all'}
                     </button>
                 </div>
             </div>
@@ -175,7 +182,7 @@ function ThumbnailCoverageCard({ libraryId, libraryType, enabled, serverId }: { 
                 <div className="vora-skeleton h-20" />
             )}
             <p className="text-xs" style={{ color: 'var(--vora-text-muted)' }}>
-                Generation runs daily at the time set in System Settings → Video Preview Thumbnails. Items with locked thumbnails are skipped. "Regenerate missing" enqueues this library now.
+                Generation runs daily at the time set in System Settings → Video Preview Thumbnails. Items with locked thumbnails are skipped. "Regenerate missing" fills the gaps (and resumes an interrupted run); "Regenerate all" redoes every item.
             </p>
         </div>
     );

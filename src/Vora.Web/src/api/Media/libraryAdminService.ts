@@ -150,8 +150,8 @@ export const libraryAdminService = {
         return response.data;
     },
 
-    regenerateLibraryThumbnails: async (libraryId: string, serverId?: string): Promise<void> => {
-        await apiClient.post(`/libraries/${libraryId}/thumbnails/regenerate`, null, { serverId });
+    regenerateLibraryThumbnails: async (libraryId: string, force = false, serverId?: string): Promise<void> => {
+        await apiClient.post(`/libraries/${libraryId}/thumbnails/regenerate${force ? '?force=true' : ''}`, null, { serverId });
     },
 
     regenerateMediaItemThumbnails: async (mediaItemId: string, serverId?: string): Promise<void> => {
