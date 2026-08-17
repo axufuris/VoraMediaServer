@@ -337,6 +337,63 @@ public partial class MediaRepository : IMediaRepository
             .FirstOrDefaultAsync();
     }
 
+    public async Task<List<Vora.Application.Media.Dtos.FingerprintInputDto>> GetSeasonFingerprintInputsAsync(Guid seasonId)
+    {
+        return await _context.Set<Episode>()
+            .AsNoTracking()
+            .Where(e => e.SeasonId == seasonId)
+            .Select(e => new Vora.Application.Media.Dtos.FingerprintInputDto
+            {
+                MediaItemId = e.Id,
+                FilePath = e.MediaParts.Select(p => p.FilePath).FirstOrDefault(),
+                Duration = e.Analysis.Duration
+            })
+            .ToListAsync();
+    }
+
+    public async Task<Dictionary<Guid, Vora.Application.Media.Dtos.StoredAudioFingerprintDto>> GetAudioFingerprintsForEpisodesAsync(IReadOnlyCollection<Guid> mediaItemIds)
+    {
+        return await _context.Set<MediaItemAudioFingerprint>()
+            .AsNoTracking()
+            .Where(f => mediaItemIds.Contains(f.MediaItemId))
+            .ToDictionaryAsync(
+                f => f.MediaItemId,
+                f => new Vora.Application.Media.Dtos.StoredAudioFingerprintDto
+                {
+                    HeadFingerprint = f.HeadFingerprint,
+                    HeadPointDurationSeconds = f.HeadPointDurationSeconds,
+                    FileIdentity = f.FileIdentity
+                });
+    }
+
+    public async Task SaveAudioFingerprintAsync(Guid mediaItemId, byte[] headFingerprint, double headPointDurationSeconds, string fileIdentity)
+    {
+        var existing = await _context.Set<MediaItemAudioFingerprint>()
+            .FirstOrDefaultAsync(f => f.MediaItemId == mediaItemId);
+
+        if (existing == null)
+        {
+            _context.Set<MediaItemAudioFingerprint>().Add(new MediaItemAudioFingerprint
+            {
+                Id = Guid.NewGuid(),
+                MediaItemId = mediaItemId,
+                HeadFingerprint = headFingerprint,
+                HeadPointDurationSeconds = headPointDurationSeconds,
+                FileIdentity = fileIdentity,
+                AnalyzedAt = DateTime.UtcNow
+            });
+        }
+        else
+        {
+            existing.HeadFingerprint = headFingerprint;
+            existing.HeadPointDurationSeconds = headPointDurationSeconds;
+            existing.FileIdentity = fileIdentity;
+            existing.AnalyzedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     public async Task<List<string>> GetMediaFilePathsAsync(Guid mediaItemId)
     {
         return await _context.MediaItems

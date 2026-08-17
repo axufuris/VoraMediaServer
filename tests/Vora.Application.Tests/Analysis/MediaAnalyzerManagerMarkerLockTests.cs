@@ -44,11 +44,13 @@ public class MediaAnalyzerManagerMarkerLockTests
             _media,
             _analyzer,
             _assembler,
+            new AudioIntroDetector(new AudioFingerprintComparer()),
             _settings,
             _queue,
             _notifier,
             new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
             Substitute.For<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(),
+            Microsoft.Extensions.Options.Options.Create(new Vora.Application.Settings.StoragePathsOptions()),
             NullLogger<MediaAnalyzerManager>.Instance);
     }
 

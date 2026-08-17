@@ -49,9 +49,12 @@ public class MediaAnalyzerManagerDetectionTests
         scope.ServiceProvider.Returns(scopedProvider);
 
         _manager = new MediaAnalyzerManager(
-            _media, _analyzer, _assembler, _settings, _queue, _notifier,
+            _media, _analyzer, _assembler,
+            new AudioIntroDetector(new AudioFingerprintComparer()),
+            _settings, _queue, _notifier,
             new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
             scopeFactory,
+            Microsoft.Extensions.Options.Options.Create(new Vora.Application.Settings.StoragePathsOptions()),
             NullLogger<MediaAnalyzerManager>.Instance);
 
         // The season path fans out episode detection through a DI scope; resolve
@@ -235,6 +238,38 @@ public class MediaAnalyzerManagerDetectionTests
 
         await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/ep.mkv",
             Arg.Is<SilenceDetectionParameters>(p => p.MinSilenceDurationSec == 2), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Fingerprint_intro_skips_the_head_decode_and_overrides_the_intro()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/ep.mkv", TimeSpan.FromMinutes(45), meanDb: -20);
+        var fingerprintIntro = new DetectedMarker
+        {
+            Type = MarkerType.Intro,
+            Start = TimeSpan.FromSeconds(90),
+            End = TimeSpan.FromSeconds(150)
+        };
+
+        await _manager.AnalyzeMediaItemMarkersAsync(id, isEpisode: true, forceOverride: true, fingerprintIntro);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/ep.mkv",
+            Arg.Is<SilenceDetectionParameters>(p => p.SkipHeadWindow), Arg.Any<CancellationToken>());
+        await _media.Received().ReplaceMarkersAsync(id, Arg.Is<IEnumerable<MediaItemMarker>>(ms =>
+            ms.Any(m => m.Type == MarkerType.Intro && m.Start == TimeSpan.FromSeconds(90) && m.End == TimeSpan.FromSeconds(150))));
+    }
+
+    [Fact]
+    public async Task No_fingerprint_intro_keeps_the_head_decode()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/ep.mkv", TimeSpan.FromMinutes(45), meanDb: -20);
+
+        await _manager.AnalyzeMediaItemMarkersAsync(id, isEpisode: true, forceOverride: true, fingerprintIntro: null);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/ep.mkv",
+            Arg.Is<SilenceDetectionParameters>(p => !p.SkipHeadWindow), Arg.Any<CancellationToken>());
     }
 
     [Fact]
