@@ -26,6 +26,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
     private readonly IVideoThumbnailStorageService _storage;
     private readonly IVideoThumbnailGeneratorService _generator;
     private readonly IClientNotifier _notifier;
+    private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<VideoThumbnailManager> _logger;
 
@@ -36,6 +37,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         IVideoThumbnailStorageService storage,
         IVideoThumbnailGeneratorService generator,
         IClientNotifier notifier,
+        Vora.Plugins.Interfaces.ITaskProgressReporter progress,
         IServiceScopeFactory scopeFactory,
         ILogger<VideoThumbnailManager> logger)
     {
@@ -45,6 +47,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         _storage = storage;
         _generator = generator;
         _notifier = notifier;
+        _progress = progress;
         _scopeFactory = scopeFactory;
         _logger = logger;
     }
@@ -93,6 +96,10 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         var ids = idsSource as IReadOnlyList<Guid> ?? idsSource.ToList();
         if (ids.Count == 0) return;
 
+        var titles = await _mediaRepository.GetDisplayTitlesByIdsAsync(ids);
+        var total = ids.Count;
+        var done = 0;
+
         var settings = await _settingsRepo.GetSettingsAsync();
         var parallelism = Math.Clamp(settings.VideoThumbnailConcurrency <= 0 ? 2 : settings.VideoThumbnailConcurrency, 1, MaxThumbnailParallelism);
         await Parallel.ForEachAsync(
@@ -103,11 +110,12 @@ public class VideoThumbnailManager : IVideoThumbnailManager
                 try
                 {
                     var itemType = await _mediaRepository.GetProjectedAsync(id, m => m.GetType().Name);
-                    if (itemType != nameof(Movie) && itemType != nameof(Episode)) return;
-
-                    using var scope = _scopeFactory.CreateScope();
-                    var manager = scope.ServiceProvider.GetRequiredService<IVideoThumbnailManager>();
-                    await manager.GenerateForItemAsync(id, forceOverride, ct);
+                    if (itemType == nameof(Movie) || itemType == nameof(Episode))
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var manager = scope.ServiceProvider.GetRequiredService<IVideoThumbnailManager>();
+                        await manager.GenerateForItemAsync(id, forceOverride, ct);
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -117,8 +125,14 @@ public class VideoThumbnailManager : IVideoThumbnailManager
                 {
                     _logger.LogError(ex, "Video thumbnail generation failed for {MediaItemId}.", id);
                 }
+
+                var n = Interlocked.Increment(ref done);
+                _progress.Report($"Generating thumbnails — {ProgressTitle(titles, id)} ({n}/{total})");
             });
     }
+
+    private static string ProgressTitle(IReadOnlyDictionary<Guid, string> titles, Guid id) =>
+        titles.TryGetValue(id, out var t) && !string.IsNullOrWhiteSpace(t) ? t : "…";
 
     public async Task<(int Total, int WithThumbnails)> GetCoverageAsync(Guid libraryId)
     {
