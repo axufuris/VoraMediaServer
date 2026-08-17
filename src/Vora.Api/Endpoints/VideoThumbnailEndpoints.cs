@@ -85,7 +85,13 @@ public static class VideoThumbnailEndpoints
     private static async Task<IResult> QueueRegenerateLibraryAsync(Guid id, ITaskQueueManager taskQueue, ILibraryRepository libraryRepository)
     {
         var name = await libraryRepository.GetProjectedByIdAsync(id, l => l.Name);
-        taskQueue.QueueGenerateLibraryVideoThumbnails(id, name, forceOverride: true);
+        // "Regenerate missing" fills the gaps: forceOverride false so items that
+        // already have current-version thumbnails are skipped and only missing (or
+        // settings-stale, via the version check) items are generated. This lets a
+        // library that stopped partway — e.g. the container restarted mid-run, since
+        // the task queue is in-memory and doesn't resume — be continued from where it
+        // left off instead of redoing everything from scratch.
+        taskQueue.QueueGenerateLibraryVideoThumbnails(id, name, forceOverride: false);
         return Results.Accepted();
     }
 
