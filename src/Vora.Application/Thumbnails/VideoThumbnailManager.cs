@@ -127,7 +127,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
                 }
 
                 var n = Interlocked.Increment(ref done);
-                _progress.Report($"Generating thumbnails — {ProgressTitle(titles, id)} ({n}/{total})");
+                _progress.Report($"{ProgressTitle(titles, id)} ({n}/{total})");
             });
     }
 
