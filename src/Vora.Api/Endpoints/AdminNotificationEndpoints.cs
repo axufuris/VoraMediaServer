@@ -14,6 +14,7 @@ public static class AdminNotificationEndpoints
         group.MapGet("/unread-count", GetUnreadCountAsync).WithName("GetAdminNotificationUnreadCount").Produces<int>();
         group.MapPut("/{id:guid}/read", MarkReadAsync).WithName("MarkAdminNotificationRead").Produces(StatusCodes.Status204NoContent);
         group.MapPost("/mark-all-read", MarkAllReadAsync).WithName("MarkAllAdminNotificationsRead").Produces(StatusCodes.Status204NoContent);
+        group.MapDelete("/", ClearAllAsync).WithName("ClearAdminNotifications").Produces(StatusCodes.Status204NoContent);
 
         return group;
     }
@@ -39,6 +40,12 @@ public static class AdminNotificationEndpoints
     private static async Task<IResult> MarkAllReadAsync(IAdminNotificationManager manager)
     {
         await manager.MarkAllReadAsync();
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> ClearAllAsync(IAdminNotificationManager manager)
+    {
+        await manager.ClearAllAsync();
         return Results.NoContent();
     }
 }

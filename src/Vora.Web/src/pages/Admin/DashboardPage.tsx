@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { streamingAdminService, type NowPlayingSession, type SystemStats } from '../../api/Streaming/streamingAdminService';
 import { adminNotificationService, type AdminNotificationVM } from '../../api/System/adminNotificationService';
@@ -12,6 +12,7 @@ import EntityCard from '../../components/Admin/Primitives/EntityCard';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
 import StatusDot from '../../components/Admin/Primitives/StatusDot';
 import EmptyState from '../../components/Admin/Primitives/EmptyState';
+import { Modal } from '../../components/Common/Modal';
 
 function formatRelative(iso: string): string {
     const diffMs = Date.now() - new Date(iso).getTime();
@@ -150,10 +151,14 @@ function NowPlayingRow({ session, onPlay, onPause, onStop }: { session: NowPlayi
     );
 }
 
-function NotificationRow({ n }: { n: AdminNotificationVM }) {
+function NotificationRow({ n, onClick }: { n: AdminNotificationVM, onClick: () => void }) {
     const tone = n.severity === 'Error' ? 'error' : n.severity === 'Warning' ? 'warn' : 'info';
     return (
-        <div className="flex items-start gap-3 px-5 py-3 border-b border-[var(--vora-border-subtle)] last:border-b-0">
+        <button
+            type="button"
+            onClick={onClick}
+            className="w-full text-left flex items-start gap-3 px-5 py-3 border-b border-[var(--vora-border-subtle)] last:border-b-0 hover:bg-[var(--vora-bg-sunken)] transition-colors"
+        >
             <span className="mt-1.5 shrink-0">
                 <StatusDot tone={tone} />
             </span>
@@ -162,7 +167,7 @@ function NotificationRow({ n }: { n: AdminNotificationVM }) {
                 <div className="text-xs text-[var(--vora-text-secondary)] mt-0.5 line-clamp-2">{n.message}</div>
                 <div className="text-[11px] text-[var(--vora-text-muted)] mt-1">{formatRelative(n.createdAt)}</div>
             </div>
-        </div>
+        </button>
     );
 }
 
@@ -178,6 +183,41 @@ export default function DashboardPage() {
     const [plugins, setPlugins] = useState<PluginVM[]>([]);
     const [librariesLoaded, setLibrariesLoaded] = useState(false);
     const [notificationsLoaded, setNotificationsLoaded] = useState(false);
+    const [detail, setDetail] = useState<AdminNotificationVM | null>(null);
+    const [viewAllOpen, setViewAllOpen] = useState(false);
+    const [allNotifications, setAllNotifications] = useState<AdminNotificationVM[]>([]);
+    const [allLoading, setAllLoading] = useState(false);
+
+    const openDetail = useCallback((n: AdminNotificationVM) => {
+        setDetail(n);
+        if (!n.isRead) {
+            adminNotificationService.markRead(n.id, serverId).catch(() => { /* best-effort */ });
+            setNotifications(prev => prev.map(x => (x.id === n.id ? { ...x, isRead: true } : x)));
+            setAllNotifications(prev => prev.map(x => (x.id === n.id ? { ...x, isRead: true } : x)));
+        }
+    }, [serverId]);
+
+    const openViewAll = useCallback(async () => {
+        setViewAllOpen(true);
+        setAllLoading(true);
+        const all = await adminNotificationService.getRecent(200, false, serverId).catch(() => [] as AdminNotificationVM[]);
+        setAllNotifications(all);
+        setAllLoading(false);
+    }, [serverId]);
+
+    const clearAll = useCallback(async () => {
+        const ok = await dialog.confirm('Clear all recent activity? This permanently removes every admin notification.');
+        if (!ok) return;
+        try {
+            await adminNotificationService.clearAll(serverId);
+            setNotifications([]);
+            setAllNotifications([]);
+            setViewAllOpen(false);
+            setDetail(null);
+        } catch {
+            await dialog.alert('Failed to clear notifications.');
+        }
+    }, [serverId, dialog]);
 
     useEffect(() => {
         let isMounted = true;
@@ -329,6 +369,12 @@ export default function DashboardPage() {
                         title="Recent Activity"
                         description={notificationsLoaded ? `${notifications.length} recent event${notifications.length === 1 ? '' : 's'}` : 'Loading…'}
                         maxBodyHeight="520px"
+                        actions={notificationsLoaded && notifications.length > 0 ? (
+                            <>
+                                <button type="button" onClick={openViewAll} className="vora-button-secondary text-xs">View all</button>
+                                <button type="button" onClick={clearAll} className="vora-button-secondary text-xs">Clear</button>
+                            </>
+                        ) : undefined}
                     >
                         {!notificationsLoaded ? (
                             <div className="p-5 space-y-3">
@@ -341,7 +387,7 @@ export default function DashboardPage() {
                                 icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" /></svg>}
                             />
                         ) : (
-                            notifications.map(n => <NotificationRow key={n.id} n={n} />)
+                            notifications.map(n => <NotificationRow key={n.id} n={n} onClick={() => openDetail(n)} />)
                         )}
                     </ListCard>
                 </div>
@@ -445,6 +491,45 @@ export default function DashboardPage() {
                     </div>
                 </ListCard>
             </div>
+
+            <Modal isOpen={viewAllOpen} onClose={() => setViewAllOpen(false)} surface="light" size="2xl">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--vora-border-subtle)]">
+                    <h3 className="text-sm font-semibold text-[var(--vora-text-primary)]">Recent activity</h3>
+                    <div className="flex items-center gap-2">
+                        {allNotifications.length > 0 && <button type="button" onClick={clearAll} className="vora-button-secondary text-xs">Clear all</button>}
+                        <button type="button" onClick={() => setViewAllOpen(false)} className="vora-button-secondary text-xs">Close</button>
+                    </div>
+                </div>
+                <div className="max-h-[70vh] overflow-y-auto">
+                    {allLoading ? (
+                        <div className="p-5 space-y-3">{[1, 2, 3, 4].map(i => <div key={i} className="vora-skeleton h-12" />)}</div>
+                    ) : allNotifications.length === 0 ? (
+                        <div className="p-8 text-center text-sm text-[var(--vora-text-muted)]">No recent alerts or notifications.</div>
+                    ) : (
+                        allNotifications.map(n => <NotificationRow key={n.id} n={n} onClick={() => openDetail(n)} />)
+                    )}
+                </div>
+            </Modal>
+
+            <Modal isOpen={!!detail} onClose={() => setDetail(null)} surface="light" size="lg" zIndex="z-[210]">
+                {detail && (
+                    <div className="p-6 space-y-4">
+                        <div className="flex items-start gap-3">
+                            <span className="mt-1.5 shrink-0">
+                                <StatusDot tone={detail.severity === 'Error' ? 'error' : detail.severity === 'Warning' ? 'warn' : 'info'} />
+                            </span>
+                            <div className="min-w-0">
+                                <h3 className="text-base font-semibold text-[var(--vora-text-primary)]">{detail.title}</h3>
+                                <p className="text-xs text-[var(--vora-text-muted)] mt-0.5">{new Date(detail.createdAt).toLocaleString()} · {detail.severity}</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-[var(--vora-text-secondary)] whitespace-pre-wrap break-words">{detail.message}</p>
+                        <div className="flex justify-end">
+                            <button type="button" onClick={() => setDetail(null)} className="vora-button-secondary text-sm">Close</button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 }

@@ -45,4 +45,9 @@ public class AdminNotificationRepository : IAdminNotificationRepository
             .Where(n => !n.IsRead)
             .ExecuteUpdateAsync(setters => setters.SetProperty(n => n.IsRead, true));
     }
+
+    public async Task ClearAllAsync()
+    {
+        await _context.AdminNotifications.ExecuteDeleteAsync();
+    }
 }
