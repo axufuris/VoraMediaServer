@@ -46,8 +46,12 @@ public class VideoThumbnailManagerTests
             VideoThumbnailSpriteColumns = 10
         });
 
+        _media.GetDisplayTitlesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>())
+            .Returns(new Dictionary<Guid, string>());
+
         _manager = new VideoThumbnailManager(
             _media, _library, _settings, _storage, _generator, _notifier,
+            new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
             Substitute.For<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(),
             NullLogger<VideoThumbnailManager>.Instance);
     }
