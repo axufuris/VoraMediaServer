@@ -32,9 +32,9 @@ public class ServerSetting
 
     public TimeSpan VideoThumbnailScheduleTime { get; set; } = new(4, 0, 0);
     public int VideoThumbnailIntervalSeconds { get; set; } = 10;
-    public int VideoThumbnailWidth { get; set; } = 320;
-    public int VideoThumbnailHeight { get; set; } = 180;
-    public int VideoThumbnailJpegQuality { get; set; } = 5;
+    public int VideoThumbnailWidth { get; set; } = 160;
+    public int VideoThumbnailHeight { get; set; } = 90;
+    public int VideoThumbnailJpegQuality { get; set; } = 9;
     public int VideoThumbnailSpriteColumns { get; set; } = 10;
 
     // How many media items thumbnail generation processes in parallel.

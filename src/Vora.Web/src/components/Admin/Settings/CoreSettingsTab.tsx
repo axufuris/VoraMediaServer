@@ -639,10 +639,10 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                                 min={2}
                                 max={31}
                                 value={serverSettings.videoThumbnailJpegQuality}
-                                onChange={e => setServerSettings({ ...serverSettings, videoThumbnailJpegQuality: parseInt(e.target.value) || 5 })}
+                                onChange={e => setServerSettings({ ...serverSettings, videoThumbnailJpegQuality: parseInt(e.target.value) || 9 })}
                                 className="vora-input w-32"
                             />
-                            <FieldHint>FFmpeg JPEG quality scale (2 = best, 31 = worst). Default 5 keeps sprites small without visible artifacts.</FieldHint>
+                            <FieldHint>FFmpeg quality scale (2 = best/largest, 31 = worst/smallest). Default 9 keeps sprites small without visible artifacts on a hover preview.</FieldHint>
                         </div>
                         <div>
                             <FieldLabel>Sprite Columns</FieldLabel>
