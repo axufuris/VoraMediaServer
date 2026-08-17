@@ -271,7 +271,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
 
     internal static string ComputeSpriteVersion(int interval, int width, int height, int quality, int columns)
     {
-        var seed = string.Create(CultureInfo.InvariantCulture, $"v1|{interval}|{width}|{height}|{quality}|{columns}");
+        var seed = string.Create(CultureInfo.InvariantCulture, $"v2-webp|{interval}|{width}|{height}|{quality}|{columns}");
         var bytes = SHA1.HashData(Encoding.UTF8.GetBytes(seed));
         return Convert.ToHexString(bytes)[..12].ToLowerInvariant();
     }

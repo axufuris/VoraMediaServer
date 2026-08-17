@@ -72,7 +72,7 @@ public static class VideoThumbnailEndpoints
         var lastWriteUtc = File.GetLastWriteTimeUtc(path);
         var etag = $"\"{lastWriteUtc.Ticks:x}\"";
         httpContext.Response.Headers.CacheControl = "public, max-age=86400";
-        return Results.File(path, "image/jpeg", entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue(etag), lastModified: lastWriteUtc);
+        return Results.File(path, "image/webp", entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue(etag), lastModified: lastWriteUtc);
     }
 
     private static async Task<IResult> QueueRegenerateMediaItemAsync(Guid id, ITaskQueueManager taskQueue, IMediaRepository mediaRepository)
