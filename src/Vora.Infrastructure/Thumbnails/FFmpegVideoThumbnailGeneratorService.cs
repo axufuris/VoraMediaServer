@@ -107,6 +107,18 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
         File.Move(tempSpritePath, finalSpritePath);
         File.Move(tempVttPath, finalVttPath);
 
+        // Remove the pre-WebP JPEG sprite an earlier generation may have left behind
+        // so a regenerated item doesn't keep both formats in its directory.
+        var legacyJpeg = Path.Combine(Path.GetDirectoryName(finalSpritePath)!, "sprite.jpg");
+        try
+        {
+            if (File.Exists(legacyJpeg)) File.Delete(legacyJpeg);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Could not delete legacy JPEG sprite {LegacyPath}", legacyJpeg);
+        }
+
         return new VideoThumbnailGenerationResult
         {
             SpriteOutputPath = finalSpritePath,
@@ -132,8 +144,8 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
             CreateNoWindow = true
         };
         startInfo.ArgumentList.Add("-y");
-        // -hwaccel is an input option (must precede -i). We keep the mjpeg tiles on
-        // the CPU side, so decode on the GPU and let frames download to system RAM.
+        // -hwaccel is an input option (must precede -i). We encode the tiles on the
+        // CPU side, so decode on the GPU and let frames download to system RAM.
         if (useHardware)
         {
             startInfo.ArgumentList.Add("-hwaccel");
@@ -157,14 +169,21 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
         startInfo.ArgumentList.Add(parameters.InputPath);
         startInfo.ArgumentList.Add("-vf");
         startInfo.ArgumentList.Add(filter);
-        startInfo.ArgumentList.Add("-qscale:v");
-        startInfo.ArgumentList.Add(parameters.JpegQuality.ToString(CultureInfo.InvariantCulture));
         startInfo.ArgumentList.Add("-frames:v");
         startInfo.ArgumentList.Add("1");
         startInfo.ArgumentList.Add("-an");
         startInfo.ArgumentList.Add("-sn");
+        // WebP is ~25-35% smaller than JPEG at the same visual quality. The stored
+        // quality is an FFmpeg qscale (2 = best .. 31 = worst); map it to libwebp's
+        // 0-100 quality (higher = better) so the one setting keeps its meaning across
+        // both encoders.
+        var webpQuality = Math.Clamp((int)Math.Round((31 - Math.Clamp(parameters.JpegQuality, 2, 31)) / 29.0 * 100), 0, 100);
         startInfo.ArgumentList.Add("-c:v");
-        startInfo.ArgumentList.Add("mjpeg");
+        startInfo.ArgumentList.Add("libwebp");
+        startInfo.ArgumentList.Add("-quality");
+        startInfo.ArgumentList.Add(webpQuality.ToString(CultureInfo.InvariantCulture));
+        startInfo.ArgumentList.Add("-preset");
+        startInfo.ArgumentList.Add("picture");
         startInfo.ArgumentList.Add("-f");
         startInfo.ArgumentList.Add("image2");
         startInfo.ArgumentList.Add(tempSpritePath);

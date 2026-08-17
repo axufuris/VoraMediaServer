@@ -28,7 +28,7 @@ public class VideoThumbnailStorageService : IVideoThumbnailStorageService
     }
 
     public string GetSpritePath(Guid mediaItemId) =>
-        Path.Combine(GetItemDirectory(mediaItemId), "sprite.jpg");
+        Path.Combine(GetItemDirectory(mediaItemId), "sprite.webp");
 
     public string GetVttPath(Guid mediaItemId) =>
         Path.Combine(GetItemDirectory(mediaItemId), "thumbnails.vtt");
