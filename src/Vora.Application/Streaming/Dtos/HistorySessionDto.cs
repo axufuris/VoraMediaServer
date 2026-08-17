@@ -10,6 +10,9 @@ public class HistorySessionDto
     public string Product { get; set; } = string.Empty;
     public string Player { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
+    public string? ShowTitle { get; set; }
+    public int? SeasonNumber { get; set; }
+    public int? EpisodeNumber { get; set; }
     public string MediaType { get; set; } = string.Empty;
 
     public Guid LibraryId { get; set; }
