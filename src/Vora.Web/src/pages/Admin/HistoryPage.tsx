@@ -238,7 +238,7 @@ export default function HistoryPage() {
                 }
             />
 
-            <div className="p-8 max-w-[1500px] mx-auto space-y-4">
+            <div className="p-8 space-y-4">
                 <div className="vora-card p-4 flex flex-wrap items-center gap-3">
                     <select
                         value={selectedUser}
@@ -370,7 +370,16 @@ export default function HistoryPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-2.5 font-medium">
-                                                    <span className="text-[var(--vora-text-primary)] truncate max-w-[220px] inline-block align-bottom" title={row.title}>{row.title}</span>
+                                                    {row.showTitle ? (
+                                                        <div className="max-w-[260px]">
+                                                            <div className="text-[10px] text-[var(--vora-text-muted)] truncate" title={row.showTitle}>
+                                                                {row.showTitle}{row.seasonNumber != null && row.episodeNumber != null ? ` · S${String(row.seasonNumber).padStart(2, '0')}E${String(row.episodeNumber).padStart(2, '0')}` : ''}
+                                                            </div>
+                                                            <span className="block text-[var(--vora-text-primary)] truncate" title={row.title}>{row.title}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[var(--vora-text-primary)] truncate max-w-[260px] inline-block align-bottom" title={row.title}>{row.title}</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-2.5">
                                                     {renderStreamDetails(row)}

@@ -9,6 +9,9 @@ export interface HistorySessionDto {
     product: string;
     player: string;
     title: string;
+    showTitle?: string;
+    seasonNumber?: number;
+    episodeNumber?: number;
     mediaType: string;
     libraryId: string;
     libraryName: string;

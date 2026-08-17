@@ -46,6 +46,29 @@ internal static class StreamHistoryProjection
 
         var rawData = await LoadRawSessionDataAsync(baseQuery, pagedKeys);
 
+        // For episodes, resolve the parent show title + season/episode number so the
+        // history can show "Show — S01E02 — Episode" rather than the episode title
+        // alone. Fetched in one query keyed by episode id.
+        var episodeIds = rawData
+            .Where(s => s.MediaItem is Episode)
+            .Select(s => s.MediaItemId)
+            .Distinct()
+            .ToList();
+
+        var showInfo = episodeIds.Count == 0
+            ? new Dictionary<Guid, EpisodeShowInfo>()
+            : await context.Set<Episode>()
+                .AsNoTracking()
+                .Where(e => episodeIds.Contains(e.Id))
+                .Select(e => new EpisodeShowInfo
+                {
+                    EpisodeId = e.Id,
+                    ShowTitle = e.Season.TvShow.Title,
+                    SeasonNumber = e.Season.SeasonNumber,
+                    EpisodeNumber = e.EpisodeNumber
+                })
+                .ToDictionaryAsync(x => x.EpisodeId);
+
         var grouped = rawData
             .GroupBy(s => new HistoryGroupKey
             {
@@ -54,7 +77,7 @@ internal static class StreamHistoryProjection
                 DeviceId = s.ClientDevice?.DeviceId,
                 MediaItemId = s.MediaItemId
             })
-            .Select(g => BuildHistoryDto(g.OrderByDescending(x => x.StartedAt).ToList()))
+            .Select(g => BuildHistoryDto(g.OrderByDescending(x => x.StartedAt).ToList(), showInfo))
             .OrderByDescending(x => DateTime.Parse(x.StartedAt))
             .ToList();
 
@@ -107,12 +130,21 @@ internal static class StreamHistoryProjection
             .ToList();
     }
 
-    private static HistorySessionDto BuildHistoryDto(List<StreamSession> sessions)
+    private sealed class EpisodeShowInfo
+    {
+        public Guid EpisodeId { get; set; }
+        public string ShowTitle { get; set; } = string.Empty;
+        public int SeasonNumber { get; set; }
+        public int EpisodeNumber { get; set; }
+    }
+
+    private static HistorySessionDto BuildHistoryDto(List<StreamSession> sessions, IReadOnlyDictionary<Guid, EpisodeShowInfo> showInfo)
     {
         var newest = sessions[0];
         var oldest = sessions[^1];
         var userName = newest.UserProfile?.Name ?? "Unknown User";
         var libName = newest.MediaItem?.Library?.Name ?? "Unknown";
+        showInfo.TryGetValue(newest.MediaItemId, out var episodeInfo);
         var mediaDurationSecs = newest.MediaItem?.Analysis?.Duration?.TotalSeconds ?? 0;
 
         var totalPausedMins = (int)Math.Round(sessions.Sum(x => x.TotalPausedDuration / 60.0));
@@ -123,22 +155,22 @@ internal static class StreamHistoryProjection
             : 0;
 
         var activePart = newest.MediaItem?.MediaParts.FirstOrDefault();
-        var dto = BuildHistoryRow(newest, userName, libName, activePart);
+        var dto = BuildHistoryRow(newest, userName, libName, activePart, episodeInfo);
         dto.PausedMinutes = totalPausedMins;
         dto.DurationMinutes = totalDurationMins;
         dto.PercentComplete = percentComplete;
         dto.StartedAt = oldest.StartedAt.ToString("o");
         dto.IsGrouped = sessions.Count > 1;
         dto.SubSessions = sessions.Count > 1
-            ? sessions.Select(sub => BuildSubSession(sub, userName, libName, activePart, mediaDurationSecs)).ToList()
+            ? sessions.Select(sub => BuildSubSession(sub, userName, libName, activePart, mediaDurationSecs, episodeInfo)).ToList()
             : null;
 
         return dto;
     }
 
-    private static HistorySessionDto BuildSubSession(StreamSession sub, string userName, string libName, MediaPart? activePart, double mediaDurationSecs)
+    private static HistorySessionDto BuildSubSession(StreamSession sub, string userName, string libName, MediaPart? activePart, double mediaDurationSecs, EpisodeShowInfo? episodeInfo)
     {
-        var dto = BuildHistoryRow(sub, userName, libName, activePart);
+        var dto = BuildHistoryRow(sub, userName, libName, activePart, episodeInfo);
         dto.PausedMinutes = (int)Math.Round(sub.TotalPausedDuration / 60.0);
         dto.DurationMinutes = (int)Math.Round((sub.EndedAt ?? DateTime.UtcNow).Subtract(sub.StartedAt).TotalMinutes - (sub.TotalPausedDuration / 60.0));
         dto.PercentComplete = mediaDurationSecs > 0
@@ -149,7 +181,7 @@ internal static class StreamHistoryProjection
         return dto;
     }
 
-    private static HistorySessionDto BuildHistoryRow(StreamSession session, string userName, string libName, MediaPart? activePart)
+    private static HistorySessionDto BuildHistoryRow(StreamSession session, string userName, string libName, MediaPart? activePart, EpisodeShowInfo? episodeInfo)
     {
         var originalAudioTrack = activePart?.AudioTracks.FirstOrDefault(t => t.Id == session.AudioTrackId);
 
@@ -163,6 +195,9 @@ internal static class StreamHistoryProjection
             Product = "Vora",
             Player = session.ClientDevice?.DeviceName ?? "Unknown",
             Title = session.MediaItem?.Title ?? "Unknown",
+            ShowTitle = episodeInfo?.ShowTitle,
+            SeasonNumber = episodeInfo?.SeasonNumber,
+            EpisodeNumber = episodeInfo?.EpisodeNumber,
             MediaType = session.MediaItem is Episode || session.MediaItem is Season || session.MediaItem is TvShow ? "TvShow" : "Movie",
             LibraryId = session.MediaItem?.LibraryId ?? Guid.Empty,
             LibraryName = libName,
