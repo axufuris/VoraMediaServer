@@ -58,14 +58,19 @@ public class MarkerAssembler : IMarkerAssembler
     // movies keep the fraction since their credits are legitimately long.
     private static readonly TimeSpan MaxEpisodeCreditsRoll = TimeSpan.FromMinutes(4);
     private const double MaxCreditsRollFraction = 0.2;
+    // Credit cards with dense text briefly break the black background; black runs
+    // split by less than this are one credits region, not separate events.
+    private static readonly TimeSpan CreditsBlackMergeGap = TimeSpan.FromSeconds(15);
 
     public List<DetectedMarker> Assemble(MarkerAssemblerInput input)
     {
         var markers = new List<DetectedMarker>();
         if (input.Duration <= TimeSpan.Zero) return markers;
 
+        // Intro/recap read silence∩black joint gaps; credits read black frames
+        // alone (they roll over black even with music). Don't bail when there are no
+        // joint gaps — a music-over-black credits roll has none yet is still there.
         var jointGaps = FindJointSilenceAndBlackGaps(input.SilenceIntervals, input.BlackIntervals);
-        if (jointGaps.Count == 0) return markers;
 
         DetectedMarker? introMarker = null;
         if (input.DetectIntro)
@@ -77,7 +82,7 @@ public class MarkerAssembler : IMarkerAssembler
             if (recapMarker != null) markers.Add(recapMarker);
         }
 
-        var creditsRollStart = input.DetectCredits ? FindCreditsRollStart(jointGaps, input) : null;
+        var creditsRollStart = input.DetectCredits ? FindCreditsRollStart(input) : null;
         if (creditsRollStart != null)
         {
             markers.Add(new DetectedMarker
@@ -179,51 +184,60 @@ public class MarkerAssembler : IMarkerAssembler
         };
     }
 
-    private static TimeSpan? FindCreditsRollStart(List<DetectedInterval> jointGaps, MarkerAssemblerInput input)
+    private static TimeSpan? FindCreditsRollStart(MarkerAssemblerInput input)
     {
         var minStart = TimeSpan.FromSeconds(input.Duration.TotalSeconds * CreditsSearchStartFraction);
-        var creditsCandidates = jointGaps
+
+        // Credits are detected from BLACK frames alone, not silence∩black. Unlike
+        // the intro, a credits roll is reliably on a black background even when the
+        // theme music plays over it — requiring silence too meant a black-with-music
+        // credits roll (HBO shows, etc.) produced no joint gap and went undetected.
+        // Dense credit cards briefly break the black, so merge black runs separated
+        // by a short gap into one region.
+        var tailBlack = input.BlackIntervals
+            .Where(b => b.End >= minStart)
+            .OrderBy(b => b.Start)
+            .ToList();
+        var creditsCandidates = MergeCloseIntervals(tailBlack, CreditsBlackMergeGap)
             .Where(g => g.Start >= minStart)
             .OrderBy(g => g.Start)
             .ToList();
 
         if (creditsCandidates.Count == 0) return null;
 
-        // Pick the earliest gap that leaves only a plausible credits-length tail.
-        // The naive "first gap past 60%" caught a commercial act break and
-        // mislabeled the last several minutes of the episode as credits
-        // (auto-skipping real content). Act breaks leave a longer tail, so
-        // skipping over-long candidates lands on the real credits roll near the
-        // end. Fall back to the last candidate if none fit (unusual structure).
+        // Pick the earliest black region that leaves only a plausible credits-length
+        // tail. Act breaks / scene fades earlier in the episode leave a longer tail,
+        // so skipping over-long candidates lands on the real credits roll near the
+        // end. Episodes emit no credits when nothing fits (better than mislabeling
+        // minutes of content); movies keep the fallback since their credits are long.
         var maxTail = input.IsEpisode
             ? MaxEpisodeCreditsRoll
             : TimeSpan.FromSeconds(input.Duration.TotalSeconds * MaxCreditsRollFraction);
         var creditsStart = creditsCandidates.FirstOrDefault(g => input.Duration - g.Start <= maxTail);
         if (creditsStart == null)
         {
-            // No gap leaves a plausible credits-length tail. For an episode that
-            // means the real credits roll wasn't detectable (e.g. credits over music,
-            // no black) and the only late gaps are act breaks / scene fades — emit no
-            // credits rather than mislabeling minutes of the episode as credits.
-            // Movies legitimately have long credits, so fall back to the latest gap.
             if (input.IsEpisode) return null;
             creditsStart = creditsCandidates[^1];
         }
-        var chosen = creditsStart.Start;
 
-        // Credits are frequently black text/roll over MUSIC (no silence), so the
-        // only silence∩black gap is the final fade and `chosen` lands a second
-        // from the end. Extend the start back to the beginning of the black region
-        // it sits in (clamped to the search window) so the whole black credits
-        // roll is covered instead of just the last second.
-        var containingBlack = input.BlackIntervals
-            .Where(b => b.Start <= chosen && b.End >= chosen)
-            .OrderBy(b => b.Start)
-            .FirstOrDefault();
-        if (containingBlack != null && containingBlack.Start > minStart && containingBlack.Start < chosen)
-            chosen = containingBlack.Start;
+        return creditsStart.Start;
+    }
 
-        return chosen;
+    private static List<DetectedInterval> MergeCloseIntervals(List<DetectedInterval> sorted, TimeSpan maxGap)
+    {
+        var merged = new List<DetectedInterval>();
+        foreach (var interval in sorted)
+        {
+            if (merged.Count > 0 && interval.Start - merged[^1].End <= maxGap)
+            {
+                if (interval.End > merged[^1].End) merged[^1].End = interval.End;
+            }
+            else
+            {
+                merged.Add(new DetectedInterval { Start = interval.Start, End = interval.End });
+            }
+        }
+        return merged;
     }
 
     private static IEnumerable<DetectedMarker> FindCreditsScenes(List<DetectedInterval> jointGaps, TimeSpan creditsStart, TimeSpan duration)

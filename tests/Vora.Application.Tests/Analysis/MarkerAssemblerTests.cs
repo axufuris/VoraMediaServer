@@ -163,6 +163,29 @@ public class MarkerAssemblerTests
     }
 
     [Fact]
+    public void Credits_over_black_are_detected_even_with_music_and_no_silence()
+    {
+        // House of the Dragon shape: ~54-min episode whose credits roll on a black
+        // background from ~52:45 to the end, with the theme playing (no silence).
+        // Detection must come from the BLACK frames alone — dense credit cards break
+        // the black into pieces that merge back into one region.
+        var result = _assembler.Assemble(new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(3233),
+            IsEpisode = true,
+            SilenceIntervals = new List<DetectedInterval>(),
+            BlackIntervals = new List<DetectedInterval>
+            {
+                Interval(3165, 3180), Interval(3186, 3205), Interval(3210, 3233)
+            }
+        });
+
+        var credits = result.Single(m => m.Type == MarkerType.Credits);
+        credits.Start.Should().Be(TimeSpan.FromSeconds(3165));
+        credits.End.Should().Be(TimeSpan.FromSeconds(3233));
+    }
+
+    [Fact]
     public void Movies_do_not_get_recap_markers()
     {
         var result = _assembler.Assemble(new MarkerAssemblerInput
