@@ -42,5 +42,9 @@ export const adminNotificationService = {
 
     markAllRead: async (serverId?: string): Promise<void> => {
         await apiClient.post('/admin/notifications/mark-all-read', undefined, { serverId });
+    },
+
+    clearAll: async (serverId?: string): Promise<void> => {
+        await apiClient.delete('/admin/notifications', { serverId });
     }
 };

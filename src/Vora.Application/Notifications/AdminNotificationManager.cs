@@ -12,6 +12,7 @@ public interface IAdminNotificationManager
     Task<int> GetUnreadCountAsync();
     Task<bool> MarkReadAsync(Guid id);
     Task MarkAllReadAsync();
+    Task ClearAllAsync();
 }
 
 public class AdminNotificationManager : IAdminNotificationManager
@@ -56,6 +57,12 @@ public class AdminNotificationManager : IAdminNotificationManager
     public async Task MarkAllReadAsync()
     {
         await _repository.MarkAllReadAsync();
+        await _notifier.NotifyAdminAlertUnreadChangedAsync();
+    }
+
+    public async Task ClearAllAsync()
+    {
+        await _repository.ClearAllAsync();
         await _notifier.NotifyAdminAlertUnreadChangedAsync();
     }
 }
