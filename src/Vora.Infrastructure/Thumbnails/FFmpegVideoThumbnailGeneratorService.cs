@@ -144,6 +144,15 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
                 startInfo.ArgumentList.Add(parameters.HardwareDevice);
             }
         }
+        // Only keyframes are needed. The sprite keeps a single frame per interval, so
+        // fully decoding every B/P frame in between (and, under -hwaccel, copying them
+        // off the GPU) is pure waste — the dominant cost on a full-length episode.
+        // -skip_frame nokey makes the decoder emit keyframes only; the fps filter
+        // still yields one tile per interval from the nearest keyframe, so the sprite
+        // grid and the WebVTT cue mapping are unchanged. This is an input/decoder
+        // option, so it must precede -i.
+        startInfo.ArgumentList.Add("-skip_frame");
+        startInfo.ArgumentList.Add("nokey");
         startInfo.ArgumentList.Add("-i");
         startInfo.ArgumentList.Add(parameters.InputPath);
         startInfo.ArgumentList.Add("-vf");
