@@ -28,7 +28,7 @@ public static class VideoThumbnailEndpoints
             .Produces(StatusCodes.Status404NotFound);
 
         clientGroup.MapGet("/{id:guid}/thumbnails.jpg", ServeSpriteAsync)
-            .Produces(StatusCodes.Status200OK, contentType: "image/jpeg")
+            .Produces(StatusCodes.Status200OK, contentType: "image/webp")
             .Produces(StatusCodes.Status404NotFound);
 
         var adminGroup = routes.MapGroup("/api/media").WithTags("Video Thumbnails (Admin)").RequireAuthorization("AdminOnly");
