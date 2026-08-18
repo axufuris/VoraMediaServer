@@ -345,6 +345,18 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 </div>
             </SettingsCard>
 
+            <SettingsCard title="Ignored Folders">
+                <FieldLabel>Folder Names to Skip</FieldLabel>
+                <textarea
+                    value={(serverSettings.scanIgnoredFolders || []).join('\n')}
+                    onChange={e => setServerSettings({ ...serverSettings, scanIgnoredFolders: e.target.value.split('\n') })}
+                    rows={4}
+                    className="vora-input w-full"
+                    placeholder=".recycle"
+                />
+                <FieldHint>One folder name per line. Any folder in your media paths whose name matches (and everything inside it) is skipped during scanning — useful for recycle bins like .recycle or in-progress transcode folders. Matching is case-insensitive and applies to every library.</FieldHint>
+            </SettingsCard>
+
             <SettingsCard
                 title="Missing Media (Trash)"
                 headingControl={

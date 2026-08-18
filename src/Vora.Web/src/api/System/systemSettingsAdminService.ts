@@ -4,6 +4,7 @@ export interface ServerSettings {
     serverName: string;
     enableNightlyScan: boolean;
     nightlyScanTime: string;
+    scanIgnoredFolders: string[];
     runDetections: number;
     detectionScheduleTime: string;
     silenceThresholdOffsetDb: number;

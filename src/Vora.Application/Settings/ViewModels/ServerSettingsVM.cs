@@ -8,6 +8,7 @@ public class ServerSettingsVM
     public string ServerName { get; set; } = "Vora Server";
     public bool EnableNightlyScan { get; set; }
     public string NightlyScanTime { get; set; } = "02:00";
+    public List<string> ScanIgnoredFolders { get; set; } = new();
     public int RegistrationMode { get; set; }
     public int RunDetections { get; set; }
     public string DetectionScheduleTime { get; set; } = "03:00";
@@ -80,6 +81,7 @@ public class ServerSettingsVM
             ServerName = s.ServerName,
             EnableNightlyScan = s.EnableNightlyScan,
             NightlyScanTime = s.NightlyScanTime.ToString(@"hh\:mm"),
+            ScanIgnoredFolders = s.ScanIgnoredFolders,
             RegistrationMode = (int)s.RegistrationMode,
             RunDetections = (int)s.RunDetections,
             DetectionScheduleTime = s.DetectionScheduleTime.ToString(@"hh\:mm"),

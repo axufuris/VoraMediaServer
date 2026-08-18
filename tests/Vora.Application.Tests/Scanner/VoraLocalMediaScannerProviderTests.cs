@@ -183,6 +183,25 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task ScanMovieLibrary_skips_files_inside_an_ignored_folder()
+    {
+        _ingestion.GetLibraryDetailsAsync(Arg.Any<LibraryHandle>())
+            .Returns(Task.FromResult<(List<string> FolderPaths, string? ScannerRegex, List<string> ExcludeFilters)>((new List<string> { _tempRoot }, null, new List<string> { ".recycle" })));
+
+        TouchFile("Inception (2010).mkv");
+        TouchFile(Path.Combine(".recycle", "Dune (2021).mkv"));
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).EnsureMovieAsync(
+            Arg.Any<LibraryHandle>(), "Inception", 2010,
+            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>());
+        await _ingestion.DidNotReceive().EnsureMovieAsync(
+            Arg.Any<LibraryHandle>(), "Dune", Arg.Any<int?>(),
+            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>());
+    }
+
+    [Fact]
     public async Task ScanMovieLibrary_extracts_edition_from_radarr_edition_tag()
     {
         // "Fan Edit" is not in the keyword list — only the {edition-...} tag yields it.

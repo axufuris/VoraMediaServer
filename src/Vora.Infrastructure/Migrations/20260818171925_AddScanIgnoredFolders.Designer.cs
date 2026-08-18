@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -12,9 +13,11 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    partial class VoraDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260818171925_AddScanIgnoredFolders")]
+    partial class AddScanIgnoredFolders
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1695,9 +1698,6 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<string>("PosterUrl")
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
-
-                    b.Property<DateTime?>("RatingsCheckedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("ReleaseDate")
                         .HasColumnType("timestamp with time zone");

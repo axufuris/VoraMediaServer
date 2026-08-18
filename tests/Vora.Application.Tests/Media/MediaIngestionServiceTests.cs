@@ -21,6 +21,7 @@ public class MediaIngestionServiceTests : IDisposable
     private readonly IMusicRepository _musicRepo;
     private readonly ITaskQueueManager _taskQueue;
     private readonly IMediaAnalyzerService _analyzerService;
+    private readonly ISystemSettingsRepository _settingsRepo;
     private readonly MediaIngestionService _service;
 
     public MediaIngestionServiceTests()
@@ -33,6 +34,8 @@ public class MediaIngestionServiceTests : IDisposable
         _musicRepo = Substitute.For<IMusicRepository>();
         _taskQueue = Substitute.For<ITaskQueueManager>();
         _analyzerService = Substitute.For<IMediaAnalyzerService>();
+        _settingsRepo = Substitute.For<ISystemSettingsRepository>();
+        _settingsRepo.GetSettingsAsync().Returns(new Vora.Domain.Entities.Settings.ServerSetting { ScanIgnoredFolders = new List<string>() });
 
         var options = Options.Create(new StoragePathsOptions { CustomArtwork = _tempArtwork });
 
@@ -44,6 +47,7 @@ public class MediaIngestionServiceTests : IDisposable
             _taskQueue,
             _analyzerService,
             new ReferenceWriteGate(),
+            _settingsRepo,
             options,
             NullLogger<MediaIngestionService>.Instance);
     }

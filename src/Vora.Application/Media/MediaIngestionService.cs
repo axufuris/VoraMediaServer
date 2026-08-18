@@ -25,6 +25,7 @@ public class MediaIngestionService : IMediaIngestionService
     private readonly ITaskQueueManager _taskQueue;
     private readonly IMediaAnalyzerService _analyzerService;
     private readonly Vora.Application.Metadata.ReferenceWriteGate _writeGate;
+    private readonly ISystemSettingsRepository _settingsRepo;
     private readonly ILogger<MediaIngestionService> _logger;
     private readonly string _artworkBasePath;
 
@@ -36,6 +37,7 @@ public class MediaIngestionService : IMediaIngestionService
         ITaskQueueManager taskQueue,
         IMediaAnalyzerService analyzerService,
         Vora.Application.Metadata.ReferenceWriteGate writeGate,
+        ISystemSettingsRepository settingsRepo,
         IOptions<StoragePathsOptions> storagePaths,
         ILogger<MediaIngestionService> logger)
     {
@@ -46,6 +48,7 @@ public class MediaIngestionService : IMediaIngestionService
         _taskQueue = taskQueue;
         _analyzerService = analyzerService;
         _writeGate = writeGate;
+        _settingsRepo = settingsRepo;
         _logger = logger;
 
         var configured = storagePaths.Value.CustomArtwork;
@@ -65,7 +68,19 @@ public class MediaIngestionService : IMediaIngestionService
         var row = await _libraryRepository.GetProjectedByIdAsync(libraryId, l => new { l.FolderPaths, l.ScannerRegex, l.ExcludeFilters });
         if (row == null) throw new InvalidOperationException($"Library {libraryId} not found.");
 
-        return (row.FolderPaths, row.ScannerRegex, row.ExcludeFilters ?? new List<string>());
+        var excludeFilters = row.ExcludeFilters ?? new List<string>();
+        var settings = await _settingsRepo.GetSettingsAsync();
+        var ignoredFolders = settings.ScanIgnoredFolders;
+        if (ignoredFolders.Count > 0)
+        {
+            excludeFilters = excludeFilters
+                .Concat(ignoredFolders)
+                .Where(f => !string.IsNullOrWhiteSpace(f))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        return (row.FolderPaths, row.ScannerRegex, excludeFilters);
     }
 
     public async Task<LibraryHandle?> GetLibraryForMediaAsync(MediaItemHandle item)
