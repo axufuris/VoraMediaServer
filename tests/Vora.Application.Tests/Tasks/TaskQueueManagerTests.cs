@@ -179,14 +179,28 @@ public class TaskQueueManagerTests
     }
 
     [Fact]
-    public async Task CancelTask_keeps_token_until_RemoveTask_then_returns_false()
+    public void CancelTask_on_pending_task_removes_it_immediately()
     {
         var id = _queue.EnqueueTask("alpha", (ct, sp) => Task.CompletedTask);
 
-        // CancelTask intentionally keeps the entry so a still-queued task is
-        // observed as cancelled (and skipped) by the worker; a repeat cancel
-        // still finds it. RemoveTask is what disposes and evicts the token.
+        // A task that never started running has no in-flight work to wind down and
+        // may be stuck behind a long-running same-key task, so cancel removes it now.
         _queue.CancelTask(id).Should().BeTrue();
+        _queue.GetAllTasks().Should().NotContain(t => t.Id == id);
+        // Already gone — a repeat cancel finds nothing.
+        _queue.CancelTask(id).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CancelTask_keeps_a_running_task_until_RemoveTask_then_returns_false()
+    {
+        var id = _queue.EnqueueTask("alpha", (ct, sp) => Task.CompletedTask);
+        _queue.MarkTaskAsRunning(id);
+
+        // A running task keeps its entry (shown as "Cancelling") so its in-flight
+        // work can observe cancellation; RemoveTask disposes and evicts the token.
+        _queue.CancelTask(id).Should().BeTrue();
+        _queue.GetAllTasks().Single(t => t.Id == id).Status.Should().Be("Cancelling");
         _queue.CancelTask(id).Should().BeTrue();
 
         _queue.RemoveTask(id);
