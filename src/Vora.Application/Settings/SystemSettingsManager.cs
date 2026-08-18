@@ -84,6 +84,11 @@ public class SystemSettingsManager : ISystemSettingsManager
 
         settings.EnableNightlyScan = request.EnableNightlyScan;
         if (TimeSpan.TryParse(request.NightlyScanTime, out var nsTime)) settings.NightlyScanTime = nsTime;
+        settings.ScanIgnoredFolders = (request.ScanIgnoredFolders ?? new List<string>())
+            .Select(f => f.Trim())
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         settings.RunDetections = (DetectionTrigger)request.RunDetections;
         if (TimeSpan.TryParse(request.DetectionScheduleTime, out var dsTime)) settings.DetectionScheduleTime = dsTime;

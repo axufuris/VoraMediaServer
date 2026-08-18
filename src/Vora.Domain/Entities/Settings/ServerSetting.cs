@@ -16,6 +16,8 @@ public class ServerSetting
     public bool EnableNightlyScan { get; set; } = true;
     public TimeSpan NightlyScanTime { get; set; } = new(2, 0, 0);
 
+    public List<string> ScanIgnoredFolders { get; set; } = new() { ".recycle" };
+
     public DetectionTrigger RunDetections { get; set; } = DetectionTrigger.OnSchedule;
     public TimeSpan DetectionScheduleTime { get; set; } = new(3, 0, 0);
 

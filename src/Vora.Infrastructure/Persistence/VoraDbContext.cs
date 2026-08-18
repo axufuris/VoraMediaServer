@@ -1239,8 +1239,12 @@ public class VoraDbContext : DbContext
 
     private static void ConfigureSettings(ModelBuilder modelBuilder)
     {
+        var converters = new ListValueConverters();
         modelBuilder.Entity<ServerSetting>(entity =>
         {
+            entity.Property(e => e.ScanIgnoredFolders)
+                  .HasConversion(converters.StringList)
+                  .Metadata.SetValueComparer(converters.StringListComparer);
             entity.Property(e => e.Id).HasMaxLength(64);
             entity.Property(e => e.ServerName).HasMaxLength(128);
             entity.Property(e => e.TmdbApiKey).HasMaxLength(256);

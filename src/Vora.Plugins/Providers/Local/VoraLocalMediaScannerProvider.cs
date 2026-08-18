@@ -566,17 +566,29 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         }
     }
 
-    // A file is skipped entirely if its name contains any of the library's
-    // exclude substrings (e.g. ".TDARR" for files still being transcoded).
+    // A file is skipped entirely if its name contains any of the exclude
+    // substrings (e.g. ".TDARR" for files still being transcoded) or if any
+    // directory in its path is an ignored folder (e.g. ".recycle").
     private static bool IsExcluded(string filePath, IReadOnlyList<string> excludeFilters)
     {
         if (excludeFilters == null || excludeFilters.Count == 0) return false;
         var name = Path.GetFileName(filePath);
-        foreach (var filter in excludeFilters)
+        var directory = Path.GetDirectoryName(filePath) ?? string.Empty;
+        var segments = directory.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        foreach (var raw in excludeFilters)
         {
-            if (!string.IsNullOrWhiteSpace(filter) && name.Contains(filter.Trim(), StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+            var filter = raw.Trim();
+            if (name.Contains(filter, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
+            }
+            foreach (var segment in segments)
+            {
+                if (segment.Equals(filter, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
             }
         }
         return false;
