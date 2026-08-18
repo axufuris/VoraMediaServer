@@ -89,8 +89,6 @@ function MarkerCoverageCard({ libraryId, serverId }: { libraryId: string, server
             <div className="flex items-center justify-between gap-2">
                 <h2 className="text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Marker coverage</h2>
                 <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => analyze(false)} className="vora-button-secondary text-xs">Analyze library</button>
-                    <button type="button" onClick={() => analyze(true)} className="vora-button-secondary text-xs">Re-analyze all</button>
                     <button
                         type="button"
                         onClick={load}
@@ -99,6 +97,8 @@ function MarkerCoverageCard({ libraryId, serverId }: { libraryId: string, server
                     >
                         {loading ? 'Refreshing…' : 'Refresh'}
                     </button>
+                    <button type="button" onClick={() => analyze(false)} className="vora-button-secondary text-xs">Analyze library</button>
+                    <button type="button" onClick={() => analyze(true)} className="vora-button-secondary text-xs">Re-analyze all</button>
                 </div>
             </div>
             {coverage && coverage.totalItems === 0 ? (
