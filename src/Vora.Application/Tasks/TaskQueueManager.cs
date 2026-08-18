@@ -68,6 +68,7 @@ public interface ITaskQueueManager
 public class TaskQueueManager : ITaskQueueManager
 {
     private const int AiEmbeddingsBatchSize = 100;
+    private const string PendingStatus = "Pending";
     private const string RunningStatus = "Running";
     private const string CancellingStatus = "Cancelling";
     private static readonly TimeSpan ProgressNotifyInterval = TimeSpan.FromMilliseconds(500);
@@ -487,11 +488,21 @@ public class TaskQueueManager : ITaskQueueManager
             // (and skipped) by the worker, and a running task's linked token —
             // built from this same source — fires. RemoveTask disposes it.
             cts.Cancel();
-            // Surface a transient "Cancelling" state so the UI shows feedback
-            // between the click and the task actually stopping (a running FFmpeg
-            // pass, say). RemoveTask drops the entry when it stops.
             if (_taskStates.TryGetValue(taskId, out var state))
             {
+                // A task that never started running has no in-flight work to wind
+                // down, and the worker won't revisit it until its resource key frees
+                // — which can be hours behind a long-running same-key task, leaving
+                // it stuck "Cancelling". Remove it now; the worker skips it (its
+                // token is gone) if it's ever dequeued.
+                if (state.Status == PendingStatus)
+                {
+                    RemoveTask(taskId);
+                    return true;
+                }
+                // A running task keeps a transient "Cancelling" state so the UI
+                // shows feedback until the work actually stops (a running FFmpeg
+                // pass, say). RemoveTask drops the entry when it stops.
                 state.Status = CancellingStatus;
             }
             _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
