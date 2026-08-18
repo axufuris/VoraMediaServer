@@ -316,6 +316,23 @@ public class MetadataManager : IMetadataManager
         var ratingsData = await _fetchService.GetRatingsAsync(item);
 
         var updated = await _mappingService.ApplyRatingsAsync(item, ratingsData, forceOverride);
+
+        // Stamp "checked" only when every configured provider was actually consulted
+        // this pass. FetchRatingsDataAsync returns a null slot name when a provider
+        // was skipped (its rate-limit breaker was open), so a null name means "not
+        // consulted" — don't stamp then, so the item is retried once quota frees up.
+        // A non-null name with a null rating means the provider genuinely has no
+        // score, and the timestamp lets the sweep stop re-asking every night.
+        var wants1 = !string.IsNullOrEmpty(item.Library?.ThirdPartyRating1ProviderId);
+        var wants2 = !string.IsNullOrEmpty(item.Library?.ThirdPartyRating2ProviderId);
+        var consulted1 = !wants1 || ratingsData.Name1 != null;
+        var consulted2 = !wants2 || ratingsData.Name2 != null;
+        if (consulted1 && consulted2)
+        {
+            item.RatingsCheckedAt = DateTime.UtcNow;
+            updated = true;
+        }
+
         if (updated)
         {
             await _repository.UpdateMediaItemAsync(item);

@@ -30,6 +30,11 @@ public abstract class MediaItem : LockableEntity
     public string? ThirdPartyRating1Name { get; set; }
     public decimal? ThirdPartyRating2 { get; set; }
     public string? ThirdPartyRating2Name { get; set; }
+    // When every configured ratings provider was last actually consulted for this
+    // item (i.e. not skipped because its rate-limit breaker was open). Lets the
+    // "missing ratings" sweep skip items a provider genuinely has no score for,
+    // instead of re-spending the daily quota on them every night. Null = never.
+    public DateTime? RatingsCheckedAt { get; set; }
 
     public string? PosterUrl { get; set; }
     public string? OriginalPosterUrl { get; set; }

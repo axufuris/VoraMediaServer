@@ -13,6 +13,10 @@ namespace Vora.Infrastructure.Persistence.Repositories;
 
 public partial class MediaRepository : IMediaRepository
 {
+    // How long a "no score available" ratings result is trusted before the sweep
+    // will re-ask the provider (in case a score gets added upstream later).
+    private const int RatingsRecheckDays = 30;
+
     private readonly ILogger<MediaRepository> _logger;
     private readonly VoraDbContext _context;
 
@@ -532,10 +536,17 @@ public partial class MediaRepository : IMediaRepository
         var wantsRating2 = !string.IsNullOrWhiteSpace(providers.ThirdPartyRating2ProviderId);
         if (!wantsRating1 && !wantsRating2) return Array.Empty<Guid>();
 
+        // Skip items we already consulted the provider for recently and that still
+        // came back empty — the provider simply has no score for them, so re-asking
+        // every night just burns the (small) daily quota. They become eligible again
+        // after the recheck window in case a score appears later.
+        var recheckCutoff = DateTime.UtcNow.AddDays(-RatingsRecheckDays);
+
         return await _context.MediaItems
             .Where(m => m.LibraryId == libraryId
                 && (m is Movie || m is TvShow)
-                && ((wantsRating1 && m.ThirdPartyRating1 == null) || (wantsRating2 && m.ThirdPartyRating2 == null)))
+                && ((wantsRating1 && m.ThirdPartyRating1 == null) || (wantsRating2 && m.ThirdPartyRating2 == null))
+                && (m.RatingsCheckedAt == null || m.RatingsCheckedAt < recheckCutoff))
             .Select(m => m.Id)
             .ToListAsync();
     }
