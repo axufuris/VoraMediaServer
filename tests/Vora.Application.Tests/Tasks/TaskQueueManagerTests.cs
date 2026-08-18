@@ -32,6 +32,37 @@ public class TaskQueueManagerTests
     }
 
     [Fact]
+    public void EnqueueTask_with_same_dedupe_key_does_not_create_a_second_task()
+    {
+        var first = _queue.EnqueueTask("gen", (ct, sp) => Task.CompletedTask, dedupeKey: "gen-thumbs:lib1:False");
+        var second = _queue.EnqueueTask("gen", (ct, sp) => Task.CompletedTask, dedupeKey: "gen-thumbs:lib1:False");
+
+        second.Should().Be(first);
+        _queue.GetAllTasks().Count(t => t.Id == first).Should().Be(1);
+        _queue.GetAllTasks().Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void EnqueueTask_dedupe_does_not_block_a_different_dedupe_key()
+    {
+        var missing = _queue.EnqueueTask("gen", (ct, sp) => Task.CompletedTask, dedupeKey: "gen-thumbs:lib1:False");
+        var all = _queue.EnqueueTask("gen", (ct, sp) => Task.CompletedTask, dedupeKey: "gen-thumbs:lib1:True");
+
+        all.Should().NotBe(missing);
+        _queue.GetAllTasks().Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void EnqueueTask_without_dedupe_key_always_enqueues()
+    {
+        var a = _queue.EnqueueTask("a", (ct, sp) => Task.CompletedTask);
+        var b = _queue.EnqueueTask("a", (ct, sp) => Task.CompletedTask);
+
+        b.Should().NotBe(a);
+        _queue.GetAllTasks().Should().HaveCount(2);
+    }
+
+    [Fact]
     public void EnqueueTask_records_task_in_GetAllTasks_with_pending_status()
     {
         var id = _queue.EnqueueTask("alpha", (ct, sp) => Task.CompletedTask);

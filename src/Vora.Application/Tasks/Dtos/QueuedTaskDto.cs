@@ -12,6 +12,14 @@ public class QueuedTaskDto
     // of the same library serialize). Unkeyed tasks get a unique key, so they're
     // always eligible to run alongside others up to the global concurrency cap.
     public string ResourceKey { get; set; } = string.Empty;
+
+    // Optional identity for the specific operation. When set, enqueuing is skipped
+    // if a task with the same DedupeKey is already queued or running — e.g. the
+    // daily thumbnail schedule firing while the same library's run is still going.
+    // Distinct from ResourceKey, which only serializes *different* jobs on a shared
+    // resource; two different ops share a ResourceKey but never a DedupeKey.
+    public string? DedupeKey { get; set; }
+
     public Func<CancellationToken, IServiceProvider, Task> WorkItem { get; set; } = null!;
 
     // Optional: resolves a friendly display name at run time (e.g. look up a
