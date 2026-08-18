@@ -46,7 +46,7 @@ public interface ITaskQueueManager
     void QueueGeneratePosterOverlays(Guid mediaItemId);
     void QueueFullCollectionSync(Guid collectionId, string title, bool hasContentSync, bool hasChronologySort);
     void QueueReevaluateCollectionOrder(Guid collectionId);
-    Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null);
+    Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null, string? dedupeKey = null);
     bool CancelTask(Guid taskId);
     CancellationToken? GetTaskCancellationToken(Guid taskId);
     void UpdateTaskName(Guid taskId, string name);
@@ -395,9 +395,19 @@ public class TaskQueueManager : ITaskQueueManager
         }, resourceKey: CollectionKey(collectionId));
     }
 
-    public Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null)
+    public Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null, string? dedupeKey = null)
     {
-        var task = new QueuedTaskDto { Name = name, WorkItem = workItem, NameResolver = nameResolver, ResourceKey = resourceKey ?? Guid.NewGuid().ToString() };
+        // Don't enqueue a duplicate of an operation that's already queued or
+        // running (e.g. the daily thumbnail schedule firing over a manual run).
+        // Best-effort: the states dict holds only active tasks, and a schedule vs.
+        // manual trigger are far enough apart that a tight race isn't a concern.
+        if (dedupeKey != null)
+        {
+            var existing = _taskStates.Values.FirstOrDefault(t => t.DedupeKey == dedupeKey);
+            if (existing != null) return existing.Id;
+        }
+
+        var task = new QueuedTaskDto { Name = name, WorkItem = workItem, NameResolver = nameResolver, ResourceKey = resourceKey ?? Guid.NewGuid().ToString(), DedupeKey = dedupeKey };
         var cts = new CancellationTokenSource();
 
         _taskTokens.TryAdd(task.Id, cts);
@@ -606,7 +616,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
             await manager.TriggerLibraryThumbnailGenerationAsync(libraryId, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger, cancellationToken: ct);
-        }, resourceKey: LibraryMaintenanceKey(libraryId));
+        }, resourceKey: LibraryMaintenanceKey(libraryId), dedupeKey: $"gen-thumbs:{libraryId}:{forceOverride}");
     }
 
     public void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
