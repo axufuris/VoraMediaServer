@@ -139,7 +139,20 @@ export default function ServerManagerModal({
             setMode('profiles');
         } catch (err) {
             if (isAxiosError(err)) {
-                setError(err.response?.data?.message || err.response?.data || err.message || "Failed to connect to server.");
+                if (err.response?.status === 401) {
+                    setError("Invalid email or password. If you've tried several times, wait a few minutes and try again.");
+                } else {
+                    // Never hand setError a non-string (e.g. a ProblemDetails object).
+                    const data: unknown = err.response?.data;
+                    let message = err.message || "Failed to connect to server.";
+                    if (typeof data === 'string' && data) {
+                        message = data;
+                    } else if (data && typeof data === 'object') {
+                        const d = data as { message?: string; detail?: string; title?: string };
+                        message = d.message || d.detail || d.title || message;
+                    }
+                    setError(message);
+                }
             } else if (err instanceof Error) {
                 setError(err.message);
             } else {
