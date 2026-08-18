@@ -96,7 +96,23 @@ export default function LoginPage() {
             sessionStorage.removeItem('pending_user_id');
 
             if (isAxiosError(err)) {
-                setError(err.response?.data?.message || err.response?.data || "Failed to connect to server. Check credentials.");
+                if (err.response?.status === 401) {
+                    // Covers wrong credentials and the temporary lockout after
+                    // repeated failures — both return 401.
+                    setError("Invalid email or password. If you've tried several times, wait a few minutes and try again.");
+                } else {
+                    // Never hand setError a non-string (e.g. a ProblemDetails object),
+                    // or rendering it crashes the page.
+                    const data: unknown = err.response?.data;
+                    let message = "Failed to connect to server. Check credentials.";
+                    if (typeof data === 'string' && data) {
+                        message = data;
+                    } else if (data && typeof data === 'object') {
+                        const d = data as { message?: string; detail?: string; title?: string };
+                        message = d.message || d.detail || d.title || message;
+                    }
+                    setError(message);
+                }
             } else if (err instanceof Error) {
                 setError(err.message);
             } else {
