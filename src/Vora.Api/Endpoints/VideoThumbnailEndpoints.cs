@@ -82,7 +82,7 @@ public static class VideoThumbnailEndpoints
         return Results.Accepted();
     }
 
-    private static async Task<IResult> QueueRegenerateLibraryAsync(Guid id, [FromQuery] bool force, ITaskQueueManager taskQueue, ILibraryRepository libraryRepository)
+    private static async Task<IResult> QueueRegenerateLibraryAsync(Guid id, ITaskQueueManager taskQueue, ILibraryRepository libraryRepository, [FromQuery] bool force = false)
     {
         var name = await libraryRepository.GetProjectedByIdAsync(id, l => l.Name);
         // "Regenerate missing" (force=false) fills the gaps: items that already have
