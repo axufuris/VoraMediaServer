@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Libraries;
+using Vora.Application.Media;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Application.Watchers;
@@ -54,6 +55,14 @@ public class FolderWatcherService : IFolderWatcherService
                 );
 
                 _activeWatchers.TryAdd(libraryId, provider);
+
+                // The provider only reports files that appear AFTER it starts, and
+                // it treats everything already on disk as known. So a file that was
+                // on disk but never ingested — a scan that arrived between runs, an
+                // ingest that failed, or anything present at a restart — would stay
+                // invisible forever (there is no nightly scan to catch it). Reconcile
+                // against the database now so any un-ingested file gets queued.
+                await ReconcileLibraryAsync(libraryId, directoryPaths);
             }
             catch (Exception ex)
             {
@@ -131,11 +140,76 @@ public class FolderWatcherService : IFolderWatcherService
         taskQueue.QueueRemoveOrphanedMedia(filePath);
     }
 
+    private async Task ReconcileLibraryAsync(Guid libraryId, IEnumerable<string> directoryPaths)
+    {
+        try
+        {
+            var paths = directoryPaths.Where(Directory.Exists).ToList();
+            if (paths.Count == 0) return;
+
+            using var scope = _serviceProvider.CreateScope();
+            var mediaRepo = scope.ServiceProvider.GetRequiredService<IMediaRepository>();
+            var libraryManager = scope.ServiceProvider.GetRequiredService<ILibraryManager>();
+            var taskQueue = scope.ServiceProvider.GetRequiredService<ITaskQueueManager>();
+
+            var ingested = await mediaRepo.GetExistingLibraryPathsAsync(libraryId);
+            var library = await libraryManager.GetLibraryByIdAsync(libraryId);
+            var excludeFilters = library?.ExcludeFilters ?? new List<string>();
+
+            var filesOnDisk = paths.SelectMany(EnumerateSupportedFiles);
+            var uningested = FindUningestedFiles(filesOnDisk, ingested, excludeFilters);
+            if (uningested.Count == 0) return;
+
+            _logger.LogInformation(
+                "Watcher reconciliation for library {LibraryId} found {Count} file(s) on disk that were never ingested; queueing them.",
+                libraryId, uningested.Count);
+
+            foreach (var filePath in uningested)
+            {
+                taskQueue.QueueScanNewFile(libraryId, filePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Folder watcher reconciliation failed for library {LibraryId}.", libraryId);
+        }
+    }
+
+    private static IEnumerable<string> EnumerateSupportedFiles(string directory)
+    {
+        try
+        {
+            return Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories);
+        }
+        catch
+        {
+            return Enumerable.Empty<string>();
+        }
+    }
+
+    internal static List<string> FindUningestedFiles(IEnumerable<string> filesOnDisk, ISet<string> ingestedPaths, IReadOnlyList<string> excludeFilters)
+    {
+        var result = new List<string>();
+        foreach (var file in filesOnDisk)
+        {
+            if (!SupportedExtensions.Contains(Path.GetExtension(file).ToLowerInvariant())) continue;
+            if (ingestedPaths.Contains(file)) continue;
+            if (MatchesExcludeFilter(Path.GetFileName(file), excludeFilters)) continue;
+            result.Add(file);
+        }
+        return result;
+    }
+
     private static async Task<bool> IsExcludedAsync(IServiceScope scope, Guid libraryId, string fileName)
     {
         var libraryManager = scope.ServiceProvider.GetRequiredService<ILibraryManager>();
         var library = await libraryManager.GetLibraryByIdAsync(libraryId);
-        return library?.ExcludeFilters != null
-            && library.ExcludeFilters.Any(f => !string.IsNullOrWhiteSpace(f) && fileName.Contains(f.Trim(), StringComparison.OrdinalIgnoreCase));
+        return MatchesExcludeFilter(fileName, library?.ExcludeFilters);
+    }
+
+    private static bool MatchesExcludeFilter(string fileName, IReadOnlyList<string>? excludeFilters)
+    {
+        return excludeFilters != null
+            && excludeFilters.Any(f => !string.IsNullOrWhiteSpace(f) && fileName.Contains(f.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 }
