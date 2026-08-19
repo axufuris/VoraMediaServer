@@ -472,7 +472,7 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 <FieldHint>Control how new users can create accounts on this server.</FieldHint>
             </SettingsCard>
 
-            <SettingsCard title="Silence Detection Schedule">
+            <SettingsCard title="Intro & Credit Detection">
                 <div className="space-y-4">
                     <div>
                         <FieldLabel>Trigger Condition</FieldLabel>
@@ -486,6 +486,7 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                             <option value={2}>On schedule only</option>
                             <option value={3}>On addition & schedule</option>
                         </select>
+                        <FieldHint>Controls when Vora automatically detects intro and credit markers (analyzing audio and video). "Never run" means detection only happens when you click Analyze on a library or item. Scans and metadata refreshes will not trigger it.</FieldHint>
                     </div>
                     {(serverSettings.runDetections === 2 || serverSettings.runDetections === 3) && (
                         <div>
