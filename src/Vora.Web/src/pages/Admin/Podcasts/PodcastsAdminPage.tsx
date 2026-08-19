@@ -1,10 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { podcastService, type CatalogPodcastVM, type DiscoveredPodcastVM } from '../../../api/Podcasts/podcastService';
 import { useDialog } from '../../../dialogs';
 import FeatureToggle from '../../../components/Admin/Features/FeatureToggle';
-import FeaturePluginList from '../../../components/Admin/Features/FeaturePluginList';
-import FeatureTabs from '../../../components/Admin/Features/FeatureTabs';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import EmptyState from '../../../components/Admin/Primitives/EmptyState';
 
@@ -22,7 +20,6 @@ export default function PodcastsAdminPage() {
 
     const [catalog, setCatalog] = useState<CatalogPodcastVM[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'catalog' | 'plugins'>('catalog');
 
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<DiscoveredPodcastVM[]>([]);
@@ -119,7 +116,6 @@ export default function PodcastsAdminPage() {
     };
 
     const inCatalogUrls = new Set(catalog.map(c => c.feedUrl.toLowerCase()));
-    const pluginTypes = useMemo(() => ['PodcastDiscovery'], []);
 
     return (
         <div data-vora-page="">
@@ -136,17 +132,7 @@ export default function PodcastsAdminPage() {
                     serverId={serverId}
                 />
 
-                <FeatureTabs
-                    tabs={[
-                        { key: 'catalog', label: 'Catalog' },
-                        { key: 'plugins', label: 'Plugins' },
-                    ]}
-                    activeKey={activeTab}
-                    onChange={k => setActiveTab(k as 'catalog' | 'plugins')}
-                />
-
-                {activeTab === 'catalog' && (
-                    <section>
+                <section>
                         <p className="text-sm text-[var(--vora-text-muted)] mb-4">
                             Curate a list of approved podcasts. Profiles without the "Add custom podcast feeds" permission can only subscribe to shows in this catalog.
                         </p>
@@ -259,21 +245,7 @@ export default function PodcastsAdminPage() {
                                 ))}
                             </div>
                         )}
-                    </section>
-                )}
-
-                {activeTab === 'plugins' && (
-                    <section>
-                        <p className="text-sm text-[var(--vora-text-muted)] mb-4">
-                            Podcast discovery plugins power the in-app podcast search.
-                        </p>
-                        <FeaturePluginList
-                            serverId={serverId}
-                            pluginTypes={pluginTypes}
-                            emptyLabel="No PodcastDiscovery plugins are installed."
-                        />
-                    </section>
-                )}
+                </section>
             </div>
         </div>
     );

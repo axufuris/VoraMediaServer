@@ -1,10 +1,8 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { systemSettingsAdminService, type ServerSettings } from '../../../api/System/systemSettingsAdminService';
 import { musicService } from '../../../api/Music/musicService';
 import FeatureToggle from '../../../components/Admin/Features/FeatureToggle';
-import FeaturePluginList from '../../../components/Admin/Features/FeaturePluginList';
-import FeatureTabs from '../../../components/Admin/Features/FeatureTabs';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import { useDialog } from '../../../dialogs';
 
@@ -21,7 +19,6 @@ export default function ForYouPage() {
     const dialog = useDialog();
     const [serverSettings, setServerSettings] = useState<ServerSettings | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'settings' | 'plugins'>('settings');
 
     const loadServerSettings = useCallback(async () => {
         try {
@@ -59,8 +56,6 @@ export default function ForYouPage() {
         }
     };
 
-    const pluginTypes = useMemo(() => ['Recommendation'], []);
-
     return (
         <div data-vora-page="">
             <PageHeader
@@ -76,17 +71,7 @@ export default function ForYouPage() {
                     serverId={serverId}
                 />
 
-                <FeatureTabs
-                    tabs={[
-                        { key: 'settings', label: 'Recommendation Engine' },
-                        { key: 'plugins', label: 'Plugins' },
-                    ]}
-                    activeKey={activeTab}
-                    onChange={k => setActiveTab(k as 'settings' | 'plugins')}
-                />
-
-                {activeTab === 'settings' && (
-                    <section>
+                <section>
                         <p className="text-sm text-[var(--vora-text-muted)] mb-4">
                             Controls how Vora generates Daily Mixes, Discover Mix, and Mood Mixes for each profile. These are independent of the For You feature toggle — turning off Daily/Weekly mixes here stops the engine entirely.
                         </p>
@@ -219,20 +204,6 @@ export default function ForYouPage() {
                             </form>
                         )}
                     </section>
-                )}
-
-                {activeTab === 'plugins' && (
-                    <section>
-                        <p className="text-sm text-[var(--vora-text-muted)] mb-4">
-                            Recommendation plugins that power the For You rows on Home.
-                        </p>
-                        <FeaturePluginList
-                            serverId={serverId}
-                            pluginTypes={pluginTypes}
-                            emptyLabel="No Recommendation plugins are installed."
-                        />
-                    </section>
-                )}
             </div>
         </div>
     );

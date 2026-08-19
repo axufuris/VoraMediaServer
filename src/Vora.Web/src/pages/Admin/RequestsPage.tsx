@@ -1,9 +1,7 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { requestAdminService, type MediaRequestVM, type RequestServerVM, type ProviderOptionDto } from '../../api/Discovery/requestAdminService';
 import { useDialog } from '../../dialogs';
-import FeaturePluginList from '../../components/Admin/Features/FeaturePluginList';
-import FeatureTabs from '../../components/Admin/Features/FeatureTabs';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
 import EmptyState from '../../components/Admin/Primitives/EmptyState';
@@ -15,7 +13,6 @@ export default function RequestsPage() {
     const [requests, setRequests] = useState<MediaRequestVM[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeStatus, setActiveStatus] = useState<number>(0);
-    const [viewTab, setViewTab] = useState<'queue' | 'plugins'>('queue');
 
     const [servers, setServers] = useState<RequestServerVM[]>([]);
     const [profilesMap, setProfilesMap] = useState<Record<string, ProviderOptionDto[]>>({});
@@ -108,8 +105,6 @@ export default function RequestsPage() {
         return acc;
     }, {} as Record<string, MediaRequestVM[]>);
 
-    const pluginTypes = useMemo(() => ['Request'], []);
-
     const statusPills: { value: number, label: string, tone: 'accent' | 'info' | 'success' }[] = [
         { value: 0, label: 'Pending', tone: 'accent' },
         { value: 3, label: 'Processing', tone: 'info' },
@@ -123,21 +118,8 @@ export default function RequestsPage() {
                 description="Manage user media requests and monitor Radarr/Sonarr download status."
             />
 
-            <div className="px-8 pt-2">
-                <FeatureTabs
-                    tabs={[
-                        { key: 'queue', label: 'Queue' },
-                        { key: 'plugins', label: 'Plugins' },
-                    ]}
-                    activeKey={viewTab}
-                    onChange={k => setViewTab(k as 'queue' | 'plugins')}
-                />
-            </div>
-
             <div className="px-8 pb-10 max-w-7xl mx-auto pt-2">
-                {viewTab === 'queue' && (
-                    <>
-                        <div className="flex gap-2 mb-6">
+                <div className="flex gap-2 mb-6">
                             {statusPills.map(pill => {
                                 const count = requests.filter(r => r.status === pill.value).length;
                                 const isActive = activeStatus === pill.value;
@@ -259,19 +241,6 @@ export default function RequestsPage() {
                                 </div>
                             ))
                         )}
-                    </>
-                )}
-
-                {viewTab === 'plugins' && (
-                    <section>
-                        <p className="text-sm text-[var(--vora-text-muted)] mb-4">Request provider plugins (Radarr, Sonarr, etc.) that handle download routing.</p>
-                        <FeaturePluginList
-                            serverId={serverId}
-                            pluginTypes={pluginTypes}
-                            emptyLabel="No Request plugins are installed."
-                        />
-                    </section>
-                )}
             </div>
         </div>
     );

@@ -1,13 +1,11 @@
-import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import FeatureToggle from '../../../components/Admin/Features/FeatureToggle';
-import FeaturePluginList from '../../../components/Admin/Features/FeaturePluginList';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 
 export default function ReleaseCalendarPage() {
     const { serverId } = useParams<{ serverId?: string }>();
-    const pluginTypes = useMemo(() => ['Calendar'], []);
     const settingsHref = serverId ? `/admin/server/${serverId}/settings` : '/admin/settings';
+    const pluginsHref = serverId ? `/admin/server/${serverId}/plugins` : '/admin/plugins';
 
     return (
         <div data-vora-page="">
@@ -33,16 +31,9 @@ export default function ReleaseCalendarPage() {
                     Tick <span className="font-semibold">Use for Release Calendar</span> on any Radarr or Sonarr instance you want this page to pull from. You can use the same instance for requests and calendar, or set up a calendar-only server with requests disabled.
                 </div>
 
-                <section>
-                    <p className="text-sm text-[var(--vora-text-muted)] mb-4">
-                        Toggle which calendar sources are active. Source-specific credentials are managed where the source lives.
-                    </p>
-                    <FeaturePluginList
-                        serverId={serverId}
-                        pluginTypes={pluginTypes}
-                        emptyLabel="No Calendar plugins are installed."
-                    />
-                </section>
+                <p className="text-sm text-[var(--vora-text-muted)]">
+                    Enable or disable individual calendar sources on the <Link to={pluginsHref} className="text-[var(--vora-accent-text)] hover:underline">Plugins</Link> page.
+                </p>
             </div>
         </div>
     );
