@@ -121,7 +121,6 @@ pages/Admin/Libraries/    CreateLibrary, ManageLibrary
 pages/Admin/SmartLists/   SmartListsPage
 pages/Admin/Discovery/    DiscoveryPage
 pages/Admin/Features/     ForYouPage, ReleaseCalendarPage, DvrPage,
-                          MusicAdminPage, CollectionsAdminPage,
                           YouTubeAdminPage
 pages/Admin/Iptv/         IptvPage (renders Live TV + Internet Radio via prop)
 pages/Admin/Podcasts/     PodcastsAdminPage

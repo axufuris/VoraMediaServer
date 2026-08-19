@@ -65,6 +65,20 @@ Plugin settings (API keys, endpoints) come through `IPluginSettingsProvider`. Th
 
 `IPluginSettingsProvider.GetMetadataLanguageAsync()` returns the admin's chosen metadata language (Admin → Settings → Core) as a **TVDB-style ISO 639-2 (3-letter) code** — e.g. `"eng"`, `"kor"`. Any metadata/artwork provider should read it so titles, overviews, and localized artwork come back in the admin's language instead of the item's original language. TVDB endpoints take the 3-letter code verbatim; for APIs that expect ISO 639-1 (2-letter, e.g. TMDB) call `Vora.Plugins.MetadataLanguageCodes.ToIso6391(code)` rather than re-deriving the table — adding a language to the admin dropdown then lights up every provider at once. Prefer skipping the extra translation call when the item is already in the target language (TVDB exposes `originalLanguage`), and always fall back to the original language when no translation exists. Built-in consumers: `TvdbMetadataProvider`, `TmdbMetadataProvider`, `TmdbArtworkProvider`.
 
+### Setting definitions, required fields, and connection tests
+
+A plugin declares its settings by returning `PluginSettingDefinitionDto`s from `GetSettingDefinitions()`. Each definition carries `Key`, `Label`, `Type` (`text`, `password`, `select`, …), `DefaultValue`, `Description`, `Options` (for `select`), plus two fields that shape the generic admin form:
+
+- **`Required`** — renders a `*` on the label. It's a UI affordance for "you should fill this in"; it does not by itself block saving.
+- **`Placeholder`** — greyed example text in the input (e.g. `https://radarr.example.com`).
+
+Two plugin-level flags surface on `PluginVM` and drive admin UX:
+
+- **`RequiresConfiguration`** (computed, not authored) — true when any definition has an empty `DefaultValue` **and** no saved value yet (`PluginManager.RequiresConfiguration`). The admin list uses it to badge plugins that are installed but not yet usable.
+- **`ExternalConfigurationHint`** (`IVoraPlugin.ExternalConfigurationHint`, default `null`) — a short string for plugins whose credentials live elsewhere, so the settings form shows a pointer instead of empty fields. The Radarr/Sonarr **calendar** providers set this because their credentials come from Request Servers via `IRequestServerLookup` (see the `ProvidesReleaseCalendar` note in `docs/database.md`); they return no setting definitions of their own.
+
+**Connection test.** A plugin that can verify its credentials implements `IPluginConnectionTest.TestConnectionAsync(settings, ct)` and returns `PluginConnectionTestResult.Ok(msg)` / `.Fail(msg)` (exceptions are caught and reported as a failure, 15s timeout). `PluginManager` sets `SupportsConnectionTest = plugin is IPluginConnectionTest`; when true, the admin form renders a **Test connection** button that POSTs the current (unsaved) field values to `POST /api/settings/plugins/{pluginId}/test` (AdminOnly) and shows the ✓/✕ message inline. Test against a cheap, auth-only upstream endpoint — the built-in providers (TMDB, TVDB, OMDb, Fanart, MDbList, Last.fm, Genius, SerpApi) each probe a lightweight authenticated call.
+
 ## Where plugin settings render in the admin UI
 
 The `PluginSection` component in `components/Admin/Settings/PluginSettingsTab.tsx` renders one plugin's settings inline. It's exported so feature pages can mount it directly. The `FeaturePluginList` wrapper in `components/Admin/Features/FeaturePluginList.tsx` takes a list of plugin type names (matching the interface name without the `I` prefix and `Provider` suffix — e.g. `Discovery` for `IDiscoveryProvider`), fetches plugins, filters, and renders a `PluginSection` per match.

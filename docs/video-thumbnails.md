@@ -55,17 +55,28 @@ On `MediaItem`:
 `FFmpegVideoThumbnailGeneratorService` runs a single FFmpeg invocation per video:
 
 ```
-ffmpeg -y -i <input>
+ffmpeg -y [-hwaccel auto [-hwaccel_device <dev>]] -skip_frame nokey -i <input>
   -vf "fps=1/<interval>,scale=W:H:force_original_aspect_ratio=decrease:flags=fast_bilinear,
        pad=W:H:(ow-iw)/2:(oh-ih)/2:color=black,
        tile=COLSxROWS"
-  -qscale:v <q> -frames:v 1 -an -sn
-  -c:v mjpeg -f image2 <out>
+  -frames:v 1 -an -sn
+  -c:v libwebp -quality <0-100> -preset picture -f image2 <out>
 ```
 
-`tile` flattens the captured frames into a single JPEG. The scale + pad chain ensures every tile is exactly W × H even when the source aspect ratio differs (letterboxed with black). Frame count is `ceil(duration / interval)`; row count is `ceil(count / columns)`. Source duration comes from `ffprobe -show_entries format=duration`.
+`tile` flattens the captured frames into a single sprite. The scale + pad chain ensures every tile is exactly W × H even when the source aspect ratio differs (letterboxed with black). Frame count is `ceil(duration / interval)`; row count is `ceil(count / columns)`. Source duration comes from `ffprobe -show_entries format=duration`.
 
-The `-c:v mjpeg -f image2` pair is load-bearing: the temp file uses a `.jpg.tmp` suffix during atomic write, and FFmpeg's extension-based muxer autodetect chokes on `.tmp`. Pinning the codec to MJPEG and the muxer to `image2` makes the filename irrelevant.
+- **`-skip_frame nokey`** (an input/decoder option, so it precedes `-i`) makes the decoder emit keyframes only — the `fps` filter still yields one tile per interval from the nearest keyframe, so the grid and WebVTT cues are unchanged, but the dominant cost of fully decoding B/P frames disappears.
+- **`-hwaccel auto`** is added only when the server has hardware acceleration enabled; if a GPU decode pass fails on a codec/profile NVDEC can't handle, the service retries the same command in software so one quirky file never blocks the library.
+- **`libwebp`** output is ~25–35% smaller than JPEG at equal quality. The stored quality is an FFmpeg qscale (2 = best … 31 = worst) mapped to libwebp's 0–100 scale, so the one admin setting keeps its meaning. `-f image2` pins the muxer because the temp file uses a `.webp.tmp` suffix during atomic write and FFmpeg's extension autodetect chokes on `.tmp`. The sprite-version seed is `v2-webp|…`, so flipping to WebP invalidated old JPEG sprites automatically; a stale `sprite.jpg` left by an older generation is deleted after a successful WebP run.
+
+### Failure handling
+
+A per-item ffmpeg failure never aborts the batch — `GenerateManyAsync` runs items in parallel scopes and `RunSingleAsync` catches the exception, logs it, and moves on (cancellation is rethrown, not swallowed). Two things make a broken source visible instead of silent:
+
+- On generation failure (commonly a **corrupt/unreadable file** — e.g. ffmpeg misdetecting an MKV as raw audio, so there's no video stream) the item is skipped, an `Error` is logged with the file path, and a **deduplicated** `AdminNotification` (severity `Warning`, title "Video preview thumbnails failed") is raised naming the file to fix. Dedupe is keyed on the item id (`{"thumbnailFailure":"<id>"}`) so a permanently-broken file surfaces **one** actionable alert rather than a fresh one on every scheduled pass until the admin clears it.
+- The "no media file path on record" early-return, previously silent, now logs a `Warning` — so an item that shows as missing coverage with no error is explained.
+
+A failed item keeps no version marker, so it stays in the target list and is retried on the next pass (once the file is fixed, it succeeds and the alert stops).
 
 After the sprite lands on disk, the service synthesizes a WebVTT file:
 
