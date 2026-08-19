@@ -382,4 +382,46 @@ public class MediaAnalyzerManagerDetectionTests
         await _media.Received().ReplaceMarkersAsync(ep3, Arg.Is<IEnumerable<MediaItemMarker>>(ms =>
             ms.Any(m => m.Type == MarkerType.Credits && m.Start == TimeSpan.FromMinutes(40).Add(TimeSpan.FromSeconds(2)))));
     }
+
+    [Fact]
+    public async Task TriggerLibrarySilenceDetectionAsync_does_not_detect_on_a_scan_when_detections_are_never()
+    {
+        _settings.GetSettingsAsync().Returns(new ServerSetting { RunDetections = DetectionTrigger.Never });
+
+        await _manager.TriggerLibrarySilenceDetectionAsync(Guid.NewGuid(), isAdditionTrigger: true);
+
+        await _media.DidNotReceive().GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task TriggerLibrarySilenceDetectionAsync_does_not_detect_on_a_scan_when_detections_are_schedule_only()
+    {
+        _settings.GetSettingsAsync().Returns(new ServerSetting { RunDetections = DetectionTrigger.OnSchedule });
+
+        await _manager.TriggerLibrarySilenceDetectionAsync(Guid.NewGuid(), isAdditionTrigger: true);
+
+        await _media.DidNotReceive().GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task TriggerLibrarySilenceDetectionAsync_detects_on_a_scan_when_detections_run_on_addition()
+    {
+        _settings.GetSettingsAsync().Returns(new ServerSetting { RunDetections = DetectionTrigger.OnAddition });
+        _media.GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>()).Returns(new List<Guid>());
+
+        await _manager.TriggerLibrarySilenceDetectionAsync(Guid.NewGuid(), isAdditionTrigger: true);
+
+        await _media.Received(1).GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task TriggerLibrarySilenceDetectionAsync_runs_when_forced_even_if_detections_are_never()
+    {
+        _settings.GetSettingsAsync().Returns(new ServerSetting { RunDetections = DetectionTrigger.Never });
+        _media.GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>()).Returns(new List<Guid>());
+
+        await _manager.TriggerLibrarySilenceDetectionAsync(Guid.NewGuid(), forceOverride: true);
+
+        await _media.Received(1).GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>());
+    }
 }

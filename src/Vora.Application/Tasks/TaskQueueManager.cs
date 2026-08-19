@@ -93,7 +93,7 @@ public class TaskQueueManager : ITaskQueueManager
     public void QueueLibraryAdded(Guid libraryId, string? libraryName = null, bool forceOverride = false)
     {
         EnqueueTask($"Auto-Ingest Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, isAdditionTrigger: true, ct),
+            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, ct),
             libraryName == null ? LibraryLabel(libraryId, "Auto-Ingest Library: {0}") : null,
             resourceKey: LibraryKey(libraryId));
     }
@@ -101,7 +101,7 @@ public class TaskQueueManager : ITaskQueueManager
     public void QueueLibraryUpdated(Guid libraryId, string? libraryName = null, bool forceOverride = false)
     {
         EnqueueTask($"Update Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, isAdditionTrigger: false, ct),
+            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, ct),
             libraryName == null ? LibraryLabel(libraryId, "Update Library: {0}") : null,
             resourceKey: LibraryKey(libraryId));
     }
@@ -109,7 +109,7 @@ public class TaskQueueManager : ITaskQueueManager
     public void QueueScanLibrary(Guid libraryId, string? libraryName = null, bool forceOverride = false)
     {
         EnqueueTask($"Scan Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, isAdditionTrigger: false, ct),
+            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, ct),
             libraryName == null ? LibraryLabel(libraryId, "Scan Library: {0}") : null,
             resourceKey: LibraryKey(libraryId));
     }
@@ -639,7 +639,7 @@ public class TaskQueueManager : ITaskQueueManager
         });
     }
 
-    private static async Task RunFullLibraryWorkflowAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, bool isAdditionTrigger, CancellationToken ct = default)
+    private static async Task RunFullLibraryWorkflowAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, CancellationToken ct = default)
     {
         var metadataManager = sp.GetRequiredService<IMetadataManager>();
         var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
@@ -788,7 +788,11 @@ public class TaskQueueManager : ITaskQueueManager
         // detection runs here too so the stinger badge is available.
         await RunStepAsync("Analyzing media…", () => analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName, ct));
 
-        await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: isAdditionTrigger, cancellationToken: ct));
+        // Scanning a library is an addition event, so marker detection here runs
+        // as an addition trigger — it is gated by RunDetections and stays off
+        // entirely when detection is set to Never or Schedule-only. Only the
+        // explicit Analyze action (forceOverride) detects regardless of setting.
+        await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: true, cancellationToken: ct));
 
         // Overlays LAST: now the posters get every badge — resolution (scan),
         // content rating (enrich), audio/video codec + HDR (analysis), and
