@@ -88,8 +88,6 @@ export const ADMIN_NAV: AdminNavEntry[] = [
 
     // === Library ===
     { label: 'Libraries',            pathTemplate: '/admin/libraries',        section: 'Library', icon: 'folder',     keywords: ['media', 'sources', 'folders'] },
-    { label: 'Collections',          pathTemplate: '/admin/collections',      section: 'Library', icon: 'layers',     keywords: ['sync', 'trakt', 'lists'] },
-    { label: 'Music',                pathTemplate: '/admin/music',            section: 'Library', icon: 'music-note', keywords: ['lyrics', 'lastfm', 'listening data'] },
     { label: 'Poster Overlays',      pathTemplate: '/admin/overlays',         section: 'Library', icon: 'image',      keywords: ['badges', 'resolution', 'ratings', 'editor'] },
     { label: 'Media Deduplication',  pathTemplate: '/admin/dedupe',           section: 'Library', icon: 'copy',       keywords: ['duplicates', 'duplicate', 'cleanup'] },
     { label: 'Media Trash',          pathTemplate: '/admin/media-trash',      section: 'Library', icon: 'trash',      keywords: ['missing', 'trash', 'deleted', 'removed', 'restore', 'retention'] },

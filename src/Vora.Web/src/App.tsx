@@ -62,8 +62,6 @@ const AdminIptvPage = lazy(() => import('./pages/Admin/Iptv/IptvPage'));
 const AdminForYouPage = lazy(() => import('./pages/Admin/Features/ForYouPage'));
 const AdminReleaseCalendarPage = lazy(() => import('./pages/Admin/Features/ReleaseCalendarPage'));
 const AdminDvrPage = lazy(() => import('./pages/Admin/Features/DvrPage'));
-const AdminCollectionsPage = lazy(() => import('./pages/Admin/Features/CollectionsAdminPage'));
-const AdminMusicPage = lazy(() => import('./pages/Admin/Features/MusicAdminPage'));
 const AdminLiveTvPage = () => <AdminIptvPage kind="Tv" />;
 const AdminInternetRadioPage = () => <AdminIptvPage kind="Radio" />;
 const AdminPodcastsPage = lazy(() => import('./pages/Admin/Podcasts/PodcastsAdminPage'));
@@ -238,8 +236,6 @@ export default function App() {
                         <Route path="for-you" element={<AdminForYouPage />} />
                         <Route path="release-calendar" element={<AdminReleaseCalendarPage />} />
                         <Route path="dvr-settings" element={<AdminDvrPage />} />
-                        <Route path="collections" element={<AdminCollectionsPage />} />
-                        <Route path="music" element={<AdminMusicPage />} />
                         <Route path="youtube" element={<AdminYouTubePage />} />
                         <Route path="requests" element={<AdminRequestsPage />} />
                         <Route path="ai-stats" element={<AdminAiStatsPage />} />
@@ -273,8 +269,6 @@ export default function App() {
                         <Route path="for-you" element={<AdminForYouPage />} />
                         <Route path="release-calendar" element={<AdminReleaseCalendarPage />} />
                         <Route path="dvr-settings" element={<AdminDvrPage />} />
-                        <Route path="collections" element={<AdminCollectionsPage />} />
-                        <Route path="music" element={<AdminMusicPage />} />
                         <Route path="youtube" element={<AdminYouTubePage />} />
                             <Route path="requests" element={<AdminRequestsPage />} />
                             <Route path="ai-stats" element={<AdminAiStatsPage />} />
