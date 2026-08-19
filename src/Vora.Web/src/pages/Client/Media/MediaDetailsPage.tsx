@@ -488,18 +488,9 @@ export default function MediaDetailsPage() {
     const isEpisode = media.type === 'Episode';
     const isSeason = media.type === 'Season';
     const showParentNav = (isEpisode && !!media.seasonId) || (isSeason && !!media.tvShowId);
-    // The back button jumps to the parent (episode -> season, or the show if
-    // there's no season; season -> show) rather than browser history, so
-    // arriving from a rail on Home lands on the parent instead of going back to
-    // Home. Movies and shows have no parent and fall back to history.
-    const backParentId = isEpisode ? (media.seasonId ?? media.tvShowId) : isSeason ? media.tvShowId : undefined;
-    const goBack = () => {
-        if (backParentId) {
-            navigate(serverId ? `/server/${serverId}/media/${backParentId}` : `/media/${backParentId}`);
-        } else {
-            navigate(-1);
-        }
-    };
+    // Always return to wherever the user came from rather than jumping to the
+    // parent item; the "Go to season"/"Go to show" menu covers parent navigation.
+    const goBack = () => navigate(-1);
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = (isSeason || isEpisode) ? media.title : undefined;
     const showQualityButton = (media.type === 'Movie' || isEpisode || media.type === 'TvShow') && (versionOptions.length > 1 || sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
@@ -539,7 +530,7 @@ export default function MediaDetailsPage() {
                         style={{ background: 'rgba(20, 20, 28, 0.65)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#fafafa' }}
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-                        {media.tvShowTitle ? `Back to ${media.tvShowTitle}` : 'Back'}
+                        Back
                     </button>
                 </div>
 
