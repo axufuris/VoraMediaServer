@@ -24,11 +24,13 @@ function PluginCard({
     serverId,
     showModal,
     onUninstall,
+    onToggled,
 }: {
     plugin: PluginVM;
     serverId?: string;
     showModal: (title: string, message: string, isError?: boolean) => void;
     onUninstall: (id: string, name: string) => void;
+    onToggled: (id: string, enabled: boolean) => void;
 }) {
     const [latestVersion, setLatestVersion] = useState<string | null>(null);
     const [checkingVersion, setCheckingVersion] = useState(!!plugin.latestVersionApiUrl);
@@ -57,6 +59,7 @@ function PluginCard({
         setIsToggling(true);
         try {
             await systemSettingsAdminService.updatePluginSettings(plugin.id, { is_enabled: next ? 'true' : 'false' }, serverId);
+            onToggled(plugin.id, next);
         } catch {
             setEnabled(!next);
             showModal('Error', `Failed to ${next ? 'enable' : 'disable'} ${plugin.name}.`, true);
@@ -169,6 +172,8 @@ export default function PluginsPage() {
     const [loading, setLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
     const [query, setQuery] = useState('');
+    const [setupOnly, setSetupOnly] = useState(false);
+    const [enabledFilter, setEnabledFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -229,18 +234,31 @@ export default function PluginsPage() {
         }
     };
 
+    const handlePluginToggled = useCallback((id: string, enabled: boolean) => {
+        setPlugins(prev => prev.map(p => p.id === id ? { ...p, isEnabled: enabled } : p));
+    }, []);
+
+    const setupNeededCount = useMemo(() => plugins.filter(p => p.requiresConfiguration).length, [plugins]);
+
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
-        if (!q) return plugins;
-        return plugins.filter(p =>
-            p.name.toLowerCase().includes(q) ||
-            p.id.toLowerCase().includes(q) ||
-            p.type.toLowerCase().includes(q) ||
-            formatTypeLabel(p.type).toLowerCase().includes(q) ||
-            (p.description?.toLowerCase().includes(q) ?? false) ||
-            (p.developerName?.toLowerCase().includes(q) ?? false)
-        );
-    }, [plugins, query]);
+        return plugins.filter(p => {
+            if (setupOnly && !p.requiresConfiguration) return false;
+            if (enabledFilter === 'enabled' && !p.isEnabled) return false;
+            if (enabledFilter === 'disabled' && p.isEnabled) return false;
+            if (!q) return true;
+            return (
+                p.name.toLowerCase().includes(q) ||
+                p.id.toLowerCase().includes(q) ||
+                p.type.toLowerCase().includes(q) ||
+                formatTypeLabel(p.type).toLowerCase().includes(q) ||
+                (p.description?.toLowerCase().includes(q) ?? false) ||
+                (p.developerName?.toLowerCase().includes(q) ?? false)
+            );
+        });
+    }, [plugins, query, setupOnly, enabledFilter]);
+
+    const filtersActive = setupOnly || enabledFilter !== 'all';
 
     const groupedPlugins = useMemo(() => {
         const acc: Record<string, PluginVM[]> = {};
@@ -279,16 +297,41 @@ export default function PluginsPage() {
 
             <div className="p-8 max-w-5xl mx-auto space-y-8">
                 {!loading && plugins.length > 0 && (
-                    <div className="relative">
-                        <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--vora-text-muted)] pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
-                        <input
-                            type="text"
-                            value={query}
-                            onChange={e => setQuery(e.target.value)}
-                            placeholder="Search plugins by name, type, key, or description (e.g. OMDb, ratings, showtimes)…"
-                            className="vora-input w-full"
-                            style={{ paddingLeft: '2.5rem' }}
-                        />
+                    <div className="space-y-3">
+                        <div className="relative">
+                            <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--vora-text-muted)] pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+                            <input
+                                type="text"
+                                value={query}
+                                onChange={e => setQuery(e.target.value)}
+                                placeholder="Search plugins by name, type, key, or description (e.g. OMDb, ratings, showtimes)…"
+                                className="vora-input w-full"
+                                style={{ paddingLeft: '2.5rem' }}
+                            />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setSetupOnly(v => !v)}
+                                className={`text-xs font-semibold px-3 py-1.5 rounded-[var(--vora-radius-md)] border transition-colors cursor-pointer ${setupOnly ? 'border-[var(--vora-warning-500)] bg-[var(--vora-warning-soft)] text-[var(--vora-warning-text)]' : 'border-[var(--vora-border-subtle)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]/40'}`}
+                                title="Show only plugins that still need configuration"
+                            >
+                                Setup needed{setupNeededCount > 0 && <span className="ml-1.5 opacity-80">· {setupNeededCount}</span>}
+                            </button>
+
+                            <div className="inline-flex rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] overflow-hidden">
+                                {(['all', 'enabled', 'disabled'] as const).map(opt => (
+                                    <button
+                                        key={opt}
+                                        type="button"
+                                        onClick={() => setEnabledFilter(opt)}
+                                        className={`text-xs font-semibold px-3 py-1.5 transition-colors cursor-pointer capitalize ${enabledFilter === opt ? 'bg-[var(--vora-accent-500)] text-white' : 'text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]/40'}`}
+                                    >
+                                        {opt}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -307,12 +350,14 @@ export default function PluginsPage() {
                     <div className="vora-card">
                         <EmptyState
                             title="No matching plugins"
-                            description={`Nothing matches “${query}”. Try a different search.`}
+                            description={query.trim().length > 0
+                                ? `Nothing matches “${query}” with the current filters. Try a different search or clear the filters.`
+                                : 'No plugins match the current filters.'}
                         />
                     </div>
                 ) : (
                     groupNames.map(type => {
-                        const isGroupOpen = query.trim().length > 0 || expandedGroups.has(type);
+                        const isGroupOpen = query.trim().length > 0 || filtersActive || expandedGroups.has(type);
                         return (
                             <section key={type} className="space-y-3">
                                 <button
@@ -335,6 +380,7 @@ export default function PluginsPage() {
                                                 serverId={serverId}
                                                 showModal={showModal}
                                                 onUninstall={handleUninstall}
+                                                onToggled={handlePluginToggled}
                                             />
                                         ))}
                                     </div>
