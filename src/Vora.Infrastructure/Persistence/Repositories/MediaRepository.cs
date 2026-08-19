@@ -302,6 +302,23 @@ public partial class MediaRepository : IMediaRepository
             .ToListAsync();
     }
 
+    public async Task<List<Guid>> GetVideoThumbnailTargetIdsAsync(Guid libraryId, string currentSpriteVersion, bool includeCompleted)
+    {
+        var query = _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m is Movie || m is Episode)
+            .Where(m =>
+                (m is Movie && m.LibraryId == libraryId) ||
+                (m is Episode && ((Episode)m).Season.TvShow.LibraryId == libraryId));
+
+        if (!includeCompleted)
+        {
+            query = query.Where(m => m.VideoThumbnailSpriteVersion != currentSpriteVersion);
+        }
+
+        return await query.Select(m => m.Id).ToListAsync();
+    }
+
     public async Task<List<Guid>> GetTopLevelMediaItemIdsByLibraryAsync(Guid libraryId)
     {
         return await _context.MediaItems

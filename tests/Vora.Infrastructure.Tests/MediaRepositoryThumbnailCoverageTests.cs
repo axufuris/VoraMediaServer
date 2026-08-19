@@ -54,6 +54,26 @@ public class MediaRepositoryThumbnailCoverageTests
     }
 
     [Fact]
+    public async Task Target_ids_returns_only_items_needing_thumbnails_when_not_forced()
+    {
+        using var db = NewContext();
+        var libraryId = Guid.NewGuid();
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+
+        var current = new Movie { Id = Guid.NewGuid(), Title = "Current", LibraryId = libraryId, VideoThumbnailSpriteVersion = "v2-webp" };
+        var outdated = new Movie { Id = Guid.NewGuid(), Title = "Outdated", LibraryId = libraryId, VideoThumbnailSpriteVersion = "v1" };
+        var never = new Movie { Id = Guid.NewGuid(), Title = "Never", LibraryId = libraryId };
+        db.Set<Movie>().AddRange(current, outdated, never);
+        await db.SaveChangesAsync();
+
+        var remaining = await repo.GetVideoThumbnailTargetIdsAsync(libraryId, "v2-webp", includeCompleted: false);
+        Assert.Equal(new[] { outdated.Id, never.Id }.OrderBy(x => x), remaining.OrderBy(x => x));
+
+        var all = await repo.GetVideoThumbnailTargetIdsAsync(libraryId, "v2-webp", includeCompleted: true);
+        Assert.Equal(3, all.Count);
+    }
+
+    [Fact]
     public async Task Does_not_count_items_from_another_library()
     {
         using var db = NewContext();
