@@ -29,6 +29,8 @@ public class YouTubePlugin : IVoraPlugin
                 Key = ApiKeySettingKey,
                 Label = "YouTube Data API Key",
                 Type = "password",
+                Required = true,
+                Placeholder = "Paste your YouTube Data API key",
                 Description = "YouTube Data API v3 key (free). Three-step setup: (1) Create a Google Cloud project at https://console.cloud.google.com/projectcreate. (2) Enable the YouTube Data API v3 at https://console.cloud.google.com/apis/library/youtube.googleapis.com. (3) Open https://console.cloud.google.com/apis/credentials, click 'Create Credentials → API key', and paste the result here. The free quota is 10,000 units/day, more than enough for a personal or small-family server."
             },
             new PluginSettingDefinitionDto

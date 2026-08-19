@@ -40,6 +40,7 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
                 Key = "discovery_region",
                 Label = "Discovery Region",
                 Type = "text",
+                Required = false,
                 Description = "ISO 3166-1 country code (e.g., US, GB, CA) to filter the discovery lists. Defaults to US if left blank."
             },
             new PluginSettingDefinitionDto
@@ -47,6 +48,7 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
                 Key = "discovery_language",
                 Label = "Discovery Language",
                 Type = "text",
+                Required = false,
                 Description = "ISO 639-1 language code (e.g., en-US). Helps filter out foreign titles. Defaults to en-US if left blank."
             }
         };

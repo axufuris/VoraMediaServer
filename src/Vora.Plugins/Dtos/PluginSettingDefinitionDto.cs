@@ -7,5 +7,7 @@ public class PluginSettingDefinitionDto
     public string Type { get; set; } = "text";
     public string DefaultValue { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string Placeholder { get; set; } = string.Empty;
+    public bool Required { get; set; }
     public List<string> Options { get; set; } = new();
 }

@@ -77,6 +77,8 @@ export interface PluginSettingField {
     type: string;
     description: string;
     value: string;
+    placeholder: string;
+    required: boolean;
     options: string[];
 }
 

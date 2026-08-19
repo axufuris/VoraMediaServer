@@ -32,7 +32,7 @@ public class MdbListCollectionSyncProvider : ICollectionSyncProvider
     {
         return new List<PluginSettingDefinitionDto>
         {
-            new PluginSettingDefinitionDto { Key = "api_key", Label = "MDbList API Key", Type = "password", Description = "MDbList API Key (free). Sign in at https://mdblist.com, then open Preferences → API and click 'Generate API Key' (https://mdblist.com/preferences). Free tier provides ample quota for personal use. This same key is reused by the MDbList chronology provider." }
+            new PluginSettingDefinitionDto { Key = "api_key", Label = "MDbList API Key", Type = "password", Required = true, Placeholder = "Paste your MDbList API key", Description = "MDbList API Key (free). Sign in at https://mdblist.com, then open Preferences → API and click 'Generate API Key' (https://mdblist.com/preferences). Free tier provides ample quota for personal use. This same key is reused by the MDbList chronology provider." }
         };
     }
 
