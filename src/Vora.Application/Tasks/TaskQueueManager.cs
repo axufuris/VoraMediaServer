@@ -150,7 +150,8 @@ public class TaskQueueManager : ITaskQueueManager
             await analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger, cancellationToken: ct);
         },
         libraryName == null ? LibraryLabel(libraryId, "Analyze Library Media: {0}") : null,
-        resourceKey: LibraryMaintenanceKey(libraryId));
+        resourceKey: LibraryMaintenanceKey(libraryId),
+        dedupeKey: $"analyze-lib:{libraryId}:{forceOverride}");
     }
 
     public void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
