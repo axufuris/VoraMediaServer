@@ -559,7 +559,7 @@ export default function ManageLibrary() {
                         {showVideoOptions && <Checkbox checked={library.onlyShowTrailers} onChange={v => handleChange('onlyShowTrailers', v)} label="Only show trailers" />}
                         {showVideoPreviewThumbnails && <Checkbox checked={library.enableVideoPreviewThumbnails} onChange={v => handleChange('enableVideoPreviewThumbnails', v)} label="Enable video preview thumbnails" />}
                         {showVideoOptions && <Checkbox checked={library.enableCreditsDetection} onChange={v => handleChange('enableCreditsDetection', v)} label="Enable credits detection" />}
-                        {showVideoOptions && <Checkbox checked={library.enablePreviewDetection} onChange={v => handleChange('enablePreviewDetection', v)} label="Enable next-episode preview skips" />}
+                        {isTvShow && <Checkbox checked={library.enablePreviewDetection} onChange={v => handleChange('enablePreviewDetection', v)} label="Enable next-episode preview skips" />}
                     </div>
 
                     {showVideoOptions && (

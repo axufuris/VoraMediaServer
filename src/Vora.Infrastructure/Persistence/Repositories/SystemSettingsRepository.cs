@@ -49,6 +49,7 @@ public class SystemSettingsRepository(VoraDbContext dbContext) : ISystemSettings
 
         return await dbContext.ServerSettings
             .AsNoTracking()
+            .OrderBy(s => s.Id)
             .Select(ServerSettingsVM.Projection)
             .FirstAsync();
     }
@@ -57,6 +58,7 @@ public class SystemSettingsRepository(VoraDbContext dbContext) : ISystemSettings
     {
         var dto = await dbContext.ServerSettings
             .AsNoTracking()
+            .OrderBy(s => s.Id)
             .Select(RemoteAccessSettingsDto.Projection)
             .FirstOrDefaultAsync();
 
