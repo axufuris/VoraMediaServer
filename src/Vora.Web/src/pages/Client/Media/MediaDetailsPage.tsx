@@ -488,9 +488,17 @@ export default function MediaDetailsPage() {
     const isEpisode = media.type === 'Episode';
     const isSeason = media.type === 'Season';
     const showParentNav = (isEpisode && !!media.seasonId) || (isSeason && !!media.tvShowId);
-    // Always return to wherever the user came from rather than jumping to the
-    // parent item; the "Go to season"/"Go to show" menu covers parent navigation.
-    const goBack = () => navigate(-1);
+    // Return to wherever the user came from. When there is no in-app history to
+    // go back to (a direct/deep link opened the page), fall back to the parent
+    // show so Back never drops the user out of the app.
+    const goBack = () => {
+        const hasHistory = ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0;
+        if (!hasHistory && media.tvShowId) {
+            navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`);
+            return;
+        }
+        navigate(-1);
+    };
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = (isSeason || isEpisode) ? media.title : undefined;
     const showQualityButton = (media.type === 'Movie' || isEpisode || media.type === 'TvShow') && (versionOptions.length > 1 || sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
