@@ -6,7 +6,7 @@ using Vora.Plugins.Interfaces;
 
 namespace Vora.Plugins.Providers.Tmdb;
 
-public class TmdbMetadataProvider : IMetadataProvider
+public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 {
     private readonly HttpClient _httpClient;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -45,6 +45,25 @@ public class TmdbMetadataProvider : IMetadataProvider
                 Description = "Free TMDB v3 API key. Sign up at https://www.themoviedb.org/signup, then request a key under Settings → API (https://www.themoviedb.org/settings/api) and click 'Create'. Copy the 'API Key (v3 auth)' value — not the Read Access Token."
             }
         };
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("api_key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        var response = await _httpClient.GetAsync($"configuration?api_key={Uri.EscapeDataString(apiKey.Trim())}", cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            return PluginConnectionTestResult.Ok("TMDB accepted the API key.");
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            return PluginConnectionTestResult.Fail("TMDB rejected the API key. Make sure you copied the 'API Key (v3 auth)' value, not the Read Access Token.");
+        }
+        return PluginConnectionTestResult.Fail($"Unexpected response from TMDB (HTTP {(int)response.StatusCode}).");
     }
 
     private async Task<string?> GetApiKeyAsync()

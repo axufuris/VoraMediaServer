@@ -8,7 +8,7 @@ using Vora.Plugins.Interfaces;
 
 namespace Vora.Plugins.Providers.Tvdb;
 
-public class TvdbMetadataProvider : IMetadataProvider
+public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 {
     private readonly HttpClient _httpClient;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -56,6 +56,28 @@ public class TvdbMetadataProvider : IMetadataProvider
                 Description = "TVDB v4 API key. Requires a subscriber account — sign up at https://thetvdb.com/subscribe. Once subscribed, generate the key at https://thetvdb.com/dashboard/account/apikey and paste it here. Vora exchanges it for a session token automatically and caches that token in plugin settings."
             }
         };
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("api_key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        var loginRequest = new { apikey = apiKey.Trim() };
+        var content = new StringContent(JsonSerializer.Serialize(loginRequest), Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync("login", content, cancellationToken);
+
+        if (response.IsSuccessStatusCode)
+        {
+            return PluginConnectionTestResult.Ok("TVDB accepted the API key.");
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            return PluginConnectionTestResult.Fail("TVDB rejected the API key. A TVDB v4 subscriber account is required.");
+        }
+        return PluginConnectionTestResult.Fail($"Unexpected response from TVDB (HTTP {(int)response.StatusCode}).");
     }
 
     private async Task<string?> GetValidTokenAsync()

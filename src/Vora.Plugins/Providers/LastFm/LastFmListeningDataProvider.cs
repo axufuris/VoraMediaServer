@@ -9,7 +9,7 @@ using Vora.Plugins.Interfaces;
 
 namespace Vora.Plugins.Providers.LastFm;
 
-public class LastFmListeningDataProvider : IListeningDataProvider
+public class LastFmListeningDataProvider : IListeningDataProvider, IPluginConnectionTest
 {
     public const string HttpClientName = "LastFmHttpClient";
     private const string BaseUrl = "https://ws.audioscrobbler.com/2.0/";
@@ -61,6 +61,23 @@ public class LastFmListeningDataProvider : IListeningDataProvider
                 Description = "Last.fm Shared Secret. Returned alongside your API Key when you registered at https://www.last.fm/api/account/create. Required for signed write operations (scrobbling, Now Playing updates) — without it, reads still work but plays cannot be submitted."
             }
         };
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("api_key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        var client = _httpClientFactory.CreateClient(HttpClientName);
+        var response = await client.GetAsync($"http://ws.audioscrobbler.com/2.0/?method=auth.getToken&api_key={Uri.EscapeDataString(apiKey.Trim())}&format=json", cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (response.IsSuccessStatusCode && !body.Contains("\"error\"", StringComparison.OrdinalIgnoreCase))
+        {
+            return PluginConnectionTestResult.Ok("Last.fm accepted the API key.");
+        }
+        return PluginConnectionTestResult.Fail("Last.fm rejected the API key.");
     }
 
     private async Task<(string? Key, string? Secret)> GetCredentialsAsync()

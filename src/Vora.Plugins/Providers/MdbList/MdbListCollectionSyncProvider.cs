@@ -5,7 +5,7 @@ using Vora.Plugins.Interfaces;
 
 namespace Vora.Plugins.Providers.MdbList;
 
-public class MdbListCollectionSyncProvider : ICollectionSyncProvider
+public class MdbListCollectionSyncProvider : ICollectionSyncProvider, IPluginConnectionTest
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IPluginSettingsProvider _settings;
@@ -34,6 +34,26 @@ public class MdbListCollectionSyncProvider : ICollectionSyncProvider
         {
             new PluginSettingDefinitionDto { Key = "api_key", Label = "MDbList API Key", Type = "password", Required = true, Placeholder = "Paste your MDbList API key", Description = "MDbList API Key (free). Sign in at https://mdblist.com, then open Preferences → API and click 'Generate API Key' (https://mdblist.com/preferences). Free tier provides ample quota for personal use. This same key is reused by the MDbList chronology provider." }
         };
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("api_key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        var client = _httpClientFactory.CreateClient();
+        var response = await client.GetAsync($"https://api.mdblist.com/user?apikey={Uri.EscapeDataString(apiKey.Trim())}", cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            return PluginConnectionTestResult.Ok("MDbList accepted the API key.");
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            return PluginConnectionTestResult.Fail("MDbList rejected the API key.");
+        }
+        return PluginConnectionTestResult.Fail($"Unexpected response (HTTP {(int)response.StatusCode}).");
     }
 
     public async Task<List<CollectionSyncItemDto>> FetchItemsAsync(string externalId)
