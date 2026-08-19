@@ -87,6 +87,7 @@ function PluginCard({
                         {isLatest && <HealthBadge tone="ok">Latest</HealthBadge>}
                         {hasUpdate && <HealthBadge tone="warn">Update to v{latestVersion}</HealthBadge>}
                         {plugin.isSystemPlugin && <HealthBadge tone="info" showDot={false}>System Core</HealthBadge>}
+                        {plugin.requiresConfiguration && <HealthBadge tone="warn">Setup needed</HealthBadge>}
                     </div>
                     <p className="text-xs text-[var(--vora-text-secondary)] leading-relaxed mt-1.5">{plugin.description}</p>
                     {plugin.developerName && (

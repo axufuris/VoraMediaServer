@@ -32,6 +32,14 @@ public class PluginManager(
         foreach (var plugin in plugins)
         {
             var isEnabledStr = await settingsRepo.GetPluginSettingAsync(plugin.Id, EnabledSettingKey);
+            var definitions = plugin.GetSettingDefinitions().ToList();
+
+            var requiresConfiguration = false;
+            if (definitions.Count > 0)
+            {
+                var saved = await settingsRepo.GetAllPluginSettingsAsync(plugin.Id);
+                requiresConfiguration = RequiresConfiguration(definitions, saved);
+            }
 
             result.Add(new PluginVM
             {
@@ -44,9 +52,10 @@ public class PluginManager(
                 DeveloperName = plugin.DeveloperName,
                 LatestVersionApiUrl = plugin.LatestVersionApiUrl,
                 DocumentationUrl = plugin.DocumentationUrl,
-                HasSettings = true,
+                HasSettings = definitions.Count > 0,
                 IsAiPlugin = plugin.IsAiPlugin,
-                IsEnabled = isEnabledStr != DisabledValue
+                IsEnabled = isEnabledStr != DisabledValue,
+                RequiresConfiguration = requiresConfiguration
             });
         }
 
@@ -152,6 +161,15 @@ public class PluginManager(
             logger.LogError(ex, "Failed to mark plugin {PluginId} for deletion at {AssemblyPath}.", id, assemblyPath);
             throw;
         }
+    }
+
+    private static bool RequiresConfiguration(
+        IReadOnlyList<Vora.Plugins.Dtos.PluginSettingDefinitionDto> definitions,
+        IReadOnlyDictionary<string, string> savedSettings)
+    {
+        return definitions.Any(def =>
+            string.IsNullOrEmpty(def.DefaultValue) &&
+            (!savedSettings.TryGetValue(def.Key, out var value) || string.IsNullOrWhiteSpace(value)));
     }
 
     private async Task<bool> HasAllRequiredSettingsAsync(IVoraPlugin plugin)

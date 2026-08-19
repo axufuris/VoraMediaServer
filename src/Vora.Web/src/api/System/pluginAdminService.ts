@@ -13,6 +13,7 @@ export interface PluginVM {
     documentationUrl?: string;
     isAiPlugin: boolean;
     isEnabled: boolean;
+    requiresConfiguration: boolean;
 }
 
 export interface PluginOptionVM {
