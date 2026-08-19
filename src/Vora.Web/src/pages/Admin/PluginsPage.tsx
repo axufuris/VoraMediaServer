@@ -161,7 +161,16 @@ export default function PluginsPage() {
     const [loading, setLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
     const [query, setQuery] = useState('');
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const toggleGroup = useCallback((type: string) => {
+        setExpandedGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(type)) next.delete(type); else next.add(type);
+            return next;
+        });
+    }, []);
 
     const showModal = useCallback((title: string, message: string, isError: boolean = false) => {
         dialog.alert({ title, message, tone: isError ? 'danger' : 'default' });
@@ -269,7 +278,8 @@ export default function PluginsPage() {
                             value={query}
                             onChange={e => setQuery(e.target.value)}
                             placeholder="Search plugins by name, type, key, or description (e.g. OMDb, ratings, showtimes)…"
-                            className="vora-input w-full pl-9"
+                            className="vora-input w-full"
+                            style={{ paddingLeft: '2.5rem' }}
                         />
                     </div>
                 )}
@@ -293,25 +303,37 @@ export default function PluginsPage() {
                         />
                     </div>
                 ) : (
-                    groupNames.map(type => (
-                        <section key={type} className="space-y-3">
-                            <h2 className="text-xs font-bold text-[var(--vora-text-muted)] uppercase tracking-widest">
-                                {formatTypeLabel(type)}
-                                <span className="ml-2 text-[var(--vora-text-disabled)] font-medium normal-case tracking-normal">· {groupedPlugins[type].length}</span>
-                            </h2>
-                            <div className="space-y-3">
-                                {groupedPlugins[type].map(plugin => (
-                                    <PluginCard
-                                        key={plugin.id}
-                                        plugin={plugin}
-                                        serverId={serverId}
-                                        showModal={showModal}
-                                        onUninstall={handleUninstall}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    ))
+                    groupNames.map(type => {
+                        const isGroupOpen = query.trim().length > 0 || expandedGroups.has(type);
+                        return (
+                            <section key={type} className="space-y-3">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleGroup(type)}
+                                    className="flex items-center gap-2 w-full text-left group"
+                                >
+                                    <svg className={`w-3.5 h-3.5 text-[var(--vora-text-muted)] shrink-0 transition-transform ${isGroupOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                    <h2 className="text-xs font-bold text-[var(--vora-text-muted)] uppercase tracking-widest group-hover:text-[var(--vora-text-secondary)] transition-colors">
+                                        {formatTypeLabel(type)}
+                                        <span className="ml-2 text-[var(--vora-text-disabled)] font-medium normal-case tracking-normal">· {groupedPlugins[type].length}</span>
+                                    </h2>
+                                </button>
+                                {isGroupOpen && (
+                                    <div className="space-y-3">
+                                        {groupedPlugins[type].map(plugin => (
+                                            <PluginCard
+                                                key={plugin.id}
+                                                plugin={plugin}
+                                                serverId={serverId}
+                                                showModal={showModal}
+                                                onUninstall={handleUninstall}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+                        );
+                    })
                 )}
             </div>
         </div>
