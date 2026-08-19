@@ -129,12 +129,15 @@ public class MetadataMappingService : IMetadataMappingService
 
             if (topBackdrop != null && (!item.IsLocked(nameof(item.BackgroundUrl)) || forceOverride))
             {
-                if (item is Episode && item.OriginalPosterUrl != topBackdrop.Url)
+                if (item is Episode)
                 {
-                    CleanupOrphanedOverlay(item);
-                    item.OriginalPosterUrl = topBackdrop.Url;
-                    item.BackgroundUrl = topBackdrop.Url;
-                    updated = true;
+                    if (item.OriginalPosterUrl != topBackdrop.Url)
+                    {
+                        CleanupOrphanedOverlay(item);
+                        item.OriginalPosterUrl = topBackdrop.Url;
+                        item.PosterUrl = topBackdrop.Url;
+                        updated = true;
+                    }
                 }
                 else if (item.BackgroundUrl != topBackdrop.Url)
                 {
@@ -227,12 +230,19 @@ public class MetadataMappingService : IMetadataMappingService
         {
             if (metadata.BackgroundUrl != null)
             {
-                if (item is Episode && metadata.BackgroundUrl != item.OriginalPosterUrl)
+                if (item is Episode)
                 {
-                    CleanupOrphanedOverlay(item);
-                    item.OriginalPosterUrl = metadata.BackgroundUrl;
+                    if (metadata.BackgroundUrl != item.OriginalPosterUrl)
+                    {
+                        CleanupOrphanedOverlay(item);
+                        item.OriginalPosterUrl = metadata.BackgroundUrl;
+                        item.PosterUrl = metadata.BackgroundUrl;
+                    }
                 }
-                item.BackgroundUrl = metadata.BackgroundUrl;
+                else
+                {
+                    item.BackgroundUrl = metadata.BackgroundUrl;
+                }
             }
         }
 

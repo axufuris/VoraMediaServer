@@ -26,6 +26,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
     private readonly IVideoThumbnailStorageService _storage;
     private readonly IVideoThumbnailGeneratorService _generator;
     private readonly IClientNotifier _notifier;
+    private readonly Notifications.IAdminNotificationManager _adminNotifications;
     private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<VideoThumbnailManager> _logger;
@@ -37,6 +38,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         IVideoThumbnailStorageService storage,
         IVideoThumbnailGeneratorService generator,
         IClientNotifier notifier,
+        Notifications.IAdminNotificationManager adminNotifications,
         Vora.Plugins.Interfaces.ITaskProgressReporter progress,
         IServiceScopeFactory scopeFactory,
         ILogger<VideoThumbnailManager> logger)
@@ -47,6 +49,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         _storage = storage;
         _generator = generator;
         _notifier = notifier;
+        _adminNotifications = adminNotifications;
         _progress = progress;
         _scopeFactory = scopeFactory;
         _logger = logger;
@@ -210,7 +213,11 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         }
 
         var filePaths = await _mediaRepository.GetMediaFilePathsAsync(mediaItemId);
-        if (filePaths == null || filePaths.Count == 0) return;
+        if (filePaths == null || filePaths.Count == 0)
+        {
+            _logger.LogWarning("Skipping video thumbnail generation for {MediaItemId}: no media file path on record", mediaItemId);
+            return;
+        }
         var input = filePaths[0];
         if (string.IsNullOrWhiteSpace(input) || !File.Exists(input))
         {
@@ -241,9 +248,14 @@ public class VideoThumbnailManager : IVideoThumbnailManager
                 vttPath,
                 cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "ffmpeg generation failed for {MediaItemId} ({Input})", mediaItemId, input);
+            _logger.LogError(ex, "ffmpeg generation failed for {MediaItemId} ({Input}); skipping this item", mediaItemId, input);
+            await RaiseThumbnailFailureAlertAsync(mediaItemId, input);
             return;
         }
 
@@ -263,6 +275,27 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         }
 
         await _notifier.NotifyVideoThumbnailsReadyAsync(mediaItemId);
+    }
+
+    // A broken/unreadable source file will fail every scheduled pass, so the alert
+    // is deduplicated on the item id: the admin gets one actionable notification
+    // (which file to fix) rather than a fresh one on every run until it's cleared.
+    private async Task RaiseThumbnailFailureAlertAsync(Guid mediaItemId, string input)
+    {
+        try
+        {
+            var title = await _mediaRepository.GetProjectedAsync(mediaItemId, m => m.Title) ?? "Unknown item";
+            await _adminNotifications.RaiseAsync(
+                AdminNotificationSeverity.Warning,
+                "Video preview thumbnails failed",
+                $"Could not generate scrub-bar thumbnails for \"{title}\". The source file may be corrupt or unreadable: {input}",
+                $"{{\"thumbnailFailure\":\"{mediaItemId}\"}}",
+                deduplicateByContext: true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to raise admin notification for thumbnail failure {MediaItemId}", mediaItemId);
+        }
     }
 
     private async Task<(LibraryType Type, bool Enabled)> GetLibraryThumbnailStateAsync(Guid libraryId)

@@ -119,10 +119,11 @@ public class PosterOverlayManager : IPosterOverlayManager
             var itemsToRevert = await _mediaRepo.GetItemsPendingOverlayGenerationAsync(libraryId, DateTime.UtcNow);
             foreach (var item in itemsToRevert.Where(m => !string.IsNullOrEmpty(m.OriginalPosterUrl)))
             {
+                var episodeBackdropWasOverlay = item is Episode && item.BackgroundUrl == item.PosterUrl;
                 CleanupOldOverlay(item.PosterUrl, item.OriginalPosterUrl);
                 item.PosterUrl = item.OriginalPosterUrl;
 
-                if (item is Episode) item.BackgroundUrl = item.OriginalPosterUrl;
+                if (episodeBackdropWasOverlay) item.BackgroundUrl = null;
 
                 item.LastOverlayGeneratedAt = null;
                 await _mediaRepo.UpdateMediaItemAsync(item);
@@ -212,10 +213,11 @@ public class PosterOverlayManager : IPosterOverlayManager
         {
             if (item.LastOverlayGeneratedAt != null && !string.IsNullOrEmpty(item.OriginalPosterUrl))
             {
+                var episodeBackdropWasOverlay = item is Episode && item.BackgroundUrl == item.PosterUrl;
                 CleanupOldOverlay(item.PosterUrl, item.OriginalPosterUrl);
                 item.PosterUrl = item.OriginalPosterUrl;
 
-                if (item is Episode) item.BackgroundUrl = item.OriginalPosterUrl;
+                if (episodeBackdropWasOverlay) item.BackgroundUrl = null;
 
                 item.LastOverlayGeneratedAt = null;
                 await _mediaRepo.UpdateMediaItemAsync(item);
@@ -225,7 +227,7 @@ public class PosterOverlayManager : IPosterOverlayManager
 
         if (string.IsNullOrEmpty(item.OriginalPosterUrl))
         {
-            item.OriginalPosterUrl = (item is Episode && !string.IsNullOrEmpty(item.BackgroundUrl)) ? item.BackgroundUrl : item.PosterUrl;
+            item.OriginalPosterUrl = item.PosterUrl;
         }
 
         if (string.IsNullOrEmpty(item.OriginalPosterUrl)) return;
@@ -279,11 +281,6 @@ public class PosterOverlayManager : IPosterOverlayManager
         {
             CleanupOldOverlay(item.PosterUrl, item.OriginalPosterUrl);
             item.PosterUrl = newPosterUrl;
-
-            if (item is Episode)
-            {
-                item.BackgroundUrl = newPosterUrl;
-            }
         }
 
         item.LastOverlayGeneratedAt = DateTime.UtcNow;

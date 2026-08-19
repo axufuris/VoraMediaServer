@@ -19,6 +19,9 @@ public class AdminNotificationRepository : IAdminNotificationRepository
         await _context.SaveChangesAsync();
     }
 
+    public Task<bool> ExistsUnreadByContextAsync(string contextJson) =>
+        _context.AdminNotifications.AnyAsync(n => !n.IsRead && n.ContextJson == contextJson);
+
     public async Task<List<AdminNotification>> GetRecentAsync(int limit, bool unreadOnly)
     {
         var query = _context.AdminNotifications.AsNoTracking().AsQueryable();

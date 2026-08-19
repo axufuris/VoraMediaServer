@@ -7,7 +7,7 @@ namespace Vora.Application.Notifications;
 
 public interface IAdminNotificationManager
 {
-    Task RaiseAsync(AdminNotificationSeverity severity, string title, string message, string? contextJson = null);
+    Task RaiseAsync(AdminNotificationSeverity severity, string title, string message, string? contextJson = null, bool deduplicateByContext = false);
     Task<List<AdminNotificationVM>> GetRecentAsync(int limit, bool unreadOnly);
     Task<int> GetUnreadCountAsync();
     Task<bool> MarkReadAsync(Guid id);
@@ -26,8 +26,13 @@ public class AdminNotificationManager : IAdminNotificationManager
         _notifier = notifier;
     }
 
-    public async Task RaiseAsync(AdminNotificationSeverity severity, string title, string message, string? contextJson = null)
+    public async Task RaiseAsync(AdminNotificationSeverity severity, string title, string message, string? contextJson = null, bool deduplicateByContext = false)
     {
+        if (deduplicateByContext && !string.IsNullOrEmpty(contextJson) && await _repository.ExistsUnreadByContextAsync(contextJson))
+        {
+            return;
+        }
+
         var notification = new AdminNotification
         {
             Severity = severity,
