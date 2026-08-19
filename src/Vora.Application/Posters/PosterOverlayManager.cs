@@ -119,10 +119,11 @@ public class PosterOverlayManager : IPosterOverlayManager
             var itemsToRevert = await _mediaRepo.GetItemsPendingOverlayGenerationAsync(libraryId, DateTime.UtcNow);
             foreach (var item in itemsToRevert.Where(m => !string.IsNullOrEmpty(m.OriginalPosterUrl)))
             {
+                var episodeBackdropWasOverlay = item is Episode && item.BackgroundUrl == item.PosterUrl;
                 CleanupOldOverlay(item.PosterUrl, item.OriginalPosterUrl);
                 item.PosterUrl = item.OriginalPosterUrl;
 
-                if (item is Episode) item.BackgroundUrl = null;
+                if (episodeBackdropWasOverlay) item.BackgroundUrl = null;
 
                 item.LastOverlayGeneratedAt = null;
                 await _mediaRepo.UpdateMediaItemAsync(item);
@@ -212,10 +213,11 @@ public class PosterOverlayManager : IPosterOverlayManager
         {
             if (item.LastOverlayGeneratedAt != null && !string.IsNullOrEmpty(item.OriginalPosterUrl))
             {
+                var episodeBackdropWasOverlay = item is Episode && item.BackgroundUrl == item.PosterUrl;
                 CleanupOldOverlay(item.PosterUrl, item.OriginalPosterUrl);
                 item.PosterUrl = item.OriginalPosterUrl;
 
-                if (item is Episode) item.BackgroundUrl = null;
+                if (episodeBackdropWasOverlay) item.BackgroundUrl = null;
 
                 item.LastOverlayGeneratedAt = null;
                 await _mediaRepo.UpdateMediaItemAsync(item);

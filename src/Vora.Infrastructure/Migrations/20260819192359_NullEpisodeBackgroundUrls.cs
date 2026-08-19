@@ -10,7 +10,7 @@ namespace Vora.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("UPDATE \"MediaItems\" SET \"BackgroundUrl\" = NULL WHERE \"MediaType\" = 'Episode' AND \"BackgroundUrl\" IS NOT NULL;");
+            migrationBuilder.Sql("UPDATE \"MediaItems\" SET \"BackgroundUrl\" = NULL WHERE \"MediaType\" = 'Episode' AND \"BackgroundUrl\" IS NOT NULL AND \"BackgroundUrl\" = \"PosterUrl\";");
         }
 
         /// <inheritdoc />
