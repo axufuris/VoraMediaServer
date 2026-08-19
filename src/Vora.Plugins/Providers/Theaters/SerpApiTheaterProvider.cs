@@ -40,6 +40,8 @@ public class SerpApiTheaterProvider : IDiscoveryTheaterProvider
                 Key = "api_key",
                 Label = "SerpApi Key",
                 Type = "password",
+                Required = true,
+                Placeholder = "Paste your SerpApi key",
                 Description = "SerpApi Private API Key. Sign up at https://serpapi.com/users/sign_up (free tier = 100 searches/month). After signing in, copy the 'Private API Key' from https://serpapi.com/manage-api-key. Showtimes are cached per movie + location + date to minimize search usage."
             },
             new PluginSettingDefinitionDto
@@ -47,6 +49,8 @@ public class SerpApiTheaterProvider : IDiscoveryTheaterProvider
                 Key = "default_location",
                 Label = "Admin Default Zipcode/City",
                 Type = "text",
+                Required = false,
+                Placeholder = "e.g. New York, NY",
                 Description = "The default location to search if the user has not set a Zipcode in their Client Settings."
             },
             new PluginSettingDefinitionDto
@@ -54,6 +58,8 @@ public class SerpApiTheaterProvider : IDiscoveryTheaterProvider
                 Key = "max_theaters",
                 Label = "Admin Default Max Theaters",
                 Type = "number",
+                Required = false,
+                Placeholder = "5",
                 Description = "Maximum number of theaters to return. Defaults to 6."
             },
             new PluginSettingDefinitionDto
@@ -61,6 +67,7 @@ public class SerpApiTheaterProvider : IDiscoveryTheaterProvider
                 Key = "auto_showtimes",
                 Label = "Auto-Load Showtimes",
                 Type = "boolean",
+                Required = false,
                 Description = "Automatically fetch showtimes when a movie page loads. Turn off to show a manual load button (saves API calls)."
             }
         };

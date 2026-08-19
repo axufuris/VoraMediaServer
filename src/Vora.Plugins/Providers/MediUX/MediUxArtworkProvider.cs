@@ -36,6 +36,8 @@ public class MediUxArtworkProvider : IArtworkProvider
                 Key = "api_key",
                 Label = "MediUX API Key",
                 Type = "password",
+                Required = true,
+                Placeholder = "Paste your MediUX API key",
                 Description = "MediUX API Key. Sign in at https://mediux.pro and copy the API key from the account settings page (https://mediux.pro/settings). Free tier available; rate limits apply per account."
             }
         };

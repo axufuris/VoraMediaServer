@@ -46,6 +46,8 @@ public class LastFmListeningDataProvider : IListeningDataProvider
                 Label = "Last.fm API Key",
                 Type = "password",
                 DefaultValue = string.Empty,
+                Required = true,
+                Placeholder = "Paste your Last.fm API key",
                 Description = "Last.fm API Key (free). Request one at https://www.last.fm/api/account/create — fill in any Application Name, Description, and Homepage URL (Last.fm doesn't validate them). The page immediately returns both an API Key and a Shared Secret; copy the API Key here and paste the Shared Secret into the field below. Scrobbling requires both."
             },
             new PluginSettingDefinitionDto
@@ -54,6 +56,8 @@ public class LastFmListeningDataProvider : IListeningDataProvider
                 Label = "Last.fm API Secret",
                 Type = "password",
                 DefaultValue = string.Empty,
+                Required = true,
+                Placeholder = "Paste your Last.fm shared secret",
                 Description = "Last.fm Shared Secret. Returned alongside your API Key when you registered at https://www.last.fm/api/account/create. Required for signed write operations (scrobbling, Now Playing updates) — without it, reads still work but plays cannot be submitted."
             }
         };

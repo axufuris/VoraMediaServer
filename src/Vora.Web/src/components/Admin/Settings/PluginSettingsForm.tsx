@@ -96,7 +96,10 @@ export default function PluginSettingsForm({ serverId, pluginId, pluginName, sho
         <form onSubmit={handleSave} className="space-y-4">
             {configurableFields.map(field => (
                 <div key={field.key}>
-                    <label className="block text-xs font-bold text-[var(--vora-text-secondary)] mb-0.5">{field.label}</label>
+                    <label className="block text-xs font-bold text-[var(--vora-text-secondary)] mb-0.5">
+                        {field.label}
+                        {field.required && <span className="text-[var(--vora-danger-text)] ml-0.5" title="Required">*</span>}
+                    </label>
                     {field.description && <p className="text-[11px] text-[var(--vora-text-muted)] mb-1.5">{renderDescriptionWithLinks(field.description)}</p>}
                     {field.type === 'boolean' || field.type === 'checkbox' ? (
                         <label className="flex items-center gap-2 cursor-pointer w-max">
@@ -120,6 +123,7 @@ export default function PluginSettingsForm({ serverId, pluginId, pluginName, sho
                             value={values[field.key] || ''}
                             onChange={e => handleValueChange(field.key, e.target.value)}
                             rows={4}
+                            placeholder={field.placeholder || undefined}
                             className="vora-input text-sm resize-y"
                         />
                     ) : field.type === 'select' ? (
@@ -140,6 +144,7 @@ export default function PluginSettingsForm({ serverId, pluginId, pluginName, sho
                             type={field.type}
                             value={values[field.key] || ''}
                             onChange={e => handleValueChange(field.key, e.target.value)}
+                            placeholder={field.placeholder || undefined}
                             className="vora-input text-sm"
                         />
                     )}

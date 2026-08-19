@@ -46,6 +46,8 @@ public class GeniusLyricsProvider : ILyricsProvider
                 Label = "Genius API Access Token",
                 Type = "password",
                 DefaultValue = string.Empty,
+                Required = true,
+                Placeholder = "Paste your Genius access token",
                 Description = "Genius Client Access Token (free). Sign in at https://genius.com, then create an API client at https://genius.com/api-clients (any App Name and Website URL — Genius does not validate them). On the resulting client page click 'Generate Access Token' and paste that value here. Note: Genius lyrics come back as plain text only — no time-synced LRC."
             }
         };

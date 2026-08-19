@@ -66,6 +66,8 @@ public class SystemSettingsManager : ISystemSettingsManager
                 Type = def.Type,
                 Description = def.Description,
                 Value = savedValue ?? def.DefaultValue,
+                Placeholder = def.Placeholder,
+                Required = def.Required,
                 Options = def.Options
             });
         }

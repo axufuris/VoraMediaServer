@@ -32,7 +32,7 @@ public class TraktCollectionSyncProvider : ICollectionSyncProvider
     {
         return new List<PluginSettingDefinitionDto>
         {
-            new PluginSettingDefinitionDto { Key = "client_id", Label = "Trakt Client ID", Type = "password", Description = "Trakt API Client ID — used on its own to read public lists (no account login/OAuth needed). Heads up: Trakt now appears to require Trakt VIP to create a working API application, so free-account keys are rejected with a 403 (unrelated to the separate 'one connected app' OAuth limit). If you can create an app: register it at https://trakt.tv/oauth/applications/new (any Name; Redirect URI 'urn:ietf:wg:oauth:2.0:oob'), then copy the 'Client ID' (not the Client Secret). The same Client ID is used by the Trakt chronology provider. If you don't have Trakt VIP, use the free MDbList provider instead." }
+            new PluginSettingDefinitionDto { Key = "client_id", Label = "Trakt Client ID", Type = "password", Required = true, Placeholder = "Paste your Trakt client id", Description = "Trakt API Client ID — used on its own to read public lists (no account login/OAuth needed). Heads up: Trakt now appears to require Trakt VIP to create a working API application, so free-account keys are rejected with a 403 (unrelated to the separate 'one connected app' OAuth limit). If you can create an app: register it at https://trakt.tv/oauth/applications/new (any Name; Redirect URI 'urn:ietf:wg:oauth:2.0:oob'), then copy the 'Client ID' (not the Client Secret). The same Client ID is used by the Trakt chronology provider. If you don't have Trakt VIP, use the free MDbList provider instead." }
         };
     }
 
