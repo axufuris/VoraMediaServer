@@ -81,7 +81,12 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         if (!IsVideoBearingLibrary(libraryType)) return;
         if (!enabled && !forceOverride) return;
 
-        var ids = await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId);
+        // On a non-forced run only pull the items that still need thumbnails
+        // (never generated or generated with an outdated sprite version), so the
+        // progress total reflects what's left instead of the whole library.
+        var settings = await _settingsRepo.GetSettingsAsync();
+        var version = ComputeSpriteVersion(settings.VideoThumbnailIntervalSeconds, settings.VideoThumbnailWidth, settings.VideoThumbnailHeight, settings.VideoThumbnailJpegQuality, settings.VideoThumbnailSpriteColumns);
+        var ids = await _mediaRepository.GetVideoThumbnailTargetIdsAsync(libraryId, version, includeCompleted: forceOverride);
         await GenerateManyAsync(ids, forceOverride, cancellationToken);
     }
 
@@ -109,13 +114,13 @@ public class VideoThumbnailManager : IVideoThumbnailManager
             {
                 try
                 {
-                    var itemType = await _mediaRepository.GetProjectedAsync(id, m => m.GetType().Name);
-                    if (itemType == nameof(Movie) || itemType == nameof(Episode))
-                    {
-                        using var scope = _scopeFactory.CreateScope();
-                        var manager = scope.ServiceProvider.GetRequiredService<IVideoThumbnailManager>();
-                        await manager.GenerateForItemAsync(id, forceOverride, ct);
-                    }
+                    // Each item runs in its own scope so parallel work never shares
+                    // the manager's DbContext (a shared query here raced and threw
+                    // "a second operation was started on this context"). The id list
+                    // is already filtered to Movies/Episodes by the caller.
+                    using var scope = _scopeFactory.CreateScope();
+                    var manager = scope.ServiceProvider.GetRequiredService<IVideoThumbnailManager>();
+                    await manager.GenerateForItemAsync(id, forceOverride, ct);
                 }
                 catch (OperationCanceledException)
                 {
