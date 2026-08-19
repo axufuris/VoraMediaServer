@@ -44,7 +44,10 @@ public class FolderWatcherService : IFolderWatcherService
                 var provider = _providers.FirstOrDefault(p => p.Id == providerId) ?? _providers.FirstOrDefault(p => p.Id == "polling_watcher");
                 if (provider == null) return;
 
-                _logger.LogInformation("Starting {ProviderName} for Library {LibraryId}", provider.Name, libraryId);
+                var libraryManager = scope.ServiceProvider.GetRequiredService<ILibraryManager>();
+                var libraryName = (await libraryManager.GetLibraryByIdAsync(libraryId))?.Name ?? libraryId.ToString();
+
+                _logger.LogInformation("Starting {ProviderName} for library {LibraryName}", provider.Name, libraryName);
 
                 provider.StartWatching(
                     libraryId,
@@ -161,8 +164,8 @@ public class FolderWatcherService : IFolderWatcherService
             if (uningested.Count == 0) return;
 
             _logger.LogInformation(
-                "Watcher reconciliation for library {LibraryId} found {Count} file(s) on disk that were never ingested; queueing them.",
-                libraryId, uningested.Count);
+                "Watcher reconciliation for library {LibraryName} found {Count} file(s) on disk that were never ingested; queueing them.",
+                library?.Name ?? libraryId.ToString(), uningested.Count);
 
             foreach (var filePath in uningested)
             {

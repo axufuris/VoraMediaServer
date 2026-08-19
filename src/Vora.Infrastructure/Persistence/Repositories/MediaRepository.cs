@@ -307,6 +307,7 @@ public partial class MediaRepository : IMediaRepository
         var query = _context.MediaItems
             .AsNoTracking()
             .Where(m => m is Movie || m is Episode)
+            .Where(m => m.MissingSince == null)
             .Where(m =>
                 (m is Movie && m.LibraryId == libraryId) ||
                 (m is Episode && ((Episode)m).Season.TvShow.LibraryId == libraryId));
@@ -646,18 +647,20 @@ public partial class MediaRepository : IMediaRepository
         var playable = _context.MediaItems
             .AsNoTracking()
             .Where(m => m is Movie || m is Episode)
+            .Where(m => m.MissingSince == null)
             .Where(m =>
                 (m is Movie && m.LibraryId == libraryId) ||
                 (m is Episode && ((Episode)m).Season.TvShow.LibraryId == libraryId));
 
-        var counts = await playable
+        var counts = (await playable
             .GroupBy(_ => 1)
             .Select(g => new
             {
                 Total = g.Count(),
                 WithThumbnails = g.Sum(m => m.LastVideoThumbnailGenerationAt != null ? 1 : 0)
             })
-            .FirstOrDefaultAsync();
+            .ToListAsync())
+            .FirstOrDefault();
 
         return (counts?.Total ?? 0, counts?.WithThumbnails ?? 0);
     }
@@ -673,11 +676,12 @@ public partial class MediaRepository : IMediaRepository
         var playable = _context.MediaItems
             .AsNoTracking()
             .Where(m => m is Movie || m is Episode)
+            .Where(m => m.MissingSince == null)
             .Where(m =>
                 (m is Movie && m.LibraryId == libraryId) ||
                 (m is Episode && ((Episode)m).Season.TvShow.LibraryId == libraryId));
 
-        var counts = await playable
+        var counts = (await playable
             .GroupBy(_ => 1)
             .Select(g => new
             {
@@ -690,7 +694,8 @@ public partial class MediaRepository : IMediaRepository
                 WithPreview = g.Sum(m => m.Markers.Any(k => k.Type == MarkerType.Preview) ? 1 : 0),
                 MissingDuration = g.Sum(m => (m.Analysis == null || m.Analysis.Duration == null) ? 1 : 0)
             })
-            .FirstOrDefaultAsync();
+            .ToListAsync())
+            .FirstOrDefault();
 
         return new MarkerCoverageVM
         {
