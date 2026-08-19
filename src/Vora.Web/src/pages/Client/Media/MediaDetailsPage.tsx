@@ -488,17 +488,16 @@ export default function MediaDetailsPage() {
     const isEpisode = media.type === 'Episode';
     const isSeason = media.type === 'Season';
     const showParentNav = (isEpisode && !!media.seasonId) || (isSeason && !!media.tvShowId);
-    // The back button jumps to the parent (episode -> season, or the show if
-    // there's no season; season -> show) rather than browser history, so
-    // arriving from a rail on Home lands on the parent instead of going back to
-    // Home. Movies and shows have no parent and fall back to history.
-    const backParentId = isEpisode ? (media.seasonId ?? media.tvShowId) : isSeason ? media.tvShowId : undefined;
+    // Return to wherever the user came from. When there is no in-app history to
+    // go back to (a direct/deep link opened the page), fall back to the parent
+    // show so Back never drops the user out of the app.
     const goBack = () => {
-        if (backParentId) {
-            navigate(serverId ? `/server/${serverId}/media/${backParentId}` : `/media/${backParentId}`);
-        } else {
-            navigate(-1);
+        const hasHistory = ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0;
+        if (!hasHistory && media.tvShowId) {
+            navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`);
+            return;
         }
+        navigate(-1);
     };
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = (isSeason || isEpisode) ? media.title : undefined;
@@ -539,7 +538,7 @@ export default function MediaDetailsPage() {
                         style={{ background: 'rgba(20, 20, 28, 0.65)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#fafafa' }}
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-                        {media.tvShowTitle ? `Back to ${media.tvShowTitle}` : 'Back'}
+                        Back
                     </button>
                 </div>
 
