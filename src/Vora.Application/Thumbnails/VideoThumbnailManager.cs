@@ -112,6 +112,13 @@ public class VideoThumbnailManager : IVideoThumbnailManager
             new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
             async (id, ct) =>
             {
+                // Report BEFORE generating: each item is a slow FFmpeg run, so
+                // reporting only on completion left the task blank at the start and
+                // between items. Showing the item as it starts keeps the "what it's
+                // on" line live.
+                var n = Interlocked.Increment(ref done);
+                _progress.Report($"{ProgressTitle(titles, id)} ({n}/{total})");
+
                 try
                 {
                     // Each item runs in its own scope so parallel work never shares
@@ -130,9 +137,6 @@ public class VideoThumbnailManager : IVideoThumbnailManager
                 {
                     _logger.LogError(ex, "Video thumbnail generation failed for {MediaItemId}.", id);
                 }
-
-                var n = Interlocked.Increment(ref done);
-                _progress.Report($"{ProgressTitle(titles, id)} ({n}/{total})");
             });
     }
 
