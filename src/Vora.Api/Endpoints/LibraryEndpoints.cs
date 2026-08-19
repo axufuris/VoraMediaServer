@@ -112,9 +112,10 @@ public static class LibraryEndpoints
         return Results.Accepted();
     }
 
-    private static IResult QueueAnalyzeAsync(Guid id, [FromQuery] bool force, ITaskQueueManager taskQueue)
+    private static async Task<IResult> QueueAnalyzeAsync(Guid id, [FromQuery] bool force, ITaskQueueManager taskQueue, ILibraryManager manager)
     {
-        taskQueue.QueueAnalyzeLibraryMediaContent(id, forceOverride: force);
+        var library = await manager.GetLibraryByIdAsync(id);
+        taskQueue.QueueAnalyzeLibraryMediaContent(id, library?.Name, forceOverride: force);
         return Results.Accepted();
     }
 

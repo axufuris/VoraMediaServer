@@ -146,6 +146,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Analyze Library Media: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
         {
             var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
+            await analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName, ct);
             await analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger, cancellationToken: ct);
         },
         libraryName == null ? LibraryLabel(libraryId, "Analyze Library Media: {0}") : null,
