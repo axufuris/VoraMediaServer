@@ -10,7 +10,7 @@ using Vora.Plugins.Interfaces;
 
 namespace Vora.Plugins.Providers.Genius;
 
-public class GeniusLyricsProvider : ILyricsProvider
+public class GeniusLyricsProvider : ILyricsProvider, IPluginConnectionTest
 {
     public const string HttpClientName = "GeniusHttpClient";
     private const string SearchUrlTemplate = "https://api.genius.com/search?q={0}";
@@ -51,6 +51,28 @@ public class GeniusLyricsProvider : ILyricsProvider
                 Description = "Genius Client Access Token (free). Sign in at https://genius.com, then create an API client at https://genius.com/api-clients (any App Name and Website URL — Genius does not validate them). On the resulting client page click 'Generate Access Token' and paste that value here. Note: Genius lyrics come back as plain text only — no time-synced LRC."
             }
         };
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("access_token", out var token) || string.IsNullOrWhiteSpace(token))
+        {
+            return PluginConnectionTestResult.Fail("Enter an access token first.");
+        }
+
+        var client = _httpClientFactory.CreateClient(HttpClientName);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.genius.com/search?q=test");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Trim());
+        var response = await client.SendAsync(request, cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            return PluginConnectionTestResult.Ok("Genius accepted the access token.");
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            return PluginConnectionTestResult.Fail("Genius rejected the access token.");
+        }
+        return PluginConnectionTestResult.Fail($"Unexpected response from Genius (HTTP {(int)response.StatusCode}).");
     }
 
     private async Task<string?> GetAccessTokenAsync()

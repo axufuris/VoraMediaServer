@@ -7,7 +7,7 @@ using Vora.Plugins.Interfaces;
 
 namespace Vora.Plugins.Providers.Theaters;
 
-public class SerpApiTheaterProvider : IDiscoveryTheaterProvider
+public class SerpApiTheaterProvider : IDiscoveryTheaterProvider, IPluginConnectionTest
 {
     private const long CacheEntrySize = 1024;
 
@@ -71,6 +71,25 @@ public class SerpApiTheaterProvider : IDiscoveryTheaterProvider
                 Description = "Automatically fetch showtimes when a movie page loads. Turn off to show a manual load button (saves API calls)."
             }
         };
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("api_key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        var response = await _httpClient.GetAsync($"https://serpapi.com/account?api_key={Uri.EscapeDataString(apiKey.Trim())}", cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            return PluginConnectionTestResult.Ok("SerpApi accepted the API key.");
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            return PluginConnectionTestResult.Fail("SerpApi rejected the API key.");
+        }
+        return PluginConnectionTestResult.Fail($"Unexpected response (HTTP {(int)response.StatusCode}).");
     }
 
     public async Task<bool> IsAutoLoadEnabledAsync()

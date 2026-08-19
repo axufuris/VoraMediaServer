@@ -6,7 +6,7 @@ using Vora.Plugins.Interfaces;
 
 namespace Vora.Plugins.Providers.FanartTv;
 
-public class FanartTvArtworkProvider : IArtworkProvider
+public class FanartTvArtworkProvider : IArtworkProvider, IPluginConnectionTest
 {
     private readonly HttpClient _httpClient;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -41,6 +41,25 @@ public class FanartTvArtworkProvider : IArtworkProvider
                 Description = "Fanart.tv Project API Key (free). Create an account at https://fanart.tv/register, then generate a project key at https://fanart.tv/get-an-api-key/ and copy the 'Project Key' value. Personal Keys are not supported — use a Project Key."
             }
         };
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("api_key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        var response = await _httpClient.GetAsync($"https://webservice.fanart.tv/v3/movies/12445?api_key={Uri.EscapeDataString(apiKey.Trim())}", cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            return PluginConnectionTestResult.Ok("Fanart.tv accepted the API key.");
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            return PluginConnectionTestResult.Fail("Fanart.tv rejected the API key.");
+        }
+        return PluginConnectionTestResult.Fail($"Unexpected response (HTTP {(int)response.StatusCode}).");
     }
 
     public async Task<IEnumerable<ArtworkResult>> GetArtworkAsync(string? tmdbId, string? tvdbId, string? imdbId, string mediaType, string? localPath = null, string? title = null, CancellationToken cancellationToken = default)
