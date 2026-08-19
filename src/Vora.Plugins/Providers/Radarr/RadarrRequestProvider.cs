@@ -17,6 +17,7 @@ public class RadarrRequestProvider : IRequestProvider
     public string Description => "Sends movie requests directly to Radarr.";
     public bool IsSystemPlugin => true;
     public string Type => "Request";
+    public string ExternalConfigurationHint => "Add your Radarr connection under System Settings → Request Servers. This plugin only enables the integration.";
 
     public string[] SupportedMediaTypes => new[] { "Movie" };
 

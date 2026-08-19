@@ -96,6 +96,26 @@ public class PluginManagerTests
         result[0].LatestVersionApiUrl.Should().Be("https://api.example.com/version");
     }
 
+    private sealed class HintPlugin : IVoraPlugin
+    {
+        public string Id => "hint";
+        public string Name => "Hint";
+        public string Version => "1.0";
+        public string Description => "d";
+        public bool IsSystemPlugin => false;
+        public string Type => "Metadata";
+        public string? ExternalConfigurationHint => "Configure under System Settings → Request Servers.";
+        public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>();
+    }
+
+    [Fact]
+    public async Task GetActivePluginsAsync_maps_external_configuration_hint()
+    {
+        var result = (await Build(new HintPlugin()).GetActivePluginsAsync()).ToList();
+
+        result[0].ExternalConfigurationHint.Should().Be("Configure under System Settings → Request Servers.");
+    }
+
     [Fact]
     public async Task GetActivePluginsAsync_has_settings_is_false_when_plugin_has_no_definitions()
     {

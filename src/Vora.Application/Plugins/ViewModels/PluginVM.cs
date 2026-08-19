@@ -11,6 +11,7 @@ public class PluginVM
     public string? DeveloperName { get; set; }
     public string? LatestVersionApiUrl { get; set; }
     public string? DocumentationUrl { get; set; }
+    public string? ExternalConfigurationHint { get; set; }
     public bool HasSettings { get; set; }
     public bool IsAiPlugin { get; set; }
     public bool IsEnabled { get; set; }

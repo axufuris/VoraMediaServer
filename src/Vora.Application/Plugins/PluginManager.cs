@@ -52,6 +52,7 @@ public class PluginManager(
                 DeveloperName = plugin.DeveloperName,
                 LatestVersionApiUrl = plugin.LatestVersionApiUrl,
                 DocumentationUrl = plugin.DocumentationUrl,
+                ExternalConfigurationHint = plugin.ExternalConfigurationHint,
                 HasSettings = definitions.Count > 0,
                 IsAiPlugin = plugin.IsAiPlugin,
                 IsEnabled = isEnabledStr != DisabledValue,

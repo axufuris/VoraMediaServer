@@ -90,6 +90,12 @@ function PluginCard({
                         {plugin.requiresConfiguration && <HealthBadge tone="warn">Setup needed</HealthBadge>}
                     </div>
                     <p className="text-xs text-[var(--vora-text-secondary)] leading-relaxed mt-1.5">{plugin.description}</p>
+                    {plugin.externalConfigurationHint && (
+                        <p className="text-[11px] text-[var(--vora-info-text)] leading-relaxed mt-2 flex items-start gap-1.5">
+                            <svg className="w-3.5 h-3.5 shrink-0 mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span>{plugin.externalConfigurationHint}</span>
+                        </p>
+                    )}
                     {plugin.developerName && (
                         <p className="text-[11px] text-[var(--vora-text-muted)] mt-1">
                             By <span className="text-[var(--vora-text-secondary)] font-medium">{plugin.developerName}</span>

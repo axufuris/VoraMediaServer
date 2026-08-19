@@ -17,6 +17,7 @@ public class SonarrRequestProvider : IRequestProvider
     public string Description => "Sends TV show requests directly to Sonarr.";
     public bool IsSystemPlugin => true;
     public string Type => "Request";
+    public string ExternalConfigurationHint => "Add your Sonarr connection under System Settings → Request Servers. This plugin only enables the integration.";
     public string[] SupportedMediaTypes => new[] { "TvShow" };
 
     public SonarrRequestProvider(HttpClient httpClient)
