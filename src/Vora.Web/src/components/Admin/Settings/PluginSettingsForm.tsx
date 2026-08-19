@@ -36,15 +36,18 @@ interface PluginSettingsFormProps {
     serverId?: string;
     pluginId: string;
     pluginName: string;
+    supportsConnectionTest?: boolean;
     showModal: (title: string, message: string, isError?: boolean) => void;
     onAfterChange?: () => void;
 }
 
-export default function PluginSettingsForm({ serverId, pluginId, pluginName, showModal, onAfterChange }: PluginSettingsFormProps) {
+export default function PluginSettingsForm({ serverId, pluginId, pluginName, supportsConnectionTest, showModal, onAfterChange }: PluginSettingsFormProps) {
     const [fields, setFields] = useState<PluginSettingField[]>([]);
     const [values, setValues] = useState<Record<string, string>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [isTesting, setIsTesting] = useState(false);
+    const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
     const loadSettings = useCallback(async () => {
         try {
@@ -68,6 +71,22 @@ export default function PluginSettingsForm({ serverId, pluginId, pluginName, sho
 
     const handleValueChange = (key: string, value: string) => {
         setValues(prev => ({ ...prev, [key]: value }));
+        setTestResult(null);
+    };
+
+    const handleTest = async () => {
+        setIsTesting(true);
+        setTestResult(null);
+        try {
+            const payload: Record<string, string> = {};
+            configurableFields.forEach(f => { payload[f.key] = values[f.key] ?? ''; });
+            const result = await systemSettingsAdminService.testPluginConnection(pluginId, payload, serverId);
+            setTestResult(result);
+        } catch {
+            setTestResult({ success: false, message: 'The connection test could not be run.' });
+        } finally {
+            setIsTesting(false);
+        }
     };
 
     const handleSave = async (e: React.SyntheticEvent) => {
@@ -150,11 +169,27 @@ export default function PluginSettingsForm({ serverId, pluginId, pluginName, sho
                     )}
                 </div>
             ))}
-            <div className="pt-1">
+            <div className="pt-1 flex items-center gap-2">
                 <button type="submit" disabled={isSaving} className="vora-button-primary text-xs !py-1.5">
                     {isSaving ? 'Saving…' : 'Save settings'}
                 </button>
+                {supportsConnectionTest && (
+                    <button
+                        type="button"
+                        onClick={handleTest}
+                        disabled={isTesting}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-[var(--vora-radius-md)] border border-[var(--vora-border-strong)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)] transition-colors disabled:opacity-50"
+                    >
+                        {isTesting ? 'Testing…' : 'Test connection'}
+                    </button>
+                )}
             </div>
+            {testResult && (
+                <p className={`text-xs flex items-start gap-1.5 ${testResult.success ? 'text-[var(--vora-success-text)]' : 'text-[var(--vora-danger-text)]'}`}>
+                    <span aria-hidden>{testResult.success ? '✓' : '✕'}</span>
+                    <span>{testResult.message}</span>
+                </p>
+            )}
         </form>
     );
 }

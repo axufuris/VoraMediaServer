@@ -100,5 +100,14 @@ export const systemSettingsAdminService = {
     },
     updatePluginSettings: async (pluginId: string, settings: Record<string, string>, serverId?: string): Promise<void> => {
         await apiClient.put(`/settings/plugins/${pluginId}`, settings, { serverId });
+    },
+    testPluginConnection: async (pluginId: string, settings: Record<string, string>, serverId?: string): Promise<PluginConnectionTestResult> => {
+        const response = await apiClient.post<PluginConnectionTestResult>(`/settings/plugins/${pluginId}/test`, settings, { serverId });
+        return response.data;
     }
 };
+
+export interface PluginConnectionTestResult {
+    success: boolean;
+    message: string;
+}

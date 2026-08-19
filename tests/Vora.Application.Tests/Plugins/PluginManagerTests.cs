@@ -41,6 +41,56 @@ public class PluginManagerTests
         return plugin;
     }
 
+    private sealed class TestablePlugin(PluginConnectionTestResult result) : IVoraPlugin, IPluginConnectionTest
+    {
+        public string Id => "testable";
+        public string Name => "Testable";
+        public string Version => "1.0";
+        public string Description => "d";
+        public bool IsSystemPlugin => false;
+        public string Type => "Metadata";
+        public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>();
+        public Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default) => Task.FromResult(result);
+    }
+
+    [Fact]
+    public async Task GetActivePluginsAsync_supports_connection_test_true_only_for_testable_plugin()
+    {
+        var testable = (await Build(new TestablePlugin(PluginConnectionTestResult.Ok("ok"))).GetActivePluginsAsync()).ToList();
+        testable[0].SupportsConnectionTest.Should().BeTrue();
+
+        var plain = (await Build(MakePlugin("p1")).GetActivePluginsAsync()).ToList();
+        plain[0].SupportsConnectionTest.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task TestPluginConnectionAsync_returns_fail_for_unknown_plugin()
+    {
+        var result = await Build().TestPluginConnectionAsync("nope", new Dictionary<string, string>());
+
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("not found");
+    }
+
+    [Fact]
+    public async Task TestPluginConnectionAsync_returns_fail_when_plugin_does_not_support_testing()
+    {
+        var result = await Build(MakePlugin("p1")).TestPluginConnectionAsync("p1", new Dictionary<string, string>());
+
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("does not support");
+    }
+
+    [Fact]
+    public async Task TestPluginConnectionAsync_returns_the_plugins_result_for_a_testable_plugin()
+    {
+        var result = await Build(new TestablePlugin(PluginConnectionTestResult.Ok("great")))
+            .TestPluginConnectionAsync("testable", new Dictionary<string, string>());
+
+        result.Success.Should().BeTrue();
+        result.Message.Should().Be("great");
+    }
+
     [Fact]
     public async Task GetActivePluginsAsync_returns_plugin_with_enabled_true_when_setting_absent()
     {
