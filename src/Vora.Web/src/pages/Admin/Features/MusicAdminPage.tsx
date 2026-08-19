@@ -1,11 +1,9 @@
-import { useMemo } from 'react';
-import { useParams } from 'react-router-dom';
-import FeaturePluginList from '../../../components/Admin/Features/FeaturePluginList';
+import { Link, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 
 export default function MusicAdminPage() {
     const { serverId } = useParams<{ serverId?: string }>();
-    const pluginTypes = useMemo(() => ['Lyrics', 'ListeningData'], []);
+    const pluginsHref = serverId ? `/admin/server/${serverId}/plugins` : '/admin/plugins';
 
     return (
         <div data-vora-page="">
@@ -15,12 +13,11 @@ export default function MusicAdminPage() {
             />
 
             <div className="px-8 pb-10 max-w-6xl mx-auto pt-6">
-                <p className="text-sm text-[var(--vora-text-muted)] mb-4">Lyrics providers and listening-data providers (e.g. Last.fm).</p>
-                <FeaturePluginList
-                    serverId={serverId}
-                    pluginTypes={pluginTypes}
-                    emptyLabel="No Lyrics or ListeningData plugins are installed."
-                />
+                <div className="vora-card p-6 text-sm text-[var(--vora-text-secondary)] leading-relaxed">
+                    Lyrics providers and listening-data providers (e.g. Last.fm) are configured on the{' '}
+                    <Link to={pluginsHref} className="text-[var(--vora-accent-text)] hover:underline font-medium">Plugins</Link>{' '}
+                    page — open the <span className="font-semibold">Lyrics</span> and <span className="font-semibold">Listening Data</span> categories to add API keys and enable a source.
+                </div>
             </div>
         </div>
     );

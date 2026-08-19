@@ -1,10 +1,8 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { discoveryService, type DiscoveryRowConfig } from '../../../api/Discovery/discoveryService';
 import { useDialog } from '../../../dialogs';
 import FeatureToggle from '../../../components/Admin/Features/FeatureToggle';
-import FeaturePluginList from '../../../components/Admin/Features/FeaturePluginList';
-import FeatureTabs from '../../../components/Admin/Features/FeatureTabs';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import EmptyState from '../../../components/Admin/Primitives/EmptyState';
 
@@ -14,7 +12,6 @@ export default function DiscoveryPage() {
     const [configs, setConfigs] = useState<DiscoveryRowConfig[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'layout' | 'plugins'>('layout');
 
     const dragItem = useRef<number | null>(null);
     const dragOverItem = useRef<number | null>(null);
@@ -61,8 +58,6 @@ export default function DiscoveryPage() {
         }
     };
 
-    const pluginTypes = useMemo(() => ['Discovery', 'Theater'], []);
-
     return (
         <div data-vora-page="">
             <PageHeader
@@ -78,17 +73,7 @@ export default function DiscoveryPage() {
                     serverId={serverId}
                 />
 
-                <FeatureTabs
-                    tabs={[
-                        { key: 'layout', label: 'Page Layout' },
-                        { key: 'plugins', label: 'Plugins' },
-                    ]}
-                    activeKey={activeTab}
-                    onChange={k => setActiveTab(k as 'layout' | 'plugins')}
-                />
-
-                {activeTab === 'layout' && (
-                    <section>
+                <section>
                         <p className="text-sm text-[var(--vora-text-muted)] mb-4">
                             Drag rows to reorder. Toggle to show or hide each row on the client Discover page.
                         </p>
@@ -148,20 +133,6 @@ export default function DiscoveryPage() {
                             </>
                         )}
                     </section>
-                )}
-
-                {activeTab === 'plugins' && (
-                    <section>
-                        <p className="text-sm text-[var(--vora-text-muted)] mb-4">
-                            Discovery and Theater plugins that power this feature.
-                        </p>
-                        <FeaturePluginList
-                            serverId={serverId}
-                            pluginTypes={pluginTypes}
-                            emptyLabel="No Discovery or Theater plugins are installed."
-                        />
-                    </section>
-                )}
             </div>
         </div>
     );

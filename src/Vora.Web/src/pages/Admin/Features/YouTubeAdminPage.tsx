@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import FeaturePluginList from '../../../components/Admin/Features/FeaturePluginList';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import { youtubeService, type YouTubeStatus } from '../../../api/YouTube/youtubeService';
 
 export default function YouTubeAdminPage() {
     const { serverId } = useParams<{ serverId?: string }>();
-    const pluginTypes = useMemo(() => ['YouTube'], []);
+    const pluginsHref = serverId ? `/admin/server/${serverId}/plugins` : '/admin/plugins';
 
     const [status, setStatus] = useState<YouTubeStatus | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -32,17 +31,9 @@ export default function YouTubeAdminPage() {
             <div className="px-8 pt-6 pb-10 max-w-6xl mx-auto space-y-6">
                 <StatusCard status={status} isLoading={isLoading} />
 
-                <section>
-                    <p className="text-sm text-[var(--vora-text-muted)] mb-4">
-                        Configure the YouTube plugin. The orange toggle on the plugin card is the master switch: when it&apos;s off, the YouTube nav item is hidden for every profile on the server. Even with it on, admins can still disable YouTube for individual users from the Users &amp; Access page, and users can hide it on their own profile from Settings.
-                    </p>
-                    <FeaturePluginList
-                        serverId={serverId}
-                        pluginTypes={pluginTypes}
-                        emptyLabel="The YouTube plugin is not installed."
-                        onAfterChange={refreshStatus}
-                    />
-                </section>
+                <p className="text-sm text-[var(--vora-text-muted)]">
+                    Configure the YouTube plugin — API key, trending region, and the master enable toggle — on the <Link to={pluginsHref} className="text-[var(--vora-accent-text)] hover:underline">Plugins</Link> page. The master toggle hides the YouTube nav item for every profile when off; even with it on, admins can disable YouTube per user from Users &amp; Access, and users can hide it on their own profile from Settings.
+                </p>
 
                 <ParentalControlsInfo />
             </div>

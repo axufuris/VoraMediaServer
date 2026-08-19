@@ -1,10 +1,8 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Rnd } from 'react-rnd';
 import { useParams } from 'react-router-dom';
 import { overlayService } from '../../../api/Streaming/overlayService';
 import { useDialog } from '../../../dialogs';
-import FeaturePluginList from '../../../components/Admin/Features/FeaturePluginList';
-import FeatureTabs from '../../../components/Admin/Features/FeatureTabs';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 
 type MediaType = 'Movie' | 'Season' | 'TvShow' | 'Episode';
@@ -175,7 +173,6 @@ export default function OverlayEditor() {
     const [mediaType, setMediaType] = useState<MediaType>('Movie');
     const [elements, setElements] = useState<OverlayElement[]>([]);
     const [mockUI, setMockUI] = useState<MockType>('none');
-    const [activeTab, setActiveTab] = useState<'editor' | 'plugins'>('editor');
 
 
     const canvasRef = useRef<HTMLDivElement>(null);
@@ -363,8 +360,6 @@ export default function OverlayEditor() {
         }
     };
 
-    const pluginTypes = useMemo(() => ['OverlayEngine'], []);
-
     return (
         <div data-vora-page="" className="lg:h-full lg:flex lg:flex-col lg:overflow-hidden">
             <PageHeader
@@ -372,18 +367,6 @@ export default function OverlayEditor() {
                 description="Compose badges (resolution, content rating, audio codec, ratings) onto your posters."
             />
 
-            <div className="px-8 pt-2 shrink-0">
-                <FeatureTabs
-                    tabs={[
-                        { key: 'editor', label: 'Template Editor' },
-                        { key: 'plugins', label: 'Plugins' },
-                    ]}
-                    activeKey={activeTab}
-                    onChange={k => setActiveTab(k as 'editor' | 'plugins')}
-                />
-            </div>
-
-            {activeTab === 'editor' && (
             <div className="flex flex-col lg:flex-row gap-6 px-8 pt-4 pb-8 lg:flex-1 lg:min-h-0">
 
                 <div className="w-full lg:w-80 shrink-0 vora-card p-5 lg:overflow-y-auto flex flex-col">
@@ -614,18 +597,6 @@ export default function OverlayEditor() {
                 </div>
 
             </div>
-            )}
-
-            {activeTab === 'plugins' && (
-                <div className="px-8 pb-10 max-w-6xl mx-auto pt-6">
-                    <p className="text-sm text-[var(--vora-text-muted)] mb-4">Overlay rendering engines that produce the final composited posters.</p>
-                    <FeaturePluginList
-                        serverId={serverId}
-                        pluginTypes={pluginTypes}
-                        emptyLabel="No OverlayEngine plugins are installed."
-                    />
-                </div>
-            )}
         </div>
     );
 }
