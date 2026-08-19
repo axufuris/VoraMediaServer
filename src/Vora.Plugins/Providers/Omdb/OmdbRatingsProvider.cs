@@ -14,7 +14,7 @@ public static class OmdbCircuitBreaker
     public static bool IsBlocked => BlockedUntil.HasValue && DateTime.UtcNow < BlockedUntil.Value;
 }
 
-public class OmdbImdbRatingsProvider : IRatingsProvider
+public class OmdbImdbRatingsProvider : IRatingsProvider, IPluginConnectionTest
 {
     private readonly HttpClient _httpClient;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -61,6 +61,27 @@ public class OmdbImdbRatingsProvider : IRatingsProvider
     public async Task<decimal?> FetchRatingAsync(string? imdbId, string? tmdbId, string? tvdbId, string mediaType, CancellationToken cancellationToken = default)
     {
         return await OmdbFetcher.FetchRatingCoreAsync(_httpClient, _scopeFactory, imdbId, RatingSourceName, cancellationToken);
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("api_key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        var response = await _httpClient.GetAsync($"?apikey={Uri.EscapeDataString(apiKey.Trim())}&i=tt3896198", cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (body.Contains("\"Response\":\"True\"", StringComparison.OrdinalIgnoreCase))
+        {
+            return PluginConnectionTestResult.Ok("OMDb accepted the API key.");
+        }
+        if (body.Contains("Invalid API key", StringComparison.OrdinalIgnoreCase) || body.Contains("No API key", StringComparison.OrdinalIgnoreCase))
+        {
+            return PluginConnectionTestResult.Fail("OMDb rejected the API key. Check the key and that you clicked the activation link in the confirmation email.");
+        }
+        return PluginConnectionTestResult.Fail($"Unexpected response from OMDb (HTTP {(int)response.StatusCode}).");
     }
 }
 

@@ -15,6 +15,7 @@ export interface PluginVM {
     isAiPlugin: boolean;
     isEnabled: boolean;
     requiresConfiguration: boolean;
+    supportsConnectionTest: boolean;
 }
 
 export interface PluginOptionVM {
