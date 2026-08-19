@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Vora.Application.FileSystem;
 using Vora.Application.Plugins.ViewModels;
 using Vora.Application.Settings;
+using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Plugins;
@@ -11,6 +12,7 @@ public interface IPluginManager
 {
     Task<IEnumerable<PluginVM>> GetActivePluginsAsync();
     Task<IEnumerable<PluginOptionVM>> GetPluginOptionsAsync(string type);
+    Task<PluginConnectionTestResult> TestPluginConnectionAsync(string pluginId, IReadOnlyDictionary<string, string> settings);
     Task UploadPluginAsync(UploadedFile file);
     bool UninstallPlugin(string id);
 }
@@ -46,11 +48,41 @@ public class PluginManager(
                 DocumentationUrl = plugin.DocumentationUrl,
                 HasSettings = true,
                 IsAiPlugin = plugin.IsAiPlugin,
-                IsEnabled = isEnabledStr != DisabledValue
+                IsEnabled = isEnabledStr != DisabledValue,
+                SupportsConnectionTest = plugin is IPluginConnectionTest
             });
         }
 
         return result;
+    }
+
+    public async Task<PluginConnectionTestResult> TestPluginConnectionAsync(string pluginId, IReadOnlyDictionary<string, string> settings)
+    {
+        var plugin = plugins.FirstOrDefault(p => p.Id == pluginId);
+        if (plugin == null)
+        {
+            return PluginConnectionTestResult.Fail("Plugin not found.");
+        }
+
+        if (plugin is not IPluginConnectionTest testable)
+        {
+            return PluginConnectionTestResult.Fail("This plugin does not support connection testing.");
+        }
+
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            return await testable.TestConnectionAsync(settings, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return PluginConnectionTestResult.Fail("The connection test timed out.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Connection test failed for plugin {PluginId}.", pluginId);
+            return PluginConnectionTestResult.Fail($"Connection test failed: {ex.Message}");
+        }
     }
 
     public async Task<IEnumerable<PluginOptionVM>> GetPluginOptionsAsync(string type)

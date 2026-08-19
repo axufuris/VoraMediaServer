@@ -14,4 +14,5 @@ public class PluginVM
     public bool HasSettings { get; set; }
     public bool IsAiPlugin { get; set; }
     public bool IsEnabled { get; set; }
+    public bool SupportsConnectionTest { get; set; }
 }

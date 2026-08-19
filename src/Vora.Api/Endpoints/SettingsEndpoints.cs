@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Vora.Application.Plugins;
 using Vora.Application.Plugins.ViewModels;
 using Vora.Application.Settings;
 using Vora.Application.Settings.ViewModels;
+using Vora.Plugins.Dtos;
 
 namespace Vora.Api.Endpoints;
 
@@ -22,6 +24,9 @@ public static class SettingsEndpoints
 
         group.MapPut("/plugins/{pluginId}", UpdatePluginSettingsAsync)
             .Produces(StatusCodes.Status204NoContent);
+
+        group.MapPost("/plugins/{pluginId}/test", TestPluginConnectionAsync)
+            .Produces<PluginConnectionTestResult>(StatusCodes.Status200OK);
 
         group.MapGet("/hardware-devices", GetHardwareDevices)
             .Produces<List<string>>(StatusCodes.Status200OK);
@@ -59,6 +64,12 @@ public static class SettingsEndpoints
     {
         await manager.UpdatePluginSettingsAsync(pluginId, settings);
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> TestPluginConnectionAsync(string pluginId, [FromBody] Dictionary<string, string> settings, IPluginManager pluginManager)
+    {
+        var result = await pluginManager.TestPluginConnectionAsync(pluginId, settings);
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> GetFeatureFlagsAsync(ISystemSettingsManager manager)

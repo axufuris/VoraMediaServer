@@ -120,6 +120,7 @@ function PluginCard({
                         serverId={serverId}
                         pluginId={plugin.id}
                         pluginName={plugin.name}
+                        supportsConnectionTest={plugin.supportsConnectionTest}
                         showModal={showModal}
                     />
                 </div>
