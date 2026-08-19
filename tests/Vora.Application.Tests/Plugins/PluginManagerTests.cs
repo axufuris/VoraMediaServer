@@ -96,6 +96,80 @@ public class PluginManagerTests
         result[0].LatestVersionApiUrl.Should().Be("https://api.example.com/version");
     }
 
+    private sealed class HintPlugin : IVoraPlugin
+    {
+        public string Id => "hint";
+        public string Name => "Hint";
+        public string Version => "1.0";
+        public string Description => "d";
+        public bool IsSystemPlugin => false;
+        public string Type => "Metadata";
+        public string? ExternalConfigurationHint => "Configure under System Settings → Request Servers.";
+        public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>();
+    }
+
+    [Fact]
+    public async Task GetActivePluginsAsync_maps_external_configuration_hint()
+    {
+        var result = (await Build(new HintPlugin()).GetActivePluginsAsync()).ToList();
+
+        result[0].ExternalConfigurationHint.Should().Be("Configure under System Settings → Request Servers.");
+    }
+
+    [Fact]
+    public async Task GetActivePluginsAsync_has_settings_is_false_when_plugin_has_no_definitions()
+    {
+        var plugin = MakePlugin("p1");
+
+        var result = (await Build(plugin).GetActivePluginsAsync()).ToList();
+
+        result[0].HasSettings.Should().BeFalse();
+        result[0].RequiresConfiguration.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetActivePluginsAsync_requires_configuration_when_a_no_default_field_is_blank()
+    {
+        var plugin = MakePlugin("p1", definitions: new List<PluginSettingDefinitionDto>
+        {
+            new() { Key = "api_key" }
+        });
+        _settings.GetAllPluginSettingsAsync("p1").Returns(new Dictionary<string, string>());
+
+        var result = (await Build(plugin).GetActivePluginsAsync()).ToList();
+
+        result[0].HasSettings.Should().BeTrue();
+        result[0].RequiresConfiguration.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetActivePluginsAsync_does_not_require_configuration_when_required_field_is_filled()
+    {
+        var plugin = MakePlugin("p1", definitions: new List<PluginSettingDefinitionDto>
+        {
+            new() { Key = "api_key" }
+        });
+        _settings.GetAllPluginSettingsAsync("p1").Returns(new Dictionary<string, string> { ["api_key"] = "abc123" });
+
+        var result = (await Build(plugin).GetActivePluginsAsync()).ToList();
+
+        result[0].RequiresConfiguration.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetActivePluginsAsync_does_not_require_configuration_for_blank_field_that_has_a_default()
+    {
+        var plugin = MakePlugin("p1", definitions: new List<PluginSettingDefinitionDto>
+        {
+            new() { Key = "region", DefaultValue = "US" }
+        });
+        _settings.GetAllPluginSettingsAsync("p1").Returns(new Dictionary<string, string>());
+
+        var result = (await Build(plugin).GetActivePluginsAsync()).ToList();
+
+        result[0].RequiresConfiguration.Should().BeFalse();
+    }
+
     [Fact]
     public async Task GetPluginOptionsAsync_filters_by_type_case_insensitively()
     {

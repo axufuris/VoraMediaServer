@@ -14,6 +14,7 @@ public interface IVoraPlugin
     string? DeveloperName => null;
     string? LatestVersionApiUrl => null;
     string? DocumentationUrl => null;
+    string? ExternalConfigurationHint => null;
     bool IsAiPlugin => false;
     int ContractVersion => 1;
 

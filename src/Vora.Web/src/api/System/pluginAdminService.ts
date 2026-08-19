@@ -11,8 +11,10 @@ export interface PluginVM {
     developerName?: string;
     latestVersionApiUrl?: string;
     documentationUrl?: string;
+    externalConfigurationHint?: string;
     isAiPlugin: boolean;
     isEnabled: boolean;
+    requiresConfiguration: boolean;
 }
 
 export interface PluginOptionVM {

@@ -16,6 +16,7 @@ public class RadarrCalendarProvider : ICalendarProvider
     public string Description => "Fetches upcoming movie releases and download status directly from your Radarr instance.";
     public string Version => "1.0.0";
     public string Type => "Calendar";
+    public string ExternalConfigurationHint => "Reads from Request Servers tagged \"Use for Release Calendar\" under System Settings → Request Servers.";
     public string DeveloperName => "System";
     public bool IsSystemPlugin => true;
 
