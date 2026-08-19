@@ -47,6 +47,7 @@ function Checkbox({ checked, onChange, label }: { checked: boolean, onChange: (v
 export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, showModal }: CoreSettingsTabProps) {
     const [serverSettings, setServerSettings] = useState<ServerSettings | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [subTab, setSubTab] = useState<'general' | 'scanning' | 'transcoding' | 'analysis' | 'thumbnails'>('general');
 
     const loadServerSettings = useCallback(async () => {
         try {
@@ -78,7 +79,27 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
     if (!serverSettings) return <div className="vora-skeleton h-32 mt-6" />;
 
     return (
-        <form onSubmit={handleSaveCore} className="space-y-6 pt-2">
+        <div className="pt-2 space-y-4">
+            <div className="flex flex-wrap gap-1 border-b border-[var(--vora-border-subtle)]">
+                {([
+                    { key: 'general', label: 'General' },
+                    { key: 'scanning', label: 'Scanning' },
+                    { key: 'transcoding', label: 'Transcoding' },
+                    { key: 'analysis', label: 'Analysis' },
+                    { key: 'thumbnails', label: 'Thumbnails' },
+                ] as const).map(t => (
+                    <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => setSubTab(t.key)}
+                        className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ${subTab === t.key ? 'border-[var(--vora-accent-500)] text-[var(--vora-accent-text)]' : 'border-transparent text-[var(--vora-text-muted)] hover:text-[var(--vora-text-secondary)]'}`}
+                    >
+                        {t.label}
+                    </button>
+                ))}
+            </div>
+            <form onSubmit={handleSaveCore} className="space-y-6">
+            {subTab === 'general' && (<>
             <SettingsCard title="General">
                 <FieldLabel>Server Name</FieldLabel>
                 <input
@@ -126,7 +147,9 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 </select>
                 <FieldHint>Language used when fetching titles and descriptions from metadata providers (TMDB, TVDB). Titles fall back to their original language when no translation exists. Applies to newly scanned or refreshed items.</FieldHint>
             </SettingsCard>
+            </>)}
 
+            {subTab === 'transcoding' && (<>
             <SettingsCard title="Global Streaming Profile">
                 <FieldLabel>Transcoder Behavior Priority</FieldLabel>
                 <select
@@ -306,7 +329,9 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                     </div>
                 </div>
             </SettingsCard>
+            </>)}
 
+            {subTab === 'general' && (<>
             <SettingsCard title="In-Memory Cache">
                 <FieldLabel>Cache Size Limit (MB)</FieldLabel>
                 <input
@@ -320,7 +345,9 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 />
                 <FieldHint>Maximum size of Vora's in-memory cache (recommendations, device flags, etc.). Default 10240 MB. Changes take effect after restart.</FieldHint>
             </SettingsCard>
+            </>)}
 
+            {subTab === 'scanning' && (<>
             <SettingsCard
                 title="Nightly Library Scan"
                 headingControl={
@@ -456,7 +483,9 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                     <FieldHint>Pick which plugin parses your raw files and folder structures.</FieldHint>
                 </SettingsCard>
             )}
+            </>)}
 
+            {subTab === 'general' && (<>
             <SettingsCard title="New User Registration">
                 <FieldLabel>Registration Mode</FieldLabel>
                 <select
@@ -471,7 +500,9 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 </select>
                 <FieldHint>Control how new users can create accounts on this server.</FieldHint>
             </SettingsCard>
+            </>)}
 
+            {subTab === 'analysis' && (<>
             <SettingsCard title="Intro & Credit Detection">
                 <div className="space-y-4">
                     <div>
@@ -595,7 +626,9 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                     </div>
                 </div>
             </SettingsCard>
+            </>)}
 
+            {subTab === 'thumbnails' && (<>
             <SettingsCard title="Video Preview Thumbnails">
                 <div className="space-y-4">
                     <div>
@@ -685,7 +718,9 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                     </div>
                 </div>
             </SettingsCard>
+            </>)}
 
+            {subTab === 'general' && (<>
             <SettingsCard title="Live TV & Radio Health Check">
                 <div className="space-y-4">
                     <div>
@@ -700,7 +735,9 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                     </div>
                 </div>
             </SettingsCard>
+            </>)}
 
+            {subTab === 'scanning' && (<>
             <SettingsCard title="Real-Time File Watcher">
                 <div className="space-y-4">
                     <div>
@@ -729,10 +766,12 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                     )}
                 </div>
             </SettingsCard>
+            </>)}
 
             <button type="submit" disabled={isSaving} className="vora-button-primary">
                 {isSaving ? 'Saving…' : 'Save Core Settings'}
             </button>
-        </form>
+            </form>
+        </div>
     );
 }
