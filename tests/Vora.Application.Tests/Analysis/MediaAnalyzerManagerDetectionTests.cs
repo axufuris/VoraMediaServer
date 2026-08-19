@@ -390,7 +390,7 @@ public class MediaAnalyzerManagerDetectionTests
 
         await _manager.TriggerLibrarySilenceDetectionAsync(Guid.NewGuid(), isAdditionTrigger: true);
 
-        await _media.DidNotReceive().GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>());
+        await _media.DidNotReceive().GetMarkerDetectionTargetIdsAsync(Arg.Any<Guid>(), Arg.Any<bool>());
     }
 
     [Fact]
@@ -400,28 +400,28 @@ public class MediaAnalyzerManagerDetectionTests
 
         await _manager.TriggerLibrarySilenceDetectionAsync(Guid.NewGuid(), isAdditionTrigger: true);
 
-        await _media.DidNotReceive().GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>());
+        await _media.DidNotReceive().GetMarkerDetectionTargetIdsAsync(Arg.Any<Guid>(), Arg.Any<bool>());
     }
 
     [Fact]
     public async Task TriggerLibrarySilenceDetectionAsync_detects_on_a_scan_when_detections_run_on_addition()
     {
         _settings.GetSettingsAsync().Returns(new ServerSetting { RunDetections = DetectionTrigger.OnAddition });
-        _media.GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>()).Returns(new List<Guid>());
+        _media.GetMarkerDetectionTargetIdsAsync(Arg.Any<Guid>(), Arg.Any<bool>()).Returns(new List<Guid>());
 
         await _manager.TriggerLibrarySilenceDetectionAsync(Guid.NewGuid(), isAdditionTrigger: true);
 
-        await _media.Received(1).GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>());
+        await _media.Received(1).GetMarkerDetectionTargetIdsAsync(Arg.Any<Guid>(), Arg.Any<bool>());
     }
 
     [Fact]
     public async Task TriggerLibrarySilenceDetectionAsync_runs_when_forced_even_if_detections_are_never()
     {
         _settings.GetSettingsAsync().Returns(new ServerSetting { RunDetections = DetectionTrigger.Never });
-        _media.GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>()).Returns(new List<Guid>());
+        _media.GetMarkerDetectionTargetIdsAsync(Arg.Any<Guid>(), Arg.Any<bool>()).Returns(new List<Guid>());
 
         await _manager.TriggerLibrarySilenceDetectionAsync(Guid.NewGuid(), forceOverride: true);
 
-        await _media.Received(1).GetTopLevelMediaItemIdsByLibraryAsync(Arg.Any<Guid>());
+        await _media.Received(1).GetMarkerDetectionTargetIdsAsync(Arg.Any<Guid>(), Arg.Any<bool>());
     }
 }

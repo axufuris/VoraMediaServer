@@ -110,7 +110,10 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     public async Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null, CancellationToken cancellationToken = default)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
-        var mediaIds = (await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId)).ToList();
+        // Only the items whose parts still need probing, so the progress total
+        // reflects what's left rather than the whole library (shows/seasons have
+        // no parts and are skipped; already-analyzed items are filtered out).
+        var mediaIds = await _mediaRepository.GetFileAnalysisTargetIdsAsync(libraryId);
         var titles = await _mediaRepository.GetDisplayTitlesByIdsAsync(mediaIds);
         var total = mediaIds.Count;
         var done = 0;
@@ -195,7 +198,10 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // skip it — and every season's episodes were then detected twice (once via
         // the show, once via the season). For a large TV library that's tens of
         // thousands of wasted queries before any real work starts.
-        var mediaIds = await _mediaRepository.GetTopLevelMediaItemIdsByLibraryAsync(libraryId);
+        // On a non-forced run only the shows/movies that still have un-analyzed
+        // markers, so the progress total reflects what's left instead of every
+        // top-level item. A forced run targets them all.
+        var mediaIds = await _mediaRepository.GetMarkerDetectionTargetIdsAsync(libraryId, includeCompleted: forceOverride);
         if (mediaIds.Count == 0) return;
 
         // Both marker toggles off → there's nothing to detect. Bail before the
