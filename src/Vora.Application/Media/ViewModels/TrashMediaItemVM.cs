@@ -11,6 +11,8 @@ public class TrashMediaItemVM
     public string? PosterUrl { get; set; }
     public string? LibraryName { get; set; }
     public string? SeriesTitle { get; set; }
+    public int? SeasonNumber { get; set; }
+    public int? EpisodeNumber { get; set; }
     public DateTime MissingSince { get; set; }
 
     public static Expression<Func<MediaItem, TrashMediaItemVM>> Projection =>
@@ -28,6 +30,10 @@ public class TrashMediaItemVM
             SeriesTitle = item is Episode ? ((Episode)item).Season.TvShow.Title
                 : item is Season ? ((Season)item).TvShow.Title
                 : null,
+            SeasonNumber = item is Episode ? ((Episode)item).Season.SeasonNumber
+                : item is Season ? ((Season)item).SeasonNumber
+                : null,
+            EpisodeNumber = item is Episode ? ((Episode)item).EpisodeNumber : (int?)null,
             MissingSince = item.MissingSince ?? DateTime.MinValue
         };
 }
