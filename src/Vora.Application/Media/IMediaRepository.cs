@@ -50,6 +50,8 @@ public interface IMediaRepository
     Task<MarkerCoverageVM> GetMarkerCoverageAsync(Guid libraryId);
     Task<(int Total, int WithThumbnails)> GetVideoThumbnailCoverageAsync(Guid libraryId);
     Task<List<Guid>> GetVideoThumbnailTargetIdsAsync(Guid libraryId, string currentSpriteVersion, bool includeCompleted);
+    Task<List<Guid>> GetFileAnalysisTargetIdsAsync(Guid libraryId);
+    Task<List<Guid>> GetMarkerDetectionTargetIdsAsync(Guid libraryId, bool includeCompleted);
     Task<bool> AreMarkersLockedAsync(Guid mediaItemId);
     Task SetMarkersLockedAsync(Guid mediaItemId, bool locked);
     Task<bool> AreThumbnailsLockedAsync(Guid mediaItemId);

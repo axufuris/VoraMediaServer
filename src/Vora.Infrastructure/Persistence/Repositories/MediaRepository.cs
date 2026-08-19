@@ -319,6 +319,35 @@ public partial class MediaRepository : IMediaRepository
         return await query.Select(m => m.Id).ToListAsync();
     }
 
+    public async Task<List<Guid>> GetFileAnalysisTargetIdsAsync(Guid libraryId)
+    {
+        return await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m is Movie || m is Episode)
+            .Where(m =>
+                (m is Movie && m.LibraryId == libraryId) ||
+                (m is Episode && ((Episode)m).Season.TvShow.LibraryId == libraryId))
+            .Where(m => m.MediaParts.Any(p => p.LastAnalyzedAt == null))
+            .Select(m => m.Id)
+            .ToListAsync();
+    }
+
+    public async Task<List<Guid>> GetMarkerDetectionTargetIdsAsync(Guid libraryId, bool includeCompleted)
+    {
+        var query = _context.MediaItems
+            .AsNoTracking()
+            .Where(m => (m is Movie || m is TvShow) && m.LibraryId == libraryId);
+
+        if (!includeCompleted)
+        {
+            query = query.Where(m =>
+                (m is Movie && m.MarkersAnalyzedAt == null) ||
+                (m is TvShow && ((TvShow)m).Seasons.Any(s => s.Episodes.Any(e => e.MarkersAnalyzedAt == null))));
+        }
+
+        return await query.Select(m => m.Id).ToListAsync();
+    }
+
     public async Task<List<Guid>> GetTopLevelMediaItemIdsByLibraryAsync(Guid libraryId)
     {
         return await _context.MediaItems
