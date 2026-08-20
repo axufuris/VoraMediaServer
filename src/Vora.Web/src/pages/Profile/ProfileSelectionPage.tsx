@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../../api/Auth/authService';
 import { serverVault } from '../../utils/serverVault';
 import { StorageKeys, SessionKeys, decodeJwtPayload, getProfileIdFromToken } from '../../utils/storageKeys';
+import { defaultApiBaseUrl } from '../../utils/apiBase';
 import { useDialog } from '../../dialogs';
 
 import { profileService, type UserProfileVM } from '../../api/Users/profileService';
@@ -93,7 +94,7 @@ export default function ProfileSelectionPage() {
                 sessionStorage.removeItem('pending_user_id');
             } else if (serverVault.getServers().length === 0) {
                 const newServerId = 'legacy_server';
-                const localUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
+                const localUrl = defaultApiBaseUrl().replace('/api', '');
 
                 let sName = 'Vora Server';
                 try {

@@ -1,6 +1,7 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosRequestConfig, isAxiosError } from 'axios';
 import { serverVault, type VoraServer } from '../utils/serverVault';
 import { StorageKeys, SessionKeys } from '../utils/storageKeys';
+import { defaultApiBaseUrl } from '../utils/apiBase';
 
 export interface VoraRequestConfig extends AxiosRequestConfig {
     serverId?: string;
@@ -43,7 +44,7 @@ const DETECTED_OS: string = (() => {
     return 'Unknown OS';
 })();
 
-const FALLBACK_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const FALLBACK_BASE_URL: string = defaultApiBaseUrl();
 
 const PENDING_KEY = '__pending__';
 
