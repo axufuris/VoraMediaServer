@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import MediaPlaceholder from '../Client/Primitives/MediaPlaceholder';
+import PosterRemoveButton from '../Client/Primitives/PosterRemoveButton';
 
 export interface MediaCardProps {
     id: string;
@@ -104,9 +105,9 @@ export default function MediaCard({
                 </div>
 
                 {onHide && (
-                    <button onClick={onHide} className="absolute top-2 right-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-danger-500)] text-[var(--vora-accent-contrast)] backdrop-blur-sm rounded-full p-1 shadow-[var(--vora-shadow-md)] z-20 opacity-0 group-hover:opacity-100 transition-all cursor-pointer" title="Remove">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+                    <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <PosterRemoveButton onClick={onHide} />
+                    </div>
                 )}
 
                 {isAdmin && onDelete && (

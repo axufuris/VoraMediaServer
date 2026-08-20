@@ -13,6 +13,7 @@ import EmptyState from '../../components/Client/Primitives/EmptyState';
 import PlaylistsPage from './Playlists/PlaylistsPage';
 import MediaRail from '../../components/Client/Primitives/MediaRail';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
+import PosterRemoveButton from '../../components/Client/Primitives/PosterRemoveButton';
 import MediaStill from '../../components/Client/Primitives/MediaStill';
 import { posterTitle } from '../../utils/posterTitle';
 import Hero from '../../components/Client/Primitives/Hero';
@@ -174,40 +175,12 @@ function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serve
                 const onOpen = () => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`);
 
                 const hideBadge = (
-                    <button
-                        type="button"
-                        aria-label="Hide from Continue Watching"
-                        title="Hide from Continue Watching"
-                        onClick={(e) => { e.stopPropagation(); handleHide(item); }}
-                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-all"
-                        style={{
-                            background: 'rgba(20, 20, 28, 0.88)',
-                            color: '#fafafa',
-                            border: '1.5px solid rgba(255,255,255,0.4)',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                            backdropFilter: 'blur(6px)',
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'var(--vora-danger-500)';
-                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.7)';
-                            e.currentTarget.style.transform = 'scale(1.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(20, 20, 28, 0.88)';
-                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
-                            e.currentTarget.style.transform = 'scale(1)';
-                        }}
-                    >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                    </button>
+                    <PosterRemoveButton onClick={() => handleHide(item)} title="Hide from Continue Watching" />
                 );
 
                 return (
                     <div key={item.id} style={{ scrollSnapAlign: 'start', flex: 'none' }}>
-                        <MediaPoster imageUrl={imageUrl} title={title} subtitle={subtitle} progressPercent={percent} onClick={onOpen} badge={hideBadge} />
+                        <MediaPoster imageUrl={imageUrl} title={title} subtitle={subtitle} progressPercent={percent} onClick={onOpen} hoverBadge={hideBadge} />
                     </div>
                 );
             })}

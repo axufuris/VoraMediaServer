@@ -9,6 +9,7 @@ interface MediaPosterProps {
     title: string;
     subtitle?: string;
     badge?: ReactNode;
+    hoverBadge?: ReactNode;
     bottomLeftBadge?: ReactNode;
     progressPercent?: number;
     isPlayed?: boolean;
@@ -31,7 +32,7 @@ const DEFAULT_WIDTH_BY_VARIANT: Record<PosterVariant, number> = {
     actor: 96,
 };
 
-export default function MediaPoster({ imageUrl, title, subtitle, badge, bottomLeftBadge, progressPercent, isPlayed, onClick, variant = 'standard', width, fill, className }: MediaPosterProps) {
+export default function MediaPoster({ imageUrl, title, subtitle, badge, hoverBadge, bottomLeftBadge, progressPercent, isPlayed, onClick, variant = 'standard', width, fill, className }: MediaPosterProps) {
     const aspect = ASPECT_BY_VARIANT[variant];
     const round = variant === 'actor';
     const widthStyle = fill ? '100%' : (width ?? DEFAULT_WIDTH_BY_VARIANT[variant]);
@@ -61,14 +62,13 @@ export default function MediaPoster({ imageUrl, title, subtitle, badge, bottomLe
             style={{ width: widthStyle, background: 'transparent', border: 'none', padding: 0 }}
         >
             <div
-                className="relative overflow-hidden transition-transform"
+                className="relative overflow-hidden border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)]"
                 style={{
                     aspectRatio: aspect,
                     borderRadius: round ? '50%' : 'var(--vora-radius-md)',
                     boxShadow: 'var(--vora-shadow-md)',
                     background: 'var(--vora-bg-surface)',
-                    border: '1px solid var(--vora-border-subtle)',
-                    transition: 'transform var(--vora-duration-med, 240ms) var(--vora-ease-out)',
+                    transition: 'transform var(--vora-duration-med, 240ms) var(--vora-ease-out), border-color var(--vora-duration-med, 240ms) var(--vora-ease-out)',
                 }}
             >
                 {showImage ? (
@@ -95,6 +95,11 @@ export default function MediaPoster({ imageUrl, title, subtitle, badge, bottomLe
                         <svg className="h-5 w-5" style={{ color: 'var(--vora-accent-500)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                     </div>
                 ) : null}
+                {hoverBadge && (
+                    <div className="absolute right-2 top-2 z-20 opacity-0 transition-opacity group-hover:opacity-100">
+                        {hoverBadge}
+                    </div>
+                )}
                 {bottomLeftBadge && (
                     <div className="absolute left-2 bottom-2">
                         {bottomLeftBadge}
