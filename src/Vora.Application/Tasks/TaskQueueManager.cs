@@ -216,6 +216,19 @@ public class TaskQueueManager : ITaskQueueManager
 
             var collectionMembership = sp.GetRequiredService<CollectionMembershipService>();
             await collectionMembership.CheckMediaItemForCollectionsAsync(itemId, ct);
+
+            // A per-file ingest can spawn a duplicate show row — e.g. adding a
+            // second-resolution copy whose folder carries no external-id tag, so
+            // scan-time title/year dedup can't link it to the existing show. Now
+            // that metadata has resolved the external ids, fold duplicates together
+            // by external id so the new file becomes another version/part rather
+            // than a parallel show — the same self-heal the full-library scan runs.
+            // No-op when there are no duplicates.
+            if (result.ParentShowId.HasValue)
+            {
+                var dedupeManager = sp.GetRequiredService<IMediaDedupeManager>();
+                await dedupeManager.MergeDuplicateTvShowsAsync(libraryId, ct);
+            }
         }, resourceKey: LibraryKey(libraryId));
     }
 
