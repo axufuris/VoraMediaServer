@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import MediaCard from './MediaCard';
 import MediaRow from '../Common/MediaRow';
-import { posterTitle } from '../../utils/posterTitle';
+import { posterCaption } from '../../utils/posterCaption';
 import type { RecommendationListVM } from '../../api/Discovery/recommendationService';
 
 interface RecommendationRowProps {
@@ -16,12 +16,14 @@ export default function RecommendationRow({ list, serverId }: RecommendationRowP
 
     return (
         <MediaRow title={list.title} subtitle={list.description} variant="home">
-            {list.items.map(item => (
+            {list.items.map(item => {
+                const cap = posterCaption(item);
+                return (
                 <div key={item.id} className="flex-none w-40 sm:w-48 snap-start">
                     <MediaCard
                         id={item.id}
-                        title={posterTitle(item)}
-                        subtitle={item.releaseDate ? new Date(item.releaseDate).getFullYear().toString() : item.type}
+                        title={cap.title}
+                        captionLines={cap.lines}
                         imageUrl={item.posterUrl}
                         type={item.type}
                         aspectRatio={item.type === 'Episode' ? 'video' : 'poster'}
@@ -30,7 +32,8 @@ export default function RecommendationRow({ list, serverId }: RecommendationRowP
                         onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
                     />
                 </div>
-            ))}
+                );
+            })}
         </MediaRow>
     );
 }

@@ -15,7 +15,7 @@ import MediaRail from '../../components/Client/Primitives/MediaRail';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
 import PosterRemoveButton from '../../components/Client/Primitives/PosterRemoveButton';
 import MediaStill from '../../components/Client/Primitives/MediaStill';
-import { posterTitle } from '../../utils/posterTitle';
+import { posterCaption } from '../../utils/posterCaption';
 import Hero from '../../components/Client/Primitives/Hero';
 import { useDialog } from '../../dialogs';
 
@@ -168,9 +168,7 @@ function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serve
                 const percent = item.resumePositionSeconds && item.durationSeconds
                     ? Math.min(100, Math.max(0, (item.resumePositionSeconds / item.durationSeconds) * 100))
                     : 0;
-                const isEpisode = item.type === 'Episode';
-                const title = isEpisode ? item.tvShowTitle ?? item.title : item.title;
-                const subtitle = isEpisode ? `S${item.seasonNumber} E${item.episodeNumber} · ${item.title}` : (item.releaseDate ? new Date(item.releaseDate).getFullYear().toString() : item.type);
+                const cap = posterCaption(item);
                 const imageUrl = item.posterUrl ?? item.backgroundUrl;
                 const onOpen = () => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`);
 
@@ -180,7 +178,7 @@ function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serve
 
                 return (
                     <div key={item.id} style={{ scrollSnapAlign: 'start', flex: 'none' }}>
-                        <MediaPoster imageUrl={imageUrl} title={title} subtitle={subtitle} progressPercent={percent} onClick={onOpen} hoverBadge={hideBadge} />
+                        <MediaPoster imageUrl={imageUrl} title={cap.title} captionLines={cap.lines} progressPercent={percent} onClick={onOpen} hoverBadge={hideBadge} />
                     </div>
                 );
             })}
@@ -216,14 +214,14 @@ function SmartListRow({ list, serverId }: { list: SmartListClientDto, serverId?:
         <MediaRail title={list.title}>
             {items.map(item => {
                 const isEpisode = item.type === 'Episode';
-                const subtitle = item.releaseDate ? new Date(item.releaseDate).getFullYear().toString() : item.type;
+                const cap = posterCaption(item);
                 const onOpen = () => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`);
                 return (
                     <div key={item.id} style={{ scrollSnapAlign: 'start', flex: 'none' }}>
                         {isEpisode ? (
-                            <MediaStill imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} />
+                            <MediaStill imageUrl={item.posterUrl} title={cap.title} captionLines={cap.lines} onClick={onOpen} />
                         ) : (
-                            <MediaPoster imageUrl={item.posterUrl} title={posterTitle(item)} subtitle={subtitle} isPlayed={item.isPlayed} onClick={onOpen} />
+                            <MediaPoster imageUrl={item.posterUrl} title={cap.title} captionLines={cap.lines} isPlayed={item.isPlayed} onClick={onOpen} />
                         )}
                     </div>
                 );

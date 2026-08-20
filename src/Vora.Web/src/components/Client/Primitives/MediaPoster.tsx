@@ -8,6 +8,7 @@ interface MediaPosterProps {
     imageUrl?: string | null;
     title: string;
     subtitle?: string;
+    captionLines?: string[];
     badge?: ReactNode;
     hoverBadge?: ReactNode;
     bottomLeftBadge?: ReactNode;
@@ -32,7 +33,7 @@ const DEFAULT_WIDTH_BY_VARIANT: Record<PosterVariant, number> = {
     actor: 96,
 };
 
-export default function MediaPoster({ imageUrl, title, subtitle, badge, hoverBadge, bottomLeftBadge, progressPercent, isPlayed, onClick, variant = 'standard', width, fill, className }: MediaPosterProps) {
+export default function MediaPoster({ imageUrl, title, subtitle, captionLines, badge, hoverBadge, bottomLeftBadge, progressPercent, isPlayed, onClick, variant = 'standard', width, fill, className }: MediaPosterProps) {
     const aspect = ASPECT_BY_VARIANT[variant];
     const round = variant === 'actor';
     const widthStyle = fill ? '100%' : (width ?? DEFAULT_WIDTH_BY_VARIANT[variant]);
@@ -111,10 +112,14 @@ export default function MediaPoster({ imageUrl, title, subtitle, badge, hoverBad
                     </div>
                 )}
             </div>
-            {(title || subtitle) && (
+            {(title || subtitle || (captionLines && captionLines.length > 0)) && (
                 <div className={`${round ? 'mt-2 text-center' : 'mt-2.5'}`}>
                     <div className="truncate text-sm font-medium" style={{ color: 'var(--vora-text-primary)' }}>{title}</div>
-                    {subtitle && <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--vora-text-muted)' }}>{subtitle}</div>}
+                    {captionLines && captionLines.length > 0
+                        ? captionLines.map((line, i) => (
+                            <div key={i} className="mt-0.5 truncate text-xs" style={{ color: 'var(--vora-text-muted)' }}>{line}</div>
+                        ))
+                        : subtitle && <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--vora-text-muted)' }}>{subtitle}</div>}
                 </div>
             )}
         </div>

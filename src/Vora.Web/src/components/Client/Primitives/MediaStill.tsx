@@ -6,6 +6,7 @@ interface MediaStillProps {
     imageUrl?: string | null;
     title: string;
     subtitle?: string;
+    captionLines?: string[];
     badge?: ReactNode;
     bottomLeftBadge?: ReactNode;
     progressPercent?: number;
@@ -15,7 +16,7 @@ interface MediaStillProps {
     className?: string;
 }
 
-export default function MediaStill({ imageUrl, title, subtitle, badge, bottomLeftBadge, progressPercent, onClick, width = 280, fill, className }: MediaStillProps) {
+export default function MediaStill({ imageUrl, title, subtitle, captionLines, badge, bottomLeftBadge, progressPercent, onClick, width = 280, fill, className }: MediaStillProps) {
     const widthStyle = fill ? '100%' : width;
     const [failed, setFailed] = useState(false);
     useEffect(() => { setFailed(false); }, [imageUrl]);
@@ -63,7 +64,11 @@ export default function MediaStill({ imageUrl, title, subtitle, badge, bottomLef
             </div>
             <div className="mt-2.5">
                 <div className="truncate text-sm font-medium" style={{ color: 'var(--vora-text-primary)' }}>{title}</div>
-                {subtitle && <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--vora-text-muted)' }}>{subtitle}</div>}
+                {captionLines && captionLines.length > 0
+                    ? captionLines.map((line, i) => (
+                        <div key={i} className="mt-0.5 truncate text-xs" style={{ color: 'var(--vora-text-muted)' }}>{line}</div>
+                    ))
+                    : subtitle && <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--vora-text-muted)' }}>{subtitle}</div>}
             </div>
         </div>
     );

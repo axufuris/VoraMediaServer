@@ -75,7 +75,17 @@ public class CollectionDetailsVM
                     : item is Season ? "Season"
                     : item is Episode ? "Episode"
                     : "Unknown",
-                TvShowTitle = item is Season ? ((Season)item).TvShow.Title : null,
+                TvShowTitle = item is Season ? ((Season)item).TvShow.Title
+                    : item is Episode ? ((Episode)item).Season.TvShow.Title
+                    : null,
+                SeasonNumber = item is Season ? ((Season)item).SeasonNumber
+                    : item is Episode ? ((Episode)item).Season.SeasonNumber
+                    : (int?)null,
+                SeasonName = item is Season ? item.Title
+                    : item is Episode ? ((Episode)item).Season.Title
+                    : null,
+                EpisodeNumber = item is Episode ? ((Episode)item).EpisodeNumber : (int?)null,
+                Edition = item is Movie ? item.Edition : null,
                 PosterUrl = item.PosterUrl ?? (item is Season ? ((Season)item).TvShow.PosterUrl : null),
                 ReleaseDate = item.ReleaseDate,
                 AddedAt = item.AddedAt,

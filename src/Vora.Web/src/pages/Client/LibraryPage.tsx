@@ -11,7 +11,7 @@ import EmptyState from '../../components/Client/Primitives/EmptyState';
 import Tabs from '../../components/Client/Primitives/Tabs';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
 import MediaStill from '../../components/Client/Primitives/MediaStill';
-import { posterTitle } from '../../utils/posterTitle';
+import { posterCaption } from '../../utils/posterCaption';
 import LetterRail from '../../components/Client/Primitives/LetterRail';
 import { StorageKeys } from '../../utils/storageKeys';
 
@@ -89,11 +89,7 @@ function renderLibraryCard(
 ) {
     const { isAdmin, navigate, serverId, handleDeleteMedia } = ctx;
     const isEpisode = item.type === 'Episode';
-    const subtitle = item.type === 'TvShow'
-        ? `${item.numberOfSeasons || 1} season${item.numberOfSeasons !== 1 ? 's' : ''}`
-        : item.releaseDate
-            ? new Date(item.releaseDate).getFullYear().toString()
-            : 'Unknown year';
+    const cap = posterCaption(item);
     const onOpen = () => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`);
     const unplayedBadge = item.unplayedItemCount && item.unplayedItemCount > 0
         ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}>{item.unplayedItemCount}</span>
@@ -104,9 +100,9 @@ function renderLibraryCard(
             : undefined;
 
     const card = isEpisode ? (
-        <MediaStill imageUrl={item.posterUrl} title={item.title} subtitle={subtitle} onClick={onOpen} badge={unplayedBadge} fill />
+        <MediaStill imageUrl={item.posterUrl} title={cap.title} captionLines={cap.lines} onClick={onOpen} badge={unplayedBadge} fill />
     ) : (
-        <MediaPoster imageUrl={item.posterUrl} title={posterTitle(item)} subtitle={subtitle} onClick={onOpen} badge={unplayedBadge} fill />
+        <MediaPoster imageUrl={item.posterUrl} title={cap.title} captionLines={cap.lines} onClick={onOpen} badge={unplayedBadge} fill />
     );
 
     if (!isAdmin) return <div key={item.id} className="[content-visibility:auto] [contain-intrinsic-size:180px_320px]">{card}</div>;

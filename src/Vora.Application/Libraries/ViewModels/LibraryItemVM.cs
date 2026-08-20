@@ -19,6 +19,10 @@ public class LibraryItemVM
     public int? DurationSeconds { get; set; }
     public int? NumberOfSeasons { get; set; }
     public string? TvShowTitle { get; set; }
+    public int? SeasonNumber { get; set; }
+    public string? SeasonName { get; set; }
+    public int? EpisodeNumber { get; set; }
+    public string? Edition { get; set; }
     public Guid LibraryId { get; set; }
     public decimal? TimelineOrder { get; set; }
     public bool IsPlayed { get; set; }
@@ -62,7 +66,17 @@ public class LibraryItemVM
             ThirdPartyRating2 = item.ThirdPartyRating2,
             ThirdPartyRating2Name = item.ThirdPartyRating2Name,
             NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count(s => s.MissingSince == null) : (int?)null,
-            TvShowTitle = item is Season ? ((Season)item).TvShow.Title : null,
+            TvShowTitle = item is Season ? ((Season)item).TvShow.Title
+                : item is Episode ? ((Episode)item).Season.TvShow.Title
+                : null,
+            SeasonNumber = item is Season ? ((Season)item).SeasonNumber
+                : item is Episode ? ((Episode)item).Season.SeasonNumber
+                : (int?)null,
+            SeasonName = item is Season ? item.Title
+                : item is Episode ? ((Episode)item).Season.Title
+                : null,
+            EpisodeNumber = item is Episode ? ((Episode)item).EpisodeNumber : (int?)null,
+            Edition = item is Movie ? item.Edition : null,
             Genres = item.Genres.Select(g => g.Name).ToList()
         };
 }

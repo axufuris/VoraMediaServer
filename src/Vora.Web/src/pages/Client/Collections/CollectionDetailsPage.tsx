@@ -6,7 +6,7 @@ import { collectionAdminService } from '../../../api/Collections/collectionAdmin
 import EditCollectionModal from '../../../components/Collections/EditCollectionModal';
 import ReorderCollectionModal from '../../../components/Collections/ReorderCollectionModal';
 import MediaCard from '../../../components/Media/MediaCard';
-import { posterTitle } from '../../../utils/posterTitle';
+import { posterCaption } from '../../../utils/posterCaption';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { useDialog } from '../../../dialogs';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
@@ -248,12 +248,14 @@ export default function CollectionDetailsPage() {
                     </div>
 
                     <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,192px))] gap-4">
-                        {collection.items?.map(item => (
+                        {collection.items?.map(item => {
+                            const cap = posterCaption(item);
+                            return (
                             <MediaCard
                                 key={item.id}
                                 id={item.id}
-                                title={posterTitle(item)}
-                                subtitle={item.releaseDate ? new Date(item.releaseDate).getFullYear() : 'Unknown Year'}
+                                title={cap.title}
+                                captionLines={cap.lines}
                                 imageUrl={item.posterUrl}
                                 type={item.type}
                                 aspectRatio="poster"
@@ -262,7 +264,8 @@ export default function CollectionDetailsPage() {
                                 onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
                                 onHide={isAdmin && !collection.systemGenerated ? (e) => handleRemoveItem(e, item.id) : undefined}
                             />
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </div>
