@@ -42,6 +42,11 @@ public interface IUserRepository
     Task InvalidateOutstandingEmailChangeTicketsForUserAsync(Guid userId);
     Task ApplyEmailChangeAsync(User user);
 
+    Task AddAuthRefreshTokenAsync(AuthRefreshToken token);
+    Task<AuthRefreshToken?> GetAuthRefreshTokenByHashAsync(string tokenHash);
+    Task UpdateAuthRefreshTokenAsync(AuthRefreshToken token);
+    Task RevokeAuthRefreshTokenFamilyAsync(Guid familyId);
+
     Task<(List<UserProfileHistoryDto> Data, int Total)> GetUserPlayHistoryAsync(Guid userId, Guid? profileId, int page, int pageSize, string search, string typeFilter);
 
     Task<string?> GetProfileDeviceNavPrefsAsync(Guid profileId, string deviceId);

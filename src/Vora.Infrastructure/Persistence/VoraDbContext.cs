@@ -84,6 +84,7 @@ public class VoraDbContext : DbContext
     public DbSet<PasswordResetTicket> PasswordResetTickets { get; set; }
     public DbSet<EmailChangeTicket> EmailChangeTickets { get; set; }
     public DbSet<InvitationTicket> InvitationTickets { get; set; }
+    public DbSet<AuthRefreshToken> AuthRefreshTokens { get; set; }
     public DbSet<ClientDevice> ClientDevices { get; set; }
 
     public DbSet<Playlist> Playlists { get; set; }
@@ -182,6 +183,7 @@ public class VoraDbContext : DbContext
         ConfigurePasswordResetTickets(modelBuilder);
         ConfigureEmailChangeTickets(modelBuilder);
         ConfigureInvitationTickets(modelBuilder);
+        ConfigureAuthRefreshTokens(modelBuilder);
         ConfigureClientDevices(modelBuilder, converters);
 
         ConfigurePlaylists(modelBuilder);
@@ -936,6 +938,25 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
             entity.HasIndex(e => e.TokenHash).IsUnique();
             entity.HasIndex(e => e.Email);
+        });
+    }
+
+    private static void ConfigureAuthRefreshTokens(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AuthRefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.SecurityStamp).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.DeviceId).HasMaxLength(128);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.FamilyId);
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

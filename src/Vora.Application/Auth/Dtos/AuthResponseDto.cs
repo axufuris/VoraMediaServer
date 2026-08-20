@@ -6,4 +6,6 @@ public class AuthResponseDto
     public required Guid UserId { get; set; }
     public required string DisplayName { get; set; }
     public required bool IsAdmin { get; set; }
+    public string? RefreshToken { get; set; }
+    public string? ProfileToken { get; set; }
 }

@@ -46,6 +46,9 @@ public interface IAuthManager
     Task<AuthResponseDto?> LoginAsync(string email, string password);
     Task<string?> GenerateProfileTokenAsync(Guid accountId, Guid profileId);
     Task<AuthResponseDto> RegisterAsync(string email, string password, string displayName, string? secretCode, string? inviteToken = null);
+    Task<string> IssueRefreshTokenAsync(Guid accountId, string? deviceId);
+    Task<AuthResponseDto?> RefreshAsync(string refreshToken, Guid? profileId, string? deviceId);
+    Task RevokeRefreshTokenAsync(string refreshToken);
     Task<string> GenerateInviteCodeAsync();
     Task RequestPasswordResetAsync(string email, string requestOriginFallback, CancellationToken cancellationToken = default);
     Task<PasswordResetResult> ConfirmPasswordResetAsync(string token, string newPassword, CancellationToken cancellationToken = default);
@@ -64,6 +67,7 @@ public class AuthManager(
 {
     private const int AccountTokenLifetimeHours = 2;
     private const int ProfileTokenLifetimeDays = 7;
+    private const int RefreshTokenLifetimeDays = 90;
     private const int InviteCodeLifetimeMinutes = 30;
     private const int PasswordResetTicketLifetimeMinutes = 60;
     private const int EmailChangeTicketLifetimeMinutes = 60;
@@ -304,6 +308,88 @@ public class AuthManager(
 
         return CreateToken(claims, TimeSpan.FromDays(ProfileTokenLifetimeDays));
     }
+
+    public async Task<string> IssueRefreshTokenAsync(Guid accountId, string? deviceId)
+    {
+        var user = await repository.GetUserByIdAsync(accountId)
+            ?? throw new InvalidOperationException("Cannot issue a refresh token for a non-existent account.");
+
+        var token = GenerateRefreshTokenValue();
+        await repository.AddAuthRefreshTokenAsync(new AuthRefreshToken
+        {
+            FamilyId = Guid.NewGuid(),
+            UserId = accountId,
+            TokenHash = HashToken(token),
+            SecurityStamp = user.SecurityStamp,
+            DeviceId = deviceId,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddDays(RefreshTokenLifetimeDays)
+        });
+
+        return token;
+    }
+
+    public async Task<AuthResponseDto?> RefreshAsync(string refreshToken, Guid? profileId, string? deviceId)
+    {
+        var stored = await repository.GetAuthRefreshTokenByHashAsync(HashToken(refreshToken));
+        if (stored == null || stored.ExpiresAt <= DateTime.UtcNow)
+        {
+            return null;
+        }
+
+        // A presented token that is already revoked means someone replayed a
+        // rotated (or logged-out) token — treat it as theft and kill the family.
+        if (stored.RevokedAt != null)
+        {
+            await repository.RevokeAuthRefreshTokenFamilyAsync(stored.FamilyId);
+            return null;
+        }
+
+        var user = await repository.GetUserByIdAsync(stored.UserId);
+        if (user == null || user.SecurityStamp != stored.SecurityStamp)
+        {
+            await repository.RevokeAuthRefreshTokenFamilyAsync(stored.FamilyId);
+            return null;
+        }
+
+        var newToken = GenerateRefreshTokenValue();
+        await repository.AddAuthRefreshTokenAsync(new AuthRefreshToken
+        {
+            FamilyId = stored.FamilyId,
+            UserId = user.Id,
+            TokenHash = HashToken(newToken),
+            SecurityStamp = user.SecurityStamp,
+            DeviceId = deviceId ?? stored.DeviceId,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddDays(RefreshTokenLifetimeDays)
+        });
+
+        stored.RevokedAt = DateTime.UtcNow;
+        await repository.UpdateAuthRefreshTokenAsync(stored);
+
+        var response = BuildAuthResponse(user);
+        response.RefreshToken = newToken;
+        if (profileId.HasValue)
+        {
+            response.ProfileToken = await GenerateProfileTokenAsync(user.Id, profileId.Value);
+        }
+
+        return response;
+    }
+
+    public async Task RevokeRefreshTokenAsync(string refreshToken)
+    {
+        var stored = await repository.GetAuthRefreshTokenByHashAsync(HashToken(refreshToken));
+        if (stored == null)
+        {
+            return;
+        }
+
+        await repository.RevokeAuthRefreshTokenFamilyAsync(stored.FamilyId);
+    }
+
+    private static string GenerateRefreshTokenValue() =>
+        Base64UrlEncode(RandomNumberGenerator.GetBytes(48));
 
     private string GenerateAccountToken(User user)
     {
