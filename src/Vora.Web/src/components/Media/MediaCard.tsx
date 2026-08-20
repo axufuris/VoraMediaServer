@@ -6,6 +6,7 @@ export interface MediaCardProps {
     id: string;
     title: string;
     subtitle?: string | number | null;
+    captionLines?: string[];
     imageUrl?: string;
     type?: 'Movie' | 'TvShow' | 'Season' | 'Episode' | 'Collection' | 'Playlist' | string;
     aspectRatio?: 'poster' | 'video' | 'square';
@@ -21,7 +22,7 @@ export interface MediaCardProps {
 }
 
 export default function MediaCard({
-    title, subtitle, imageUrl, type, aspectRatio = 'poster',
+    title, subtitle, captionLines, imageUrl, type, aspectRatio = 'poster',
     isPlayed, unplayedCount, progressPercent, multiPosters, inWatchlist,
     onClick, onDelete, onHide, isAdmin
 }: MediaCardProps) {
@@ -118,7 +119,9 @@ export default function MediaCard({
             </div>
 
             <h3 className="font-semibold text-sm text-[var(--vora-text-primary)] truncate group-hover:text-[var(--vora-accent-text)] transition-colors">{title}</h3>
-            {subtitle && <p className="text-xs text-[var(--vora-text-muted)] font-medium truncate">{subtitle}</p>}
+            {captionLines && captionLines.length > 0
+                ? captionLines.map((line, i) => <p key={i} className="text-xs text-[var(--vora-text-muted)] font-medium truncate">{line}</p>)
+                : subtitle && <p className="text-xs text-[var(--vora-text-muted)] font-medium truncate">{subtitle}</p>}
         </div>
     );
 }

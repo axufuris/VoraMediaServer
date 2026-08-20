@@ -42,6 +42,10 @@ export interface LibraryItem {
     addedAt?: string;
     type: string;
     tvShowTitle?: string;
+    seasonNumber?: number;
+    seasonName?: string;
+    episodeNumber?: number;
+    edition?: string;
     posterUrl?: string;
     backgroundUrl?: string;
     contentRating?: string;

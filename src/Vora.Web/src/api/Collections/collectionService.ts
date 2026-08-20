@@ -55,6 +55,10 @@ export interface CollectionDetailsLibraryItem {
     releaseDate?: string;
     type: string;
     tvShowTitle?: string;
+    seasonNumber?: number;
+    seasonName?: string;
+    episodeNumber?: number;
+    edition?: string;
     posterUrl?: string;
     isPlayed?: boolean;
     unplayedItemCount?: number;
