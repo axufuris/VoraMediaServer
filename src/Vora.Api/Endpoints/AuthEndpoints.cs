@@ -42,6 +42,17 @@ public class ConfirmEmailChangeRequestDto
     public required string Token { get; set; }
 }
 
+public class RefreshRequestDto
+{
+    public required string RefreshToken { get; set; }
+    public Guid? ProfileId { get; set; }
+}
+
+public class LogoutRequestDto
+{
+    public required string RefreshToken { get; set; }
+}
+
 public static class AuthEndpoints
 {
     public static RouteGroupBuilder MapAuthEndpoints(this IEndpointRouteBuilder routes)
@@ -62,6 +73,14 @@ public static class AuthEndpoints
             .WithName("Register")
             .Produces<Vora.Application.Auth.Dtos.AuthResponseDto>(StatusCodes.Status200OK)
             .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
+        group.MapPost("/refresh", RefreshAsync)
+            .WithName("RefreshToken")
+            .Produces<Vora.Application.Auth.Dtos.AuthResponseDto>(StatusCodes.Status200OK)
+            .RequireRateLimiting(VoraRateLimitPolicies.AuthBurst);
+        group.MapPost("/logout", LogoutAsync)
+            .WithName("Logout")
+            .Produces(StatusCodes.Status204NoContent)
+            .RequireRateLimiting(VoraRateLimitPolicies.AuthBurst);
         group.MapPost("/exchange-profile-token", ExchangeProfileTokenAsync)
             .WithName("ExchangeProfileToken")
             .Produces<ExchangeProfileTokenResponse>(StatusCodes.Status200OK)
@@ -117,11 +136,12 @@ public static class AuthEndpoints
         });
     }
 
-    private static async Task<IResult> ClaimServerAsync([FromBody] SetupRequestDto request, IAuthManager manager)
+    private static async Task<IResult> ClaimServerAsync([FromBody] SetupRequestDto request, IAuthManager manager, HttpContext httpContext)
     {
         try
         {
             var result = await manager.ClaimServerAsync(request.Email, request.Password, request.DisplayName);
+            result.RefreshToken = await manager.IssueRefreshTokenAsync(result.UserId, ReadDeviceId(httpContext));
             return Results.Ok(result);
         }
         catch (InvalidOperationException ex)
@@ -130,17 +150,24 @@ public static class AuthEndpoints
         }
     }
 
-    private static async Task<IResult> LoginAsync([FromBody] LoginRequestDto request, IAuthManager manager)
+    private static async Task<IResult> LoginAsync([FromBody] LoginRequestDto request, IAuthManager manager, HttpContext httpContext)
     {
         var result = await manager.LoginAsync(request.Email, request.Password);
-        return result != null ? Results.Ok(result) : Results.Unauthorized();
+        if (result == null)
+        {
+            return Results.Unauthorized();
+        }
+
+        result.RefreshToken = await manager.IssueRefreshTokenAsync(result.UserId, ReadDeviceId(httpContext));
+        return Results.Ok(result);
     }
 
-    private static async Task<IResult> RegisterAsync([FromBody] RegisterRequestDto request, IAuthManager manager)
+    private static async Task<IResult> RegisterAsync([FromBody] RegisterRequestDto request, IAuthManager manager, HttpContext httpContext)
     {
         try
         {
             var result = await manager.RegisterAsync(request.Email, request.Password, request.DisplayName, request.SecretCode, request.InviteToken);
+            result.RefreshToken = await manager.IssueRefreshTokenAsync(result.UserId, ReadDeviceId(httpContext));
             return Results.Ok(result);
         }
         catch (InvalidOperationException ex)
@@ -148,6 +175,21 @@ public static class AuthEndpoints
             return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
     }
+
+    private static async Task<IResult> RefreshAsync([FromBody] RefreshRequestDto request, IAuthManager manager, HttpContext httpContext)
+    {
+        var result = await manager.RefreshAsync(request.RefreshToken, request.ProfileId, ReadDeviceId(httpContext));
+        return result != null ? Results.Ok(result) : Results.Unauthorized();
+    }
+
+    private static async Task<IResult> LogoutAsync([FromBody] LogoutRequestDto request, IAuthManager manager)
+    {
+        await manager.RevokeRefreshTokenAsync(request.RefreshToken);
+        return Results.NoContent();
+    }
+
+    private static string? ReadDeviceId(HttpContext httpContext) =>
+        httpContext.Request.Headers["X-Vora-Device-Id"].FirstOrDefault();
 
     private static async Task<IResult> ExchangeProfileTokenAsync([FromQuery] Guid accountId, [FromQuery] Guid profileId, ClaimsPrincipal user, IAuthManager manager)
     {

@@ -215,6 +215,28 @@ public class UserRepository(VoraDbContext context) : IUserRepository
         await context.SaveChangesAsync();
     }
 
+    public async Task AddAuthRefreshTokenAsync(AuthRefreshToken token)
+    {
+        await context.AuthRefreshTokens.AddAsync(token);
+        await context.SaveChangesAsync();
+    }
+
+    public Task<AuthRefreshToken?> GetAuthRefreshTokenByHashAsync(string tokenHash) =>
+        context.AuthRefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
+
+    public async Task UpdateAuthRefreshTokenAsync(AuthRefreshToken token)
+    {
+        context.AuthRefreshTokens.Update(token);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task RevokeAuthRefreshTokenFamilyAsync(Guid familyId)
+    {
+        await context.AuthRefreshTokens
+            .Where(t => t.FamilyId == familyId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTime.UtcNow));
+    }
+
     public Task<(List<UserProfileHistoryDto> Data, int Total)> GetUserPlayHistoryAsync(
         Guid userId,
         Guid? profileId,
