@@ -314,6 +314,15 @@ public class AuthManager(
         var user = await repository.GetUserByIdAsync(accountId)
             ?? throw new InvalidOperationException("Cannot issue a refresh token for a non-existent account.");
 
+        // A fresh login supersedes this device's previous session. The client
+        // discards its refresh token on logout without revoking it server-side,
+        // so retire any lingering active token for this account+device instead of
+        // leaving it valid until it expires.
+        if (!string.IsNullOrEmpty(deviceId))
+        {
+            await repository.RevokeAuthRefreshTokensForDeviceAsync(accountId, deviceId);
+        }
+
         var token = GenerateRefreshTokenValue();
         await repository.AddAuthRefreshTokenAsync(new AuthRefreshToken
         {

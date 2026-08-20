@@ -237,6 +237,13 @@ public class UserRepository(VoraDbContext context) : IUserRepository
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTime.UtcNow));
     }
 
+    public async Task RevokeAuthRefreshTokensForDeviceAsync(Guid userId, string deviceId)
+    {
+        await context.AuthRefreshTokens
+            .Where(t => t.UserId == userId && t.DeviceId == deviceId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTime.UtcNow));
+    }
+
     public Task<(List<UserProfileHistoryDto> Data, int Total)> GetUserPlayHistoryAsync(
         Guid userId,
         Guid? profileId,
