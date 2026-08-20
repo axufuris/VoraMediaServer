@@ -7,6 +7,7 @@ import {
     type DedupeIgnoredGroupVM
 } from '../../api/System/adminService';
 import { libraryService, type LibrarySummary } from '../../api/Media/libraryService';
+import { libraryAdminService } from '../../api/Media/libraryAdminService';
 import { useDialog } from '../../dialogs';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
@@ -151,6 +152,22 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
         }
     };
 
+    const handleMergeShows = async () => {
+        const ok = await dialog.confirm({
+            title: 'Merge duplicate TV shows?',
+            message: 'If the same show was scanned into more than one entry (e.g. a 1080p and a 4K copy in separate folders), this consolidates them into one show — each episode keeps every file version as a selectable quality, and watch progress and ratings are merged. Nothing on disk is deleted. Runs across all libraries in the background.',
+            confirmText: 'Merge',
+            cancelText: 'Cancel',
+        });
+        if (!ok) return;
+        try {
+            await libraryAdminService.mergeDuplicateShows(serverId);
+            await dialog.alert({ title: 'Merge queued', message: 'Merging duplicate TV shows — watch progress under Background Tasks.' });
+        } catch {
+            await dialog.alert({ title: 'Failed', message: 'Could not queue the duplicate-show merge.', tone: 'danger' });
+        }
+    };
+
     const availableTypes = Array.from(new Set(groups.map(g => g.type))).sort();
     const typesKey = availableTypes.join('|');
 
@@ -175,10 +192,16 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
                         <span className="text-xs text-[var(--vora-text-muted)]">if you keep the best version in each group</span>
                     </div>
                 ) : <div />}
-                <button type="button" onClick={fetchDuplicates} className="vora-button-secondary flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                    Rescan
-                </button>
+                <div className="flex items-center gap-2">
+                    <button type="button" onClick={handleMergeShows} className="vora-button-secondary flex items-center gap-2" title="Consolidate the same show scanned into multiple entries into one, keeping every file version">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8m0 0l-3-3m3 3l-3 3M16 17H8m0 0l3 3m-3-3l3-3" /></svg>
+                        Merge duplicate shows
+                    </button>
+                    <button type="button" onClick={fetchDuplicates} className="vora-button-secondary flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        Rescan
+                    </button>
+                </div>
             </div>
 
             {availableTypes.length > 1 && (
