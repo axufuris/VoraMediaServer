@@ -3,6 +3,7 @@ import { useEffect, lazy, Suspense, type ReactElement } from 'react';
 import { serverVault } from './utils/serverVault';
 import { StorageKeys, getProfileIdFromToken } from './utils/storageKeys';
 import { getOrCreateDeviceId } from './utils/deviceId';
+import { defaultApiBaseUrl } from './utils/apiBase';
 import MainLayout from './layouts/MainLayout';
 import AdminShell from './components/Admin/Shell/AdminShell';
 import { PlayerProvider } from './contexts/PlayerContext';
@@ -85,7 +86,7 @@ if (serverVault.getServers().length === 0 && localStorage.getItem(StorageKeys.pr
         if (!token || !profileId) throw new Error('Missing profile token for legacy migration');
         const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
 
-        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+        const apiUrl = defaultApiBaseUrl();
         const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
 
         serverVault.addOrUpdateServer({
