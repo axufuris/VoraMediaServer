@@ -75,7 +75,7 @@ export default function TaskDashboard() {
                     </div>
                 ) : (
                     <div className="vora-card overflow-hidden">
-                        <table className="w-full text-left">
+                        <table className="w-full text-left table-fixed">
                             <thead>
                                 <tr className="bg-[var(--vora-bg-sunken)] border-b border-[var(--vora-border-subtle)] text-xs uppercase tracking-wider text-[var(--vora-text-muted)]">
                                     <th className="px-5 py-3 font-semibold w-32">Status</th>
@@ -102,9 +102,9 @@ export default function TaskDashboard() {
                                             )}
                                         </td>
                                         <td className="px-5 py-3">
-                                            <div className="text-sm font-semibold text-[var(--vora-text-primary)]">{task.name}</div>
+                                            <div className="text-sm font-semibold text-[var(--vora-text-primary)] truncate">{task.name}</div>
                                             {task.progress && (
-                                                <div className="mt-0.5 text-xs text-[var(--vora-text-muted)] font-normal truncate max-w-md">{task.progress}</div>
+                                                <div className="mt-0.5 text-xs text-[var(--vora-text-muted)] font-normal truncate">{task.progress}</div>
                                             )}
                                         </td>
                                         <td className="px-5 py-3 text-right">
