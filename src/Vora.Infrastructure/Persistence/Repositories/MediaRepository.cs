@@ -830,6 +830,13 @@ public partial class MediaRepository : IMediaRepository
 
     public async Task MarkMediaMissingByFilePathAsync(string filePath)
     {
+        // The folder watcher fires this from a "file deleted" event, but on a
+        // network share a transient enumeration blip (or an atomic move/rename
+        // during an import) can report a deletion for a file that is still there.
+        // Re-verify the file is actually gone before dropping the part and
+        // trashing the item, so a present file is never soft-deleted.
+        if (System.IO.File.Exists(filePath)) return;
+
         var item = await _context.MediaItems
             .Include(m => m.MediaParts)
             .FirstOrDefaultAsync(m => m.MediaParts.Any(p => p.FilePath == filePath));

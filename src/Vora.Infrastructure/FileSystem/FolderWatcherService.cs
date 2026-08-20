@@ -130,6 +130,12 @@ public class FolderWatcherService : IFolderWatcherService
     {
         if (!SupportedExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return;
 
+        // A rename/move (e.g. an import upgrading a release in place) surfaces as a
+        // delete immediately followed by a create. Let it settle and re-check: if
+        // the file is back, this was churn, not a real deletion — don't trash it.
+        await Task.Delay(5000);
+        if (File.Exists(filePath)) return;
+
         using var scope = _serviceProvider.CreateScope();
 
         // Excluded files (e.g. *.TDARR temp copies) were never ingested, so a
