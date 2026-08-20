@@ -44,6 +44,22 @@ const DETECTED_OS: string = (() => {
     return 'Unknown OS';
 })();
 
+// The persistent per-browser device id (and its companion X-Vora-* headers) must
+// ride along on every request — including the login/setup/register calls made
+// through createDirectClient — so the server can stamp DeviceId on the refresh
+// token it issues and admins can later revoke a specific device.
+function deviceHeaders(): Record<string, string> {
+    const deviceId = localStorage.getItem(StorageKeys.deviceId);
+    if (!deviceId) return {};
+    return {
+        'X-Vora-Device-Id': deviceId,
+        'X-Vora-Client': 'Vora Web',
+        'X-Vora-Device': 'Web Browser',
+        'X-Vora-Device-Type': 'Browser',
+        'X-Vora-OS': DETECTED_OS,
+    };
+}
+
 const FALLBACK_BASE_URL: string = defaultApiBaseUrl();
 
 const PENDING_KEY = '__pending__';
@@ -106,13 +122,8 @@ function buildAxiosInstance(baseUrl: string, server: VoraServer | undefined): Ax
                 delete config.headers['Authorization'];
             }
 
-            const deviceId = localStorage.getItem(StorageKeys.deviceId);
-            if (deviceId) {
-                config.headers['X-Vora-Device-Id'] = deviceId;
-                config.headers['X-Vora-Client'] = 'Vora Web';
-                config.headers['X-Vora-Device'] = 'Web Browser';
-                config.headers['X-Vora-Device-Type'] = 'Browser';
-                config.headers['X-Vora-OS'] = DETECTED_OS;
+            for (const [key, value] of Object.entries(deviceHeaders())) {
+                config.headers[key] = value;
             }
         }
         return config;
@@ -154,6 +165,7 @@ export const createDirectClient = (baseUrl: string, token?: string): AxiosInstan
         baseURL: apiBase,
         headers: {
             'Content-Type': 'application/json',
+            ...deviceHeaders(),
             ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         }
     });
