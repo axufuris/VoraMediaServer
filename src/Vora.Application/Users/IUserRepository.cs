@@ -46,6 +46,7 @@ public interface IUserRepository
     Task<AuthRefreshToken?> GetAuthRefreshTokenByHashAsync(string tokenHash);
     Task UpdateAuthRefreshTokenAsync(AuthRefreshToken token);
     Task RevokeAuthRefreshTokenFamilyAsync(Guid familyId);
+    Task RevokeAuthRefreshTokensForDeviceAsync(Guid userId, string deviceId);
 
     Task<(List<UserProfileHistoryDto> Data, int Total)> GetUserPlayHistoryAsync(Guid userId, Guid? profileId, int page, int pageSize, string search, string typeFilter);
 
