@@ -13,6 +13,16 @@ const TYPE_LABELS: Record<string, string> = {
     Episode: 'Episode',
 };
 
+function seasonEpisodeLabel(item: TrashMediaItem): string | null {
+    if (item.type === 'Episode' && item.seasonNumber != null && item.episodeNumber != null) {
+        return `S${String(item.seasonNumber).padStart(2, '0')}E${String(item.episodeNumber).padStart(2, '0')}`;
+    }
+    if (item.type === 'Season' && item.seasonNumber != null) {
+        return `Season ${item.seasonNumber}`;
+    }
+    return null;
+}
+
 function formatMissingSince(iso: string) {
     const then = new Date(iso).getTime();
     const days = Math.floor((Date.now() - then) / (1000 * 60 * 60 * 24));
@@ -98,6 +108,9 @@ export default function MediaTrashPage() {
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
                                         <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-[var(--vora-bg-sunken)] text-[var(--vora-text-secondary)]">{TYPE_LABELS[item.type] ?? item.type}</span>
+                                        {seasonEpisodeLabel(item) && (
+                                            <span className="text-[11px] font-mono font-semibold px-1.5 py-0.5 rounded bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] shrink-0">{seasonEpisodeLabel(item)}</span>
+                                        )}
                                         <p className="font-medium text-[var(--vora-text-primary)] truncate">{item.title}</p>
                                     </div>
                                     <p className="text-xs text-[var(--vora-text-muted)] mt-1 truncate">

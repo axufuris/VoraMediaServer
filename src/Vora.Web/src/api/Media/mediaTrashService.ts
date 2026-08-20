@@ -7,6 +7,8 @@ export interface TrashMediaItem {
     posterUrl?: string;
     libraryName?: string;
     seriesTitle?: string;
+    seasonNumber?: number;
+    episodeNumber?: number;
     missingSince: string;
 }
 
