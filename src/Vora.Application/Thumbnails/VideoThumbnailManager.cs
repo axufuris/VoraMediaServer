@@ -418,7 +418,14 @@ public class VideoThumbnailManager : IVideoThumbnailManager
 
     internal static string ComputeSpriteVersion(int interval, int width, int height, int quality, int columns)
     {
-        var seed = string.Create(CultureInfo.InvariantCulture, $"v3-perpart|{interval}|{width}|{height}|{quality}|{columns}");
+        // Keep the "v2-webp" token: the per-part sprite layout (#241) is backward
+        // compatible — items with existing item-level sprites keep serving them via
+        // the legacy fallback, and per-part layout is produced for newly generated
+        // items and whenever a part is added. Bumping this token would mark every
+        // item stale and force a full-library re-encode, which isn't wanted just to
+        // relocate identical single-part sprites. Only change it when the sprite
+        // bytes themselves must change (new size/interval/quality already vary it).
+        var seed = string.Create(CultureInfo.InvariantCulture, $"v2-webp|{interval}|{width}|{height}|{quality}|{columns}");
         var bytes = SHA1.HashData(Encoding.UTF8.GetBytes(seed));
         return Convert.ToHexString(bytes)[..12].ToLowerInvariant();
     }
