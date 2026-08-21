@@ -370,6 +370,19 @@ public partial class MediaRepository : IMediaRepository
             .FirstOrDefaultAsync();
     }
 
+    public async Task<bool> SeasonHasPendingMarkerWorkAsync(Guid seasonId)
+    {
+        var rows = await _context.Set<Episode>()
+            .AsNoTracking()
+            .Where(e => e.SeasonId == seasonId)
+            .Select(e => new { e.LockedFields, e.MarkersAnalyzedAt })
+            .ToListAsync();
+
+        return rows.Any(r =>
+            r.MarkersAnalyzedAt == null &&
+            !(r.LockedFields != null && r.LockedFields.Contains("Markers", StringComparer.OrdinalIgnoreCase)));
+    }
+
     public async Task<Vora.Application.Media.Dtos.SilenceDetectionInputsDto?> GetSilenceDetectionInputsAsync(Guid mediaItemId)
     {
         return await _context.MediaItems

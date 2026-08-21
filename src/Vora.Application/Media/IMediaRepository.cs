@@ -26,6 +26,7 @@ public interface IMediaRepository
     Task<IEnumerable<Guid>> GetAllMediaItemIdsByLibraryAsync(Guid libraryId);
     Task<List<Guid>> GetTopLevelMediaItemIdsByLibraryAsync(Guid libraryId);
     Task<MarkerDetectionGateDto?> GetMarkerDetectionGateAsync(Guid mediaItemId);
+    Task<bool> SeasonHasPendingMarkerWorkAsync(Guid seasonId);
     Task<SilenceDetectionInputsDto?> GetSilenceDetectionInputsAsync(Guid mediaItemId);
     Task<List<FingerprintInputDto>> GetSeasonFingerprintInputsAsync(Guid seasonId);
     Task<Dictionary<Guid, StoredAudioFingerprintDto>> GetAudioFingerprintsForEpisodesAsync(IReadOnlyCollection<Guid> mediaItemIds);

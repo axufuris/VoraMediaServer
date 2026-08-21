@@ -317,53 +317,64 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         var episodeIds = await _mediaRepository.GetEpisodeIdsForSeasonAsync(seasonId);
         if (episodeIds.Count == 0) return;
 
-        // Tier 2 — season-relative audio fingerprinting. Runs once up front (it
-        // needs every episode together) and yields a per-episode intro marker where
-        // the recurring theme is found; each episode's detection then prefers that
-        // over the silence/black intro. Failures fall back silently.
-        IReadOnlyDictionary<Guid, DetectedMarker> fingerprintIntros;
-        try
+        // When every episode is already analyzed (or its markers are locked), a
+        // non-forced pass has no per-episode work to do — and the season audio-
+        // fingerprint decode below would be computed only to be discarded, since
+        // each episode short-circuits before it consumes the fingerprint. Skip
+        // both the fingerprint decode (the expensive part) and the per-episode
+        // fan-out. Finalization still runs so a season whose per-episode detection
+        // completed but whose clustering was interrupted last time still gets
+        // finalized on a later pass.
+        if (forceOverride || await _mediaRepository.SeasonHasPendingMarkerWorkAsync(seasonId))
         {
-            fingerprintIntros = await ComputeSeasonFingerprintIntrosAsync(seasonId, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Season audio-fingerprint pass failed for {SeasonId}; intros fall back to silence/black.", seasonId);
-            fingerprintIntros = new Dictionary<Guid, DetectedMarker>();
-        }
-
-        // Each episode's FFmpeg pass is independent and CPU-bound, so run several
-        // at once — each in its own DI scope (own DbContext) so parallel writes
-        // don't share a context — then finalize the season once they've all
-        // committed their markers. Mirrors the file-analysis/overlay fan-out.
-        var parallelism = ResolveParallelism(settings.AnalyzeConcurrency);
-        await Parallel.ForEachAsync(
-            episodeIds,
-            new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
-            async (epId, ct) =>
+            // Tier 2 — season-relative audio fingerprinting. Runs once up front (it
+            // needs every episode together) and yields a per-episode intro marker where
+            // the recurring theme is found; each episode's detection then prefers that
+            // over the silence/black intro. Failures fall back silently.
+            IReadOnlyDictionary<Guid, DetectedMarker> fingerprintIntros;
+            try
             {
-                try
-                {
-                    fingerprintIntros.TryGetValue(epId, out var fingerprintIntro);
-                    using var scope = _scopeFactory.CreateScope();
-                    var analyzer = scope.ServiceProvider.GetRequiredService<IMediaAnalyzerManager>();
-                    await analyzer.AnalyzeMediaItemMarkersAsync(epId, isEpisode: true, forceOverride, fingerprintIntro, ct);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Episode silence detection failed for {EpisodeId}.", epId);
-                }
-            });
+                fingerprintIntros = await ComputeSeasonFingerprintIntrosAsync(seasonId, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Season audio-fingerprint pass failed for {SeasonId}; intros fall back to silence/black.", seasonId);
+                fingerprintIntros = new Dictionary<Guid, DetectedMarker>();
+            }
 
-        cancellationToken.ThrowIfCancellationRequested();
+            // Each episode's FFmpeg pass is independent and CPU-bound, so run several
+            // at once — each in its own DI scope (own DbContext) so parallel writes
+            // don't share a context — then finalize the season once they've all
+            // committed their markers. Mirrors the file-analysis/overlay fan-out.
+            var parallelism = ResolveParallelism(settings.AnalyzeConcurrency);
+            await Parallel.ForEachAsync(
+                episodeIds,
+                new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
+                async (epId, ct) =>
+                {
+                    try
+                    {
+                        fingerprintIntros.TryGetValue(epId, out var fingerprintIntro);
+                        using var scope = _scopeFactory.CreateScope();
+                        var analyzer = scope.ServiceProvider.GetRequiredService<IMediaAnalyzerManager>();
+                        await analyzer.AnalyzeMediaItemMarkersAsync(epId, isEpisode: true, forceOverride, fingerprintIntro, ct);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Episode silence detection failed for {EpisodeId}.", epId);
+                    }
+                });
+
+            cancellationToken.ThrowIfCancellationRequested();
+        }
 
         try
         {
