@@ -44,6 +44,37 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         query = ApplyMostWatchedFilter(query, sortBy, profileId);
         query = ApplySortOrder(query, sortBy, profileId);
 
+        // A show should appear at most once in a list row. When the list surfaces
+        // episodes, collapse each show to a single episode — the first unwatched
+        // one (by season/episode), or its earliest if all are watched. Only the
+        // top of the sorted pool is inspected so this stays cheap on large TV
+        // libraries; non-episode items pass through untouched.
+        if (rules?.MediaTypes != null && rules.MediaTypes.Contains("Episode"))
+        {
+            var poolSize = Math.Max(maxItems * 10, 100);
+            var episodePool = await query
+                .Where(m => m is Episode)
+                .Take(poolSize)
+                .Select(m => new
+                {
+                    m.Id,
+                    ShowId = ((Episode)m).Season.TvShowId,
+                    Season = ((Episode)m).Season.SeasonNumber,
+                    Episode = ((Episode)m).EpisodeNumber,
+                    Played = profileId.HasValue && context.Set<UserMediaState>()
+                        .Any(s => s.ProfileId == profileId.Value && s.MediaItemId == m.Id && s.IsPlayed)
+                })
+                .ToListAsync();
+
+            var keptEpisodeIds = episodePool
+                .GroupBy(e => e.ShowId)
+                .Select(g => (g.Where(e => !e.Played).OrderBy(e => e.Season).ThenBy(e => e.Episode).FirstOrDefault()
+                              ?? g.OrderBy(e => e.Season).ThenBy(e => e.Episode).First()).Id)
+                .ToHashSet();
+
+            query = query.Where(m => !(m is Episode) || keptEpisodeIds.Contains(m.Id));
+        }
+
         return await query
             .Select(LibraryItemVM.Projection)
             .Take(maxItems)
