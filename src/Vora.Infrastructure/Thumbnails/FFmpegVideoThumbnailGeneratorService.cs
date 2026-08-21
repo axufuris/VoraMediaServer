@@ -15,6 +15,47 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
         _logger = logger;
     }
 
+    public async Task<bool> ExtractFrameAsync(string inputPath, TimeSpan at, string outputPath, CancellationToken cancellationToken = default)
+    {
+        var dir = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "ffmpeg",
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("-y");
+        // -ss before -i seeks fast to the offset; one frame, decent JPEG quality.
+        startInfo.ArgumentList.Add("-ss");
+        startInfo.ArgumentList.Add(at.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture));
+        startInfo.ArgumentList.Add("-i");
+        startInfo.ArgumentList.Add(inputPath);
+        startInfo.ArgumentList.Add("-frames:v");
+        startInfo.ArgumentList.Add("1");
+        startInfo.ArgumentList.Add("-q:v");
+        startInfo.ArgumentList.Add("3");
+        startInfo.ArgumentList.Add("-an");
+        startInfo.ArgumentList.Add("-sn");
+        startInfo.ArgumentList.Add(outputPath);
+
+        try
+        {
+            using var process = new Process { StartInfo = startInfo };
+            process.Start();
+            _ = process.StandardError.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+            return process.ExitCode == 0 && File.Exists(outputPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ffmpeg single-frame extraction failed for {Input} at {At}", inputPath, at);
+            return false;
+        }
+    }
+
     public async Task<TimeSpan?> ProbeDurationAsync(string inputPath, CancellationToken cancellationToken = default)
     {
         var startInfo = new ProcessStartInfo

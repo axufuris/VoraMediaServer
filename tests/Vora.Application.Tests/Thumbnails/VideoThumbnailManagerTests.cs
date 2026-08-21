@@ -54,6 +54,7 @@ public class VideoThumbnailManagerTests
             Substitute.For<Vora.Application.Notifications.IAdminNotificationManager>(),
             new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
             Substitute.For<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(),
+            Microsoft.Extensions.Options.Options.Create(new Vora.Application.Settings.StoragePathsOptions()),
             NullLogger<VideoThumbnailManager>.Instance);
     }
 

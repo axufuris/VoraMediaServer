@@ -30,6 +30,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
     private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<VideoThumbnailManager> _logger;
+    private readonly string _customArtworkBase;
 
     public VideoThumbnailManager(
         IMediaRepository mediaRepository,
@@ -41,6 +42,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         Notifications.IAdminNotificationManager adminNotifications,
         Vora.Plugins.Interfaces.ITaskProgressReporter progress,
         IServiceScopeFactory scopeFactory,
+        Microsoft.Extensions.Options.IOptions<Settings.StoragePathsOptions> storagePaths,
         ILogger<VideoThumbnailManager> logger)
     {
         _mediaRepository = mediaRepository;
@@ -53,6 +55,10 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         _progress = progress;
         _scopeFactory = scopeFactory;
         _logger = logger;
+        var customArtwork = storagePaths.Value.CustomArtwork;
+        _customArtworkBase = !string.IsNullOrWhiteSpace(customArtwork)
+            ? customArtwork
+            : System.IO.Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
     }
 
     public async Task TriggerMediaItemThumbnailGenerationAsync(Guid mediaItemId, bool forceOverride = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default)
@@ -196,7 +202,9 @@ public class VideoThumbnailManager : IVideoThumbnailManager
             LibraryEnabled = m.Library.EnableVideoPreviewThumbnails,
             LockedFields = m.LockedFields,
             CurrentVersion = m.VideoThumbnailSpriteVersion,
-            CurrentGeneratedAt = m.LastVideoThumbnailGenerationAt
+            CurrentGeneratedAt = m.LastVideoThumbnailGenerationAt,
+            IsEpisode = m is Episode,
+            HasPoster = m.PosterUrl != null
         });
 
         if (meta == null) return;
@@ -271,10 +279,41 @@ public class VideoThumbnailManager : IVideoThumbnailManager
             item.VideoThumbnailSpriteColumns = result.SpriteColumns;
             item.VideoThumbnailWidth = result.Width;
             item.VideoThumbnailHeight = result.Height;
+
+            // An episode with no artwork gets a still grabbed from the middle of
+            // its own runtime, so the season/episode pages show a real frame
+            // instead of a placeholder.
+            if (meta.IsEpisode && !meta.HasPoster && result.SourceDuration > TimeSpan.Zero)
+            {
+                var posterUrl = await TryExtractEpisodeStillAsync(mediaItemId, input, result.SourceDuration, cancellationToken);
+                if (posterUrl != null)
+                {
+                    item.PosterUrl = posterUrl;
+                    item.OriginalPosterUrl = posterUrl;
+                }
+            }
+
             await _mediaRepository.UpdateMediaItemAsync(item);
         }
 
         await _notifier.NotifyVideoThumbnailsReadyAsync(mediaItemId);
+    }
+
+    private async Task<string?> TryExtractEpisodeStillAsync(Guid mediaItemId, string input, TimeSpan duration, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var fileName = $"media_{mediaItemId}_still_{Guid.NewGuid():N}.jpg";
+            var outputPath = System.IO.Path.Combine(_customArtworkBase, fileName);
+            var midpoint = TimeSpan.FromSeconds(duration.TotalSeconds / 2);
+            var ok = await _generator.ExtractFrameAsync(input, midpoint, outputPath, cancellationToken);
+            return ok ? $"/api/artwork/custom/{fileName}" : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to extract fallback still for episode {MediaItemId}", mediaItemId);
+            return null;
+        }
     }
 
     // A broken/unreadable source file will fail every scheduled pass, so the alert
