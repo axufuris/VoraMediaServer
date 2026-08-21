@@ -77,7 +77,7 @@ public interface IMediaRepository
     Task<bool> MediaExistsByExternalIdAsync(string externalId, string type);
     Task<HashSet<string>> GetExistingExternalIdsAsync(IEnumerable<string> externalIds, string type);
     Task<Dictionary<string, Guid>> GetLibraryIdsByTmdbIdsAsync(IEnumerable<string> tmdbIds);
-    Task<List<MediaItem>> GetItemsPendingOverlayGenerationAsync(Guid libraryId, DateTime maxTemplateUpdatedDate);
+    Task<List<MediaItem>> GetItemsPendingOverlayGenerationAsync(Guid libraryId, DateTime maxTemplateUpdatedDate, int currentLayoutVersion);
     Task<bool> AnyItemHasOverlayAppliedAsync(Guid libraryId);
     Task<HashSet<string>> GetReferencedOverlayFileNamesAsync();
     Task<string?> GetParentContentRatingAsync(Guid mediaItemId);

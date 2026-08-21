@@ -144,6 +144,13 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
 
     private const string CacheKeyVersion = "v8-badge-per-axis-padding";
 
+    // Derived from CacheKeyVersion's leading "vN" so a single bump (which authors
+    // already do when the compositing output changes) both busts the cached files
+    // and forces every already-overlaid item to re-generate once via the regen gate.
+    public int LayoutVersion => int.TryParse(
+        new string(CacheKeyVersion.SkipWhile(c => !char.IsDigit(c)).TakeWhile(char.IsDigit).ToArray()),
+        out var v) ? v : 1;
+
     private static string ComputeOverlayCacheKey(OverlayMediaDto item, string originalArtworkPath, string templateJson)
     {
         var sourceInfo = new FileInfo(originalArtworkPath);

@@ -1167,7 +1167,7 @@ public partial class MediaRepository : IMediaRepository
         return dict;
     }
 
-    public async Task<List<MediaItem>> GetItemsPendingOverlayGenerationAsync(Guid libraryId, DateTime maxTemplateUpdatedDate)
+    public async Task<List<MediaItem>> GetItemsPendingOverlayGenerationAsync(Guid libraryId, DateTime maxTemplateUpdatedDate, int currentLayoutVersion)
     {
         var query = _context.MediaItems
             .AsNoTracking()
@@ -1216,7 +1216,9 @@ public partial class MediaRepository : IMediaRepository
                     (
                         m.LastOverlayGeneratedAt == null ||
                         m.LastMetadataRefresh > m.LastOverlayGeneratedAt ||
-                        m.LastOverlayGeneratedAt < maxTemplateUpdatedDate
+                        m.LastOverlayGeneratedAt < maxTemplateUpdatedDate ||
+                        m.OverlayLayoutVersion == null ||
+                        m.OverlayLayoutVersion != currentLayoutVersion
                     )
                 )
             )
