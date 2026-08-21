@@ -23,7 +23,7 @@ export default function MusicGenresView({ isLoading, genres, updateNav }: MusicG
     return (
         <>
             <h2 className="text-lg font-bold text-[var(--vora-text-primary)] mb-4">Browse by Genre</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
                 {genres.map(g => (
                     <button
                         key={g.name}

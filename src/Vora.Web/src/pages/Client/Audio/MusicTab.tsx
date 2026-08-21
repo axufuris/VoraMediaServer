@@ -531,7 +531,7 @@ export default function MusicTab() {
             <button onClick={() => updateNav({ view: 'artists' })} className={`hover:text-[var(--vora-accent-text)] transition-colors cursor-pointer ${nav.view === 'artists' ? 'text-[var(--vora-accent-text)] font-bold' : 'text-[var(--vora-text-muted)]'}`}>
                 Artists
             </button>
-            {nav.view !== 'artists' && currentArtist && (
+            {(nav.view === 'artist' || nav.view === 'album') && currentArtist && (
                 <>
                     <span className="text-[var(--vora-text-disabled)]">/</span>
                     <button
