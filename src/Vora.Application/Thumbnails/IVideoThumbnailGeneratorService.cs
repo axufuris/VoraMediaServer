@@ -38,4 +38,8 @@ public interface IVideoThumbnailGeneratorService
         string finalSpritePath,
         string finalVttPath,
         CancellationToken cancellationToken = default);
+
+    // Grabs a single full-frame JPEG from the video at the given offset (used as
+    // a fallback still for episodes that have no artwork). Returns true on success.
+    Task<bool> ExtractFrameAsync(string inputPath, TimeSpan at, string outputPath, CancellationToken cancellationToken = default);
 }
