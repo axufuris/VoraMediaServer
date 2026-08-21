@@ -53,9 +53,10 @@ public static class VideoThumbnailEndpoints
         return routes;
     }
 
-    private static IResult ServeVttAsync(Guid id, IVideoThumbnailStorageService storage, HttpContext httpContext)
+    private static async Task<IResult> ServeVttAsync(Guid id, [FromQuery] Guid? partId, IVideoThumbnailStorageService storage, IMediaRepository mediaRepository, HttpContext httpContext)
     {
-        var path = storage.GetVttPath(id);
+        var sourcePartId = await mediaRepository.GetThumbnailSourcePartIdAsync(id, partId);
+        var path = sourcePartId.HasValue ? storage.GetPartVttPath(id, sourcePartId.Value) : storage.GetVttPath(id);
         if (!File.Exists(path)) return Results.NotFound();
 
         var lastWriteUtc = File.GetLastWriteTimeUtc(path);
@@ -64,9 +65,10 @@ public static class VideoThumbnailEndpoints
         return Results.File(path, "text/vtt", entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue(etag), lastModified: lastWriteUtc);
     }
 
-    private static IResult ServeSpriteAsync(Guid id, IVideoThumbnailStorageService storage, HttpContext httpContext)
+    private static async Task<IResult> ServeSpriteAsync(Guid id, [FromQuery] Guid? partId, IVideoThumbnailStorageService storage, IMediaRepository mediaRepository, HttpContext httpContext)
     {
-        var path = storage.GetSpritePath(id);
+        var sourcePartId = await mediaRepository.GetThumbnailSourcePartIdAsync(id, partId);
+        var path = sourcePartId.HasValue ? storage.GetPartSpritePath(id, sourcePartId.Value) : storage.GetSpritePath(id);
         if (!File.Exists(path)) return Results.NotFound();
 
         var lastWriteUtc = File.GetLastWriteTimeUtc(path);

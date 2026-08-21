@@ -16,6 +16,19 @@ public class MediaPart
     public TimeSpan? Duration { get; set; }
     public DateTime? LastAnalyzedAt { get; set; }
 
+    // Scrub-bar thumbnails are per-part so a different cut (a runtime that differs
+    // from a sibling by more than a few seconds) gets its own sprite. Parts that
+    // share a cut share one sprite: ThumbnailSourcePartId points at the part that
+    // actually owns the generated files (itself, or a same-runtime sibling), and
+    // the sprite metadata below is copied from that source so the VTT can be built.
+    public Guid? ThumbnailSourcePartId { get; set; }
+    public string? VideoThumbnailSpriteVersion { get; set; }
+    public int VideoThumbnailSpriteCount { get; set; }
+    public int VideoThumbnailIntervalSeconds { get; set; }
+    public int VideoThumbnailSpriteColumns { get; set; }
+    public int VideoThumbnailWidth { get; set; }
+    public int VideoThumbnailHeight { get; set; }
+
     // A part belongs to exactly one owner: either a MediaItem (the item's own
     // file) or a MediaExtra (a trailer/featurette file). Both FKs are nullable;
     // exactly one is set.

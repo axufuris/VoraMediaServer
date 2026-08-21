@@ -164,7 +164,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
     {
         _storage.DeleteItemDirectory(mediaItemId);
 
-        var item = await _mediaRepository.GetForBasicUpdateAsync(mediaItemId);
+        var item = await _mediaRepository.GetItemWithPartsForThumbnailsAsync(mediaItemId);
         if (item == null) return;
 
         item.LastVideoThumbnailGenerationAt = null;
@@ -174,6 +174,17 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         item.VideoThumbnailSpriteColumns = 0;
         item.VideoThumbnailWidth = 0;
         item.VideoThumbnailHeight = 0;
+
+        foreach (var part in item.MediaParts)
+        {
+            part.ThumbnailSourcePartId = null;
+            part.VideoThumbnailSpriteVersion = null;
+            part.VideoThumbnailSpriteCount = 0;
+            part.VideoThumbnailIntervalSeconds = 0;
+            part.VideoThumbnailSpriteColumns = 0;
+            part.VideoThumbnailWidth = 0;
+            part.VideoThumbnailHeight = 0;
+        }
 
         await _mediaRepository.UpdateMediaItemAsync(item);
     }
@@ -215,88 +226,143 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         var settings = await _settingsRepo.GetSettingsAsync();
         var version = ComputeSpriteVersion(settings.VideoThumbnailIntervalSeconds, settings.VideoThumbnailWidth, settings.VideoThumbnailHeight, settings.VideoThumbnailJpegQuality, settings.VideoThumbnailSpriteColumns);
 
-        if (!forceOverride && meta.CurrentVersion == version && _storage.HasGeneratedAssets(mediaItemId))
+        if (!forceOverride && meta.CurrentVersion == version)
         {
             return;
         }
 
-        var filePaths = await _mediaRepository.GetMediaFilePathsAsync(mediaItemId);
-        if (filePaths == null || filePaths.Count == 0)
+        var item = await _mediaRepository.GetItemWithPartsForThumbnailsAsync(mediaItemId);
+        if (item == null) return;
+
+        var partsWithFiles = item.MediaParts
+            .Where(p => !string.IsNullOrWhiteSpace(p.FilePath) && File.Exists(p.FilePath))
+            .OrderBy(p => p.Id)
+            .ToList();
+
+        if (partsWithFiles.Count == 0)
         {
-            _logger.LogWarning("Skipping video thumbnail generation for {MediaItemId}: no media file path on record", mediaItemId);
-            return;
-        }
-        var input = filePaths[0];
-        if (string.IsNullOrWhiteSpace(input) || !File.Exists(input))
-        {
-            _logger.LogWarning("Skipping video thumbnail generation for {MediaItemId}: file not found at {Input}", mediaItemId, input);
+            _logger.LogWarning("Skipping video thumbnail generation for {MediaItemId}: no readable media file on record", mediaItemId);
             return;
         }
 
         _storage.EnsureItemDirectory(mediaItemId);
-        var spritePath = _storage.GetSpritePath(mediaItemId);
-        var vttPath = _storage.GetVttPath(mediaItemId);
 
-        VideoThumbnailGenerationResult result;
-        try
-        {
-            result = await _generator.GenerateAsync(
-                new VideoThumbnailGenerationParameters
-                {
-                    InputPath = input,
-                    IntervalSeconds = settings.VideoThumbnailIntervalSeconds,
-                    Width = settings.VideoThumbnailWidth,
-                    Height = settings.VideoThumbnailHeight,
-                    JpegQuality = settings.VideoThumbnailJpegQuality,
-                    SpriteColumns = settings.VideoThumbnailSpriteColumns,
-                    UseHardwareDecode = settings.UseHardwareAcceleration,
-                    HardwareDevice = settings.HardwareTranscodingDevice
-                },
-                spritePath,
-                vttPath,
-                cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "ffmpeg generation failed for {MediaItemId} ({Input}); skipping this item", mediaItemId, input);
-            await RaiseThumbnailFailureAlertAsync(mediaItemId, input);
-            return;
-        }
+        // Group the parts into cuts by runtime (±5s). Parts in the same cut share a
+        // single sprite (generated once from the group's representative); a part
+        // whose runtime differs by more than the tolerance — a genuinely different
+        // edit — gets its own sprite. Unknown-duration parts each get their own.
+        var cuts = GroupPartsIntoCuts(partsWithFiles);
 
-        await File.WriteAllTextAsync(_storage.GetVersionMarkerPath(mediaItemId), version);
+        var anySuccess = false;
+        VideoThumbnailGenerationResult? firstResult = null;
+        string? firstInput = null;
 
-        var item = await _mediaRepository.GetForBasicUpdateAsync(mediaItemId);
-        if (item != null)
+        foreach (var cut in cuts)
         {
-            item.LastVideoThumbnailGenerationAt = DateTime.UtcNow;
-            item.VideoThumbnailSpriteVersion = version;
-            item.VideoThumbnailSpriteCount = result.SpriteCount;
-            item.VideoThumbnailIntervalSeconds = result.IntervalSeconds;
-            item.VideoThumbnailSpriteColumns = result.SpriteColumns;
-            item.VideoThumbnailWidth = result.Width;
-            item.VideoThumbnailHeight = result.Height;
+            var representative = cut[0];
+            _storage.EnsurePartDirectory(mediaItemId, representative.Id);
+            var spritePath = _storage.GetPartSpritePath(mediaItemId, representative.Id);
+            var vttPath = _storage.GetPartVttPath(mediaItemId, representative.Id);
 
-            // An episode with no artwork gets a still grabbed from the middle of
-            // its own runtime, so the season/episode pages show a real frame
-            // instead of a placeholder.
-            if (meta.IsEpisode && !meta.HasPoster && result.SourceDuration > TimeSpan.Zero)
+            VideoThumbnailGenerationResult result;
+            try
             {
-                var posterUrl = await TryExtractEpisodeStillAsync(mediaItemId, input, result.SourceDuration, cancellationToken);
-                if (posterUrl != null)
-                {
-                    item.PosterUrl = posterUrl;
-                    item.OriginalPosterUrl = posterUrl;
-                }
+                result = await _generator.GenerateAsync(
+                    new VideoThumbnailGenerationParameters
+                    {
+                        InputPath = representative.FilePath,
+                        IntervalSeconds = settings.VideoThumbnailIntervalSeconds,
+                        Width = settings.VideoThumbnailWidth,
+                        Height = settings.VideoThumbnailHeight,
+                        JpegQuality = settings.VideoThumbnailJpegQuality,
+                        SpriteColumns = settings.VideoThumbnailSpriteColumns,
+                        UseHardwareDecode = settings.UseHardwareAcceleration,
+                        HardwareDevice = settings.HardwareTranscodingDevice
+                    },
+                    spritePath,
+                    vttPath,
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ffmpeg generation failed for {MediaItemId} part {PartId} ({Input}); skipping this cut", mediaItemId, representative.Id, representative.FilePath);
+                await RaiseThumbnailFailureAlertAsync(mediaItemId, representative.FilePath);
+                continue;
             }
 
-            await _mediaRepository.UpdateMediaItemAsync(item);
+            anySuccess = true;
+            firstResult ??= result;
+            firstInput ??= representative.FilePath;
+
+            foreach (var part in cut)
+            {
+                part.ThumbnailSourcePartId = representative.Id;
+                part.VideoThumbnailSpriteVersion = version;
+                part.VideoThumbnailSpriteCount = result.SpriteCount;
+                part.VideoThumbnailIntervalSeconds = result.IntervalSeconds;
+                part.VideoThumbnailSpriteColumns = result.SpriteColumns;
+                part.VideoThumbnailWidth = result.Width;
+                part.VideoThumbnailHeight = result.Height;
+            }
         }
 
+        if (!anySuccess) return;
+
+        item.LastVideoThumbnailGenerationAt = DateTime.UtcNow;
+        item.VideoThumbnailSpriteVersion = version;
+        item.VideoThumbnailSpriteCount = firstResult!.SpriteCount;
+        item.VideoThumbnailIntervalSeconds = firstResult.IntervalSeconds;
+        item.VideoThumbnailSpriteColumns = firstResult.SpriteColumns;
+        item.VideoThumbnailWidth = firstResult.Width;
+        item.VideoThumbnailHeight = firstResult.Height;
+
+        // An episode with no artwork gets a still grabbed from the middle of its
+        // own runtime, so the season/episode pages show a real frame instead of a
+        // placeholder. Use the first cut's representative file and duration.
+        if (meta.IsEpisode && !meta.HasPoster && firstInput != null && firstResult.SourceDuration > TimeSpan.Zero)
+        {
+            var posterUrl = await TryExtractEpisodeStillAsync(mediaItemId, firstInput, firstResult.SourceDuration, cancellationToken);
+            if (posterUrl != null)
+            {
+                item.PosterUrl = posterUrl;
+                item.OriginalPosterUrl = posterUrl;
+            }
+        }
+
+        await _mediaRepository.UpdateMediaItemAsync(item);
+
+        await File.WriteAllTextAsync(_storage.GetVersionMarkerPath(mediaItemId), version);
         await _notifier.NotifyVideoThumbnailsReadyAsync(mediaItemId);
+    }
+
+    private const double ThumbnailCutToleranceSeconds = 5.0;
+
+    private static List<List<MediaPart>> GroupPartsIntoCuts(List<MediaPart> partsSortedById)
+    {
+        var cuts = new List<List<MediaPart>>();
+        foreach (var part in partsSortedById)
+        {
+            var dur = part.Duration?.TotalSeconds ?? -1;
+            var cut = dur < 0
+                ? null
+                : cuts.FirstOrDefault(c =>
+                {
+                    var repDur = c[0].Duration?.TotalSeconds ?? -1;
+                    return repDur >= 0 && Math.Abs(repDur - dur) <= ThumbnailCutToleranceSeconds;
+                });
+
+            if (cut == null)
+            {
+                cut = new List<MediaPart>();
+                cuts.Add(cut);
+            }
+            cut.Add(part);
+        }
+        return cuts;
     }
 
     private async Task<string?> TryExtractEpisodeStillAsync(Guid mediaItemId, string input, TimeSpan duration, CancellationToken cancellationToken)
@@ -352,7 +418,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
 
     internal static string ComputeSpriteVersion(int interval, int width, int height, int quality, int columns)
     {
-        var seed = string.Create(CultureInfo.InvariantCulture, $"v2-webp|{interval}|{width}|{height}|{quality}|{columns}");
+        var seed = string.Create(CultureInfo.InvariantCulture, $"v3-perpart|{interval}|{width}|{height}|{quality}|{columns}");
         var bytes = SHA1.HashData(Encoding.UTF8.GetBytes(seed));
         return Convert.ToHexString(bytes)[..12].ToLowerInvariant();
     }

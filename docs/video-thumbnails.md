@@ -6,16 +6,17 @@ Scrub-bar preview thumbnails for the video player, analogous to Plex's hover thu
 
 Configured via `StoragePaths:VideoThumbnails` (env var `StoragePaths__VideoThumbnails`). Defaults to `<AppContext.BaseDirectory>/video-thumbnails`; in Docker it lives at `/app/data/video-thumbnails` under the existing `./Vora-data:/app/data` volume so the cache survives container rebuilds. **No new Docker volume is required.**
 
-Per-item layout, sharded by the first two hex chars of the GUID to keep directories manageable:
+Per-item directory, sharded by the first two hex chars of the GUID, with **one sprite set per cut** stored under the owning ("source") part's id:
 
 ```
 <root>/<shard>/<mediaItemId>/
-  sprite.jpg          # tiled JPEG: COLS × ROWS tiles at WxH each
-  thumbnails.vtt      # WebVTT cues, each referencing sprite.jpg#xywh=x,y,w,h
+  <sourcePartId>/
+    sprite.webp       # tiled WebP: COLS × ROWS tiles at WxH each
+    thumbnails.vtt    # WebVTT cues, each referencing sprite.webp#xywh=x,y,w,h
   .version            # short hash of the settings used at generation time
 ```
 
-The `.version` file is a hash of `(interval, width, height, jpegQuality, columns)`; the manager compares it against `MediaItem.VideoThumbnailSpriteVersion` to decide whether the existing artifacts are still current.
+Thumbnails are **per media part**. At generation the item's parts are grouped into *cuts* by runtime (±5s): parts in the same cut share one sprite (generated once from the group's representative), and a part whose runtime differs by more than the tolerance — a genuinely different edit — gets its own. Each `MediaPart` records `ThumbnailSourcePartId` (the part that owns its sprite files, itself or a same-runtime sibling) plus the sprite metadata copied from that source. So a 1080p + 4K of the same cut store **one** sprite referenced by both, while a theatrical vs extended pair store two. The `.version` file is a hash of `(interval, width, height, jpegQuality, columns)`; the manager compares it against the item-level `MediaItem.VideoThumbnailSpriteVersion` (still the coverage/target aggregate) to decide whether the artifacts are current — bumping the seed (currently `v3-perpart`) forces a one-time regen of every item into the per-part layout.
 
 ## Server-wide settings
 
@@ -104,8 +105,8 @@ Thumbnails are **never** queued on ingestion — they're background-only by desi
 
 Authenticated client endpoints (any logged-in profile with access to the library):
 
-- `GET /api/media/{id}/thumbnails.vtt` — serves the cue file with ETag based on file mtime, long Cache-Control.
-- `GET /api/media/{id}/thumbnails.jpg` — serves the sprite, same caching shape.
+- `GET /api/media/{id}/thumbnails.vtt?partId={partId}` — serves the cue file for the requested part's cut (resolves `ThumbnailSourcePartId`); omit `partId` to get a stable representative. ETag based on file mtime, long Cache-Control. Falls back to the legacy item-level file for anything generated before the per-part layout.
+- `GET /api/media/{id}/thumbnails.jpg?partId={partId}` — serves the sprite, same shape. The player derives `partId` from the video track being streamed, so scrubbing the 4K vs 1080p (or an alternate cut) shows the sprite for the file actually playing.
 
 Admin endpoints (`AdminOnly`):
 
