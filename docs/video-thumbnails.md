@@ -29,8 +29,10 @@ All in `ServerSetting` (admin UI: System Settings → Video Preview Thumbnails):
 - `VideoThumbnailWidth` / `VideoThumbnailHeight` — tile size, default `320 × 180`.
 - `VideoThumbnailJpegQuality` — FFmpeg's `-qscale:v` (2–31, lower = better), default `5`.
 - `VideoThumbnailSpriteColumns` — tiles per row in the sprite, default `10`.
+- `VideoThumbnailConcurrency` — how many items the sprite pass decodes at once, default `2` (clamped 1–16).
+- `VideoThumbnailUseHardwareDecode` — default `true`. Whether the sprite pass decodes on the GPU. It only takes effect when the global `UseHardwareAcceleration` (Transcoding tab) is on, so the FFmpeg command uses `-hwaccel` only when **both** are true. Turn it off to keep thumbnail generation on the CPU and leave the GPU for playback transcoding or other apps (e.g. Tdarr) — it does **not** bump the sprite-version hash, so toggling it never triggers a regeneration.
 
-Changing any of those bumps the sprite-version hash, so the next scheduled pass regenerates affected items (locked items still skip).
+Changing any of the geometry/quality values above bumps the sprite-version hash, so the next scheduled pass regenerates affected items (locked items still skip). Concurrency and the hardware-decode toggle do not.
 
 ## Per-library opt-in
 
@@ -69,7 +71,7 @@ ffmpeg -y [-hwaccel auto [-hwaccel_device <dev>]] -skip_frame nokey -i <input>
 `tile` flattens the captured frames into a single sprite. The scale + pad chain ensures every tile is exactly W × H even when the source aspect ratio differs (letterboxed with black). Frame count is `ceil(duration / interval)`; row count is `ceil(count / columns)`. Source duration comes from `ffprobe -show_entries format=duration`.
 
 - **`-skip_frame nokey`** (an input/decoder option, so it precedes `-i`) makes the decoder emit keyframes only — the `fps` filter still yields one tile per interval from the nearest keyframe, so the grid and WebVTT cues are unchanged, but the dominant cost of fully decoding B/P frames disappears.
-- **`-hwaccel auto`** is added only when the server has hardware acceleration enabled; if a GPU decode pass fails on a codec/profile NVDEC can't handle, the service retries the same command in software so one quirky file never blocks the library.
+- **`-hwaccel auto`** is added only when the global `UseHardwareAcceleration` **and** the per-feature `VideoThumbnailUseHardwareDecode` toggle are both on; if a GPU decode pass fails on a codec/profile NVDEC can't handle, the service retries the same command in software so one quirky file never blocks the library.
 - **`libwebp`** output is ~25–35% smaller than JPEG at equal quality. The stored quality is an FFmpeg qscale (2 = best … 31 = worst) mapped to libwebp's 0–100 scale, so the one admin setting keeps its meaning. `-f image2` pins the muxer because the temp file uses a `.webp.tmp` suffix during atomic write and FFmpeg's extension autodetect chokes on `.tmp`. The sprite-version seed is `v2-webp|…`, so flipping to WebP invalidated old JPEG sprites automatically; a stale `sprite.jpg` left by an older generation is deleted after a successful WebP run.
 
 ### Failure handling
