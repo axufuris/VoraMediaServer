@@ -4,7 +4,7 @@
 //   Movie    {Title}            /  {Year} · {Edition}
 //   TvShow   {Title}            /  {Year}
 //   Season   {Show}             /  Season {name|number}  /  {Year}
-//   Episode  {Show}             /  Season {name|number}  /  {Number} · {Episode}
+//   Episode  {Show}             /  S{season} E{number}    /  {Episode}
 //   Music    {Artist}           /  {Year} · {Album}      /  {Song}
 //
 // The first entry is the bold primary line; the rest are muted sub-lines.
@@ -68,14 +68,18 @@ export function posterCaption(item: PosterCaptionItem): PosterCaption {
                 title: item.tvShowTitle || item.title,
                 lines: [seasonLabel(item), year].filter((l): l is string => !!l),
             };
-        case 'Episode':
+        case 'Episode': {
+            // Episode number belongs with the season, not the title: "S1 E5" on
+            // one line, the episode name on the next. Falls back to the named-
+            // season label ("Specials · E3") when there's no numeric season.
+            const seasonEp = item.seasonNumber != null && item.episodeNumber != null
+                ? `S${item.seasonNumber} E${item.episodeNumber}`
+                : dotJoin([seasonLabel(item), item.episodeNumber != null ? `E${item.episodeNumber}` : null]);
             return {
                 title: item.tvShowTitle || item.title,
-                lines: [
-                    seasonLabel(item),
-                    dotJoin([item.episodeNumber != null ? String(item.episodeNumber) : null, item.title]),
-                ].filter((l): l is string => !!l),
+                lines: [seasonEp, item.title].filter((l): l is string => !!l),
             };
+        }
         case 'Artist':
             return { title: item.title, lines: [] };
         case 'Album':
