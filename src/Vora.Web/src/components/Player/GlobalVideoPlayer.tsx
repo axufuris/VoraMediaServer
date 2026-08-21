@@ -347,7 +347,14 @@ export default function GlobalVideoPlayer() {
     const toggleFullScreen = useFullscreen(playerContainerRef);
 
     const thumbnailsEligible = currentMedia?.playbackContextType !== 'LiveTv' && currentMedia?.playbackContextType !== 'Dvr';
-    const thumbnails = useVideoThumbnails(thumbnailsEligible ? currentMedia?.id : undefined, serverId);
+    // Thumbnails are per media part (different cuts get their own sprite). Resolve
+    // the part being streamed from the active video track so scrubbing the 4K/1080p
+    // or an alternate cut shows the sprite for the file actually playing.
+    const activePartId = useMemo(() => {
+        if (!mediaDetails?.mediaParts || !currentMedia?.videoTrackId) return undefined;
+        return mediaDetails.mediaParts.find(p => p.videoTracks?.some(t => t.id === currentMedia.videoTrackId))?.id;
+    }, [mediaDetails?.mediaParts, currentMedia?.videoTrackId]);
+    const thumbnails = useVideoThumbnails(thumbnailsEligible ? currentMedia?.id : undefined, activePartId, serverId);
     const [hoverPercent, setHoverPercent] = useState<number | null>(null);
     const [hoverBarRect, setHoverBarRect] = useState<DOMRect | null>(null);
 

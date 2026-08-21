@@ -61,4 +61,19 @@ public class VideoThumbnailStorageService : IVideoThumbnailStorageService
     {
         return File.Exists(GetSpritePath(mediaItemId)) && File.Exists(GetVttPath(mediaItemId));
     }
+
+    private string GetPartDirectory(Guid mediaItemId, Guid sourcePartId) =>
+        Path.Combine(GetItemDirectory(mediaItemId), sourcePartId.ToString("N"));
+
+    public string GetPartSpritePath(Guid mediaItemId, Guid sourcePartId) =>
+        Path.Combine(GetPartDirectory(mediaItemId, sourcePartId), "sprite.webp");
+
+    public string GetPartVttPath(Guid mediaItemId, Guid sourcePartId) =>
+        Path.Combine(GetPartDirectory(mediaItemId, sourcePartId), "thumbnails.vtt");
+
+    public void EnsurePartDirectory(Guid mediaItemId, Guid sourcePartId) =>
+        Directory.CreateDirectory(GetPartDirectory(mediaItemId, sourcePartId));
+
+    public bool HasPartAssets(Guid mediaItemId, Guid sourcePartId) =>
+        File.Exists(GetPartSpritePath(mediaItemId, sourcePartId)) && File.Exists(GetPartVttPath(mediaItemId, sourcePartId));
 }

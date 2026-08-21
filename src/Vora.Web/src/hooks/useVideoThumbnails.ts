@@ -68,7 +68,7 @@ const resolveApiBase = (serverId?: string): { baseUrl: string; token: string | n
     return { baseUrl, token: token && token !== 'undefined' && token !== 'null' ? token : null };
 };
 
-export function useVideoThumbnails(mediaItemId: string | undefined | null, serverId?: string) {
+export function useVideoThumbnails(mediaItemId: string | undefined | null, partId?: string | null, serverId?: string) {
     const [data, setData] = useState<ParsedThumbnails | null>(null);
     const currentBlobRef = useRef<string | null>(null);
 
@@ -86,7 +86,8 @@ export function useVideoThumbnails(mediaItemId: string | undefined | null, serve
             const { baseUrl, token } = resolveApiBase(serverId);
             const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-            const vttRes = await fetch(`${baseUrl}/media/${mediaItemId}/thumbnails.vtt`, { headers });
+            const partQuery = partId ? `?partId=${encodeURIComponent(partId)}` : '';
+            const vttRes = await fetch(`${baseUrl}/media/${mediaItemId}/thumbnails.vtt${partQuery}`, { headers });
             if (!vttRes.ok) {
                 if (currentBlobRef.current) URL.revokeObjectURL(currentBlobRef.current);
                 currentBlobRef.current = null;
@@ -97,7 +98,7 @@ export function useVideoThumbnails(mediaItemId: string | undefined | null, serve
             const parsed = parseVtt(vttText);
             if (!parsed) { setData(null); return; }
 
-            const spriteRes = await fetch(`${baseUrl}/media/${mediaItemId}/thumbnails.jpg`, { headers });
+            const spriteRes = await fetch(`${baseUrl}/media/${mediaItemId}/thumbnails.jpg${partQuery}`, { headers });
             if (!spriteRes.ok) { setData(null); return; }
             const blob = await spriteRes.blob();
             const blobUrl = URL.createObjectURL(blob);
@@ -109,7 +110,7 @@ export function useVideoThumbnails(mediaItemId: string | undefined | null, serve
         } catch {
             setData(null);
         }
-    }, [mediaItemId, serverId]);
+    }, [mediaItemId, partId, serverId]);
 
     const loadRef = useRef(load);
     useEffect(() => {
@@ -118,7 +119,7 @@ export function useVideoThumbnails(mediaItemId: string | undefined | null, serve
 
     useEffect(() => {
         void loadRef.current();
-    }, [mediaItemId, serverId]);
+    }, [mediaItemId, partId, serverId]);
 
     useEffect(() => () => {
         if (currentBlobRef.current) {

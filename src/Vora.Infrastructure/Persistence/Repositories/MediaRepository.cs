@@ -320,6 +320,32 @@ public partial class MediaRepository : IMediaRepository
         return await query.Select(m => m.Id).ToListAsync();
     }
 
+    public Task<MediaItem?> GetItemWithPartsForThumbnailsAsync(Guid mediaItemId) =>
+        _context.MediaItems
+            .Include(m => m.MediaParts)
+            .FirstOrDefaultAsync(m => m.Id == mediaItemId);
+
+    public async Task<Guid?> GetThumbnailSourcePartIdAsync(Guid mediaItemId, Guid? partId)
+    {
+        var parts = await _context.MediaParts
+            .AsNoTracking()
+            .Where(p => p.MediaItemId == mediaItemId && p.ThumbnailSourcePartId != null)
+            .Select(p => new { p.Id, p.ThumbnailSourcePartId })
+            .ToListAsync();
+
+        if (parts.Count == 0) return null;
+
+        if (partId.HasValue)
+        {
+            var match = parts.FirstOrDefault(p => p.Id == partId.Value);
+            if (match != null) return match.ThumbnailSourcePartId;
+        }
+
+        // No specific part requested (or it isn't ours) — serve a stable
+        // representative so a plain request still gets a sprite.
+        return parts.OrderBy(p => p.Id).First().ThumbnailSourcePartId;
+    }
+
     public async Task<List<Guid>> GetTopLevelMediaItemIdsByLibraryAsync(Guid libraryId)
     {
         return await _context.MediaItems
@@ -1057,11 +1083,14 @@ public partial class MediaRepository : IMediaRepository
         // Adding a part can change the item's best resolution/audio/HDR, so clear
         // LastOverlayGeneratedAt to flag it for overlay regeneration on the next
         // sync (the gate otherwise only re-runs on metadata/template changes).
+        // Clearing the thumbnail version likewise re-runs the per-part sprite pass
+        // so the new part gets its own cut (or shares a same-runtime sibling's).
         // Also clear the missing flag if the file returned.
         await _context.MediaItems
             .Where(m => m.Id == part.MediaItemId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(m => m.LastOverlayGeneratedAt, (DateTime?)null)
+                .SetProperty(m => m.VideoThumbnailSpriteVersion, (string?)null)
                 .SetProperty(m => m.MissingSince, (DateTime?)null));
     }
 
