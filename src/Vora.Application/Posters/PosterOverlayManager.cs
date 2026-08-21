@@ -107,6 +107,7 @@ public class PosterOverlayManager : IPosterOverlayManager
 
     public async Task<bool> RunLibraryOverlaySyncAsync(Guid libraryId, CancellationToken cancellationToken = default)
     {
+        var layoutVersion = _providers.FirstOrDefault()?.LayoutVersion ?? 0;
         var templates = await _templateRepo.GetTemplatesForLibraryAsync(libraryId);
 
         if (!templates.Any() && libraryId != Guid.Empty)
@@ -116,7 +117,7 @@ public class PosterOverlayManager : IPosterOverlayManager
 
         if (!templates.Any())
         {
-            var itemsToRevert = await _mediaRepo.GetItemsPendingOverlayGenerationAsync(libraryId, DateTime.UtcNow);
+            var itemsToRevert = await _mediaRepo.GetItemsPendingOverlayGenerationAsync(libraryId, DateTime.UtcNow, layoutVersion);
             foreach (var item in itemsToRevert.Where(m => !string.IsNullOrEmpty(m.OriginalPosterUrl)))
             {
                 var episodeBackdropWasOverlay = item is Episode && item.BackgroundUrl == item.PosterUrl;
@@ -134,7 +135,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         var activeProvider = _providers.FirstOrDefault();
         if (activeProvider == null) return false;
 
-        var itemsToProcess = await _mediaRepo.GetItemsPendingOverlayGenerationAsync(libraryId, templates.Select(t => t.UpdatedAt).Max());
+        var itemsToProcess = await _mediaRepo.GetItemsPendingOverlayGenerationAsync(libraryId, templates.Select(t => t.UpdatedAt).Max(), layoutVersion);
 
         // Overlay generation downloads a poster + composites with ImageSharp per
         // item, so run several at once. Each item enriches in its own scope
@@ -284,6 +285,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         }
 
         item.LastOverlayGeneratedAt = DateTime.UtcNow;
+        item.OverlayLayoutVersion = activeProvider.LayoutVersion;
 
         await _mediaRepo.UpdateMediaItemAsync(item);
     }
