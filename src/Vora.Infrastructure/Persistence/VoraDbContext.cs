@@ -1547,8 +1547,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("73c33c2c-1fe6-4885-875e-481a1dac5462"),
-                Title = "Recently Released Movies & Episodes",
-                IsSystemList = true,
+                Title = "Recently Released Movies & Episodes",
                 IsSpotlight = true,
                 ShowOnHomepage = true,
                 ShowToFriends = true,
@@ -1560,8 +1559,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("17ddede2-2de0-42b8-9b33-32708b4d29b8"),
-                Title = "Recently Added Movies & Shows",
-                IsSystemList = true,
+                Title = "Recently Added Movies & Shows",
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.DateAddedDesc,
@@ -1572,8 +1570,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("ebbefd92-4232-4cae-9c5d-2134943b8bf8"),
-                Title = "Recently Released Movies",
-                IsSystemList = true,
+                Title = "Recently Released Movies",
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.ReleaseDateDesc,
@@ -1584,8 +1581,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("c88d6c8a-57ea-4b24-a7be-3f2638a38aca"),
-                Title = "Recently Added Movies",
-                IsSystemList = true,
+                Title = "Recently Added Movies",
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.DateAddedDesc,
@@ -1596,8 +1592,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("58424b85-b6da-4a9c-8204-e364f1319508"),
-                Title = "Recently Released Episodes",
-                IsSystemList = true,
+                Title = "Recently Released Episodes",
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.ReleaseDateDesc,
@@ -1608,8 +1603,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("dfc420d4-421c-4e14-aec4-a5bedefd2f2e"),
-                Title = "Recently Added Shows",
-                IsSystemList = true,
+                Title = "Recently Added Shows",
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.DateAddedDesc,

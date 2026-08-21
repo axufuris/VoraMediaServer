@@ -4,7 +4,6 @@ import { smartListService, type SmartListAdminDto, type SmartListRulesDto, type 
 import { collectionService, type CollectionSummary } from '../../../api/Collections/collectionService';
 import { useDialog } from '../../../dialogs';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
-import HealthBadge from '../../../components/Admin/Primitives/HealthBadge';
 import EmptyState from '../../../components/Admin/Primitives/EmptyState';
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
@@ -21,7 +20,6 @@ export default function SmartListsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [isSystemList, setIsSystemList] = useState(false);
     const [draggedId, setDraggedId] = useState<string | null>(null);
 
     const [title, setTitle] = useState('');
@@ -95,18 +93,18 @@ export default function SmartListsPage() {
     };
 
     const toggleMediaType = (type: string) => {
-        if (isSystemList || listMode === 'collection') return;
+        if (listMode === 'collection') return;
         setMediaTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
     };
 
     const openCreateModal = () => {
-        setEditingId(null); setIsSystemList(false); setTitle(''); setListMode('rules');
+        setEditingId(null); setTitle(''); setListMode('rules');
         setCollectionId(''); setMediaTypes([]); setDecade(''); setSortBy(0);
         setMaxItems(20); setShowOnHomepage(true); setShowToFriends(true); setIsSpotlight(false); setIsModalOpen(true);
     };
 
     const openEditModal = (list: SmartListAdminDto) => {
-        setEditingId(list.id); setIsSystemList(list.isSystemList); setTitle(list.title);
+        setEditingId(list.id); setTitle(list.title);
         setSortBy(list.sortBy); setMaxItems(list.maxItems); setShowOnHomepage(list.showOnHomepage);
         setShowToFriends(list.showToFriends); setIsSpotlight(list.isSpotlight); setListMode(list.collectionId ? 'collection' : 'rules');
         setCollectionId(list.collectionId || '');
@@ -133,7 +131,7 @@ export default function SmartListsPage() {
             title,
             filterRulesJson: listMode === 'rules' && Object.keys(rules).length > 0 ? JSON.stringify(rules) : '{}',
             collectionId: listMode === 'collection' && collectionId ? collectionId : undefined,
-            sortBy, maxItems, showOnHomepage, showToFriends, isSystemList, isSpotlight,
+            sortBy, maxItems, showOnHomepage, showToFriends, isSpotlight,
             displayOrder: existingList ? existingList.displayOrder : lists.length,
         };
 
@@ -217,7 +215,6 @@ export default function SmartListsPage() {
                                         </td>
                                         <td className="px-4 py-3">
                                             <span className="font-semibold text-[var(--vora-text-primary)]">{list.title}</span>
-                                            {list.isSystemList && <span className="ml-2"><HealthBadge tone="info" showDot={false}>System</HealthBadge></span>}
                                             {list.isSpotlight && (
                                                 <span
                                                     className="ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
@@ -253,7 +250,7 @@ export default function SmartListsPage() {
                                                     {list.isSpotlight ? '★ Spotlight' : '☆ Spotlight'}
                                                 </button>
                                                 <button type="button" onClick={() => openEditModal(list)} className="text-[var(--vora-accent-text)] hover:text-[var(--vora-accent-active)] cursor-pointer">Edit</button>
-                                                {!list.isSystemList && <button type="button" onClick={() => handleDelete(list.id)} className="text-[var(--vora-danger-text)] hover:text-[var(--vora-danger-500)] cursor-pointer">Delete</button>}
+                                                <button type="button" onClick={() => handleDelete(list.id)} className="text-[var(--vora-danger-text)] hover:text-[var(--vora-danger-500)] cursor-pointer">Delete</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -268,14 +265,8 @@ export default function SmartListsPage() {
                 <div className="fixed inset-0 bg-[var(--vora-bg-overlay)] backdrop-blur-sm flex items-center justify-center z-[200] p-4" onClick={() => setIsModalOpen(false)}>
                     <div className="vora-card shadow-[var(--vora-shadow-overlay)] p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
                         <h2 className="text-base font-semibold text-[var(--vora-text-primary)] mb-4">
-                            {editingId ? (isSystemList ? 'Edit system list' : 'Edit smart list') : 'Create smart list'}
+                            {editingId ? 'Edit smart list' : 'Create smart list'}
                         </h2>
-
-                        {isSystemList && (
-                            <div className="mb-4 p-3 bg-[var(--vora-info-soft)] border border-[var(--vora-info-500)]/30 rounded-[var(--vora-radius-md)] text-sm text-[var(--vora-info-text)]">
-                                This is a System List. Filtering rules cannot be modified, but you can adjust visibility and max items.
-                            </div>
-                        )}
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
@@ -283,33 +274,30 @@ export default function SmartListsPage() {
                                 <input
                                     required
                                     type="text"
-                                    disabled={isSystemList}
                                     value={title}
                                     onChange={e => setTitle(e.target.value)}
-                                    className="vora-input disabled:opacity-50"
+                                    className="vora-input"
                                 />
                             </div>
 
-                            {!isSystemList && (
-                                <div className="grid grid-cols-2 gap-1 p-1 bg-[var(--vora-bg-sunken)] rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)]">
-                                    <button
-                                        type="button"
-                                        onClick={() => setListMode('rules')}
-                                        className={`py-1.5 text-sm font-semibold rounded-[var(--vora-radius-sm)] cursor-pointer transition-colors ${listMode === 'rules' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)]'}`}
-                                    >
-                                        Rule-based
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setListMode('collection')}
-                                        className={`py-1.5 text-sm font-semibold rounded-[var(--vora-radius-sm)] cursor-pointer transition-colors ${listMode === 'collection' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)]'}`}
-                                    >
-                                        Collection-based
-                                    </button>
-                                </div>
-                            )}
+                            <div className="grid grid-cols-2 gap-1 p-1 bg-[var(--vora-bg-sunken)] rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)]">
+                                <button
+                                    type="button"
+                                    onClick={() => setListMode('rules')}
+                                    className={`py-1.5 text-sm font-semibold rounded-[var(--vora-radius-sm)] cursor-pointer transition-colors ${listMode === 'rules' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)]'}`}
+                                >
+                                    Rule-based
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setListMode('collection')}
+                                    className={`py-1.5 text-sm font-semibold rounded-[var(--vora-radius-sm)] cursor-pointer transition-colors ${listMode === 'collection' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)]'}`}
+                                >
+                                    Collection-based
+                                </button>
+                            </div>
 
-                            {listMode === 'collection' && !isSystemList && (
+                            {listMode === 'collection' && (
                                 <div className="p-4 bg-[var(--vora-info-soft)] border border-[var(--vora-info-500)]/30 rounded-[var(--vora-radius-md)]">
                                     <FieldLabel>Source collection</FieldLabel>
                                     <select required value={collectionId} onChange={e => setCollectionId(e.target.value)} className="vora-input cursor-pointer">
@@ -325,10 +313,9 @@ export default function SmartListsPage() {
                                         <FieldLabel>Media types</FieldLabel>
                                         <div className="flex flex-wrap gap-3">
                                             {['Movie', 'TvShow', 'Season', 'Episode', 'Track'].map(type => (
-                                                <label key={type} className={`flex items-center gap-2 text-sm text-[var(--vora-text-primary)] ${isSystemList ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                                                <label key={type} className="flex items-center gap-2 text-sm text-[var(--vora-text-primary)] cursor-pointer">
                                                     <input
                                                         type="checkbox"
-                                                        disabled={isSystemList}
                                                         checked={mediaTypes.includes(type)}
                                                         onChange={() => toggleMediaType(type)}
                                                         className="w-4 h-4 accent-[var(--vora-accent-500)]"
@@ -341,7 +328,7 @@ export default function SmartListsPage() {
 
                                     <div>
                                         <FieldLabel>Decade rule</FieldLabel>
-                                        <select disabled={isSystemList} value={decade} onChange={e => setDecade(e.target.value)} className="vora-input cursor-pointer disabled:opacity-50">
+                                        <select value={decade} onChange={e => setDecade(e.target.value)} className="vora-input cursor-pointer">
                                             <option value="">Any</option>
                                             <option value="2020">2020s</option>
                                             <option value="2010">2010s</option>
@@ -355,7 +342,7 @@ export default function SmartListsPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <FieldLabel>Sort by</FieldLabel>
-                                    <select disabled={isSystemList} value={sortBy} onChange={e => setSortBy(Number(e.target.value))} className="vora-input cursor-pointer disabled:opacity-50">
+                                    <select value={sortBy} onChange={e => setSortBy(Number(e.target.value))} className="vora-input cursor-pointer">
                                         <option value={0}>Recently added</option>
                                         <option value={1}>Recently released</option>
                                         <option value={3}>Random (shuffle)</option>
