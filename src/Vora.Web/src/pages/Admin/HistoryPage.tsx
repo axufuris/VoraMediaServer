@@ -11,7 +11,7 @@ interface DecisionLogEntry {
 
 function StrategyTag({ strategy }: { strategy: string }) {
     const tone =
-        strategy === 'Transcode' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' :
+        strategy === 'Transcode' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' :
         strategy === 'Remux' || strategy === 'Copy' ? 'bg-[var(--vora-warning-500)] text-[var(--vora-text-primary)]' :
         'bg-[var(--vora-border-strong)] text-[var(--vora-text-primary)]';
     const label =
@@ -262,7 +262,7 @@ export default function HistoryPage() {
                                         else newSet.add(lib.id);
                                         setActiveLibraryIds(newSet);
                                     }}
-                                    className={`px-3 py-1.5 text-xs font-semibold border-r last:border-r-0 border-[var(--vora-border-strong)] transition-colors cursor-pointer ${isActive ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
+                                    className={`px-3 py-1.5 text-xs font-semibold border-r last:border-r-0 border-[var(--vora-border-strong)] transition-colors cursor-pointer ${isActive ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                                 >
                                     {lib.name}
                                 </button>
@@ -274,17 +274,17 @@ export default function HistoryPage() {
                         <button
                             type="button"
                             onClick={() => setStreamFilters(p => ({ ...p, directPlay: !p.directPlay }))}
-                            className={`px-3 py-1.5 text-xs font-semibold border-r border-[var(--vora-border-strong)] transition-colors cursor-pointer ${streamFilters.directPlay ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
+                            className={`px-3 py-1.5 text-xs font-semibold border-r border-[var(--vora-border-strong)] transition-colors cursor-pointer ${streamFilters.directPlay ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                         >Direct Play</button>
                         <button
                             type="button"
                             onClick={() => setStreamFilters(p => ({ ...p, directStream: !p.directStream }))}
-                            className={`px-3 py-1.5 text-xs font-semibold border-r border-[var(--vora-border-strong)] transition-colors cursor-pointer ${streamFilters.directStream ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
+                            className={`px-3 py-1.5 text-xs font-semibold border-r border-[var(--vora-border-strong)] transition-colors cursor-pointer ${streamFilters.directStream ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                         >Direct Stream</button>
                         <button
                             type="button"
                             onClick={() => setStreamFilters(p => ({ ...p, transcode: !p.transcode }))}
-                            className={`px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${streamFilters.transcode ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
+                            className={`px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${streamFilters.transcode ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                         >Transcode</button>
                     </div>
 
