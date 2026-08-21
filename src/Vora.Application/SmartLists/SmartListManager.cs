@@ -92,8 +92,7 @@ public class SmartListManager(
             ActiveEndMonth = request.ActiveEndMonth,
             ActiveEndDay = request.ActiveEndDay,
             LibraryId = request.LibraryId,
-            CollectionId = request.CollectionId,
-            IsSystemList = false
+            CollectionId = request.CollectionId
         };
 
         try
@@ -129,13 +128,9 @@ public class SmartListManager(
         list.ActiveEndMonth = request.ActiveEndMonth;
         list.ActiveEndDay = request.ActiveEndDay;
         list.LibraryId = request.LibraryId;
-
-        if (!list.IsSystemList)
-        {
-            list.Title = request.Title;
-            list.FilterRulesJson = request.FilterRulesJson;
-            list.SortBy = request.SortBy;
-        }
+        list.Title = request.Title;
+        list.FilterRulesJson = request.FilterRulesJson;
+        list.SortBy = request.SortBy;
 
         try
         {
@@ -156,11 +151,6 @@ public class SmartListManager(
         if (list == null)
         {
             return false;
-        }
-
-        if (list.IsSystemList)
-        {
-            throw new InvalidOperationException("System lists cannot be deleted.");
         }
 
         try

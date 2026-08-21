@@ -14,7 +14,6 @@ public class SmartListAdminVM
     public int DisplayOrder { get; set; }
     public bool ShowOnHomepage { get; set; }
     public bool ShowToFriends { get; set; }
-    public bool IsSystemList { get; set; }
     public bool IsSpotlight { get; set; }
     public Guid? CollectionId { get; set; }
 
@@ -30,7 +29,6 @@ public class SmartListAdminVM
         ShowOnHomepage = list.ShowOnHomepage,
         ShowToFriends = list.ShowToFriends,
         CollectionId = list.CollectionId,
-        IsSystemList = list.IsSystemList,
         IsSpotlight = list.IsSpotlight
     };
 }

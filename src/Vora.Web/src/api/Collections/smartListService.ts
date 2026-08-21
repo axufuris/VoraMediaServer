@@ -26,7 +26,6 @@ export interface SmartListAdminDto {
     showOnHomepage: boolean;
     showToFriends: boolean;
     collectionId?: string;
-    isSystemList: boolean;
     isSpotlight: boolean;
 }
 
