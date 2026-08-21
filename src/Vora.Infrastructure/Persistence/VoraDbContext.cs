@@ -1547,7 +1547,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("73c33c2c-1fe6-4885-875e-481a1dac5462"),
-                Title = "Recently Released Movies & Shows",
+                Title = "Recently Released Movies & Episodes",
                 IsSystemList = true,
                 IsSpotlight = true,
                 ShowOnHomepage = true,
@@ -1555,7 +1555,7 @@ public class VoraDbContext : DbContext
                 SortBy = SmartListSortBy.ReleaseDateDesc,
                 MaxItems = 20,
                 DisplayOrder = 0,
-                FilterRulesJson = "{\"mediaTypes\":[\"Movie\",\"TvShow\",\"Season\"]}"
+                FilterRulesJson = "{\"mediaTypes\":[\"Movie\",\"Episode\"]}"
             },
             new SmartList
             {
@@ -1567,7 +1567,7 @@ public class VoraDbContext : DbContext
                 SortBy = SmartListSortBy.DateAddedDesc,
                 MaxItems = 20,
                 DisplayOrder = 1,
-                FilterRulesJson = "{\"mediaTypes\":[\"Movie\",\"TvShow\",\"Season\"]}"
+                FilterRulesJson = "{\"mediaTypes\":[\"Movie\",\"TvShow\",\"Season\",\"Episode\"]}"
             },
             new SmartList
             {
@@ -1596,14 +1596,14 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("58424b85-b6da-4a9c-8204-e364f1319508"),
-                Title = "Recently Released Shows",
+                Title = "Recently Released Episodes",
                 IsSystemList = true,
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.ReleaseDateDesc,
                 MaxItems = 20,
                 DisplayOrder = 4,
-                FilterRulesJson = "{\"mediaTypes\":[\"TvShow\"]}"
+                FilterRulesJson = "{\"mediaTypes\":[\"Episode\"]}"
             },
             new SmartList
             {
