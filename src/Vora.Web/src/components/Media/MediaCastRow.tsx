@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { CastMember } from '../../api/Media/mediaService';
 import MediaRow from '../Common/MediaRow';
@@ -7,14 +8,27 @@ interface Props {
     serverId?: string;
 }
 
+// Actors lead the row; crew (producers, directors, writers) follow. The incoming
+// list is billing-ordered, so a stable sort keeps that order within each group
+// and only lifts the actors ahead of the crew. Someone credited as both (e.g.
+// "Actor, Producer") counts as an actor.
+const isActor = (member: CastMember) => /actor/i.test(member.role);
+
 export default function MediaCastRow({ cast, serverId }: Props) {
     const navigate = useNavigate();
 
-    if (!cast || cast.length === 0) return null;
+    const orderedCast = useMemo(
+        () => [...(cast ?? [])].sort(
+            (a, b) => (Number(isActor(b)) - Number(isActor(a))) || (a.order - b.order)
+        ),
+        [cast]
+    );
+
+    if (orderedCast.length === 0) return null;
 
     return (
         <MediaRow title="Cast & Crew" variant="detail" gap="5">
-            {cast.map(actor => (
+            {orderedCast.map(actor => (
                 <div key={actor.actorId} onClick={() => navigate(serverId ? `/server/${serverId}/actor/${actor.actorId}` : `/actor/${actor.actorId}`)} className="w-32 shrink-0 flex flex-col items-center text-center group cursor-pointer">
                     <div className="w-32 h-40 rounded-lg overflow-hidden bg-[var(--vora-bg-sunken)] mb-3 border border-[var(--vora-border-subtle)] shadow-lg relative group-hover:border-[var(--vora-accent-500)] transition-colors">
                         {actor.profileImageUrl ? (
