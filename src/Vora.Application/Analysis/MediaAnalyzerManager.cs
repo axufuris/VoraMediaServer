@@ -481,7 +481,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             HeadWindowEndSeconds = headEnd,
             TailWindowStartSeconds = tailStart,
             SkipHeadWindow = useFingerprintIntro,
-            UseHardwareDecode = settings.UseHardwareAcceleration,
+            UseHardwareDecode = settings.UseHardwareAcceleration && settings.AnalyzeUseHardwareDecode,
             HardwareDevice = settings.HardwareTranscodingDevice
         };
 

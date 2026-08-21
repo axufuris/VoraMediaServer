@@ -32,6 +32,11 @@ public class ServerSetting
     // full-file FFmpeg decode, so this trades CPU/GPU load for throughput.
     public int AnalyzeConcurrency { get; set; } = 2;
 
+    // Whether analysis decodes on the GPU. Only takes effect when the global
+    // UseHardwareAcceleration is on; turn it off to keep analysis on the CPU and
+    // leave the GPU free for playback transcoding or other apps.
+    public bool AnalyzeUseHardwareDecode { get; set; } = true;
+
     public TimeSpan VideoThumbnailScheduleTime { get; set; } = new(4, 0, 0);
     public int VideoThumbnailIntervalSeconds { get; set; } = 10;
     public int VideoThumbnailWidth { get; set; } = 160;
@@ -41,6 +46,11 @@ public class ServerSetting
 
     // How many media items thumbnail generation processes in parallel.
     public int VideoThumbnailConcurrency { get; set; } = 2;
+
+    // Whether thumbnail generation decodes on the GPU. Only takes effect when the
+    // global UseHardwareAcceleration is on; turn it off to keep the sprite pass on
+    // the CPU and leave the GPU free for playback transcoding or other apps.
+    public bool VideoThumbnailUseHardwareDecode { get; set; } = true;
 
     public TimeSpan IptvSyncTime { get; set; } = new(4, 0, 0);
     public TimeSpan IptvHealthCheckTime { get; set; } = new(4, 30, 0);
