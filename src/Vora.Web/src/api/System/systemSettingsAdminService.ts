@@ -14,6 +14,7 @@ export interface ServerSettings {
     episodeIntroClusterToleranceSec: number;
     episodeIntroClusterMinAgreementPct: number;
     analyzeConcurrency: number;
+    analyzeUseHardwareDecode: boolean;
     videoThumbnailScheduleTime: string;
     iptvHealthCheckTime: string;
     videoThumbnailIntervalSeconds: number;
@@ -22,6 +23,7 @@ export interface ServerSettings {
     videoThumbnailJpegQuality: number;
     videoThumbnailSpriteColumns: number;
     videoThumbnailConcurrency: number;
+    videoThumbnailUseHardwareDecode: boolean;
     folderWatcherProviderId: string;
     folderWatcherPollingInterval: number;
     localMediaScannerProviderId: string;

@@ -624,6 +624,14 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                         />
                         <FieldHint>How many media items an Analyze run decodes at once. Higher is faster but uses more CPU/GPU; raise it if you have hardware acceleration or spare cores.</FieldHint>
                     </div>
+                    <div>
+                        <Checkbox
+                            checked={serverSettings.analyzeUseHardwareDecode}
+                            onChange={v => setServerSettings({ ...serverSettings, analyzeUseHardwareDecode: v })}
+                            label="Use hardware (GPU) decode for analysis"
+                        />
+                        <FieldHint>Only applies when hardware acceleration is enabled under Transcoding. Turn this off to keep analysis on the CPU and leave the GPU free for playback or other apps (e.g. Tdarr).</FieldHint>
+                    </div>
                 </div>
             </SettingsCard>
             </>)}
@@ -715,6 +723,14 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                             className="vora-input w-32"
                         />
                         <FieldHint>How many videos generate thumbnails at once. Higher is faster but uses more CPU/GPU.</FieldHint>
+                    </div>
+                    <div>
+                        <Checkbox
+                            checked={serverSettings.videoThumbnailUseHardwareDecode}
+                            onChange={v => setServerSettings({ ...serverSettings, videoThumbnailUseHardwareDecode: v })}
+                            label="Use hardware (GPU) decode for thumbnails"
+                        />
+                        <FieldHint>Only applies when hardware acceleration is enabled under Transcoding. Turn this off to keep thumbnail generation on the CPU and leave the GPU free for playback or other apps (e.g. Tdarr).</FieldHint>
                     </div>
                 </div>
             </SettingsCard>
