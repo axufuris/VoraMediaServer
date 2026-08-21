@@ -14,7 +14,6 @@ import PlaylistsPage from './Playlists/PlaylistsPage';
 import MediaRail from '../../components/Client/Primitives/MediaRail';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
 import PosterRemoveButton from '../../components/Client/Primitives/PosterRemoveButton';
-import MediaStill from '../../components/Client/Primitives/MediaStill';
 import { posterCaption } from '../../utils/posterCaption';
 import Hero from '../../components/Client/Primitives/Hero';
 import { useDialog } from '../../dialogs';
@@ -213,16 +212,11 @@ function SmartListRow({ list, serverId }: { list: SmartListClientDto, serverId?:
     return (
         <MediaRail title={list.title}>
             {items.map(item => {
-                const isEpisode = item.type === 'Episode';
                 const cap = posterCaption(item);
                 const onOpen = () => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`);
                 return (
                     <div key={item.id} style={{ scrollSnapAlign: 'start', flex: 'none' }}>
-                        {isEpisode ? (
-                            <MediaStill imageUrl={item.posterUrl} title={cap.title} captionLines={cap.lines} onClick={onOpen} />
-                        ) : (
-                            <MediaPoster imageUrl={item.posterUrl} title={cap.title} captionLines={cap.lines} isPlayed={item.isPlayed} onClick={onOpen} />
-                        )}
+                        <MediaPoster imageUrl={item.posterUrl} title={cap.title} captionLines={cap.lines} isPlayed={item.isPlayed} onClick={onOpen} />
                     </div>
                 );
             })}

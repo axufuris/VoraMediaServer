@@ -568,15 +568,19 @@ export default function MediaDetailsPage() {
                             {media.type === 'Movie' && 'Movie'}
                             {media.type === 'TvShow' && 'TV Series'}
                             {isSeason && `Season ${media.seasonNumber ?? ''}`}
-                            {isEpisode && (media.endEpisodeNumber && media.endEpisodeNumber > (media.episodeNumber ?? 0)
-                                ? `Season ${media.seasonNumber} · Episodes ${media.episodeNumber}-${media.endEpisodeNumber}`
-                                : `Season ${media.seasonNumber} · Episode ${media.episodeNumber}`)}
-                            {media.releaseDate && ` · ${new Date(media.releaseDate).getFullYear()}`}
+                            {!isEpisode && media.releaseDate && ` · ${new Date(media.releaseDate).getFullYear()}`}
                         </div>
 
                         <h1 className="m-0 mt-2 font-semibold" style={{ color: 'var(--vora-text-primary)', fontSize: 'clamp(32px, 4vw, 44px)', lineHeight: 1.05, letterSpacing: '-0.02em' }}>
                             {heroTitle}
                         </h1>
+                        {isEpisode && (
+                            <div className="mt-2 text-lg font-semibold" style={{ color: 'var(--vora-accent-text)' }}>
+                                {media.endEpisodeNumber && media.endEpisodeNumber > (media.episodeNumber ?? 0)
+                                    ? `S${media.seasonNumber} E${media.episodeNumber}-E${media.endEpisodeNumber}`
+                                    : `S${media.seasonNumber} E${media.episodeNumber}`}
+                            </div>
+                        )}
                         {heroSubtitle && (
                             <div className="mt-1 text-xl" style={{ color: 'var(--vora-text-secondary)' }}>
                                 {heroSubtitle}
