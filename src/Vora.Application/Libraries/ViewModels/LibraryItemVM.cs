@@ -47,7 +47,12 @@ public class LibraryItemVM
                 : item is Season ? "Season"
                 : item is Episode ? "Episode"
                 : "Unknown",
-            PosterUrl = item.PosterUrl ?? (item is Season ? ((Season)item).TvShow.PosterUrl : null),
+            // Episodes in a list use their season's poster (falling back to the
+            // show's) rather than the 16:9 still — the still only belongs on the
+            // season/episode detail pages.
+            PosterUrl = item is Episode
+                ? (((Episode)item).Season.PosterUrl ?? ((Episode)item).Season.TvShow.PosterUrl)
+                : (item.PosterUrl ?? (item is Season ? ((Season)item).TvShow.PosterUrl : null)),
             BackgroundUrl = item.BackgroundUrl ?? (item is Season ? ((Season)item).TvShow.BackgroundUrl : null),
             ContentRating = item.ContentRating,
             Resolution = item.MediaParts.FirstOrDefault() != null

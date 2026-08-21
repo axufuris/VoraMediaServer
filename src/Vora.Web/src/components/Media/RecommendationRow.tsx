@@ -26,7 +26,7 @@ export default function RecommendationRow({ list, serverId }: RecommendationRowP
                         captionLines={cap.lines}
                         imageUrl={item.posterUrl}
                         type={item.type}
-                        aspectRatio={item.type === 'Episode' ? 'video' : 'poster'}
+                        aspectRatio="poster"
                         isPlayed={item.isPlayed}
                         unplayedCount={item.unplayedItemCount}
                         onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}

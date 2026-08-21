@@ -10,7 +10,6 @@ import { useDialog } from '../../dialogs';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import Tabs from '../../components/Client/Primitives/Tabs';
 import MediaPoster from '../../components/Client/Primitives/MediaPoster';
-import MediaStill from '../../components/Client/Primitives/MediaStill';
 import { posterCaption } from '../../utils/posterCaption';
 import LetterRail from '../../components/Client/Primitives/LetterRail';
 import { StorageKeys } from '../../utils/storageKeys';
@@ -88,7 +87,6 @@ function renderLibraryCard(
     }
 ) {
     const { isAdmin, navigate, serverId, handleDeleteMedia } = ctx;
-    const isEpisode = item.type === 'Episode';
     const cap = posterCaption(item);
     const onOpen = () => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`);
     const unplayedBadge = item.unplayedItemCount && item.unplayedItemCount > 0
@@ -99,9 +97,7 @@ function renderLibraryCard(
             </span>
             : undefined;
 
-    const card = isEpisode ? (
-        <MediaStill imageUrl={item.posterUrl} title={cap.title} captionLines={cap.lines} onClick={onOpen} badge={unplayedBadge} fill />
-    ) : (
+    const card = (
         <MediaPoster imageUrl={item.posterUrl} title={cap.title} captionLines={cap.lines} onClick={onOpen} badge={unplayedBadge} fill />
     );
 

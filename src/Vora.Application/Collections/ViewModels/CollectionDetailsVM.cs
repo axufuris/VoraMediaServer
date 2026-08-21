@@ -86,7 +86,9 @@ public class CollectionDetailsVM
                     : null,
                 EpisodeNumber = item is Episode ? ((Episode)item).EpisodeNumber : (int?)null,
                 Edition = item is Movie ? item.Edition : null,
-                PosterUrl = item.PosterUrl ?? (item is Season ? ((Season)item).TvShow.PosterUrl : null),
+                PosterUrl = item is Episode
+                    ? (((Episode)item).Season.PosterUrl ?? ((Episode)item).Season.TvShow.PosterUrl)
+                    : (item.PosterUrl ?? (item is Season ? ((Season)item).TvShow.PosterUrl : null)),
                 ReleaseDate = item.ReleaseDate,
                 AddedAt = item.AddedAt,
                 IsPlayed = false,
