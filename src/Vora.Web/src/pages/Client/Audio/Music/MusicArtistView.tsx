@@ -138,7 +138,7 @@ export default function MusicArtistView({
                 <div className="text-[var(--vora-text-muted)] py-12 text-center">No albums for this artist.</div>
             ) : (
                 <>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
                         {albums.map(album => (
                             <div
                                 key={album.id}
