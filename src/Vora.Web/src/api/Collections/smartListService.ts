@@ -58,5 +58,8 @@ export const smartListService = {
     },
     deleteList: async (id: string, serverId?: string): Promise<void> => {
         await apiClient.delete(`/admin/smartlists/${id}`, { serverId });
+    },
+    setSpotlight: async (id: string, enabled: boolean, serverId?: string): Promise<void> => {
+        await apiClient.post(`/admin/smartlists/${id}/spotlight`, { enabled }, { serverId });
     }
 };
