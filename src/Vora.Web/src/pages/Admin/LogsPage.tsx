@@ -277,7 +277,7 @@ export default function LogsPage() {
                 loading={loading}
             />
 
-            <div className="px-8 pb-4 max-w-7xl mx-auto pt-2 relative flex-1 min-h-0 flex flex-col">
+            <div className="px-8 pb-4 pt-2 relative flex-1 min-h-0 flex flex-col">
                 <div className="vora-card overflow-hidden flex flex-col flex-1 min-h-0">
                     <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)]">
                         <div className="text-xs text-[var(--vora-text-secondary)]">
@@ -360,7 +360,7 @@ interface FilterBarProps {
 
 function FilterBar(props: FilterBarProps) {
     return (
-        <div className="px-8 pt-4 pb-3 max-w-7xl mx-auto">
+        <div className="px-8 pt-4 pb-3">
             <div className="vora-card p-4 flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-semibold text-[var(--vora-text-muted)] uppercase tracking-wide mr-1">Level</span>
