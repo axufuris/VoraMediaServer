@@ -109,6 +109,22 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         return rows > 0;
     }
 
+    public async Task SetSpotlightAsync(Guid id, bool enabled)
+    {
+        // Only one list can be the home spotlight at a time — turning one on
+        // clears every other, so there's no lingering flag to remember to undo.
+        if (enabled)
+        {
+            await context.SmartLists
+                .Where(s => s.Id != id && s.IsSpotlight)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.IsSpotlight, false));
+        }
+
+        await context.SmartLists
+            .Where(s => s.Id == id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.IsSpotlight, enabled));
+    }
+
     public async Task ReorderListsAsync(List<Guid> orderedListIds)
     {
         var lists = await context.SmartLists.ToListAsync();

@@ -85,6 +85,15 @@ export default function SmartListsPage() {
         refreshLists();
     };
 
+    const handleToggleSpotlight = async (list: SmartListAdminDto) => {
+        try {
+            await smartListService.setSpotlight(list.id, !list.isSpotlight, serverId);
+            await refreshLists();
+        } catch (err) {
+            console.error('Failed to update spotlight', err);
+        }
+    };
+
     const toggleMediaType = (type: string) => {
         if (isSystemList || listMode === 'collection') return;
         setMediaTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
@@ -235,6 +244,14 @@ export default function SmartListsPage() {
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end gap-3 text-xs font-semibold">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleSpotlight(list)}
+                                                    className={`cursor-pointer ${list.isSpotlight ? 'text-[var(--vora-accent-text)]' : 'text-[var(--vora-text-muted)] hover:text-[var(--vora-text-secondary)]'}`}
+                                                    title={list.isSpotlight ? 'Remove from the Home spotlight' : 'Use as the Home spotlight (replaces any current one)'}
+                                                >
+                                                    {list.isSpotlight ? '★ Spotlight' : '☆ Spotlight'}
+                                                </button>
                                                 <button type="button" onClick={() => openEditModal(list)} className="text-[var(--vora-accent-text)] hover:text-[var(--vora-accent-active)] cursor-pointer">Edit</button>
                                                 {!list.isSystemList && <button type="button" onClick={() => handleDelete(list.id)} className="text-[var(--vora-danger-text)] hover:text-[var(--vora-danger-500)] cursor-pointer">Delete</button>}
                                             </div>
@@ -378,18 +395,7 @@ export default function SmartListsPage() {
                                     />
                                     <span className="text-sm font-medium text-[var(--vora-text-primary)]">Show to friends</span>
                                 </label>
-                                <label className="flex items-start gap-3 cursor-pointer select-none">
-                                    <input
-                                        type="checkbox"
-                                        checked={isSpotlight}
-                                        onChange={e => setIsSpotlight(e.target.checked)}
-                                        className="mt-0.5 w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer"
-                                    />
-                                    <span>
-                                        <span className="block text-sm font-medium text-[var(--vora-text-primary)]">Use as Home spotlight</span>
-                                        <span className="block text-xs text-[var(--vora-text-muted)]">Items from this list cycle through the cinematic hero at the top of the client Home page. If multiple lists are flagged, the highest DisplayOrder wins.</span>
-                                    </span>
-                                </label>
+                                <p className="text-xs text-[var(--vora-text-muted)]">Use the <span className="font-semibold text-[var(--vora-text-secondary)]">★ Spotlight</span> button on the list row to make a list power the Home hero — only one can be the spotlight at a time.</p>
                             </div>
 
                             <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-[var(--vora-border-subtle)]">
