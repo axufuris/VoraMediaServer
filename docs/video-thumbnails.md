@@ -24,7 +24,8 @@ The per-part layout is **backward compatible and not force-migrated**: the versi
 
 All in `ServerSetting` (admin UI: System Settings → Video Preview Thumbnails):
 
-- `VideoThumbnailScheduleTime` — `TimeSpan`, default `04:00`. Daily run time. Mirrors the `DetectionScheduleTime` pattern.
+- `VideoThumbnailGeneration` — `DetectionTrigger` (the same enum analysis's `RunDetections` uses), default `OnSchedule`. Controls when generation runs **automatically**: `OnAddition` generates right after a scan adds files, `OnSchedule` runs the nightly pass, `OnAdditionAndSchedule` both, `Never` neither. A manual per-item/library **Regenerate** (`forceOverride`) always runs regardless. Gated in three places, mirroring analysis: `ScheduledJobWorker` skips the nightly enqueue unless the setting includes schedule; the scan workflow's thumbnail step passes `isAdditionTrigger`; and `VideoThumbnailManager.TriggerLibraryThumbnailGenerationAsync` re-checks both flags defensively.
+- `VideoThumbnailScheduleTime` — `TimeSpan`, default `04:00`. Daily run time (only used when `VideoThumbnailGeneration` includes schedule). Mirrors the `DetectionScheduleTime` pattern.
 - `VideoThumbnailIntervalSeconds` — seconds between captured frames, default `10`.
 - `VideoThumbnailWidth` / `VideoThumbnailHeight` — tile size, default `320 × 180`.
 - `VideoThumbnailJpegQuality` — FFmpeg's `-qscale:v` (2–31, lower = better), default `5`.
@@ -101,9 +102,9 @@ Both files are written to `<final>.tmp` first, then atomically renamed.
 
 ## Scheduling
 
-`ScheduledJobWorker` checks the schedule on its existing 5-minute timer. When `timeOfDay >= VideoThumbnailScheduleTime` and we haven't run today, it queries `ILibraryRepository.GetAllProjectedAsync` for libraries that have the checkbox on **and** a video-bearing `Type`, and enqueues `ITaskQueueManager.QueueGenerateLibraryVideoThumbnails` for each.
+`ScheduledJobWorker` checks the schedule on its existing 5-minute timer. When `VideoThumbnailGeneration` includes schedule (`OnSchedule`/`OnAdditionAndSchedule`), `timeOfDay >= VideoThumbnailScheduleTime`, and we haven't run today, it queries `ILibraryRepository.GetAllProjectedAsync` for libraries that have the checkbox on **and** a video-bearing `Type`, and enqueues `ITaskQueueManager.QueueGenerateLibraryVideoThumbnails` for each.
 
-Thumbnails are **never** queued on ingestion — they're background-only by design (matches the original spec). DVR recordings are explicitly out of scope.
+When `VideoThumbnailGeneration` includes addition (`OnAddition`/`OnAdditionAndSchedule`), a library scan also generates thumbnails inline as its final step (via the scan workflow's `TriggerLibraryThumbnailGenerationAsync(isAdditionTrigger: true)`), so newly added items get scrub thumbnails without waiting for the nightly pass. That step is **never** forced — even a forced rescan only fills new/stale items and still honours the trigger, so a rescan can't kick off a whole-library re-encode. DVR recordings are explicitly out of scope.
 
 ## API surface
 

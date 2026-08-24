@@ -84,7 +84,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         await RunSingleAsync(mediaItemId, forceOverride, cancellationToken);
     }
 
-    public async Task TriggerLibraryThumbnailGenerationAsync(Guid libraryId, bool forceOverride = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default)
+    public async Task TriggerLibraryThumbnailGenerationAsync(Guid libraryId, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false, CancellationToken cancellationToken = default)
     {
         var (libraryType, enabled) = await GetLibraryThumbnailStateAsync(libraryId);
         if (!IsVideoBearingLibrary(libraryType)) return;
@@ -94,6 +94,17 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         // (never generated or generated with an outdated sprite version), so the
         // progress total reflects what's left instead of the whole library.
         var settings = await _settingsRepo.GetSettingsAsync();
+
+        // The generation trigger gates the automatic paths the same way
+        // RunDetections gates analysis: a scan (addition) or the nightly pass
+        // (schedule) only runs when the setting opts into that path. The admin
+        // "Regenerate" action passes forceOverride and always runs.
+        if (!forceOverride)
+        {
+            if (isAdditionTrigger && settings.VideoThumbnailGeneration != DetectionTrigger.OnAddition && settings.VideoThumbnailGeneration != DetectionTrigger.OnAdditionAndSchedule) return;
+            if (isScheduleTrigger && settings.VideoThumbnailGeneration != DetectionTrigger.OnSchedule && settings.VideoThumbnailGeneration != DetectionTrigger.OnAdditionAndSchedule) return;
+        }
+
         var version = ComputeSpriteVersion(settings.VideoThumbnailIntervalSeconds, settings.VideoThumbnailWidth, settings.VideoThumbnailHeight, settings.VideoThumbnailJpegQuality, settings.VideoThumbnailSpriteColumns);
         var ids = await _mediaRepository.GetVideoThumbnailTargetIdsAsync(libraryId, version, includeCompleted: forceOverride);
         await GenerateManyAsync(ids, forceOverride, cancellationToken);

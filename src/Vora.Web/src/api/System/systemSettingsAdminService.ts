@@ -15,6 +15,7 @@ export interface ServerSettings {
     episodeIntroClusterMinAgreementPct: number;
     analyzeConcurrency: number;
     analyzeUseHardwareDecode: boolean;
+    videoThumbnailGeneration: number;
     videoThumbnailScheduleTime: string;
     iptvHealthCheckTime: string;
     videoThumbnailIntervalSeconds: number;

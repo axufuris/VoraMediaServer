@@ -102,6 +102,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.EpisodeIntroClusterMinAgreementPct = Math.Clamp(request.EpisodeIntroClusterMinAgreementPct, 50, 100);
         settings.AnalyzeConcurrency = Math.Clamp(request.AnalyzeConcurrency, 1, 16);
         settings.AnalyzeUseHardwareDecode = request.AnalyzeUseHardwareDecode;
+        settings.VideoThumbnailGeneration = (DetectionTrigger)request.VideoThumbnailGeneration;
 
         if (TimeSpan.TryParse(request.VideoThumbnailScheduleTime, out var vtTime)) settings.VideoThumbnailScheduleTime = vtTime;
         if (TimeSpan.TryParse(request.IptvHealthCheckTime, out var ihcTime)) settings.IptvHealthCheckTime = ihcTime;
