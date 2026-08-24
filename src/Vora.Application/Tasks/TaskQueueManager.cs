@@ -660,6 +660,7 @@ public class TaskQueueManager : ITaskQueueManager
         var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
         var libraryManager = sp.GetRequiredService<ILibraryManager>();
         var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
+        var thumbnailManager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
         var dedupeManager = sp.GetRequiredService<Vora.Application.Media.IMediaDedupeManager>();
         var progress = sp.GetRequiredService<ITaskProgressReporter>();
         var logger = sp.GetService<ILogger<TaskQueueManager>>();
@@ -821,6 +822,14 @@ public class TaskQueueManager : ITaskQueueManager
         {
             await RunStepAsync("Generating poster overlays…", () => overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct));
         }
+
+        // Scanning is an addition event, so thumbnail generation here runs as an
+        // addition trigger — gated by VideoThumbnailGeneration, it stays off unless
+        // the setting opts into On-addition. Otherwise the nightly scheduled pass
+        // (or a manual Regenerate) produces them. Never forced: even a forced
+        // rescan only fills new/stale items and still honours the trigger, so a
+        // rescan can't kick off a whole-library re-encode.
+        await RunStepAsync("Generating video thumbnails…", () => thumbnailManager.TriggerLibraryThumbnailGenerationAsync(libraryId, forceOverride: false, isAdditionTrigger: true, cancellationToken: ct));
 
         workflowStopwatch.Stop();
         logger?.LogInformation("Full library workflow for {LibraryId} completed in {Wall:n1}s.", libraryId, workflowStopwatch.Elapsed.TotalSeconds);

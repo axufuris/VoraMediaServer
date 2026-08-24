@@ -248,7 +248,10 @@ public class ScheduledJobWorker : BackgroundService
             _lastIptvHealthCheckDate = today;
         }
 
-        if (timeOfDay >= settings.VideoThumbnailScheduleTime && _lastVideoThumbnailDate < today)
+        bool shouldRunThumbnails = settings.VideoThumbnailGeneration == Domain.Enums.DetectionTrigger.OnSchedule ||
+                                   settings.VideoThumbnailGeneration == Domain.Enums.DetectionTrigger.OnAdditionAndSchedule;
+
+        if (shouldRunThumbnails && timeOfDay >= settings.VideoThumbnailScheduleTime && _lastVideoThumbnailDate < today)
         {
             _logger.LogInformation("Triggering Scheduled Video Thumbnail Generation.");
 

@@ -20,6 +20,7 @@ public class ServerSettingsVM
     public int EpisodeIntroClusterMinAgreementPct { get; set; } = 70;
     public int AnalyzeConcurrency { get; set; } = 2;
     public bool AnalyzeUseHardwareDecode { get; set; } = true;
+    public int VideoThumbnailGeneration { get; set; } = 2;
     public string VideoThumbnailScheduleTime { get; set; } = "04:00";
     public string IptvHealthCheckTime { get; set; } = "04:30";
     public int VideoThumbnailIntervalSeconds { get; set; } = 10;
@@ -95,6 +96,7 @@ public class ServerSettingsVM
             EpisodeIntroClusterMinAgreementPct = s.EpisodeIntroClusterMinAgreementPct,
             AnalyzeConcurrency = s.AnalyzeConcurrency,
             AnalyzeUseHardwareDecode = s.AnalyzeUseHardwareDecode,
+            VideoThumbnailGeneration = (int)s.VideoThumbnailGeneration,
             VideoThumbnailScheduleTime = s.VideoThumbnailScheduleTime.ToString(@"hh\:mm"),
             IptvHealthCheckTime = s.IptvHealthCheckTime.ToString(@"hh\:mm"),
             VideoThumbnailIntervalSeconds = s.VideoThumbnailIntervalSeconds,

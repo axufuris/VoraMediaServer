@@ -37,6 +37,11 @@ public class ServerSetting
     // leave the GPU free for playback transcoding or other apps.
     public bool AnalyzeUseHardwareDecode { get; set; } = true;
 
+    // When thumbnail generation runs automatically. Mirrors RunDetections for
+    // analysis: OnSchedule (default) keeps the nightly pass, OnAddition generates
+    // right after a scan adds files, Never disables both (manual Regenerate only).
+    public DetectionTrigger VideoThumbnailGeneration { get; set; } = DetectionTrigger.OnSchedule;
+
     public TimeSpan VideoThumbnailScheduleTime { get; set; } = new(4, 0, 0);
     public int VideoThumbnailIntervalSeconds { get; set; } = 10;
     public int VideoThumbnailWidth { get; set; } = 160;

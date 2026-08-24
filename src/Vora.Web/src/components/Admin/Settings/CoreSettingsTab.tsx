@@ -640,15 +640,31 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
             <SettingsCard title="Video Preview Thumbnails">
                 <div className="space-y-4">
                     <div>
-                        <FieldLabel>Schedule Time</FieldLabel>
-                        <input
-                            type="time"
-                            value={serverSettings.videoThumbnailScheduleTime}
-                            onChange={e => setServerSettings({ ...serverSettings, videoThumbnailScheduleTime: e.target.value })}
-                            className="vora-input w-40"
-                        />
-                        <FieldHint>Daily time the thumbnail generation pass runs. Only libraries with "Enable video preview thumbnails" turned on are processed.</FieldHint>
+                        <FieldLabel>Trigger Condition</FieldLabel>
+                        <select
+                            value={serverSettings.videoThumbnailGeneration}
+                            onChange={e => setServerSettings({ ...serverSettings, videoThumbnailGeneration: Number(e.target.value) })}
+                            className="vora-input max-w-md cursor-pointer"
+                        >
+                            <option value={0}>Never run</option>
+                            <option value={1}>On media addition only</option>
+                            <option value={2}>On schedule only</option>
+                            <option value={3}>On addition & schedule</option>
+                        </select>
+                        <FieldHint>Controls when Vora automatically generates scrub-bar preview thumbnails. "Never run" means generation only happens when you click Regenerate on a library or item. Only libraries with "Enable video preview thumbnails" turned on are processed either way.</FieldHint>
                     </div>
+                    {(serverSettings.videoThumbnailGeneration === 2 || serverSettings.videoThumbnailGeneration === 3) && (
+                        <div>
+                            <FieldLabel>Schedule Time</FieldLabel>
+                            <input
+                                type="time"
+                                value={serverSettings.videoThumbnailScheduleTime}
+                                onChange={e => setServerSettings({ ...serverSettings, videoThumbnailScheduleTime: e.target.value })}
+                                className="vora-input w-40"
+                            />
+                            <FieldHint>Daily time the thumbnail generation pass runs.</FieldHint>
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <div>
                             <FieldLabel>Interval (seconds)</FieldLabel>
