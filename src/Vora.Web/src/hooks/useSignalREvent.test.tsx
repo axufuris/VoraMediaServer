@@ -39,7 +39,14 @@ vi.mock('@microsoft/signalr', () => {
         withAutomaticReconnect() { return this; }
         build() { return mockConnection; }
     }
-    return { HubConnectionBuilder };
+    const HubConnectionState = {
+        Disconnected: 'Disconnected',
+        Connecting: 'Connecting',
+        Connected: 'Connected',
+        Disconnecting: 'Disconnecting',
+        Reconnecting: 'Reconnecting',
+    };
+    return { HubConnectionBuilder, HubConnectionState };
 });
 
 // Helper to use the hook inside a test component.

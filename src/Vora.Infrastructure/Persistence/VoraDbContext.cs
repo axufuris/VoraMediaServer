@@ -21,7 +21,6 @@ using Vora.Domain.Entities.Streaming;
 using Vora.Domain.Entities.Ai;
 using Vora.Domain.Entities.Tracking;
 using Vora.Domain.Entities.Users;
-using Vora.Domain.Entities.YouTube;
 using Vora.Domain.Enums;
 
 namespace Vora.Infrastructure.Persistence;
@@ -136,11 +135,6 @@ public class VoraDbContext : DbContext
     public DbSet<DiscoveryRowConfig> DiscoveryRowConfigs { get; set; }
     public DbSet<UserWatchlistItem> UserWatchlistItems { get; set; }
 
-    public DbSet<YouTubeAccountSettings> YouTubeAccountSettings { get; set; }
-    public DbSet<YouTubeProfileSettings> YouTubeProfileSettings { get; set; }
-    public DbSet<YouTubeSubscription> YouTubeSubscriptions { get; set; }
-    public DbSet<YouTubeWatchHistory> YouTubeWatchHistory { get; set; }
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -213,8 +207,6 @@ public class VoraDbContext : DbContext
         }
 
         ConfigureDiscovery(modelBuilder);
-
-        ConfigureYouTube(modelBuilder);
 
         SeedReferenceData(modelBuilder);
         SeedSystemDefaults(modelBuilder);
@@ -1471,46 +1463,6 @@ public class VoraDbContext : DbContext
         });
     }
 
-    private static void ConfigureYouTube(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<YouTubeAccountSettings>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.YouTubeAccess).HasConversion<string>().HasMaxLength(16);
-            entity.HasIndex(e => e.AccountId).IsUnique();
-        });
-
-        modelBuilder.Entity<YouTubeProfileSettings>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.UserProfileId).IsUnique();
-        });
-
-        modelBuilder.Entity<YouTubeSubscription>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.ChannelId).IsRequired().HasMaxLength(64);
-            entity.Property(e => e.ChannelName).IsRequired().HasMaxLength(256);
-            entity.Property(e => e.ChannelThumbnailUrl).HasMaxLength(1024);
-
-            entity.HasIndex(e => new { e.UserProfileId, e.ChannelId }).IsUnique();
-            entity.HasIndex(e => e.UserProfileId);
-        });
-
-        modelBuilder.Entity<YouTubeWatchHistory>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.VideoId).IsRequired().HasMaxLength(32);
-            entity.Property(e => e.VideoTitle).IsRequired().HasMaxLength(500);
-            entity.Property(e => e.ThumbnailUrl).IsRequired().HasMaxLength(1024);
-            entity.Property(e => e.ChannelId).IsRequired().HasMaxLength(64);
-            entity.Property(e => e.ChannelName).IsRequired().HasMaxLength(256);
-
-            entity.HasIndex(e => new { e.UserProfileId, e.WatchedAt });
-            entity.HasIndex(e => new { e.UserProfileId, e.VideoId });
-        });
-    }
-
     private static void SeedReferenceData(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Genre>().HasData(
@@ -1547,7 +1499,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("73c33c2c-1fe6-4885-875e-481a1dac5462"),
-                Title = "Recently Released Movies & Episodes",
+                Title = "Recently Released Movies & Episodes",
                 IsSpotlight = true,
                 ShowOnHomepage = true,
                 ShowToFriends = true,
@@ -1559,7 +1511,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("17ddede2-2de0-42b8-9b33-32708b4d29b8"),
-                Title = "Recently Added Movies & Shows",
+                Title = "Recently Added Movies & Shows",
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.DateAddedDesc,
@@ -1570,7 +1522,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("ebbefd92-4232-4cae-9c5d-2134943b8bf8"),
-                Title = "Recently Released Movies",
+                Title = "Recently Released Movies",
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.ReleaseDateDesc,
@@ -1581,7 +1533,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("c88d6c8a-57ea-4b24-a7be-3f2638a38aca"),
-                Title = "Recently Added Movies",
+                Title = "Recently Added Movies",
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.DateAddedDesc,
@@ -1592,7 +1544,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("58424b85-b6da-4a9c-8204-e364f1319508"),
-                Title = "Recently Released Episodes",
+                Title = "Recently Released Episodes",
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.ReleaseDateDesc,
@@ -1603,7 +1555,7 @@ public class VoraDbContext : DbContext
             new SmartList
             {
                 Id = Guid.Parse("dfc420d4-421c-4e14-aec4-a5bedefd2f2e"),
-                Title = "Recently Added Shows",
+                Title = "Recently Added Shows",
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.DateAddedDesc,

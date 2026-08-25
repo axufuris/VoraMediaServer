@@ -132,7 +132,6 @@ public static class WebApplicationExtensions
         app.MapUserEndpoints();
         app.MapUserImageEndpoints();
         app.MapVideoThumbnailEndpoints();
-        app.MapYouTubeEndpoints();
 
         app.MapHub<VoraHub>("/hubs/Vora").RequireAuthorization();
         app.MapHealthChecks("/health").AllowAnonymous();

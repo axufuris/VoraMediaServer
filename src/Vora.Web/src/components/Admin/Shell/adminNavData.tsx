@@ -102,7 +102,6 @@ export const ADMIN_NAV: AdminNavEntry[] = [
     { label: 'DVR',                  pathTemplate: '/admin/dvr-settings',     section: 'Features', icon: 'record',     keywords: ['recording', 'tuners'] },
     { label: 'Internet Radio',       pathTemplate: '/admin/internet-radio',   section: 'Features', icon: 'radio',      keywords: ['radio', 'streams'] },
     { label: 'Podcasts',             pathTemplate: '/admin/podcasts',         section: 'Features', icon: 'mic',        keywords: ['rss', 'feeds', 'catalog'] },
-    { label: 'YouTube',              pathTemplate: '/admin/youtube',          section: 'Features', icon: 'tv',         keywords: ['youtube', 'video', 'iframe', 'subscriptions'] },
 ];
 
 /**

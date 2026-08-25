@@ -24,7 +24,6 @@ export const NAV_ICON_PATHS: Record<string, ReactNode> = {
     music: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.657-1.79 3-4 3s-4-1.343-4-3 1.79-3 4-3 4 1.343 4 3z" />,
     podcasts: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14a3 3 0 003-3V6a3 3 0 00-6 0v5a3 3 0 003 3zm0 0v4m-4 3h8m-9.5-8.5a6 6 0 0011 0" />,
     radio: <><circle cx="12" cy="14" r="2" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6.34 8.34a8 8 0 0111.32 0M9.17 11.17a4 4 0 015.66 0" /></>,
-    youtube: <><rect x="2.5" y="6" width="19" height="12" rx="3" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9.5l5 2.5-5 2.5z" /></>,
     Movie: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 4h16c.55 0 1 .45 1 1v14c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1V5c0-.55.45-1 1-1z" />,
     TvShow: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18v10H3z M8 21h8 M12 17v4" />,
     Music: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.657-1.79 3-4 3s-4-1.343-4-3 1.79-3 4-3 4 1.343 4 3z" />,

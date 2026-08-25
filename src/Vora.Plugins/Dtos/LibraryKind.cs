@@ -8,7 +8,6 @@ public enum LibraryKind
     HomeVideo,
     Photo,
     Podcast,
-    YouTube,
     Audiobook
 }
 

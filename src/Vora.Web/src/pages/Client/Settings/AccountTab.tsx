@@ -1,8 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { profileService } from '../../../api/Users/profileService';
-import { youtubeService } from '../../../api/YouTube/youtubeService';
-import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { useDialog } from '../../../dialogs';
 import { StorageKeys } from '../../../utils/storageKeys';
 
@@ -24,100 +22,7 @@ export default function AccountTab({ serverId }: { serverId?: string }) {
             </section>
             <ShowtimesLocationSection serverId={serverId} />
             <PlaybackPreferencesSection serverId={serverId} />
-            <YouTubeToggleSection serverId={serverId} />
         </div>
-    );
-}
-
-function YouTubeToggleSection({ serverId }: { serverId?: string }) {
-    const dialog = useDialog();
-    const [isEnabled, setIsEnabled] = useState(true);
-    const [isAvailable, setIsAvailable] = useState(false);
-    const [unavailableReason, setUnavailableReason] = useState<string | undefined>(undefined);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-
-    const currentUserId = localStorage.getItem(StorageKeys.userId);
-
-    const refresh = useMemo(() => async () => {
-        try {
-            const settings = await youtubeService.getProfileSettings(serverId);
-            setIsEnabled(settings.isEnabled);
-            setIsAvailable(settings.isAvailable);
-            setUnavailableReason(settings.unavailableReason);
-        } catch {
-            // Swallow — the unavailable banner will surface if the refetch fails after first load
-        } finally {
-            setLoading(false);
-        }
-    }, [serverId]);
-
-    useEffect(() => {
-        void refresh();
-    }, [refresh]);
-
-    useSignalREvent("YouTubeAccessChanged", (changedUserId: string) => {
-        if (currentUserId && changedUserId.toLowerCase() === currentUserId.toLowerCase()) {
-            void refresh();
-        }
-    });
-
-    const handleToggle = async () => {
-        const next = !isEnabled;
-        setSaving(true);
-        try {
-            const updated = await youtubeService.updateProfileSettings(next, serverId);
-            setIsEnabled(updated.isEnabled);
-            setIsAvailable(updated.isAvailable);
-            setUnavailableReason(updated.unavailableReason);
-        } catch {
-            await dialog.alert({ title: 'YouTube', message: 'Could not update YouTube preference.' });
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    return (
-        <section className="vora-card p-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex-1">
-                    <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>YouTube</h2>
-                    <p className="m-0 text-sm" style={{ color: 'var(--vora-text-muted)' }}>
-                        Show the YouTube tab in this profile&apos;s navigation. Subscriptions and watch history stay inside Vora.
-                    </p>
-                    {!isAvailable && !loading && (
-                        <p className="mt-2 text-xs" style={{ color: 'var(--vora-warning-500, var(--vora-text-muted))' }}>
-                            {unavailableReason ?? 'YouTube is unavailable for this profile.'}
-                        </p>
-                    )}
-                </div>
-                <label
-                    className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors"
-                    style={{
-                        background: isEnabled ? 'var(--vora-accent-500)' : 'var(--vora-bg-raised)',
-                        border: '1px solid var(--vora-border-subtle)',
-                        opacity: loading || saving ? 0.5 : 1,
-                        cursor: loading || saving ? 'wait' : 'pointer',
-                    }}
-                    aria-label={`YouTube tab is ${isEnabled ? 'enabled' : 'disabled'}`}
-                >
-                    <input
-                        type="checkbox"
-                        checked={isEnabled}
-                        disabled={loading || saving}
-                        onChange={handleToggle}
-                        className="absolute inset-0 cursor-pointer opacity-0"
-                    />
-                    <span
-                        className="inline-block h-4 w-4 transform rounded-full shadow-sm transition-transform"
-                        style={{
-                            background: 'var(--vora-text-primary)',
-                            transform: `translateX(${isEnabled ? '22px' : '4px'})`,
-                        }}
-                    />
-                </label>
-            </div>
-        </section>
     );
 }
 

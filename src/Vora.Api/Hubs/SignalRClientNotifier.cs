@@ -84,7 +84,4 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
 
     public Task NotifyLibraryMigrationUpdatedAsync(LibraryMigrationJobVM job) =>
         hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("LibraryMigrationUpdated", job);
-
-    public Task NotifyYouTubeAccessChangedAsync(Guid userId) =>
-        hubContext.Clients.Groups(VoraHub.UserGroupName(userId), VoraHub.AdminGroupName).SendAsync("YouTubeAccessChanged", userId.ToString());
 }

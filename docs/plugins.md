@@ -51,8 +51,6 @@ User-facing docs and the full plugin/setting matrix live in the README's **Boots
 
 **Built-in providers** live inside the `Vora.Plugins` project. To add one: drop a new file under `Providers/<Source>/<Whatever>Provider.cs`, implement `IVoraPlugin` plus the relevant provider interface, and the loader picks it up automatically on the next build.
 
-**Settings-only plugins** are also a thing — a plugin that's just a settings carrier for a built-in feature, with no provider interface. They implement `IVoraPlugin` directly and expose a `Type` string that names a new admin home (e.g. `YouTube` → `/admin/youtube`). The actual feature lives in the regular app layers (`Vora.Application`, `Vora.Api`, EF entities in `Vora.Domain`); the plugin only exists to declare the `api_key` / enable-toggle / region fields and let env-seeding work. See `Vora.Plugins/Providers/YouTube/YouTubePlugin.cs` and `docs/youtube.md`.
-
 **External (third-party) plugins** are separate assemblies dropped into `<install>/Plugins/`. An external plugin project:
 
 - References `Vora.Plugins` (and `Vora.Domain` only if entity shapes are required).
@@ -91,7 +89,6 @@ Each plugin category has a canonical home:
 | `Recommendation` | For You (`/admin/for-you`) |
 | `Calendar` | Release Calendar (`/admin/release-calendar`) |
 | `PodcastDiscovery` | Podcasts (`/admin/podcasts`) |
-| `YouTube` | YouTube (`/admin/youtube`) |
 | `Artwork`, `Metadata`, `Ratings`, `FolderWatcher`, `LocalScanner`, `Chronology` | Libraries (TBD) |
 | `CollectionSync` | Collections (TBD) |
 | `OverlayEngine` | Poster Overlays (TBD) |
