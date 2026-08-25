@@ -63,7 +63,7 @@ export default function CinematicBackdrop({ src, intensity = 'detail', parallax,
                 style={{
                     transition: 'opacity 560ms var(--vora-ease-out, ease-out)',
                     opacity,
-                    backgroundImage: currentSrc ? `url("${thumbUrl(currentSrc, 1280, 'backdrop')}")` : 'none',
+                    backgroundImage: currentSrc ? `url("${thumbUrl(currentSrc, intensity === 'hero' ? 1920 : 1280, 'backdrop')}")` : 'none',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center 20%',
                     backgroundColor: 'var(--vora-bg-sunken)',

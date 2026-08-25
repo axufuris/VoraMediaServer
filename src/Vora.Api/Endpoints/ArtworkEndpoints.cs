@@ -100,7 +100,8 @@ public static partial class ArtworkEndpoints
         <= 360 => 360,
         <= 500 => 500,
         <= 780 => 780,
-        _ => 1280
+        <= 1280 => 1280,
+        _ => 1920
     };
 
     private static async Task<IResult> GetMediaArtworkAsync(Guid id, IArtworkService service)
