@@ -49,7 +49,6 @@ export const VORA_EVENTS = {
     BackupCreated: 'BackupCreated',
     BackupRestored: 'BackupRestored',
     LibraryMigrationUpdated: 'LibraryMigrationUpdated',
-    YouTubeAccessChanged: 'YouTubeAccessChanged',
 } as const;
 
 export type VoraEventName = typeof VORA_EVENTS[keyof typeof VORA_EVENTS];

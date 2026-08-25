@@ -11,7 +11,6 @@ public class LibraryKindExtensionsTests
     [InlineData("HomeVideo", LibraryKind.HomeVideo)]
     [InlineData("Photo", LibraryKind.Photo)]
     [InlineData("Podcast", LibraryKind.Podcast)]
-    [InlineData("YouTube", LibraryKind.YouTube)]
     [InlineData("Audiobook", LibraryKind.Audiobook)]
     public void TryParseLibraryKind_recognises_each_enum_value(string input, LibraryKind expected)
     {

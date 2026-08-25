@@ -3,12 +3,16 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Vora.Api.Tests.Infra;
 using Vora.Application.Plugins.ViewModels;
-using Vora.Plugins.Providers.YouTube;
 
 namespace Vora.Api.Tests;
 
 public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
 {
+    // A stable built-in system plugin used as the subject for the generic
+    // plugin-toggle flow (listing, enable/disable, admin-only auth).
+    private const string PluginId = "tmdb_metadata";
+    private const string PluginName = "The Movie Database (TMDB)";
+
     private readonly VoraApiTestFactory _factory;
 
     public PluginToggleFlowTests(VoraApiTestFactory factory)
@@ -25,7 +29,7 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
     }
 
     [Fact]
-    public async Task GET_plugins_returns_youtube_plugin_in_the_listing()
+    public async Task GET_plugins_returns_builtin_plugin_in_the_listing()
     {
         // NOTE: this class uses IClassFixture so the in-memory DB is shared across tests
         // and xUnit doesn't guarantee execution order. We can't reliably assert the
@@ -37,9 +41,9 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var plugins = await response.Content.ReadFromJsonAsync<List<PluginVM>>(TestContext.Current.CancellationToken);
         plugins.Should().NotBeNull();
-        var yt = plugins!.FirstOrDefault(p => p.Id == YouTubePlugin.PluginId);
-        yt.Should().NotBeNull("YouTube is a built-in plugin and should always be present");
-        yt!.Name.Should().Be("YouTube");
+        var yt = plugins!.FirstOrDefault(p => p.Id == PluginId);
+        yt.Should().NotBeNull($"{PluginId} is a built-in plugin and should always be present");
+        yt!.Name.Should().Be(PluginName);
         yt.IsSystemPlugin.Should().BeTrue();
     }
 
@@ -49,7 +53,7 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
         var client = AdminClient();
 
         // Toggle off
-        var put = await client.PutAsJsonAsync($"/api/settings/plugins/{YouTubePlugin.PluginId}", new Dictionary<string, string>
+        var put = await client.PutAsJsonAsync($"/api/settings/plugins/{PluginId}", new Dictionary<string, string>
         {
             ["is_enabled"] = "false"
         },
@@ -59,11 +63,11 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
         // Verify via plugin listing
         var get = await client.GetAsync("/api/plugins", TestContext.Current.CancellationToken);
         var plugins = await get.Content.ReadFromJsonAsync<List<PluginVM>>(TestContext.Current.CancellationToken);
-        var yt = plugins!.Single(p => p.Id == YouTubePlugin.PluginId);
+        var yt = plugins!.Single(p => p.Id == PluginId);
         yt.IsEnabled.Should().BeFalse();
 
         // Verify via per-plugin settings endpoint
-        var settings = await client.GetFromJsonAsync<List<PluginSettingFieldVM>>($"/api/settings/plugins/{YouTubePlugin.PluginId}", TestContext.Current.CancellationToken);
+        var settings = await client.GetFromJsonAsync<List<PluginSettingFieldVM>>($"/api/settings/plugins/{PluginId}", TestContext.Current.CancellationToken);
         var enabledField = settings!.Single(f => f.Key == "is_enabled");
         enabledField.Value.Should().Be("false");
     }
@@ -73,12 +77,12 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        await client.PutAsJsonAsync($"/api/settings/plugins/{YouTubePlugin.PluginId}", new Dictionary<string, string>
+        await client.PutAsJsonAsync($"/api/settings/plugins/{PluginId}", new Dictionary<string, string>
         {
             ["is_enabled"] = "false"
         },
         TestContext.Current.CancellationToken);
-        await client.PutAsJsonAsync($"/api/settings/plugins/{YouTubePlugin.PluginId}", new Dictionary<string, string>
+        await client.PutAsJsonAsync($"/api/settings/plugins/{PluginId}", new Dictionary<string, string>
         {
             ["is_enabled"] = "true"
         },
@@ -86,7 +90,7 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
 
         var get = await client.GetAsync("/api/plugins", TestContext.Current.CancellationToken);
         var plugins = await get.Content.ReadFromJsonAsync<List<PluginVM>>(TestContext.Current.CancellationToken);
-        var yt = plugins!.Single(p => p.Id == YouTubePlugin.PluginId);
+        var yt = plugins!.Single(p => p.Id == PluginId);
         yt.IsEnabled.Should().BeTrue();
     }
 
@@ -109,7 +113,7 @@ public class PluginToggleFlowTests : IClassFixture<VoraApiTestFactory>
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", profileToken);
 
-        var response = await client.PutAsJsonAsync($"/api/settings/plugins/{YouTubePlugin.PluginId}", new Dictionary<string, string>
+        var response = await client.PutAsJsonAsync($"/api/settings/plugins/{PluginId}", new Dictionary<string, string>
         {
             ["is_enabled"] = "false"
         },

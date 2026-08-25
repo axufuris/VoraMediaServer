@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { libraryService } from '../api/Media/libraryService';
 import { authService } from '../api/Auth/authService';
@@ -19,16 +19,14 @@ import MainLayoutSidebar from './parts/MainLayoutSidebar';
 import MainLayoutUserMenu from './parts/MainLayoutUserMenu';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import type { FeatureFlagsVM } from '../api/System/featureFlagsService';
-import { youtubeService } from '../api/YouTube/youtubeService';
 
-const isNavItemEnabled = (item: NavItem, flags: FeatureFlagsVM, youtubeAvailable: boolean): boolean => {
+const isNavItemEnabled = (item: NavItem, flags: FeatureFlagsVM): boolean => {
     if (item.type !== 'system') return true;
     switch (item.id) {
         case 'discovery': return flags.discover || flags.forYou || flags.releaseCalendar;
         case 'podcasts': return flags.podcasts;
         case 'radio': return flags.internetRadio;
         case 'livetv': return flags.liveTv;
-        case 'youtube': return youtubeAvailable;
         default: return true;
     }
 };
@@ -105,32 +103,6 @@ export default function MainLayout() {
     const [isServerManagerOpen, setIsServerManagerOpen] = useState(false);
 
     const flags = useFeatureFlags();
-    const [youtubeAvailable, setYoutubeAvailable] = useState(false);
-
-    const refreshYouTubeAvailability = useCallback(() => {
-        if (!activeProfileId) {
-            setYoutubeAvailable(false);
-            return;
-        }
-        youtubeService.getProfileSettings(serverId)
-            .then((settings) => setYoutubeAvailable(settings.isAvailable && settings.isEnabled))
-            .catch(() => setYoutubeAvailable(false));
-    }, [activeProfileId, serverId]);
-
-    const refreshYouTubeAvailabilityRef = useRef(refreshYouTubeAvailability);
-    useEffect(() => {
-        refreshYouTubeAvailabilityRef.current = refreshYouTubeAvailability;
-    });
-
-    useEffect(() => {
-        refreshYouTubeAvailabilityRef.current();
-    }, [activeProfileId, serverId]);
-
-    useSignalREvent("YouTubeAccessChanged", useCallback((changedUserId: string) => {
-        if (currentUserId && changedUserId.toLowerCase() === currentUserId.toLowerCase()) {
-            refreshYouTubeAvailabilityRef.current();
-        }
-    }, [currentUserId]));
 
     useSignalREvent("UserAccessUpdated", useCallback(async (updatedUserId: string) => {
         if (currentUserId && updatedUserId.toLowerCase() === currentUserId.toLowerCase()) {
@@ -213,7 +185,6 @@ export default function MainLayout() {
                 { id: 'podcasts', title: 'Podcasts', path: '/podcasts', type: 'system', serverName: primaryServerName, isPinned: true, order: 1 },
                 { id: 'livetv', title: 'Live TV', path: '/livetv', type: 'system', isPinned: true, order: 2 },
                 { id: 'radio', title: 'Radio', path: '/radio', type: 'system', isPinned: true, order: 3 },
-                { id: 'youtube', title: 'YouTube', path: '/youtube', type: 'system', isPinned: true, order: 4 },
                 { id: 'discovery', title: 'Discover', path: '/discovery', type: 'system', isPinned: true, order: 5 },
                 { id: 'collections', title: 'Collections', path: '/collections', type: 'system', isPinned: true, order: 6 }
             ];
@@ -367,7 +338,7 @@ export default function MainLayout() {
         );
     }
 
-    const gatedNavItems = navItems.filter(i => isNavItemEnabled(i, flags, youtubeAvailable));
+    const gatedNavItems = navItems.filter(i => isNavItemEnabled(i, flags));
     const pinnedItems = gatedNavItems.filter(i => i.isPinned);
     const unpinnedItems = gatedNavItems.filter(i => !i.isPinned);
 

@@ -48,7 +48,6 @@ using Vora.Application.Templates;
 using Vora.Application.Themes;
 using Vora.Application.Users;
 using Vora.Application.Watchers;
-using Vora.Application.YouTube;
 using Vora.Infrastructure.Analysis;
 using Vora.Infrastructure.Email;
 using Vora.Infrastructure.FileSystem;
@@ -370,8 +369,6 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IUserMediaStateRepository, UserMediaStateRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ILibraryMigrationRepository, LibraryMigrationRepository>();
-        services.AddScoped<IYouTubeAccessRepository, YouTubeAccessRepository>();
-        services.AddScoped<IYouTubeRepository, YouTubeRepository>();
         return services;
     }
 
@@ -442,8 +439,6 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IClientTemplateManager, ClientTemplateManager>();
         services.AddScoped<IUserManager, UserManager>();
         services.AddScoped<IUserMediaStateManager, UserMediaStateManager>();
-        services.AddScoped<IYouTubeAccessResolver, YouTubeAccessResolver>();
-        services.AddScoped<IYouTubeManager, YouTubeManager>();
         return services;
     }
 
@@ -462,7 +457,6 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<Vora.Application.Metadata.ReferenceWriteGate>();
         services.AddScoped<IRequestNotificationService, RequestNotificationService>();
         services.AddScoped<IUserProfileImageService, UserProfileImageService>();
-        services.AddScoped<IYouTubeDataApiClient, YouTubeDataApiClient>();
         services.AddScoped<CollectionOrderingService>();
         services.AddScoped<CollectionSyncService>();
         services.AddScoped<CollectionMembershipService>();
@@ -575,18 +569,6 @@ public static class ServiceRegistrationExtensions
             client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Library Migration)");
         }).AddVoraResilience(totalTimeoutSeconds: 60);
-        services.AddHttpClient(YouTubeDataApiClient.DataApiHttpClientName, client =>
-        {
-            client.Timeout = Timeout.InfiniteTimeSpan;
-            client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (YouTube Client)");
-            client.DefaultRequestHeaders.Add("Accept", "application/json");
-        }).AddVoraResilience(totalTimeoutSeconds: 30);
-        services.AddHttpClient(YouTubeDataApiClient.RssHttpClientName, client =>
-        {
-            client.Timeout = Timeout.InfiniteTimeSpan;
-            client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (YouTube RSS Reader)");
-            client.DefaultRequestHeaders.Add("Accept", "application/atom+xml, application/xml, text/xml");
-        }).AddVoraResilience(totalTimeoutSeconds: 30);
         services.AddMemoryCache();
         return services;
     }

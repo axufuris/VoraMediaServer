@@ -48,11 +48,6 @@ const SearchPage = lazy(() => import('./pages/Client/SearchPage'));
 const AdminDiscoveryPage = lazy(() => import('./pages/Admin/Discovery/DiscoveryPage'));
 const ClientDiscoveryDetailsPage = lazy(() => import('./pages/Client/Discovery/DiscoveryDetailsPage'));
 const ClientDiscoveryActorPage = lazy(() => import('./pages/Client/Discovery/DiscoveryActorPage'));
-const ClientYouTubePage = lazy(() => import('./pages/Client/YouTube/YouTubePage'));
-const ClientYouTubeChannelPage = lazy(() => import('./pages/Client/YouTube/YouTubeChannelPage'));
-const ClientYouTubePlayerPage = lazy(() => import('./pages/Client/YouTube/YouTubePlayerPage'));
-const ClientYouTubeSubscriptionsPage = lazy(() => import('./pages/Client/YouTube/YouTubeSubscriptionsPage'));
-const AdminYouTubePage = lazy(() => import('./pages/Admin/Features/YouTubeAdminPage'));
 const ClientDiscoveryViewAllPage = lazy(() => import('./pages/Client/Discovery/DiscoveryViewAllPage'));
 const AdminRequestsPage = lazy(() => import('./pages/Admin/RequestsPage'));
 const AdminAiStatsPage = lazy(() => import('./pages/Admin/AiStatsPage'));
@@ -186,10 +181,6 @@ export default function App() {
                         <Route path="discovery/:providerId/row/:rowId" element={<ClientDiscoveryViewAllPage />} />
                         <Route path="discovery/:providerId/:type/:externalId" element={<ClientDiscoveryDetailsPage />} />
                         <Route path="discovery/:providerId/actor/:externalId" element={<ClientDiscoveryActorPage />} />
-                        <Route path="youtube" element={<ClientYouTubePage />} />
-                        <Route path="youtube/subscriptions" element={<ClientYouTubeSubscriptionsPage />} />
-                        <Route path="youtube/channel/:channelId" element={<ClientYouTubeChannelPage />} />
-                        <Route path="youtube/watch/:videoId" element={<ClientYouTubePlayerPage />} />
 
                         <Route path="server/:serverId" element={<ServerContextWrapper />}>
                             <Route path="search" element={<SearchPage />} />
@@ -210,10 +201,6 @@ export default function App() {
                             <Route path="discovery/:providerId/row/:rowId" element={<ClientDiscoveryViewAllPage />} />
                             <Route path="discovery/:providerId/:type/:externalId" element={<ClientDiscoveryDetailsPage />} />
                             <Route path="discovery/:providerId/actor/:externalId" element={<ClientDiscoveryActorPage />} />
-                            <Route path="youtube" element={<ClientYouTubePage />} />
-                            <Route path="youtube/subscriptions" element={<ClientYouTubeSubscriptionsPage />} />
-                            <Route path="youtube/channel/:channelId" element={<ClientYouTubeChannelPage />} />
-                            <Route path="youtube/watch/:videoId" element={<ClientYouTubePlayerPage />} />
                         </Route>
                     </Route>
 
@@ -237,7 +224,6 @@ export default function App() {
                         <Route path="for-you" element={<AdminForYouPage />} />
                         <Route path="release-calendar" element={<AdminReleaseCalendarPage />} />
                         <Route path="dvr-settings" element={<AdminDvrPage />} />
-                        <Route path="youtube" element={<AdminYouTubePage />} />
                         <Route path="requests" element={<AdminRequestsPage />} />
                         <Route path="ai-stats" element={<AdminAiStatsPage />} />
                         <Route path="overlays" element={<OverlayEditor />} />
@@ -270,7 +256,6 @@ export default function App() {
                         <Route path="for-you" element={<AdminForYouPage />} />
                         <Route path="release-calendar" element={<AdminReleaseCalendarPage />} />
                         <Route path="dvr-settings" element={<AdminDvrPage />} />
-                        <Route path="youtube" element={<AdminYouTubePage />} />
                             <Route path="requests" element={<AdminRequestsPage />} />
                             <Route path="ai-stats" element={<AdminAiStatsPage />} />
                             <Route path="overlays" element={<OverlayEditor />} />
