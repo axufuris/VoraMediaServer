@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SixLabors.ImageSharp;
@@ -20,7 +21,7 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
     private const int PruneEveryWrites = 250;
     private const string DefaultKindFolder = "posters";
 
-    private static readonly int[] WidthBuckets = { 200, 360, 500, 780, 1280 };
+    private static readonly int[] WidthBuckets = { 200, 360, 500, 780, 1280, 1920 };
 
     private static readonly IReadOnlyDictionary<string, string> KindFolders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -74,7 +75,7 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
         byte[]? sourceBytes;
         try
         {
-            sourceBytes = await LoadSourceAsync(src, cancellationToken);
+            sourceBytes = await LoadSourceAsync(ResolveDownloadSource(src, width), cancellationToken);
         }
         catch (Exception ex)
         {
@@ -137,6 +138,19 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
     {
         if (!string.IsNullOrWhiteSpace(kind) && KindFolders.TryGetValue(kind, out var folder)) return folder;
         return DefaultKindFolder;
+    }
+
+    private static readonly Regex TmdbSizeSegment = new(@"(https?://image\.tmdb\.org/t/p/)[wh]\d+(/)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // For the large (hero) bucket, pull TMDB's full-resolution "original" backdrop
+    // rather than the stored w1280, so the downscale to the bucket stays sharp on
+    // wide screens. Smaller buckets keep the stored size to avoid oversized
+    // downloads; the cache key still uses the requested `src`, so nothing else
+    // needs to know about the upgrade.
+    private static string ResolveDownloadSource(string src, int width)
+    {
+        if (width <= 1280) return src;
+        return TmdbSizeSegment.Replace(src, "$1original$2");
     }
 
     private async Task<byte[]?> LoadSourceAsync(string src, CancellationToken cancellationToken)
