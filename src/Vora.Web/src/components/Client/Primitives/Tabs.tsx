@@ -11,12 +11,15 @@ interface TabsProps<TKey extends string> {
     tabs: TabDefinition<TKey>[];
     active: TKey;
     onChange: (key: TKey) => void;
+    // Page-level controls that belong beside the tabs rather than in the page
+    // header — they sit flush right on the same line.
+    actions?: ReactNode;
     className?: string;
 }
 
-export default function Tabs<TKey extends string>({ tabs, active, onChange, className }: TabsProps<TKey>) {
+export default function Tabs<TKey extends string>({ tabs, active, onChange, actions, className }: TabsProps<TKey>) {
     return (
-        <nav className={`flex gap-7 border-b ${className ?? ''}`} style={{ borderColor: 'var(--vora-border-subtle)' }} role="tablist">
+        <nav className={`flex items-center gap-7 border-b ${className ?? ''}`} style={{ borderColor: 'var(--vora-border-subtle)' }} role="tablist">
             {tabs.map(tab => {
                 const isActive = tab.key === active;
                 return (
@@ -47,6 +50,7 @@ export default function Tabs<TKey extends string>({ tabs, active, onChange, clas
                     </button>
                 );
             })}
+            {actions && <div className="ml-auto flex items-center gap-2 pb-2 pl-4">{actions}</div>}
         </nav>
     );
 }

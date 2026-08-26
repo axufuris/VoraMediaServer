@@ -137,6 +137,7 @@ export interface MediaItem {
     upcomingEpisodesJson?: string;
     collectionIds: string[];
     genres?: string[];
+    studios?: string[];
     seasons?: Season[];
     cast?: CastMember[];
     videos?: MediaVideo[];

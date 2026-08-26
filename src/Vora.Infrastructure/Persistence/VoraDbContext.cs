@@ -1500,7 +1500,6 @@ public class VoraDbContext : DbContext
             {
                 Id = Guid.Parse("73c33c2c-1fe6-4885-875e-481a1dac5462"),
                 Title = "Recently Released Movies & Episodes",
-                IsSpotlight = true,
                 ShowOnHomepage = true,
                 ShowToFriends = true,
                 SortBy = SmartListSortBy.ReleaseDateDesc,

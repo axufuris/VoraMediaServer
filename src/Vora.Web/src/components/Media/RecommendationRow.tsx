@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import MediaCard from './MediaCard';
-import MediaRow from '../Common/MediaRow';
-import { posterCaption } from '../../utils/posterCaption';
+import MediaRow, { MediaRowItem } from '../Client/Primitives/MediaRow';
+import MediaCard from '../Client/Primitives/MediaCard';
 import type { RecommendationListVM } from '../../api/Discovery/recommendationService';
 
 interface RecommendationRowProps {
@@ -15,25 +14,18 @@ export default function RecommendationRow({ list, serverId }: RecommendationRowP
     if (!list.items || list.items.length === 0) return null;
 
     return (
-        <MediaRow title={list.title} subtitle={list.description} variant="home">
-            {list.items.map(item => {
-                const cap = posterCaption(item);
-                return (
-                <div key={item.id} className="flex-none w-40 sm:w-48 snap-start">
+        <MediaRow title={list.title} subtitle={list.description}>
+            {list.items.map(item => (
+                <MediaRowItem key={item.id}>
                     <MediaCard
-                        id={item.id}
-                        title={cap.title}
-                        captionLines={cap.lines}
+                        item={item}
                         imageUrl={item.posterUrl}
-                        type={item.type}
-                        aspectRatio="poster"
                         isPlayed={item.isPlayed}
                         unplayedCount={item.unplayedItemCount}
                         onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
                     />
-                </div>
-                );
-            })}
+                </MediaRowItem>
+            ))}
         </MediaRow>
     );
 }

@@ -10,6 +10,7 @@ namespace Vora.Plugins.Providers.Tmdb;
 public class TmdbDiscoveryProvider : IDiscoveryProvider
 {
     private const long CacheEntrySize = 1024;
+    private const int MaxCredits = 20;
 
     private readonly HttpClient _httpClient;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -180,7 +181,8 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
             var isTv = type.Equals("TvShow", StringComparison.OrdinalIgnoreCase);
             var endpoint = isTv ? $"tv/{externalId}" : $"movie/{externalId}";
 
-            var response = await _httpClient.GetAsync($"{endpoint}?api_key={apiKey}&append_to_response=credits,videos&language={language}", cancellationToken);
+            var certificationAppend = isTv ? "content_ratings" : "release_dates";
+            var response = await _httpClient.GetAsync($"{endpoint}?api_key={apiKey}&append_to_response=credits,videos,{certificationAppend}&language={language}", cancellationToken);
             if (!response.IsSuccessStatusCode) return null;
 
             using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -210,9 +212,30 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
                 PosterUrl = el.TryGetProperty("poster_path", out var p) && p.ValueKind != JsonValueKind.Null ? $"https://image.tmdb.org/t/p/w500{p.GetString()}" : null,
                 BackgroundUrl = el.TryGetProperty("backdrop_path", out var b) && b.ValueKind != JsonValueKind.Null ? $"https://image.tmdb.org/t/p/w1280{b.GetString()}" : null,
                 Year = parsedDate?.Year,
-                ReleaseDate = parsedDate, // <-- I ACCIDENTALLY DELETED THIS LINE IN THE LAST STEP!
-                NextAirDate = parsedNextAirDate
+                ReleaseDate = parsedDate,
+                NextAirDate = parsedNextAirDate,
+                Rating = el.TryGetProperty("vote_average", out var va) && va.TryGetDecimal(out var voteAverage) && voteAverage > 0 ? voteAverage : null,
+                RuntimeMinutes = ReadRuntimeMinutes(el, isTv),
+                ContentRating = ReadCertification(el, isTv)
             };
+
+            if (el.TryGetProperty("genres", out var genres) && genres.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var genre in genres.EnumerateArray())
+                {
+                    var name = genre.TryGetProperty("name", out var gn) ? gn.GetString() : null;
+                    if (!string.IsNullOrWhiteSpace(name)) details.Genres.Add(name);
+                }
+            }
+
+            if (el.TryGetProperty("production_companies", out var companies) && companies.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var company in companies.EnumerateArray())
+                {
+                    var name = company.TryGetProperty("name", out var cn) ? cn.GetString() : null;
+                    if (!string.IsNullOrWhiteSpace(name)) details.Studios.Add(name);
+                }
+            }
 
             if (el.TryGetProperty("credits", out var credits) && credits.TryGetProperty("cast", out var cast))
             {
@@ -224,6 +247,27 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
                         Name = actor.GetProperty("name").GetString() ?? "Unknown",
                         Role = actor.TryGetProperty("character", out var c) ? c.GetString() ?? "Actor" : "Actor",
                         ProfileImageUrl = actor.TryGetProperty("profile_path", out var pp) && pp.ValueKind != JsonValueKind.Null ? $"https://image.tmdb.org/t/p/w185{pp.GetString()}" : null
+                    });
+                }
+            }
+
+            if (el.TryGetProperty("credits", out var creditsForCrew) && creditsForCrew.TryGetProperty("crew", out var crew))
+            {
+                foreach (var member in crew.EnumerateArray())
+                {
+                    var role = MapCrewJob(member.TryGetProperty("job", out var job) ? job.GetString() : null);
+                    if (role == null) continue;
+                    if (details.Cast.Count >= MaxCredits) break;
+
+                    var externalCrewId = member.TryGetProperty("id", out var cid) ? cid.GetInt32().ToString() : null;
+                    if (externalCrewId == null || details.Cast.Any(c => c.ExternalId == externalCrewId)) continue;
+
+                    details.Cast.Add(new CastMemberDto
+                    {
+                        ExternalId = externalCrewId,
+                        Name = member.TryGetProperty("name", out var cnm) ? cnm.GetString() ?? "Unknown" : "Unknown",
+                        Role = role,
+                        ProfileImageUrl = member.TryGetProperty("profile_path", out var cpp) && cpp.ValueKind != JsonValueKind.Null ? $"https://image.tmdb.org/t/p/w185{cpp.GetString()}" : null
                     });
                 }
             }
@@ -248,6 +292,62 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
 
             return details;
         });
+    }
+
+    private static string? MapCrewJob(string? job) => job switch
+    {
+        "Director" => "Director",
+        "Writer" or "Screenplay" or "Story" => "Writer",
+        "Producer" or "Executive Producer" => "Producer",
+        _ => null
+    };
+
+    private static int? ReadRuntimeMinutes(JsonElement el, bool isTv)
+    {
+        if (isTv)
+        {
+            if (el.TryGetProperty("episode_run_time", out var runTimes) && runTimes.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var entry in runTimes.EnumerateArray())
+                {
+                    if (entry.TryGetInt32(out var minutes) && minutes > 0) return minutes;
+                }
+            }
+            return null;
+        }
+
+        return el.TryGetProperty("runtime", out var rt) && rt.ValueKind == JsonValueKind.Number && rt.TryGetInt32(out var movieMinutes) && movieMinutes > 0
+            ? movieMinutes
+            : null;
+    }
+
+    private static string? ReadCertification(JsonElement el, bool isTv)
+    {
+        if (isTv)
+        {
+            if (!el.TryGetProperty("content_ratings", out var crObj) || !crObj.TryGetProperty("results", out var crResults)) return null;
+            foreach (var country in crResults.EnumerateArray())
+            {
+                if (!country.TryGetProperty("iso_3166_1", out var iso) || iso.GetString() != "US") continue;
+                var cert = country.TryGetProperty("rating", out var r) ? r.GetString() : null;
+                if (!string.IsNullOrWhiteSpace(cert)) return cert;
+            }
+            return null;
+        }
+
+        if (!el.TryGetProperty("release_dates", out var rdObj) || !rdObj.TryGetProperty("results", out var rdResults)) return null;
+        foreach (var country in rdResults.EnumerateArray())
+        {
+            if (!country.TryGetProperty("iso_3166_1", out var iso) || iso.GetString() != "US") continue;
+            if (!country.TryGetProperty("release_dates", out var dates) || dates.ValueKind != JsonValueKind.Array) continue;
+
+            foreach (var release in dates.EnumerateArray())
+            {
+                var cert = release.TryGetProperty("certification", out var c) ? c.GetString() : null;
+                if (!string.IsNullOrWhiteSpace(cert)) return cert;
+            }
+        }
+        return null;
     }
 
     public async Task<DiscoveryActorDto?> GetActorDetailsAsync(string externalId, CancellationToken cancellationToken = default)

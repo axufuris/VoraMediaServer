@@ -5,7 +5,8 @@ import { collectionService, type CollectionSummary } from '../../../api/Collecti
 import CreateCollectionModal from '../../../components/Collections/CreateCollectionModal';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
-import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import MediaCard from '../../../components/Client/Primitives/MediaCard';
+import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import { StorageKeys } from '../../../utils/storageKeys';
 
 export default function CollectionsPage() {
@@ -134,9 +135,9 @@ export default function CollectionsPage() {
 
             <div className="px-8 pt-6">
                 {loading ? (
-                    <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
+                    <MediaGrid>
                         {Array.from({ length: 10 }, (_, i) => <div key={i} className="vora-skeleton aspect-[2/3]" />)}
-                    </div>
+                    </MediaGrid>
                 ) : collections.length === 0 ? (
                     <EmptyState
                         title="No collections in this section"
@@ -153,18 +154,17 @@ export default function CollectionsPage() {
                         )}
                     />
                 ) : (
-                    <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
+                    <MediaGrid>
                         {collections.map(collection => (
-                            <MediaPoster
+                            <MediaCard
                                 key={collection.id}
+                                item={{ type: 'Collection', title: collection.title, itemCount: collection.itemCount }}
                                 imageUrl={collection.posterUrl}
-                                title={collection.title}
-                                subtitle={`${collection.itemCount} item${collection.itemCount === 1 ? '' : 's'}`}
                                 onClick={() => navigate(serverId ? `/server/${serverId}/collection/${collection.id}` : `/collection/${collection.id}`)}
                                 fill
                             />
                         ))}
-                    </div>
+                    </MediaGrid>
                 )}
             </div>
         </div>

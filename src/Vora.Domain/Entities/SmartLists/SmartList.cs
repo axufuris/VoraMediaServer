@@ -16,7 +16,6 @@ public class SmartList
 
     public bool ShowOnHomepage { get; set; } = true;
     public bool ShowToFriends { get; set; } = true;
-    public bool IsSpotlight { get; set; }
 
     public int? ActiveStartMonth { get; set; }
     public int? ActiveStartDay { get; set; }

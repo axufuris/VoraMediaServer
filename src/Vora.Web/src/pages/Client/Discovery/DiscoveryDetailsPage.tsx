@@ -3,9 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { discoveryService, type DiscoveryItemDetails, type Trailer, type Theater } from '../../../api/Discovery/discoveryService';
 import { useDialog } from '../../../dialogs';
-import MediaRow from '../../../components/Common/MediaRow';
-import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
+import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
+import CastRow from '../../../components/Client/Primitives/CastRow';
+import VideoCard from '../../../components/Client/Primitives/VideoCard';
+import DetailHero, { HeroChip, HeroCredits } from '../../../components/Client/Primitives/DetailHero';
+import { directorsFrom } from '../../../utils/credits';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { formatRuntime } from '../../../utils/formatRuntime';
 
 export default function DiscoveryDetailsPage() {
     const dialog = useDialog();
@@ -145,6 +149,9 @@ export default function DiscoveryDetailsPage() {
     if (isLoading) return <div className="p-12 text-center text-[var(--vora-text-muted)] mt-16">Loading details...</div>;
     if (!details) return <div className="p-12 text-center text-[var(--vora-danger-500)] mt-16">Media details not found.</div>;
 
+    const runtime = formatRuntime(details.runtimeMinutes);
+    const runtimeLabel = runtime && details.type === 'TvShow' ? `${runtime} episodes` : runtime;
+
     const modalContent = playingTrailer ? (
         <div className="fixed inset-0 z-[99999] bg-black flex items-center justify-center">
             <button
@@ -170,125 +177,91 @@ export default function DiscoveryDetailsPage() {
     return (
         <>
             <div className="relative min-h-full pb-16">
-
-                <div className="absolute inset-x-0 top-0 z-0">
-                    <CinematicBackdrop src={details.backgroundUrl} intensity="detail" parallax transitionKey={details.externalId} />
-                </div>
-
-                <div className="relative z-10 px-12 pt-8">
-                    <button
-                        type="button"
-                        onClick={() => navigate(-1)}
-                        className="mb-8 inline-flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                        style={{ background: 'rgba(20, 20, 28, 0.65)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#fafafa' }}
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-                        Back to Discover
-                    </button>
-
-                    <div className="flex flex-col md:flex-row gap-10">
-                        <div className="w-64 shrink-0 relative">
-                            <div className="aspect-[2/3] rounded-lg overflow-hidden shadow-2xl border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] relative">
-                                {details.posterUrl ? <img src={details.posterUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-muted)]">No Image</div>}
-                            </div>
+                <DetailHero
+                    backdropSrc={details.backgroundUrl || details.posterUrl}
+                    transitionKey={details.externalId}
+                    posterSrc={details.posterUrl}
+                    onBack={() => navigate(-1)}
+                    backLabel="Back to Discover"
+                    eyebrow={[details.type === 'TvShow' ? 'TV Series' : 'Movie', details.year].filter(Boolean).join(' · ')}
+                    title={details.title}
+                    chips={(
+                        <>
+                            {runtimeLabel && <HeroChip>{runtimeLabel}</HeroChip>}
+                            {details.contentRating && <HeroChip>{details.contentRating}</HeroChip>}
+                            {details.inLibrary && <HeroChip tone="accent">In your library</HeroChip>}
+                            {details.nextAirDate && <HeroChip>Next air date {new Date(details.nextAirDate).toLocaleDateString()}</HeroChip>}
+                            {requestStatus === 0 && <HeroChip>Request pending</HeroChip>}
+                            {requestStatus === 3 && <HeroChip>Downloading</HeroChip>}
+                            {requestStatus === 4 && <HeroChip tone="accent">Available in library</HeroChip>}
+                        </>
+                    )}
+                    ratings={details.rating != null && details.rating > 0 ? (
+                        <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
+                            <span className="font-semibold">The Movie Database</span>
+                            <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{details.rating.toFixed(1)}</span>
                         </div>
+                    ) : undefined}
+                    credits={<HeroCredits directors={directorsFrom(details.cast)} genres={details.genres} studios={details.studios} />}
+                    actions={(
+                        <button
+                            type="button"
+                            onClick={handleToggleWatchlist}
+                            className={inWatchlist ? 'vora-button-secondary cursor-pointer' : 'vora-button-primary cursor-pointer'}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '0.875rem 1.75rem', fontSize: '0.9375rem' }}
+                        >
+                            {inWatchlist ? (
+                                <>
+                                    <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                    In Watchlist
+                                </>
+                            ) : (
+                                <>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                                    Add to Watchlist
+                                </>
+                            )}
+                        </button>
+                    )}
+                    overview={details.overview}
+                />
 
-                        <div className="flex-1 pt-0">
-                            <h1 className="text-[2.75rem] leading-tight font-bold text-[var(--vora-text-primary)] drop-shadow-lg mb-1">
-                                {details.title}
-                            </h1>
-
-                            <div className="flex items-center gap-3 text-sm font-medium text-[var(--vora-text-muted)] mb-8">
-                                <span>{details.type === 'TvShow' ? 'TV Series' : 'Movie'}</span>
-                                {details.year && <span>• {details.year}</span>}
-                            </div>
-
-                            <div className="flex items-center gap-4 mb-8">
-                                <div className="flex items-center gap-4 mb-8">
-                                    <button
-                                        onClick={handleToggleWatchlist}
-                                        className={`px-6 py-2.5 font-bold rounded shadow-lg transition-colors flex items-center gap-2 cursor-pointer ${inWatchlist ? 'bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] border border-[var(--vora-border-subtle)]' : 'bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-text-primary)]'}`}
-                                    >
-                                        {inWatchlist ? (
-                                            <><svg className="w-5 h-5 text-[var(--vora-accent-500)]" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg> In Watchlist</>
-                                        ) : (
-                                            <><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg> Add to Watchlist</>
-                                        )}
-                                    </button>
-
-                                    {requestStatus === 0 && <span className="px-3 py-1 bg-[var(--vora-bg-sunken)]/80 text-[var(--vora-text-secondary)] text-xs font-bold uppercase tracking-wider rounded border border-[var(--vora-border-subtle)]">Request Pending</span>}
-                                    {requestStatus === 3 && <span className="px-3 py-1 bg-blue-900/30 text-blue-400 text-xs font-bold uppercase tracking-wider rounded border border-blue-900/50">Downloading...</span>}
-                                    {requestStatus === 4 && <span className="px-3 py-1 bg-green-900/30 text-green-400 text-xs font-bold uppercase tracking-wider rounded border border-green-900/50">Available in Library</span>}
-                                </div>
-                            </div>
-
-                            <p className="text-[15px] text-[var(--vora-text-secondary)] leading-relaxed max-w-4xl shadow-sm mb-10">
-                                {details.overview || "No overview available."}
-                            </p>
-                        </div>
+                <div className="px-12 pb-16">
+                    <div className="mt-16">
+                        <CastRow
+                            cast={details.cast.map((actor, idx) => {
+                                const isCrew = actor.role === 'Director' || actor.role === 'Writer' || actor.role === 'Creator' || actor.role === 'Crew';
+                                return {
+                                    id: actor.externalId,
+                                    name: actor.name,
+                                    role: isCrew ? actor.role : 'Actor',
+                                    characterName: isCrew ? null : actor.role,
+                                    profileImageUrl: actor.profileImageUrl,
+                                    order: idx,
+                                };
+                            })}
+                            onSelect={member => navigate(serverId ? `/server/${serverId}/discovery/${details.providerId}/actor/${member.id}` : `/discovery/${details.providerId}/actor/${member.id}`)}
+                        />
                     </div>
 
-                    {details.cast.length > 0 && (
-                        <MediaRow title="Cast & Crew" variant="detail" gap="5">
-                                {details.cast.map((actor, idx) => {
-                                    const isCrew = actor.role === 'Director' || actor.role === 'Writer' || actor.role === 'Creator' || actor.role === 'Crew';
-                                    const displayRole = isCrew ? actor.role : 'Actor';
-                                    const characterName = isCrew ? '---' : actor.role;
-
-                                    return (
-                                        <div key={idx} onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${details.providerId}/actor/${actor.externalId}` : `/discovery/${details.providerId}/actor/${actor.externalId}`)} className="w-32 shrink-0 flex flex-col items-center text-center group cursor-pointer">
-                                            <div className="w-32 h-40 rounded-lg overflow-hidden bg-[var(--vora-bg-sunken)] mb-3 border border-[var(--vora-border-subtle)] shadow-lg relative group-hover:border-[var(--vora-accent-500)] transition-colors">
-                                                {actor.profileImageUrl ? (
-                                                    <img src={actor.profileImageUrl} alt={actor.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center bg-[var(--vora-bg-sunken)]">
-                                                        <svg className="w-16 h-16 text-[var(--vora-text-muted)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" /></svg>
-                                                    </div>
-                                                )}
-                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"></div>
-                                            </div>
-                                            <h3 className="font-bold text-[var(--vora-text-secondary)] text-sm leading-tight max-w-full truncate group-hover:text-[var(--vora-text-primary)] transition-colors">
-                                                {actor.name}
-                                            </h3>
-                                            <p className="text-xs text-[var(--vora-accent-500)] font-bold uppercase tracking-wider mt-1 line-clamp-1">
-                                                {displayRole}
-                                            </p>
-                                            <p className="text-xs text-[var(--vora-text-muted)] font-medium leading-tight mt-1 line-clamp-2 max-w-full">
-                                                {characterName}
-                                            </p>
-                                        </div>
-                                    );
-                                })}
-                        </MediaRow>
-                    )}
-
                     {details.trailers.length > 0 && (
-                        <MediaRow title="Trailers" variant="detail" gap="6">
+                        <div className="mt-16">
+                            <MediaRow title="Trailers" variant="section">
                                 {details.trailers.map((trailer, idx) => {
                                     const videoId = trailer.url.split('v=')[1]?.split('&')[0];
                                     if (!videoId) return null;
-
                                     return (
-                                        <div key={idx} onClick={() => setPlayingTrailer(trailer)} className="w-72 shrink-0 flex flex-col group cursor-pointer text-left">
-                                            <div className="aspect-video rounded-md overflow-hidden bg-[var(--vora-bg-canvas)] mb-3 border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-colors shadow-md relative">
-                                                <img
-                                                    src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
-                                                    alt={trailer.name}
-                                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                                                />
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                    <div className="w-12 h-12 rounded-full bg-black/60 group-hover:bg-[var(--vora-accent-500)]/90 flex items-center justify-center pl-1 shadow-lg transition-colors">
-                                                        <svg className="w-6 h-6 text-[var(--vora-text-primary)]" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4l12 6-12 6z" /></svg>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <h3 className="font-bold text-[var(--vora-text-secondary)] text-sm line-clamp-2 group-hover:text-[var(--vora-text-primary)] transition-colors">
-                                                {trailer.name}
-                                            </h3>
-                                        </div>
+                                        <MediaRowItem key={idx}>
+                                            <VideoCard
+                                                title={trailer.name}
+                                                imageUrl={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
+                                                onClick={() => setPlayingTrailer(trailer)}
+                                            />
+                                        </MediaRowItem>
                                     );
                                 })}
-                        </MediaRow>
+                            </MediaRow>
+                        </div>
                     )}
 
                     {details.type === 'Movie' && autoLoad !== null && (

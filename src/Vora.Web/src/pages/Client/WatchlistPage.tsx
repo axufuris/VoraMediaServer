@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { discoveryService, type WatchlistItem } from '../../api/Discovery/discoveryService';
 import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
-import MediaPoster from '../../components/Client/Primitives/MediaPoster';
+import MediaCard from '../../components/Client/Primitives/MediaCard';
+import MediaGrid from '../../components/Client/Primitives/MediaGrid';
 import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 
 interface WatchlistPageProps {
@@ -41,9 +42,9 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
 
             <div className="px-8 pt-2">
                 {isLoading ? (
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                    <MediaGrid>
                         {Array.from({ length: 12 }, (_, i) => <div key={i} className="vora-skeleton aspect-[2/3]" />)}
-                    </div>
+                    </MediaGrid>
                 ) : items.length === 0 ? (
                     <EmptyState
                         title="Your watchlist is empty"
@@ -55,18 +56,19 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
                         )}
                     />
                 ) : (
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                    <MediaGrid>
                         {items.map(item => (
-                            <MediaPoster
+                            <MediaCard
                                 key={item.id}
                                 imageUrl={item.posterUrl}
                                 title={item.title}
-                                subtitle={item.type === 'TvShow' ? 'TV Series' : 'Movie'}
+                                captionLines={[item.type === 'TvShow' ? 'TV Series' : 'Movie']}
+                                inWatchlist
                                 onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${item.providerId}/${item.type}/${item.externalId}` : `/discovery/${item.providerId}/${item.type}/${item.externalId}`)}
                                 fill
                             />
                         ))}
-                    </div>
+                    </MediaGrid>
                 )}
             </div>
         </div>

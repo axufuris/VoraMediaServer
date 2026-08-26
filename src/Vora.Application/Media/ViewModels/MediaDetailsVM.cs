@@ -1,4 +1,4 @@
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using Vora.Application.Actors.ViewModels;
 using Vora.Application.Media.ViewModels;
 using Vora.Domain.Entities.Media;
@@ -49,6 +49,7 @@ public class MediaDetailsVM
     public List<MediaExtraVM> Extras { get; set; } = new();
     public List<MediaDetailsPartVM> MediaParts { get; set; } = new();
     public List<string> Genres { get; set; } = new();
+    public List<string> Studios { get; set; } = new();
     public List<MediaMarkerVM> Markers { get; set; } = new();
 
     public static Expression<Func<MediaItem, MediaDetailsVM>> Projection =>
@@ -82,6 +83,7 @@ public class MediaDetailsVM
             ServerAdminRating = item.ServerAdminRating,
             CollectionIds = item.Collections.Select(c => c.Id).ToList(),
             Genres = item.Genres.Select(g => g.Name).OrderBy(g => g).ToList(),
+            Studios = item.ProductionCompanies.Select(c => c.Name).OrderBy(c => c).ToList(),
             Cast = (item is Episode && !item.Cast.Any())
                 ? ((Episode)item).Season.TvShow.Cast
                     .OrderBy(c => c.Order)

@@ -117,7 +117,7 @@ When adding a new endpoint, default to `RequireAuthorization()`. Lock it to `Adm
 - **Claims access goes through `AuthExtensions`.** Don't call `user.FindFirst("...")` directly inside a handler. If you need a new claim shape, add a helper there.
 - **HTTP clients use `IHttpClientFactory`.** No static `HttpClient` fields. Name your clients with a public `const` (e.g. `DeviceTrackingMiddleware.GeoLookupHttpClientName`).
 - **Error / exception strategy:** log the error and **then throw**, so middleware can surface a useful message to the frontend. Don't swallow exceptions.
-- **API response shape:** return `*VM` or `*Response`. **Never** expose `Vora.Domain` entities through the API. If you find an endpoint returning an entity, that's a bug — replace it with a VM or create one.
+- **API response shape:** return `*VM` or `*Response` from `Vora.Application`. **Never** expose `Vora.Domain` entities or `Vora.Plugins` DTOs through the API. If you find an endpoint returning either, that's a bug — replace it with a VM or create one. Plugin DTOs matter as much as entities here: anything on the wire lands in the OpenAPI document and therefore in every generated native client, so a plugin-side refactor breaks native builds (`docs/clients/openapi-codegen.md`).
 
 ## JSON enum serialization
 

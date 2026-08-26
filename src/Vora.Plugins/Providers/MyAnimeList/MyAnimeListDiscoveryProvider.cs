@@ -147,7 +147,7 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
                 return null;
             }
 
-            var url = $"anime/{externalId}?fields=id,title,main_picture,synopsis,start_date,media_type,studios,pictures";
+            var url = $"anime/{externalId}?fields=id,title,main_picture,synopsis,start_date,media_type,studios,genres,mean,num_episodes,average_episode_duration,pictures";
 
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("X-MAL-CLIENT-ID", clientId);
@@ -180,8 +180,32 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
                 Overview = node.TryGetProperty("synopsis", out var syn) ? syn.GetString() : null,
                 PosterUrl = node.TryGetProperty("main_picture", out var mp) && mp.TryGetProperty("large", out var p) ? p.GetString() : null,
                 Year = parsedDate?.Year,
-                ReleaseDate = parsedDate // <-- ADDED THIS!
+                ReleaseDate = parsedDate,
+                Rating = node.TryGetProperty("mean", out var mean) && mean.TryGetDecimal(out var meanScore) ? meanScore : null
             };
+
+            if (node.TryGetProperty("genres", out var malGenres) && malGenres.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var genre in malGenres.EnumerateArray())
+                {
+                    var name = genre.TryGetProperty("name", out var gn) ? gn.GetString() : null;
+                    if (!string.IsNullOrWhiteSpace(name)) details.Genres.Add(name);
+                }
+            }
+
+            if (node.TryGetProperty("studios", out var malStudios) && malStudios.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var studio in malStudios.EnumerateArray())
+                {
+                    var name = studio.TryGetProperty("name", out var sn) ? sn.GetString() : null;
+                    if (!string.IsNullOrWhiteSpace(name)) details.Studios.Add(name);
+                }
+            }
+
+            if (node.TryGetProperty("average_episode_duration", out var epDuration) && epDuration.TryGetInt32(out var seconds) && seconds > 0)
+            {
+                details.RuntimeMinutes = (int)Math.Round(seconds / 60.0);
+            }
 
             if (node.TryGetProperty("pictures", out var pics) && pics.ValueKind == JsonValueKind.Array && pics.GetArrayLength() > 1)
             {

@@ -11,7 +11,6 @@ public class SmartListSaveRequest
     public int DisplayOrder { get; set; }
     public bool ShowOnHomepage { get; set; } = true;
     public bool ShowToFriends { get; set; } = true;
-    public bool IsSpotlight { get; set; }
     public int? ActiveStartMonth { get; set; }
     public int? ActiveStartDay { get; set; }
     public int? ActiveEndMonth { get; set; }

@@ -25,6 +25,12 @@ That's sufficient for now: codegen runs against a development instance of `Vora.
 
 The default `AddSwaggerGen()` call produces an OpenAPI document that *works* for codegen but generates ugly client method names and loses some type fidelity. The recommended hardening (do this before scaling out to a second client) is to:
 
+### 0. Keep `Vora.Plugins` types out of the schema
+
+Every `.Produces<T>()` must name a `*VM` / `*Response` from `Vora.Application`. A `Vora.Plugins` DTO returned directly gets pulled into the OpenAPI document, and from there into every generated Swift/Kotlin client — so plugin-assembly types become part of the public client surface and a plugin-side refactor silently breaks native builds.
+
+This is the project-wide View Model rule (see `docs/backend-conventions.md`), but codegen is what makes violating it expensive. `GET /api/discovery/details/{providerId}/{type}/{externalId}` used to return `DiscoveryItemDetailsDto` straight from `Vora.Plugins`; it now returns `DiscoveryItemDetailsVM`. When adding an endpoint, check the `.Produces<>` type's namespace.
+
 ### 1. Set explicit operation IDs
 
 Without explicit IDs, Swashbuckle generates names like `GetApiUsersById` from verb + route. With explicit IDs, generated method names match what the endpoint actually does.

@@ -13,11 +13,6 @@ public class ReorderSmartListsRequest
     public List<Guid> ListIds { get; set; } = new();
 }
 
-public class SetSpotlightRequest
-{
-    public bool Enabled { get; set; }
-}
-
 public static class SmartListEndpoints
 {
     public static IEndpointRouteBuilder MapSmartListEndpoints(this IEndpointRouteBuilder routes)
@@ -60,16 +55,6 @@ public static class SmartListEndpoints
         group.MapDelete("/{id:guid}", DeleteListAsync)
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest);
-
-        group.MapPost("/{id:guid}/spotlight", SetListSpotlightAsync)
-            .Produces(StatusCodes.Status204NoContent)
-            .Produces(StatusCodes.Status404NotFound);
-    }
-
-    private static async Task<IResult> SetListSpotlightAsync(Guid id, [FromBody] SetSpotlightRequest request, ISmartListManager manager)
-    {
-        var updated = await manager.SetSpotlightAsync(id, request.Enabled);
-        return updated ? Results.NoContent() : Results.NotFound();
     }
 
     private static async Task<IResult> GetActiveListsAsync(ClaimsPrincipal user, ISmartListManager manager)

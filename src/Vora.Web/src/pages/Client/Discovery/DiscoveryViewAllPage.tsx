@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { discoveryService, type DiscoveryItem, type DiscoveryRowConfig } from '../../../api/Discovery/discoveryService';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
-import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import MediaCard from '../../../components/Client/Primitives/MediaCard';
+import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
@@ -131,34 +132,25 @@ export default function DiscoveryViewAllPage() {
                     />
                 ) : (
                 <>
-                <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                <MediaGrid>
                     {items.map(item => {
-                        const inWatchlist = watchlistIds.has(item.externalId);
-                        const badge = inWatchlist ? (
-                            <span
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-full"
-                                style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}
-                            >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
-                            </span>
-                        ) : undefined;
                         const statusBadge = (item.inLibrary || item.requestStatus)
                             ? <DiscoveryStatusBadge inLibrary={item.inLibrary} requestStatus={item.requestStatus} />
                             : undefined;
                         return (
-                            <MediaPoster
+                            <MediaCard
                                 key={item.externalId}
                                 imageUrl={item.posterUrl}
                                 title={item.title}
-                                subtitle={item.year?.toString()}
+                                captionLines={item.year ? [item.year.toString()] : []}
+                                inWatchlist={watchlistIds.has(item.externalId)}
                                 onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${providerId}/${item.type}/${item.externalId}` : `/discovery/${providerId}/${item.type}/${item.externalId}`)}
-                                badge={badge}
                                 bottomLeftBadge={statusBadge}
                                 fill
                             />
                         );
                     })}
-                </div>
+                </MediaGrid>
 
                 <div ref={observerTarget} className="mt-10 flex h-12 items-center justify-center">
                     {isLoading && (

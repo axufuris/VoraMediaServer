@@ -62,10 +62,6 @@ describe('getProfileIdFromToken', () => {
 });
 
 describe('StorageKeys helpers', () => {
-    it('produces profile-scoped spotlight key', () => {
-        expect(StorageKeys.spotlight('abc')).toBe('vora_show_spotlight_abc');
-    });
-
     it('produces profile + device scoped iptv prefs key', () => {
         expect(StorageKeys.iptvPrefs('p1', 'd1')).toBe('iptv_prefs_p1_d1');
     });

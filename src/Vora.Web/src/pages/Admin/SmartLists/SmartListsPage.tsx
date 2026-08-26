@@ -30,7 +30,6 @@ export default function SmartListsPage() {
     const [sortBy, setSortBy] = useState(0);
     const [maxItems, setMaxItems] = useState(20);
     const [showOnHomepage, setShowOnHomepage] = useState(true);
-    const [isSpotlight, setIsSpotlight] = useState(false);
     const [showToFriends, setShowToFriends] = useState(true);
 
     useEffect(() => {
@@ -83,15 +82,6 @@ export default function SmartListsPage() {
         refreshLists();
     };
 
-    const handleToggleSpotlight = async (list: SmartListAdminDto) => {
-        try {
-            await smartListService.setSpotlight(list.id, !list.isSpotlight, serverId);
-            await refreshLists();
-        } catch (err) {
-            console.error('Failed to update spotlight', err);
-        }
-    };
-
     const toggleMediaType = (type: string) => {
         if (listMode === 'collection') return;
         setMediaTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
@@ -100,13 +90,13 @@ export default function SmartListsPage() {
     const openCreateModal = () => {
         setEditingId(null); setTitle(''); setListMode('rules');
         setCollectionId(''); setMediaTypes([]); setDecade(''); setSortBy(0);
-        setMaxItems(20); setShowOnHomepage(true); setShowToFriends(true); setIsSpotlight(false); setIsModalOpen(true);
+        setMaxItems(20); setShowOnHomepage(true); setShowToFriends(true); setIsModalOpen(true);
     };
 
     const openEditModal = (list: SmartListAdminDto) => {
         setEditingId(list.id); setTitle(list.title);
         setSortBy(list.sortBy); setMaxItems(list.maxItems); setShowOnHomepage(list.showOnHomepage);
-        setShowToFriends(list.showToFriends); setIsSpotlight(list.isSpotlight); setListMode(list.collectionId ? 'collection' : 'rules');
+        setShowToFriends(list.showToFriends); setListMode(list.collectionId ? 'collection' : 'rules');
         setCollectionId(list.collectionId || '');
 
         try {
@@ -131,7 +121,7 @@ export default function SmartListsPage() {
             title,
             filterRulesJson: listMode === 'rules' && Object.keys(rules).length > 0 ? JSON.stringify(rules) : '{}',
             collectionId: listMode === 'collection' && collectionId ? collectionId : undefined,
-            sortBy, maxItems, showOnHomepage, showToFriends, isSpotlight,
+            sortBy, maxItems, showOnHomepage, showToFriends,
             displayOrder: existingList ? existingList.displayOrder : lists.length,
         };
 
@@ -215,18 +205,6 @@ export default function SmartListsPage() {
                                         </td>
                                         <td className="px-4 py-3">
                                             <span className="font-semibold text-[var(--vora-text-primary)]">{list.title}</span>
-                                            {list.isSpotlight && (
-                                                <span
-                                                    className="ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                                                    style={{ background: 'var(--vora-accent-soft)', color: 'var(--vora-accent-text)', border: '1px solid var(--vora-accent-500)' }}
-                                                    title="This list powers the home page spotlight hero"
-                                                >
-                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                                        <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6L12 2z" />
-                                                    </svg>
-                                                    Spotlight
-                                                </span>
-                                            )}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-[var(--vora-text-secondary)]">{getListType(list)}</td>
                                         <td className="px-4 py-3">
@@ -241,14 +219,6 @@ export default function SmartListsPage() {
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end gap-3 text-xs font-semibold">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleToggleSpotlight(list)}
-                                                    className={`cursor-pointer ${list.isSpotlight ? 'text-[var(--vora-accent-text)]' : 'text-[var(--vora-text-muted)] hover:text-[var(--vora-text-secondary)]'}`}
-                                                    title={list.isSpotlight ? 'Remove from the Home spotlight' : 'Use as the Home spotlight (replaces any current one)'}
-                                                >
-                                                    {list.isSpotlight ? '★ Spotlight' : '☆ Spotlight'}
-                                                </button>
                                                 <button type="button" onClick={() => openEditModal(list)} className="text-[var(--vora-accent-text)] hover:text-[var(--vora-accent-active)] cursor-pointer">Edit</button>
                                                 <button type="button" onClick={() => handleDelete(list.id)} className="text-[var(--vora-danger-text)] hover:text-[var(--vora-danger-500)] cursor-pointer">Delete</button>
                                             </div>
@@ -382,7 +352,6 @@ export default function SmartListsPage() {
                                     />
                                     <span className="text-sm font-medium text-[var(--vora-text-primary)]">Show to friends</span>
                                 </label>
-                                <p className="text-xs text-[var(--vora-text-muted)]">Use the <span className="font-semibold text-[var(--vora-text-secondary)]">★ Spotlight</span> button on the list row to make a list power the Home hero — only one can be the spotlight at a time.</p>
                             </div>
 
                             <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-[var(--vora-border-subtle)]">

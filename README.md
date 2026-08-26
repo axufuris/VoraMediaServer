@@ -518,7 +518,10 @@ Project documentation lives under [`docs/`](docs/). Highlights:
   sync, the AI List (franchise/universe) provider, and AI chronological
   ordering
 - [`docs/redesign/`](docs/redesign/) — client templates, scheduling, and
-  design language
+  design language, including the shared client primitives (`MediaCard`,
+  `MediaRow`, `MediaGrid`, `DetailHero`) and the media metric tokens
+- [`docs/clients/`](docs/clients/) — cross-platform contracts for the
+  native clients: design tokens, primitive specs, and OpenAPI codegen
 
 ## License
 

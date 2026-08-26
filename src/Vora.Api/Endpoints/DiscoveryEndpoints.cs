@@ -35,7 +35,7 @@ public static class DiscoveryEndpoints
             .Produces<IEnumerable<DiscoveryItemVM>>(StatusCodes.Status200OK);
         group.MapGet("/details/{providerId}/{type}/{externalId}", GetItemDetailsAsync)
             .WithName("GetDiscoveryItemDetails")
-            .Produces<DiscoveryItemDetailsDto>(StatusCodes.Status200OK)
+            .Produces<DiscoveryItemDetailsVM>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
         group.MapGet("/actor/{providerId}/{externalId}", GetActorAsync)
             .WithName("GetDiscoveryActor")

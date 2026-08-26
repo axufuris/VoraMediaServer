@@ -56,12 +56,13 @@ All HTTP calls go through `apiClient.get/post/put/delete` from `api/client.ts`. 
 ## `src/components/` — grouped by feature
 
 ```
-components/Common/        Modal, MediaRow, ArtworkPicker (shared primitives).
+components/Common/        Modal, ArtworkPicker, IconSelect, RuleTreeEditor.
                           Modal supports a `surface="light"` variant for admin
                           modals that should pick up the active theme.
 components/Layout/        SearchBar, ServerManagerModal
-components/Media/         MediaCard, MediaCastRow, MediaEpisodesList,
-                          MediaExtrasRow, RecommendationRow, EditMetadataModal
+components/Media/         MediaEpisodesList, MediaExtrasRow,
+                          RecommendationRow, EditMetadataModal,
+                          MusicMetadataEditModal
 components/Collections/   AddToCollectionModal, CreateCollectionModal,
                           EditCollectionModal, ReorderCollectionModal,
                           AddToPlaylistModal
@@ -160,7 +161,26 @@ Use this anywhere you'd otherwise reach for `window.alert/confirm/prompt`. **Nev
 
 `ArtworkPicker` from `components/Common/ArtworkPicker.tsx` is the shared poster/backdrop picker used by `EditMetadataModal` and `EditCollectionModal`. It handles upload, add-by-URL, delete, sort-current-selection-first, and provider-fetch via slot props.
 
-`MediaRow` from `components/Common/MediaRow.tsx` is the horizontal scroller used by row-style sections (Continue Watching, Recommendations, Cast & Crew, Trailers, Seasons, etc.). Two variants: `home` (snap-x, hide-scrollbar, px-8) and `detail` (custom-scrollbar, pr-12).
+## The media tile system
+
+Everything that renders a piece of media as a tile goes through one small set of primitives in `components/Client/Primitives/`. There is exactly one implementation of each — do not hand-roll a card, a rail or a poster grid.
+
+| Primitive | Use |
+| --- | --- |
+| `MediaCard` | **The** media tile: artwork plus the caption block under it. Home rails, Continue Watching, discover rows, recommendations, library/collection/watchlist/filmography grids, search results, playlists, seasons, collection tiles. |
+| `MediaRow` | **The** horizontal rail. `variant="page"` sits on a page canvas and owns its gutter (`--vora-row-gutter`); `variant="section"` sits inside an already-padded block and gets an underlined header. Exports `MediaRowItem` for scroll-snap children. |
+| `MediaGrid` | The wrapping-grid counterpart to `MediaRow`, on the same card metrics. |
+| `PersonCard` | The cast/crew tile. |
+| `CastRow` | `MediaRow` + `PersonCard`, with actors sorted ahead of crew. Used by both the media details page and the discovery details page. |
+| `VideoCard` | The 16:9 trailer/extra tile. |
+| `SectionHeader` | The heading shared by `MediaRow` and `MediaGrid`, so a rail title and a grid title match. |
+| `DetailHero` | **The** top block of a detail page — backdrop, poster, title, chips, ratings, credits, actions, overview. Used by the media details page (Movie / TV Show / Season / Episode) and the discovery details page. `HeroChip` renders each hero fact; `HeroCredits` renders the director / genres / studio rows. |
+
+**Captions.** What appears under a tile is decided by `utils/posterCaption.ts`, keyed on the item's `type` — Movie shows year + edition, Episode shows show / `S1 E2` / episode title, Collection shows an item count, and so on. Pass `item={…}` to `MediaCard` and it captions itself. Only pass `title`/`captionLines` for tiles that aren't library media (a discovery result, a server-scoped search hit). Adding a new media type means adding a case in `posterCaption`, not a bespoke subtitle at the call site.
+
+**Detail pages.** `MediaDetailsPage` serves all four local types — Movie, TV Show, Season, Episode — so they share one hero by construction; `posterShape="still"` and the `S1 E2` title suffix are the only per-type differences. The local media details page and the discovery details page render the same `DetailHero`, so a title looks identical whether it's in the library or not. They differ only in what they pass to `actions`: local items get Play / Quality & tracks / Watched / more, discovery items get Add to Watchlist and nothing else. Everything a page has data for goes into a slot — `eyebrow`, `chips`, `ratings`, `notice` — and slots a page has no data for are simply omitted. `DetailHero` lays the backdrop *beside* the content (right ~65% on md+) and dissolves it at the left and bottom edges via `CinematicBackdrop`'s `mask="edge"`, so the artwork melts into the page instead of ending on a hard line.
+
+**Sizing.** Card metrics are tokens in `styles/tokens.css`: `--vora-card-w-sm|md|lg`, `--vora-card-min-w`, `--vora-card-gap`, `--vora-card-title-size`, `--vora-card-caption-size`, `--vora-card-badge-size`, `--vora-person-w`, `--vora-video-w`, `--vora-row-title-size`, `--vora-row-gutter`. The widths are `clamp(rem, vw, rem)` so a tile follows both the root font size and the viewport instead of snapping at breakpoints. Change a token and every rail, grid and detail page moves together. Never size a tile in `px`.
 
 ## Player shared primitives
 

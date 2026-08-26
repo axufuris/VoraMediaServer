@@ -5,8 +5,8 @@ import { collectionService, type CollectionDetails, type CollectionSortOrder } f
 import { collectionAdminService } from '../../../api/Collections/collectionAdminService';
 import EditCollectionModal from '../../../components/Collections/EditCollectionModal';
 import ReorderCollectionModal from '../../../components/Collections/ReorderCollectionModal';
-import MediaCard from '../../../components/Media/MediaCard';
-import { posterCaption } from '../../../utils/posterCaption';
+import MediaCard from '../../../components/Client/Primitives/MediaCard';
+import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { useDialog } from '../../../dialogs';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
@@ -247,26 +247,20 @@ export default function CollectionDetailsPage() {
                         )}
                     </div>
 
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,192px))] gap-4">
-                        {collection.items?.map(item => {
-                            const cap = posterCaption(item);
-                            return (
+                    <MediaGrid>
+                        {collection.items?.map(item => (
                             <MediaCard
                                 key={item.id}
-                                id={item.id}
-                                title={cap.title}
-                                captionLines={cap.lines}
+                                item={item}
                                 imageUrl={item.posterUrl}
-                                type={item.type}
-                                aspectRatio="poster"
                                 isPlayed={item.isPlayed}
                                 unplayedCount={item.unplayedItemCount}
                                 onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
-                                onHide={isAdmin && !collection.systemGenerated ? (e) => handleRemoveItem(e, item.id) : undefined}
+                                onRemove={isAdmin && !collection.systemGenerated ? (e) => handleRemoveItem(e, item.id) : undefined}
+                                fill
                             />
-                            );
-                        })}
-                    </div>
+                        ))}
+                    </MediaGrid>
                 </div>
             </div>
         </div>

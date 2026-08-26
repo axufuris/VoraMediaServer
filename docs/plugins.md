@@ -17,6 +17,7 @@ Vora plugins fall into these provider interfaces (defined in `Vora.Plugins/Inter
 - **Metadata provider** — looks up media metadata by external ID or title (e.g. TMDB, IMDB, TVDB). The built-in TMDB provider (`Providers/Tmdb/TmdbMetadataProvider.cs`) also maps `external_ids.tvdb_id` onto results — free for TV shows. **Movies** don't get a TVDB id from TMDB; the opt-in `ServerSetting.ResolveMovieTvdbIds` (off by default) makes the nightly metadata pass run an extra TVDB search to backfill missing movie **and** show `TvdbId`s (`MetadataManager.ResolveTvdbIdForMovieAsync` / `ResolveTvdbIdForShowAsync`). Admins can also trigger a one-time backfill via `POST /metadata/resolve-tvdb-ids` (Core Settings → "Resolve now"). Items that already have a `TvdbId`, and movies that come back empty, aren't re-searched every night.
 - **Artwork provider** — fetches posters/backdrops/banners
 - **IPTV provider** — supplies channels, EPG, stream URLs at the plugin contract level. Distinct from the user-facing `IptvPlaylist` / `IptvEpgSource` aggregates documented in `docs/iptv-and-dvr.md`; an IPTV provider plugin would typically feed data into those aggregates (e.g. HDHomeRun integration).
+- **Discovery provider** — supplies browsable rows, search, and item details for titles that aren't in the library (built-ins: `Providers/Tmdb/TmdbDiscoveryProvider.cs`, `Providers/MyAnimeList/`). `GetItemDetailsAsync` returns a `DiscoveryItemDetailsDto` carrying overview, backdrop, next air date, runtime, rating, genres, studios, cast **and crew**, and trailers. Fill in every field the source actually has — the client hero renders whatever it's given and omits the rest, so a sparse provider silently produces a sparse page. Two things to copy from the TMDB provider: crew is matched on the member's **job** (`"Director"`), not their `department` (`"Directing"` also contains assistant and second-unit directors, which credits seven people on a one-director film), and crew is appended to the same `Cast` list rather than a separate collection, so the shared `CastRow` picks it up with no extra wiring. Provider results are memory-cached for 24h per `{type}/{externalId}/{language}`.
 - **Collection sync provider** — pulls list contents from external sources (Trakt lists, custom feeds)
 - **Chronology provider** — supplies a custom watch order for a collection (e.g. timeline-based MCU order)
 
@@ -24,6 +25,8 @@ When adding a **new** provider interface:
 
 1. Add the interface to `Vora.Plugins/Interfaces/`.
 2. Add it to the `PluginProviderInterfaces` array in `Vora.Api/Extensions/PluginLoaderExtensions.cs` so the loader discovers it.
+
+**Never return a `Vora.Plugins` DTO straight out of an API endpoint.** Map it to a `*VM` in `Vora.Application` first (e.g. `DiscoveryItemDetailsVM.FromDto`). A plugin DTO on the wire ends up in the OpenAPI document and therefore in every generated native client — see `docs/clients/openapi-codegen.md`.
 
 ## Loader
 

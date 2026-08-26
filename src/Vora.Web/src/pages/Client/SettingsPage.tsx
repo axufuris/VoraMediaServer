@@ -49,7 +49,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="px-8 pt-6">
-                {activeTab === 'templates' && <TemplatesTab activeProfileId={activeProfileId} />}
+                {activeTab === 'templates' && <TemplatesTab />}
                 {activeTab === 'playback' && <PlaybackTab activeProfileId={activeProfileId} serverId={serverId} onSaved={onSaved} />}
                 {activeTab === 'providers' && <ProvidersTab activeProfileId={activeProfileId} serverId={serverId} onSaved={onSaved} />}
                 {activeTab === 'account' && <AccountTab serverId={serverId} />}
