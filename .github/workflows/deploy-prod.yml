@@ -3,6 +3,9 @@ name: Deploy Production
 on:
   release:
     types: [ published ]
+  # Manual trigger — same reasoning as deploy-qa.yml. Lets a published
+  # release be re-shipped without cutting a new tag.
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io

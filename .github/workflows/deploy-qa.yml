@@ -3,6 +3,11 @@ name: Deploy QA
 on:
   push:
     branches: [ main ]
+  # Manual trigger. A push event that GitHub drops — an Actions outage, a
+  # failover — never creates a run, so there is nothing to re-run from the
+  # Actions tab. This makes the QA image rebuildable from any ref without
+  # pushing an empty commit to main.
+  workflow_dispatch:
 
 concurrency:
   group: deploy-qa
