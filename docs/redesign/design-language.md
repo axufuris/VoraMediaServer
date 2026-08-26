@@ -93,7 +93,9 @@ Guidelines:
 
 Two new responsibilities, both handled by a new `CinematicBackdrop` primitive:
 
-1. **Page backdrop** — large image (1920×1080+ ideally) behind a page's header section. Top 70vh on `MediaDetailsPage` and `LibraryPage`, top 50vh on `Home` (when a feature is spotlighted). Always wrapped in a long gradient mask that fades from `var(--vora-bg-canvas)/0` at the top to `var(--vora-bg-canvas)/1` at the bottom over the lower 40% — this guarantees text legibility no matter the artwork.
+1. **Page backdrop** — large image (1920×1080+ ideally) behind or beside a page's header section. Two masking modes:
+   - `mask="scrim"` (default) — full-bleed, with gradient scrims painted *over* the artwork so overlaid text stays legible. Used by the collection, actor and playlist pages.
+   - `mask="edge"` — the artwork itself dissolves at its left and bottom edges, so it can sit *beside* content instead of under it and melt into the page rather than ending on a hard seam. This is what `DetailHero` uses: the backdrop occupies the right ~65% of the header on wide layouts. Implemented as two nested one-axis CSS masks rather than `mask-composite`, which is still uneven across engines.
 2. **Template canvas image** — already supported in `ThemeManifest.backgrounds.canvas`. Renders behind the whole app at low opacity (0.06–0.12) with an optional tint. Holiday templates lean on this hard.
 
 The `CinematicBackdrop` API:
@@ -101,8 +103,10 @@ The `CinematicBackdrop` API:
 ```tsx
 <CinematicBackdrop
     src={mediaItem.backdropUrl}
-    intensity="hero"       // 'hero' | 'detail' | 'ambient'
-    parallax              // optional
+    intensity="hero"       // 'hero' | 'detail' | 'ambient' — sets height
+    mask="scrim"           // 'scrim' (darken over) | 'edge' (dissolve at edges)
+    parallax               // optional
+    fill                   // optional — fill the parent instead of the intensity height
     transitionKey={mediaItem.id}  // forces crossfade when this changes
 />
 ```
@@ -114,13 +118,17 @@ New folder, mirrors `components/Admin/Primitives/`. Authored once, used everywhe
 | Primitive | Purpose |
 | --- | --- |
 | `PageHeader` | Title + subtitle + action slot. Optional hero backdrop. Used by every client page. |
-| `Hero` | Full-bleed featured area used on Home. Composes `CinematicBackdrop` + title + CTA. |
+| `Hero` | Full-bleed featured area. Composes `CinematicBackdrop` + title + CTA. Currently unused by the web client — kept as the cross-platform contract for native clients. |
 | `CinematicBackdrop` | See above. |
-| `MediaPoster` | 2:3 portrait card. Title + meta below on hover/focus. Progress bar overlay. Replaces today's `MediaCard` for movies/TV/albums. |
-| `MediaStill` | 16:9 landscape card. Used for episodes, recordings, Live TV programs, playlist covers. |
-| `MediaRail` | Horizontal-scroll rail with snap, momentum, edge gradient fade. Replaces today's `MediaRow`. Includes a peek-right indicator and keyboard arrows. |
+| `MediaCard` | **The** media tile. `shape` selects the aspect (`poster` 2:3, `still` 16:9, `square`, `circle`); `size` selects the width token. Artwork plus a caption block derived from the item's type. Progress bar, played check, unplayed count, watchlist flag, remove/delete affordances. |
+| `MediaRow` | **The** horizontal rail: scroll-snap, keyboard arrows, optional "View all". `page` and `section` variants. |
+| `MediaGrid` | Wrapping grid on the same card metrics as `MediaRow`. |
+| `PersonCard` / `CastRow` | The cast/crew tile and the row that lays them out (actors ahead of crew). |
+| `VideoCard` | 16:9 trailer/extra tile with a play affordance and a type label. |
+| `SectionHeader` | Shared heading for `MediaRow` and `MediaGrid`. |
+| `DetailHero` | The detail-page top block: edge-faded backdrop beside poster + title + chips + ratings + actions + overview. Shared by the media details and discovery details pages; `HeroChip` renders each fact. |
 | `Chip` | Filter pill. Selected state uses `accent-soft`. |
-| `Tabs` | Underlined tab bar. Replaces hand-rolled `border-b-2` patterns. |
+| `Tabs` | Underlined tab bar. Replaces hand-rolled `border-b-2` patterns. An optional `actions` slot puts page-level controls (e.g. Home's Customize button) flush right on the tab line rather than in the page header. |
 | `EmptyState` | Centered glyph + title + body + optional CTA. |
 | `Glass` | A frosted-surface wrapper (`backdrop-filter: blur(18px)` + `bg-glass`). Used by topbar, the player chrome panel, and popovers. |
 | `QualityPanel` | Slide-in right panel for video track/quality selection. Replaces raw `<select>`s in player. |
@@ -128,6 +136,23 @@ New folder, mirrors `components/Admin/Primitives/`. Authored once, used everywhe
 | `LetterRail` | Vertical right-edge A–Z index for `LibraryPage` (refactored out of inline implementation). |
 
 All composable with Tailwind utility classes; tokens consumed via `var(--vora-*)`.
+
+### Media metrics
+
+`MediaCard`, `MediaRow`, `MediaGrid`, `PersonCard` and `VideoCard` never hard-code a pixel size. Every dimension comes from a token in `styles/tokens.css`:
+
+| Token | Meaning |
+| --- | --- |
+| `--vora-card-w-sm` / `-md` / `-lg` | Tile widths. `clamp(rem, vw, rem)` — follows both root font size and viewport. |
+| `--vora-card-min-w` | Minimum grid track for `MediaGrid`. |
+| `--vora-card-gap` | Gap between tiles, in rows and grids alike. |
+| `--vora-card-title-size` / `--vora-card-caption-size` / `--vora-card-badge-size` | Caption typography. |
+| `--vora-person-w` | `PersonCard` width. |
+| `--vora-video-w` | `VideoCard` width. |
+| `--vora-row-title-size` | Row heading size. |
+| `--vora-row-gutter` | Page gutter owned by `variant="page"` rows. |
+
+Because they're relative units, bumping the root font size scales the whole client proportionally, and a tile grows with the viewport rather than jumping at a breakpoint.
 
 ## Iconography
 

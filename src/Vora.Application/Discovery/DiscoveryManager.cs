@@ -15,7 +15,7 @@ public interface IDiscoveryManager
     Task<List<DiscoveryRowConfig>> GetAdminRowConfigsAsync(CancellationToken cancellationToken = default);
     Task UpdateAdminRowConfigsAsync(List<DiscoveryRowConfigRequest> configs);
     Task<IEnumerable<DiscoveryItemVM>> GetRowItemsAsync(string providerId, string rowId, int page = 1, CancellationToken cancellationToken = default);
-    Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string providerId, string externalId, string type, CancellationToken cancellationToken = default);
+    Task<DiscoveryItemDetailsVM?> GetItemDetailsAsync(string providerId, string externalId, string type, CancellationToken cancellationToken = default);
     Task<List<UserWatchlistItem>> GetWatchlistAsync(Guid profileId);
     Task ToggleWatchlistAsync(Guid profileId, string externalId, string providerId, string type, string title, string? posterUrl, DateTime? expectedReleaseDate);
     Task<bool> CheckWatchlistStatusAsync(Guid profileId, string externalId, string providerId);
@@ -187,7 +187,7 @@ public class DiscoveryManager(
         return result;
     }
 
-    public async Task<DiscoveryItemDetailsDto?> GetItemDetailsAsync(string providerId, string externalId, string type, CancellationToken cancellationToken = default)
+    public async Task<DiscoveryItemDetailsVM?> GetItemDetailsAsync(string providerId, string externalId, string type, CancellationToken cancellationToken = default)
     {
         var plugin = plugins.FirstOrDefault(p => p.Id == providerId);
         if (plugin == null)
@@ -197,7 +197,16 @@ public class DiscoveryManager(
 
         try
         {
-            return await plugin.GetItemDetailsAsync(externalId, type, cancellationToken);
+            var details = await plugin.GetItemDetailsAsync(externalId, type, cancellationToken);
+            if (details == null)
+            {
+                return null;
+            }
+
+            var inLibrary = !string.IsNullOrWhiteSpace(details.ExternalId)
+                && (await mediaRepository.GetExistingExternalIdsAsync([details.ExternalId], details.Type)).Any();
+
+            return DiscoveryItemDetailsVM.FromDto(details, inLibrary);
         }
         catch (Exception ex)
         {

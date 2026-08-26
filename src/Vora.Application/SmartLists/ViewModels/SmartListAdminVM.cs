@@ -14,7 +14,6 @@ public class SmartListAdminVM
     public int DisplayOrder { get; set; }
     public bool ShowOnHomepage { get; set; }
     public bool ShowToFriends { get; set; }
-    public bool IsSpotlight { get; set; }
     public Guid? CollectionId { get; set; }
 
     public static Expression<Func<SmartList, SmartListAdminVM>> Projection => list => new SmartListAdminVM
@@ -28,7 +27,6 @@ public class SmartListAdminVM
         DisplayOrder = list.DisplayOrder,
         ShowOnHomepage = list.ShowOnHomepage,
         ShowToFriends = list.ShowToFriends,
-        CollectionId = list.CollectionId,
-        IsSpotlight = list.IsSpotlight
+        CollectionId = list.CollectionId
     };
 }

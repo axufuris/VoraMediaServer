@@ -65,6 +65,10 @@ export interface DiscoveryItemDetails extends DiscoveryItem {
     overview?: string;
     backgroundUrl?: string;
     nextAirDate?: string;
+    runtimeMinutes?: number;
+    rating?: number;
+    genres?: string[];
+    studios?: string[];
     cast: CastMember[];
     trailers: Trailer[];
 }

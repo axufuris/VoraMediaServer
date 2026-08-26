@@ -18,7 +18,6 @@ public interface ISmartListManager
     Task<bool> UpdateListAsync(Guid id, SmartListSaveRequest request);
     Task<bool> DeleteListAsync(Guid id);
     Task ReorderListsAsync(List<Guid> orderedListIds);
-    Task<bool> SetSpotlightAsync(Guid id, bool enabled);
 }
 
 public class SmartListManager(
@@ -86,7 +85,6 @@ public class SmartListManager(
             DisplayOrder = request.DisplayOrder,
             ShowOnHomepage = request.ShowOnHomepage,
             ShowToFriends = request.ShowToFriends,
-            IsSpotlight = request.IsSpotlight,
             ActiveStartMonth = request.ActiveStartMonth,
             ActiveStartDay = request.ActiveStartDay,
             ActiveEndMonth = request.ActiveEndMonth,
@@ -121,8 +119,6 @@ public class SmartListManager(
         list.ShowToFriends = request.ShowToFriends;
         list.DisplayOrder = request.DisplayOrder;
         list.CollectionId = request.CollectionId;
-        // Spotlight is managed exclusively through SetSpotlightAsync (the row
-        // toggle), not the edit form, so it isn't clobbered on save.
         list.ActiveStartMonth = request.ActiveStartMonth;
         list.ActiveStartDay = request.ActiveStartDay;
         list.ActiveEndMonth = request.ActiveEndMonth;
@@ -164,19 +160,6 @@ public class SmartListManager(
             logger.LogError(ex, "Failed to delete smart list {ListId}.", id);
             throw;
         }
-    }
-
-    public async Task<bool> SetSpotlightAsync(Guid id, bool enabled)
-    {
-        var list = await repository.GetListByIdAsync(id);
-        if (list == null)
-        {
-            return false;
-        }
-
-        await repository.SetSpotlightAsync(id, enabled);
-        await notifier.NotifySmartListsUpdatedAsync();
-        return true;
     }
 
     public async Task ReorderListsAsync(List<Guid> orderedListIds)

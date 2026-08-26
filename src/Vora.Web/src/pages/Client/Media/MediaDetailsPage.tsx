@@ -6,7 +6,7 @@ import EditMetadataModal from '../../../components/Media/EditMetadataModal';
 import MarkerEditorModal from '../../../components/Admin/MarkerEditorModal';
 import AddToCollectionModal from '../../../components/Collections/AddToCollectionModal';
 import AddToPlaylistModal from '../../../components/Collections/AddToPlaylistModal';
-import MediaCastRow from '../../../components/Media/MediaCastRow';
+import CastRow from '../../../components/Client/Primitives/CastRow';
 import MediaExtrasRow from '../../../components/Media/MediaExtrasRow';
 import MediaEpisodesList from '../../../components/Media/MediaEpisodesList';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
@@ -15,28 +15,21 @@ import { streamingService } from '../../../api/Streaming/streamingService';
 import { getEffectiveCapabilities } from '../../../utils/hardwareScanner';
 import { isVideoDirectPlayable, isAudioDirectPlayable, parseResolutionHeight } from '../../../utils/playbackDecision';
 import { useDialog } from '../../../dialogs';
-import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
-import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
-import ArtImage from '../../../components/Client/Primitives/ArtImage';
-import MediaRail from '../../../components/Client/Primitives/MediaRail';
+import MediaCard from '../../../components/Client/Primitives/MediaCard';
+import DetailHero, { HeroChip, HeroCredits } from '../../../components/Client/Primitives/DetailHero';
+import { directorsFrom } from '../../../utils/credits';
+import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import QualityPanel, { QualityPanelSection, type QualityOption } from '../../../components/Client/Primitives/QualityPanel';
 import StarRating from '../../../components/Client/Primitives/StarRating';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { formatRuntime } from '../../../utils/formatRuntime';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
     EpisodeNumber: number;
     Title: string;
     AirDate: string;
-}
-
-function formatRuntime(minutes?: number): string | null {
-    if (!minutes) return null;
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    if (hours === 0) return `${mins} min`;
-    return mins === 0 ? `${hours} hr` : `${hours} hr ${mins} min`;
 }
 
 function isPercentScaleRating(providerName?: string): boolean {
@@ -505,6 +498,201 @@ export default function MediaDetailsPage() {
     const playLabel = media.type === 'TvShow' ? 'Play next' : inProgress ? 'Resume' : 'Play';
     const playRuntime = formatRuntime(media.durationMinutes);
 
+    const heroEyebrow = [
+        isEpisode ? 'Episode' : isSeason ? `Season ${media.seasonNumber ?? ''}`.trim() : media.type === 'TvShow' ? 'TV Series' : 'Movie',
+        media.releaseDate ? String(new Date(media.releaseDate).getFullYear()) : null,
+    ].filter(Boolean).join(' · ');
+
+    const heroChips = (
+        <>
+            {playRuntime && <HeroChip>{playRuntime}</HeroChip>}
+            {media.contentRating && <HeroChip>{media.contentRating}</HeroChip>}
+            {activePart?.resolution && <HeroChip tone="accent">{activePart.resolution === '2160p' ? '4K' : activePart.resolution}</HeroChip>}
+            {sortedAudioTracks[0]?.codec && <HeroChip>{sortedAudioTracks[0].codec.toUpperCase()}{sortedAudioTracks[0].channels ? ` ${sortedAudioTracks[0].channels}ch` : ''}</HeroChip>}
+        </>
+    );
+
+    const heroRatings = (
+        <>
+            <div className="flex items-center gap-2">
+                <StarRating
+                    value={media.myRating ?? null}
+                    onChange={handleSetRating}
+                    showNumeric
+                    title={media.myRating != null ? 'Click a star to change, or click the same star to clear' : 'Rate this title'}
+                />
+            </div>
+            {media.serverAdminRating != null && !isAdmin && (
+                <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Server admin</span>
+                    <StarRating value={media.serverAdminRating} readOnly showNumeric color="var(--vora-accent-text)" />
+                </div>
+            )}
+            {media.thirdPartyRating1 != null && (
+                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
+                    <span className="font-semibold">{media.thirdPartyRating1Name ?? 'Rating'}</span>
+                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{formatThirdPartyRating(media.thirdPartyRating1, media.thirdPartyRating1Name)}</span>
+                </div>
+            )}
+            {media.thirdPartyRating2 != null && (
+                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
+                    <span className="font-semibold">{media.thirdPartyRating2Name ?? 'Rating'}</span>
+                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{formatThirdPartyRating(media.thirdPartyRating2, media.thirdPartyRating2Name)}</span>
+                </div>
+            )}
+        </>
+    );
+
+    const heroActions = (
+        <>
+            <button
+                type="button"
+                onClick={() => handlePlay(true)}
+                className="vora-button-primary cursor-pointer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 30px', fontSize: 15 }}
+            >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                {playLabel}
+                {inProgress && resumePos > 0 && (
+                    <span className="ml-1 text-xs font-normal opacity-70">
+                        {Math.floor(resumePos / 60)}:{String(Math.floor(resumePos % 60)).padStart(2, '0')}
+                    </span>
+                )}
+            </button>
+
+            {inProgress && (
+                <button
+                    type="button"
+                    onClick={() => handlePlay(false)}
+                    title="Start over"
+                    aria-label="Start over"
+                    className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
+                    style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa' }}
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
+                </button>
+            )}
+
+            {showQualityButton && (
+                <button
+                    type="button"
+                    onClick={() => setIsQualityPanelOpen(true)}
+                    className="cursor-pointer inline-flex items-center gap-2 rounded-md px-5 py-3 text-sm font-medium backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
+                    style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa' }}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3" /></svg>
+                    Quality &amp; tracks
+                </button>
+            )}
+
+            <button
+                type="button"
+                onClick={() => setIsPlaylistModalOpen(true)}
+                title="Add to playlist"
+                aria-label="Add to playlist"
+                className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
+                style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa' }}
+            >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="14" y2="18" /><polygon points="17 16 22 19 17 22 17 16" fill="currentColor" /></svg>
+            </button>
+
+            <button
+                type="button"
+                onClick={handleTogglePlayed}
+                title={isFullyPlayed ? 'Mark as unwatched' : 'Mark as watched'}
+                aria-label={isFullyPlayed ? 'Mark as unwatched' : 'Mark as watched'}
+                className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors"
+                style={{
+                    background: isFullyPlayed ? 'var(--vora-accent-500)' : 'rgba(20, 20, 28, 0.72)',
+                    color: isFullyPlayed ? 'var(--vora-accent-contrast)' : '#fafafa',
+                    border: `1px solid ${isFullyPlayed ? 'var(--vora-accent-500)' : 'rgba(255, 255, 255, 0.18)'}`,
+                }}
+            >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isFullyPlayed ? 3 : 2}><polyline points="20 6 9 17 4 12" /></svg>
+            </button>
+
+            <div className="relative">
+                <button
+                    type="button"
+                    onClick={() => setShowMenu(s => !s)}
+                    aria-label="More actions"
+                    className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
+                    style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa', padding: 0 }}
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" /></svg>
+                </button>
+                {showMenu && (
+                    <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                        <div
+                            className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl z-50"
+                            style={{
+                                background: 'var(--vora-bg-raised)',
+                                border: '1px solid var(--vora-border-strong)',
+                                boxShadow: 'var(--vora-shadow-lg)',
+                            }}
+                        >
+                            {isEpisode && media.seasonId && (
+                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.seasonId}` : `/media/${media.seasonId}`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Go to season</button>
+                            )}
+                            {isSeason && media.tvShowId && (
+                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Go to show</button>
+                            )}
+                            {showParentNav && <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />}
+                            <button type="button" onClick={() => { setIsEditModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit metadata</button>
+                            <button type="button" onClick={() => { setIsCollectionModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Add to collection</button>
+                            {isAdmin && (
+                                <>
+                                    <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />
+                                    <button type="button" onClick={handleRefresh} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Refresh metadata</button>
+                                    <button type="button" onClick={handleScan} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Scan files</button>
+                                    <button type="button" onClick={handleAnalyze} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Analyze media</button>
+                                    {(media.type === 'Movie' || media.type === 'Episode') && (
+                                        <>
+                                            <button type="button" onClick={handleRegenerateThumbnails} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Regenerate thumbnails</button>
+                                            <button type="button" onClick={handleToggleThumbnailsLock} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>
+                                                {thumbnailsLocked ? 'Unlock thumbnails' : 'Lock thumbnails'}
+                                            </button>
+                                        </>
+                                    )}
+                                    <button type="button" onClick={() => { setIsMarkerEditorOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit markers</button>
+                                    <button type="button" onClick={handleDelete} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/5" style={{ color: 'var(--vora-danger-text)' }}>Delete item</button>
+                                </>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        </>
+    );
+
+    const heroNotice = (
+        <>
+            {nextEpisode && (
+                <div
+                    className="mt-7 flex w-fit max-w-3xl items-center gap-4 rounded-xl p-4"
+                    style={{
+                        background: 'var(--vora-info-soft)',
+                        border: '1px solid color-mix(in srgb, var(--vora-info-500) 35%, transparent)',
+                    }}
+                >
+                    <div className="shrink-0 rounded-md px-2.5 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider" style={{ background: 'var(--vora-info-500)', color: 'var(--vora-text-inverse)' }}>
+                        <div className="opacity-80">Next</div>
+                        <div>episode</div>
+                    </div>
+                    <div>
+                        <p className="m-0 text-sm font-semibold" style={{ color: 'var(--vora-text-primary)' }}>
+                            Season {nextEpisode.SeasonNumber} · Episode {nextEpisode.EpisodeNumber} — {nextEpisode.Title}
+                        </p>
+                        <p className="m-0 mt-0.5 text-xs" style={{ color: 'var(--vora-info-text)' }}>
+                            Airs {new Date(nextEpisode.AirDate).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+
     return (
         <div className="relative min-h-full pb-20">
             <EditMetadataModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSaved={reloadMedia} itemId={media.id} type="media" initialData={{ ...media, lockedFields: media.lockedFields ?? [] }} />
@@ -525,283 +713,59 @@ export default function MediaDetailsPage() {
                 <QualityPanelSection title="Subtitles" options={subtitleOptions} value={selectedSubtitleId} onChange={setSelectedSubtitleId} />
             </QualityPanel>
 
-            <div className="absolute inset-x-0 top-0 z-0">
-                <CinematicBackdrop src={media.backgroundUrl || media.posterUrl} intensity="detail" parallax transitionKey={media.id} />
-            </div>
-
-            <div className="relative z-10 pt-8">
-                <div className="px-12">
-                    <button
-                        type="button"
-                        onClick={goBack}
-                        className="inline-flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                        style={{ background: 'rgba(20, 20, 28, 0.65)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#fafafa' }}
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-                        Back
-                    </button>
-                </div>
-
-                <div className="mt-12 grid gap-10 px-12 md:grid-cols-[260px_1fr]">
-                    <div className="shrink-0">
-                        <div
-                            className={`relative overflow-hidden ${isEpisode ? 'aspect-video' : 'aspect-[2/3]'}`}
-                            style={{
-                                borderRadius: 'var(--vora-radius-lg)',
-                                boxShadow: 'var(--vora-shadow-lg)',
-                                border: '1px solid var(--vora-border-subtle)',
-                                background: 'var(--vora-bg-surface)',
-                                maxWidth: isEpisode ? 400 : 260,
-                            }}
-                        >
-                            <ArtImage
-                                src={media.posterUrl}
-                                alt={media.title}
-                                variant={isEpisode ? 'still' : 'poster'}
-                                imgClassName={`h-full w-full ${isEpisode ? 'object-contain' : 'object-cover'}`}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="min-w-0">
-                        <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-accent-text)' }}>
-                            {media.type === 'Movie' && 'Movie'}
-                            {media.type === 'TvShow' && 'TV Series'}
-                            {isSeason && `Season ${media.seasonNumber ?? ''}`}
-                            {!isEpisode && media.releaseDate && ` · ${new Date(media.releaseDate).getFullYear()}`}
-                        </div>
-
-                        <h1 className="m-0 mt-2 font-semibold" style={{ color: 'var(--vora-text-primary)', fontSize: 'clamp(32px, 4vw, 44px)', lineHeight: 1.05, letterSpacing: '-0.02em' }}>
-                            {heroTitle}
-                        </h1>
-                        {isEpisode && (
-                            <div className="mt-2 text-lg font-semibold" style={{ color: 'var(--vora-accent-text)' }}>
-                                {media.endEpisodeNumber && media.endEpisodeNumber > (media.episodeNumber ?? 0)
-                                    ? `S${media.seasonNumber} E${media.episodeNumber}-E${media.endEpisodeNumber}`
-                                    : `S${media.seasonNumber} E${media.episodeNumber}`}
-                            </div>
-                        )}
-                        {heroSubtitle && (
-                            <div className="mt-1 text-xl" style={{ color: 'var(--vora-text-secondary)' }}>
-                                {heroSubtitle}
-                            </div>
-                        )}
-
-                        <div className="mt-4 flex flex-wrap items-center gap-2">
-                            {playRuntime && <span className="rounded-md px-2.5 py-1 text-xs font-medium backdrop-blur-md" style={{ background: 'rgba(8, 8, 11, 0.6)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}>{playRuntime}</span>}
-                            {media.contentRating && <span className="rounded-md px-2.5 py-1 text-xs font-medium backdrop-blur-md" style={{ background: 'rgba(8, 8, 11, 0.6)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}>{media.contentRating}</span>}
-                            {activePart?.resolution && <span className="rounded-md px-2.5 py-1 text-xs font-semibold backdrop-blur-md" style={{ background: 'var(--vora-accent-500)', border: '1px solid var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}>{activePart.resolution === '2160p' ? '4K' : activePart.resolution}</span>}
-                            {sortedAudioTracks[0]?.codec && <span className="rounded-md px-2.5 py-1 text-xs font-medium backdrop-blur-md" style={{ background: 'rgba(8, 8, 11, 0.6)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}>{sortedAudioTracks[0].codec.toUpperCase()}{sortedAudioTracks[0].channels ? ` ${sortedAudioTracks[0].channels}ch` : ''}</span>}
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
-                            <div className="flex items-center gap-2">
-                                <StarRating
-                                    value={media.myRating ?? null}
-                                    onChange={handleSetRating}
-                                    showNumeric
-                                    title={media.myRating != null ? 'Click a star to change, or click the same star to clear' : 'Rate this title'}
+            <DetailHero
+                backdropSrc={media.backgroundUrl || media.posterUrl}
+                transitionKey={media.id}
+                posterSrc={media.posterUrl}
+                posterShape={isEpisode ? 'still' : 'poster'}
+                onBack={goBack}
+                eyebrow={heroEyebrow}
+                title={heroTitle}
+                titleSuffix={isEpisode
+                    ? (media.endEpisodeNumber && media.endEpisodeNumber > (media.episodeNumber ?? 0)
+                        ? `S${media.seasonNumber} E${media.episodeNumber}-E${media.endEpisodeNumber}`
+                        : `S${media.seasonNumber} E${media.episodeNumber}`)
+                    : undefined}
+                subtitle={heroSubtitle}
+                chips={heroChips}
+                ratings={heroRatings}
+                credits={<HeroCredits directors={directorsFrom(media.cast)} genres={media.genres} studios={media.studios} />}
+                actions={heroActions}
+                notice={heroNotice}
+                overview={media.overview}
+            />
+            {media.type === 'TvShow' && (media.seasons || []).length > 0 && (
+                <div className="mt-12">
+                    <MediaRow title="Seasons">
+                        {(media.seasons || []).map(season => (
+                            <MediaRowItem key={season.id}>
+                                <MediaCard
+                                    imageUrl={season.posterUrl || media.posterUrl}
+                                    title={season.title || `Season ${season.seasonNumber}`}
+                                    captionLines={[`${season.episodeCount || 0} episode${season.episodeCount === 1 ? '' : 's'}`]}
+                                    unplayedCount={season.unplayedItemCount}
+                                    onClick={() => navigate(serverId ? `/server/${serverId}/media/${season.id}` : `/media/${season.id}`)}
                                 />
-                            </div>
-                            {media.serverAdminRating != null && !isAdmin && (
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Server admin</span>
-                                    <StarRating value={media.serverAdminRating} readOnly showNumeric color="var(--vora-accent-text)" />
-                                </div>
-                            )}
-                            {media.thirdPartyRating1 != null && (
-                                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
-                                    <span className="font-semibold">{media.thirdPartyRating1Name ?? 'Rating'}</span>
-                                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{formatThirdPartyRating(media.thirdPartyRating1, media.thirdPartyRating1Name)}</span>
-                                </div>
-                            )}
-                            {media.thirdPartyRating2 != null && (
-                                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
-                                    <span className="font-semibold">{media.thirdPartyRating2Name ?? 'Rating'}</span>
-                                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{formatThirdPartyRating(media.thirdPartyRating2, media.thirdPartyRating2Name)}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="mt-6 flex flex-wrap items-center gap-3">
-                            <button
-                                type="button"
-                                onClick={() => handlePlay(true)}
-                                className="vora-button-primary cursor-pointer"
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 30px', fontSize: 15 }}
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
-                                {playLabel}
-                                {inProgress && resumePos > 0 && (
-                                    <span className="ml-1 text-xs font-normal opacity-70">
-                                        {Math.floor(resumePos / 60)}:{String(Math.floor(resumePos % 60)).padStart(2, '0')}
-                                    </span>
-                                )}
-                            </button>
-
-                            {inProgress && (
-                                <button
-                                    type="button"
-                                    onClick={() => handlePlay(false)}
-                                    title="Start over"
-                                    aria-label="Start over"
-                                    className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                                    style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa' }}
-                                >
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
-                                </button>
-                            )}
-
-                            {showQualityButton && (
-                                <button
-                                    type="button"
-                                    onClick={() => setIsQualityPanelOpen(true)}
-                                    className="cursor-pointer inline-flex items-center gap-2 rounded-md px-5 py-3 text-sm font-medium backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                                    style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa' }}
-                                >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3" /></svg>
-                                    Quality &amp; tracks
-                                </button>
-                            )}
-
-                            <button
-                                type="button"
-                                onClick={() => setIsPlaylistModalOpen(true)}
-                                title="Add to playlist"
-                                aria-label="Add to playlist"
-                                className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                                style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa' }}
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="14" y2="18" /><polygon points="17 16 22 19 17 22 17 16" fill="currentColor" /></svg>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleTogglePlayed}
-                                title={isFullyPlayed ? 'Mark as unwatched' : 'Mark as watched'}
-                                aria-label={isFullyPlayed ? 'Mark as unwatched' : 'Mark as watched'}
-                                className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors"
-                                style={{
-                                    background: isFullyPlayed ? 'var(--vora-accent-500)' : 'rgba(20, 20, 28, 0.72)',
-                                    color: isFullyPlayed ? 'var(--vora-accent-contrast)' : '#fafafa',
-                                    border: `1px solid ${isFullyPlayed ? 'var(--vora-accent-500)' : 'rgba(255, 255, 255, 0.18)'}`,
-                                }}
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isFullyPlayed ? 3 : 2}><polyline points="20 6 9 17 4 12" /></svg>
-                            </button>
-
-                            <div className="relative">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowMenu(s => !s)}
-                                    aria-label="More actions"
-                                    className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                                    style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa', padding: 0 }}
-                                >
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" /></svg>
-                                </button>
-                                {showMenu && (
-                                    <>
-                                        <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                                        <div
-                                            className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl z-50"
-                                            style={{
-                                                background: 'var(--vora-bg-raised)',
-                                                border: '1px solid var(--vora-border-strong)',
-                                                boxShadow: 'var(--vora-shadow-lg)',
-                                            }}
-                                        >
-                                            {isEpisode && media.seasonId && (
-                                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.seasonId}` : `/media/${media.seasonId}`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Go to season</button>
-                                            )}
-                                            {isSeason && media.tvShowId && (
-                                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Go to show</button>
-                                            )}
-                                            {showParentNav && <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />}
-                                            <button type="button" onClick={() => { setIsEditModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit metadata</button>
-                                            <button type="button" onClick={() => { setIsCollectionModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Add to collection</button>
-                                            {isAdmin && (
-                                                <>
-                                                    <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />
-                                                    <button type="button" onClick={handleRefresh} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Refresh metadata</button>
-                                                    <button type="button" onClick={handleScan} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Scan files</button>
-                                                    <button type="button" onClick={handleAnalyze} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Analyze media</button>
-                                                    {(media.type === 'Movie' || media.type === 'Episode') && (
-                                                        <>
-                                                            <button type="button" onClick={handleRegenerateThumbnails} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Regenerate thumbnails</button>
-                                                            <button type="button" onClick={handleToggleThumbnailsLock} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>
-                                                                {thumbnailsLocked ? 'Unlock thumbnails' : 'Lock thumbnails'}
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                    <button type="button" onClick={() => { setIsMarkerEditorOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit markers</button>
-                                                    <button type="button" onClick={handleDelete} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/5" style={{ color: 'var(--vora-danger-text)' }}>Delete item</button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
-                        {nextEpisode && (
-                            <div
-                                className="mt-7 flex w-fit max-w-3xl items-center gap-4 rounded-xl p-4"
-                                style={{
-                                    background: 'var(--vora-info-soft)',
-                                    border: '1px solid color-mix(in srgb, var(--vora-info-500) 35%, transparent)',
-                                }}
-                            >
-                                <div className="shrink-0 rounded-md px-2.5 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider" style={{ background: 'var(--vora-info-500)', color: 'var(--vora-text-inverse)' }}>
-                                    <div className="opacity-80">Next</div>
-                                    <div>episode</div>
-                                </div>
-                                <div>
-                                    <p className="m-0 text-sm font-semibold" style={{ color: 'var(--vora-text-primary)' }}>
-                                        Season {nextEpisode.SeasonNumber} · Episode {nextEpisode.EpisodeNumber} — {nextEpisode.Title}
-                                    </p>
-                                    <p className="m-0 mt-0.5 text-xs" style={{ color: 'var(--vora-info-text)' }}>
-                                        Airs {new Date(nextEpisode.AirDate).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        <p className="mt-7 max-w-3xl text-[15px] leading-relaxed" style={{ color: 'var(--vora-text-secondary)' }}>
-                            {media.overview || 'No overview available.'}
-                        </p>
-                    </div>
+                            </MediaRowItem>
+                        ))}
+                    </MediaRow>
                 </div>
+            )}
 
-                {media.type === 'TvShow' && (media.seasons || []).length > 0 && (
-                    <div className="mt-12">
-                        <MediaRail title="Seasons">
-                            {(media.seasons || []).map(season => {
-                                const onOpen = () => navigate(serverId ? `/server/${serverId}/media/${season.id}` : `/media/${season.id}`);
-                                const unplayedBadge = season.unplayedItemCount && season.unplayedItemCount > 0
-                                    ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}>{season.unplayedItemCount}</span>
-                                    : undefined;
-                                return (
-                                    <div key={season.id} style={{ scrollSnapAlign: 'start', flex: 'none' }}>
-                                        <MediaPoster
-                                            imageUrl={season.posterUrl || media.posterUrl}
-                                            title={season.title || `Season ${season.seasonNumber}`}
-                                            subtitle={`${season.episodeCount || 0} episode${season.episodeCount === 1 ? '' : 's'}`}
-                                            onClick={onOpen}
-                                            badge={unplayedBadge}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </MediaRail>
-                    </div>
-                )}
-
-                <div className="mt-12 px-12">
-                    <MediaCastRow cast={media.cast || []} serverId={serverId} />
-                    <MediaExtrasRow videos={media.videos || []} extras={media.extras || []} serverId={serverId} />
-                    <MediaEpisodesList episodes={media.episodes || []} serverId={serverId} />
-                </div>
+            <div className="mt-12 space-y-16 px-12">
+                <CastRow
+                    cast={(media.cast || []).map(member => ({
+                        id: member.actorId,
+                        name: member.name,
+                        role: member.role,
+                        characterName: member.characterName,
+                        profileImageUrl: member.profileImageUrl,
+                        order: member.order,
+                    }))}
+                    onSelect={member => navigate(serverId ? `/server/${serverId}/actor/${member.id}` : `/actor/${member.id}`)}
+                />
+                <MediaExtrasRow videos={media.videos || []} extras={media.extras || []} serverId={serverId} />
+                <MediaEpisodesList episodes={media.episodes || []} serverId={serverId} />
             </div>
         </div>
     );

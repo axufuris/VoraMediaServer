@@ -6,6 +6,8 @@
 //   Season   {Show}             /  Season {name|number}  /  {Year}
 //   Episode  {Show}             /  S{season} E{number}    /  {Episode}
 //   Music    {Artist}           /  {Year} · {Album}      /  {Song}
+//   Collection {Title}          /  {N items}
+//   Playlist {Name}             /  {N items} · {MediaType}
 //
 // The first entry is the bold primary line; the rest are muted sub-lines.
 
@@ -21,6 +23,9 @@ export interface PosterCaptionItem {
     // Music
     artistName?: string | null;
     albumTitle?: string | null;
+    // Collections and playlists
+    itemCount?: number | null;
+    mediaTypeLabel?: string | null;
 }
 
 export interface PosterCaption {
@@ -55,6 +60,11 @@ function seasonLabel(item: PosterCaptionItem): string | null {
     return name || null;
 }
 
+function itemCountLabel(count?: number | null): string | null {
+    if (count == null) return null;
+    return `${count} item${count === 1 ? '' : 's'}`;
+}
+
 export function posterCaption(item: PosterCaptionItem): PosterCaption {
     const year = yearOf(item.releaseDate);
 
@@ -80,6 +90,10 @@ export function posterCaption(item: PosterCaptionItem): PosterCaption {
                 lines: [seasonEp, item.title].filter((l): l is string => !!l),
             };
         }
+        case 'Collection':
+            return { title: item.title, lines: [itemCountLabel(item.itemCount)].filter((l): l is string => !!l) };
+        case 'Playlist':
+            return { title: item.title, lines: [dotJoin([itemCountLabel(item.itemCount), item.mediaTypeLabel])].filter((l): l is string => !!l) };
         case 'Artist':
             return { title: item.title, lines: [] };
         case 'Album':

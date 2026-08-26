@@ -29,6 +29,5 @@ public interface ISmartListRepository
     Task UpdateListAsync(SmartList list);
     Task<bool> DeleteListAsync(Guid id);
     Task ReorderListsAsync(List<Guid> orderedListIds);
-    Task SetSpotlightAsync(Guid id, bool enabled);
     Task AttachLibraryItemUserStatesAsync(IEnumerable<LibraryItemVM> items, Guid profileId);
 }

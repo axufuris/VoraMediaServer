@@ -7,7 +7,6 @@ export const StorageKeys = {
     isServerAdmin: 'is_server_admin',
     isProfileAdmin: 'is_profile_admin',
     autoLoginProfileId: 'auto_login_profile_id',
-    spotlight: (profileId: string) => `vora_show_spotlight_${profileId}`,
     iptvPrefs: (profileId: string, deviceId: string) => `iptv_prefs_${profileId}_${deviceId}`,
 } as const;
 

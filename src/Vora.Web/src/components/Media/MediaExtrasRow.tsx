@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import type { MediaVideo, MediaExtra } from '../../api/Media/mediaService';
 import { streamingService } from '../../api/Streaming/streamingService';
 import { usePlayer } from '../../contexts/usePlayer';
-import MediaRow from '../Common/MediaRow';
+import MediaRow, { MediaRowItem } from '../Client/Primitives/MediaRow';
+import VideoCard from '../Client/Primitives/VideoCard';
 
 interface Props {
     videos: MediaVideo[];
@@ -74,54 +75,26 @@ export default function MediaExtrasRow({ videos, extras = [], serverId }: Props)
 
     return (
         <>
-            <MediaRow title="Extras" variant="detail" gap="6">
+            <MediaRow title="Extras" variant="section">
                 {extras.map(extra => (
-                    <button
-                        key={extra.id}
-                        type="button"
-                        onClick={() => playLocalExtra(extra)}
-                        className="w-72 shrink-0 flex flex-col group cursor-pointer text-left"
-                    >
-                        <div className="aspect-video rounded-md overflow-hidden bg-gradient-to-br from-[var(--vora-bg-raised)] to-[var(--vora-bg-canvas)] mb-3 border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-colors shadow-md relative flex items-center justify-center">
-                            <svg className="w-10 h-10 text-[var(--vora-text-muted)] opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="w-12 h-12 rounded-full bg-black/60 group-hover:bg-[var(--vora-accent-500)]/90 flex items-center justify-center pl-1 shadow-lg transition-colors">
-                                    <svg className="w-6 h-6 text-[var(--vora-text-primary)]" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4l12 6-12 6z" /></svg>
-                                </div>
-                            </div>
-                            <div className="absolute top-2 left-2 bg-black/80 px-2 py-1 rounded text-[10px] font-bold text-[var(--vora-text-primary)] uppercase tracking-wider">
-                                {formatExtraType(extra.extraType)}
-                            </div>
-                        </div>
-                        <h3 className="font-bold text-[var(--vora-text-secondary)] text-sm line-clamp-2 group-hover:text-[var(--vora-text-primary)] transition-colors">
-                            {extra.title}
-                        </h3>
-                    </button>
+                    <MediaRowItem key={extra.id}>
+                        <VideoCard
+                            title={extra.title}
+                            label={formatExtraType(extra.extraType)}
+                            onClick={() => playLocalExtra(extra)}
+                        />
+                    </MediaRowItem>
                 ))}
 
                 {videos.map(video => (
-                    <div key={video.videoKey} onClick={() => setPlayingVideo(video)} className="w-72 shrink-0 flex flex-col group cursor-pointer text-left">
-                        <div className="aspect-video rounded-md overflow-hidden bg-[var(--vora-bg-canvas)] mb-3 border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-colors shadow-md relative">
-                            <img
-                                src={video.site === 'YouTube' ? `https://img.youtube.com/vi/${video.videoKey}/hqdefault.jpg` : ''}
-                                alt={video.name}
-                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="w-12 h-12 rounded-full bg-black/60 group-hover:bg-[var(--vora-accent-500)]/90 flex items-center justify-center pl-1 shadow-lg transition-colors">
-                                    <svg className="w-6 h-6 text-[var(--vora-text-primary)]" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4l12 6-12 6z" /></svg>
-                                </div>
-                            </div>
-                            {video.type && (
-                                <div className="absolute top-2 left-2 bg-black/80 px-2 py-1 rounded text-[10px] font-bold text-[var(--vora-text-primary)] uppercase tracking-wider">
-                                    {video.type}
-                                </div>
-                            )}
-                        </div>
-                        <h3 className="font-bold text-[var(--vora-text-secondary)] text-sm line-clamp-2 group-hover:text-[var(--vora-text-primary)] transition-colors">
-                            {video.name}
-                        </h3>
-                    </div>
+                    <MediaRowItem key={video.videoKey}>
+                        <VideoCard
+                            title={video.name ?? 'Video'}
+                            label={video.type}
+                            imageUrl={video.site === 'YouTube' ? `https://img.youtube.com/vi/${video.videoKey}/hqdefault.jpg` : undefined}
+                            onClick={() => setPlayingVideo(video)}
+                        />
+                    </MediaRowItem>
                 ))}
             </MediaRow>
 

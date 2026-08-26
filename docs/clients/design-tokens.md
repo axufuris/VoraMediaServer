@@ -21,6 +21,14 @@ When a token slot is added or renamed:
 3. Update `Vora.Web/scripts/emit-tokens.ts` so the Swift and Kotlin emitters include the new field. Both `data class` / `struct` definitions and the per-theme value blocks need the new line.
 4. Run `npm run emit-tokens` and commit the regenerated `dist/tokens/*` files (see "Workflow" below).
 
+## Media metrics — deliberately *not* in the manifest
+
+The media-tile tokens live only in `Vora.Web/src/styles/tokens.css` on bare `:root` — **not** in `ThemeManifest`, not applied by `applyTheme()`, not emitted: `--vora-card-w-sm|md|lg` (tile widths), `--vora-card-min-w` (minimum `MediaGrid` track), `--vora-card-gap`, `--vora-card-title-size` / `-caption-size` / `-badge-size`, `--vora-person-w`, `--vora-video-w`, `--vora-row-title-size`, `--vora-row-gutter`.
+
+These are **layout constants, not theme choices** — a Thanksgiving template should recolor the client, not resize every poster in it. Keeping them out of the manifest means a theme can't break the grid, and there's nothing per-theme for the emitter to write. Contrast `--vora-shell-topbar-h` / `--vora-shell-sidebar-w`, which *are* in the manifest (`TokenLayout`) because an admin theme may legitimately want a taller bar. The widths are `clamp(rem, vw, rem)`, so a tile follows both the root font size and the viewport instead of snapping at breakpoints.
+
+**Native clients don't read these** — they implement equivalent sizing per primitive, scaled by the platform's dynamic-type setting (see the `MediaCard` **Sizing** note in [`primitive-specs.md`](primitive-specs.md)). Mirror any material change there.
+
 ## Emitter
 
 The emitter is `Vora.Web/scripts/emit-tokens.ts`. Run it from `src/Vora.Web/`:

@@ -6,8 +6,8 @@ import { serverVault } from '../../../utils/serverVault';
 import ClientDiscoveryCustomizeModal, { type ClientLayoutItem } from '../../../components/Discovery/DiscoveryCustomizeModal';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
-import MediaRail from '../../../components/Client/Primitives/MediaRail';
-import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
+import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 
@@ -235,40 +235,31 @@ function DiscoveryRow({ config, serverId, watchlistIds }: { config: DiscoveryRow
     }
 
     const providerLabel = config.providerName || config.providerId;
-    const railTitle = `${config.name} · ${providerLabel}`;
 
     return (
-        <MediaRail
-            title={railTitle}
+        <MediaRow
+            title={config.name}
+            subtitle={providerLabel}
             onMore={() => navigate(serverId ? `/server/${serverId}/discovery/${config.providerId}/row/${config.rowId}` : `/discovery/${config.providerId}/row/${config.rowId}`)}
         >
             {items.map(item => {
                 const inWatchlist = watchlistIds.has(item.externalId);
-                const badge = inWatchlist ? (
-                    <span
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-full"
-                        title="On your watchlist"
-                        style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}
-                    >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
-                    </span>
-                ) : undefined;
                 const statusBadge = (item.inLibrary || item.requestStatus)
                     ? <DiscoveryStatusBadge inLibrary={item.inLibrary} requestStatus={item.requestStatus} />
                     : undefined;
                 return (
-                    <div key={item.externalId} style={{ scrollSnapAlign: 'start', flex: 'none' }}>
-                        <MediaPoster
+                    <MediaRowItem key={item.externalId}>
+                        <MediaCard
                             imageUrl={item.posterUrl}
                             title={item.title}
-                            subtitle={item.year?.toString()}
+                            captionLines={item.year ? [item.year.toString()] : []}
+                            inWatchlist={inWatchlist}
                             onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${config.providerId}/${item.type}/${item.externalId}` : `/discovery/${config.providerId}/${item.type}/${item.externalId}`)}
-                            badge={badge}
                             bottomLeftBadge={statusBadge}
                         />
-                    </div>
+                    </MediaRowItem>
                 );
             })}
-        </MediaRail>
+        </MediaRow>
     );
 }

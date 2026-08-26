@@ -79,7 +79,6 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 | `auto_login_profile_id` | Skips profile picker on next load | `ProfileSelectionPage` |
 | `vora_admin_theme_id` | Active admin theme id. First-paint cache so the admin doesn't flash the default theme on every load; backend `/api/admin/themes/active` is the source of truth and reconciles after mount. | `theme/ThemeProvider.tsx` |
 | `vora_client_template_id` | Active client template id. First-paint cache for `ClientTemplateProvider`; backend reconciles after mount. | `theme/ClientTemplateProvider.tsx` |
-| `vora_show_spotlight_<profileId>` | Per-profile toggle for the Home page spotlight hero. Default `true`. Setting this dispatches a `vora:home-prefs-changed` window event so `HomePage` re-reads it live. | `SettingsPage` (Templates tab) |
 | `playback_prefs_<profileId>_<deviceId>` | Per-profile/device bandwidth + max resolution + max audio channels JSON. Mirrored server-side via `profileDeviceSettingsService`. | `SettingsPage` (Playback tab) |
 | `iptv_prefs_<profileId>_<deviceId>` | Per-profile/device IPTV provider selection + timeshift prefs JSON. Mirrored server-side via `profileDeviceSettingsService`. | `SettingsPage` (Providers tab) |
 | `vora_library_migration_job_id` | Active library-migration job id. Lets the admin reload `/admin/library-migration` and re-attach to the running job. Cleared on "Run again" / "Start over" or when the backend returns 404 (job evicted on server restart). | `LibraryMigrationPage` |

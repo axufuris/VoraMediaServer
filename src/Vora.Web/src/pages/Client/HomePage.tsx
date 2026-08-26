@@ -11,14 +11,10 @@ import PageHeader from '../../components/Client/Primitives/PageHeader';
 import Tabs from '../../components/Client/Primitives/Tabs';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import PlaylistsPage from './Playlists/PlaylistsPage';
-import MediaRail from '../../components/Client/Primitives/MediaRail';
-import MediaPoster from '../../components/Client/Primitives/MediaPoster';
+import MediaRow, { MediaRowItem } from '../../components/Client/Primitives/MediaRow';
+import MediaCard from '../../components/Client/Primitives/MediaCard';
 import PosterRemoveButton from '../../components/Client/Primitives/PosterRemoveButton';
-import { posterCaption } from '../../utils/posterCaption';
-import Hero from '../../components/Client/Primitives/Hero';
 import { useDialog } from '../../dialogs';
-
-const SPOTLIGHT_CYCLE_MS = 8000;
 
 type HomeTab = 'overview' | 'playlists';
 
@@ -28,88 +24,6 @@ const readSavedHomeTab = (): HomeTab => {
     const saved = sessionStorage.getItem(HOME_TAB_STORAGE_KEY);
     return saved === 'playlists' ? 'playlists' : 'overview';
 };
-
-function HeroSpotlight({ items, serverId }: { items: LibraryItem[], serverId?: string }) {
-    const navigate = useNavigate();
-    const [index, setIndex] = useState(0);
-
-    useEffect(() => {
-        if (items.length <= 1) return;
-        const interval = window.setInterval(() => {
-            setIndex(prev => (prev + 1) % items.length);
-        }, SPOTLIGHT_CYCLE_MS);
-        return () => window.clearInterval(interval);
-    }, [items.length]);
-
-    if (items.length === 0) return null;
-    const active = items[index];
-    const year = active.releaseDate ? new Date(active.releaseDate).getFullYear() : undefined;
-    const targetPath = serverId ? `/server/${serverId}/media/${active.id}` : `/media/${active.id}`;
-
-    return (
-        <Hero
-            backdropSrc={active.backgroundUrl || active.posterUrl}
-            transitionKey={active.id}
-            eyebrow={(
-                <>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--vora-accent-500)' }} />
-                    <span>Spotlight</span>
-                </>
-            )}
-            title={active.title}
-            meta={(
-                <>
-                    {year && <span>{year}</span>}
-                    {active.contentRating && <span style={{ padding: '3px 9px', border: '1px solid var(--vora-border-subtle)', borderRadius: 6, fontSize: 12 }}>{active.contentRating}</span>}
-                    {active.resolution && <span style={{ padding: '3px 9px', border: '1px solid var(--vora-border-subtle)', borderRadius: 6, fontSize: 12 }}>{active.resolution}</span>}
-                </>
-            )}
-            ctas={(
-                <>
-                    <button
-                        type="button"
-                        className="vora-button-primary cursor-pointer"
-                        onClick={() => navigate(targetPath)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 28px', fontSize: 15 }}
-                    >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
-                        Play
-                    </button>
-                    <button
-                        type="button"
-                        className="vora-button-secondary cursor-pointer"
-                        onClick={() => navigate(targetPath)}
-                        style={{ padding: '14px 24px', fontSize: 15 }}
-                    >
-                        More info
-                    </button>
-                </>
-            )}
-            indicator={items.length > 1 ? (
-                <div style={{ display: 'flex', gap: 8 }}>
-                    {items.map((it, i) => (
-                        <button
-                            key={it.id}
-                            type="button"
-                            aria-label={`Show spotlight ${i + 1}`}
-                            onClick={() => setIndex(i)}
-                            className="cursor-pointer"
-                            style={{
-                                width: i === index ? 36 : 24,
-                                height: 3,
-                                borderRadius: 2,
-                                border: 'none',
-                                padding: 0,
-                                background: i === index ? 'var(--vora-accent-500)' : 'rgba(255,255,255,0.2)',
-                                transition: 'width 240ms var(--vora-ease-out, ease-out), background 240ms ease',
-                            }}
-                        />
-                    ))}
-                </div>
-            ) : undefined}
-        />
-    );
-}
 
 function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serverId?: string }) {
     const navigate = useNavigate();
@@ -162,26 +76,24 @@ function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serve
     if (items.length === 0) return null;
 
     return (
-        <MediaRail title="Continue Watching">
+        <MediaRow title="Continue Watching">
             {items.map(item => {
                 const percent = item.resumePositionSeconds && item.durationSeconds
                     ? Math.min(100, Math.max(0, (item.resumePositionSeconds / item.durationSeconds) * 100))
                     : 0;
-                const cap = posterCaption(item);
-                const imageUrl = item.posterUrl ?? item.backgroundUrl;
-                const onOpen = () => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`);
-
-                const hideBadge = (
-                    <PosterRemoveButton onClick={() => handleHide(item)} title="Hide from Continue Watching" />
-                );
-
                 return (
-                    <div key={item.id} style={{ scrollSnapAlign: 'start', flex: 'none' }}>
-                        <MediaPoster imageUrl={imageUrl} title={cap.title} captionLines={cap.lines} progressPercent={percent} onClick={onOpen} hoverBadge={hideBadge} />
-                    </div>
+                    <MediaRowItem key={item.id}>
+                        <MediaCard
+                            item={item}
+                            imageUrl={item.posterUrl ?? item.backgroundUrl}
+                            progressPercent={percent}
+                            onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
+                            hoverBadge={<PosterRemoveButton onClick={() => handleHide(item)} title="Hide from Continue Watching" />}
+                        />
+                    </MediaRowItem>
                 );
             })}
-        </MediaRail>
+        </MediaRow>
     );
 }
 
@@ -210,55 +122,19 @@ function SmartListRow({ list, serverId }: { list: SmartListClientDto, serverId?:
     if (items.length === 0) return null;
 
     return (
-        <MediaRail title={list.title}>
-            {items.map(item => {
-                const cap = posterCaption(item);
-                const onOpen = () => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`);
-                return (
-                    <div key={item.id} style={{ scrollSnapAlign: 'start', flex: 'none' }}>
-                        <MediaPoster imageUrl={item.posterUrl} title={cap.title} captionLines={cap.lines} isPlayed={item.isPlayed} onClick={onOpen} />
-                    </div>
-                );
-            })}
-        </MediaRail>
+        <MediaRow title={list.title}>
+            {items.map(item => (
+                <MediaRowItem key={item.id}>
+                    <MediaCard
+                        item={item}
+                        imageUrl={item.posterUrl}
+                        isPlayed={item.isPlayed}
+                        onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
+                    />
+                </MediaRowItem>
+            ))}
+        </MediaRow>
     );
-}
-
-function useSpotlightItems(lists: SmartListClientDto[], serverId?: string): { items: LibraryItem[], sourceListId: string | null } {
-    const [items, setItems] = useState<LibraryItem[]>([]);
-    const [sourceListId, setSourceListId] = useState<string | null>(null);
-
-    const spotlightList = useMemo(() => {
-        const candidates = lists.filter(l => l.isSpotlight);
-        if (candidates.length === 0) return null;
-        return [...candidates].sort((a, b) => b.displayOrder - a.displayOrder)[0];
-    }, [lists]);
-
-    useEffect(() => {
-        if (!spotlightList) {
-            queueMicrotask(() => {
-                setItems([]);
-                setSourceListId(null);
-            });
-            return;
-        }
-        let cancelled = false;
-        smartListService.getListItems(spotlightList.id, serverId)
-            .then(data => {
-                if (cancelled) return;
-                setItems(data.slice(0, 5));
-                setSourceListId(spotlightList.id);
-            })
-            .catch(() => {
-                if (!cancelled) {
-                    setItems([]);
-                    setSourceListId(null);
-                }
-            });
-        return () => { cancelled = true; };
-    }, [spotlightList, serverId]);
-
-    return { items, sourceListId };
 }
 
 export default function HomePage() {
@@ -321,32 +197,8 @@ export default function HomePage() {
         }
     };
 
-    const { items: spotlightItems, sourceListId: spotlightListId } = useSpotlightItems(lists, serverId);
-
-    const [showSpotlightPref, setShowSpotlightPref] = useState<boolean>(() => {
-        if (!activeProfileId) return true;
-        const stored = localStorage.getItem(StorageKeys.spotlight(activeProfileId));
-        return stored === null ? true : stored === 'true';
-    });
-
-    useEffect(() => {
-        const handler = () => {
-            if (!activeProfileId) return;
-            const stored = localStorage.getItem(StorageKeys.spotlight(activeProfileId));
-            setShowSpotlightPref(stored === null ? true : stored === 'true');
-        };
-        handler();
-        window.addEventListener('vora:home-prefs-changed', handler);
-        return () => window.removeEventListener('vora:home-prefs-changed', handler);
-    }, [activeProfileId]);
-
-    const heroVisible = showSpotlightPref && spotlightItems.length > 0;
-
     const displayLists = useMemo(() => {
-        // The spotlight list is featured in the hero AND still shown as a row so
-        // it's browsable (the hero only rotates a few items at a time).
-        const base = [...lists]
-            .sort((a, b) => a.displayOrder - b.displayOrder);
+        const base = [...lists].sort((a, b) => a.displayOrder - b.displayOrder);
 
         if (clientLayout.length === 0) {
             return base;
@@ -367,42 +219,7 @@ export default function HomePage() {
                 const pref = prefById.get(l.id);
                 return pref ? pref.isEnabled : true;
             });
-    }, [lists, clientLayout, spotlightListId]);
-
-    const tabBar = (
-        <div className="px-8 pt-4">
-            <Tabs<HomeTab>
-                tabs={[
-                    { key: 'overview', label: 'Home' },
-                    { key: 'playlists', label: 'Playlists' },
-                ]}
-                active={activeTab}
-                onChange={handleTabChange}
-            />
-        </div>
-    );
-
-    if (activeTab === 'playlists') {
-        return (
-            <div className="min-h-full pb-20">
-                {tabBar}
-                <PlaylistsPage embedded />
-            </div>
-        );
-    }
-
-    if (loading) {
-        return (
-            <div className="min-h-full pb-20">
-                {tabBar}
-                <div className="p-8">
-                    <div className="vora-skeleton mb-8 h-[50vh] min-h-[420px]" />
-                    <div className="vora-skeleton mx-8 mb-8 h-48" />
-                    <div className="vora-skeleton mx-8 mb-8 h-48" />
-                </div>
-            </div>
-        );
-    }
+    }, [lists, clientLayout]);
 
     const customizeAction = (
         <button
@@ -425,6 +242,42 @@ export default function HomePage() {
         </button>
     );
 
+    const tabBar = (
+        <div className="px-8 pt-4">
+            <Tabs<HomeTab>
+                tabs={[
+                    { key: 'overview', label: 'Home' },
+                    { key: 'playlists', label: 'Playlists' },
+                ]}
+                active={activeTab}
+                onChange={handleTabChange}
+                actions={activeTab === 'overview' ? customizeAction : undefined}
+            />
+        </div>
+    );
+
+    if (activeTab === 'playlists') {
+        return (
+            <div className="min-h-full pb-20">
+                {tabBar}
+                <PlaylistsPage embedded />
+            </div>
+        );
+    }
+
+    if (loading) {
+        return (
+            <div className="min-h-full pb-20">
+                {tabBar}
+                <div className="p-8">
+                    <div className="vora-skeleton mb-8 h-24" />
+                    <div className="vora-skeleton mb-8 h-48" />
+                    <div className="vora-skeleton mb-8 h-48" />
+                </div>
+            </div>
+        );
+    }
+
     return (
         <>
             <ClientHomeCustomizeModal
@@ -437,16 +290,12 @@ export default function HomePage() {
 
             <div className="min-h-full pb-20">
                 {tabBar}
-                {heroVisible ? (
-                    <HeroSpotlight items={spotlightItems} serverId={serverId} />
-                ) : (
-                    <PageHeader title="Home" subtitle="Pick up where you left off, or wander somewhere new." actions={customizeAction} />
-                )}
+                <PageHeader title="Home" subtitle="Pick up where you left off, or wander somewhere new." />
 
                 {lists.length === 0 ? (
                     <EmptyState
                         title="Your home screen is empty"
-                        description="Create Smart Lists in Server Settings to populate rows on this page. Flag one as Spotlight to fill the cinematic hero above."
+                        description="Create Smart Lists in Server Settings to populate rows on this page."
                         icon={(
                             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                 <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -455,12 +304,7 @@ export default function HomePage() {
                         )}
                     />
                 ) : (
-                    <div className={heroVisible ? '-mt-12 space-y-10' : 'space-y-10 pt-2'}>
-                        {heroVisible && (
-                            <div className="relative z-10 flex justify-end px-8">
-                                {customizeAction}
-                            </div>
-                        )}
+                    <div className="space-y-10 pt-2">
                         {activeProfileId && <ContinueWatchingRow profileId={activeProfileId} serverId={serverId} />}
                         {displayLists.map(list => <SmartListRow key={list.id} list={list} serverId={serverId} />)}
                     </div>

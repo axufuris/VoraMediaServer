@@ -8,7 +8,7 @@ The ADR is [`docs/adr/0002-client-platform-strategy.md`](../adr/0002-client-plat
 
 A primitive is a single composable view with:
 
-- A **stable name** (`Hero`, `MediaPoster`, `MediaRail`, …).
+- A **stable name** (`Hero`, `MediaCard`, `MediaRow`, …).
 - A **prop contract** — the shape of inputs the primitive accepts. Same names across platforms; types translated naturally (e.g. `string | null` → `String?`).
 - An **observable behavior** — what it does on interaction (focus, hover, press, scroll).
 - A **motion budget** — which token motion values it respects.
@@ -20,7 +20,7 @@ A primitive is *not* a leaf widget — it's a feature-level building block. Layo
 
 The reference implementation is in `Vora.Web` today. The full list (matched 1:1 from `docs/redesign/design-language.md`):
 
-`PageHeader`, `Hero`, `CinematicBackdrop`, `MediaPoster`, `MediaStill`, `MediaRail`, `Chip`, `Tabs`, `EmptyState`, `Glass`, `QualityPanel`, `NowPlayingBar`, `LetterRail`.
+`PageHeader`, `Hero`, `DetailHero`, `CinematicBackdrop`, `MediaCard`, `MediaRow`, `MediaGrid`, `SectionHeader`, `PersonCard`, `CastRow`, `VideoCard`, `Chip`, `Tabs`, `EmptyState`, `Glass`, `QualityPanel`, `NowPlayingBar`, `LetterRail`.
 
 The specs below cover the high-leverage primitives — the ones a client can't function without. The others (`Chip`, `Tabs`, `EmptyState`, `LetterRail`) are simpler and their specs follow the same pattern: prop names from the web component, behavior from `design-language.md`, focus rules from the "TV focus rules" section below.
 
@@ -66,50 +66,78 @@ Full-bleed featured area used at the top of Home. Composes `CinematicBackdrop` +
 
 **Motion:** Inherits backdrop crossfade. Title text fades in 100ms after the backdrop settles.
 
-**TV focus:** Play CTA is focusable (the default), Info CTA is focusable. D-pad down from the Hero moves focus to the first `MediaRail` below. D-pad up from the first rail returns focus to the Hero's Play CTA.
+**TV focus:** Play CTA is focusable (the default), Info CTA is focusable. D-pad down from the Hero moves focus to the first `MediaRow` below. D-pad up from the first rail returns focus to the Hero's Play CTA.
 
 ---
 
-### MediaPoster
+### MediaCard
 
-2:3 portrait card representing a movie, TV show, album, playlist cover, or similar.
+The single media tile. One primitive covers every aspect ratio rather than a separate card per shape.
 
 **Props:**
-- `mediaItem: MediaItemVM` — id, title, poster URL, progress fraction (0–1) for "continue watching."
+- `mediaItem: MediaItemVM` — id, title, type, artwork URL, progress fraction (0–1) for "continue watching", played state, unplayed count.
 - `onActivate: () => void` — fire on click (web), tap (phone touch), or D-pad center (TV).
 - `onFocusChange: (focused: boolean) => void | null` — optional, fires on focus enter/exit. Web ignores hover-as-focus; native TV uses focus events directly.
-- `size: 'sm' | 'md' | 'lg' = 'md'` — visual size variant. `md` is the default rail size.
-- `showTitle: boolean = true` — whether to render the title below the poster.
+- `shape: 'poster' | 'still' | 'square' | 'circle' = 'poster'` — 2:3, 16:9, 1:1, or 1:1 masked to a circle (people, music artists).
+- `size: 'sm' | 'md' | 'lg' = 'md'` — width variant. `md` is the default rail size.
+- `showCaption: boolean = true` — whether to render the caption block below the artwork.
 
 **Behavior:**
-- Image renders at 2:3 aspect ratio, lazy-loaded, with a low-contrast skeleton placeholder using `misc.skeletonShimmer` while loading.
-- Title (if shown) below the poster, single line, ellipsized at width.
-- If `mediaItem.progress > 0`, a progress bar overlays the bottom of the poster — height 3px (web/phone) or 4px (TV), color `accent500`, full-width track at `accentSoft`.
+- Artwork renders at the shape's aspect ratio, lazy-loaded, with a low-contrast skeleton placeholder using `misc.skeletonShimmer` while loading, falling back to the branded placeholder if the source is missing or fails.
+- The caption block below the artwork is **derived from `mediaItem.type`**, not passed in: a title line plus zero or more muted sub-lines. Movie → year · edition. TV show → year. Season → show / season label / year. Episode → show / `S1 E2` / episode title. Album → artist / year · album. Collection → item count. Every platform must produce the same lines for the same item; the web implementation lives in `utils/posterCaption.ts` and is the reference.
+- If `mediaItem.progress > 0`, a progress bar overlays the bottom of the artwork — height 3px (web/phone) or 4px (TV), color `accent500`, full-width track at `accentSoft`.
+- Status affordances render in the artwork's corners: watchlist flag top-left, unplayed count or played check top-right, provider/quality badge bottom-left.
+
+**Sizing:** widths are relative, not fixed pixels. Web reads the `--vora-card-w-*` tokens (`clamp(rem, vw, rem)`); native clients scale the equivalent values by the platform's dynamic-type / display-size setting.
 
 **Motion:**
 - On hover (web/phone with cursor): scale to 1.035, `translateY(-2px)`, accent-soft glow (`box-shadow: 0 0 0 2px accentSoft`). Duration `durationMed`, ease `easeOut`.
 - On focus (TV): same scale and glow, but the glow is stronger (`0 0 0 3px accent500`). Title typography brightens from `textSecondary` to `textPrimary`. Duration `durationFast`.
 
-**TV focus:** focusable. Activation = D-pad center. Receives focus from `MediaRail`'s sibling navigation (left/right). On focus enter, optionally calls `onFocusChange(true)` so the parent can update a "currently focused" preview elsewhere (e.g. Home's spotlighted backdrop).
+**TV focus:** focusable. Activation = D-pad center. Receives focus from `MediaRow`'s sibling navigation (left/right). On focus enter, optionally calls `onFocusChange(true)` so the parent can update a "currently focused" preview elsewhere.
 
 ---
 
-### MediaStill
+### DetailHero
 
-16:9 landscape card. Same prop shape as `MediaPoster`. Used for episodes, recordings, Live TV programs, playlist covers. All behavior matches `MediaPoster` except aspect ratio is 16:9.
+The top block of a detail page. One primitive serves both an in-library title and an external (discovery) title — the difference is the actions, never the layout.
 
-The web/Apple/Android implementations should share enough of the body that they're nearly identical to `MediaPoster` — different aspect ratio, different rail sizing, same focus / motion / progress rules.
+**Props:**
+- `backdropSrc`, `posterSrc`, `title` — the artwork and the name.
+- `posterShape: 'poster' | 'still' = 'poster'` — episodes use `still`.
+- `eyebrow`, `titleSuffix`, `subtitle` — type/year, `S1 E2`, and the show name for a season or episode.
+- `chips`, `ratings`, `credits`, `actions`, `notice`, `overview` — slots. A platform omits a slot it has no data for; it never substitutes a different layout. `credits` is the labelled director / genres / studio block.
+- `onBack`, `backLabel`.
+
+**Behavior:**
+- The backdrop occupies the right of the header (about 65% on wide layouts, full width when the layout stacks) and fades out at its **left and bottom** edges so it dissolves into the page rather than ending on a seam. Web does this with nested masks; native clients use the equivalent gradient mask.
+- The poster sits left of the text column at a fixed relative width.
+- `actions` is the only slot that differs by source: an in-library item gets Play / Quality & tracks / Mark watched / overflow; a discovery item gets Add to Watchlist alone. Playback controls must never appear for an item that isn't in the library.
+
+**TV focus:** the first action is the default focus target for the page. D-pad down leaves the hero for the first `MediaRow` below.
 
 ---
 
-### MediaRail
+### PersonCard
 
-Horizontal-scroll rail of `MediaPoster` or `MediaStill` cards. The primary content unit on Home and Library.
+Cast/crew tile: 4:5 portrait artwork, name, credited role, character name. Same focus and motion rules as `MediaCard`. `CastRow` composes it inside a `MediaRow`, sorting actors ahead of crew while preserving billing order within each group.
+
+---
+
+### VideoCard
+
+16:9 trailer/extra tile with a centered play affordance and an optional uppercase type label in the top-left. Title below, clamped to two lines. Same focus and motion rules as `MediaCard`.
+
+---
+
+### MediaRow
+
+Horizontal-scroll rail of `MediaCard`s. The primary content unit on Home, Discover and Library.
 
 **Props:**
 - `title: string` — section title (e.g. "Continue Watching", "New Releases").
 - `items: MediaItemVM[]` — the cards to render.
-- `cardKind: 'poster' | 'still' = 'poster'` — which child primitive to use.
+- `cardShape: 'poster' | 'still' | 'square' | 'circle' = 'poster'` — passed through to the child cards.
 - `onItemActivate: (item: MediaItemVM) => void` — fired by the child card.
 - `onItemFocus: (item: MediaItemVM | null) => void | null` — fired on TV when focus enters / leaves a card. `null` means rail lost focus entirely.
 - `peekIndicator: boolean = true` — on web, fades the right edge so users see there's more.
@@ -209,7 +237,7 @@ Every native client follows the same conventions so user behavior is consistent 
 - Settings → first list item.
 
 **Focus visuals:**
-- Cards (`MediaPoster`, `MediaStill`): scale `1.035`, accent glow `0 0 0 3px accent500`.
+- Cards (`MediaCard`, `PersonCard`, `VideoCard`): scale `1.035`, accent glow `0 0 0 3px accent500`.
 - Buttons (any kind): elevation lift + glow with `accent500`.
 - List items: leading accent bar (`4px wide accent500`), background tint `accentSoft`.
 - Inputs: thicker border `accent500` + outer halo `accentFocusRing`.

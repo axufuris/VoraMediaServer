@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { discoveryService, type DiscoveryActor } from '../../../api/Discovery/discoveryService';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
-import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import MediaCard from '../../../components/Client/Primitives/MediaCard';
+import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import InLibraryBadge from '../../../components/Client/Primitives/InLibraryBadge';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 
@@ -123,19 +124,19 @@ export default function DiscoveryActorPage() {
                         <h2 className="m-0 mb-6 pb-2 text-xl font-semibold" style={{ color: 'var(--vora-text-primary)', borderBottom: '1px solid var(--vora-border-subtle)', letterSpacing: '-0.01em' }}>
                             Known For
                         </h2>
-                        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
+                        <MediaGrid>
                             {sortedFilmography.map((item, idx) => (
-                                <MediaPoster
+                                <MediaCard
                                     key={`${item.externalId}-${idx}`}
                                     imageUrl={item.posterUrl}
                                     title={item.title}
-                                    subtitle={item.year ? item.year.toString() : 'Unknown year'}
+                                    captionLines={[item.year ? item.year.toString() : 'Unknown year']}
                                     badge={item.inLibrary ? <InLibraryBadge /> : undefined}
                                     onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${providerId}/${item.type}/${item.externalId}` : `/discovery/${providerId}/${item.type}/${item.externalId}`)}
                                     fill
                                 />
                             ))}
-                        </div>
+                        </MediaGrid>
                     </div>
                 )}
             </div>

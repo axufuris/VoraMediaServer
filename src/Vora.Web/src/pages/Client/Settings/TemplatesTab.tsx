@@ -5,7 +5,6 @@ import { useClientTemplate } from '../../../theme/useClientTemplate';
 import { useDialog } from '../../../dialogs';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import ScheduledTemplateBanner from '../../../components/Client/Primitives/ScheduledTemplateBanner';
-import { StorageKeys } from '../../../utils/storageKeys';
 
 interface TemplateSwatch {
     canvas: string;
@@ -56,34 +55,13 @@ function TemplateSwatchStrip({ template, isActive }: { template: TemplateMetaVM,
     );
 }
 
-const SPOTLIGHT_PREF_KEY = (profileId: string) => StorageKeys.spotlight(profileId);
-
-export default function TemplatesTab({ activeProfileId }: { activeProfileId: string }) {
+export default function TemplatesTab() {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const { active, activeInfo, activeSchedule, isSwitching, setActive, clearActive, refresh } = useClientTemplate();
     const [templates, setTemplates] = useState<TemplateMetaVM[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [savingId, setSavingId] = useState<string | null>(null);
-    const [showSpotlight, setShowSpotlight] = useState<boolean>(() => {
-        if (!activeProfileId) return true;
-        const stored = localStorage.getItem(SPOTLIGHT_PREF_KEY(activeProfileId));
-        return stored === null ? true : stored === 'true';
-    });
-
-    useEffect(() => {
-        if (!activeProfileId) return;
-        const stored = localStorage.getItem(SPOTLIGHT_PREF_KEY(activeProfileId));
-        queueMicrotask(() => setShowSpotlight(stored === null ? true : stored === 'true'));
-    }, [activeProfileId]);
-
-    const handleSpotlightToggle = (next: boolean) => {
-        setShowSpotlight(next);
-        if (activeProfileId) {
-            localStorage.setItem(SPOTLIGHT_PREF_KEY(activeProfileId), String(next));
-            window.dispatchEvent(new CustomEvent('vora:home-prefs-changed'));
-        }
-    };
 
     useEffect(() => {
         let cancelled = false;
@@ -174,35 +152,6 @@ export default function TemplatesTab({ activeProfileId }: { activeProfileId: str
                     </button>
                 </div>
             )}
-
-            <section className="vora-card mb-6 p-5">
-                <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Home page</h2>
-                <p className="m-0 mb-4 text-sm" style={{ color: 'var(--vora-text-muted)' }}>Tune what shows up the moment you land on Home.</p>
-                <label className="flex cursor-pointer items-start justify-between gap-4 rounded-lg p-3 transition-colors hover:bg-[var(--vora-bg-sunken)]/40">
-                    <div>
-                        <p className="m-0 text-sm font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Show spotlight hero</p>
-                        <p className="m-0 mt-0.5 text-xs" style={{ color: 'var(--vora-text-muted)' }}>
-                            The big rotating banner at the top of Home. Turn off if you'd rather jump straight to your rails.
-                        </p>
-                    </div>
-                    <span
-                        className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors"
-                        style={{ background: showSpotlight ? 'var(--vora-accent-500)' : 'var(--vora-bg-raised)', border: '1px solid var(--vora-border-subtle)' }}
-                    >
-                        <input
-                            type="checkbox"
-                            checked={showSpotlight}
-                            onChange={e => handleSpotlightToggle(e.target.checked)}
-                            className="absolute inset-0 cursor-pointer opacity-0"
-                            aria-label="Show spotlight hero on Home"
-                        />
-                        <span
-                            className="inline-block h-4 w-4 transform rounded-full shadow-sm transition-transform"
-                            style={{ background: 'var(--vora-text-primary)', transform: `translateX(${showSpotlight ? '22px' : '4px'})` }}
-                        />
-                    </span>
-                </label>
-            </section>
 
             {isLoading ? (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">

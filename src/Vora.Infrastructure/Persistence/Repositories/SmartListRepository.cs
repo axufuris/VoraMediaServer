@@ -92,7 +92,6 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
                 l.Id,
                 l.Title,
                 l.DisplayOrder,
-                l.IsSpotlight,
                 l.ActiveStartMonth,
                 l.ActiveStartDay,
                 l.ActiveEndMonth,
@@ -108,7 +107,7 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         return lists
             .Where(l => IsListActive(l.CollectionId, l.CollectionStartDate, l.CollectionEndDate,
                                      l.ActiveStartMonth, l.ActiveStartDay, l.ActiveEndMonth, l.ActiveEndDay, now))
-            .Select(l => new SmartListClientVM { Id = l.Id, Title = l.Title, DisplayOrder = l.DisplayOrder, IsSpotlight = l.IsSpotlight })
+            .Select(l => new SmartListClientVM { Id = l.Id, Title = l.Title, DisplayOrder = l.DisplayOrder })
             .ToList();
     }
 
@@ -138,22 +137,6 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
     {
         var rows = await context.SmartLists.Where(s => s.Id == id).ExecuteDeleteAsync();
         return rows > 0;
-    }
-
-    public async Task SetSpotlightAsync(Guid id, bool enabled)
-    {
-        // Only one list can be the home spotlight at a time — turning one on
-        // clears every other, so there's no lingering flag to remember to undo.
-        if (enabled)
-        {
-            await context.SmartLists
-                .Where(s => s.Id != id && s.IsSpotlight)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.IsSpotlight, false));
-        }
-
-        await context.SmartLists
-            .Where(s => s.Id == id)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.IsSpotlight, enabled));
     }
 
     public async Task ReorderListsAsync(List<Guid> orderedListIds)

@@ -84,6 +84,25 @@
     --vora-shell-sidebar-w: 240px;
     --vora-shell-sidebar-rail-w: 64px;
 
+    /* === Media card metrics ===
+     * Every poster, still, person and video tile in the client is sized from
+     * these. They are relative units on purpose: the clamp() upper/lower bounds
+     * are rem so they follow the root font size, and the middle term is vw so a
+     * card grows with the viewport instead of snapping at breakpoints. Change a
+     * value here and every rail, grid and detail page moves together. */
+    --vora-card-w-sm: clamp(7rem, 11vw, 9.5rem);
+    --vora-card-w-md: clamp(8.5rem, 14vw, 12rem);
+    --vora-card-w-lg: clamp(10rem, 18vw, 15rem);
+    --vora-card-min-w: 8.75rem;
+    --vora-card-gap: 1rem;
+    --vora-card-title-size: 0.875rem;
+    --vora-card-caption-size: 0.75rem;
+    --vora-card-badge-size: 0.625rem;
+    --vora-person-w: clamp(6.5rem, 9vw, 8.5rem);
+    --vora-video-w: clamp(14rem, 22vw, 18rem);
+    --vora-row-title-size: 1.125rem;
+    --vora-row-gutter: 2rem;
+
     /* === Misc === */
     --vora-skeleton-shimmer: #ebeae8;
     --vora-accent-focus-ring: rgba(217, 119, 6, 0.15);

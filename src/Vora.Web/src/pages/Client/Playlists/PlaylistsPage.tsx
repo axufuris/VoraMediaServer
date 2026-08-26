@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { playlistService, type PlaylistSummaryVM } from '../../../api/Collections/playlistService';
 import { musicService, type GeneratedMixSummaryVM } from '../../../api/Music/musicService';
 import { smartPlaylistService, type SmartPlaylistSummaryVM, type PlaylistMediaType } from '../../../api/Music/smartPlaylistService';
-import MediaCard from '../../../components/Media/MediaCard';
+import MediaCard from '../../../components/Client/Primitives/MediaCard';
+import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import { useDialog } from '../../../dialogs';
 import SmartPlaylistEditorModal from './SmartPlaylistEditorModal';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
@@ -226,19 +227,16 @@ export default function PlaylistsPage({ embedded = false }: { embedded?: boolean
                 ) : visiblePlaylists.length === 0 ? null : (
                     <>
                         {(visibleMixes.length > 0 || visibleSmart.length > 0) && <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4">Your Playlists</h2>}
-                        <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-4">
+                        <MediaGrid>
                             {visiblePlaylists.map(p => (
                                 <MediaCard
                                     key={p.id}
-                                    id={p.id}
-                                    title={p.name}
-                                    subtitle={`${p.itemCount} Items${p.mediaType !== 'Mixed' ? ` · ${p.mediaType}` : ''}`}
-                                    type="Playlist"
-                                    aspectRatio="square"
+                                    item={{ type: 'Playlist', title: p.name, itemCount: p.itemCount, mediaTypeLabel: p.mediaType !== 'Mixed' ? p.mediaType : null }}
+                                    shape="square"
                                     // Prefer backdrops for the cinematic mosaic. Falls back to
                                     // posters for playlists where items have no backdrop art
                                     // (e.g. music tracks — albums never carry backgrounds).
-                                    multiPosters={p.backdropUrls && p.backdropUrls.length > 0 ? p.backdropUrls : p.posterUrls}
+                                    mosaicUrls={p.backdropUrls && p.backdropUrls.length > 0 ? p.backdropUrls : p.posterUrls}
                                     imageUrl={
                                         p.backdropUrls && p.backdropUrls.length > 0
                                             ? p.backdropUrls[0]
@@ -246,10 +244,10 @@ export default function PlaylistsPage({ embedded = false }: { embedded?: boolean
                                     }
                                     onClick={() => navigate(serverId ? `/server/${serverId}/playlist/${p.id}` : `/playlist/${p.id}`)}
                                     onDelete={(e) => handleDelete(e, p.id, p.name)}
-                                    isAdmin={true}
+                                    fill
                                 />
                             ))}
-                        </div>
+                        </MediaGrid>
                     </>
                 )}
             </div>

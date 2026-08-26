@@ -63,7 +63,7 @@ export default function RecommendationsPage({ embedded = false }: Recommendation
                 />
             )}
 
-            <div className="pt-2">
+            <div className="space-y-10 pt-2">
                 {loadingProviders ? (
                     <div className="px-8">
                         <div className="vora-skeleton mb-4 h-6 w-48" />

@@ -4,7 +4,8 @@ import { actorService, type ActorProfile } from '../../../api/Media/actorService
 import { discoveryService, type DiscoveryActor } from '../../../api/Discovery/discoveryService';
 import { useFeatureFlags } from '../../../hooks/useFeatureFlags';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
-import MediaPoster from '../../../components/Client/Primitives/MediaPoster';
+import MediaCard from '../../../components/Client/Primitives/MediaCard';
+import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import InLibraryBadge from '../../../components/Client/Primitives/InLibraryBadge';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 
@@ -173,18 +174,18 @@ export default function ActorDetailsPage() {
                         <h2 className="m-0 mb-6 pb-2 text-xl font-semibold" style={{ color: 'var(--vora-text-primary)', borderBottom: '1px solid var(--vora-border-subtle)', letterSpacing: '-0.01em' }}>
                             Filmography
                         </h2>
-                        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
+                        <MediaGrid>
                             {actor.filmography.map(item => (
-                                <MediaPoster
+                                <MediaCard
                                     key={item.id}
                                     imageUrl={item.posterUrl}
                                     title={item.title}
-                                    subtitle={`${item.characterName || item.role} · ${item.releaseDate ? new Date(item.releaseDate).getFullYear() : 'Unknown'}`}
+                                    captionLines={[`${item.characterName || item.role} · ${item.releaseDate ? new Date(item.releaseDate).getFullYear() : 'Unknown'}`]}
                                     onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
                                     fill
                                 />
                             ))}
-                        </div>
+                        </MediaGrid>
                     </div>
                 )}
 
@@ -193,21 +194,21 @@ export default function ActorDetailsPage() {
                         <h2 className="m-0 mb-6 pb-2 text-xl font-semibold" style={{ color: 'var(--vora-text-primary)', borderBottom: '1px solid var(--vora-border-subtle)', letterSpacing: '-0.01em' }}>
                             Known For
                         </h2>
-                        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
+                        <MediaGrid>
                             {knownForFiltered
                                 .sort((a, b) => (b.year || 0) - (a.year || 0))
                                 .map((item, idx) => (
-                                    <MediaPoster
+                                    <MediaCard
                                         key={`${item.externalId}-${idx}`}
                                         imageUrl={item.posterUrl}
                                         title={item.title}
-                                        subtitle={item.year ? item.year.toString() : 'Unknown year'}
+                                        captionLines={[item.year ? item.year.toString() : 'Unknown year']}
                                         badge={item.inLibrary ? <InLibraryBadge /> : undefined}
                                         onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${DISCOVERY_PROVIDER}/${item.type}/${item.externalId}` : `/discovery/${DISCOVERY_PROVIDER}/${item.type}/${item.externalId}`)}
                                         fill
                                     />
                                 ))}
-                        </div>
+                        </MediaGrid>
                     </div>
                 )}
             </div>

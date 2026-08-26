@@ -4,7 +4,7 @@ import MediaPlaceholder, { type PlaceholderVariant } from './MediaPlaceholder';
 // Drop-in <img> replacement that falls back to the branded MediaPlaceholder when
 // the source is missing OR fails to load (404 etc.) — so nothing ever shows the
 // browser's broken-image icon. Use for one-off posters/stills that don't go
-// through MediaPoster/MediaStill.
+// through MediaCard.
 export default function ArtImage({ src, alt, variant = 'poster', imgClassName }: {
     src?: string | null;
     alt: string;

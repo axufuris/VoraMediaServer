@@ -9,8 +9,8 @@ import RecommendationRow from '../../components/Media/RecommendationRow';
 import { useDialog } from '../../dialogs';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import Tabs from '../../components/Client/Primitives/Tabs';
-import MediaPoster from '../../components/Client/Primitives/MediaPoster';
-import { posterCaption } from '../../utils/posterCaption';
+import MediaCard from '../../components/Client/Primitives/MediaCard';
+import MediaGrid from '../../components/Client/Primitives/MediaGrid';
 import LetterRail from '../../components/Client/Primitives/LetterRail';
 import { StorageKeys } from '../../utils/storageKeys';
 
@@ -87,45 +87,17 @@ function renderLibraryCard(
     }
 ) {
     const { isAdmin, navigate, serverId, handleDeleteMedia } = ctx;
-    const cap = posterCaption(item);
-    const onOpen = () => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`);
-    const unplayedBadge = item.unplayedItemCount && item.unplayedItemCount > 0
-        ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}>{item.unplayedItemCount}</span>
-        : item.isPlayed
-            ? <span className="inline-flex h-5 w-5 items-center justify-center rounded-full" style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-            </span>
-            : undefined;
-
-    const card = (
-        <MediaPoster imageUrl={item.posterUrl} title={cap.title} captionLines={cap.lines} onClick={onOpen} badge={unplayedBadge} fill />
-    );
-
-    if (!isAdmin) return <div key={item.id} className="[content-visibility:auto] [contain-intrinsic-size:180px_320px]">{card}</div>;
-
     return (
-        <div key={item.id} className="group relative [content-visibility:auto] [contain-intrinsic-size:180px_320px]">
-            {card}
-            <button
-                type="button"
-                aria-label="Delete media item"
-                onClick={(e) => handleDeleteMedia(e, item.id)}
-                title="Delete media item"
-                className="absolute left-2 top-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full opacity-0 backdrop-blur-md transition-all hover:scale-105 group-hover:opacity-100 group-focus-within:opacity-100"
-                style={{
-                    background: 'var(--vora-danger-500)',
-                    color: '#ffffff',
-                    border: '2px solid rgba(255, 255, 255, 0.95)',
-                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.55)',
-                }}
-            >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-                    <line x1="10" y1="11" x2="10" y2="17" />
-                    <line x1="14" y1="11" x2="14" y2="17" />
-                </svg>
-            </button>
+        <div key={item.id} className="[content-visibility:auto] [contain-intrinsic-size:11rem_20rem]">
+            <MediaCard
+                item={item}
+                imageUrl={item.posterUrl}
+                isPlayed={item.isPlayed}
+                unplayedCount={item.unplayedItemCount}
+                onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
+                onDelete={isAdmin ? (e) => handleDeleteMedia(e, item.id) : undefined}
+                fill
+            />
         </div>
     );
 }
@@ -359,7 +331,7 @@ function RecommendationsPanel({ providers, libraryId, serverId }: { providers: s
     }
 
     return (
-        <div>
+        <div className="space-y-10">
             {orderedProviders.flatMap(providerId =>
                 [...(results[providerId] ?? [])]
                     .sort((a, b) => a.weight - b.weight)
@@ -711,9 +683,9 @@ export default function LibraryPage() {
                 <div className="vora-skeleton mb-8 h-[280px] w-full" />
                 <div className="px-8">
                     <div className="vora-skeleton mb-6 h-10 w-64" />
-                    <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
+                    <MediaGrid>
                         {Array.from({ length: 18 }, (_, i) => <div key={i} className="vora-skeleton aspect-[2/3]" />)}
-                    </div>
+                    </MediaGrid>
                 </div>
             </div>
         );
@@ -821,15 +793,15 @@ export default function LibraryPage() {
                                 sectionLetters.map(letter => (
                                     <section key={letter} id={`letter-${letter}`} className="mb-10 scroll-mt-24">
                                         <h2 className="m-0 mb-4 text-base font-semibold" style={{ color: 'var(--vora-text-muted)', letterSpacing: '0.04em' }}>{letter}</h2>
-                                        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
+                                        <MediaGrid>
                                             {groupedItems[letter].map(item => renderLibraryCard(item, { isAdmin, navigate, serverId, handleDeleteMedia }))}
-                                        </div>
+                                        </MediaGrid>
                                     </section>
                                 ))
                             ) : (
-                                <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
+                                <MediaGrid>
                                     {visibleItems.map(item => renderLibraryCard(item, { isAdmin, navigate, serverId, handleDeleteMedia }))}
-                                </div>
+                                </MediaGrid>
                             )}
                         </>
                     )}
@@ -849,18 +821,17 @@ export default function LibraryPage() {
                             description="Collections group related media — like a movie franchise or a curated set."
                         />
                     ) : (
-                        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,192px))]">
+                        <MediaGrid>
                             {collections.map(collection => (
-                                <MediaPoster
+                                <MediaCard
                                     key={collection.id}
+                                    item={{ type: 'Collection', title: collection.title, itemCount: collection.itemCount }}
                                     imageUrl={collection.posterUrl}
-                                    title={collection.title}
-                                    subtitle={`${collection.itemCount} item${collection.itemCount === 1 ? '' : 's'}`}
                                     onClick={() => navigate(serverId ? `/server/${serverId}/collection/${collection.id}` : `/collection/${collection.id}`)}
                                     fill
                                 />
                             ))}
-                        </div>
+                        </MediaGrid>
                     )}
                 </div>
             )}
