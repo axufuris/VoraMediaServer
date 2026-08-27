@@ -262,7 +262,7 @@ export default function HomePage() {
         return (
             <div className="min-h-full pb-20">
                 {tabBar}
-                {activeTab === 'collections' ? <CollectionsPage embedded /> : <PlaylistsPage embedded />}
+                {activeTab === 'collections' ? <CollectionsPage /> : <PlaylistsPage embedded />}
             </div>
         );
     }

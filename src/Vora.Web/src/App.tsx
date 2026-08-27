@@ -169,7 +169,7 @@ export default function App() {
                         <Route path="smart-playlist/:id" element={<SmartPlaylistDetailsPage />} />
                         <Route path="media/:id" element={<ClientMediaDetailsPage />} />
                         <Route path="collection/:id" element={<ClientCollectionDetailsPage />} />
-                                                <Route path="/actor/:id" element={<ClientActorDetailsPage />} />
+                        <Route path="/actor/:id" element={<ClientActorDetailsPage />} />
                         <Route path="discovery" element={<DiscoverHubPage />} />
                         <Route path="livetv" element={<LiveTvHubPage />} />
                         <Route path="music" element={<MusicPage />} />
@@ -185,7 +185,7 @@ export default function App() {
                             <Route path="library/:id" element={<ClientLibraryPage />} />
                             <Route path="media/:id" element={<ClientMediaDetailsPage />} />
                             <Route path="collection/:id" element={<ClientCollectionDetailsPage />} />
-                                                        <Route path="actor/:id" element={<ClientActorDetailsPage />} />
+                            <Route path="actor/:id" element={<ClientActorDetailsPage />} />
                             <Route path="playlists" element={<ClientPlaylistsPage />} />
                             <Route path="playlist/:id" element={<ClientPlaylistDetailsPage />} />
                             <Route path="smart-playlist/:id" element={<SmartPlaylistDetailsPage />} />

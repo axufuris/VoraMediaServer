@@ -3,17 +3,12 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { libraryService, type LibrarySummary } from '../../../api/Media/libraryService';
 import { collectionService, type CollectionSummary } from '../../../api/Collections/collectionService';
 import CreateCollectionModal from '../../../components/Collections/CreateCollectionModal';
-import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import { StorageKeys } from '../../../utils/storageKeys';
 
-interface CollectionsPageProps {
-    embedded?: boolean;
-}
-
-export default function CollectionsPage({ embedded = false }: CollectionsPageProps = {}) {
+export default function CollectionsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -99,15 +94,7 @@ export default function CollectionsPage({ embedded = false }: CollectionsPagePro
                 activeTab={activeTab}
             />
 
-            {embedded ? (
-                createAction && <div className="flex justify-end px-8 pt-4">{createAction}</div>
-            ) : (
-                <PageHeader
-                    title="Collections"
-                    subtitle="Curated sets of media — global or scoped to a library."
-                    actions={createAction}
-                />
-            )}
+            {createAction && <div className="flex justify-end px-8 pt-4">{createAction}</div>}
 
             <div className="px-8">
                 <nav
