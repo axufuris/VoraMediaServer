@@ -84,7 +84,7 @@ The single media tile. One primitive covers every aspect ratio rather than a sep
 
 **Behavior:**
 - Artwork renders at the shape's aspect ratio, lazy-loaded, with a low-contrast skeleton placeholder using `misc.skeletonShimmer` while loading, falling back to the branded placeholder if the source is missing or fails.
-- The caption block below the artwork is **derived from `mediaItem.type`**, not passed in: a title line plus zero or more muted sub-lines. Movie → year · edition. TV show → year. Season → show / season label / year. Episode → show / `S1 E2` / episode title. Album → artist / year · album. Collection → item count. Every platform must produce the same lines for the same item; the web implementation lives in `utils/posterCaption.ts` and is the reference.
+- The caption block below the artwork is **derived from `mediaItem.type`**, not passed in: a title line plus zero or more muted sub-lines. Movie → year · edition. TV show → year. Season → show / season label / year. Episode → show / episode title / `S1 · E2`. Album → artist / year · album. Collection → item count. Every platform must produce the same lines for the same item; the web implementation lives in `utils/posterCaption.ts` and is the reference.
 - If `mediaItem.progress > 0`, a progress bar overlays the bottom of the artwork — height 3px (web/phone) or 4px (TV), color `accent500`, full-width track at `accentSoft`.
 - Status affordances render in the artwork's corners: watchlist flag top-left, unplayed count or played check top-right, provider/quality badge bottom-left.
 
