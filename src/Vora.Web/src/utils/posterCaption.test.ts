@@ -33,12 +33,12 @@ describe('posterCaption', () => {
     it('episode: show, S#E#, episode title', () => {
         const cap = posterCaption({ type: 'Episode', title: 'We Light the Way', tvShowTitle: 'House of the Dragon', seasonNumber: 1, seasonName: 'Season 1', episodeNumber: 5 });
         expect(cap.title).toBe('House of the Dragon');
-        expect(cap.lines).toEqual(['S1 E5', 'We Light the Way']);
+        expect(cap.lines).toEqual(['We Light the Way', 'S1 · E5']);
     });
 
     it('episode: named season without a number falls back to label · E#', () => {
         const cap = posterCaption({ type: 'Episode', title: 'The Snowmen', tvShowTitle: 'Doctor Who', seasonName: 'Specials', episodeNumber: 3 });
-        expect(cap.lines).toEqual(['Specials · E3', 'The Snowmen']);
+        expect(cap.lines).toEqual(['The Snowmen', 'Specials · E3']);
     });
 
     it('drops empty parts (no year, no edition)', () => {

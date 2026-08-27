@@ -15,7 +15,7 @@ describe('MediaCard', () => {
     it('captions itself from the item type when given an item', () => {
         render(<MediaCard item={{ type: 'Episode', title: 'Pilot', tvShowTitle: 'The Show', seasonNumber: 1, episodeNumber: 2 }} />);
         expect(screen.getByText('The Show')).toBeInTheDocument();
-        expect(screen.getByText('S1 E2')).toBeInTheDocument();
+        expect(screen.getByText('S1 · E2')).toBeInTheDocument();
         expect(screen.getByText('Pilot')).toBeInTheDocument();
     });
 
