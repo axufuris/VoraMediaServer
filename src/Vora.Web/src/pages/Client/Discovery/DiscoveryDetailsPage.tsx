@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { createPortal } from 'react-dom';
 import { discoveryService, type DiscoveryItemDetails, type Trailer, type Theater } from '../../../api/Discovery/discoveryService';
 import { useDialog } from '../../../dialogs';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import CastRow from '../../../components/Client/Primitives/CastRow';
 import VideoCard from '../../../components/Client/Primitives/VideoCard';
 import DetailHero, { HeroChip, HeroCredits } from '../../../components/Client/Primitives/DetailHero';
+import RatingBadge from '../../../components/Client/Primitives/RatingBadge';
+import TrailerOverlay from '../../../components/Client/Primitives/TrailerOverlay';
+import { BookmarkIcon } from '../../../components/Client/Primitives/ActionIcons';
 import { directorsFrom } from '../../../utils/credits';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { formatRuntime } from '../../../utils/formatRuntime';
@@ -152,28 +154,6 @@ export default function DiscoveryDetailsPage() {
     const runtime = formatRuntime(details.runtimeMinutes);
     const runtimeLabel = runtime && details.type === 'TvShow' ? `${runtime} episodes` : runtime;
 
-    const modalContent = playingTrailer ? (
-        <div className="fixed inset-0 z-[99999] bg-black flex items-center justify-center">
-            <button
-                onClick={() => setPlayingTrailer(null)}
-                className="absolute top-6 left-1/2 -translate-x-1/2 px-6 py-2.5 flex items-center gap-2 rounded-full bg-black/70 hover:bg-[var(--vora-bg-sunken)] text-[var(--vora-text-primary)] transition-colors backdrop-blur-md cursor-pointer z-10 border border-white/20 shadow-2xl font-bold tracking-wider text-sm"
-                title="Close Video"
-            >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                CLOSE
-            </button>
-            <div className="w-full h-full relative flex items-center justify-center">
-                <iframe
-                    className="w-full h-full border-none bg-black"
-                    src={`https://www.youtube.com/embed/${playingTrailer.url.split('v=')[1]?.split('&')[0]}?autoplay=1`}
-                    title={playingTrailer.name}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                ></iframe>
-            </div>
-        </div>
-    ) : null;
-
     return (
         <>
             <div className="relative min-h-full pb-16">
@@ -196,12 +176,9 @@ export default function DiscoveryDetailsPage() {
                             {requestStatus === 4 && <HeroChip tone="accent">Available in library</HeroChip>}
                         </>
                     )}
-                    ratings={details.rating != null && details.rating > 0 ? (
-                        <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
-                            <span className="font-semibold">The Movie Database</span>
-                            <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{details.rating.toFixed(1)}</span>
-                        </div>
-                    ) : undefined}
+                    ratings={details.rating != null && details.rating > 0
+                        ? <RatingBadge value={details.rating} name="TMDB" />
+                        : undefined}
                     credits={<HeroCredits directors={directorsFrom(details.cast)} genres={details.genres} studios={details.studios} />}
                     actions={(
                         <button
@@ -212,12 +189,12 @@ export default function DiscoveryDetailsPage() {
                         >
                             {inWatchlist ? (
                                 <>
-                                    <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                    <BookmarkIcon filled />
                                     In Watchlist
                                 </>
                             ) : (
                                 <>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                                    <BookmarkIcon />
                                     Add to Watchlist
                                 </>
                             )}
@@ -330,7 +307,10 @@ export default function DiscoveryDetailsPage() {
                 </div>
             </div>
 
-            {playingTrailer && createPortal(modalContent, document.body)}
+            <TrailerOverlay
+                trailer={playingTrailer ? { name: playingTrailer.name, url: playingTrailer.url } : null}
+                onClose={() => setPlayingTrailer(null)}
+            />
         </>
     );
 }

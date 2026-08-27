@@ -16,7 +16,10 @@ import { getEffectiveCapabilities } from '../../../utils/hardwareScanner';
 import { isVideoDirectPlayable, isAudioDirectPlayable, parseResolutionHeight } from '../../../utils/playbackDecision';
 import { useDialog } from '../../../dialogs';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
-import DetailHero, { HeroChip, HeroCredits } from '../../../components/Client/Primitives/DetailHero';
+import DetailHero, { HeroChip, HeroCredits, HeroIconButton } from '../../../components/Client/Primitives/DetailHero';
+import RatingBadge from '../../../components/Client/Primitives/RatingBadge';
+import TrailerOverlay, { type TrailerSource } from '../../../components/Client/Primitives/TrailerOverlay';
+import { PlayIcon, RestartIcon, GearIcon, FilmReelIcon, PencilIcon, CheckIcon, MoreIcon } from '../../../components/Client/Primitives/ActionIcons';
 import { directorsFrom } from '../../../utils/credits';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
@@ -30,24 +33,6 @@ interface UpcomingEpisodeParsed {
     EpisodeNumber: number;
     Title: string;
     AirDate: string;
-}
-
-function isPercentScaleRating(providerName?: string): boolean {
-    if (!providerName) return false;
-    const n = providerName.trim().toLowerCase();
-    return n === 'rotten tomatoes'
-        || n === 'rotten tomatoes audience'
-        || n === 'rotten tomatoes critic'
-        || n === 'rotten tomatoes certified'
-        || n === 'rt'
-        || n === 'rt audience'
-        || n === 'rt critic'
-        || n === 'rt certified';
-}
-
-function formatThirdPartyRating(value: number, providerName?: string): string {
-    if (isPercentScaleRating(providerName)) return `${Math.round(value)}%`;
-    return value.toFixed(1);
 }
 
 const audioCodecRank = (codec?: string): number => {
@@ -76,6 +61,7 @@ export default function MediaDetailsPage() {
     const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
     const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
+    const [playingTrailer, setPlayingTrailer] = useState<TrailerSource | null>(null);
     const [isMarkerEditorOpen, setIsMarkerEditorOpen] = useState(false);
     const [isQualityPanelOpen, setIsQualityPanelOpen] = useState(false);
 
@@ -498,6 +484,12 @@ export default function MediaDetailsPage() {
     const playLabel = media.type === 'TvShow' ? 'Play next' : inProgress ? 'Resume' : 'Play';
     const playRuntime = formatRuntime(media.durationMinutes);
 
+    const videos = media.videos ?? [];
+    const trailerVideo = videos.find(v => v.type === 'Trailer') ?? videos[0];
+    const trailer: TrailerSource | null = trailerVideo
+        ? { name: trailerVideo.name ?? 'Trailer', videoKey: trailerVideo.videoKey, site: trailerVideo.site }
+        : null;
+
     const heroEyebrow = [
         isEpisode ? 'Episode' : isSeason ? `Season ${media.seasonNumber ?? ''}`.trim() : media.type === 'TvShow' ? 'TV Series' : 'Movie',
         media.releaseDate ? String(new Date(media.releaseDate).getFullYear()) : null,
@@ -528,18 +520,8 @@ export default function MediaDetailsPage() {
                     <StarRating value={media.serverAdminRating} readOnly showNumeric color="var(--vora-accent-text)" />
                 </div>
             )}
-            {media.thirdPartyRating1 != null && (
-                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
-                    <span className="font-semibold">{media.thirdPartyRating1Name ?? 'Rating'}</span>
-                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{formatThirdPartyRating(media.thirdPartyRating1, media.thirdPartyRating1Name)}</span>
-                </div>
-            )}
-            {media.thirdPartyRating2 != null && (
-                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vora-text-secondary)' }}>
-                    <span className="font-semibold">{media.thirdPartyRating2Name ?? 'Rating'}</span>
-                    <span className="tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{formatThirdPartyRating(media.thirdPartyRating2, media.thirdPartyRating2Name)}</span>
-                </div>
-            )}
+            {media.thirdPartyRating1 != null && <RatingBadge value={media.thirdPartyRating1} name={media.thirdPartyRating1Name} />}
+            {media.thirdPartyRating2 != null && <RatingBadge value={media.thirdPartyRating2} name={media.thirdPartyRating2Name} />}
         </>
     );
 
@@ -551,7 +533,7 @@ export default function MediaDetailsPage() {
                 className="vora-button-primary cursor-pointer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 30px', fontSize: 15 }}
             >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                <PlayIcon />
                 {playLabel}
                 {inProgress && resumePos > 0 && (
                     <span className="ml-1 text-xs font-normal opacity-70">
@@ -561,66 +543,39 @@ export default function MediaDetailsPage() {
             </button>
 
             {inProgress && (
-                <button
-                    type="button"
-                    onClick={() => handlePlay(false)}
-                    title="Start over"
-                    aria-label="Start over"
-                    className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                    style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa' }}
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
-                </button>
+                <HeroIconButton label="Start over" onClick={() => handlePlay(false)}>
+                    <RestartIcon />
+                </HeroIconButton>
             )}
 
             {showQualityButton && (
-                <button
-                    type="button"
-                    onClick={() => setIsQualityPanelOpen(true)}
-                    className="cursor-pointer inline-flex items-center gap-2 rounded-md px-5 py-3 text-sm font-medium backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                    style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa' }}
-                >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3" /></svg>
-                    Quality &amp; tracks
-                </button>
+                <HeroIconButton label="Quality & tracks" onClick={() => setIsQualityPanelOpen(true)}>
+                    <GearIcon />
+                </HeroIconButton>
             )}
 
-            <button
-                type="button"
-                onClick={() => setIsPlaylistModalOpen(true)}
-                title="Add to playlist"
-                aria-label="Add to playlist"
-                className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa' }}
-            >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="14" y2="18" /><polygon points="17 16 22 19 17 22 17 16" fill="currentColor" /></svg>
-            </button>
+            {trailer && (
+                <HeroIconButton label="Play trailer" onClick={() => setPlayingTrailer(trailer)}>
+                    <FilmReelIcon />
+                </HeroIconButton>
+            )}
 
-            <button
-                type="button"
+            <HeroIconButton label="Edit metadata" onClick={() => setIsEditModalOpen(true)}>
+                <PencilIcon />
+            </HeroIconButton>
+
+            <HeroIconButton
+                label={isFullyPlayed ? 'Mark as unwatched' : 'Mark as watched'}
+                active={isFullyPlayed}
                 onClick={handleTogglePlayed}
-                title={isFullyPlayed ? 'Mark as unwatched' : 'Mark as watched'}
-                aria-label={isFullyPlayed ? 'Mark as unwatched' : 'Mark as watched'}
-                className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors"
-                style={{
-                    background: isFullyPlayed ? 'var(--vora-accent-500)' : 'rgba(20, 20, 28, 0.72)',
-                    color: isFullyPlayed ? 'var(--vora-accent-contrast)' : '#fafafa',
-                    border: `1px solid ${isFullyPlayed ? 'var(--vora-accent-500)' : 'rgba(255, 255, 255, 0.18)'}`,
-                }}
             >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isFullyPlayed ? 3 : 2}><polyline points="20 6 9 17 4 12" /></svg>
-            </button>
+                <CheckIcon bold={isFullyPlayed} />
+            </HeroIconButton>
 
             <div className="relative">
-                <button
-                    type="button"
-                    onClick={() => setShowMenu(s => !s)}
-                    aria-label="More actions"
-                    className="cursor-pointer inline-flex h-12 w-12 items-center justify-center rounded-md backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                    style={{ background: 'rgba(20, 20, 28, 0.72)', border: '1px solid rgba(255, 255, 255, 0.18)', color: '#fafafa', padding: 0 }}
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" /></svg>
-                </button>
+                <HeroIconButton label="More actions" onClick={() => setShowMenu(v => !v)}>
+                    <MoreIcon />
+                </HeroIconButton>
                 {showMenu && (
                     <>
                         <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
@@ -639,7 +594,7 @@ export default function MediaDetailsPage() {
                                 <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Go to show</button>
                             )}
                             {showParentNav && <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />}
-                            <button type="button" onClick={() => { setIsEditModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit metadata</button>
+                            <button type="button" onClick={() => { setIsPlaylistModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Add to playlist</button>
                             <button type="button" onClick={() => { setIsCollectionModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Add to collection</button>
                             {isAdmin && (
                                 <>
@@ -698,6 +653,7 @@ export default function MediaDetailsPage() {
             <EditMetadataModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSaved={reloadMedia} itemId={media.id} type="media" initialData={{ ...media, lockedFields: media.lockedFields ?? [] }} />
             <AddToCollectionModal isOpen={isCollectionModalOpen} onClose={() => setIsCollectionModalOpen(false)} mediaId={media.id} libraryId={media.libraryId} mediaType={media.type} initialCollectionIds={media.collectionIds || []} onSaved={reloadMedia} />
             <AddToPlaylistModal isOpen={isPlaylistModalOpen} onClose={() => setIsPlaylistModalOpen(false)} mediaId={media.id} />
+            <TrailerOverlay trailer={playingTrailer} onClose={() => setPlayingTrailer(null)} />
             <MarkerEditorModal isOpen={isMarkerEditorOpen} onClose={() => setIsMarkerEditorOpen(false)} mediaItemId={media.id} mediaItemTitle={media.title} durationSeconds={media.durationMinutes ? media.durationMinutes * 60 : undefined} serverId={serverId} onSaved={reloadMedia} />
 
             <QualityPanel open={isQualityPanelOpen} onClose={() => setIsQualityPanelOpen(false)}>
