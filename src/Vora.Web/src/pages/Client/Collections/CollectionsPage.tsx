@@ -9,7 +9,11 @@ import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import { StorageKeys } from '../../../utils/storageKeys';
 
-export default function CollectionsPage() {
+interface CollectionsPageProps {
+    embedded?: boolean;
+}
+
+export default function CollectionsPage({ embedded = false }: CollectionsPageProps = {}) {
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -95,11 +99,15 @@ export default function CollectionsPage() {
                 activeTab={activeTab}
             />
 
-            <PageHeader
-                title="Collections"
-                subtitle="Curated sets of media — global or scoped to a library."
-                actions={createAction}
-            />
+            {embedded ? (
+                createAction && <div className="flex justify-end px-8 pt-4">{createAction}</div>
+            ) : (
+                <PageHeader
+                    title="Collections"
+                    subtitle="Curated sets of media — global or scoped to a library."
+                    actions={createAction}
+                />
+            )}
 
             <div className="px-8">
                 <nav

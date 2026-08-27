@@ -24,7 +24,6 @@ const LibraryDashboard = lazy(() => import('./pages/Client/LibraryDashboard'));
 const ManageLibrary = lazy(() => import('./pages/Admin/Libraries/ManageLibrary'));
 const ClientMediaDetailsPage = lazy(() => import('./pages/Client/Media/MediaDetailsPage'));
 const ClientCollectionDetailsPage = lazy(() => import('./pages/Client/Collections/CollectionDetailsPage'));
-const ClientCollectionsPage = lazy(() => import('./pages/Client/Collections/CollectionsPage'));
 const TaskDashboard = lazy(() => import('./pages/Admin/Tasks/TaskDashboard'));
 const ClientActorDetailsPage = lazy(() => import('./pages/Client/Media/ActorDetailsPage'));
 const ClientHomePage = lazy(() => import('./pages/Client/HomePage'));
@@ -170,8 +169,7 @@ export default function App() {
                         <Route path="smart-playlist/:id" element={<SmartPlaylistDetailsPage />} />
                         <Route path="media/:id" element={<ClientMediaDetailsPage />} />
                         <Route path="collection/:id" element={<ClientCollectionDetailsPage />} />
-                        <Route path="collections" element={<ClientCollectionsPage />} />
-                        <Route path="/actor/:id" element={<ClientActorDetailsPage />} />
+                                                <Route path="/actor/:id" element={<ClientActorDetailsPage />} />
                         <Route path="discovery" element={<DiscoverHubPage />} />
                         <Route path="livetv" element={<LiveTvHubPage />} />
                         <Route path="music" element={<MusicPage />} />
@@ -187,8 +185,7 @@ export default function App() {
                             <Route path="library/:id" element={<ClientLibraryPage />} />
                             <Route path="media/:id" element={<ClientMediaDetailsPage />} />
                             <Route path="collection/:id" element={<ClientCollectionDetailsPage />} />
-                            <Route path="collections" element={<ClientCollectionsPage />} />
-                            <Route path="actor/:id" element={<ClientActorDetailsPage />} />
+                                                        <Route path="actor/:id" element={<ClientActorDetailsPage />} />
                             <Route path="playlists" element={<ClientPlaylistsPage />} />
                             <Route path="playlist/:id" element={<ClientPlaylistDetailsPage />} />
                             <Route path="smart-playlist/:id" element={<SmartPlaylistDetailsPage />} />

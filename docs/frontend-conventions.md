@@ -125,12 +125,39 @@ pages/Client/             HomePage, LibraryPage, LibraryDashboard, SearchPage,
                           SettingsPage, WatchlistPage, RecommendationsPage,
                           CalendarPage, ProfileHistoryPage
 pages/Client/Media/       MediaDetailsPage, ActorDetailsPage
-pages/Client/Collections/ CollectionsPage, CollectionDetailsPage
+pages/Client/Collections/ CollectionsPage (Home tab), CollectionDetailsPage
 pages/Client/Playlists/   PlaylistsPage, PlaylistDetailsPage
 pages/Client/Discovery/   DiscoveryPage, DiscoveryActorPage,
                           DiscoveryDetailsPage, DiscoveryViewAllPage
 pages/Client/LiveTv/      LiveTvPage, LiveTvGuide, DvrDashboard
 ```
+
+## Tab-host pages and the `embedded` prop
+
+Some client pages are hosted as a tab inside another page rather than living at
+their own route. `HomePage` hosts **Home / Collections / Playlists**;
+`DiscoverHubPage` hosts **Discover / For You / Watchlist / Calendar**.
+
+A page that can appear both ways takes an `embedded?: boolean` prop. Embedded, it
+drops its own `PageHeader` — the host already owns the title — and moves any
+page-level action into a right-aligned row above its content. Everything else
+(sub-tabs, filters, URL params, data loading) is unchanged, so the page has one
+implementation, not two.
+
+```tsx
+{embedded
+    ? createAction && <div className="flex justify-end px-8 pt-4">{createAction}</div>
+    : <PageHeader title="Collections" subtitle="…" actions={createAction} />}
+```
+
+The host owns which tab is active and persists it in `sessionStorage`
+(`home_active_tab`, `discover_active_tab`), so returning from a detail page lands
+back on the tab you left. Put page-level controls in the `Tabs` `actions` slot
+only when they belong to the host itself — Home's Customize button does; a tab's
+own actions stay inside that tab.
+
+Collections has **no standalone route**. `/collections` falls through to the
+catch-all in `App.tsx` and redirects to `/`.
 
 ## Dialog system — replaces all `alert/confirm/prompt`
 
