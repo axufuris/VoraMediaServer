@@ -19,7 +19,7 @@ import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import DetailHero, { HeroChip, HeroCredits, HeroIconButton } from '../../../components/Client/Primitives/DetailHero';
 import RatingBadge from '../../../components/Client/Primitives/RatingBadge';
 import TrailerOverlay, { type TrailerSource } from '../../../components/Client/Primitives/TrailerOverlay';
-import { PlayIcon, RestartIcon, GearIcon, FilmReelIcon, PencilIcon, CheckIcon, MoreIcon } from '../../../components/Client/Primitives/ActionIcons';
+import { PlayIcon, RestartIcon, GearIcon, FilmReelIcon, CheckIcon, MoreIcon } from '../../../components/Client/Primitives/ActionIcons';
 import { directorsFrom } from '../../../utils/credits';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
@@ -587,10 +587,6 @@ export default function MediaDetailsPage() {
                 </HeroIconButton>
             )}
 
-            <HeroIconButton label="Edit metadata" onClick={() => setIsEditModalOpen(true)}>
-                <PencilIcon />
-            </HeroIconButton>
-
             <div className="relative">
                 <HeroIconButton label="More actions" onClick={() => setShowMenu(v => !v)}>
                     <MoreIcon />
@@ -613,6 +609,7 @@ export default function MediaDetailsPage() {
                                 <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Go to show</button>
                             )}
                             {showParentNav && <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />}
+                            <button type="button" onClick={() => { setIsEditModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit metadata</button>
                             <button type="button" onClick={() => { setIsPlaylistModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Add to playlist</button>
                             <button type="button" onClick={() => { setIsCollectionModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Add to collection</button>
                             {isAdmin && (

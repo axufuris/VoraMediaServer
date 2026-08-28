@@ -65,15 +65,6 @@ export function BookmarkIcon({ size = 18, filled = false }: { size?: number; fil
     );
 }
 
-export function PencilIcon({ size = 18 }: { size?: number }) {
-    return (
-        <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} aria-hidden="true">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
-        </svg>
-    );
-}
-
 export function CheckIcon({ size = 18, bold = false }: { size?: number; bold?: boolean }) {
     return <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} strokeWidth={bold ? 3 : 2} aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>;
 }
