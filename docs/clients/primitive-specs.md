@@ -107,7 +107,7 @@ The top block of a detail page. One primitive serves both an in-library title an
 - `posterShape: 'poster' | 'still' = 'poster'` — episodes use `still`.
 - `eyebrow`, `titleSuffix`, `subtitle` — type/year, `S1 E2`, and the show name for a season or episode.
 - `chips`, `ratings`, `credits`, `actions`, `notice`, `overview` — slots. A platform omits a slot it has no data for; it never substitutes a different layout. `credits` is the labelled director / genres / studio block.
-- `onBack`, `backLabel`.
+- `onBack` — the back affordance always reads "Back". A detail page is reachable from several places (Discover, search, the Home watchlist), so a label naming one destination would be wrong from the others.
 
 **Behavior:**
 - The backdrop occupies the right of the header (about 65% on wide layouts, full width when the layout stacks) and fades out at its **left and bottom** edges so it dissolves into the page rather than ending on a seam. Web does this with nested masks; native clients use the equivalent gradient mask.
