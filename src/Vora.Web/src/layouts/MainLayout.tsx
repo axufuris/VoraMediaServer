@@ -185,8 +185,7 @@ export default function MainLayout() {
                 { id: 'podcasts', title: 'Podcasts', path: '/podcasts', type: 'system', serverName: primaryServerName, isPinned: true, order: 1 },
                 { id: 'livetv', title: 'Live TV', path: '/livetv', type: 'system', isPinned: true, order: 2 },
                 { id: 'radio', title: 'Radio', path: '/radio', type: 'system', isPinned: true, order: 3 },
-                { id: 'discovery', title: 'Discover', path: '/discovery', type: 'system', isPinned: true, order: 5 },
-                { id: 'collections', title: 'Collections', path: '/collections', type: 'system', isPinned: true, order: 6 }
+                { id: 'discovery', title: 'Discover', path: '/discovery', type: 'system', isPinned: true, order: 5 }
             ];
 
             const combinedItems = [...baseItems, ...allLibraries];

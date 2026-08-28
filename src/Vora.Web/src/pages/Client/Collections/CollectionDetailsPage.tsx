@@ -134,7 +134,7 @@ export default function CollectionDetailsPage() {
                     isOpen={isEditModalOpen}
                     onClose={() => setIsEditModalOpen(false)}
                     onSaved={fetchCollection}
-                    onDeleted={() => navigate(serverId ? `/server/${serverId}/collections` : '/collections')}
+                    onDeleted={() => navigate(serverId ? `/server/${serverId}` : '/')}
                     collection={collection}
                 />
             )}

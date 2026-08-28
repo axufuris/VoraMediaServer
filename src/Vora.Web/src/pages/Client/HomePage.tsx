@@ -11,18 +11,19 @@ import PageHeader from '../../components/Client/Primitives/PageHeader';
 import Tabs from '../../components/Client/Primitives/Tabs';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import PlaylistsPage from './Playlists/PlaylistsPage';
+import CollectionsPage from './Collections/CollectionsPage';
 import MediaRow, { MediaRowItem } from '../../components/Client/Primitives/MediaRow';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import PosterRemoveButton from '../../components/Client/Primitives/PosterRemoveButton';
 import { useDialog } from '../../dialogs';
 
-type HomeTab = 'overview' | 'playlists';
+type HomeTab = 'overview' | 'collections' | 'playlists';
 
 const HOME_TAB_STORAGE_KEY = 'home_active_tab';
 
 const readSavedHomeTab = (): HomeTab => {
     const saved = sessionStorage.getItem(HOME_TAB_STORAGE_KEY);
-    return saved === 'playlists' ? 'playlists' : 'overview';
+    return saved === 'collections' || saved === 'playlists' ? saved : 'overview';
 };
 
 function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serverId?: string }) {
@@ -247,6 +248,7 @@ export default function HomePage() {
             <Tabs<HomeTab>
                 tabs={[
                     { key: 'overview', label: 'Home' },
+                    { key: 'collections', label: 'Collections' },
                     { key: 'playlists', label: 'Playlists' },
                 ]}
                 active={activeTab}
@@ -256,11 +258,11 @@ export default function HomePage() {
         </div>
     );
 
-    if (activeTab === 'playlists') {
+    if (activeTab !== 'overview') {
         return (
             <div className="min-h-full pb-20">
                 {tabBar}
-                <PlaylistsPage embedded />
+                {activeTab === 'collections' ? <CollectionsPage /> : <PlaylistsPage embedded />}
             </div>
         );
     }
