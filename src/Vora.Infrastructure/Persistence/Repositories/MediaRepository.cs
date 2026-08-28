@@ -1170,6 +1170,38 @@ public partial class MediaRepository : IMediaRepository
         return await _context.MediaItems.AnyAsync(m => m.TmdbId == externalId);
     }
 
+    // Same match as GetExistingExternalIdsAsync, but returns which local item
+    // each external id belongs to so the watchlist can link to it.
+    public async Task<Dictionary<string, Guid>> GetLocalIdsByExternalIdsAsync(IEnumerable<string> externalIds, string type)
+    {
+        var ids = externalIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<string, Guid>();
+
+        IQueryable<MediaItem> query = type switch
+        {
+            "Movie" => _context.MediaItems.OfType<Movie>(),
+            "TvShow" => _context.MediaItems.OfType<TvShow>(),
+            _ => _context.MediaItems
+        };
+
+        var found = await query
+            .AsNoTracking()
+            .Where(m => m.TmdbId != null && ids.Contains(m.TmdbId))
+            .Select(m => new { m.TmdbId, m.Id })
+            .ToListAsync();
+
+        return found
+            .GroupBy(x => x.TmdbId!)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+    }
+
+    public Task<string?> GetTmdbIdAsync(Guid mediaItemId) =>
+        _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == mediaItemId)
+            .Select(m => m.TmdbId)
+            .FirstOrDefaultAsync();
+
     public async Task<HashSet<string>> GetExistingExternalIdsAsync(IEnumerable<string> externalIds, string type)
     {
         var ids = externalIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();

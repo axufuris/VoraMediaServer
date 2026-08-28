@@ -97,6 +97,7 @@ public static class WebApplicationExtensions
         app.MapCollectionArtworkEndpoints();
         app.MapDeviceEndpoints();
         app.MapDiscoveryEndpoints();
+        app.MapWatchlistEndpoints();
         app.MapDvrEndpoints();
         app.MapDvrPlaybackEndpoints();
         app.MapEmailEndpoints();

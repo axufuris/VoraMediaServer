@@ -9,16 +9,6 @@ using Vora.Plugins.Dtos;
 
 namespace Vora.Api.Endpoints;
 
-public class ToggleWatchlistRequest
-{
-    public string ExternalId { get; set; } = string.Empty;
-    public string ProviderId { get; set; } = string.Empty;
-    public string Type { get; set; } = string.Empty;
-    public string Title { get; set; } = string.Empty;
-    public string? PosterUrl { get; set; }
-    public DateTime? ExpectedReleaseDate { get; set; }
-}
-
 public static class DiscoveryEndpoints
 {
     public static RouteGroupBuilder MapDiscoveryEndpoints(this IEndpointRouteBuilder routes)
@@ -44,15 +34,6 @@ public static class DiscoveryEndpoints
         group.MapGet("/search", SearchAsync)
             .WithName("SearchDiscovery")
             .Produces<IEnumerable<DiscoveryItemVM>>(StatusCodes.Status200OK);
-
-        group.MapGet("/profiles/{profileId:guid}/watchlist", GetWatchlistAsync)
-            .WithName("ListProfileWatchlist")
-            .Produces<IEnumerable<WatchlistItemVM>>(StatusCodes.Status200OK);
-        group.MapGet("/profiles/{profileId:guid}/watchlist/check", CheckWatchlistAsync)
-            .WithName("CheckProfileWatchlist")
-            .Produces<WatchlistStatusVM>(StatusCodes.Status200OK);
-        group.MapPost("/profiles/{profileId:guid}/watchlist/toggle", ToggleWatchlistAsync)
-            .WithName("ToggleProfileWatchlist");
 
         group.MapGet("/theater/showtimes", GetShowtimesAsync)
             .WithName("ListMovieShowtimes")
@@ -129,47 +110,6 @@ public static class DiscoveryEndpoints
         }
         cancellationToken.ThrowIfCancellationRequested();
         return Results.Ok(await manager.SearchAsync(q, cancellationToken));
-    }
-
-    private static async Task<IResult> GetWatchlistAsync(Guid profileId, IDiscoveryManager manager)
-    {
-        var items = await manager.GetWatchlistAsync(profileId);
-        var vms = items.Select(w => new WatchlistItemVM
-        {
-            Id = w.Id,
-            ProfileId = w.ProfileId,
-            ExternalId = w.ExternalId,
-            ProviderId = w.ProviderId,
-            Type = w.Type,
-            Title = w.Title,
-            PosterUrl = w.PosterUrl,
-            AddedAt = w.AddedAt,
-        }).ToList();
-        return Results.Ok(vms);
-    }
-
-    private static async Task<IResult> CheckWatchlistAsync(
-        Guid profileId,
-        [FromQuery] string externalId,
-        [FromQuery] string providerId,
-        IDiscoveryManager manager) =>
-        Results.Ok(new WatchlistStatusVM { InWatchlist = await manager.CheckWatchlistStatusAsync(profileId, externalId, providerId) });
-
-    private static async Task<IResult> ToggleWatchlistAsync(
-        Guid profileId,
-        [FromBody] ToggleWatchlistRequest req,
-        IDiscoveryManager manager,
-        IRequestManager requestManager)
-    {
-        await manager.ToggleWatchlistAsync(profileId, req.ExternalId, req.ProviderId, req.Type, req.Title, req.PosterUrl, req.ExpectedReleaseDate);
-
-        var inWatchlist = await manager.CheckWatchlistStatusAsync(profileId, req.ExternalId, req.ProviderId);
-        if (inWatchlist)
-        {
-            await requestManager.ProcessWatchlistAdditionAsync(req.ExternalId, req.ProviderId, req.Title, req.Type, req.PosterUrl ?? string.Empty, profileId, req.ExpectedReleaseDate);
-        }
-
-        return Results.NoContent();
     }
 
     private static async Task<IResult> GetShowtimesAsync(

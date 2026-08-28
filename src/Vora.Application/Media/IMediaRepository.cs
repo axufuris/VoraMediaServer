@@ -79,6 +79,8 @@ public interface IMediaRepository
     Task SetTvNetworksAsync(Guid tvShowId, IEnumerable<int> networkIds);
     Task<bool> MediaExistsByExternalIdAsync(string externalId, string type);
     Task<HashSet<string>> GetExistingExternalIdsAsync(IEnumerable<string> externalIds, string type);
+    Task<Dictionary<string, Guid>> GetLocalIdsByExternalIdsAsync(IEnumerable<string> externalIds, string type);
+    Task<string?> GetTmdbIdAsync(Guid mediaItemId);
     Task<Dictionary<string, Guid>> GetLibraryIdsByTmdbIdsAsync(IEnumerable<string> tmdbIds);
     Task<List<MediaItem>> GetItemsPendingOverlayGenerationAsync(Guid libraryId, DateTime maxTemplateUpdatedDate, int currentLayoutVersion);
     Task<bool> AnyItemHasOverlayAppliedAsync(Guid libraryId);

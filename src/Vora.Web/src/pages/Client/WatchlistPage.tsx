@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { discoveryService, type WatchlistItem } from '../../api/Discovery/discoveryService';
+import { watchlistService, type WatchlistItem } from '../../api/Watchlist/watchlistService';
 import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
@@ -25,11 +25,20 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
             queueMicrotask(() => setIsLoading(false));
             return;
         }
-        discoveryService.getWatchlist(activeProfileId, serverId)
+        watchlistService.getWatchlist(serverId)
             .then(setItems)
             .catch(console.error)
             .finally(() => setIsLoading(false));
     }, [activeProfileId, serverId]);
+
+    // A bookmarked title that is in the library opens the local item, where it
+    // can actually be played; anything else opens the provider page.
+    const openPath = (item: WatchlistItem) => {
+        const prefix = serverId ? `/server/${serverId}` : '';
+        return item.mediaItemId
+            ? `${prefix}/media/${item.mediaItemId}`
+            : `${prefix}/discovery/${item.providerId}/${item.type}/${item.externalId}`;
+    };
 
     return (
         <div className="min-h-full pb-20">
@@ -64,7 +73,7 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
                                 title={item.title}
                                 captionLines={[item.type === 'TvShow' ? 'TV Series' : 'Movie']}
                                 inWatchlist
-                                onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${item.providerId}/${item.type}/${item.externalId}` : `/discovery/${item.providerId}/${item.type}/${item.externalId}`)}
+                                onClick={() => navigate(openPath(item))}
                                 fill
                             />
                         ))}

@@ -19,7 +19,8 @@ import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import DetailHero, { HeroChip, HeroCredits, HeroIconButton } from '../../../components/Client/Primitives/DetailHero';
 import RatingBadge from '../../../components/Client/Primitives/RatingBadge';
 import TrailerOverlay, { type TrailerSource } from '../../../components/Client/Primitives/TrailerOverlay';
-import { PlayIcon, RestartIcon, GearIcon, FilmReelIcon, CheckIcon, MoreIcon } from '../../../components/Client/Primitives/ActionIcons';
+import { PlayIcon, RestartIcon, GearIcon, FilmReelIcon, BookmarkIcon, CheckIcon, MoreIcon } from '../../../components/Client/Primitives/ActionIcons';
+import { watchlistService } from '../../../api/Watchlist/watchlistService';
 import { directorsFrom } from '../../../utils/credits';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
@@ -63,6 +64,7 @@ export default function MediaDetailsPage() {
     const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [playingTrailer, setPlayingTrailer] = useState<TrailerSource | null>(null);
+    const [inWatchlist, setInWatchlist] = useState(false);
     const [isMarkerEditorOpen, setIsMarkerEditorOpen] = useState(false);
     const [isQualityPanelOpen, setIsQualityPanelOpen] = useState(false);
 
@@ -121,6 +123,11 @@ export default function MediaDetailsPage() {
         // so close any open overlay/menu from the previous item.
         setIsQualityPanelOpen(false);
         setShowMenu(false);
+        setInWatchlist(false);
+
+        watchlistService.check({ mediaItemId: id }, serverId)
+            .then(saved => { if (isMounted) setInWatchlist(saved); })
+            .catch(() => { /* a watchlist read failing shouldn't block the page */ });
 
         mediaService.getMediaItem(id, serverId)
             .then(data => {
@@ -325,6 +332,20 @@ export default function MediaDetailsPage() {
             }
         }
         setShowMenu(false);
+    };
+
+    const handleToggleWatchlist = async () => {
+        if (!media) return;
+        try {
+            const next = await watchlistService.toggle(
+                { mediaItemId: media.id },
+                { type: media.type, title: media.title, posterUrl: media.posterUrl },
+                serverId
+            );
+            setInWatchlist(next);
+        } catch {
+            await dialog.alert('Failed to update watchlist.');
+        }
     };
 
     const handleTogglePlayed = async () => {
@@ -566,6 +587,14 @@ export default function MediaDetailsPage() {
                     <RestartIcon />
                 </HeroIconButton>
             )}
+
+            <HeroIconButton
+                label={inWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+                active={inWatchlist}
+                onClick={handleToggleWatchlist}
+            >
+                <BookmarkIcon filled={inWatchlist} />
+            </HeroIconButton>
 
             {trailer && (
                 <HeroIconButton label="Play trailer" onClick={() => setPlayingTrailer(trailer)}>

@@ -6,6 +6,7 @@ import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/Me
 import CastRow from '../../../components/Client/Primitives/CastRow';
 import VideoCard from '../../../components/Client/Primitives/VideoCard';
 import DetailHero, { HeroChip, HeroCredits } from '../../../components/Client/Primitives/DetailHero';
+import { watchlistService } from '../../../api/Watchlist/watchlistService';
 import RatingBadge from '../../../components/Client/Primitives/RatingBadge';
 import TrailerOverlay from '../../../components/Client/Primitives/TrailerOverlay';
 import { BookmarkIcon } from '../../../components/Client/Primitives/ActionIcons';
@@ -43,7 +44,7 @@ export default function DiscoveryDetailsPage() {
                 setDetails(item);
 
                 if (activeProfileId) {
-                    const watchStatus = await discoveryService.checkWatchlist(activeProfileId, externalId, providerId, serverId);
+                    const watchStatus = await watchlistService.check({ externalId, providerId }, serverId);
                     setInWatchlist(watchStatus);
                     const status = await discoveryService.getRequestStatus(externalId, type, serverId);
                     setRequestStatus(status);
@@ -132,17 +133,19 @@ export default function DiscoveryDetailsPage() {
             : details.releaseDate;
 
         try {
-            await discoveryService.toggleWatchlist(
-                activeProfileId,
-                details.externalId,
-                details.providerId,
-                details.type,
-                details.title,
-                details.posterUrl,
-                expectedDate, // <-- PASSED SMART DATE
+            const next = await watchlistService.toggle(
+                { externalId: details.externalId, providerId: details.providerId },
+                {
+                    type: details.type,
+                    title: details.title,
+                    posterUrl: details.posterUrl,
+                    // A show that is still airing bookmarks against its next
+                    // episode rather than its original premiere.
+                    expectedReleaseDate: expectedDate,
+                },
                 serverId
             );
-            setInWatchlist(!inWatchlist);
+            setInWatchlist(next);
         } catch {
             await dialog.alert("Failed to update watchlist.");
         }

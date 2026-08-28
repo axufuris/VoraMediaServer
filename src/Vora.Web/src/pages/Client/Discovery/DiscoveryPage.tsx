@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { discoveryService, type DiscoveryRowConfig, type DiscoveryItem } from '../../../api/Discovery/discoveryService';
+import { watchlistService } from '../../../api/Watchlist/watchlistService';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
 import { serverVault } from '../../../utils/serverVault';
 import ClientDiscoveryCustomizeModal, { type ClientLayoutItem } from '../../../components/Discovery/DiscoveryCustomizeModal';
@@ -55,7 +56,7 @@ export default function DiscoveryPage({ embedded = false }: DiscoveryPageProps =
                 setConfigs(mappedConfigs);
 
                 if (activeProfileId) {
-                    const wItems = await discoveryService.getWatchlist(activeProfileId, serverId);
+                    const wItems = await watchlistService.getWatchlist(serverId);
                     setWatchlistIds(new Set(wItems.map(i => i.externalId)));
                 }
             } catch (error) {

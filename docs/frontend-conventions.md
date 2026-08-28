@@ -135,8 +135,8 @@ pages/Client/LiveTv/      LiveTvPage, LiveTvGuide, DvrDashboard
 ## Tab-host pages and the `embedded` prop
 
 Some client pages are hosted as a tab inside another page rather than living at
-their own route. `HomePage` hosts **Home / Collections / Playlists**;
-`DiscoverHubPage` hosts **Discover / For You / Watchlist / Calendar**.
+their own route. `HomePage` hosts **Home / Watchlist / Collections / Playlists**;
+`DiscoverHubPage` hosts **Discover / For You / Calendar**.
 
 A hosted page drops its own `PageHeader` — the tab bar already names it — and
 moves any page-level action into a right-aligned row above its content. Sub-tabs,
@@ -153,6 +153,14 @@ The host owns which tab is active and persists it in `sessionStorage`
 back on the tab you left. Put page-level controls in the `Tabs` `actions` slot
 only when they belong to the host itself — Home's Customize button does; a tab's
 own actions stay inside that tab.
+
+**The watchlist is not a Discovery feature.** It holds library items as well as
+titles that aren't in the library, so it is a Home tab, is shown unconditionally,
+and its API lives at `/api/watchlist` rather than under `/api/discovery` — that
+group is gated on the Discover feature and would 403 with Discover switched off.
+An entry is keyed by its external provider identity whenever one is known, so a
+title bookmarked from Discovery and the same title once it lands in the library
+are one row; a library item with no external match is keyed by its own id.
 
 ## Dialog system — replaces all `alert/confirm/prompt`
 

@@ -112,7 +112,7 @@ The top block of a detail page. One primitive serves both an in-library title an
 **Behavior:**
 - The backdrop occupies the right of the header (about 65% on wide layouts, full width when the layout stacks) and fades out at its **left and bottom** edges so it dissolves into the page rather than ending on a seam. Web does this with nested masks; native clients use the equivalent gradient mask.
 - The poster sits left of the text column at a fixed relative width.
-- `actions` is the only slot that differs by source: an in-library item gets Play / Quality & tracks / Mark watched / overflow; a discovery item gets Add to Watchlist alone. Playback controls must never appear for an item that isn't in the library.
+- `actions` is the only slot that differs by source: an in-library item gets Play / Start over / Add to watchlist / Play trailer / Mark watched / Quality & tracks / overflow; a discovery item gets Add to Watchlist alone. Playback controls must never appear for an item that isn't in the library, but **Add to watchlist appears on both** — the watchlist spans owned and unowned titles.
 
 **TV focus:** the first action is the default focus target for the page. D-pad down leaves the hero for the first `MediaRow` below.
 
