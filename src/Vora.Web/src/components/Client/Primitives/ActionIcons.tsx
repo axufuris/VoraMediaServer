@@ -34,18 +34,24 @@ export function GearIcon({ size = 18 }: { size?: number }) {
     );
 }
 
-// Film reel — the trailer affordance. A stroked reel body with solid punched
-// holes and a centre hub; outlined rings for the holes read as a flower rather
-// than a reel.
+// Film reel — the trailer affordance. A filled disc centred in the box with
+// large holes punched out of it (evenodd), so what reads at 18px is the spoke
+// pattern of a reel. The holes have to be big: small ones vanish at button size
+// and leave a plain blob. No arm or handle — the silhouette is just the reel.
 export function FilmReelIcon({ size = 18 }: { size?: number }) {
     return (
         <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth={2} />
-            <circle cx="12" cy="12" r="1.6" fill="currentColor" />
-            <circle cx="12" cy="7.4" r="1.7" fill="currentColor" />
-            <circle cx="12" cy="16.6" r="1.7" fill="currentColor" />
-            <circle cx="7.4" cy="12" r="1.7" fill="currentColor" />
-            <circle cx="16.6" cy="12" r="1.7" fill="currentColor" />
+            <path
+                fill="currentColor"
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M2.5 12a9.5 9.5 0 1 0 19 0 9.5 9.5 0 1 0-19 0Z
+                   M10.3 12a1.7 1.7 0 1 0 3.4 0 1.7 1.7 0 1 0-3.4 0Z
+                   M9.4 6.5a2.6 2.6 0 1 0 5.2 0 2.6 2.6 0 1 0-5.2 0Z
+                   M9.4 17.5a2.6 2.6 0 1 0 5.2 0 2.6 2.6 0 1 0-5.2 0Z
+                   M3.9 12a2.6 2.6 0 1 0 5.2 0 2.6 2.6 0 1 0-5.2 0Z
+                   M14.9 12a2.6 2.6 0 1 0 5.2 0 2.6 2.6 0 1 0-5.2 0Z"
+            />
         </svg>
     );
 }
@@ -55,15 +61,6 @@ export function BookmarkIcon({ size = 18, filled = false }: { size?: number; fil
     return (
         <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} fill={filled ? 'currentColor' : 'none'} aria-hidden="true">
             <path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-4.2L6 21z" />
-        </svg>
-    );
-}
-
-export function PencilIcon({ size = 18 }: { size?: number }) {
-    return (
-        <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} aria-hidden="true">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
         </svg>
     );
 }
