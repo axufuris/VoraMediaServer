@@ -34,15 +34,18 @@ export function GearIcon({ size = 18 }: { size?: number }) {
     );
 }
 
-// Film reel — the trailer affordance.
+// Film reel — the trailer affordance. A stroked reel body with solid punched
+// holes and a centre hub; outlined rings for the holes read as a flower rather
+// than a reel.
 export function FilmReelIcon({ size = 18 }: { size?: number }) {
     return (
-        <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <circle cx="12" cy="7.6" r="1.7" />
-            <circle cx="12" cy="16.4" r="1.7" />
-            <circle cx="7.6" cy="12" r="1.7" />
-            <circle cx="16.4" cy="12" r="1.7" />
+        <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth={2} />
+            <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+            <circle cx="12" cy="7.4" r="1.7" fill="currentColor" />
+            <circle cx="12" cy="16.6" r="1.7" fill="currentColor" />
+            <circle cx="7.4" cy="12" r="1.7" fill="currentColor" />
+            <circle cx="16.6" cy="12" r="1.7" fill="currentColor" />
         </svg>
     );
 }

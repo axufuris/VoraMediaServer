@@ -548,21 +548,11 @@ export default function MediaDetailsPage() {
                 </HeroIconButton>
             )}
 
-            {showQualityButton && (
-                <HeroIconButton label="Quality & tracks" onClick={() => setIsQualityPanelOpen(true)}>
-                    <GearIcon />
-                </HeroIconButton>
-            )}
-
             {trailer && (
                 <HeroIconButton label="Play trailer" onClick={() => setPlayingTrailer(trailer)}>
                     <FilmReelIcon />
                 </HeroIconButton>
             )}
-
-            <HeroIconButton label="Edit metadata" onClick={() => setIsEditModalOpen(true)}>
-                <PencilIcon />
-            </HeroIconButton>
 
             <HeroIconButton
                 label={isFullyPlayed ? 'Mark as unwatched' : 'Mark as watched'}
@@ -570,6 +560,16 @@ export default function MediaDetailsPage() {
                 onClick={handleTogglePlayed}
             >
                 <CheckIcon bold={isFullyPlayed} />
+            </HeroIconButton>
+
+            {showQualityButton && (
+                <HeroIconButton label="Quality & tracks" onClick={() => setIsQualityPanelOpen(true)}>
+                    <GearIcon />
+                </HeroIconButton>
+            )}
+
+            <HeroIconButton label="Edit metadata" onClick={() => setIsEditModalOpen(true)}>
+                <PencilIcon />
             </HeroIconButton>
 
             <div className="relative">
