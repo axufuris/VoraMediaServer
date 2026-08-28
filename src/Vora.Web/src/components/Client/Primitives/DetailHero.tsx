@@ -40,6 +40,35 @@ export function HeroChip({ children, tone = 'neutral' }: { children: ReactNode; 
     );
 }
 
+// A square icon action in the hero's button row. Fixed light-on-dark chrome,
+// not theme tokens — these sit over artwork, which isn't themed. `active` is the
+// on-state (Mark as watched once watched).
+export function HeroIconButton({ label, active, onClick, children }: {
+    label: string;
+    active?: boolean;
+    onClick: () => void;
+    children: ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title={label}
+            aria-label={label}
+            aria-pressed={active}
+            className={`inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-md backdrop-blur-md transition-colors ${active ? '' : 'hover:bg-[rgba(20,20,28,0.85)]'}`}
+            style={{
+                background: active ? 'var(--vora-accent-500)' : 'rgba(20, 20, 28, 0.72)',
+                color: active ? 'var(--vora-accent-contrast)' : '#fafafa',
+                border: `1px solid ${active ? 'var(--vora-accent-500)' : 'rgba(255, 255, 255, 0.18)'}`,
+                padding: 0,
+            }}
+        >
+            {children}
+        </button>
+    );
+}
+
 // The labelled facts under the hero's rating row — director, genres, studio.
 // Shared so a title reads the same whether it came from the library or from a
 // discovery provider. Rows with nothing to show are dropped entirely.

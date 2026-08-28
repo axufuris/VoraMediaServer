@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import type { MediaVideo, MediaExtra } from '../../api/Media/mediaService';
 import { streamingService } from '../../api/Streaming/streamingService';
 import { usePlayer } from '../../contexts/usePlayer';
 import MediaRow, { MediaRowItem } from '../Client/Primitives/MediaRow';
 import VideoCard from '../Client/Primitives/VideoCard';
+import TrailerOverlay from '../Client/Primitives/TrailerOverlay';
 
 interface Props {
     videos: MediaVideo[];
@@ -51,28 +51,6 @@ export default function MediaExtrasRow({ videos, extras = [], serverId }: Props)
         }
     };
 
-    const modalContent = playingVideo ? (
-        <div className="fixed inset-0 z-[99999] bg-black flex items-center justify-center">
-            <button
-                onClick={() => setPlayingVideo(null)}
-                className="absolute top-6 left-1/2 -translate-x-1/2 px-6 py-2.5 flex items-center gap-2 rounded-full bg-black/70 hover:bg-[var(--vora-bg-sunken)] text-[var(--vora-text-primary)] transition-colors backdrop-blur-md cursor-pointer z-10 border border-white/20 shadow-2xl font-bold tracking-wider text-sm"
-                title="Close Video"
-            >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                CLOSE
-            </button>
-            <div className="w-full h-full relative flex items-center justify-center">
-                <iframe
-                    className="w-full h-full border-none bg-black"
-                    src={playingVideo.site === 'Vimeo' ? `https://player.vimeo.com/video/${playingVideo.videoKey}?autoplay=1` : `https://www.youtube.com/embed/${playingVideo.videoKey}?autoplay=1`}
-                    title={playingVideo.name}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                ></iframe>
-            </div>
-        </div>
-    ) : null;
-
     return (
         <>
             <MediaRow title="Extras" variant="section">
@@ -98,7 +76,10 @@ export default function MediaExtrasRow({ videos, extras = [], serverId }: Props)
                 ))}
             </MediaRow>
 
-            {playingVideo && createPortal(modalContent, document.body)}
+            <TrailerOverlay
+                trailer={playingVideo ? { name: playingVideo.name ?? 'Video', videoKey: playingVideo.videoKey, site: playingVideo.site } : null}
+                onClose={() => setPlayingVideo(null)}
+            />
         </>
     );
 }
