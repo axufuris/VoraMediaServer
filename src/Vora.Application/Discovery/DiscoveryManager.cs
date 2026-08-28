@@ -16,9 +16,6 @@ public interface IDiscoveryManager
     Task UpdateAdminRowConfigsAsync(List<DiscoveryRowConfigRequest> configs);
     Task<IEnumerable<DiscoveryItemVM>> GetRowItemsAsync(string providerId, string rowId, int page = 1, CancellationToken cancellationToken = default);
     Task<DiscoveryItemDetailsVM?> GetItemDetailsAsync(string providerId, string externalId, string type, CancellationToken cancellationToken = default);
-    Task<List<UserWatchlistItem>> GetWatchlistAsync(Guid profileId);
-    Task ToggleWatchlistAsync(Guid profileId, string externalId, string providerId, string type, string title, string? posterUrl, DateTime? expectedReleaseDate);
-    Task<bool> CheckWatchlistStatusAsync(Guid profileId, string externalId, string providerId);
     Task<DiscoveryActorVM?> GetActorDetailsAsync(string providerId, string externalId, CancellationToken cancellationToken = default);
     Task<IEnumerable<DiscoveryItemVM>> SearchAsync(string query, CancellationToken cancellationToken = default);
     Task<IEnumerable<TheaterDto>> GetShowtimesAsync(string movieTitle, string location, DateTime date, int? maxTheaters);
@@ -214,40 +211,6 @@ public class DiscoveryManager(
             return null;
         }
     }
-
-    public Task<List<UserWatchlistItem>> GetWatchlistAsync(Guid profileId) =>
-        repository.GetWatchlistAsync(profileId);
-
-    public async Task ToggleWatchlistAsync(Guid profileId, string externalId, string providerId, string type, string title, string? posterUrl, DateTime? expectedReleaseDate)
-    {
-        try
-        {
-            if (await repository.IsInWatchlistAsync(profileId, externalId, providerId))
-            {
-                await repository.RemoveFromWatchlistAsync(profileId, externalId, providerId);
-                return;
-            }
-
-            await repository.AddToWatchlistAsync(new UserWatchlistItem
-            {
-                ProfileId = profileId,
-                ExternalId = externalId,
-                ProviderId = providerId,
-                Type = type,
-                Title = title,
-                PosterUrl = posterUrl,
-                ExpectedReleaseDate = expectedReleaseDate
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to toggle watchlist entry {ExternalId} from {ProviderId} for profile {ProfileId}.", externalId, providerId, profileId);
-            throw;
-        }
-    }
-
-    public Task<bool> CheckWatchlistStatusAsync(Guid profileId, string externalId, string providerId) =>
-        repository.IsInWatchlistAsync(profileId, externalId, providerId);
 
     public async Task<DiscoveryActorVM?> GetActorDetailsAsync(string providerId, string externalId, CancellationToken cancellationToken = default)
     {

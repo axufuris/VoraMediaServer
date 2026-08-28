@@ -12,18 +12,19 @@ import Tabs from '../../components/Client/Primitives/Tabs';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import PlaylistsPage from './Playlists/PlaylistsPage';
 import CollectionsPage from './Collections/CollectionsPage';
+import WatchlistPage from './WatchlistPage';
 import MediaRow, { MediaRowItem } from '../../components/Client/Primitives/MediaRow';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import PosterRemoveButton from '../../components/Client/Primitives/PosterRemoveButton';
 import { useDialog } from '../../dialogs';
 
-type HomeTab = 'overview' | 'collections' | 'playlists';
+type HomeTab = 'overview' | 'watchlist' | 'collections' | 'playlists';
 
 const HOME_TAB_STORAGE_KEY = 'home_active_tab';
 
 const readSavedHomeTab = (): HomeTab => {
     const saved = sessionStorage.getItem(HOME_TAB_STORAGE_KEY);
-    return saved === 'collections' || saved === 'playlists' ? saved : 'overview';
+    return saved === 'watchlist' || saved === 'collections' || saved === 'playlists' ? saved : 'overview';
 };
 
 function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serverId?: string }) {
@@ -249,6 +250,7 @@ export default function HomePage() {
                 tabs={[
                     { key: 'overview', label: 'Home' },
                     { key: 'collections', label: 'Collections' },
+                    { key: 'watchlist', label: 'Watchlist' },
                     { key: 'playlists', label: 'Playlists' },
                 ]}
                 active={activeTab}
@@ -262,7 +264,9 @@ export default function HomePage() {
         return (
             <div className="min-h-full pb-20">
                 {tabBar}
-                {activeTab === 'collections' ? <CollectionsPage /> : <PlaylistsPage embedded />}
+                {activeTab === 'collections' && <CollectionsPage />}
+                {activeTab === 'watchlist' && <WatchlistPage embedded />}
+                {activeTab === 'playlists' && <PlaylistsPage embedded />}
             </div>
         );
     }

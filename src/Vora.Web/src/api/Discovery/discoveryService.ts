@@ -73,16 +73,6 @@ export interface DiscoveryItemDetails extends DiscoveryItem {
     trailers: Trailer[];
 }
 
-export interface WatchlistItem {
-    id: string;
-    profileId: string;
-    externalId: string;
-    providerId: string;
-    type: string;
-    title: string;
-    posterUrl?: string;
-    addedAt: string;
-}
 
 export const discoveryService = {
     getAdminConfigs: async (serverId?: string): Promise<DiscoveryRowConfig[]> => {
@@ -116,21 +106,6 @@ export const discoveryService = {
         return response.data;
     },
 
-    getWatchlist: async (profileId: string, serverId?: string): Promise<WatchlistItem[]> => {
-        const response = await apiClient.get<WatchlistItem[]>(`/discovery/profiles/${profileId}/watchlist`, { serverId });
-        return response.data;
-    },
-    checkWatchlist: async (profileId: string, externalId: string, providerId: string, serverId?: string): Promise<boolean> => {
-        const response = await apiClient.get<{ inWatchlist: boolean }>(`/discovery/profiles/${profileId}/watchlist/check?externalId=${externalId}&providerId=${providerId}`, { serverId });
-        return response.data.inWatchlist;
-    },
-    toggleWatchlist: async (profileId: string, externalId: string, providerId: string, type: string, title: string, posterUrl?: string, expectedReleaseDate?: string, serverId?: string): Promise<void> => {
-        await apiClient.post(
-            `/discovery/profiles/${profileId}/watchlist/toggle`,
-            { externalId, providerId, type, title, posterUrl, expectedReleaseDate },
-            { serverId }
-        );
-    },
     search: async (query: string, serverId?: string): Promise<DiscoveryItem[]> => {
         const response = await apiClient.get<DiscoveryItem[]>(`/discovery/search?q=${encodeURIComponent(query)}`, { serverId });
         return response.data;

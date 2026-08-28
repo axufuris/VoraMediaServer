@@ -4,30 +4,27 @@ import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import Tabs from '../../../components/Client/Primitives/Tabs';
 import DiscoveryPage from './DiscoveryPage';
 import RecommendationsPage from '../RecommendationsPage';
-import WatchlistPage from '../WatchlistPage';
 import CalendarPage from '../CalendarPage';
 
-type DiscoverTab = 'discover' | 'forYou' | 'watchlist' | 'calendar';
+type DiscoverTab = 'discover' | 'forYou' | 'calendar';
 
 const ACTIVE_TAB_STORAGE_KEY = 'discover_active_tab';
 
 const TAB_LABELS: Record<DiscoverTab, string> = {
     discover: 'Discover',
     forYou: 'For You',
-    watchlist: 'Watchlist',
     calendar: 'Calendar',
 };
 
 const TAB_SUBTITLES: Record<DiscoverTab, string> = {
     discover: "What's out there — trending, popular, and curated picks from external sources.",
     forYou: "Personalized recommendations based on what you've watched.",
-    watchlist: 'Anything you bookmark from Discovery lands here.',
     calendar: 'Track upcoming movies, episodes, and watchlist drops.',
 };
 
 const readSavedTab = (): DiscoverTab => {
     const saved = sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-    return saved === 'discover' || saved === 'forYou' || saved === 'watchlist' || saved === 'calendar'
+    return saved === 'discover' || saved === 'forYou' || saved === 'calendar'
         ? saved
         : 'discover';
 };
@@ -39,7 +36,6 @@ export default function DiscoverHubPage() {
         const tabs: DiscoverTab[] = [];
         if (flags.discover) tabs.push('discover');
         if (flags.forYou) tabs.push('forYou');
-        if (flags.discover || flags.forYou || flags.releaseCalendar) tabs.push('watchlist');
         if (flags.releaseCalendar) tabs.push('calendar');
         return tabs;
     }, [flags.discover, flags.forYou, flags.releaseCalendar]);
@@ -77,7 +73,6 @@ export default function DiscoverHubPage() {
 
             {activeTab === 'discover' && <DiscoveryPage embedded />}
             {activeTab === 'forYou' && <RecommendationsPage embedded />}
-            {activeTab === 'watchlist' && <WatchlistPage embedded />}
             {activeTab === 'calendar' && (
                 <div className="flex min-h-0 flex-1 flex-col">
                     <CalendarPage embedded />

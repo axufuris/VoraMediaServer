@@ -21,6 +21,7 @@ using Vora.Application.Calendar;
 using Vora.Application.Collections;
 using Vora.Application.Devices;
 using Vora.Application.Discovery;
+using Vora.Application.Watchlist;
 using Vora.Application.Email;
 using Vora.Application.FileSystem;
 using Vora.Application.Iptv;
@@ -338,6 +339,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ICollectionRepository, CollectionRepository>();
         services.AddScoped<IDeviceRepository, DeviceRepository>();
         services.AddScoped<IDiscoveryRepository, DiscoveryRepository>();
+        services.AddScoped<IWatchlistRepository, WatchlistRepository>();
         services.AddScoped<IEmailDeliveryLogRepository, EmailDeliveryLogRepository>();
         services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
         services.AddScoped<IInvitationRepository, InvitationRepository>();
@@ -385,6 +387,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IDashboardManager, DashboardManager>();
         services.AddScoped<IDeviceManager, DeviceManager>();
         services.AddScoped<IDiscoveryManager, DiscoveryManager>();
+        services.AddScoped<IWatchlistManager, WatchlistManager>();
         services.AddScoped<IDvrManager, DvrManager>();
         services.AddScoped<IEmailSettingsManager, EmailSettingsManager>();
         services.AddScoped<IEmailTemplateManager, EmailTemplateManager>();

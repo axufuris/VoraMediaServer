@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { discoveryService, type DiscoveryItem, type DiscoveryRowConfig } from '../../../api/Discovery/discoveryService';
+import { watchlistService } from '../../../api/Watchlist/watchlistService';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
@@ -40,7 +41,7 @@ export default function DiscoveryViewAllPage() {
                 }
 
                 if (activeProfileId) {
-                    const wItems = await discoveryService.getWatchlist(activeProfileId, serverId);
+                    const wItems = await watchlistService.getWatchlist(serverId);
                     setWatchlistIds(new Set(wItems.map(i => i.externalId)));
                 }
             } catch (error) {
