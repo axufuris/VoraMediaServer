@@ -27,6 +27,7 @@ import QualityPanel, { QualityPanelSection, type QualityOption } from '../../../
 import StarRating from '../../../components/Client/Primitives/StarRating';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { formatRuntime } from '../../../utils/formatRuntime';
+import { isFullyWatched, affectedEpisodeCount } from '../../../utils/watchState';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -328,8 +329,26 @@ export default function MediaDetailsPage() {
 
     const handleTogglePlayed = async () => {
         if (!media) return;
+        const next = !isFullyWatched(media);
+
+        // Marking a show or season fans out to every episode under it, so say
+        // how many before doing it.
+        const episodeCount = affectedEpisodeCount(media);
+        if (episodeCount > 1) {
+            const scope = media.type === 'TvShow' ? 'this show' : 'this season';
+            const ok = await dialog.confirm({
+                title: next ? `Mark ${episodeCount} episodes as watched?` : `Mark ${episodeCount} episodes as unwatched?`,
+                message: next
+                    ? `Every episode in ${scope} will be marked watched, and any playback progress on them will be cleared.`
+                    : `Every episode in ${scope} will be marked unwatched.`,
+                confirmText: next ? 'Mark watched' : 'Mark unwatched',
+                cancelText: 'Cancel',
+            });
+            if (!ok) return;
+        }
+
         try {
-            await mediaService.markAsPlayed(media.id, !isFullyPlayed, serverId);
+            await mediaService.markAsPlayed(media.id, next, serverId);
             reloadMedia();
         } catch {
             await dialog.alert('Failed to update play state.');
@@ -399,7 +418,7 @@ export default function MediaDetailsPage() {
     const activePart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === selectedVideoId)) || qualityMedia?.mediaParts?.[0];
     const resumePos = media.resumePositionSeconds || 0;
     const inProgress = resumePos > 0 && !media.isPlayed;
-    const isFullyPlayed = media.type === 'Episode' || media.type === 'Movie' ? media.isPlayed : media.unplayedItemCount === 0 && (media.episodes?.length || 0) > 0;
+    const isFullyPlayed = isFullyWatched(media);
 
     const sortedVideoTracks = qualityMedia?.mediaParts?.flatMap(p =>
         (p.videoTracks || []).map(v => ({ part: p, track: v }))
