@@ -34,10 +34,10 @@ export function GearIcon({ size = 18 }: { size?: number }) {
     );
 }
 
-// Film reel — the trailer affordance. Solid, not outlined: the reel body is a
-// filled disc and the holes are punched out of it with evenodd, which is what
-// makes it read as a reel rather than a ring of dots. The arm at the lower
-// right is part of the silhouette.
+// Film reel — the trailer affordance. A filled disc centred in the box with
+// large holes punched out of it (evenodd), so what reads at 18px is the spoke
+// pattern of a reel. The holes have to be big: small ones vanish at button size
+// and leave a plain blob. No arm or handle — the silhouette is just the reel.
 export function FilmReelIcon({ size = 18 }: { size?: number }) {
     return (
         <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
@@ -45,19 +45,12 @@ export function FilmReelIcon({ size = 18 }: { size?: number }) {
                 fill="currentColor"
                 fillRule="evenodd"
                 clipRule="evenodd"
-                d="M2.2 10.5a8.3 8.3 0 1 0 16.6 0 8.3 8.3 0 1 0-16.6 0Z
-                   M8.9 10.5a1.6 1.6 0 1 0 3.2 0 1.6 1.6 0 1 0-3.2 0Z
-                   M8.75 6.15a1.75 1.75 0 1 0 3.5 0 1.75 1.75 0 1 0-3.5 0Z
-                   M8.75 14.85a1.75 1.75 0 1 0 3.5 0 1.75 1.75 0 1 0-3.5 0Z
-                   M4.4 10.5a1.75 1.75 0 1 0 3.5 0 1.75 1.75 0 1 0-3.5 0Z
-                   M13.1 10.5a1.75 1.75 0 1 0 3.5 0 1.75 1.75 0 1 0-3.5 0Z"
-            />
-            <path
-                d="M15.2 15.2 20.4 20.4"
-                stroke="currentColor"
-                strokeWidth={2.6}
-                strokeLinecap="round"
-                fill="none"
+                d="M2.5 12a9.5 9.5 0 1 0 19 0 9.5 9.5 0 1 0-19 0Z
+                   M10.3 12a1.7 1.7 0 1 0 3.4 0 1.7 1.7 0 1 0-3.4 0Z
+                   M9.4 6.5a2.6 2.6 0 1 0 5.2 0 2.6 2.6 0 1 0-5.2 0Z
+                   M9.4 17.5a2.6 2.6 0 1 0 5.2 0 2.6 2.6 0 1 0-5.2 0Z
+                   M3.9 12a2.6 2.6 0 1 0 5.2 0 2.6 2.6 0 1 0-5.2 0Z
+                   M14.9 12a2.6 2.6 0 1 0 5.2 0 2.6 2.6 0 1 0-5.2 0Z"
             />
         </svg>
     );
