@@ -249,8 +249,8 @@ export default function HomePage() {
             <Tabs<HomeTab>
                 tabs={[
                     { key: 'overview', label: 'Home' },
-                    { key: 'watchlist', label: 'Watchlist' },
                     { key: 'collections', label: 'Collections' },
+                    { key: 'watchlist', label: 'Watchlist' },
                     { key: 'playlists', label: 'Playlists' },
                 ]}
                 active={activeTab}
@@ -264,8 +264,8 @@ export default function HomePage() {
         return (
             <div className="min-h-full pb-20">
                 {tabBar}
-                {activeTab === 'watchlist' && <WatchlistPage embedded />}
                 {activeTab === 'collections' && <CollectionsPage />}
+                {activeTab === 'watchlist' && <WatchlistPage embedded />}
                 {activeTab === 'playlists' && <PlaylistsPage embedded />}
             </div>
         );

@@ -135,7 +135,7 @@ pages/Client/LiveTv/      LiveTvPage, LiveTvGuide, DvrDashboard
 ## Tab-host pages and the `embedded` prop
 
 Some client pages are hosted as a tab inside another page rather than living at
-their own route. `HomePage` hosts **Home / Watchlist / Collections / Playlists**;
+their own route. `HomePage` hosts **Home / Collections / Watchlist / Playlists**;
 `DiscoverHubPage` hosts **Discover / For You / Calendar**.
 
 A hosted page drops its own `PageHeader` — the tab bar already names it — and
