@@ -21,7 +21,6 @@ import RatingBadge from '../../../components/Client/Primitives/RatingBadge';
 import TrailerOverlay, { type TrailerSource } from '../../../components/Client/Primitives/TrailerOverlay';
 import { PlayIcon, RestartIcon, GearIcon, FilmReelIcon, BookmarkIcon, CheckIcon, MoreIcon } from '../../../components/Client/Primitives/ActionIcons';
 import { watchlistService } from '../../../api/Watchlist/watchlistService';
-import { directorsFrom } from '../../../utils/credits';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import QualityPanel, { QualityPanelSection, type QualityOption } from '../../../components/Client/Primitives/QualityPanel';
@@ -730,7 +729,7 @@ export default function MediaDetailsPage() {
                 subtitle={heroSubtitle}
                 chips={heroChips}
                 ratings={heroRatings}
-                credits={<HeroCredits directors={directorsFrom(media.cast)} genres={media.genres} studios={media.studios} />}
+                credits={<HeroCredits directors={media.directors} genres={media.genres} studios={media.studios} />}
                 actions={heroActions}
                 notice={heroNotice}
                 overview={media.overview}

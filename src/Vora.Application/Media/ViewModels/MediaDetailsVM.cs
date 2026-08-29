@@ -50,6 +50,11 @@ public class MediaDetailsVM
     public List<MediaDetailsPartVM> MediaParts { get; set; } = new();
     public List<string> Genres { get; set; } = new();
     public List<string> Studios { get; set; } = new();
+
+    // Resolved separately from Cast so an episode that has its own guest cast
+    // but no directing credit still shows a director, without the show's crew
+    // being mixed into the episode's cast row.
+    public List<string> Directors { get; set; } = new();
     public List<MediaMarkerVM> Markers { get; set; } = new();
 
     public static Expression<Func<MediaItem, MediaDetailsVM>> Projection =>
@@ -82,10 +87,47 @@ public class MediaDetailsVM
             ThirdPartyRating2Name = item.ThirdPartyRating2Name,
             ServerAdminRating = item.ServerAdminRating,
             CollectionIds = item.Collections.Select(c => c.Id).ToList(),
-            Genres = item.Genres.Select(g => g.Name).OrderBy(g => g).ToList(),
-            Studios = item.ProductionCompanies.Select(c => c.Name).OrderBy(c => c).ToList(),
-            Cast = (item is Episode && !item.Cast.Any())
-                ? ((Episode)item).Season.TvShow.Cast
+            // An episode carries almost none of this itself and a season carries
+            // none at all, so both inherit from the show rather than rendering a
+            // blank credits block. Own value first, then the season, then the show.
+            Genres = item.Genres.Any()
+                ? item.Genres.Select(g => g.Name).OrderBy(g => g).ToList()
+                : item is Episode
+                    ? (((Episode)item).Season.Genres.Any()
+                        ? ((Episode)item).Season.Genres.Select(g => g.Name).OrderBy(g => g).ToList()
+                        : ((Episode)item).Season.TvShow.Genres.Select(g => g.Name).OrderBy(g => g).ToList())
+                    : item is Season
+                        ? ((Season)item).TvShow.Genres.Select(g => g.Name).OrderBy(g => g).ToList()
+                        : new List<string>(),
+
+            Studios = item.ProductionCompanies.Any()
+                ? item.ProductionCompanies.Select(c => c.Name).OrderBy(c => c).ToList()
+                : item is Episode
+                    ? (((Episode)item).Season.ProductionCompanies.Any()
+                        ? ((Episode)item).Season.ProductionCompanies.Select(c => c.Name).OrderBy(c => c).ToList()
+                        : ((Episode)item).Season.TvShow.ProductionCompanies.Select(c => c.Name).OrderBy(c => c).ToList())
+                    : item is Season
+                        ? ((Season)item).TvShow.ProductionCompanies.Select(c => c.Name).OrderBy(c => c).ToList()
+                        : new List<string>(),
+
+            Directors = item.Cast.Any(c => (c.Roles & MediaCastRole.Director) != 0)
+                ? item.Cast.Where(c => (c.Roles & MediaCastRole.Director) != 0).OrderBy(c => c.Order)
+                    .Select(c => c.Actor != null ? c.Actor.Name : "Unknown").ToList()
+                : item is Episode
+                    ? (((Episode)item).Season.Cast.Any(c => (c.Roles & MediaCastRole.Director) != 0)
+                        ? ((Episode)item).Season.Cast.Where(c => (c.Roles & MediaCastRole.Director) != 0).OrderBy(c => c.Order)
+                            .Select(c => c.Actor != null ? c.Actor.Name : "Unknown").ToList()
+                        : ((Episode)item).Season.TvShow.Cast.Where(c => (c.Roles & MediaCastRole.Director) != 0).OrderBy(c => c.Order)
+                            .Select(c => c.Actor != null ? c.Actor.Name : "Unknown").ToList())
+                    : item is Season
+                        ? ((Season)item).TvShow.Cast.Where(c => (c.Roles & MediaCastRole.Director) != 0).OrderBy(c => c.Order)
+                            .Select(c => c.Actor != null ? c.Actor.Name : "Unknown").ToList()
+                        : new List<string>(),
+            // A season never has a cast of its own, and an episode only has one
+            // when the provider returned guest credits, so both fall back to the
+            // show rather than rendering an empty Cast & Crew row.
+            Cast = item is Season
+                ? ((Season)item).TvShow.Cast
                     .OrderBy(c => c.Order)
                     .Select(c => new CastMemberVM
                     {
@@ -96,8 +138,20 @@ public class MediaDetailsVM
                         Roles = c.Roles,
                         ProfileImageUrl = c.Actor != null ? c.Actor.ProfileImageUrl : null
                     }).ToList()
-                : item.Cast
-                    .OrderBy(c => c.Order)
+                : (item is Episode && !item.Cast.Any())
+                    ? ((Episode)item).Season.TvShow.Cast
+                        .OrderBy(c => c.Order)
+                    .Select(c => new CastMemberVM
+                    {
+                        ActorId = c.ActorId,
+                        TmdbId = c.Actor != null ? c.Actor.TmdbId : 0,
+                        Name = c.Actor != null ? c.Actor.Name : "Unknown Actor",
+                        CharacterName = c.CharacterName,
+                        Roles = c.Roles,
+                        ProfileImageUrl = c.Actor != null ? c.Actor.ProfileImageUrl : null
+                    }).ToList()
+                    : item.Cast
+                        .OrderBy(c => c.Order)
                     .Select(c => new CastMemberVM
                     {
                         ActorId = c.ActorId,

@@ -208,6 +208,15 @@ Everything that renders a piece of media as a tile goes through one small set of
 
 **Captions.** What appears under a tile is decided by `utils/posterCaption.ts`, keyed on the item's `type` — Movie shows year + edition, Episode shows show / episode title / `S1 · E2`, Collection shows an item count, and so on. Pass `item={…}` to `MediaCard` and it captions itself. Only pass `title`/`captionLines` for tiles that aren't library media (a discovery result, a server-scoped search hit). Adding a new media type means adding a case in `posterCaption`, not a bespoke subtitle at the call site.
 
+**Inherited facts.** A season carries no genres, production companies or cast of
+its own — `ProcessTvSeasonsAsync` never writes them — and an episode only has
+them when the provider returned episode-level credits. `MediaDetailsVM.Projection`
+resolves each of genres, studios, directors and cast up the tree (own → season →
+show) so those pages don't render a blank credits block. `Directors` is a
+separate field rather than derived from `Cast`, because an episode often has a
+guest cast with no directing credit: deriving would leave the director blank,
+and falling the whole cast back would replace the guest actors with the show's.
+
 **Detail pages.** `MediaDetailsPage` serves all four local types — Movie, TV Show, Season, Episode — so they share one hero by construction; `posterShape="still"` and the `S1 E2` title suffix are the only per-type differences. The local media details page and the discovery details page render the same `DetailHero`, so a title looks identical whether it's in the library or not. They differ only in what they pass to `actions`: local items get Play / Quality & tracks / Watched / more, discovery items get Add to Watchlist and nothing else. Everything a page has data for goes into a slot — `eyebrow`, `chips`, `ratings`, `notice` — and slots a page has no data for are simply omitted. `DetailHero` lays the backdrop *beside* the content (right ~65% on md+) and dissolves it at the left and bottom edges via `CinematicBackdrop`'s `mask="edge"`, so the artwork melts into the page instead of ending on a hard line.
 
 **Sizing.** Card metrics are tokens in `styles/tokens.css`: `--vora-card-w-sm|md|lg`, `--vora-card-min-w`, `--vora-card-gap`, `--vora-card-title-size`, `--vora-card-caption-size`, `--vora-card-badge-size`, `--vora-person-w`, `--vora-video-w`, `--vora-row-title-size`, `--vora-row-gutter`. The widths are `clamp(rem, vw, rem)` so a tile follows both the root font size and the viewport instead of snapping at breakpoints. Change a token and every rail, grid and detail page moves together. Never size a tile in `px`.
