@@ -10,7 +10,6 @@ interface DetailHeroProps {
     posterSrc?: string | null;
     posterShape?: DetailHeroPosterShape;
     onBack?: () => void;
-    backLabel?: string;
     eyebrow?: ReactNode;
     title: string;
     titleSuffix?: ReactNode;
@@ -127,7 +126,7 @@ export function HeroCredits({ directors, genres, studios }: {
 // on a hard line.
 export default function DetailHero({
     backdropSrc, transitionKey, posterSrc, posterShape = 'poster',
-    onBack, backLabel = 'Back', eyebrow, title, titleSuffix, subtitle,
+    onBack, eyebrow, title, titleSuffix, subtitle,
     chips, ratings, credits, actions, notice, overview,
 }: DetailHeroProps) {
     const isStill = posterShape === 'still';
@@ -154,7 +153,7 @@ export default function DetailHero({
                         style={{ background: 'rgba(20, 20, 28, 0.65)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#fafafa' }}
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-                        {backLabel}
+                        Back
                     </button>
                 )}
 

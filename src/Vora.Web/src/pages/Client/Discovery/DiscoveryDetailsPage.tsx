@@ -165,7 +165,6 @@ export default function DiscoveryDetailsPage() {
                     transitionKey={details.externalId}
                     posterSrc={details.posterUrl}
                     onBack={() => navigate(-1)}
-                    backLabel="Back to Discover"
                     eyebrow={[details.type === 'TvShow' ? 'TV Series' : 'Movie', details.year].filter(Boolean).join(' · ')}
                     title={details.title}
                     chips={(
