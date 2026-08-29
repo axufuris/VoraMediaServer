@@ -138,6 +138,7 @@ export interface MediaItem {
     collectionIds: string[];
     genres?: string[];
     studios?: string[];
+    directors?: string[];
     seasons?: Season[];
     cast?: CastMember[];
     videos?: MediaVideo[];
