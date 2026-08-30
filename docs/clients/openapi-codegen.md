@@ -31,6 +31,19 @@ Every `.Produces<T>()` must name a `*VM` / `*Response` from `Vora.Application`. 
 
 This is the project-wide View Model rule (see `docs/backend-conventions.md`), but codegen is what makes violating it expensive. `GET /api/discovery/details/{providerId}/{type}/{externalId}` used to return `DiscoveryItemDetailsDto` straight from `Vora.Plugins`; it now returns `DiscoveryItemDetailsVM`. When adding an endpoint, check the `.Produces<>` type's namespace.
 
+### 0.5 Keep `[Flags]` enums off the wire
+
+`JsonStringEnumConverter` serializes a combined `[Flags]` value as a comma-joined
+string — `"Actor, Producer"` — but an OpenAPI enum schema describes a single
+value. A strictly-typed generated client (Android via kotlinx-serialization)
+throws when it meets one, and only for the subset of records that happen to have
+a combined value, so it looks like bad data rather than a contract bug.
+
+`MediaCastRole` is the only such enum reaching view models. Every VM that carries
+it marks it `[JsonIgnore]` and exposes the formatted `Role` string instead
+(`CastMemberVM`, `ActorRoleVM`). `CastRoleSerializationTests` fails the build if a
+new VM exposes one.
+
 ### 1. Set explicit operation IDs
 
 Without explicit IDs, Swashbuckle generates names like `GetApiUsersById` from verb + route. With explicit IDs, generated method names match what the endpoint actually does.
