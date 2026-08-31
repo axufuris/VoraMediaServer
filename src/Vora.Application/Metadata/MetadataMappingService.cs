@@ -374,10 +374,11 @@ public class MetadataMappingService : IMetadataMappingService
         if (!metadata.Cast.Any()) return;
 
         var uniqueIncomingCast = metadata.Cast
-            .GroupBy(c => c.TmdbId != 0 ? c.TmdbId.ToString() : c.Name.ToLower())
+            .GroupBy(c => c.TmdbId != 0 ? $"tmdb:{c.TmdbId}" : c.TvdbId != 0 ? $"tvdb:{c.TvdbId}" : c.Name.ToLower())
             .Select(g => new CastMemberResult
             {
                 TmdbId = g.First().TmdbId,
+                TvdbId = g.First().TvdbId,
                 Name = g.First().Name,
                 ProfileImageUrl = g.FirstOrDefault(c => c.ProfileImageUrl != null)?.ProfileImageUrl,
                 Roles = g.Aggregate(CastRole.None, (acc, c) => acc | c.Roles),
@@ -390,6 +391,7 @@ public class MetadataMappingService : IMetadataMappingService
         var existingActors = await _actorRepository.GetActorsByTmdbIdsOrNamesAsync(tmdbIds, names);
 
         var actorsByTmdbId = existingActors.Where(a => a.TmdbId != 0).GroupBy(a => a.TmdbId).ToDictionary(g => g.Key, g => g.First());
+        var actorsByTvdbId = existingActors.Where(a => a.TvdbId != 0).GroupBy(a => a.TvdbId).ToDictionary(g => g.Key, g => g.First());
         var actorsByName = existingActors.GroupBy(a => a.Name.ToLower()).ToDictionary(g => g.Key, g => g.First());
 
         var newActorsToSave = new List<Actor>();
@@ -399,6 +401,7 @@ public class MetadataMappingService : IMetadataMappingService
         {
             Actor? actor = null;
             if (castResult.TmdbId != 0) actorsByTmdbId.TryGetValue(castResult.TmdbId, out actor);
+            if (actor == null && castResult.TvdbId != 0) actorsByTvdbId.TryGetValue(castResult.TvdbId, out actor);
             if (actor == null) actorsByName.TryGetValue(castResult.Name.ToLower(), out actor);
 
             if (actor == null)
@@ -407,17 +410,33 @@ public class MetadataMappingService : IMetadataMappingService
                 {
                     Id = Guid.NewGuid(),
                     TmdbId = castResult.TmdbId,
+                    TvdbId = castResult.TvdbId,
                     Name = castResult.Name,
                     ProfileImageUrl = castResult.ProfileImageUrl
                 };
                 newActorsToSave.Add(actor);
                 actorsByName[castResult.Name.ToLower()] = actor;
                 if (castResult.TmdbId != 0) actorsByTmdbId[castResult.TmdbId] = actor;
+                if (castResult.TvdbId != 0) actorsByTvdbId[castResult.TvdbId] = actor;
             }
             else if (!actor.IsCustom)
             {
                 actor.Name = castResult.Name;
                 actor.ProfileImageUrl = castResult.ProfileImageUrl ?? actor.ProfileImageUrl;
+
+                // A person first seen through one provider can be matched by
+                // name through the other later; record the id so they become
+                // enrichable rather than staying stuck without one.
+                if (actor.TmdbId == 0 && castResult.TmdbId != 0)
+                {
+                    actor.TmdbId = castResult.TmdbId;
+                    actorsByTmdbId[castResult.TmdbId] = actor;
+                }
+                if (actor.TvdbId == 0 && castResult.TvdbId != 0)
+                {
+                    actor.TvdbId = castResult.TvdbId;
+                    actorsByTvdbId[castResult.TvdbId] = actor;
+                }
             }
 
             finalActorsList.Add(actor);

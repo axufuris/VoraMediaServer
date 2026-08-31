@@ -7,9 +7,9 @@ using Xunit;
 namespace Vora.Infrastructure.Tests;
 
 // The enrichment backlog is drained in batches. An actor that can never resolve
-// has to stay out of it: the lookup is by TMDB person id, so a row matched by
-// name during a scan (TmdbId 0) fails every run, keeps its null biography, and
-// gets handed back again — occupying a slot forever.
+// has to stay out of it: a row matched by name during a scan carries neither a
+// TMDB nor a TVDB id, so it fails every run, keeps its null biography, and gets
+// handed back again — occupying a slot forever.
 public class ActorBacklogQueryTests
 {
     private static VoraDbContext NewContext() =>
@@ -17,15 +17,15 @@ public class ActorBacklogQueryTests
             .UseInMemoryDatabase("actor-backlog-" + Guid.NewGuid().ToString("N"))
             .Options);
 
-    private static Actor Add(VoraDbContext db, string name, int tmdbId, string? biography = null, bool isCustom = false)
+    private static Actor Add(VoraDbContext db, string name, int tmdbId, string? biography = null, bool isCustom = false, int tvdbId = 0)
     {
-        var actor = new Actor { Id = Guid.NewGuid(), Name = name, TmdbId = tmdbId, Biography = biography, IsCustom = isCustom };
+        var actor = new Actor { Id = Guid.NewGuid(), Name = name, TmdbId = tmdbId, TvdbId = tvdbId, Biography = biography, IsCustom = isCustom };
         db.Actors.Add(actor);
         return actor;
     }
 
     [Fact]
-    public async Task Skips_actors_with_no_tmdb_id()
+    public async Task Skips_actors_with_no_provider_id_at_all()
     {
         using var db = NewContext();
         var resolvable = Add(db, "Tony Bolano", 321432);
@@ -35,6 +35,20 @@ public class ActorBacklogQueryTests
         var ids = await new ActorRepository(db).GetActorIdsMissingMetadataAsync(50);
 
         ids.Should().ContainSingle().Which.Should().Be(resolvable.Id);
+    }
+
+    // A TVDB-only server stores people under TVDB ids, and those actors are just
+    // as enrichable — requiring a TMDB id would strand every one of them.
+    [Fact]
+    public async Task Includes_actors_that_only_have_a_tvdb_id()
+    {
+        using var db = NewContext();
+        var tvdbOnly = Add(db, "From A TVDB Show", 0, tvdbId: 55123);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var ids = await new ActorRepository(db).GetActorIdsMissingMetadataAsync(50);
+
+        ids.Should().ContainSingle().Which.Should().Be(tvdbOnly.Id);
     }
 
     [Fact]

@@ -76,7 +76,7 @@ public class MetadataManager : IMetadataManager
                 var actor = await _actorRepository.GetActorByIdAsync(id);
                 if (actor == null || actor.IsCustom) continue;
 
-                var metadata = await _fetchService.GetActorMetadataAsync(actor.TmdbId);
+                var metadata = await _fetchService.GetActorMetadataAsync(actor.TmdbId, actor.TvdbId);
                 if (metadata == null) continue;
 
                 actor.Biography = metadata.Biography;

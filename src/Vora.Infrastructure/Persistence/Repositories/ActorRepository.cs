@@ -25,14 +25,14 @@ public class ActorRepository(VoraDbContext context) : IActorRepository
             .Where(a => tmdbIds.Contains(a.TmdbId) || names.Contains(a.Name))
             .ToListAsync();
 
-    // Only actors that can actually be resolved: the lookup is by TMDB person id,
-    // so a row without one (matched by name during a scan) fails every time,
-    // keeps its null biography, and is handed back again on the next run,
-    // burning batch slots forever. Ordering makes the batch advance instead of
-    // re-picking the same unordered rows.
+    // Only actors that can actually be resolved. A row with neither a TMDB nor a
+    // TVDB id (matched by name during a scan) fails every time, keeps its null
+    // biography, and is handed back on the next run, burning batch slots
+    // forever. Ordering makes the batch advance instead of re-picking the same
+    // unordered rows.
     public async Task<IEnumerable<Guid>> GetActorIdsMissingMetadataAsync(int limit = 50) =>
         await context.Actors
-            .Where(a => !a.IsCustom && a.Biography == null && a.TmdbId > 0)
+            .Where(a => !a.IsCustom && a.Biography == null && (a.TmdbId > 0 || a.TvdbId > 0))
             .OrderBy(a => a.Id)
             .Select(a => a.Id)
             .Take(limit)

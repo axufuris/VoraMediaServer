@@ -12,7 +12,12 @@ public class Actor
     public DateTime? Birthday { get; set; }
     public DateTime? Deathday { get; set; }
 
+    // A person is identified by whichever provider supplied them. Only one of
+    // these is normally set; enrichment routes to the matching provider, since
+    // the two id spaces are unrelated and a TMDB id looked up on TVDB resolves
+    // to a different person entirely.
     public int TmdbId { get; set; }
+    public int TvdbId { get; set; }
     public string? ImdbId { get; set; }
 
     public bool IsCustom { get; set; }

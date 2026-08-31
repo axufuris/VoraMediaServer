@@ -67,7 +67,10 @@ public class CollectionResult
 
 public class CastMemberResult
 {
+    // Whichever id space the provider works in. TMDB fills TmdbId, TVDB fills
+    // TvdbId; an actor is enriched later through whichever one it has.
     public int TmdbId { get; set; }
+    public int TvdbId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? CharacterName { get; set; }
     public string? ProfileImageUrl { get; set; }
