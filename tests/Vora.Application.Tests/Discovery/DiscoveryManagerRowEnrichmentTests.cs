@@ -33,6 +33,8 @@ public class DiscoveryManagerRowEnrichmentTests
             NullLogger<DiscoveryManager>.Instance);
     }
 
+    private static readonly Guid MatrixLocalId = Guid.NewGuid();
+
     [Fact]
     public async Task GetRowItemsAsync_flags_items_that_already_exist_in_library()
     {
@@ -41,8 +43,8 @@ public class DiscoveryManagerRowEnrichmentTests
             new() { ExternalId = "603", ProviderId = "tmdb", Title = "The Matrix", Type = "Movie" },
             new() { ExternalId = "604", ProviderId = "tmdb", Title = "The Matrix Reloaded", Type = "Movie" }
         });
-        _mediaRepo.GetExistingExternalIdsAsync(Arg.Any<IEnumerable<string>>(), "Movie")
-            .Returns(new HashSet<string> { "603" });
+        _mediaRepo.GetLocalIdsByExternalIdsAsync(Arg.Any<IEnumerable<string>>(), "Movie")
+            .Returns(new Dictionary<string, Guid> { ["603"] = MatrixLocalId });
         _requestRepo.GetRequestsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
             .Returns(new Dictionary<string, MediaRequest>());
 
@@ -50,8 +52,15 @@ public class DiscoveryManagerRowEnrichmentTests
         var result = (await manager.GetRowItemsAsync("tmdb", "trending", cancellationToken: TestContext.Current.CancellationToken)).ToList();
 
         result.Should().HaveCount(2);
-        result.Single(r => r.ExternalId == "603").InLibrary.Should().BeTrue();
-        result.Single(r => r.ExternalId == "604").InLibrary.Should().BeFalse();
+
+        var owned = result.Single(r => r.ExternalId == "603");
+        owned.InLibrary.Should().BeTrue();
+        // Carried so a client can open the local copy rather than the provider page.
+        owned.MediaItemId.Should().Be(MatrixLocalId);
+
+        var unowned = result.Single(r => r.ExternalId == "604");
+        unowned.InLibrary.Should().BeFalse();
+        unowned.MediaItemId.Should().BeNull();
     }
 
     [Fact]
@@ -61,8 +70,8 @@ public class DiscoveryManagerRowEnrichmentTests
         {
             new() { ExternalId = "603", ProviderId = "tmdb", Title = "The Matrix", Type = "Movie" }
         });
-        _mediaRepo.GetExistingExternalIdsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
-            .Returns(new HashSet<string>());
+        _mediaRepo.GetLocalIdsByExternalIdsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
+            .Returns(new Dictionary<string, Guid>());
         _requestRepo.GetRequestsAsync(Arg.Any<IEnumerable<string>>(), "Movie")
             .Returns(new Dictionary<string, MediaRequest>
             {
@@ -90,8 +99,8 @@ public class DiscoveryManagerRowEnrichmentTests
         {
             new() { ExternalId = "999", ProviderId = "tmdb", Title = "Unrequested", Type = "Movie" }
         });
-        _mediaRepo.GetExistingExternalIdsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
-            .Returns(new HashSet<string>());
+        _mediaRepo.GetLocalIdsByExternalIdsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
+            .Returns(new Dictionary<string, Guid>());
         _requestRepo.GetRequestsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
             .Returns(new Dictionary<string, MediaRequest>());
 

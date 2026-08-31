@@ -208,6 +208,20 @@ Everything that renders a piece of media as a tile goes through one small set of
 
 **Captions.** What appears under a tile is decided by `utils/posterCaption.ts`, keyed on the item's `type` — Movie shows year + edition, Episode shows show / episode title / `S1 · E2`, Collection shows an item count, and so on. Pass `item={…}` to `MediaCard` and it captions itself. Only pass `title`/`captionLines` for tiles that aren't library media (a discovery result, a server-scoped search hit). Adding a new media type means adding a case in `posterCaption`, not a bespoke subtitle at the call site.
 
+**Actor pages.** The library actor route and the discovery actor route both
+render `ActorProfile`. Credits are split into **On Server** and **Known For** by
+whether the title is in the library, *not* by whether a local cast link exists —
+a recurring player is often missing from the show-level cast a scan stored, so
+splitting on the link stranded owned titles under "Known For" with an "In
+library" badge. The library page unions its cast links with any provider credit
+the library turns out to hold, so nothing is lost either way.
+
+A person's biography and life dates are filled in by
+`TriggerActorMetadataRefreshAsync`, which drains **50 actors per run** (those
+with a null `Biography`), so a large library backfills over several scans. Until
+a row is filled the page falls back to the provider's copy, which is why the
+library actor page fetches discovery details when the Discover feature is on.
+
 **Inherited facts.** A season carries no genres, production companies or cast of
 its own — `ProcessTvSeasonsAsync` never writes them — and an episode only has
 them when the provider returned episode-level credits. `MediaDetailsVM.Projection`
