@@ -139,6 +139,7 @@ public class DiscoveryManager(
         var list = items.ToList();
 
         var existing = new HashSet<(string ExternalId, string Type)>();
+        var localIdByKey = new Dictionary<(string ExternalId, string Type), Guid>();
         var requestByKey = new Dictionary<(string ExternalId, string Type), MediaRequest>();
 
         var groups = list
@@ -150,9 +151,10 @@ public class DiscoveryManager(
             var type = group.Key;
             var ids = group.Select(i => i.ExternalId).Distinct().ToList();
 
-            foreach (var id in await mediaRepository.GetExistingExternalIdsAsync(ids, type))
+            foreach (var pair in await mediaRepository.GetLocalIdsByExternalIdsAsync(ids, type))
             {
-                existing.Add((id, type));
+                existing.Add((pair.Key, type));
+                localIdByKey[(pair.Key, type)] = pair.Value;
             }
 
             foreach (var pair in await requestRepository.GetRequestsAsync(ids, type))
@@ -178,6 +180,7 @@ public class DiscoveryManager(
                 PosterUrl = item.PosterUrl,
                 ContentRating = item.ContentRating,
                 InLibrary = hasId && existing.Contains(key),
+                MediaItemId = hasId && localIdByKey.TryGetValue(key, out var localId) ? localId : null,
                 RequestStatus = hasId && requestByKey.TryGetValue(key, out var request) ? request.Status : null
             });
         }

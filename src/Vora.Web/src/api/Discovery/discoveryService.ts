@@ -34,6 +34,8 @@ export interface DiscoveryItem {
     posterUrl?: string;
     contentRating?: string;
     inLibrary?: boolean;
+    // Set when the title is in the library, so a client can open the local copy.
+    mediaItemId?: string;
     requestStatus?: DiscoveryRequestStatus | null;
 }
 
