@@ -16,6 +16,8 @@ public interface IMetadataFetchService
 
 public class MetadataFetchService : IMetadataFetchService
 {
+    private const string TmdbMetadataProviderId = "tmdb_metadata";
+
     private readonly IEnumerable<IMetadataProvider> _providers;
     private readonly IEnumerable<IRatingsProvider> _ratingsProviders;
     private readonly IEnumerable<IArtworkProvider> _artworkProviders;
@@ -41,12 +43,20 @@ public class MetadataFetchService : IMetadataFetchService
         return (metadata, primaryProvider.Id, primaryProvider.ProviderName);
     }
 
+    // Actor.TmdbId is explicitly a TMDB person id, so this has to go to the TMDB
+    // provider — not simply the first registered one. Registration order comes
+    // from assembly reflection, so "first" was effectively arbitrary: it could
+    // resolve to LocalMetadataProvider, whose actor fetch returns null
+    // unconditionally and silently enriched nobody, or to TVDB, which would look
+    // the id up in its own people id space and answer about the wrong person.
     public async Task<ActorMetadataResult?> GetActorMetadataAsync(int tmdbId)
     {
-        var primaryProvider = _providers.FirstOrDefault();
-        if (primaryProvider == null) return null;
+        if (tmdbId <= 0) return null;
 
-        return await primaryProvider.FetchActorMetadataAsync(tmdbId);
+        var tmdbProvider = _providers.FirstOrDefault(p => p.Id == TmdbMetadataProviderId);
+        if (tmdbProvider == null) return null;
+
+        return await tmdbProvider.FetchActorMetadataAsync(tmdbId);
     }
 
     public async Task<((decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) Ratings, List<MediaArtwork> Artwork)> GetSecondaryDataAsync(MediaItem item, bool forceOverride, CancellationToken cancellationToken = default)
