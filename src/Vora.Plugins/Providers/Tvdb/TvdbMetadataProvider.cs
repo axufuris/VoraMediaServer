@@ -341,6 +341,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                 result.Cast.Add(new CastMemberResult
                 {
                     TmdbId = 0,
+                    TvdbId = character.TryGetProperty("peopleId", out var pid) && pid.ValueKind == JsonValueKind.Number ? pid.GetInt32() : 0,
 
                     Name = character.TryGetProperty("personName", out var pn) && pn.ValueKind != JsonValueKind.Null ? pn.GetString() ?? "Unknown" : "Unknown",
                     CharacterName = character.TryGetProperty("name", out var cn) && cn.ValueKind != JsonValueKind.Null ? cn.GetString() : null,
@@ -521,6 +522,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                 result.Cast.Add(new CastMemberResult
                 {
                     TmdbId = 0,
+                    TvdbId = character.TryGetProperty("peopleId", out var pid) && pid.ValueKind == JsonValueKind.Number ? pid.GetInt32() : 0,
 
                     Name = character.TryGetProperty("personName", out var pn) && pn.ValueKind != JsonValueKind.Null ? pn.GetString() ?? "Unknown" : "Unknown",
                     CharacterName = character.TryGetProperty("name", out var cn) && cn.ValueKind != JsonValueKind.Null ? cn.GetString() : null,

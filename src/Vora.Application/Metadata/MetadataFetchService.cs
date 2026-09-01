@@ -8,7 +8,7 @@ namespace Vora.Application.Metadata;
 public interface IMetadataFetchService
 {
     Task<(MetadataResult? Metadata, string ProviderId, string ProviderName)> GetTextMetadataAsync(MediaItem item);
-    Task<ActorMetadataResult?> GetActorMetadataAsync(int tmdbId);
+    Task<ActorMetadataResult?> GetActorMetadataAsync(int tmdbId, int tvdbId);
     Task<((decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) Ratings, List<MediaArtwork> Artwork)> GetSecondaryDataAsync(MediaItem item, bool forceOverride, CancellationToken cancellationToken = default);
     Task<List<MediaArtwork>> GetArtworkAsync(MediaItem item);
     Task<(decimal? Rating1, string? Name1, decimal? Rating2, string? Name2)> GetRatingsAsync(MediaItem item, CancellationToken cancellationToken = default);
@@ -16,6 +16,9 @@ public interface IMetadataFetchService
 
 public class MetadataFetchService : IMetadataFetchService
 {
+    private const string TmdbMetadataProviderId = "tmdb_metadata";
+    private const string TvdbMetadataProviderId = "tvdb_metadata";
+
     private readonly IEnumerable<IMetadataProvider> _providers;
     private readonly IEnumerable<IRatingsProvider> _ratingsProviders;
     private readonly IEnumerable<IArtworkProvider> _artworkProviders;
@@ -41,12 +44,24 @@ public class MetadataFetchService : IMetadataFetchService
         return (metadata, primaryProvider.Id, primaryProvider.ProviderName);
     }
 
-    public async Task<ActorMetadataResult?> GetActorMetadataAsync(int tmdbId)
+    // Route by whichever id space the person came from. It used to take
+    // _providers.FirstOrDefault(); registration order comes from assembly
+    // reflection, so "first" was arbitrary — it could land on
+    // LocalMetadataProvider, whose actor fetch returns null unconditionally and
+    // silently enriched nobody, or hand a TMDB id to TVDB, which would resolve
+    // it in TVDB's own people id space and answer about a different person.
+    public async Task<ActorMetadataResult?> GetActorMetadataAsync(int tmdbId, int tvdbId)
     {
-        var primaryProvider = _providers.FirstOrDefault();
-        if (primaryProvider == null) return null;
+        var providerId = tmdbId > 0 ? TmdbMetadataProviderId
+            : tvdbId > 0 ? TvdbMetadataProviderId
+            : null;
 
-        return await primaryProvider.FetchActorMetadataAsync(tmdbId);
+        if (providerId == null) return null;
+
+        var provider = _providers.FirstOrDefault(p => p.Id == providerId);
+        if (provider == null) return null;
+
+        return await provider.FetchActorMetadataAsync(tmdbId > 0 ? tmdbId : tvdbId);
     }
 
     public async Task<((decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) Ratings, List<MediaArtwork> Artwork)> GetSecondaryDataAsync(MediaItem item, bool forceOverride, CancellationToken cancellationToken = default)

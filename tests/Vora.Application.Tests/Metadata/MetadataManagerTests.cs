@@ -63,7 +63,7 @@ public class MetadataManagerTests
 
         await _manager.TriggerActorMetadataRefreshAsync();
 
-        await _fetch.DidNotReceiveWithAnyArgs().GetActorMetadataAsync(default);
+        await _fetch.DidNotReceiveWithAnyArgs().GetActorMetadataAsync(default, default);
         await _actors.DidNotReceiveWithAnyArgs().UpdateActorAsync(Arg.Any<Actor>());
     }
 
@@ -76,7 +76,7 @@ public class MetadataManagerTests
 
         await _manager.TriggerActorMetadataRefreshAsync();
 
-        await _fetch.DidNotReceiveWithAnyArgs().GetActorMetadataAsync(default);
+        await _fetch.DidNotReceiveWithAnyArgs().GetActorMetadataAsync(default, default);
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public class MetadataManagerTests
         var id = Guid.NewGuid();
         _actors.GetActorIdsMissingMetadataAsync(Arg.Any<int>()).Returns(new[] { id });
         _actors.GetActorByIdAsync(id).Returns(MakeActor(id));
-        _fetch.GetActorMetadataAsync(Arg.Any<int>()).Returns((ActorMetadataResult?)null);
+        _fetch.GetActorMetadataAsync(Arg.Any<int>(), Arg.Any<int>()).Returns((ActorMetadataResult?)null);
 
         await _manager.TriggerActorMetadataRefreshAsync();
 
@@ -99,7 +99,7 @@ public class MetadataManagerTests
         var actor = MakeActor(id, tmdbId: 42);
         _actors.GetActorIdsMissingMetadataAsync(Arg.Any<int>()).Returns(new[] { id });
         _actors.GetActorByIdAsync(id).Returns(actor);
-        _fetch.GetActorMetadataAsync(42).Returns(new ActorMetadataResult
+        _fetch.GetActorMetadataAsync(42, Arg.Any<int>()).Returns(new ActorMetadataResult
         {
             Biography = "bio",
             Birthday = new DateTime(1970, 1, 1),
@@ -128,7 +128,7 @@ public class MetadataManagerTests
         _actors.GetActorIdsMissingMetadataAsync(Arg.Any<int>()).Returns(new[] { badId, goodId });
         _actors.GetActorByIdAsync(badId).Returns<Actor?>(_ => throw new InvalidOperationException("transient"));
         _actors.GetActorByIdAsync(goodId).Returns(MakeActor(goodId, tmdbId: 7));
-        _fetch.GetActorMetadataAsync(7).Returns(new ActorMetadataResult { Biography = "ok" });
+        _fetch.GetActorMetadataAsync(7, Arg.Any<int>()).Returns(new ActorMetadataResult { Biography = "ok" });
 
         await _manager.TriggerActorMetadataRefreshAsync();
 
