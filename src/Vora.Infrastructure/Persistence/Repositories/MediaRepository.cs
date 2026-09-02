@@ -1215,7 +1215,10 @@ public partial class MediaRepository : IMediaRepository
         };
 
         var found = await query
-            .Where(m => m.TmdbId != null && ids.Contains(m.TmdbId))
+            // Exclude trashed items (MissingSince != null): a title removed from
+            // the library still lingers in Trash awaiting purge, but it must NOT
+            // count as "in library" for Discovery's In-Library badge.
+            .Where(m => m.TmdbId != null && m.MissingSince == null && ids.Contains(m.TmdbId))
             .Select(m => m.TmdbId ?? string.Empty)
             .ToListAsync();
 
