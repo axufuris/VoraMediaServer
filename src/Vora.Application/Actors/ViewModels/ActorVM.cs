@@ -27,7 +27,11 @@ public class ActorVM
             Birthday = a.Birthday,
             Deathday = a.Deathday,
             PlaceOfBirth = a.PlaceOfBirth,
-            Filmography = a.Roles.Select(r => new ActorRoleVM
+            Filmography = a.Roles
+                // Exclude trashed titles (MissingSince != null): a removed item
+                // lingers in Trash but must not show in the actor's filmography.
+                .Where(r => r.MediaItem.MissingSince == null)
+                .Select(r => new ActorRoleVM
             {
                 Id = r.MediaItem.Id,
                 TmdbId = r.MediaItem.TmdbId,
