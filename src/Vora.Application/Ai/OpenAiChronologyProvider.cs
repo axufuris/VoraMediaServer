@@ -279,7 +279,11 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             "the release year: an origin story, prequel, period piece, " +
             "or flashback is set earlier than a film released before it — a 1940s-set wartime origin comes very early, a 1990s-set " +
             "prequel comes before later-released present-day films. This also applies to a title released years AFTER the events it " +
-            "depicts — a prequel or a gap-filler set between two earlier stories takes its story year, not its release year. For an " +
+            "depicts — a prequel or a gap-filler set between two earlier stories takes its story year, not its release year. The gap " +
+            "is often SMALL and easy to miss: a present-day entry released in the same era as its siblings can still be set one or " +
+            "two years earlier than its release, picking up days after an earlier film rather than at the time it reached cinemas. " +
+            "Never fall back on the release year for a modern-era entry — decide where it sits in the franchise's published " +
+            "timeline, and if a title continues directly from another, give it a setYear just after that one. For an " +
             "item spanning multiple periods, use its main present-day storyline. A television season takes the story year of its " +
             "own episodes, so later seasons of a show never move earlier than their earlier seasons. Use the widely-published " +
             "in-universe timeline for established franchises.\n" +
@@ -287,6 +291,13 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             "setYear for EVERY index shown above — never omit, invent, or duplicate an index, and never repeat a setYear value.";
     }
 
+    // Asks for each reviewed title's absolute story year rather than "does this
+    // look right next to its neighbours". The neighbour framing let a whole
+    // class of error through: a title given its release year by mistake sits
+    // among other titles of that release year, so it reads as locally
+    // consistent and gets confirmed. Every reviewed index must come back with a
+    // value — allowing the model to stay silent on anything it considered fine
+    // made saying nothing the cheap answer.
     private static string BuildVerificationPrompt(string description, IReadOnlyList<CollectionOrderingItemDto> ordered, Dictionary<int, double> setYears, HashSet<int> review)
     {
         var lines = ordered.Select(i => $"{i.Index}: {DescribeItem(i)} — setYear {setYears[i.Index]:0.00}");
@@ -296,16 +307,21 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
             $"You are auditing the in-universe chronological order of a media collection described as: \"{description}\".\n" +
             "Below is the current order, earliest first, one per line as `index: Title (ReleaseYear) [Type] — setYear <value>`:\n" +
             string.Join("\n", lines) + "\n\n" +
-            $"Review these indices: {reviewList}. For each, decide whether its setYear puts it at the " +
-            "correct point in this in-universe timeline relative to its neighbours. A period piece, prequel, flashback, or origin " +
-            "story belongs at its story year, not its release year; a television season belongs with its own show's other seasons " +
-            "and never earlier than an earlier season of the same show. Additionally, NO two items may share the same setYear: " +
-            "wherever the list above shows a repeated setYear, give those items DISTINCT decimal fractions within that year, " +
-            "ordered by their exact in-universe sequence (the one that happens first getting the smaller fraction). If an index is " +
-            "out of place or shares a setYear with another, return a corrected DECIMAL setYear for it; if it is already correct and " +
-            "unique, omit it.\n" +
-            "Return ONLY valid JSON of the form {\"items\": [{\"index\": <index>, \"setYear\": <decimal>}, ...]}, containing only the " +
-            "indices you are correcting. Return {\"items\": []} if every reviewed index is already correct and unique.";
+            $"Audit these indices: {reviewList}.\n" +
+            "For EACH of them, work out from your own knowledge of the story the year in which it PRIMARILY takes place, and " +
+            "return that as a DECIMAL setYear — whole part the story year, fractional part sequencing it within that year. Decide " +
+            "the story year on its own merits FIRST, from what happens in the title, and only then compare it with the value " +
+            "listed above. Do NOT judge it by whether it looks plausible next to its current neighbours: an item placed at its " +
+            "release year by mistake will always look consistent with the other items of that release year, and that is precisely " +
+            "the error you are here to catch.\n" +
+            "Watch for these in particular: a title set years before or after the era it was released in; a title released in the " +
+            "same era as its neighbours but set one or two years earlier, often continuing directly from an earlier entry; a " +
+            "television season, which takes its own episodes' story year and never moves earlier than an earlier season of the " +
+            "same show. No two items may share a setYear — where the list shows a repeat, give distinct decimal fractions within " +
+            "that year, ordered by their exact in-universe sequence.\n" +
+            "Return ONLY valid JSON of the form {\"items\": [{\"index\": <index>, \"setYear\": <decimal>}, ...]}. You MUST return " +
+            "an entry for EVERY index listed for audit, including the ones whose current value you are keeping unchanged — repeat " +
+            "the existing value for those. Never omit a reviewed index.";
     }
 
     private static OrderResult? TryParse(string? json)
