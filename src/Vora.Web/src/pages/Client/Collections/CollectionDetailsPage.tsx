@@ -87,6 +87,21 @@ export default function CollectionDetailsPage() {
 
     const handleSyncTimeline = async () => {
         if (!collection || !collection.sortProviderId) return;
+
+        // Syncing re-derives the story year of every unlocked item from
+        // scratch — it is not an incremental top-up — so say what it will do
+        // before spending the provider call and overwriting hand-checked order.
+        const lockedCount = collection.items?.filter(i => i.inUniverseYearLocked).length ?? 0;
+        const ok = await dialog.confirm({
+            title: 'Re-check the timeline?',
+            message: lockedCount > 0
+                ? `Every item's place in the story order will be worked out again from scratch. ${lockedCount} locked ${lockedCount === 1 ? 'item keeps its' : 'items keep their'} current position; everything else may move.`
+                : "Every item's place in the story order will be worked out again from scratch, and anything may move. Lock an item first if you want to keep where you put it.",
+            confirmText: 'Re-check timeline',
+            cancelText: 'Cancel',
+        });
+        if (!ok) return;
+
         setIsSyncing(true);
         try {
             await collectionAdminService.syncChronology(collection.id);

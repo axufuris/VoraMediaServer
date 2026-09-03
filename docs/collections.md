@@ -29,6 +29,28 @@ other providers are unaffected) returns a short blurb about the universe. The
 sync fills the collection's `Description` with it **only when that field is
 blank**, so a description an admin typed is never overwritten.
 
+## Chronology: how a wrong year gets in, and out
+
+Ordering is driven by a single decimal `setYear` per item — whole part the story
+year, fraction sequencing within it — assigned by the model, then audited in one
+pass that sees the whole ordered list.
+
+The audit asks for each reviewed title's **absolute** story year, worked out on
+its own merits before comparing with the current value. It used to ask whether an
+item looked right *relative to its neighbours*, and let the model omit anything
+it judged fine. Those two together let a whole class of error survive: a title
+given its release year by mistake sits among the other titles of that release
+year, so it reads as locally consistent, and silence confirms it. Black Panther
+(set 2016, released 2018) landed 13 places late in a real collection exactly that
+way. The audit now requires an explicit value for every reviewed index.
+
+**"Sync timeline" is a full re-derivation, not a top-up.** The endpoint passes
+`force: true`, which discards the cached `InUniverseYear` of every *unlocked*
+item so the whole collection is scored and audited again. Locked items keep their
+year and are excluded from the audit — locking is how you pin a placement you have
+checked yourself. Scheduled/background runs pass `force: false` and skip entirely
+while the item set is unchanged, so they never re-audit.
+
 ## Smart collections (rule-based)
 
 A collection can instead be filled by a **rule** rather than a provider list.
