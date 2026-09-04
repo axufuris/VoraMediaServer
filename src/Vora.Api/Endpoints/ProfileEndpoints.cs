@@ -74,6 +74,12 @@ public class ClientPlaybackSettingsDto
     public int Bitrate { get; set; }
     public int MaxResolution { get; set; }
     public int MaxAudioChannels { get; set; }
+
+    // Default true so a profile whose stored blob predates these fields keeps
+    // its sounds on: System.Text.Json leaves an absent property at its
+    // initializer, and the empty-blob path returns a fresh instance.
+    public bool SoundOnClick { get; set; } = true;
+    public bool SoundOnNavOpen { get; set; } = true;
 }
 
 public class UpdateNavPrefsDto
