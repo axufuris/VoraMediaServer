@@ -75,11 +75,14 @@ public class ClientPlaybackSettingsDto
     public int MaxResolution { get; set; }
     public int MaxAudioChannels { get; set; }
 
-    // Default true so a profile whose stored blob predates these fields keeps
-    // its sounds on: System.Text.Json leaves an absent property at its
-    // initializer, and the empty-blob path returns a fresh instance.
+    // Each defaults to true so a profile whose stored blob predates the field
+    // keeps that sound on: System.Text.Json leaves an absent property at its
+    // initializer, and the empty-blob path returns a fresh instance. That holds
+    // per field, so a blob written when only the first two existed still gets
+    // the third switched on.
     public bool SoundOnClick { get; set; } = true;
     public bool SoundOnNavOpen { get; set; } = true;
+    public bool SoundOnMove { get; set; } = true;
 }
 
 public class UpdateNavPrefsDto
