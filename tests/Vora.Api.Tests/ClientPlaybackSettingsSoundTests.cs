@@ -23,6 +23,7 @@ public class ClientPlaybackSettingsSoundTests
 
         legacy.SoundOnClick.Should().BeTrue();
         legacy.SoundOnNavOpen.Should().BeTrue();
+        legacy.SoundOnMove.Should().BeTrue();
         legacy.Bitrate.Should().Be(8000);
     }
 
@@ -34,37 +35,58 @@ public class ClientPlaybackSettingsSoundTests
 
         fresh.SoundOnClick.Should().BeTrue();
         fresh.SoundOnNavOpen.Should().BeTrue();
+        fresh.SoundOnMove.Should().BeTrue();
     }
 
     [Theory]
-    [InlineData(true, true)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    [InlineData(false, false)]
-    public void Both_toggles_round_trip_through_the_blob(bool click, bool navOpen)
+    [InlineData(true, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    public void Every_toggle_round_trips_through_the_blob(bool click, bool navOpen, bool move)
     {
-        var json = $$"""{"bitrate":0,"maxResolution":0,"maxAudioChannels":0,"soundOnClick":{{click.ToString().ToLowerInvariant()}},"soundOnNavOpen":{{navOpen.ToString().ToLowerInvariant()}}}""";
+        static string B(bool value) => value.ToString().ToLowerInvariant();
+        var json = $$"""{"bitrate":0,"maxResolution":0,"maxAudioChannels":0,"soundOnClick":{{B(click)}},"soundOnNavOpen":{{B(navOpen)}},"soundOnMove":{{B(move)}}}""";
 
         var parsed = Parse(json);
 
         parsed.SoundOnClick.Should().Be(click);
         parsed.SoundOnNavOpen.Should().Be(navOpen);
+        parsed.SoundOnMove.Should().Be(move);
     }
 
     [Fact]
     public void Off_survives_the_read_rather_than_falling_back_to_the_default()
     {
-        Parse("""{"soundOnClick":false,"soundOnNavOpen":false}""").SoundOnClick.Should().BeFalse();
-        Parse("""{"soundOnClick":false,"soundOnNavOpen":false}""").SoundOnNavOpen.Should().BeFalse();
+        var parsed = Parse("""{"soundOnClick":false,"soundOnNavOpen":false,"soundOnMove":false}""");
+
+        parsed.SoundOnClick.Should().BeFalse();
+        parsed.SoundOnNavOpen.Should().BeFalse();
+        parsed.SoundOnMove.Should().BeFalse();
     }
 
     [Fact]
-    public void One_toggle_present_leaves_the_other_at_its_default()
+    public void One_toggle_present_leaves_the_others_at_their_defaults()
     {
         var parsed = Parse("""{"soundOnClick":false}""");
 
         parsed.SoundOnClick.Should().BeFalse();
         parsed.SoundOnNavOpen.Should().BeTrue();
+        parsed.SoundOnMove.Should().BeTrue();
+    }
+
+    // A blob written between the two additions carries the first pair but not
+    // the third, which is the same absent-field case one release later.
+    [Fact]
+    public void A_blob_with_only_the_earlier_toggles_leaves_the_newest_on()
+    {
+        var parsed = Parse("""{"soundOnClick":false,"soundOnNavOpen":false}""");
+
+        parsed.SoundOnClick.Should().BeFalse();
+        parsed.SoundOnNavOpen.Should().BeFalse();
+        parsed.SoundOnMove.Should().BeTrue();
     }
 
     // The client writes the blob, so it decides the casing; the read is
@@ -72,8 +94,11 @@ public class ClientPlaybackSettingsSoundTests
     [Fact]
     public void Casing_does_not_matter()
     {
-        Parse("""{"SoundOnClick":false,"SOUNDONNAVOPEN":false}""").SoundOnClick.Should().BeFalse();
-        Parse("""{"SoundOnClick":false,"SOUNDONNAVOPEN":false}""").SoundOnNavOpen.Should().BeFalse();
+        var parsed = Parse("""{"SoundOnClick":false,"SOUNDONNAVOPEN":false,"soundonmove":false}""");
+
+        parsed.SoundOnClick.Should().BeFalse();
+        parsed.SoundOnNavOpen.Should().BeFalse();
+        parsed.SoundOnMove.Should().BeFalse();
     }
 
     [Fact]
@@ -83,5 +108,6 @@ public class ClientPlaybackSettingsSoundTests
 
         json.Should().Contain("SoundOnClick");
         json.Should().Contain("SoundOnNavOpen");
+        json.Should().Contain("SoundOnMove");
     }
 }
