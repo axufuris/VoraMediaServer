@@ -8,6 +8,7 @@ public class CollectionDetailsLibraryItemVM
     public DateTime? ReleaseDate { get; set; }
     public DateTime AddedAt { get; set; }
     public string Type { get; set; } = string.Empty;
+    public int? NumberOfSeasons { get; set; }
     public string? TvShowTitle { get; set; }
     public int? SeasonNumber { get; set; }
     public string? SeasonName { get; set; }
