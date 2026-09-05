@@ -1159,15 +1159,15 @@ public partial class MediaRepository : IMediaRepository
         if (type == "Movie")
         {
             return await _context.MediaItems.OfType<Movie>()
-                .AnyAsync(m => m.TmdbId == externalId);
+                .AnyAsync(m => m.TmdbId == externalId && m.MissingSince == null);
         }
         else if (type == "TvShow")
         {
             return await _context.MediaItems.OfType<TvShow>()
-                .AnyAsync(m => m.TmdbId == externalId);
+                .AnyAsync(m => m.TmdbId == externalId && m.MissingSince == null);
         }
 
-        return await _context.MediaItems.AnyAsync(m => m.TmdbId == externalId);
+        return await _context.MediaItems.AnyAsync(m => m.TmdbId == externalId && m.MissingSince == null);
     }
 
     // Same match as GetExistingExternalIdsAsync, but returns which local item
@@ -1186,7 +1186,7 @@ public partial class MediaRepository : IMediaRepository
 
         var found = await query
             .AsNoTracking()
-            .Where(m => m.TmdbId != null && ids.Contains(m.TmdbId))
+            .Where(m => m.TmdbId != null && m.MissingSince == null && ids.Contains(m.TmdbId))
             .Select(m => new { m.TmdbId, m.Id })
             .ToListAsync();
 
