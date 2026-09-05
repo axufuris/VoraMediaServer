@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { recommendationService, type RecommendationListVM } from '../../api/Discovery/recommendationService';
 import RecommendationRow from '../../components/Media/RecommendationRow';
-import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 
 function AsyncProviderBlock({ providerId, serverId }: { providerId: string, serverId?: string }) {
@@ -38,11 +37,7 @@ function AsyncProviderBlock({ providerId, serverId }: { providerId: string, serv
     );
 }
 
-interface RecommendationsPageProps {
-    embedded?: boolean;
-}
-
-export default function RecommendationsPage({ embedded = false }: RecommendationsPageProps = {}) {
+export default function RecommendationsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const [providers, setProviders] = useState<string[]>([]);
     const [loadingProviders, setLoadingProviders] = useState(true);
@@ -56,13 +51,6 @@ export default function RecommendationsPage({ embedded = false }: Recommendation
 
     return (
         <div className="min-h-full pb-20">
-            {!embedded && (
-                <PageHeader
-                    title="For you"
-                    subtitle="Personalized recommendations based on what you've watched."
-                />
-            )}
-
             <div className="space-y-10 pt-2">
                 {loadingProviders ? (
                     <div className="px-8">

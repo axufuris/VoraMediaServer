@@ -3,28 +3,25 @@ import { useFeatureFlags } from '../../../hooks/useFeatureFlags';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import Tabs from '../../../components/Client/Primitives/Tabs';
 import DiscoveryPage from './DiscoveryPage';
-import RecommendationsPage from '../RecommendationsPage';
 import CalendarPage from '../CalendarPage';
 
-type DiscoverTab = 'discover' | 'forYou' | 'calendar';
+type DiscoverTab = 'discover' | 'calendar';
 
 const ACTIVE_TAB_STORAGE_KEY = 'discover_active_tab';
 
 const TAB_LABELS: Record<DiscoverTab, string> = {
     discover: 'Discover',
-    forYou: 'For You',
     calendar: 'Calendar',
 };
 
 const TAB_SUBTITLES: Record<DiscoverTab, string> = {
     discover: "What's out there — trending, popular, and curated picks from external sources.",
-    forYou: "Personalized recommendations based on what you've watched.",
     calendar: 'Track upcoming movies, episodes, and watchlist drops.',
 };
 
 const readSavedTab = (): DiscoverTab => {
     const saved = sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-    return saved === 'discover' || saved === 'forYou' || saved === 'calendar'
+    return saved === 'discover' || saved === 'calendar'
         ? saved
         : 'discover';
 };
@@ -35,10 +32,9 @@ export default function DiscoverHubPage() {
     const visibleTabs = useMemo((): DiscoverTab[] => {
         const tabs: DiscoverTab[] = [];
         if (flags.discover) tabs.push('discover');
-        if (flags.forYou) tabs.push('forYou');
         if (flags.releaseCalendar) tabs.push('calendar');
         return tabs;
-    }, [flags.discover, flags.forYou, flags.releaseCalendar]);
+    }, [flags.discover, flags.releaseCalendar]);
 
     const [activeTab, setActiveTab] = useState<DiscoverTab>(readSavedTab);
 
@@ -72,7 +68,6 @@ export default function DiscoverHubPage() {
             </div>
 
             {activeTab === 'discover' && <DiscoveryPage embedded />}
-            {activeTab === 'forYou' && <RecommendationsPage embedded />}
             {activeTab === 'calendar' && (
                 <div className="flex min-h-0 flex-1 flex-col">
                     <CalendarPage embedded />

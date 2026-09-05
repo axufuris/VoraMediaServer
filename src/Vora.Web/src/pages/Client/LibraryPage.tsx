@@ -751,7 +751,7 @@ export default function LibraryPage() {
                     tabs={[
                         { key: 'library', label: 'Library' },
                         { key: 'collections', label: 'Collections', badge: collections.length > 0 ? <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--vora-accent-soft)', color: 'var(--vora-accent-text)' }}>{collections.length}</span> : undefined },
-                        { key: 'recommendations', label: 'Recommendations' },
+                        { key: 'recommendations', label: 'For You' },
                     ]}
                     active={activeTab}
                     onChange={setActiveTab}

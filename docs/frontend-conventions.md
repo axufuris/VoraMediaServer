@@ -135,8 +135,17 @@ pages/Client/LiveTv/      LiveTvPage, LiveTvGuide, DvrDashboard
 ## Tab-host pages and the `embedded` prop
 
 Some client pages are hosted as a tab inside another page rather than living at
-their own route. `HomePage` hosts **Home / Collections / Watchlist / Playlists**;
-`DiscoverHubPage` hosts **Discover / For You / Calendar**.
+their own route. `HomePage` hosts **Home / For You / Collections / Watchlist / Playlists**;
+`DiscoverHubPage` hosts **Discover / Calendar**.
+
+**For You is recommendations, and they come from your own library**, so it sits
+on Home rather than in Discover — Discover is for titles you don't have. The
+global endpoint (`/api/recommendations/global`) is the per-library one with a
+null library id, so it already spans every library the profile can see; there is
+nothing to group or aggregate on top of it. Each library page keeps its own
+**For You** tab, which is the same computation narrowed to that library. Both are
+gated on `FeatureGate.ForYou`, so the Home tab disappears with the feature rather
+than rendering a page whose calls 403.
 
 A hosted page drops its own `PageHeader` — the tab bar already names it — and
 moves any page-level action into a right-aligned row above its content. Sub-tabs,
