@@ -4,6 +4,7 @@ import { smartListService, type SmartListClientDto } from '../../api/Collections
 import { type LibraryItem } from '../../api/Media/libraryService';
 import { syncService, type ContinueWatchingItem } from '../../api/Media/syncService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import ClientHomeCustomizeModal, { type HomeLayoutItem } from '../../components/Home/HomeCustomizeModal';
 import { profileDeviceSettingsService } from '../../api/Users/profileDeviceSettingsService';
 import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
@@ -13,18 +14,19 @@ import EmptyState from '../../components/Client/Primitives/EmptyState';
 import PlaylistsPage from './Playlists/PlaylistsPage';
 import CollectionsPage from './Collections/CollectionsPage';
 import WatchlistPage from './WatchlistPage';
+import RecommendationsPage from './RecommendationsPage';
 import MediaRow, { MediaRowItem } from '../../components/Client/Primitives/MediaRow';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import PosterRemoveButton from '../../components/Client/Primitives/PosterRemoveButton';
 import { useDialog } from '../../dialogs';
 
-type HomeTab = 'overview' | 'watchlist' | 'collections' | 'playlists';
+type HomeTab = 'overview' | 'forYou' | 'watchlist' | 'collections' | 'playlists';
 
 const HOME_TAB_STORAGE_KEY = 'home_active_tab';
 
 const readSavedHomeTab = (): HomeTab => {
     const saved = sessionStorage.getItem(HOME_TAB_STORAGE_KEY);
-    return saved === 'watchlist' || saved === 'collections' || saved === 'playlists' ? saved : 'overview';
+    return saved === 'forYou' || saved === 'watchlist' || saved === 'collections' || saved === 'playlists' ? saved : 'overview';
 };
 
 function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serverId?: string }) {
@@ -141,6 +143,7 @@ function SmartListRow({ list, serverId }: { list: SmartListClientDto, serverId?:
 
 export default function HomePage() {
     const { serverId } = useParams<{ serverId?: string }>();
+    const flags = useFeatureFlags();
     const [lists, setLists] = useState<SmartListClientDto[]>([]);
     const [clientLayout, setClientLayout] = useState<HomeLayoutItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -244,29 +247,40 @@ export default function HomePage() {
         </button>
     );
 
+    // Recommendations sit behind the For You feature, and /api/recommendations
+    // is gated on it, so the tab has to disappear with the feature rather than
+    // render a page that 403s.
+    const tabDefinitions: { key: HomeTab; label: string }[] = [
+        { key: 'overview', label: 'Home' },
+        ...(flags.forYou ? [{ key: 'forYou' as HomeTab, label: 'For You' }] : []),
+        { key: 'collections', label: 'Collections' },
+        { key: 'watchlist', label: 'Watchlist' },
+        { key: 'playlists', label: 'Playlists' },
+    ];
+
+    // A saved tab can name something no longer visible (the feature was turned
+    // off since the last visit), so fall back rather than showing nothing.
+    const effectiveTab: HomeTab = tabDefinitions.some(t => t.key === activeTab) ? activeTab : 'overview';
+
     const tabBar = (
         <div className="px-8 pt-4">
             <Tabs<HomeTab>
-                tabs={[
-                    { key: 'overview', label: 'Home' },
-                    { key: 'collections', label: 'Collections' },
-                    { key: 'watchlist', label: 'Watchlist' },
-                    { key: 'playlists', label: 'Playlists' },
-                ]}
-                active={activeTab}
+                tabs={tabDefinitions}
+                active={effectiveTab}
                 onChange={handleTabChange}
-                actions={activeTab === 'overview' ? customizeAction : undefined}
+                actions={effectiveTab === 'overview' ? customizeAction : undefined}
             />
         </div>
     );
 
-    if (activeTab !== 'overview') {
+    if (effectiveTab !== 'overview') {
         return (
             <div className="min-h-full pb-20">
                 {tabBar}
-                {activeTab === 'collections' && <CollectionsPage />}
-                {activeTab === 'watchlist' && <WatchlistPage embedded />}
-                {activeTab === 'playlists' && <PlaylistsPage embedded />}
+                {effectiveTab === 'forYou' && <RecommendationsPage />}
+                {effectiveTab === 'collections' && <CollectionsPage />}
+                {effectiveTab === 'watchlist' && <WatchlistPage embedded />}
+                {effectiveTab === 'playlists' && <PlaylistsPage embedded />}
             </div>
         );
     }
