@@ -75,6 +75,7 @@ public class CollectionDetailsVM
                     : item is Season ? "Season"
                     : item is Episode ? "Episode"
                     : "Unknown",
+                NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count(s => s.MissingSince == null) : (int?)null,
                 TvShowTitle = item is Season ? ((Season)item).TvShow.Title
                     : item is Episode ? ((Episode)item).Season.TvShow.Title
                     : null,
