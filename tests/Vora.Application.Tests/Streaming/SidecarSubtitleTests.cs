@@ -21,6 +21,7 @@ public class SidecarSubtitleTests
 {
     private const string TempDir = "/transcode";
     private const int SubtitleStreamIndex = 3;
+    private const int SubtitleOrdinal = 1;
 
     private static readonly Guid MediaId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid PartId = Guid.Parse("22222222-2222-2222-2222-222222222222");
@@ -94,8 +95,8 @@ public class SidecarSubtitleTests
             }
         });
 
-        _extractor.ExtractWebVttAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(call => $"{call.ArgAt<Guid>(3)}_subtitles.vtt");
+        _extractor.ExtractWebVttAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(call => $"{call.ArgAt<Guid>(4)}_subtitles.vtt");
     }
 
     private Task<(StreamSession Session, string StreamUrl, string? SubtitleUrl)> StartAsync() =>
@@ -122,7 +123,7 @@ public class SidecarSubtitleTests
 
         result.SubtitleUrl.Should().BeNull();
         await _extractor.DidNotReceive().ExtractWebVttAsync(
-            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -134,7 +135,7 @@ public class SidecarSubtitleTests
 
         result.SubtitleUrl.Should().BeNull();
         await _extractor.DidNotReceive().ExtractWebVttAsync(
-            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     // A leftover .vtt from an earlier session on the same title is addressable
@@ -161,7 +162,54 @@ public class SidecarSubtitleTests
         await StartAsync();
 
         await _extractor.Received(1).ExtractWebVttAsync(
-            "/media/movie.mkv", SubtitleStreamIndex, TempDir, MediaId, Arg.Any<CancellationToken>());
+            "/media/movie.mkv", SubtitleStreamIndex, SubtitleOrdinal, TempDir, MediaId, Arg.Any<CancellationToken>());
+    }
+
+    // The fallback map is "the Nth subtitle of this file", and ffmpeg counts
+    // those in stream order. The part's track collection comes back in whatever
+    // order EF materialised it, so the ordinal has to be taken from the tracks
+    // sorted by stream index — otherwise the retry lands on a different track
+    // than the one the user picked, which is the exact failure it exists to fix.
+    [Fact]
+    public async Task The_ordinal_counts_subtitles_in_stream_order_not_collection_order()
+    {
+        Arrange(subtitleSelected: true, burnIn: false);
+        _repo.GetMediaPartForSessionAsync(SessionId).Returns(new MediaPart
+        {
+            Id = PartId,
+            FilePath = "/media/movie.mkv",
+            SubtitleTracks = new List<MediaSubtitleTrack>
+            {
+                new() { Id = SubtitleTrackId, StreamIndex = SubtitleStreamIndex, Codec = "subrip" },
+                new() { Id = Guid.NewGuid(), StreamIndex = 2, Codec = "subrip" },
+            }
+        });
+
+        await StartAsync();
+
+        await _extractor.Received(1).ExtractWebVttAsync(
+            Arg.Any<string>(), SubtitleStreamIndex, SubtitleOrdinal, Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task The_first_subtitle_of_a_file_is_ordinal_zero()
+    {
+        Arrange(subtitleSelected: true, burnIn: false);
+        _repo.GetMediaPartForSessionAsync(SessionId).Returns(new MediaPart
+        {
+            Id = PartId,
+            FilePath = "/media/movie.mkv",
+            SubtitleTracks = new List<MediaSubtitleTrack>
+            {
+                new() { Id = SubtitleTrackId, StreamIndex = SubtitleStreamIndex, Codec = "subrip" },
+                new() { Id = Guid.NewGuid(), StreamIndex = 9, Codec = "subrip" },
+            }
+        });
+
+        await StartAsync();
+
+        await _extractor.Received(1).ExtractWebVttAsync(
+            Arg.Any<string>(), SubtitleStreamIndex, 0, Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     // The HLS file route serves anything whose name starts with the prefix its
@@ -196,7 +244,7 @@ public class SidecarSubtitleTests
         var result = await NewManager().StartExtraSessionAsync(ExtraId, "device-1", Guid.NewGuid(), Guid.NewGuid(), 0);
 
         await _extractor.Received(1).ExtractWebVttAsync(
-            Arg.Any<string>(), SubtitleStreamIndex, TempDir, ExtraId, Arg.Any<CancellationToken>());
+            Arg.Any<string>(), SubtitleStreamIndex, SubtitleOrdinal, TempDir, ExtraId, Arg.Any<CancellationToken>());
         result.SubtitleUrl.Should().Contain($"{ExtraId}_subtitles.vtt");
     }
 
@@ -206,7 +254,7 @@ public class SidecarSubtitleTests
     public async Task A_failed_extraction_leaves_the_stream_playable_without_subtitles()
     {
         Arrange(subtitleSelected: true, burnIn: false);
-        _extractor.ExtractWebVttAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        _extractor.ExtractWebVttAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);
 
         var result = await StartAsync();
@@ -227,7 +275,7 @@ public class SidecarSubtitleTests
 
         result.SubtitleUrl.Should().BeNull();
         await _extractor.DidNotReceive().ExtractWebVttAsync(
-            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -239,6 +287,6 @@ public class SidecarSubtitleTests
         await StartAsync();
 
         await _extractor.Received(1).ExtractWebVttAsync(
-            Arg.Any<string>(), Arg.Any<int>(), StreamManager.DefaultTranscodeTempDirectory, MediaId, Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), StreamManager.DefaultTranscodeTempDirectory, MediaId, Arg.Any<CancellationToken>());
     }
 }

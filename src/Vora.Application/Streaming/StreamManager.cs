@@ -316,15 +316,17 @@ public class StreamManager : IStreamManager
         }
 
         var part = await _repository.GetMediaPartForSessionAsync(session.Id);
-        var streamIndex = part?.SubtitleTracks.FirstOrDefault(t => t.Id == session.SubtitleTrackId.Value)?.StreamIndex;
+        var orderedSubtitles = part?.SubtitleTracks.OrderBy(t => t.StreamIndex).ToList();
+        var ordinal = orderedSubtitles?.FindIndex(t => t.Id == session.SubtitleTrackId.Value) ?? -1;
 
-        if (part == null || streamIndex == null)
+        if (part == null || orderedSubtitles == null || ordinal < 0)
         {
             _subtitleExtractor.RemoveWebVtt(tempDir, transcodeKey);
             return null;
         }
 
-        var fileName = await _subtitleExtractor.ExtractWebVttAsync(part.FilePath, streamIndex.Value, tempDir, transcodeKey);
+        var streamIndex = orderedSubtitles[ordinal].StreamIndex;
+        var fileName = await _subtitleExtractor.ExtractWebVttAsync(part.FilePath, streamIndex, ordinal, tempDir, transcodeKey);
         if (string.IsNullOrEmpty(fileName)) return null;
 
         var hlsToken = _tokenSigner.Sign(HlsTokenScope, transcodeKey.ToString(), HlsTokenTtl);

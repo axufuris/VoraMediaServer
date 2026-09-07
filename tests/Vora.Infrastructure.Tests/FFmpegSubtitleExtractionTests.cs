@@ -45,11 +45,48 @@ public class FFmpegSubtitleExtractionTests : IDisposable
         int.TryParse(suffix, out _).Should().BeFalse();
     }
 
+    // Without an explicit -f, ffmpeg picks the muxer from the output extension.
+    // .vtt resolves, but only by inference — naming the standalone WebVTT muxer
+    // removes the guess.
+    [Fact]
+    public void The_webvtt_muxer_is_named_explicitly()
+    {
+        var args = FFmpegSubtitleExtractionService.BuildArguments("/media/movie.mkv", "0:3", "/transcode/out.vtt");
+
+        args.Should().ContainInConsecutiveOrder("-f", "webvtt");
+        args.Should().ContainInConsecutiveOrder("-c:s", "webvtt");
+    }
+
+    [Fact]
+    public void The_output_path_is_the_last_argument()
+    {
+        var args = FFmpegSubtitleExtractionService.BuildArguments("/media/movie.mkv", "0:3", "/transcode/out.vtt");
+
+        args[^1].Should().Be("/transcode/out.vtt");
+    }
+
+    [Fact]
+    public void The_map_specifier_is_passed_through_verbatim()
+    {
+        var args = FFmpegSubtitleExtractionService.BuildArguments("/media/movie.mkv", "0:s:1", "/transcode/out.vtt");
+
+        args.Should().ContainInConsecutiveOrder("-map", "0:s:1");
+    }
+
+    // The two map forms mean different things: the first is the stream's index
+    // in the file, the second its position among that file's subtitles.
+    [Fact]
+    public void The_two_map_forms_are_distinct()
+    {
+        FFmpegSubtitleExtractionService.AbsoluteMap(3).Should().Be("0:3");
+        FFmpegSubtitleExtractionService.SubtitleRelativeMap(1).Should().Be("0:s:1");
+    }
+
     [Fact]
     public async Task A_missing_source_file_yields_no_sidecar()
     {
         var result = await NewService().ExtractWebVttAsync(
-            Path.Combine(_dir, "does-not-exist.mkv"), 2, _dir, Guid.NewGuid());
+            Path.Combine(_dir, "does-not-exist.mkv"), 2, 0, _dir, Guid.NewGuid());
 
         result.Should().BeNull();
     }
@@ -57,7 +94,7 @@ public class FFmpegSubtitleExtractionTests : IDisposable
     [Fact]
     public async Task A_missing_source_file_does_not_create_the_output_directory()
     {
-        await NewService().ExtractWebVttAsync("/no/such/source.mkv", 2, _dir, Guid.NewGuid());
+        await NewService().ExtractWebVttAsync("/no/such/source.mkv", 2, 0, _dir, Guid.NewGuid());
 
         Directory.Exists(_dir).Should().BeFalse();
     }
