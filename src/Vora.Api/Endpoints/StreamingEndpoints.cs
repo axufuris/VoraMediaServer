@@ -45,9 +45,9 @@ public record StreamDecisionResponse(
 
 public static class StreamingEndpoints
 {
-    private const string PlayTokenScope = "play";
-    private const string HlsTokenScope = "hls";
-    private static readonly TimeSpan HlsTokenTtl = TimeSpan.FromHours(4);
+    private const string PlayTokenScope = StreamManager.PlayTokenScope;
+    private const string HlsTokenScope = StreamManager.HlsTokenScope;
+    private static readonly TimeSpan HlsTokenTtl = StreamManager.HlsTokenTtl;
 
     public static RouteGroupBuilder MapStreamingEndpoints(this IEndpointRouteBuilder routes)
     {
@@ -114,6 +114,7 @@ public static class StreamingEndpoints
                 VideoTrackId = result.Session.VideoTrackId,
                 AudioTrackId = result.Session.AudioTrackId,
                 SubtitleTrackId = result.Session.SubtitleTrackId,
+                SubtitleUrl = result.SubtitleUrl,
                 Strategy = result.Session.Strategy,
                 VideoStrategy = result.Session.VideoStrategy,
                 AudioStrategy = result.Session.AudioStrategy,
@@ -211,6 +212,7 @@ public static class StreamingEndpoints
                 VideoTrackId = result.Session.VideoTrackId,
                 AudioTrackId = result.Session.AudioTrackId,
                 SubtitleTrackId = result.Session.SubtitleTrackId,
+                SubtitleUrl = result.SubtitleUrl,
                 Strategy = result.Session.Strategy,
                 VideoStrategy = result.Session.VideoStrategy,
                 AudioStrategy = result.Session.AudioStrategy,
@@ -511,5 +513,5 @@ public static class StreamingEndpoints
     }
 
     private static string ResolveTempDirectory(Vora.Domain.Entities.Settings.ServerSetting settings) =>
-        string.IsNullOrWhiteSpace(settings.TranscoderTempDirectory) ? "/transcode" : settings.TranscoderTempDirectory;
+        StreamManager.ResolveTempDirectory(settings);
 }

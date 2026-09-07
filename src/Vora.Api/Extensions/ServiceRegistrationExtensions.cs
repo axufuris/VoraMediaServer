@@ -470,6 +470,7 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<ITimeshiftCoordinator, TimeshiftCoordinator>();
         services.AddSingleton<ITunerRegistry, TunerRegistry>();
         services.AddSingleton<ITranscodeService, FFmpegTranscodeService>();
+        services.AddSingleton<ISubtitleExtractionService, FFmpegSubtitleExtractionService>();
         services.AddSingleton<IAudioTranscodeService, FFmpegAudioTranscodeService>();
         services.AddSingleton<IHardwareCapabilityService, HardwareCapabilityService>();
         services.AddSingleton<IStreamingTokenSigner, StreamingTokenSigner>();
