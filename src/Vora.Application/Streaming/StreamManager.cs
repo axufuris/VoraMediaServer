@@ -14,9 +14,9 @@ public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[]
 
 public interface IStreamManager
 {
-    Task<(StreamSession Session, string StreamUrl, string? SubtitleUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
+    Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
     Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
-    Task<(StreamSession Session, string StreamUrl, string? SubtitleUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null);
+    Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null);
     Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search);
     Task PingSessionAsync(Guid sessionId, double currentPosition, double duration, bool isPaused);
     Task<List<NowPlayingSessionDto>> GetNowPlayingSessionsAsync();
@@ -39,10 +39,9 @@ public class StreamManager : IStreamManager
     private readonly IStreamingTokenSigner _tokenSigner;
     private readonly IClientNotifier _notifier;
     private readonly ITranscodeService _transcodeService;
-    private readonly ISubtitleExtractionService _subtitleExtractor;
     private readonly StoragePathsOptions _storagePaths;
 
-    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, ISubtitleExtractionService subtitleExtractor, IOptions<StoragePathsOptions> storagePaths)
+    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths)
     {
         _repository = repository;
         _decisionManager = decisionManager;
@@ -50,11 +49,10 @@ public class StreamManager : IStreamManager
         _tokenSigner = tokenSigner;
         _notifier = notifier;
         _transcodeService = transcodeService;
-        _subtitleExtractor = subtitleExtractor;
         _storagePaths = storagePaths.Value;
     }
 
-    public async Task<(StreamSession Session, string StreamUrl, string? SubtitleUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null)
+    public async Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null)
     {
         var (decision, mediaInfo, client, resolvedMediaId) = await ComputeDecisionAsync(mediaId, deviceId, profileId, videoTrackId, audioTrackId, subtitleTrackId, capabilities, mediaPartId);
 
@@ -95,9 +93,8 @@ public class StreamManager : IStreamManager
 
         var createdSession = await _repository.CreateSessionAsync(session);
 
-        var subtitleUrl = await PrepareSidecarSubtitleAsync(createdSession);
         var playToken = _tokenSigner.Sign(PlayTokenScope, createdSession.Id.ToString(), PlayTokenTtl);
-        return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}", subtitleUrl);
+        return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}");
     }
 
     public async Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null)
@@ -182,7 +179,7 @@ public class StreamManager : IStreamManager
         return (decision, mediaInfo, client, mediaId);
     }
 
-    public async Task<(StreamSession Session, string StreamUrl, string? SubtitleUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null)
+    public async Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null)
     {
         var extra = await _repository.GetMediaExtraAsync(extraId);
         if (extra == null) throw new InvalidOperationException("Extra not found.");
@@ -242,9 +239,8 @@ public class StreamManager : IStreamManager
         };
 
         var createdSession = await _repository.CreateSessionAsync(session);
-        var subtitleUrl = await PrepareSidecarSubtitleAsync(createdSession);
         var playToken = _tokenSigner.Sign(PlayTokenScope, createdSession.Id.ToString(), PlayTokenTtl);
-        return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}", subtitleUrl);
+        return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}");
     }
 
     public async Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search)
@@ -302,37 +298,6 @@ public class StreamManager : IStreamManager
 
     public static string ResolveTempDirectory(ServerSetting settings) =>
         string.IsNullOrWhiteSpace(settings.TranscoderTempDirectory) ? DefaultTranscodeTempDirectory : settings.TranscoderTempDirectory;
-
-    private async Task<string?> PrepareSidecarSubtitleAsync(StreamSession session)
-    {
-        if (!session.SubtitleTrackId.HasValue || session.IsSubtitleBurnIn) return null;
-
-        var trackId = session.SubtitleTrackId.Value;
-        var settings = await _settingsRepo.GetSettingsAsync();
-        var cacheDir = ResolveTempDirectory(settings);
-
-        if (_subtitleExtractor.TryGetCachedWebVtt(cacheDir, session.MediaPartId, trackId, out var cachedFileName))
-        {
-            return BuildSubtitleUrl(cachedFileName);
-        }
-
-        var part = await _repository.GetMediaPartForSessionAsync(session.Id);
-        var orderedSubtitles = part?.SubtitleTracks.OrderBy(t => t.StreamIndex).ToList();
-        var ordinal = orderedSubtitles?.FindIndex(t => t.Id == trackId) ?? -1;
-
-        if (part == null || orderedSubtitles == null || ordinal < 0) return null;
-
-        _ = _subtitleExtractor.BeginExtractionAsync(
-            part.FilePath, orderedSubtitles[ordinal].StreamIndex, ordinal, cacheDir, session.MediaPartId, trackId);
-
-        return null;
-    }
-
-    private string BuildSubtitleUrl(string fileName)
-    {
-        var hlsToken = _tokenSigner.Sign(HlsTokenScope, Path.GetFileNameWithoutExtension(fileName), HlsTokenTtl);
-        return $"/api/streaming/hls/s/{hlsToken}/{fileName}";
-    }
 
     public async Task<string?> GetPlayableFilePathAsync(Guid sessionId)
     {

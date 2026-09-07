@@ -80,8 +80,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             }
 
             var subCodec = subTrack?.Codec?.ToLower() ?? "";
-            bool isImageSubtitle = subCodec == "pgssub" || subCodec == "hdmv_pgs_subtitle" || subCodec == "dvd_subtitle" || subCodec == "vobsub";
-            bool requiresBurnIn = subTrack != null && isImageSubtitle;
+            bool requiresBurnIn = subTrack != null && IsImageSubtitleCodec(subCodec);
 
             var primaryAudioTrack = part.AudioTracks.FirstOrDefault(t => t.IsDefault) ?? part.AudioTracks.FirstOrDefault();
 
@@ -401,6 +400,12 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         else if (v.Contains("HDR10")) set.Add("HDR10");
         else if (v.Contains("HLG")) set.Add("HLG");
         return set;
+    }
+
+    public static bool IsImageSubtitleCodec(string? codec)
+    {
+        var normalized = codec?.Trim().ToLowerInvariant();
+        return normalized is "pgssub" or "hdmv_pgs_subtitle" or "dvd_subtitle" or "vobsub";
     }
 
     public static int ParseHeightFromResolution(string? resolution)
