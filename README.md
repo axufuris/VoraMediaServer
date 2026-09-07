@@ -510,6 +510,8 @@ Project documentation lives under [`docs/`](docs/). Highlights:
   artwork cache and poster overlay badges
 - [`docs/auth-and-devices.md`](docs/auth-and-devices.md) — auth flow and
   device tracking
+- [`docs/streaming.md`](docs/streaming.md) — playback decision, HLS
+  session output, and how subtitles reach the player
 - [`docs/iptv-and-dvr.md`](docs/iptv-and-dvr.md) — IPTV, EPG, and DVR
   architecture
 - [`docs/music-and-audio.md`](docs/music-and-audio.md) — music subsystem
