@@ -13,10 +13,11 @@ using Vora.Domain.Enums;
 
 namespace Vora.Application.Tests.Streaming;
 
-// Text subtitles are stripped from the HLS output on purpose, so the only way a
-// non-burn-in subtitle reaches the player is as a sidecar WebVTT alongside the
-// session's segments. These pin who gets one, who doesn't, and that the URL the
-// player is handed is one the HLS file route will actually serve.
+// Text subtitles are stripped from the HLS output on purpose, so a non-burn-in
+// subtitle only reaches the player as a sidecar WebVTT. Extraction can take
+// minutes on a large remux, so /start never waits for it: a cached file is
+// answered immediately, a miss starts background work and answers null. These
+// pin that split, and that the URL is one the HLS file route will serve.
 public class SidecarSubtitleTests
 {
     private const string TempDir = "/transcode";
@@ -28,6 +29,8 @@ public class SidecarSubtitleTests
     private static readonly Guid SubtitleTrackId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     private static readonly Guid SessionId = Guid.Parse("44444444-4444-4444-4444-444444444444");
     private static readonly Guid ExtraId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+
+    private static string CachedName => $"{PartId}_{SubtitleTrackId}.vtt";
 
     private readonly IStreamRepository _repo = Substitute.For<IStreamRepository>();
     private readonly IBestPathDecisionManager _decisions = Substitute.For<IBestPathDecisionManager>();
@@ -47,7 +50,7 @@ public class SidecarSubtitleTests
         _extractor,
         Options.Create(new StoragePathsOptions()));
 
-    private void Arrange(bool subtitleSelected, bool burnIn, Guid? extraId = null)
+    private void Arrange(bool subtitleSelected, bool burnIn, bool cached, Guid? extraId = null)
     {
         _settings.GetSettingsAsync().Returns(new ServerSetting { TranscoderTempDirectory = TempDir });
         _repo.ResolvePlayableMediaIdAsync(Arg.Any<Guid>(), Arg.Any<Guid?>()).Returns(MediaId);
@@ -95,21 +98,66 @@ public class SidecarSubtitleTests
             }
         });
 
-        _extractor.ExtractWebVttAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(call => $"{call.ArgAt<Guid>(4)}_subtitles.vtt");
+        _extractor.TryGetCachedWebVtt(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>(), out Arg.Any<string>())
+            .Returns(call =>
+            {
+                call[3] = $"{call.ArgAt<Guid>(1)}_{call.ArgAt<Guid>(2)}.vtt";
+                return cached;
+            });
+
+        _extractor.BeginExtractionAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>())
+            .Returns(Task.CompletedTask);
     }
 
     private Task<(StreamSession Session, string StreamUrl, string? SubtitleUrl)> StartAsync() =>
         NewManager().StartSessionAsync(MediaId, "device-1", Guid.NewGuid(), Guid.NewGuid(), 0);
 
+    private Task NoExtractionStarted() => _extractor.DidNotReceive().BeginExtractionAsync(
+        Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>());
+
     [Fact]
-    public async Task A_text_subtitle_gets_a_sidecar_url()
+    public async Task A_cached_subtitle_is_returned_without_extracting()
     {
-        Arrange(subtitleSelected: true, burnIn: false);
+        Arrange(subtitleSelected: true, burnIn: false, cached: true);
 
         var result = await StartAsync();
 
         result.SubtitleUrl.Should().NotBeNullOrEmpty();
+        await NoExtractionStarted();
+    }
+
+    // First selection for this file: the stream must start now, so the caller
+    // gets no subtitle and the extraction runs behind it.
+    [Fact]
+    public async Task A_cache_miss_starts_extraction_and_answers_without_a_subtitle()
+    {
+        Arrange(subtitleSelected: true, burnIn: false, cached: false);
+
+        var result = await StartAsync();
+
+        result.SubtitleUrl.Should().BeNull();
+        result.StreamUrl.Should().NotBeNullOrEmpty();
+        await _extractor.Received(1).BeginExtractionAsync(
+            "/media/movie.mkv", SubtitleStreamIndex, SubtitleOrdinal, TempDir, PartId, SubtitleTrackId);
+    }
+
+    // The whole point of the change: a slow extraction used to hold /start open
+    // for its full timeout and the client gave up. Starting a session must not
+    // wait on the extraction task at all.
+    [Fact]
+    public async Task Start_does_not_wait_for_the_extraction_to_finish()
+    {
+        Arrange(subtitleSelected: true, burnIn: false, cached: false);
+        var neverFinishes = new TaskCompletionSource();
+        _extractor.BeginExtractionAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>())
+            .Returns(neverFinishes.Task);
+
+        var start = StartAsync();
+        var finished = await Task.WhenAny(start, Task.Delay(TimeSpan.FromSeconds(5)));
+
+        finished.Should().BeSameAs(start);
+        (await start).SubtitleUrl.Should().BeNull();
+        neverFinishes.Task.IsCompleted.Should().BeFalse();
     }
 
     // Image subtitles are painted into the video by the encoder, so a sidecar
@@ -117,52 +165,36 @@ public class SidecarSubtitleTests
     [Fact]
     public async Task A_burn_in_subtitle_gets_no_sidecar()
     {
-        Arrange(subtitleSelected: true, burnIn: true);
+        Arrange(subtitleSelected: true, burnIn: true, cached: true);
 
         var result = await StartAsync();
 
         result.SubtitleUrl.Should().BeNull();
-        await _extractor.DidNotReceive().ExtractWebVttAsync(
-            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await NoExtractionStarted();
     }
 
     [Fact]
     public async Task Subtitles_off_gets_no_sidecar()
     {
-        Arrange(subtitleSelected: false, burnIn: false);
+        Arrange(subtitleSelected: false, burnIn: false, cached: true);
 
         var result = await StartAsync();
 
         result.SubtitleUrl.Should().BeNull();
-        await _extractor.DidNotReceive().ExtractWebVttAsync(
-            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await NoExtractionStarted();
     }
 
-    // A leftover .vtt from an earlier session on the same title is addressable
-    // by anyone holding a prefix token, so a session that wants no subtitles has
-    // to clear it rather than just decline to name it.
+    // The cache is keyed on (part, track), so the answer doesn't depend on the
+    // session — a hit is served without touching the part at all.
     [Fact]
-    public async Task A_session_without_a_text_subtitle_clears_any_stale_sidecar()
+    public async Task A_cache_hit_is_answered_from_the_session_alone()
     {
-        Arrange(subtitleSelected: false, burnIn: false);
+        Arrange(subtitleSelected: true, burnIn: false, cached: true);
 
         await StartAsync();
 
-        _extractor.Received(1).RemoveWebVtt(TempDir, MediaId);
-    }
-
-    // The subtitle stream index is absolute, the same form BuildFFmpegArguments
-    // maps video and audio with. Reading it as a subtitle-relative index would
-    // silently pick a different track whenever the subtitle isn't the Nth sub.
-    [Fact]
-    public async Task Extraction_is_asked_for_the_selected_tracks_absolute_stream_index()
-    {
-        Arrange(subtitleSelected: true, burnIn: false);
-
-        await StartAsync();
-
-        await _extractor.Received(1).ExtractWebVttAsync(
-            "/media/movie.mkv", SubtitleStreamIndex, SubtitleOrdinal, TempDir, MediaId, Arg.Any<CancellationToken>());
+        _extractor.Received(1).TryGetCachedWebVtt(TempDir, PartId, SubtitleTrackId, out Arg.Any<string>());
+        await _repo.DidNotReceive().GetMediaPartForSessionAsync(Arg.Any<Guid>());
     }
 
     // The fallback map is "the Nth subtitle of this file", and ffmpeg counts
@@ -173,7 +205,7 @@ public class SidecarSubtitleTests
     [Fact]
     public async Task The_ordinal_counts_subtitles_in_stream_order_not_collection_order()
     {
-        Arrange(subtitleSelected: true, burnIn: false);
+        Arrange(subtitleSelected: true, burnIn: false, cached: false);
         _repo.GetMediaPartForSessionAsync(SessionId).Returns(new MediaPart
         {
             Id = PartId,
@@ -187,14 +219,14 @@ public class SidecarSubtitleTests
 
         await StartAsync();
 
-        await _extractor.Received(1).ExtractWebVttAsync(
-            Arg.Any<string>(), SubtitleStreamIndex, SubtitleOrdinal, Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _extractor.Received(1).BeginExtractionAsync(
+            Arg.Any<string>(), SubtitleStreamIndex, SubtitleOrdinal, Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>());
     }
 
     [Fact]
     public async Task The_first_subtitle_of_a_file_is_ordinal_zero()
     {
-        Arrange(subtitleSelected: true, burnIn: false);
+        Arrange(subtitleSelected: true, burnIn: false, cached: false);
         _repo.GetMediaPartForSessionAsync(SessionId).Returns(new MediaPart
         {
             Id = PartId,
@@ -208,85 +240,67 @@ public class SidecarSubtitleTests
 
         await StartAsync();
 
-        await _extractor.Received(1).ExtractWebVttAsync(
-            Arg.Any<string>(), SubtitleStreamIndex, 0, Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _extractor.Received(1).BeginExtractionAsync(
+            Arg.Any<string>(), SubtitleStreamIndex, 0, Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>());
     }
 
-    // The HLS file route serves anything whose name starts with the prefix its
-    // token signs, so the sidecar has to be named and signed under the same
-    // transcode key as the playlist and segments.
+    // The HLS file route serves a file only when its name starts with the prefix
+    // the token signs. The cache file is named for the part and track rather than
+    // the transcode key, so the token has to sign that name — signing the media
+    // item id would 404 every subtitle.
     [Fact]
     public async Task The_sidecar_url_satisfies_the_hls_routes_token_and_prefix_rules()
     {
-        Arrange(subtitleSelected: true, burnIn: false);
+        Arrange(subtitleSelected: true, burnIn: false, cached: true);
 
         var url = (await StartAsync()).SubtitleUrl!;
 
         var parts = url.Split('/');
-        parts.Should().HaveCountGreaterThan(2);
         var fileName = parts[^1];
         var token = parts[^2];
 
         _signer.TryVerify(token, StreamManager.HlsTokenScope, out var prefix).Should().BeTrue();
-        prefix.Should().Be(MediaId.ToString());
+        fileName.Should().Be(CachedName);
         fileName.Should().StartWith(prefix);
-        fileName.Should().EndWith(".vtt");
         url.Should().StartWith("/api/streaming/hls/s/");
     }
 
-    // An extra transcodes under its own id so its stream can't collide with the
-    // parent item's; the sidecar has to follow that key or its URL won't verify.
+    // An extra has its own MediaPart, so it keys the cache on that rather than on
+    // the parent item — two different files never share an extracted subtitle.
     [Fact]
-    public async Task An_extras_sidecar_is_keyed_on_the_extra_not_the_parent_item()
+    public async Task An_extras_sidecar_is_keyed_on_its_own_part()
     {
-        Arrange(subtitleSelected: true, burnIn: false, extraId: ExtraId);
+        Arrange(subtitleSelected: true, burnIn: false, cached: false, extraId: ExtraId);
 
-        var result = await NewManager().StartExtraSessionAsync(ExtraId, "device-1", Guid.NewGuid(), Guid.NewGuid(), 0);
+        await NewManager().StartExtraSessionAsync(ExtraId, "device-1", Guid.NewGuid(), Guid.NewGuid(), 0);
 
-        await _extractor.Received(1).ExtractWebVttAsync(
-            Arg.Any<string>(), SubtitleStreamIndex, SubtitleOrdinal, TempDir, ExtraId, Arg.Any<CancellationToken>());
-        result.SubtitleUrl.Should().Contain($"{ExtraId}_subtitles.vtt");
-    }
-
-    // Extraction is best-effort: a source ffmpeg can't read must cost the
-    // subtitle, not the stream.
-    [Fact]
-    public async Task A_failed_extraction_leaves_the_stream_playable_without_subtitles()
-    {
-        Arrange(subtitleSelected: true, burnIn: false);
-        _extractor.ExtractWebVttAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns((string?)null);
-
-        var result = await StartAsync();
-
-        result.SubtitleUrl.Should().BeNull();
-        result.StreamUrl.Should().NotBeNullOrEmpty();
+        await _extractor.Received(1).BeginExtractionAsync(
+            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), TempDir, PartId, SubtitleTrackId);
     }
 
     // The session records a track the part no longer has (re-analysis dropped
     // it) — no sidecar, and no ffmpeg call with a bogus index.
     [Fact]
-    public async Task An_unresolvable_subtitle_track_produces_no_sidecar()
+    public async Task An_unresolvable_subtitle_track_starts_no_extraction()
     {
-        Arrange(subtitleSelected: true, burnIn: false);
+        Arrange(subtitleSelected: true, burnIn: false, cached: false);
         _repo.GetMediaPartForSessionAsync(SessionId).Returns(new MediaPart { Id = PartId, FilePath = "/media/movie.mkv" });
 
         var result = await StartAsync();
 
         result.SubtitleUrl.Should().BeNull();
-        await _extractor.DidNotReceive().ExtractWebVttAsync(
-            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await NoExtractionStarted();
     }
 
     [Fact]
-    public async Task The_temp_directory_falls_back_when_the_server_has_none_configured()
+    public async Task The_cache_directory_falls_back_when_the_server_has_none_configured()
     {
-        Arrange(subtitleSelected: true, burnIn: false);
+        Arrange(subtitleSelected: true, burnIn: false, cached: false);
         _settings.GetSettingsAsync().Returns(new ServerSetting { TranscoderTempDirectory = "" });
 
         await StartAsync();
 
-        await _extractor.Received(1).ExtractWebVttAsync(
-            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), StreamManager.DefaultTranscodeTempDirectory, MediaId, Arg.Any<CancellationToken>());
+        await _extractor.Received(1).BeginExtractionAsync(
+            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), StreamManager.DefaultTranscodeTempDirectory, PartId, SubtitleTrackId);
     }
 }

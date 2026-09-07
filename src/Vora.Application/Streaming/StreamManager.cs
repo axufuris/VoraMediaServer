@@ -305,31 +305,32 @@ public class StreamManager : IStreamManager
 
     private async Task<string?> PrepareSidecarSubtitleAsync(StreamSession session)
     {
-        var transcodeKey = session.ExtraId ?? session.MediaItemId;
-        var settings = await _settingsRepo.GetSettingsAsync();
-        var tempDir = ResolveTempDirectory(settings);
+        if (!session.SubtitleTrackId.HasValue || session.IsSubtitleBurnIn) return null;
 
-        if (!session.SubtitleTrackId.HasValue || session.IsSubtitleBurnIn)
+        var trackId = session.SubtitleTrackId.Value;
+        var settings = await _settingsRepo.GetSettingsAsync();
+        var cacheDir = ResolveTempDirectory(settings);
+
+        if (_subtitleExtractor.TryGetCachedWebVtt(cacheDir, session.MediaPartId, trackId, out var cachedFileName))
         {
-            _subtitleExtractor.RemoveWebVtt(tempDir, transcodeKey);
-            return null;
+            return BuildSubtitleUrl(cachedFileName);
         }
 
         var part = await _repository.GetMediaPartForSessionAsync(session.Id);
         var orderedSubtitles = part?.SubtitleTracks.OrderBy(t => t.StreamIndex).ToList();
-        var ordinal = orderedSubtitles?.FindIndex(t => t.Id == session.SubtitleTrackId.Value) ?? -1;
+        var ordinal = orderedSubtitles?.FindIndex(t => t.Id == trackId) ?? -1;
 
-        if (part == null || orderedSubtitles == null || ordinal < 0)
-        {
-            _subtitleExtractor.RemoveWebVtt(tempDir, transcodeKey);
-            return null;
-        }
+        if (part == null || orderedSubtitles == null || ordinal < 0) return null;
 
-        var streamIndex = orderedSubtitles[ordinal].StreamIndex;
-        var fileName = await _subtitleExtractor.ExtractWebVttAsync(part.FilePath, streamIndex, ordinal, tempDir, transcodeKey);
-        if (string.IsNullOrEmpty(fileName)) return null;
+        _ = _subtitleExtractor.BeginExtractionAsync(
+            part.FilePath, orderedSubtitles[ordinal].StreamIndex, ordinal, cacheDir, session.MediaPartId, trackId);
 
-        var hlsToken = _tokenSigner.Sign(HlsTokenScope, transcodeKey.ToString(), HlsTokenTtl);
+        return null;
+    }
+
+    private string BuildSubtitleUrl(string fileName)
+    {
+        var hlsToken = _tokenSigner.Sign(HlsTokenScope, Path.GetFileNameWithoutExtension(fileName), HlsTokenTtl);
         return $"/api/streaming/hls/s/{hlsToken}/{fileName}";
     }
 

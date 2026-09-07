@@ -242,7 +242,7 @@ public class FFmpegTranscodeService : ITranscodeService
                     ? "/transcode"
                     : settings.TranscoderTempDirectory;
             }
-            await StopProcessAndCleanFilesAsync(mediaItemId, targetDir, removeSidecars: true);
+            await StopProcessAndCleanFilesAsync(mediaItemId, targetDir);
         }
         finally
         {
@@ -307,7 +307,7 @@ public class FFmpegTranscodeService : ITranscodeService
                 if (GetNewestArtifactWriteTimeUtc(targetDir, mediaItemId, playlist) > cutoff) continue;
 
                 _logger.LogInformation("Reaping orphaned transcode artifacts for {MediaItemId} in {Dir}.", mediaItemId, targetDir);
-                await StopProcessAndCleanFilesAsync(mediaItemId, targetDir, removeSidecars: true);
+                await StopProcessAndCleanFilesAsync(mediaItemId, targetDir);
             }
         }
         finally
@@ -367,7 +367,7 @@ public class FFmpegTranscodeService : ITranscodeService
         }
     }
 
-    private async Task StopProcessAndCleanFilesAsync(Guid mediaItemId, string? targetDir, bool removeSidecars = false)
+    private async Task StopProcessAndCleanFilesAsync(Guid mediaItemId, string? targetDir)
     {
         await KillProcessOnlyAsync(mediaItemId);
 
@@ -403,13 +403,6 @@ public class FFmpegTranscodeService : ITranscodeService
             foreach (var f in Directory.EnumerateFiles(targetDir, $"{segmentPrefix}*.m4s"))
             {
                 try { File.Delete(f); } catch { /* keep going */ }
-            }
-            if (removeSidecars)
-            {
-                foreach (var f in Directory.EnumerateFiles(targetDir, $"{segmentPrefix}*.vtt"))
-                {
-                    try { File.Delete(f); } catch { /* keep going */ }
-                }
             }
         }
         catch (Exception ex)
