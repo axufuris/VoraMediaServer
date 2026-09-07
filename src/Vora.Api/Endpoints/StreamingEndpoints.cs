@@ -72,6 +72,12 @@ public static class StreamingEndpoints
             .WithName("StopStream")
             .RequireAuthorization();
 
+        group.MapGet("/sessions/{sessionId:guid}/subtitle/{subtitleTrackId}.vtt", GetSessionSubtitleAsync)
+            .WithName("GetSessionSubtitle")
+            .Produces(StatusCodes.Status200OK, contentType: "text/vtt")
+            .Produces(StatusCodes.Status404NotFound)
+            .RequireAuthorization();
+
         group.MapGet("/play/{sessionId:guid}", PlaySessionAsync);
         group.MapGet("/hls/s/{token}/{fileName}", ServeHlsChunkAsync);
 
@@ -114,7 +120,6 @@ public static class StreamingEndpoints
                 VideoTrackId = result.Session.VideoTrackId,
                 AudioTrackId = result.Session.AudioTrackId,
                 SubtitleTrackId = result.Session.SubtitleTrackId,
-                SubtitleUrl = result.SubtitleUrl,
                 Strategy = result.Session.Strategy,
                 VideoStrategy = result.Session.VideoStrategy,
                 AudioStrategy = result.Session.AudioStrategy,
@@ -212,7 +217,6 @@ public static class StreamingEndpoints
                 VideoTrackId = result.Session.VideoTrackId,
                 AudioTrackId = result.Session.AudioTrackId,
                 SubtitleTrackId = result.Session.SubtitleTrackId,
-                SubtitleUrl = result.SubtitleUrl,
                 Strategy = result.Session.Strategy,
                 VideoStrategy = result.Session.VideoStrategy,
                 AudioStrategy = result.Session.AudioStrategy,
@@ -230,6 +234,64 @@ public static class StreamingEndpoints
         {
             return Results.BadRequest(ex.Message);
         }
+    }
+
+    private static async Task<IResult> GetSessionSubtitleAsync(
+        Guid sessionId,
+        string subtitleTrackId,
+        ClaimsPrincipal user,
+        IStreamRepository streamRepo,
+        ISystemSettingsRepository settingsRepo,
+        ISubtitleExtractionService subtitleExtractor,
+        ILoggerFactory loggerFactory,
+        CancellationToken ct)
+    {
+        var log = loggerFactory.CreateLogger("Vora.Api.Streaming.Subtitle");
+
+        if (!Guid.TryParse(subtitleTrackId, out var trackId)) return Results.NotFound();
+
+        var session = await streamRepo.GetSessionAsync(sessionId);
+        if (session == null || session.UserId != (user.GetAccountId() ?? Guid.Empty))
+        {
+            log.LogWarning("Subtitle 404 (session not found or not the caller's) sessionId={SessionId}", sessionId);
+            return Results.NotFound();
+        }
+
+        var part = await streamRepo.GetMediaPartForSessionAsync(sessionId);
+        if (part == null || !File.Exists(part.FilePath))
+        {
+            log.LogWarning("Subtitle 404 (part or source file missing) sessionId={SessionId}", sessionId);
+            return Results.NotFound();
+        }
+
+        var orderedSubtitles = part.SubtitleTracks.OrderBy(t => t.StreamIndex).ToList();
+        var ordinal = orderedSubtitles.FindIndex(t => t.Id == trackId);
+        if (ordinal < 0)
+        {
+            log.LogWarning("Subtitle 404 (track not on this part) sessionId={SessionId} trackId={TrackId}", sessionId, trackId);
+            return Results.NotFound();
+        }
+
+        var track = orderedSubtitles[ordinal];
+        if (BestPathDecisionManager.IsImageSubtitleCodec(track.Codec))
+        {
+            log.LogWarning("Subtitle 404 (image subtitle, burned in rather than extracted) sessionId={SessionId} trackId={TrackId} codec={Codec}",
+                sessionId, trackId, track.Codec);
+            return Results.NotFound();
+        }
+
+        var settings = await settingsRepo.GetSettingsAsync();
+        var path = await subtitleExtractor.GetOrExtractWebVttAsync(
+            part.FilePath, track.StreamIndex, ordinal, ResolveTempDirectory(settings), part.Id, trackId, ct);
+
+        if (path == null)
+        {
+            log.LogWarning("Subtitle 404 (extraction produced nothing) sessionId={SessionId} trackId={TrackId} streamIndex={StreamIndex}",
+                sessionId, trackId, track.StreamIndex);
+            return Results.NotFound();
+        }
+
+        return Results.File(path, "text/vtt");
     }
 
     private static async Task<IResult> PingSessionAsync(Guid sessionId, IStreamManager streamManager, [FromBody] StreamPingRequest req)

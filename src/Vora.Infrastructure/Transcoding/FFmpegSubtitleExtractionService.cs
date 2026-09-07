@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Streaming;
@@ -6,8 +7,11 @@ namespace Vora.Infrastructure.Transcoding;
 
 public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
 {
-    private static readonly TimeSpan ExtractionTimeout = TimeSpan.FromSeconds(30);
+    public const string CacheDirectoryName = "subcache";
 
+    private static readonly TimeSpan ExtractionTimeout = TimeSpan.FromSeconds(180);
+
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _perKeyLocks = new(StringComparer.Ordinal);
     private readonly ILogger<FFmpegSubtitleExtractionService> _logger;
 
     public FFmpegSubtitleExtractionService(ILogger<FFmpegSubtitleExtractionService> logger)
@@ -15,7 +19,13 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         _logger = logger;
     }
 
-    public static string WebVttFileName(Guid transcodeKey) => $"{transcodeKey}_subtitles.vtt";
+    public static string CacheDirectory(string transcodeTempDirectory) =>
+        Path.Combine(transcodeTempDirectory, CacheDirectoryName);
+
+    public static string WebVttFileName(Guid mediaPartId, Guid subtitleTrackId) => $"{mediaPartId}_{subtitleTrackId}.vtt";
+
+    public static string CachePath(string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId) =>
+        Path.Combine(CacheDirectory(transcodeTempDirectory), WebVttFileName(mediaPartId, subtitleTrackId));
 
     public static string AbsoluteMap(int subtitleStreamIndex) => $"0:{subtitleStreamIndex}";
 
@@ -25,43 +35,91 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
     [
         "-y",
         "-i", sourceFilePath,
+        "-vn", "-an", "-dn",
         "-map", mapSpecifier,
         "-c:s", "webvtt",
         "-f", "webvtt",
         outputPath,
     ];
 
-    public async Task<string?> ExtractWebVttAsync(string sourceFilePath, int subtitleStreamIndex, int subtitleOrdinal, string outputDirectory, Guid transcodeKey, CancellationToken cancellationToken = default)
+    public static bool IsUsable(string path)
+    {
+        try
+        {
+            return File.Exists(path) && new FileInfo(path).Length > 0;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    public async Task<string?> GetOrExtractWebVttAsync(string sourceFilePath, int subtitleStreamIndex, int subtitleOrdinal, string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(sourceFilePath) || !File.Exists(sourceFilePath)) return null;
-        if (string.IsNullOrWhiteSpace(outputDirectory)) return null;
+        if (string.IsNullOrWhiteSpace(transcodeTempDirectory)) return null;
 
-        Directory.CreateDirectory(outputDirectory);
+        var cachePath = CachePath(transcodeTempDirectory, mediaPartId, subtitleTrackId);
+        if (IsUsable(cachePath)) return cachePath;
 
-        var fileName = WebVttFileName(transcodeKey);
-        var outputPath = Path.Combine(outputDirectory, fileName);
+        var gate = _perKeyLocks.GetOrAdd(cachePath, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (IsUsable(cachePath)) return cachePath;
 
-        var attempt = await RunFfmpegAsync(sourceFilePath, AbsoluteMap(subtitleStreamIndex), subtitleStreamIndex, outputPath, cancellationToken);
+            return await ExtractWebVttAsync(sourceFilePath, subtitleStreamIndex, subtitleOrdinal, cachePath, mediaPartId, subtitleTrackId, cancellationToken);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    public async Task<string?> ExtractWebVttAsync(string sourceFilePath, int subtitleStreamIndex, int subtitleOrdinal, string cachePath, Guid mediaPartId, Guid subtitleTrackId, CancellationToken cancellationToken = default)
+    {
+        var cacheDirectory = Path.GetDirectoryName(cachePath);
+        if (string.IsNullOrEmpty(cacheDirectory)) return null;
+        Directory.CreateDirectory(cacheDirectory);
+
+        var stagingPath = Path.Combine(cacheDirectory, $"{Guid.NewGuid():N}.vtt.tmp");
+
+        _logger.LogInformation("Subtitle extraction starting: part {PartId} track {TrackId}, stream index {StreamIndex}, source {Source}.",
+            mediaPartId, subtitleTrackId, subtitleStreamIndex, sourceFilePath);
+
+        var startedAt = Stopwatch.GetTimestamp();
+        var attempt = await RunFfmpegAsync(sourceFilePath, AbsoluteMap(subtitleStreamIndex), subtitleStreamIndex, stagingPath, cancellationToken);
 
         if (attempt.ShouldRetry && subtitleOrdinal >= 0)
         {
-            _logger.LogInformation(
-                "Absolute stream map 0:{StreamIndex} failed for {Source}; retrying as subtitle-relative 0:s:{Ordinal}.",
+            _logger.LogInformation("Absolute stream map 0:{StreamIndex} failed for {Source}; retrying as subtitle-relative 0:s:{Ordinal}.",
                 subtitleStreamIndex, sourceFilePath, subtitleOrdinal);
 
-            attempt = await RunFfmpegAsync(sourceFilePath, SubtitleRelativeMap(subtitleOrdinal), subtitleStreamIndex, outputPath, cancellationToken);
+            attempt = await RunFfmpegAsync(sourceFilePath, SubtitleRelativeMap(subtitleOrdinal), subtitleStreamIndex, stagingPath, cancellationToken);
         }
 
         if (!attempt.Succeeded)
         {
-            TryDelete(outputPath);
+            TryDelete(stagingPath);
             return null;
         }
 
-        _logger.LogInformation("Extracted subtitle stream {StreamIndex} of {Source} to {OutputPath} ({Bytes} bytes).",
-            subtitleStreamIndex, sourceFilePath, outputPath, attempt.OutputBytes);
+        try
+        {
+            File.Move(stagingPath, cachePath, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not move the extracted subtitle into {CachePath}.", cachePath);
+            TryDelete(stagingPath);
+            return null;
+        }
 
-        return fileName;
+        _logger.LogInformation("Subtitle extraction finished: part {PartId} track {TrackId}, stream index {StreamIndex}, source {Source}, {ElapsedMs} ms, {Bytes} bytes, cached at {CachePath}.",
+            mediaPartId, subtitleTrackId, subtitleStreamIndex, sourceFilePath,
+            (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, attempt.OutputBytes, cachePath);
+
+        return cachePath;
     }
 
     private async Task<ExtractionAttempt> RunFfmpegAsync(string sourceFilePath, string mapSpecifier, int subtitleStreamIndex, string outputPath, CancellationToken cancellationToken)
@@ -118,12 +176,6 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
             _logger.LogWarning(ex, "Subtitle extraction threw for {Source} via {MapSpecifier}.", sourceFilePath, mapSpecifier);
             return ExtractionAttempt.DidNotRun;
         }
-    }
-
-    public void RemoveWebVtt(string outputDirectory, Guid transcodeKey)
-    {
-        if (string.IsNullOrWhiteSpace(outputDirectory)) return;
-        TryDelete(Path.Combine(outputDirectory, WebVttFileName(transcodeKey)));
     }
 
     private static void TryDelete(string path)
