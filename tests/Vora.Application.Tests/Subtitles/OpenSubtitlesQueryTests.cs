@@ -55,6 +55,37 @@ public class OpenSubtitlesQueryTests
         url.Should().Contain("episode_number=5");
     }
 
+    // The id Vora holds for an episode is the SHOW's — episodes carry none of
+    // their own. OpenSubtitles takes a series id as parent_imdb_id; sent as
+    // imdb_id it is read as the episode's own id, matches nothing, and every TV
+    // search comes back empty with no error to explain it.
+    [Fact]
+    public void An_episode_sends_the_show_id_as_the_parent_id()
+    {
+        var url = Url(new SubtitleSearchQuery { ImdbId = "tt14500874", Season = 2, Episode = 5 }, "en");
+
+        url.Should().Contain("parent_imdb_id=14500874");
+        url.Should().NotContain("&imdb_id=");
+        url.Should().NotStartWith("subtitles?imdb_id=");
+    }
+
+    [Fact]
+    public void An_episode_sends_a_tmdb_id_as_the_parent_id_too()
+    {
+        var url = Url(new SubtitleSearchQuery { TmdbId = "125988", Season = 1, Episode = 3 }, "en");
+
+        url.Should().Contain("parent_tmdb_id=125988");
+        url.Should().NotContain("&tmdb_id=");
+    }
+
+    // A movie is its own title, so the plain id is right there — using the
+    // parent form would find nothing.
+    [Fact]
+    public void A_movie_sends_a_plain_id_with_no_parent_prefix()
+    {
+        Url(new SubtitleSearchQuery { ImdbId = "tt1368337" }, "en").Should().NotContain("parent_");
+    }
+
     [Fact]
     public void A_movie_carries_no_numbering()
     {

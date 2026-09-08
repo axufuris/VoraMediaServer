@@ -110,6 +110,31 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
             </div>
             <form onSubmit={handleSaveCore} className="space-y-6">
             {subTab === 'general' && (<>
+            <SettingsCard title="Subtitles">
+                <div className="space-y-4">
+                    <div>
+                        <Checkbox
+                            checked={serverSettings.preExtractSubtitlesOnScan}
+                            onChange={v => setServerSettings({ ...serverSettings, preExtractSubtitlesOnScan: v })}
+                            label="Pre-extract text subtitles on scan"
+                        />
+                        <FieldHint>
+                            Converts embedded text subtitles (SRT, ASS, and similar) to WebVTT in the background after a
+                            scan, so they appear instantly during playback instead of being extracted on first use.
+                            Image subtitles (PGS, VobSub) are unaffected — those are burned into the video when played.
+                            Runs one file at a time and pauses while anything is streaming. Independent of thumbnail
+                            generation.
+                        </FieldHint>
+                    </div>
+                    <div>
+                        <button type="button" className="vora-btn-secondary" onClick={backfillSubtitles} disabled={subtitleBackfillQueued}>
+                            {subtitleBackfillQueued ? 'Backfill queued' : 'Extract subtitles for existing media'}
+                        </button>
+                        <FieldHint>Walks every video library and extracts any subtitle that isn't cached yet, without needing a rescan.</FieldHint>
+                    </div>
+                </div>
+            </SettingsCard>
+
             <SettingsCard title="General">
                 <FieldLabel>Server Name</FieldLabel>
                 <input
@@ -761,30 +786,6 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                 </div>
             </SettingsCard>
 
-            <SettingsCard title="Subtitles">
-                <div className="space-y-4">
-                    <div>
-                        <Checkbox
-                            checked={serverSettings.preExtractSubtitlesOnScan}
-                            onChange={v => setServerSettings({ ...serverSettings, preExtractSubtitlesOnScan: v })}
-                            label="Pre-extract text subtitles on scan"
-                        />
-                        <FieldHint>
-                            Converts embedded text subtitles (SRT, ASS, and similar) to WebVTT in the background after a
-                            scan, so they appear instantly during playback instead of being extracted on first use.
-                            Image subtitles (PGS, VobSub) are unaffected — those are burned into the video when played.
-                            Runs one file at a time and pauses while anything is streaming. Independent of thumbnail
-                            generation.
-                        </FieldHint>
-                    </div>
-                    <div>
-                        <button type="button" className="vora-btn-secondary" onClick={backfillSubtitles} disabled={subtitleBackfillQueued}>
-                            {subtitleBackfillQueued ? 'Backfill queued' : 'Extract subtitles for existing media'}
-                        </button>
-                        <FieldHint>Walks every video library and extracts any subtitle that isn't cached yet, without needing a rescan.</FieldHint>
-                    </div>
-                </div>
-            </SettingsCard>
             </>)}
 
             {subTab === 'general' && (<>

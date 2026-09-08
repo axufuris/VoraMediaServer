@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isAxiosError } from 'axios';
 import {
     subtitleSearchService,
     defaultSubtitleLanguage,
@@ -32,13 +33,19 @@ export default function FindSubtitlesPanel({ mediaItemId, serverId, onBack, onDo
     const [downloadingId, setDownloadingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
+    // The server explains itself in ProblemDetails.detail — a rejected API key
+    // reads very differently from a title with no subtitles, and showing one
+    // sentence for both is what made the last failure undiagnosable.
+    const describe = (e: unknown, fallback: string) =>
+        (isAxiosError(e) ? (e.response?.data as { detail?: string } | undefined)?.detail : null) || fallback;
+
     const search = async () => {
         setIsSearching(true);
         setError(null);
         try {
             setResults(await subtitleSearchService.search(mediaItemId, [language], serverId));
-        } catch {
-            setError('The subtitle search failed. Check the provider settings and try again.');
+        } catch (e) {
+            setError(describe(e, 'The subtitle search failed. Check the provider settings and try again.'));
             setResults(null);
         } finally {
             setIsSearching(false);
@@ -51,8 +58,8 @@ export default function FindSubtitlesPanel({ mediaItemId, serverId, onBack, onDo
         try {
             const track = await subtitleSearchService.download(mediaItemId, result.providerFileId, result.language, serverId);
             await onDownloaded(track.id);
-        } catch {
-            setError('That subtitle could not be downloaded. The provider may have hit its daily limit.');
+        } catch (e) {
+            setError(describe(e, 'That subtitle could not be downloaded. The provider may have hit its daily limit.'));
         } finally {
             setDownloadingId(null);
         }
