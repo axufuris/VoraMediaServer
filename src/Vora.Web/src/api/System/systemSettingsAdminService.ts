@@ -29,6 +29,7 @@ export interface ServerSettings {
     folderWatcherProviderId: string;
     folderWatcherPollingInterval: number;
     localMediaScannerProviderId: string;
+    subtitleSearchProviderId: string;
     enableTrashAutoPurge: boolean;
     missingMediaRetentionDays: number;
     resolveMovieTvdbIds: boolean;

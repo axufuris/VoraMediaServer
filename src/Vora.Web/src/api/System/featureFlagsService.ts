@@ -8,6 +8,9 @@ export interface FeatureFlagsVM {
     dvr: boolean;
     internetRadio: boolean;
     podcasts: boolean;
+    // Derived from the installed plugins rather than an admin toggle: true only
+    // when a subtitle-search provider is installed AND configured.
+    subtitleSearch: boolean;
 }
 
 export const DEFAULT_FEATURE_FLAGS: FeatureFlagsVM = {
@@ -17,7 +20,10 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlagsVM = {
     liveTv: true,
     dvr: true,
     internetRadio: true,
-    podcasts: true
+    podcasts: true,
+    // Off by default: the feature needs an API key, so assuming it works would
+    // show a Find Subtitles button that can only fail.
+    subtitleSearch: false
 };
 
 export type UpdateFeatureFlagsRequest = FeatureFlagsVM;

@@ -124,6 +124,7 @@ public static class WebApplicationExtensions
         app.MapSmartListEndpoints();
         app.MapSmartPlaylistEndpoints();
         app.MapStreamingEndpoints();
+        app.MapSubtitleSearchEndpoints();
         app.MapStreamingAdminEndpoints();
         app.MapSyncEndpoints();
         app.MapTaskEndpoints();
