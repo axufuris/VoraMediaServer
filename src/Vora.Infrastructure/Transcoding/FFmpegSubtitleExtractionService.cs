@@ -138,6 +138,38 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         }
     }
 
+    // Used when a subtitle arrives from somewhere other than the media file — a
+    // provider download — and has to land in the store already converted.
+    public async Task<bool> ConvertToWebVttAsync(string sourceFilePath, string destinationPath, CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(sourceFilePath)) return false;
+
+        var directory = Path.GetDirectoryName(destinationPath);
+        if (string.IsNullOrEmpty(directory)) return false;
+        Directory.CreateDirectory(directory);
+
+        var stagingPath = Path.Combine(directory, $"{Guid.NewGuid():N}.vtt.tmp");
+        var attempt = await ConvertExternalAsync(sourceFilePath, stagingPath, cancellationToken);
+
+        if (!attempt.Succeeded)
+        {
+            TryDelete(stagingPath);
+            return false;
+        }
+
+        try
+        {
+            File.Move(stagingPath, destinationPath, overwrite: true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not move the converted subtitle into {Destination}.", destinationPath);
+            TryDelete(stagingPath);
+            return false;
+        }
+    }
+
     public void PurgePart(string transcodeTempDirectory, Guid mediaPartId) =>
         DeleteMatching(transcodeTempDirectory, PartFilePattern(mediaPartId), keepFileName: null);
 

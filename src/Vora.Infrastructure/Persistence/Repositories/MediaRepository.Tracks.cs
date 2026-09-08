@@ -75,7 +75,7 @@ public partial class MediaRepository
     public async Task SyncExternalSubtitleTracksAsync(Guid mediaPartId, List<MediaSubtitleTrack> incomingExternal)
     {
         var existing = await _context.MediaSubtitleTracks
-            .Where(t => t.MediaPartId == mediaPartId && t.ExternalFilePath != null)
+            .Where(t => t.MediaPartId == mediaPartId && t.ExternalFilePath != null && !t.IsDownloaded)
             .ToListAsync();
 
         var incomingByPath = incomingExternal

@@ -118,6 +118,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.FolderWatcherProviderId = request.FolderWatcherProviderId;
         settings.FolderWatcherPollingInterval = request.FolderWatcherPollingInterval;
         settings.LocalMediaScannerProviderId = request.LocalMediaScannerProviderId;
+        settings.SubtitleSearchProviderId = request.SubtitleSearchProviderId ?? string.Empty;
         settings.EnableTrashAutoPurge = request.EnableTrashAutoPurge;
         settings.MissingMediaRetentionDays = Math.Clamp(request.MissingMediaRetentionDays, 1, 3650);
         settings.ResolveMovieTvdbIds = request.ResolveMovieTvdbIds;
@@ -194,8 +195,17 @@ public class SystemSettingsManager : ISystemSettingsManager
             LiveTv = settings.EnableLiveTv,
             Dvr = settings.EnableDvr,
             InternetRadio = settings.EnableInternetRadio,
-            Podcasts = settings.EnablePodcasts
+            Podcasts = settings.EnablePodcasts,
+            SubtitleSearch = await IsSubtitleSearchAvailableAsync()
         };
+    }
+
+    private async Task<bool> IsSubtitleSearchAvailableAsync()
+    {
+        var manager = _serviceProvider.GetService(typeof(Vora.Application.Subtitles.ISubtitleSearchManager))
+            as Vora.Application.Subtitles.ISubtitleSearchManager;
+
+        return manager != null && await manager.IsAvailableAsync();
     }
 
     public async Task UpdateFeatureFlagsAsync(UpdateFeatureFlagsRequest request)

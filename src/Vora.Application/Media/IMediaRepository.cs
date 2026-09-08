@@ -55,6 +55,9 @@ public interface IMediaRepository
     Task<List<Vora.Application.Subtitles.SubtitleExtractionTargetDto>> GetSubtitleExtractionTargetsForItemAsync(Guid mediaItemId);
     Task<List<Vora.Application.Subtitles.SubtitleExtractionTargetDto>> GetSubtitleExtractionTargetsForLibraryAsync(Guid libraryId);
     Task<HashSet<Guid>> GetAllMediaPartIdsAsync();
+    Task<Guid?> GetPrimaryMediaPartIdAsync(Guid mediaItemId);
+    Task<Vora.Application.Subtitles.ViewModels.SubtitleSearchFactsDto?> GetSubtitleSearchFactsAsync(Guid mediaItemId);
+    Task AddSubtitleTrackAsync(MediaSubtitleTrack track);
     Task<MediaItem?> GetItemWithPartsForThumbnailsAsync(Guid mediaItemId);
     Task<Guid?> GetThumbnailSourcePartIdAsync(Guid mediaItemId, Guid? partId);
     Task<bool> AreMarkersLockedAsync(Guid mediaItemId);

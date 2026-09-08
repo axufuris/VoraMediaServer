@@ -148,6 +148,27 @@ Throttling, because each extraction reads a whole container off the media disk:
 
 Only **text** codecs are extracted. Image subtitles (`hdmv_pgs_subtitle`, `pgssub`, `dvd_subtitle`, `vobsub`) are skipped — they burn into the video and have no sidecar. The classification is `BestPathDecisionManager.IsImageSubtitleCodec`, the same list the burn-in decision uses.
 
+### Find Subtitles (provider plugins)
+
+Online subtitle search is a **swappable provider plugin**, the same shape as metadata and ratings: `ISubtitleSearchProvider` in `Vora.Plugins.Interfaces`, registered in `PluginLoaderExtensions.PluginProviderInterfaces`, configured through the ordinary plugin-settings mechanism. `OpenSubtitlesSubtitleProvider` is the built-in implementation.
+
+`SubtitleSearchManager` picks the active one from `ServerSetting.SubtitleSearchProviderId`, **but only while that provider is actually configured** — otherwise it falls through to any installed provider that is. An admin who names a plugin and never enters its key would otherwise hide a second one that works.
+
+```
+GET  /api/media/{id}/subtitles/search?languages=en,es   → results
+POST /api/media/{id}/subtitles/download {providerFileId, language}
+```
+
+Both are authenticated and both **404 when no provider is configured**. An empty list would read as "this title has no subtitles"; a 404 says the feature is not on.
+
+Availability is exposed as `FeatureFlagsVM.SubtitleSearch` so the clients hide the UI. It is **read-only and derived** — it is absent from `UpdateFeatureFlagsRequest`, because it follows the plugin: an admin turns it on by entering an API key, not by flipping a switch.
+
+**A query is built from the item, not the row.** An episode searches on its *series* title plus season and episode numbers — a provider matching on an episode's own title finds nothing — and an external id is preferred over a title, because a fuzzy title match is where wrong-film subtitles come from.
+
+**Downloads land in the server's store, never beside the media**, at `{StoragePaths:Subtitles}/{shard}/{mediaItemId}/{trackId}.vtt`. The library is read-only. The bytes are converted to WebVTT once, on the way in, so the delivery endpoint later serves them as a straight copy.
+
+The result is an external `MediaSubtitleTrack` with `IsDownloaded = true`, which makes it selectable through the machinery already described — and that flag matters: sidecar reconciliation matches by path against what is on disk next to the video, so a downloaded track must be **excluded from `SyncExternalSubtitleTracksAsync`** or every scan would delete it.
+
 ### Retention and invalidation
 
 **Nothing is evicted by age or size.** Once extracted, a VTT is kept indefinitely — the point of pre-extraction is that unchanged media is never read twice. Invalidation is driven entirely by the content changing, in two layers:

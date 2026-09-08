@@ -5,6 +5,7 @@ using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Media;
 using Vora.Application.Media.ViewModels;
 using Vora.Application.Subtitles;
+using Vora.Application.Subtitles.ViewModels;
 using Vora.Domain.Entities.Actors;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Users;
@@ -331,6 +332,40 @@ public partial class MediaRepository : IMediaRepository
             ((p.MediaItem is Movie && p.MediaItem.LibraryId == libraryId) ||
              (p.MediaItem is Episode && ((Episode)p.MediaItem).Season.TvShow.LibraryId == libraryId))))
             .ToListAsync();
+
+    public Task<Guid?> GetPrimaryMediaPartIdAsync(Guid mediaItemId) =>
+        _context.MediaParts
+            .AsNoTracking()
+            .Where(p => p.MediaItemId == mediaItemId)
+            .OrderBy(p => p.PartNumber)
+            .Select(p => (Guid?)p.Id)
+            .FirstOrDefaultAsync();
+
+    // A subtitle provider matches on the SERIES for an episode, plus the season
+    // and episode numbers — searching an episode's own title finds nothing.
+    public Task<SubtitleSearchFactsDto?> GetSubtitleSearchFactsAsync(Guid mediaItemId) =>
+        _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == mediaItemId)
+            .Select(m => new SubtitleSearchFactsDto
+            {
+                Title = m.Title,
+                SeriesTitle = m is Episode ? ((Episode)m).Season.TvShow.Title : null,
+                Year = m is Episode
+                    ? (((Episode)m).Season.TvShow.ReleaseDate != null ? ((Episode)m).Season.TvShow.ReleaseDate!.Value.Year : (int?)null)
+                    : (m.ReleaseDate != null ? m.ReleaseDate.Value.Year : (int?)null),
+                ImdbId = m is Episode ? ((Episode)m).Season.TvShow.ImdbId : m.ImdbId,
+                TmdbId = m is Episode ? ((Episode)m).Season.TvShow.TmdbId : m.TmdbId,
+                SeasonNumber = m is Episode ? ((Episode)m).Season.SeasonNumber : (int?)null,
+                EpisodeNumber = m is Episode ? ((Episode)m).EpisodeNumber : (int?)null,
+            })
+            .FirstOrDefaultAsync();
+
+    public async Task AddSubtitleTrackAsync(MediaSubtitleTrack track)
+    {
+        await _context.MediaSubtitleTracks.AddAsync(track);
+        await _context.SaveChangesAsync();
+    }
 
     public async Task<HashSet<Guid>> GetAllMediaPartIdsAsync() =>
         (await _context.MediaParts.AsNoTracking().Select(p => p.Id).ToListAsync()).ToHashSet();

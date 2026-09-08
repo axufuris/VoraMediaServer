@@ -461,6 +461,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IRequestNotificationService, RequestNotificationService>();
         services.AddScoped<IUserProfileImageService, UserProfileImageService>();
         services.AddScoped<Vora.Application.Subtitles.ISubtitlePreExtractionManager, Vora.Application.Subtitles.SubtitlePreExtractionManager>();
+        services.AddScoped<Vora.Application.Subtitles.ISubtitleSearchManager, Vora.Application.Subtitles.SubtitleSearchManager>();
         services.AddSingleton<Vora.Application.Subtitles.IExternalSubtitleScanner, Vora.Application.Subtitles.ExternalSubtitleScanner>();
         services.AddScoped<CollectionOrderingService>();
         services.AddScoped<CollectionSyncService>();
@@ -552,6 +553,12 @@ public static class ServiceRegistrationExtensions
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Podcast Discovery)");
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        }).AddVoraResilience(totalTimeoutSeconds: 30);
+        services.AddHttpClient(Vora.Plugins.Providers.OpenSubtitles.OpenSubtitlesSubtitleProvider.HttpClientName, client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+            client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0");
             client.DefaultRequestHeaders.Add("Accept", "application/json");
         }).AddVoraResilience(totalTimeoutSeconds: 30);
         services.AddHttpClient(LrcLibLyricsProvider.HttpClientName, client =>

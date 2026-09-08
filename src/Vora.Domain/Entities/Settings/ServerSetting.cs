@@ -69,6 +69,11 @@ public class ServerSetting
     public int FolderWatcherPollingInterval { get; set; } = 30;
     public string LocalMediaScannerProviderId { get; set; } = "Vora_scanner";
 
+    // Which ISubtitleSearchProvider serves Find Subtitles. Empty means "whichever
+    // installed provider is configured", so a fresh server works as soon as an
+    // admin fills in a key, without also having to pick the plugin.
+    public string SubtitleSearchProviderId { get; set; } = string.Empty;
+
     public bool EnableTrashAutoPurge { get; set; } = true;
     public int MissingMediaRetentionDays { get; set; } = 30;
 
