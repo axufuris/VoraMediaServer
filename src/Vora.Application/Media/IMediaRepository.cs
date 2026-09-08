@@ -51,6 +51,9 @@ public interface IMediaRepository
     Task<MarkerCoverageVM> GetMarkerCoverageAsync(Guid libraryId);
     Task<(int Total, int WithThumbnails)> GetVideoThumbnailCoverageAsync(Guid libraryId);
     Task<List<Guid>> GetVideoThumbnailTargetIdsAsync(Guid libraryId, string currentSpriteVersion, bool includeCompleted);
+    Task<List<Vora.Application.Subtitles.SubtitleExtractionTargetDto>> GetSubtitleExtractionTargetsForItemAsync(Guid mediaItemId);
+    Task<List<Vora.Application.Subtitles.SubtitleExtractionTargetDto>> GetSubtitleExtractionTargetsForLibraryAsync(Guid libraryId);
+    Task<HashSet<Guid>> GetAllMediaPartIdsAsync();
     Task<MediaItem?> GetItemWithPartsForThumbnailsAsync(Guid mediaItemId);
     Task<Guid?> GetThumbnailSourcePartIdAsync(Guid mediaItemId, Guid? partId);
     Task<bool> AreMarkersLockedAsync(Guid mediaItemId);

@@ -63,6 +63,9 @@ public interface ITaskQueueManager
     void QueueIptvHealthCheck(Guid playlistId, string? playlistName = null);
     void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false);
     void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
+    void QueuePreExtractMediaItemSubtitles(Guid mediaItemId, string? mediaItemName = null);
+    void QueuePreExtractLibrarySubtitles(Guid libraryId, string? libraryName = null);
+    void QueueSubtitleBackfill();
 }
 
 public class TaskQueueManager : ITaskQueueManager
@@ -193,6 +196,11 @@ public class TaskQueueManager : ITaskQueueManager
             ct.ThrowIfCancellationRequested();
             await analyzerManager.TriggerMediaItemFileAnalysisAsync(itemId, null, ct);
 
+            // Analysis has just written this item's subtitle tracks, so the
+            // pre-extraction target is known. Queued rather than awaited: it
+            // runs on its own throttled key and must not hold up the ingest.
+            sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractMediaItemSubtitles(itemId);
+
             await metadataManager.TriggerMediaItemMetadataRefreshAsync(itemId, false, ct);
             await metadataManager.TriggerMediaItemArtworkRefreshAsync(itemId, false, ct);
             await metadataManager.TriggerMediaItemRatingsRefreshAsync(itemId, false, ct);
@@ -254,6 +262,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, cancellationToken: ct);
+            sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractMediaItemSubtitles(mediaItemId, mediaItemName);
         }, mediaItemName == null ? MediaLabel(mediaItemId, "Analyze Media Item: {0}") : null);
     }
 
@@ -654,6 +663,39 @@ public class TaskQueueManager : ITaskQueueManager
         });
     }
 
+    // Every subtitle job shares one resource key, so the whole feature runs at
+    // concurrency 1 no matter how many items or libraries are queued. Each
+    // extraction reads a whole container off the media disk; two at once would
+    // fight each other and playback.
+    private const string SubtitleExtractionKey = "subtitle-pre-extract";
+
+    public void QueuePreExtractMediaItemSubtitles(Guid mediaItemId, string? mediaItemName = null)
+    {
+        EnqueueTask($"Pre-extract Subtitles: {ResolveDisplayName(mediaItemId, mediaItemName)}", async (ct, sp) =>
+        {
+            var manager = sp.GetRequiredService<Vora.Application.Subtitles.ISubtitlePreExtractionManager>();
+            await manager.PreExtractForItemAsync(mediaItemId, ct);
+        }, resourceKey: SubtitleExtractionKey, dedupeKey: $"pre-extract-subs:item:{mediaItemId}");
+    }
+
+    public void QueuePreExtractLibrarySubtitles(Guid libraryId, string? libraryName = null)
+    {
+        EnqueueTask($"Pre-extract Subtitles: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
+        {
+            var manager = sp.GetRequiredService<Vora.Application.Subtitles.ISubtitlePreExtractionManager>();
+            await manager.PreExtractForLibraryAsync(libraryId, ct);
+        }, resourceKey: SubtitleExtractionKey, dedupeKey: $"pre-extract-subs:library:{libraryId}");
+    }
+
+    public void QueueSubtitleBackfill()
+    {
+        EnqueueTask("Pre-extract Subtitles: whole library backfill", async (ct, sp) =>
+        {
+            var manager = sp.GetRequiredService<Vora.Application.Subtitles.ISubtitlePreExtractionManager>();
+            await manager.BackfillAsync(ct);
+        }, resourceKey: SubtitleExtractionKey, dedupeKey: "pre-extract-subs:backfill");
+    }
+
     private static async Task RunFullLibraryWorkflowAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, CancellationToken ct = default)
     {
         var metadataManager = sp.GetRequiredService<IMetadataManager>();
@@ -830,6 +872,15 @@ public class TaskQueueManager : ITaskQueueManager
         // rescan only fills new/stale items and still honours the trigger, so a
         // rescan can't kick off a whole-library re-encode.
         await RunStepAsync("Generating video thumbnails…", () => thumbnailManager.TriggerLibraryThumbnailGenerationAsync(libraryId, forceOverride: false, isAdditionTrigger: true, cancellationToken: ct));
+
+        // Subtitle pre-extraction has its own switch and its own job — it is not
+        // chained to the thumbnail step above, so either can be off with the
+        // other on. Queued rather than run inline: the pass parks while anything
+        // is transcoding, which must not hold a scan open.
+        if ((await sp.GetRequiredService<Vora.Application.Settings.ISystemSettingsRepository>().GetSettingsAsync()).PreExtractSubtitlesOnScan)
+        {
+            sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractLibrarySubtitles(libraryId, libraryName);
+        }
 
         workflowStopwatch.Stop();
         logger?.LogInformation("Full library workflow for {LibraryId} completed in {Wall:n1}s.", libraryId, workflowStopwatch.Elapsed.TotalSeconds);

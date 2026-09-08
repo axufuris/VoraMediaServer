@@ -53,12 +53,15 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     private readonly IOptions<StoragePathsOptions> _storagePaths;
     private readonly ILogger<MediaAnalyzerManager> _logger;
 
+    private readonly Vora.Application.Streaming.ISubtitleExtractionService _subtitleExtractor;
+
     public MediaAnalyzerManager(
         IMediaRepository mediaRepository,
         IMediaAnalyzerService analyzerService,
         IMarkerAssembler markerAssembler,
         IAudioIntroDetector audioIntroDetector,
         ISystemSettingsRepository settingsRepo,
+        Vora.Application.Streaming.ISubtitleExtractionService subtitleExtractor,
         ITaskQueueManager taskQueueManager,
         IClientNotifier notifier,
         Vora.Plugins.Interfaces.ITaskProgressReporter progress,
@@ -71,6 +74,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         _markerAssembler = markerAssembler;
         _audioIntroDetector = audioIntroDetector;
         _settingsRepo = settingsRepo;
+        _subtitleExtractor = subtitleExtractor;
         _taskQueueManager = taskQueueManager;
         _notifier = notifier;
         _progress = progress;
@@ -262,6 +266,10 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
                 item.Analysis ??= new MediaItemAnalysis { MediaItemId = item.Id };
                 item.Analysis.Duration = analysis.Duration;
             }
+
+            _subtitleExtractor.PurgePart(
+                Vora.Application.Streaming.StreamManager.ResolveTempDirectory(await _settingsRepo.GetSettingsAsync()),
+                part.Id);
 
             part.FileSizeBytes = analysis.FileSizeBytes;
             part.OverallBitrate = analysis.OverallBitrate;

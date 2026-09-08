@@ -30,6 +30,7 @@ public class ServerSettingsVM
     public int VideoThumbnailSpriteColumns { get; set; } = 10;
     public int VideoThumbnailConcurrency { get; set; } = 2;
     public bool VideoThumbnailUseHardwareDecode { get; set; } = true;
+    public bool PreExtractSubtitlesOnScan { get; set; } = true;
     public string FolderWatcherProviderId { get; set; } = "polling_watcher";
     public int FolderWatcherPollingInterval { get; set; } = 30;
     public string LocalMediaScannerProviderId { get; set; } = "Vora_scanner";
@@ -106,6 +107,7 @@ public class ServerSettingsVM
             VideoThumbnailSpriteColumns = s.VideoThumbnailSpriteColumns,
             VideoThumbnailConcurrency = s.VideoThumbnailConcurrency,
             VideoThumbnailUseHardwareDecode = s.VideoThumbnailUseHardwareDecode,
+            PreExtractSubtitlesOnScan = s.PreExtractSubtitlesOnScan,
             FolderWatcherProviderId = s.FolderWatcherProviderId,
             FolderWatcherPollingInterval = s.FolderWatcherPollingInterval,
             LocalMediaScannerProviderId = s.LocalMediaScannerProviderId,

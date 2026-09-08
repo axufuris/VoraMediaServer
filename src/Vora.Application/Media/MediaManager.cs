@@ -50,6 +50,8 @@ public class MediaManager : IMediaManager
     private readonly Vora.Application.Artwork.IArtworkThumbnailService _artworkThumbnails;
     private readonly ILogger<MediaManager> _logger;
 
+    private readonly Vora.Application.Subtitles.ISubtitlePreExtractionManager _subtitlePreExtraction;
+
     public MediaManager(
         IMediaRepository repository,
         IUserMediaStateRepository stateRepository,
@@ -60,6 +62,7 @@ public class MediaManager : IMediaManager
         IOptions<StoragePathsOptions> storagePaths,
         Vora.Application.Thumbnails.IVideoThumbnailStorageService thumbnailStorage,
         Vora.Application.Artwork.IArtworkThumbnailService artworkThumbnails,
+        Vora.Application.Subtitles.ISubtitlePreExtractionManager subtitlePreExtraction,
         ILogger<MediaManager> logger)
     {
         _repository = repository;
@@ -71,6 +74,7 @@ public class MediaManager : IMediaManager
         _storagePaths = storagePaths.Value;
         _thumbnailStorage = thumbnailStorage;
         _artworkThumbnails = artworkThumbnails;
+        _subtitlePreExtraction = subtitlePreExtraction;
         _logger = logger;
     }
 
@@ -206,6 +210,7 @@ public class MediaManager : IMediaManager
         _artworkThumbnails.RemoveThumbnailsForSource(item.PosterUrl);
         _artworkThumbnails.RemoveThumbnailsForSource(item.BackgroundUrl);
         _thumbnailStorage.DeleteItemDirectory(id);
+        await _subtitlePreExtraction.PurgeItemAsync(id);
 
         await _repository.DeleteMediaItemAsync(id);
         await _notifier.NotifyLibraryUpdatedAsync(libraryId);

@@ -109,6 +109,10 @@ public static class MediaEndpoints
 
         group.MapPost("/resolve-tvdb-ids", QueueResolveTvdbIdsAsync)
             .Produces(StatusCodes.Status202Accepted);
+
+        group.MapPost("/subtitles/backfill", QueueSubtitleBackfillAsync)
+            .WithName("QueueSubtitleBackfill")
+            .Produces(StatusCodes.Status202Accepted);
     }
 
     private static async Task<IResult> GetMarkersAsync(Guid id, IMediaManager manager)
@@ -288,6 +292,12 @@ public static class MediaEndpoints
     private static IResult QueueRefreshAllActorsAsync(ITaskQueueManager taskQueue)
     {
         taskQueue.QueueRefreshAllActorMetadata();
+        return Results.Accepted();
+    }
+
+    private static IResult QueueSubtitleBackfillAsync(ITaskQueueManager taskQueue)
+    {
+        taskQueue.QueueSubtitleBackfill();
         return Results.Accepted();
     }
 

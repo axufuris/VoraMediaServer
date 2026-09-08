@@ -113,6 +113,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.VideoThumbnailSpriteColumns = Math.Clamp(request.VideoThumbnailSpriteColumns, 1, 20);
         settings.VideoThumbnailConcurrency = Math.Clamp(request.VideoThumbnailConcurrency, 1, 16);
         settings.VideoThumbnailUseHardwareDecode = request.VideoThumbnailUseHardwareDecode;
+        settings.PreExtractSubtitlesOnScan = request.PreExtractSubtitlesOnScan;
 
         settings.FolderWatcherProviderId = request.FolderWatcherProviderId;
         settings.FolderWatcherPollingInterval = request.FolderWatcherPollingInterval;

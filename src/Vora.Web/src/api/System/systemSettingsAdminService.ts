@@ -25,6 +25,7 @@ export interface ServerSettings {
     videoThumbnailSpriteColumns: number;
     videoThumbnailConcurrency: number;
     videoThumbnailUseHardwareDecode: boolean;
+    preExtractSubtitlesOnScan: boolean;
     folderWatcherProviderId: string;
     folderWatcherPollingInterval: number;
     localMediaScannerProviderId: string;
@@ -96,6 +97,9 @@ export const systemSettingsAdminService = {
     },
     updateServerSettings: async (settings: ServerSettings, serverId?: string): Promise<void> => {
         await apiClient.put('/settings/server', settings, { serverId });
+    },
+    queueSubtitleBackfill: async (serverId?: string): Promise<void> => {
+        await apiClient.post('/metadata/subtitles/backfill', {}, { serverId });
     },
     getPluginSettings: async (pluginId: string, serverId?: string): Promise<PluginSettingField[]> => {
         const response = await apiClient.get<PluginSettingField[]>(`/settings/plugins/${pluginId}`, { serverId });
