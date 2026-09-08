@@ -24,6 +24,11 @@ export interface PlayableMedia {
     videoTrackId?: string;
     audioTrackId?: string;
     subtitleTrackId?: string | null;
+    // A text subtitle the viewer picked before playback started. It is NOT sent
+    // to /streaming/start — the server would have nothing to do with it and a
+    // cold extraction would delay the play request — so the player sideloads it
+    // once the video has metadata.
+    textSubtitleTrackId?: string | null;
     strategy?: string;
     videoStrategy?: string;
     audioStrategy?: string;

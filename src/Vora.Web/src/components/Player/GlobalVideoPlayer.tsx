@@ -1,5 +1,5 @@
 import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { mediaService, type MediaItem, type MediaPart, type UpNextItemVM, type UpNextResultVM, type MediaMarker } from '../../api/Media/mediaService';
 import { profileService, type PlaybackPreferencesVM } from '../../api/Users/profileService';
@@ -17,6 +17,7 @@ import PlayerSettingsPanel from './Panels/PlayerSettingsPanel';
 import PlayerInfoPanel from './Panels/PlayerInfoPanel';
 import UpNextOverlay from './Panels/UpNextOverlay';
 import { useVideoThumbnails } from '../../hooks/useVideoThumbnails';
+import { isImageSubtitleCodec, isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
 import { ScrubThumbnail } from './VideoScrubThumbnails';
 
 type VideoTrackType = NonNullable<MediaPart['videoTracks']>[number];
@@ -88,6 +89,72 @@ export default function GlobalVideoPlayer() {
     const [selVideo, setSelVideo] = useState('');
     const [selAudio, setSelAudio] = useState('');
     const [selSub, setSelSub] = useState('');
+
+    // The text subtitle currently sideloaded onto the <video>, and the single
+    // <track> element carrying it. Exactly one is ever attached: switching
+    // subtitles replaces it rather than stacking a second cue source.
+    const [textSubtitleId, setTextSubtitleId] = useState<string | null>(null);
+    const [isLoadingSubtitle, setIsLoadingSubtitle] = useState(false);
+    const sideloadedTrackRef = useRef<HTMLTrackElement | null>(null);
+    // What the viewer wants showing, kept across the stream restarts that a
+    // video/audio change causes: the sidecar URL is per session, so the track
+    // has to be re-attached against the new one.
+    const desiredTextSubRef = useRef<string | null>(null);
+
+    const detachSideloadedTrack = useCallback(() => {
+        const track = sideloadedTrackRef.current;
+        sideloadedTrackRef.current = null;
+        if (!track) return;
+        if (track.track) track.track.mode = 'disabled';
+        track.remove();
+    }, []);
+
+    const sideloadSubtitle = useCallback(async (subtitleTrackId: string | null) => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        detachSideloadedTrack();
+
+        if (!subtitleTrackId || isNoSubtitle(subtitleTrackId) || !sessionId) {
+            setTextSubtitleId(null);
+            return;
+        }
+
+        setIsLoadingSubtitle(true);
+        try {
+            const objectUrl = await streamingService.fetchSubtitleVtt(sessionId, subtitleTrackId, serverId);
+            // The media may have changed while the VTT was in flight.
+            if (!objectUrl || videoRef.current !== video || desiredTextSubRef.current !== subtitleTrackId) {
+                if (!objectUrl) setTextSubtitleId(null);
+                return;
+            }
+
+            const track = document.createElement('track');
+            track.kind = 'subtitles';
+            track.label = 'Subtitles';
+            track.default = true;
+            track.src = objectUrl;
+            video.appendChild(track);
+            sideloadedTrackRef.current = track;
+
+            // The browser parks a freshly attached track at 'disabled' until the
+            // cue file loads, so the mode is set again on load rather than only
+            // here — setting it once can be silently undone.
+            track.addEventListener('load', () => { track.track.mode = 'showing'; }, { once: true });
+            if (track.track) track.track.mode = 'showing';
+
+            // A media element reset (a source swap inside the same session)
+            // parks every text track at 'disabled' again, which would drop the
+            // subtitle with nothing on screen to explain it.
+            video.addEventListener('loadedmetadata', () => {
+                if (sideloadedTrackRef.current === track) track.track.mode = 'showing';
+            });
+
+            setTextSubtitleId(subtitleTrackId);
+        } finally {
+            setIsLoadingSubtitle(false);
+        }
+    }, [sessionId, serverId, videoRef, detachSideloadedTrack]);
 
     const caps = useMemo(() => {
         const profileToken = localStorage.getItem(StorageKeys.profileToken);
@@ -251,7 +318,9 @@ export default function GlobalVideoPlayer() {
             window.setTimeout(() => {
                 setSelVideo(currentMedia.videoTrackId || '');
                 setSelAudio(currentMedia.audioTrackId || '');
-                setSelSub(currentMedia.subtitleTrackId || 'none');
+                const committedText = currentMedia.textSubtitleTrackId ?? null;
+                desiredTextSubRef.current = committedText;
+                setSelSub(committedText || currentMedia.subtitleTrackId || NoSubtitle);
                 setIsEnding(false);
             }, 0);
 
@@ -316,6 +385,24 @@ export default function GlobalVideoPlayer() {
             video.load();
         };
     }, [currentMedia?.streamUrl, currentMedia?.container, currentMedia?.strategy, videoRef]);
+
+    useEffect(() => {
+        if (!sessionId) return;
+        const desired = desiredTextSubRef.current;
+        if (!desired) return;
+
+        void sideloadSubtitle(desired);
+    }, [sessionId, sideloadSubtitle]);
+
+    // The blob URLs belong to the session that produced them; a session that has
+    // gone away can never be asked for them again.
+    useEffect(() => {
+        if (!sessionId) return;
+        return () => {
+            detachSideloadedTrack();
+            streamingService.releaseSubtitleUrls(sessionId);
+        };
+    }, [sessionId, detachSideloadedTrack]);
 
     useEffect(() => {
         if (!currentMedia || isMinimized || duration === 0) return;
@@ -425,7 +512,28 @@ export default function GlobalVideoPlayer() {
 
     const handleApplyStreams = async () => {
         setShowSettings(false);
-        await changeStreams(selVideo, selAudio, selSub);
+
+        const chosenTrack = mediaDetails?.mediaParts
+            ?.flatMap((p: MediaPart) => p.subtitleTracks ?? [])
+            .find((st: SubtitleTrackType) => st.id === selSub);
+        const wantsBurnIn = !!chosenTrack && isImageSubtitleCodec(chosenTrack.codec);
+        const streamChanged = selVideo !== currentMedia.videoTrackId || selAudio !== currentMedia.audioTrackId;
+        const hasBurnedInSub = currentMedia.subtitleStrategy === 'BurnIn';
+
+        desiredTextSubRef.current = wantsBurnIn || isNoSubtitle(selSub) ? null : selSub;
+
+        // Only a video/audio change, or adding or dropping a burned-in subtitle,
+        // needs a new stream — the server has to re-encode for those. A text
+        // subtitle is cues the client draws, so switching one (or turning
+        // subtitles off) leaves the stream alone and the video never reloads.
+        if (streamChanged || wantsBurnIn || hasBurnedInSub) {
+            detachSideloadedTrack();
+            setTextSubtitleId(null);
+            await changeStreams(selVideo, selAudio, wantsBurnIn ? selSub : NoSubtitle);
+            return;
+        }
+
+        await sideloadSubtitle(desiredTextSubRef.current);
     };
 
     const progressPercent = duration > 0 && isFinite(duration) ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
@@ -436,7 +544,8 @@ export default function GlobalVideoPlayer() {
 
     const activeVideoTrack = activeStreamPart?.videoTracks?.find((vt: VideoTrackType) => vt.id === currentMedia.videoTrackId);
     const activeAudioTrack = activeStreamPart?.audioTracks?.find((at: AudioTrackType) => at.id === currentMedia.audioTrackId);
-    const activeSubtitleTrack = activeStreamPart?.subtitleTracks?.find((st: SubtitleTrackType) => st.id === currentMedia.subtitleTrackId);
+    const effectiveSubtitleId = textSubtitleId ?? currentMedia.subtitleTrackId;
+    const activeSubtitleTrack = activeStreamPart?.subtitleTracks?.find((st: SubtitleTrackType) => st.id === effectiveSubtitleId);
 
     // When a transcode is in play, the player gets WHAT THE SERVER
     // DELIVERS, not the source. The badge has to reflect the output —
@@ -638,7 +747,12 @@ export default function GlobalVideoPlayer() {
                                 {displayVideoCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{displayVideoCodec}{currentMedia.videoStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}
                                 {displayAudioCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{displayAudioCodec}{currentMedia.audioStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}
                                 {displayAudioChannels !== undefined && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={chipStyle}>{displayAudioChannels}ch</span>}
-                                {currentMedia.subtitleTrackId && currentMedia.subtitleTrackId !== 'none' && activeSubtitleTrack && (
+                                {isLoadingSubtitle && (
+                                    <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>
+                                        Loading subtitles…
+                                    </span>
+                                )}
+                                {!isLoadingSubtitle && !isNoSubtitle(effectiveSubtitleId) && activeSubtitleTrack && (
                                     <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>
                                         SUB: {activeSubtitleTrack.language?.slice(0, 3) || 'UNK'} {currentMedia.subtitleStrategy === 'BurnIn' ? '(Burn-in)' : `(${activeSubtitleTrack.codec})`}
                                     </span>

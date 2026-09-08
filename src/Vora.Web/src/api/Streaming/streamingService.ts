@@ -20,6 +20,14 @@ export interface StartSessionResponse {
     outputHdrType?: string | null;
 }
 
+// Object URLs for sidecar WebVTT, keyed by session + track. The endpoint needs
+// the bearer header, so the VTT has to be fetched as a blob and handed to the
+// <track> as an object URL — pointing <track src> at the endpoint would load
+// without the header and 401.
+const subtitleObjectUrls = new Map<string, string>();
+
+const subtitleCacheKey = (sessionId: string, subtitleTrackId: string) => `${sessionId}|${subtitleTrackId}`;
+
 export const streamingService = {
     startSession: async (mediaId: string, deviceId: string, startPosition: number = 0, videoTrackId?: string, audioTrackId?: string, subtitleTrackId?: string, serverId?: string, mediaPartId?: string) => {
         const capabilities = await scanDeviceCapabilities();
@@ -60,5 +68,35 @@ export const streamingService = {
     },
     stopSession: async (sessionId: string, serverId?: string) => {
         await apiClient.delete(`/streaming/sessions/${sessionId}`, { serverId });
+    },
+    // Returns an object URL for the track's WebVTT, or null when the server has
+    // nothing to give (404: not a text subtitle, or extraction failed). The URL
+    // is cached per session + track so re-selecting is instant; call
+    // releaseSubtitleUrls when the session ends.
+    fetchSubtitleVtt: async (sessionId: string, subtitleTrackId: string, serverId?: string): Promise<string | null> => {
+        const key = subtitleCacheKey(sessionId, subtitleTrackId);
+        const cached = subtitleObjectUrls.get(key);
+        if (cached) return cached;
+
+        try {
+            const response = await apiClient.get<Blob>(
+                `/streaming/sessions/${sessionId}/subtitle/${subtitleTrackId}.vtt`,
+                { serverId, responseType: 'blob' },
+            );
+
+            const objectUrl = URL.createObjectURL(response.data);
+            subtitleObjectUrls.set(key, objectUrl);
+            return objectUrl;
+        } catch {
+            return null;
+        }
+    },
+    releaseSubtitleUrls: (sessionId: string) => {
+        const prefix = `${sessionId}|`;
+        for (const [key, url] of subtitleObjectUrls) {
+            if (!key.startsWith(prefix)) continue;
+            URL.revokeObjectURL(url);
+            subtitleObjectUrls.delete(key);
+        }
     }
 };
