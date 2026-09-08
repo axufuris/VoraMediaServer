@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Media;
 using Vora.Application.Media.ViewModels;
+using Vora.Application.Subtitles;
 using Vora.Domain.Entities.Actors;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Users;
@@ -319,6 +320,35 @@ public partial class MediaRepository : IMediaRepository
 
         return await query.Select(m => m.Id).ToListAsync();
     }
+
+    public Task<List<SubtitleExtractionTargetDto>> GetSubtitleExtractionTargetsForItemAsync(Guid mediaItemId) =>
+        SubtitleTargetQuery(_context.MediaParts.Where(p => p.MediaItemId == mediaItemId)).ToListAsync();
+
+    public Task<List<SubtitleExtractionTargetDto>> GetSubtitleExtractionTargetsForLibraryAsync(Guid libraryId) =>
+        SubtitleTargetQuery(_context.MediaParts.Where(p =>
+            p.MediaItem != null &&
+            p.MediaItem.MissingSince == null &&
+            ((p.MediaItem is Movie && p.MediaItem.LibraryId == libraryId) ||
+             (p.MediaItem is Episode && ((Episode)p.MediaItem).Season.TvShow.LibraryId == libraryId))))
+            .ToListAsync();
+
+    public async Task<HashSet<Guid>> GetAllMediaPartIdsAsync() =>
+        (await _context.MediaParts.AsNoTracking().Select(p => p.Id).ToListAsync()).ToHashSet();
+
+    private static IQueryable<SubtitleExtractionTargetDto> SubtitleTargetQuery(IQueryable<MediaPart> parts) =>
+        parts
+            .AsNoTracking()
+            .Where(p => p.MediaItemId != null && p.SubtitleTracks.Any())
+            .Select(p => new SubtitleExtractionTargetDto
+            {
+                MediaItemId = p.MediaItemId!.Value,
+                MediaPartId = p.Id,
+                FilePath = p.FilePath,
+                Tracks = p.SubtitleTracks
+                    .OrderBy(t => t.StreamIndex)
+                    .Select(t => new SubtitleTrackTargetDto { Id = t.Id, StreamIndex = t.StreamIndex, Codec = t.Codec })
+                    .ToList()
+            });
 
     public Task<MediaItem?> GetItemWithPartsForThumbnailsAsync(Guid mediaItemId) =>
         _context.MediaItems

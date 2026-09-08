@@ -22,10 +22,40 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
     public static string CacheDirectory(string transcodeTempDirectory) =>
         Path.Combine(transcodeTempDirectory, CacheDirectoryName);
 
-    public static string WebVttFileName(Guid mediaPartId, Guid subtitleTrackId) => $"{mediaPartId}_{subtitleTrackId}.vtt";
+    public static string WebVttFileName(Guid mediaPartId, Guid subtitleTrackId, string fingerprint) =>
+        $"{mediaPartId}_{subtitleTrackId}_{fingerprint}.vtt";
 
-    public static string CachePath(string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId) =>
-        Path.Combine(CacheDirectory(transcodeTempDirectory), WebVttFileName(mediaPartId, subtitleTrackId));
+    public static string TrackFilePattern(Guid mediaPartId, Guid subtitleTrackId) => $"{mediaPartId}_{subtitleTrackId}_*.vtt";
+
+    public static string PartFilePattern(Guid mediaPartId) => $"{mediaPartId}_*.vtt";
+
+    public static string CachePath(string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, string fingerprint) =>
+        Path.Combine(CacheDirectory(transcodeTempDirectory), WebVttFileName(mediaPartId, subtitleTrackId, fingerprint));
+
+    // Binds a cached VTT to the bytes it was made from. A source whose size or
+    // mtime moved, or a track that landed on a different stream index after a
+    // re-probe, produces a different name — so a stale entry is a cache miss by
+    // construction rather than something a check has to remember to catch.
+    public static string ComputeFingerprint(long sizeBytes, DateTime lastWriteUtc, int subtitleStreamIndex)
+    {
+        var seed = $"{sizeBytes}|{lastWriteUtc.Ticks}|{subtitleStreamIndex}";
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(seed));
+        return Convert.ToHexString(hash, 0, 8).ToLowerInvariant();
+    }
+
+    public static string? FingerprintForSource(string sourceFilePath, int subtitleStreamIndex)
+    {
+        try
+        {
+            var info = new FileInfo(sourceFilePath);
+            if (!info.Exists) return null;
+            return ComputeFingerprint(info.Length, info.LastWriteTimeUtc, subtitleStreamIndex);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
 
     public static string AbsoluteMap(int subtitleStreamIndex) => $"0:{subtitleStreamIndex}";
 
@@ -54,12 +84,23 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         }
     }
 
+    public bool HasValidCachedWebVtt(string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, string sourceFilePath, int subtitleStreamIndex)
+    {
+        if (string.IsNullOrWhiteSpace(transcodeTempDirectory)) return false;
+
+        var fingerprint = FingerprintForSource(sourceFilePath, subtitleStreamIndex);
+        return fingerprint != null && IsUsable(CachePath(transcodeTempDirectory, mediaPartId, subtitleTrackId, fingerprint));
+    }
+
     public async Task<string?> GetOrExtractWebVttAsync(string sourceFilePath, int subtitleStreamIndex, int subtitleOrdinal, string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(sourceFilePath) || !File.Exists(sourceFilePath)) return null;
         if (string.IsNullOrWhiteSpace(transcodeTempDirectory)) return null;
 
-        var cachePath = CachePath(transcodeTempDirectory, mediaPartId, subtitleTrackId);
+        var fingerprint = FingerprintForSource(sourceFilePath, subtitleStreamIndex);
+        if (fingerprint == null) return null;
+
+        var cachePath = CachePath(transcodeTempDirectory, mediaPartId, subtitleTrackId, fingerprint);
         if (IsUsable(cachePath)) return cachePath;
 
         var gate = _perKeyLocks.GetOrAdd(cachePath, _ => new SemaphoreSlim(1, 1));
@@ -68,11 +109,64 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         {
             if (IsUsable(cachePath)) return cachePath;
 
-            return await ExtractWebVttAsync(sourceFilePath, subtitleStreamIndex, subtitleOrdinal, cachePath, mediaPartId, subtitleTrackId, cancellationToken);
+            var produced = await ExtractWebVttAsync(sourceFilePath, subtitleStreamIndex, subtitleOrdinal, cachePath, mediaPartId, subtitleTrackId, cancellationToken);
+            if (produced != null) RemoveSuperseded(transcodeTempDirectory, mediaPartId, subtitleTrackId, keepFileName: Path.GetFileName(produced));
+            return produced;
         }
         finally
         {
             gate.Release();
+        }
+    }
+
+    public void PurgePart(string transcodeTempDirectory, Guid mediaPartId) =>
+        DeleteMatching(transcodeTempDirectory, PartFilePattern(mediaPartId), keepFileName: null);
+
+    public IReadOnlyCollection<Guid> ListCachedPartIds(string transcodeTempDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(transcodeTempDirectory)) return Array.Empty<Guid>();
+
+        var directory = CacheDirectory(transcodeTempDirectory);
+        if (!Directory.Exists(directory)) return Array.Empty<Guid>();
+
+        try
+        {
+            return Directory.EnumerateFiles(directory, "*.vtt")
+                .Select(f => Path.GetFileNameWithoutExtension(f))
+                .Select(name => name.Split('_') is [var partId, _, _] && Guid.TryParse(partId, out var id) ? id : (Guid?)null)
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not list the cached subtitle directory {Directory}.", directory);
+            return Array.Empty<Guid>();
+        }
+    }
+
+    private void RemoveSuperseded(string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, string keepFileName) =>
+        DeleteMatching(transcodeTempDirectory, TrackFilePattern(mediaPartId, subtitleTrackId), keepFileName);
+
+    private void DeleteMatching(string transcodeTempDirectory, string pattern, string? keepFileName)
+    {
+        if (string.IsNullOrWhiteSpace(transcodeTempDirectory)) return;
+
+        var directory = CacheDirectory(transcodeTempDirectory);
+        if (!Directory.Exists(directory)) return;
+
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(directory, pattern))
+            {
+                if (keepFileName != null && string.Equals(Path.GetFileName(file), keepFileName, StringComparison.Ordinal)) continue;
+                TryDelete(file);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not sweep cached subtitles matching {Pattern} in {Directory}.", pattern, directory);
         }
     }
 

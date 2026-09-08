@@ -460,6 +460,7 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<Vora.Application.Metadata.ReferenceWriteGate>();
         services.AddScoped<IRequestNotificationService, RequestNotificationService>();
         services.AddScoped<IUserProfileImageService, UserProfileImageService>();
+        services.AddScoped<Vora.Application.Subtitles.ISubtitlePreExtractionManager, Vora.Application.Subtitles.SubtitlePreExtractionManager>();
         services.AddScoped<CollectionOrderingService>();
         services.AddScoped<CollectionSyncService>();
         services.AddScoped<CollectionMembershipService>();

@@ -47,6 +47,7 @@ function Checkbox({ checked, onChange, label }: { checked: boolean, onChange: (v
 export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, showModal }: CoreSettingsTabProps) {
     const [serverSettings, setServerSettings] = useState<ServerSettings | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [subtitleBackfillQueued, setSubtitleBackfillQueued] = useState(false);
     const [subTab, setSubTab] = useState<'general' | 'scanning' | 'transcoding' | 'analysis' | 'thumbnails'>('general');
 
     const loadServerSettings = useCallback(async () => {
@@ -61,6 +62,15 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
     useEffect(() => {
         loadServerSettings();
     }, [loadServerSettings]);
+
+    const backfillSubtitles = async () => {
+        try {
+            await systemSettingsAdminService.queueSubtitleBackfill(serverId);
+            setSubtitleBackfillQueued(true);
+        } catch {
+            showModal('Error', 'Failed to queue the subtitle backfill.', true);
+        }
+    };
 
     const handleSaveCore = async (e: React.SyntheticEvent) => {
         e.preventDefault();
@@ -747,6 +757,31 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                             label="Use hardware (GPU) decode for thumbnails"
                         />
                         <FieldHint>Only applies when hardware acceleration is enabled under Transcoding. Turn this off to keep thumbnail generation on the CPU and leave the GPU free for playback or other apps (e.g. Tdarr).</FieldHint>
+                    </div>
+                </div>
+            </SettingsCard>
+
+            <SettingsCard title="Subtitles">
+                <div className="space-y-4">
+                    <div>
+                        <Checkbox
+                            checked={serverSettings.preExtractSubtitlesOnScan}
+                            onChange={v => setServerSettings({ ...serverSettings, preExtractSubtitlesOnScan: v })}
+                            label="Pre-extract text subtitles on scan"
+                        />
+                        <FieldHint>
+                            Converts embedded text subtitles (SRT, ASS, and similar) to WebVTT in the background after a
+                            scan, so they appear instantly during playback instead of being extracted on first use.
+                            Image subtitles (PGS, VobSub) are unaffected — those are burned into the video when played.
+                            Runs one file at a time and pauses while anything is streaming. Independent of thumbnail
+                            generation.
+                        </FieldHint>
+                    </div>
+                    <div>
+                        <button type="button" className="vora-btn-secondary" onClick={backfillSubtitles} disabled={subtitleBackfillQueued}>
+                            {subtitleBackfillQueued ? 'Backfill queued' : 'Extract subtitles for existing media'}
+                        </button>
+                        <FieldHint>Walks every video library and extracts any subtitle that isn't cached yet, without needing a rescan.</FieldHint>
                     </div>
                 </div>
             </SettingsCard>

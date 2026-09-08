@@ -13,7 +13,8 @@ GET  /api/streaming/play/{id}?t= → DirectPlay: serves the file
 GET  /api/streaming/hls/s/{token}/{file} → playlist and segments
 
 GET  /api/streaming/sessions/{sessionId}/subtitle/{trackId}.vtt
-                                 → text subtitle, extracted on demand and cached
+                                 → text subtitle, from the cache a scan warmed
+                                   (extracted on demand if it isn't there yet)
 ```
 
 `/play` and the HLS route are **not** `RequireAuthorization`. They are gated by short-lived HMAC tokens from `IStreamingTokenSigner`, so a `<video src>` works without carrying an auth header. `/start`, `/start-extra`, and the subtitle route are authenticated normally.
@@ -83,11 +84,13 @@ Step 4 is why `IsImageSubtitleCodec` is a shared static on `BestPathDecisionMana
 
 ### The cache
 
-Keyed on **(`MediaPartId`, `SubtitleTrackId`)** — content, not session — at `{TranscoderTempDirectory}/subcache/{partId}_{trackId}.vtt`. The same file and track give the same VTT for every profile, device, and session, so it is extracted at most once and every later request is a file read.
+Keyed on **(`MediaPartId`, `SubtitleTrackId`)** — content, not session — at `{TranscoderTempDirectory}/subcache/{partId}_{trackId}_{fingerprint}.vtt`. The same file and track give the same VTT for every profile, device, and session, so it is extracted at most once and every later request is a file read. It lives in the server's own scratch space, never beside the media: the library is treated as read-only.
+
+The **fingerprint** is a short hash of the source's size, its last-write time, and the track's stream index. It is in the file *name*, not in a sidecar record, so validity is structural: a source that changed, or a track that moved to a different stream index after a re-probe, resolves to a name that isn't on disk and is therefore a miss. Nothing has to remember to run a check.
 
 An entry counts as a hit only if it exists **and is non-empty**. A zero-byte file is what a killed FFmpeg leaves behind, and treating it as a hit would serve an empty subtitle track forever.
 
-Concurrent misses for the same key are serialized by a per-key `SemaphoreSlim`, and the cache is re-checked after taking the gate — so two clients selecting the same subtitle at once cause one FFmpeg run, and the second request returns the first one's output.
+Concurrent misses for the same key are serialized by a per-key `SemaphoreSlim`, and the cache is re-checked after taking the gate — so two clients selecting the same subtitle at once cause one FFmpeg run, and the second request returns the first one's output. After a successful extraction, any older fingerprint for that same (part, track) is deleted.
 
 ### The FFmpeg call
 
@@ -106,11 +109,30 @@ ffmpeg -y -i <source> -vn -an -dn -map 0:<streamIndex> -c:s webvtt -f webvtt <ou
 
 Only **embedded** subtitle tracks exist. `MediaSubtitleTrack` carries a `StreamIndex` and nothing else, and the only thing that creates one is ffprobe analysis of the media file — nothing scans for sidecar `.srt`/`.ass` files on disk. (`SubtitleFormat` in `Vora.Domain.Enums` is dead and unreferenced.)
 
-### Cleanup
+### Pre-extraction on scan
 
-**The transcode service does not touch the subtitle cache.** Its cleanup globs are all `{mediaItemId}_*` in the top-level directory, and the cache is a separate subdirectory keyed on part and track — so entries survive `StopTranscodeSessionAsync`, idle eviction, and the orphan reaper, which is the point of a cache.
+`ServerSetting.PreExtractSubtitlesOnScan` (**default on**, System Settings → Video Preview Thumbnails → Subtitles) warms the cache after a scan so the endpoint is a hit before anyone plays anything. It is **the only switch** for the feature and is fully independent of thumbnail generation — either can be on with the other off.
 
-Nothing evicts them either. Each is a few KB of text and only exists for a (part, track) someone actually played, so `subcache/` grows slowly; deleting it is safe and just costs a re-extract. If it ever needs bounding, an age-based sweep in `ReapOrphanedTranscodeFilesAsync` is the place.
+`ISubtitlePreExtractionManager` is its own job with its own triggers, deliberately not chained to the thumbnail step:
+
+- **Library scan** — `RunFullLibraryWorkflowAsync` queues `QueuePreExtractLibrarySubtitles` as its own step. Queued rather than awaited: the pass parks while anything is transcoding, which must not hold a scan open.
+- **Single-file ingest** (`QueueScanNewFile`) and **per-item Analyze** — queue `QueuePreExtractMediaItemSubtitles` right after analysis, which is the point at which the item's subtitle tracks are known.
+- **Backfill** — `POST /api/metadata/subtitles/backfill` (admin) walks every video library and fills whatever is missing, so an existing library is warmed without a rescan. There is a button for it under the same settings card.
+
+Throttling, because each extraction reads a whole container off the media disk:
+
+- **Concurrency 1.** Every subtitle job shares one task-queue `resourceKey`, so no two run at once however many are queued.
+- **Yields to playback.** Before each file the pass polls `ITranscodeService.GetActiveTranscodeCount()` and waits while anything is transcoding (15s backoff, 30-minute ceiling before it proceeds anyway). This is server-wide rather than per-drive — a transcode can't be mapped back to a library cheaply, so the conservative reading is the one implemented.
+- Honours the task's cancellation token, so a shutdown or an admin cancel stops it between files.
+
+Only **text** codecs are extracted. Image subtitles (`hdmv_pgs_subtitle`, `pgssub`, `dvd_subtitle`, `vobsub`) are skipped — they burn into the video and have no sidecar. The classification is `BestPathDecisionManager.IsImageSubtitleCodec`, the same list the burn-in decision uses.
+
+### Retention and invalidation
+
+**Nothing is evicted by age or size.** Once extracted, a VTT is kept indefinitely — the point of pre-extraction is that unchanged media is never read twice. Invalidation is driven entirely by the content changing, in two layers:
+
+1. **The fingerprint** (above) makes a stale entry a miss by construction, on both the pre-extraction skip check and the on-demand endpoint. They use the same check, so neither can serve a VTT the other would consider stale.
+2. **Identity purges.** `MediaAnalyzerManager` purges a part's cached subtitles when it re-probes that part — which only happens for a new or changed file, and covers a track being dropped from the file. `MediaManager.DeleteMediaAsync` purges an item's parts before the row goes. And because deletions can bypass that path (a dedupe merge dropping a part, for one), the **backfill sweeps orphans**: it is the only pass that sees every live `MediaPart` id, so it is the only one that can tell an orphaned cache file from another library's entry.
 
 ### Client support
 

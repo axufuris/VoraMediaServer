@@ -51,7 +51,9 @@ public class MediaAnalyzerManagerDetectionTests
         _manager = new MediaAnalyzerManager(
             _media, _analyzer, _assembler,
             new AudioIntroDetector(new AudioFingerprintComparer()),
-            _settings, _queue, _notifier,
+            _settings,
+            Substitute.For<Vora.Application.Streaming.ISubtitleExtractionService>(),
+            _queue, _notifier,
             new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
             scopeFactory,
             Microsoft.Extensions.Options.Options.Create(new Vora.Application.Settings.StoragePathsOptions()),

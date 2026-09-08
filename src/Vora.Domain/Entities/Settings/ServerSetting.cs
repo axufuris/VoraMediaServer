@@ -57,6 +57,11 @@ public class ServerSetting
     // the CPU and leave the GPU free for playback transcoding or other apps.
     public bool VideoThumbnailUseHardwareDecode { get; set; } = true;
 
+    // Whether a scan pre-extracts text subtitle tracks to cached WebVTT so the
+    // on-demand subtitle endpoint is a file read rather than an FFmpeg run.
+    // Independent of thumbnail generation: either can be on with the other off.
+    public bool PreExtractSubtitlesOnScan { get; set; } = true;
+
     public TimeSpan IptvSyncTime { get; set; } = new(4, 0, 0);
     public TimeSpan IptvHealthCheckTime { get; set; } = new(4, 30, 0);
 
