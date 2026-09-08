@@ -44,6 +44,7 @@ public interface IMediaRepository
     Task<List<Guid>> GetMediaIdsMissingTvdbIdAsync();
     Task<MediaItem?> GetForBasicUpdateAsync(Guid id);
     Task SyncMediaTracksAsync(Guid mediaPartId, List<MediaVideoTrack> incomingVideo, List<MediaAudioTrack> incomingAudio, List<MediaSubtitleTrack> incomingSubtitles);
+    Task SyncExternalSubtitleTracksAsync(Guid mediaPartId, List<MediaSubtitleTrack> incomingExternal);
     Task ReplaceMarkersAsync(Guid mediaItemId, IEnumerable<MediaItemMarker> markers);
     Task<List<MediaItemMarker>> GetMarkersForSeasonAsync(Guid seasonId);
     Task<List<MediaItemMarker>> GetMarkersAsync(Guid mediaItemId);

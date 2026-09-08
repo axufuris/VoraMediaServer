@@ -778,7 +778,8 @@ public class FFmpegTranscodeService : ITranscodeService
                 // Subtitle burn-in runs on CPU only, so it can only attach
                 // here in the non-GPU path. We already excluded subtitle
                 // burn-in from fullGpuPipeline above.
-                Flag("-vf"); args.Add($"subtitles='{sourceFile}'");
+                var subtitleSource = decision.SelectedSubtitleExternalPath ?? sourceFile;
+                Flag("-vf"); args.Add($"subtitles='{subtitleSource}'");
             }
 
             if (decision.BandwidthKbps > 0)

@@ -124,15 +124,30 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
         // image ones are filtered out — indexing the filtered list would point
         // the retry at a different track.
         var work = targets
-            .SelectMany(t => t.Tracks
-                .Select((track, ordinal) => (Target: t, Track: track, Ordinal: ordinal))
-                .Where(x => IsExtractableSubtitleCodec(x.Track.Codec)))
+            .SelectMany(t =>
+            {
+                // The ordinal is the track's position among the CONTAINER's
+                // subtitle streams, which is how ffmpeg numbers 0:s:N. Sidecars
+                // have no position there, so they are excluded before indexing —
+                // counting them would shift every embedded ordinal after them.
+                var embeddedOrdinals = t.Tracks
+                    .Where(track => track.ExternalFilePath == null)
+                    .Select((track, ordinal) => (track.Id, ordinal))
+                    .ToDictionary(x => x.Id, x => x.ordinal);
+
+                return t.Tracks
+                    .Where(track => IsExtractableSubtitleCodec(track.Codec))
+                    .Select(track => (
+                        Target: t,
+                        Track: track,
+                        Ordinal: embeddedOrdinals.TryGetValue(track.Id, out var o) ? o : -1));
+            })
             .ToList();
 
         if (work.Count == 0) return;
 
         var pending = work
-            .Where(w => !_extractor.HasValidCachedWebVtt(root, w.Target.MediaPartId, w.Track.Id, w.Target.FilePath, w.Track.StreamIndex))
+            .Where(w => !_extractor.HasValidCachedWebVtt(root, w.Target.MediaPartId, w.Track.Id, SourceFor(w.Target, w.Track, w.Ordinal)))
             .ToList();
 
         if (pending.Count == 0) return;
@@ -148,7 +163,7 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
             try
             {
                 var produced = await _extractor.GetOrExtractWebVttAsync(
-                    item.Target.FilePath, item.Track.StreamIndex, item.Ordinal, root,
+                    SourceFor(item.Target, item.Track, item.Ordinal), root,
                     item.Target.MediaPartId, item.Track.Id, cancellationToken);
 
                 if (produced == null)
@@ -170,6 +185,13 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
 
         _progress.Report(null);
     }
+
+    // The ordinal only means anything for an embedded track: it is a position
+    // among the container's subtitle streams, and a sidecar has no position.
+    private static SubtitleSource SourceFor(SubtitleExtractionTargetDto target, SubtitleTrackTargetDto track, int ordinal) =>
+        track.ExternalFilePath != null
+            ? SubtitleSource.External(target.FilePath, track.ExternalFilePath)
+            : SubtitleSource.Embedded(target.FilePath, track.StreamIndex, ordinal);
 
     private async Task WaitForIdleTranscodersAsync(CancellationToken cancellationToken)
     {

@@ -47,6 +47,7 @@ public class MediaAnalyzerManagerMarkerLockTests
             new AudioIntroDetector(new AudioFingerprintComparer()),
             _settings,
             Substitute.For<Vora.Application.Streaming.ISubtitleExtractionService>(),
+            Substitute.For<Vora.Application.Subtitles.IExternalSubtitleScanner>(),
             _queue,
             _notifier,
             new Vora.Plugins.Interfaces.NullTaskProgressReporter(),

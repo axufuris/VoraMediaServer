@@ -264,15 +264,13 @@ public static class StreamingEndpoints
             return Results.NotFound();
         }
 
-        var orderedSubtitles = part.SubtitleTracks.OrderBy(t => t.StreamIndex).ToList();
-        var ordinal = orderedSubtitles.FindIndex(t => t.Id == trackId);
-        if (ordinal < 0)
+        var track = part.SubtitleTracks.FirstOrDefault(t => t.Id == trackId);
+        if (track == null)
         {
             log.LogWarning("Subtitle 404 (track not on this part) sessionId={SessionId} trackId={TrackId}", sessionId, trackId);
             return Results.NotFound();
         }
 
-        var track = orderedSubtitles[ordinal];
         if (BestPathDecisionManager.IsImageSubtitleCodec(track.Codec))
         {
             log.LogWarning("Subtitle 404 (image subtitle, burned in rather than extracted) sessionId={SessionId} trackId={TrackId} codec={Codec}",
@@ -280,14 +278,16 @@ public static class StreamingEndpoints
             return Results.NotFound();
         }
 
+        var source = ResolveSubtitleSource(part, track);
+
         var settings = await settingsRepo.GetSettingsAsync();
         var path = await subtitleExtractor.GetOrExtractWebVttAsync(
-            part.FilePath, track.StreamIndex, ordinal, ResolveTempDirectory(settings), part.Id, trackId, ct);
+            source, ResolveTempDirectory(settings), part.Id, trackId, ct);
 
         if (path == null)
         {
-            log.LogWarning("Subtitle 404 (extraction produced nothing) sessionId={SessionId} trackId={TrackId} streamIndex={StreamIndex}",
-                sessionId, trackId, track.StreamIndex);
+            log.LogWarning("Subtitle 404 (extraction produced nothing) sessionId={SessionId} trackId={TrackId} source={Source}",
+                sessionId, trackId, source.ContentPath);
             return Results.NotFound();
         }
 
@@ -370,14 +370,16 @@ public static class StreamingEndpoints
         var part = await streamRepo.GetMediaPartForSessionAsync(sessionId);
         var pickedVideo = part?.VideoTracks.FirstOrDefault(t => t.Id == session.VideoTrackId);
         var pickedAudio = part?.AudioTracks.FirstOrDefault(t => t.Id == session.AudioTrackId);
-        var pickedSubtitleIdx = session.SubtitleTrackId.HasValue
-            ? part?.SubtitleTracks.FirstOrDefault(t => t.Id == session.SubtitleTrackId.Value)?.StreamIndex
+        var pickedSubtitle = session.SubtitleTrackId.HasValue
+            ? part?.SubtitleTracks.FirstOrDefault(t => t.Id == session.SubtitleTrackId.Value)
             : null;
+        var pickedSubtitleIdx = pickedSubtitle?.StreamIndex;
 
         var decision = BuildPlaybackDecision(session);
         decision.SelectedVideoStreamIndex = pickedVideo?.StreamIndex;
         decision.SelectedAudioStreamIndex = pickedAudio?.StreamIndex;
         decision.SelectedSubtitleStreamIndex = pickedSubtitleIdx;
+        decision.SelectedSubtitleExternalPath = pickedSubtitle?.ExternalFilePath;
         decision.SourceVideoCodec = pickedVideo?.Codec;
         decision.SourceAudioCodec = pickedAudio?.Codec;
         decision.SourceDurationSeconds = part?.Duration?.TotalSeconds ?? 0.0;
@@ -523,6 +525,21 @@ public static class StreamingEndpoints
         }
 
         return Results.File(path, contentType, enableRangeProcessing: true);
+    }
+
+    // The subtitle-relative ordinal counts the CONTAINER's subtitle streams, so
+    // sidecar rows have to be excluded before indexing — otherwise an external
+    // track sitting earlier in the list shifts every embedded ordinal after it.
+    private static SubtitleSource ResolveSubtitleSource(Vora.Domain.Entities.Media.MediaPart part, Vora.Domain.Entities.Media.MediaSubtitleTrack track)
+    {
+        if (track.ExternalFilePath != null) return SubtitleSource.External(part.FilePath, track.ExternalFilePath);
+
+        var embedded = part.SubtitleTracks
+            .Where(t => t.ExternalFilePath == null)
+            .OrderBy(t => t.StreamIndex)
+            .ToList();
+
+        return SubtitleSource.Embedded(part.FilePath, track.StreamIndex, embedded.FindIndex(t => t.Id == track.Id));
     }
 
     private static string ComputeHlsPrefix(string playlistFileName)

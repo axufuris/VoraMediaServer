@@ -26,6 +26,11 @@ public class PlaybackDecisionVM
     public int? SelectedAudioStreamIndex { get; set; }
     public int? SelectedSubtitleStreamIndex { get; set; }
 
+    // Set when the burned-in subtitle is a sidecar file rather than a stream in
+    // the container. FFmpeg's subtitles filter reads a path, so without this it
+    // would be pointed at the video and burn in the wrong track — or none.
+    public string? SelectedSubtitleExternalPath { get; set; }
+
     // For VOD-style HLS: the full source duration drives how many segments
     // we list up-front in the playlist. The start position lets the
     // transcode begin from the user's last-watched position with the
