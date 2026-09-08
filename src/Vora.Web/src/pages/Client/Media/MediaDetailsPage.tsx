@@ -28,6 +28,7 @@ import StarRating from '../../../components/Client/Primitives/StarRating';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { formatRuntime } from '../../../utils/formatRuntime';
 import { isFullyWatched, affectedEpisodeCount } from '../../../utils/watchState';
+import { isImageSubtitleCodec, isNoSubtitle } from '../../../utils/subtitleKind';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -242,9 +243,17 @@ export default function MediaDetailsPage() {
 
         try {
             const startPos = resume ? (media.resumePositionSeconds || 0) : 0;
-            const subId = selectedSubtitleId === 'none' ? '00000000-0000-0000-0000-000000000000' : selectedSubtitleId;
 
             const activePart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === selectedVideoId)) || qualityMedia?.mediaParts?.[0];
+
+            // Only a burn-in (image) subtitle is the server's business — it has
+            // to re-encode for one. A text subtitle is sideloaded by the player
+            // after playback starts, so sending it here would only make the play
+            // request wait on an extraction it doesn't need.
+            const chosenSubtitle = activePart?.subtitleTracks?.find(st => st.id === selectedSubtitleId);
+            const wantsBurnIn = !isNoSubtitle(selectedSubtitleId) && !!chosenSubtitle && isImageSubtitleCodec(chosenSubtitle.codec);
+            const textSubtitleTrackId = !isNoSubtitle(selectedSubtitleId) && !wantsBurnIn ? selectedSubtitleId : null;
+            const subId = wantsBurnIn ? selectedSubtitleId : '00000000-0000-0000-0000-000000000000';
 
             const sessionInfo = await streamingService.startSession(media.id, deviceId, startPos, selectedVideoId || undefined, selectedAudioId || undefined, subId, serverId, activePart?.id);
 
@@ -254,7 +263,7 @@ export default function MediaDetailsPage() {
             playMedia({
                 id: media.id, title: media.title, subtitle: subtitle,
                 posterUrl: media.posterUrl, backgroundUrl: media.backgroundUrl,
-                ...sessionInfo, startPosition: startPos,
+                ...sessionInfo, startPosition: startPos, textSubtitleTrackId,
                 serverId: serverId ?? undefined,
                 resolution: activePart?.resolution, hdrType: activeVideoTrack?.hdrType,
                 outputResolution: sessionInfo.outputResolution ?? undefined,

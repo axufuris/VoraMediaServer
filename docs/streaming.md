@@ -114,7 +114,12 @@ Nothing evicts them either. Each is a few KB of text and only exists for a (part
 
 ### Client support
 
-**No client fetches the subtitle route yet.** The web player has no `<track>` element — it renders a `SUB: ENG (subrip)` chip in the player badge bar and nothing more. Calling the route and attaching the result is a separate change, on web and on the native clients.
+The web player fetches the route and sideloads the result. Two things shape how:
+
+- **The route needs the auth header**, so `<track src>` can't point at it — a native track load sends no headers and 401s. `streamingService.fetchSubtitleVtt` GETs it through `apiClient` as a Blob and hands the `<track>` an object URL, cached per session + track and revoked when the session ends.
+- **Picking a text subtitle doesn't restart the stream.** `GlobalVideoPlayer` keeps exactly one sideloaded `<track>` and swaps its source; the video keeps playing. Only a video/audio change, or adding or dropping a burn-in subtitle, still goes through `changeStreams`. A text subtitle is never sent to `/streaming/start` either — it's attached after playback begins, so a cold extraction can't delay the play request.
+
+Codec classification is duplicated client-side in `utils/subtitleKind.ts` and **must agree with `BestPathDecisionManager.IsImageSubtitleCodec`**: a codec the server burns in but the client thinks is text renders the subtitle twice, and the reverse renders it not at all.
 
 ## Gotchas
 
