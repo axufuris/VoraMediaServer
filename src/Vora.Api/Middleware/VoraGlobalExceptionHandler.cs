@@ -27,6 +27,7 @@ public class VoraGlobalExceptionHandler : IExceptionHandler
             ArgumentException => (StatusCodes.Status400BadRequest, "Bad request"),
             InvalidOperationException => (StatusCodes.Status400BadRequest, "Invalid operation"),
             KeyNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
+            Vora.Plugins.Dtos.SubtitleProviderException => (StatusCodes.Status429TooManyRequests, "Subtitle provider limit reached"),
             OperationCanceledException => (499, "Client closed request"),
             _ => (StatusCodes.Status500InternalServerError, "Internal server error")
         };

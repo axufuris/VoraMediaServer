@@ -9,6 +9,12 @@ public class MediaSubtitleTrack
     // external track is addressed by its path, not by a position in the file.
     public string? ExternalFilePath { get; set; }
 
+    // True when Vora fetched this file from a subtitle provider and put it in its
+    // own store, as opposed to finding it beside the video. Sidecar discovery
+    // reconciles by path against what is on disk next to the media, so a
+    // downloaded track has to be excluded from it or every scan would delete it.
+    public bool IsDownloaded { get; set; }
+
     public bool IsExternal => ExternalFilePath != null;
 
     public int StreamIndex { get; set; }

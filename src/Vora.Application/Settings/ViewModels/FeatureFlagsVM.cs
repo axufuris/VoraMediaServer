@@ -9,6 +9,11 @@ public class FeatureFlagsVM
     public bool Dvr { get; set; }
     public bool InternetRadio { get; set; }
     public bool Podcasts { get; set; }
+
+    // Read-only: true when an installed subtitle-search provider is configured.
+    // Not in UpdateFeatureFlagsRequest — it follows the plugin, so an admin sets
+    // it by entering an API key rather than by flipping a switch.
+    public bool SubtitleSearch { get; set; }
 }
 
 public class UpdateFeatureFlagsRequest

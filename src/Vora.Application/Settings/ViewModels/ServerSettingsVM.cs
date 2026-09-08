@@ -34,6 +34,7 @@ public class ServerSettingsVM
     public string FolderWatcherProviderId { get; set; } = "polling_watcher";
     public int FolderWatcherPollingInterval { get; set; } = 30;
     public string LocalMediaScannerProviderId { get; set; } = "Vora_scanner";
+    public string SubtitleSearchProviderId { get; set; } = string.Empty;
     public bool EnableTrashAutoPurge { get; set; } = true;
     public int MissingMediaRetentionDays { get; set; } = 30;
     public bool ResolveMovieTvdbIds { get; set; }
@@ -111,6 +112,7 @@ public class ServerSettingsVM
             FolderWatcherProviderId = s.FolderWatcherProviderId,
             FolderWatcherPollingInterval = s.FolderWatcherPollingInterval,
             LocalMediaScannerProviderId = s.LocalMediaScannerProviderId,
+            SubtitleSearchProviderId = s.SubtitleSearchProviderId,
             EnableTrashAutoPurge = s.EnableTrashAutoPurge,
             MissingMediaRetentionDays = s.MissingMediaRetentionDays,
             ResolveMovieTvdbIds = s.ResolveMovieTvdbIds,
