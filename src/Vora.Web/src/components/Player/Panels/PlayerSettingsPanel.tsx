@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { MediaItem, MediaPart } from '../../../api/Media/mediaService';
+import FindSubtitlesPanel from './FindSubtitlesPanel';
 import type { DeviceCapabilities } from '../../../utils/hardwareScanner';
 import { isVideoDirectPlayable, isAudioDirectPlayable } from '../../../utils/playbackDecision';
 
@@ -15,6 +17,13 @@ interface PlayerSettingsPanelProps {
     setSelAudio: (id: string) => void;
     setSelSub: (id: string) => void;
     caps: DeviceCapabilities;
+    mediaItemId: string;
+    serverId?: string;
+    // False unless a subtitle-search provider is installed and configured. The
+    // entry is hidden rather than disabled: a button that can only fail is worse
+    // than no button.
+    canFindSubtitles: boolean;
+    onSubtitleDownloaded: (subtitleTrackId: string) => void | Promise<void>;
     onCancel: () => void;
     onApply: () => void;
 }
@@ -28,9 +37,14 @@ export default function PlayerSettingsPanel({
     setSelAudio,
     setSelSub,
     caps,
+    mediaItemId,
+    serverId,
+    canFindSubtitles,
+    onSubtitleDownloaded,
     onCancel,
     onApply
 }: PlayerSettingsPanelProps) {
+    const [isFindingSubtitles, setIsFindingSubtitles] = useState(false);
     const activeSettingsPart = mediaDetails?.mediaParts?.find((p: MediaPart) =>
         p.videoTracks?.some((vt: VideoTrackType) => vt.id === selVideo)
     ) || mediaDetails?.mediaParts?.[0];
@@ -62,7 +76,9 @@ export default function PlayerSettingsPanel({
                 }}
             >
                 <div className="mb-6 flex items-center justify-between">
-                    <h2 className="m-0 text-xl font-semibold" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}>Playback settings</h2>
+                    <h2 className="m-0 text-xl font-semibold" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}>
+                        {isFindingSubtitles ? 'Find subtitles' : 'Playback settings'}
+                    </h2>
                     <button
                         type="button"
                         onClick={onCancel}
@@ -74,7 +90,17 @@ export default function PlayerSettingsPanel({
                     </button>
                 </div>
 
-                {mediaDetails?.mediaParts && mediaDetails.mediaParts.length > 0 ? (
+                {isFindingSubtitles ? (
+                    <FindSubtitlesPanel
+                        mediaItemId={mediaItemId}
+                        serverId={serverId}
+                        onBack={() => setIsFindingSubtitles(false)}
+                        onDownloaded={async trackId => {
+                            await onSubtitleDownloaded(trackId);
+                            setIsFindingSubtitles(false);
+                        }}
+                    />
+                ) : mediaDetails?.mediaParts && mediaDetails.mediaParts.length > 0 ? (
                     <div className="space-y-5">
                         <div>
                             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={labelStyle}>Video track</label>
@@ -150,6 +176,19 @@ export default function PlayerSettingsPanel({
                                     </option>
                                 ))}
                             </select>
+                            {canFindSubtitles && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFindingSubtitles(true)}
+                                    className="mt-2 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold transition-colors"
+                                    style={{ color: 'var(--vora-accent-text)' }}
+                                >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                    </svg>
+                                    Find subtitles online
+                                </button>
+                            )}
                         </div>
                         <div className="mt-7 flex justify-end gap-2 border-t pt-5" style={{ borderColor: 'var(--vora-border-subtle)' }}>
                             <button type="button" onClick={onCancel} className="vora-button-secondary cursor-pointer">Cancel</button>

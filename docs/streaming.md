@@ -172,7 +172,7 @@ Account mode with a blank username or password **falls back to API-key-only with
 
 Quota is not a single signal. OpenSubtitles refuses with a 406, a 429, *or* a 200 whose body carries `remaining: 0` and no `link`, so all three are read as out-of-downloads and raised as `SubtitleProviderException` — which the global handler turns into a **429 with the provider's own wording**, so a viewer sees "download limit reached" instead of a generic failure. `remaining: 0` *with* a link is the last allowed download, not a refusal.
 
-Availability is exposed as `FeatureFlagsVM.SubtitleSearch` so the clients hide the UI. It is **read-only and derived** — it is absent from `UpdateFeatureFlagsRequest`, because it follows the plugin: an admin turns it on by entering an API key, not by flipping a switch.
+Availability is exposed as `FeatureFlagsVM.SubtitleSearch` so the clients hide the UI — the web player shows a **Find subtitles online** entry under the subtitle picker only when the flag is true, and hides rather than disables it, since a button that can only fail is worse than no button. A download refreshes the track list, selects the new track, and sideloads it through the existing `<track>` path: no restart, no new delivery code. The flag is **read-only and derived** — it is absent from `UpdateFeatureFlagsRequest`, because it follows the plugin: an admin turns it on by entering an API key, not by flipping a switch.
 
 **A query is built from the item, not the row.** An episode searches on its *series* title plus season and episode numbers — a provider matching on an episode's own title finds nothing — and an external id is preferred over a title, because a fuzzy title match is where wrong-film subtitles come from.
 
