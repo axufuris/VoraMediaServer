@@ -124,7 +124,7 @@ public class OpenSubtitlesSubtitleProvider : ISubtitleSearchProvider, IPluginCon
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("OpenSubtitles search failed ({Status}) for {Url}.", response.StatusCode, url);
-                return Array.Empty<SubtitleSearchResultDto>();
+                throw new SubtitleProviderException(DescribeSearchFailure(response.StatusCode, apiKey!));
             }
 
             var payload = await response.Content.ReadFromJsonAsync<SearchResponse>(Json, cancellationToken);
@@ -216,6 +216,12 @@ public class OpenSubtitlesSubtitleProvider : ISubtitleSearchProvider, IPluginCon
         if (!settings.TryGetValue("api_key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
         {
             return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        if (LooksLikeJwt(apiKey))
+        {
+            return PluginConnectionTestResult.Fail(
+                "That looks like a login token, not an API key. Sign in at opensubtitles.com, open Consumers, and paste the API key from there.");
         }
 
         settings.TryGetValue("auth_mode", out var mode);
@@ -402,13 +408,15 @@ public class OpenSubtitlesSubtitleProvider : ISubtitleSearchProvider, IPluginCon
 
         // An external id pins the exact title; without one the API falls back to
         // fuzzy title matching, which is where wrong-film subtitles come from.
+        var idPrefix = query.IsEpisode ? "parent_" : string.Empty;
+
         if (!string.IsNullOrWhiteSpace(query.ImdbId))
         {
-            parts.Add($"imdb_id={Uri.EscapeDataString(query.ImdbId.TrimStart('t').TrimStart('0'))}");
+            parts.Add($"{idPrefix}imdb_id={Uri.EscapeDataString(NormalizeImdbId(query.ImdbId))}");
         }
         else if (!string.IsNullOrWhiteSpace(query.TmdbId))
         {
-            parts.Add($"tmdb_id={Uri.EscapeDataString(query.TmdbId)}");
+            parts.Add($"{idPrefix}tmdb_id={Uri.EscapeDataString(query.TmdbId)}");
         }
         else if (!string.IsNullOrWhiteSpace(query.Title))
         {
@@ -428,6 +436,30 @@ public class OpenSubtitlesSubtitleProvider : ISubtitleSearchProvider, IPluginCon
         }
 
         return "subtitles?" + string.Join("&", parts);
+    }
+
+    public static string DescribeSearchFailure(HttpStatusCode status, string apiKey) => status switch
+    {
+        HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden when LooksLikeJwt(apiKey) =>
+            "OpenSubtitles rejected the credentials. The API Key field holds a login token (a long value starting \"eyJ\"), not an API key — paste the key from your Consumers page instead.",
+        HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden =>
+            "OpenSubtitles rejected the API key. Check it under Plugins, or use Test Connection there.",
+        HttpStatusCode.TooManyRequests =>
+            "OpenSubtitles is rate-limiting this server. Try again in a few minutes.",
+        _ => $"OpenSubtitles returned {(int)status} for this search.",
+    };
+
+    public static string NormalizeImdbId(string imdbId) => imdbId.Trim().TrimStart('t').TrimStart('0');
+
+    // An OpenSubtitles API key is a short consumer key. A JWT is what /login
+    // hands back — pasting one into the key field is an easy mistake, and the
+    // only symptom is every search coming back empty.
+    public static bool LooksLikeJwt(string? value)
+    {
+        var trimmed = value?.Trim();
+        return trimmed != null
+            && trimmed.StartsWith("eyJ", StringComparison.Ordinal)
+            && trimmed.Count(c => c == '.') == 2;
     }
 
     public static IReadOnlyList<string> ParseLanguages(string? configured)
