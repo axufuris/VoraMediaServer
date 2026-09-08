@@ -13,4 +13,5 @@ public class SubtitleTrackTargetDto
     public Guid Id { get; set; }
     public int StreamIndex { get; set; }
     public string? Codec { get; set; }
+    public string? ExternalFilePath { get; set; }
 }

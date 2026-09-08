@@ -9,7 +9,9 @@ public partial class MediaRepository
     {
         var existingVideo = await _context.MediaVideoTracks.Where(t => t.MediaPartId == mediaPartId).ToListAsync();
         var existingAudio = await _context.MediaAudioTracks.Where(t => t.MediaPartId == mediaPartId).ToListAsync();
-        var existingSubs = await _context.MediaSubtitleTracks.Where(t => t.MediaPartId == mediaPartId).ToListAsync();
+        var existingSubs = await _context.MediaSubtitleTracks
+            .Where(t => t.MediaPartId == mediaPartId && t.ExternalFilePath == null)
+            .ToListAsync();
 
         var inVideoIdx = incomingVideo.Select(v => v.StreamIndex).ToHashSet();
         var inAudioIdx = incomingAudio.Select(a => a.StreamIndex).ToHashSet();
@@ -53,6 +55,44 @@ public partial class MediaRepository
         foreach (var inc in incomingSubtitles)
         {
             if (existingSubsByIdx.TryGetValue(inc.StreamIndex, out var ex))
+            {
+                ex.Codec = inc.Codec; ex.Language = inc.Language; ex.Title = inc.Title;
+                ex.IsDefault = inc.IsDefault; ex.IsForced = inc.IsForced;
+            }
+            else
+            {
+                inc.MediaPartId = mediaPartId;
+                await _context.MediaSubtitleTracks.AddAsync(inc);
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    // Sidecars reconcile by path, not by stream index, and are kept entirely
+    // separate from the ffprobe sync above: an ffprobe pass knows nothing about
+    // files beside the video, so letting it reconcile them would delete them all.
+    public async Task SyncExternalSubtitleTracksAsync(Guid mediaPartId, List<MediaSubtitleTrack> incomingExternal)
+    {
+        var existing = await _context.MediaSubtitleTracks
+            .Where(t => t.MediaPartId == mediaPartId && t.ExternalFilePath != null)
+            .ToListAsync();
+
+        var incomingByPath = incomingExternal
+            .Where(t => t.ExternalFilePath != null)
+            .GroupBy(t => t.ExternalFilePath!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        _context.MediaSubtitleTracks.RemoveRange(
+            existing.Where(t => !incomingByPath.ContainsKey(t.ExternalFilePath!)));
+
+        var existingByPath = existing
+            .GroupBy(t => t.ExternalFilePath!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (path, inc) in incomingByPath)
+        {
+            if (existingByPath.TryGetValue(path, out var ex))
             {
                 ex.Codec = inc.Codec; ex.Language = inc.Language; ex.Title = inc.Title;
                 ex.IsDefault = inc.IsDefault; ex.IsForced = inc.IsForced;

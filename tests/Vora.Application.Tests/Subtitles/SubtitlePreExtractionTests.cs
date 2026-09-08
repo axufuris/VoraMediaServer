@@ -49,7 +49,7 @@ public class SubtitlePreExtractionTests
                 Tracks = tracks.ToList(),
             }
         });
-        _extractor.HasValidCachedWebVtt(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>())
+        _extractor.HasValidCachedWebVtt(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<SubtitleSource>())
             .Returns(cached);
         _transcodes.GetActiveTranscodeCount().Returns(0);
     }
@@ -61,7 +61,7 @@ public class SubtitlePreExtractionTests
         new() { Id = id, StreamIndex = streamIndex, Codec = "hdmv_pgs_subtitle" };
 
     private Task NothingExtracted() => _extractor.DidNotReceive().GetOrExtractWebVttAsync(
-        Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        Arg.Any<SubtitleSource>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
 
     [Fact]
     public async Task A_text_track_is_extracted()
@@ -71,7 +71,7 @@ public class SubtitlePreExtractionTests
         await NewManager().PreExtractForItemAsync(ItemId);
 
         await _extractor.Received(1).GetOrExtractWebVttAsync(
-            "/media/movie.mkv", 3, Arg.Any<int>(), TempDir, PartId, TextTrackId, Arg.Any<CancellationToken>());
+            SubtitleSource.Embedded("/media/movie.mkv", 3, 0), TempDir, PartId, TextTrackId, Arg.Any<CancellationToken>());
     }
 
     // The setting is the only switch. It is checked before any work at all, so
@@ -132,7 +132,7 @@ public class SubtitlePreExtractionTests
 
         await NewManager().PreExtractForItemAsync(ItemId);
 
-        _extractor.Received(1).HasValidCachedWebVtt(TempDir, PartId, TextTrackId, "/media/movie.mkv", 3);
+        _extractor.Received(1).HasValidCachedWebVtt(TempDir, PartId, TextTrackId, SubtitleSource.Embedded("/media/movie.mkv", 3, 0));
     }
 
     // The retry inside extraction maps by "the Nth subtitle of this file", and
@@ -146,7 +146,7 @@ public class SubtitlePreExtractionTests
         await NewManager().PreExtractForItemAsync(ItemId);
 
         await _extractor.Received(1).GetOrExtractWebVttAsync(
-            Arg.Any<string>(), 3, 1, Arg.Any<string>(), Arg.Any<Guid>(), TextTrackId, Arg.Any<CancellationToken>());
+            Arg.Is<SubtitleSource>(s => s.StreamIndex == 3 && s.Ordinal == 1), Arg.Any<string>(), Arg.Any<Guid>(), TextTrackId, Arg.Any<CancellationToken>());
     }
 
     [Fact]

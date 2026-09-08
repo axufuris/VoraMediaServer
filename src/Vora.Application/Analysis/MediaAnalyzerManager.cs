@@ -54,6 +54,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     private readonly ILogger<MediaAnalyzerManager> _logger;
 
     private readonly Vora.Application.Streaming.ISubtitleExtractionService _subtitleExtractor;
+    private readonly Vora.Application.Subtitles.IExternalSubtitleScanner _externalSubtitles;
 
     public MediaAnalyzerManager(
         IMediaRepository mediaRepository,
@@ -62,6 +63,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         IAudioIntroDetector audioIntroDetector,
         ISystemSettingsRepository settingsRepo,
         Vora.Application.Streaming.ISubtitleExtractionService subtitleExtractor,
+        Vora.Application.Subtitles.IExternalSubtitleScanner externalSubtitles,
         ITaskQueueManager taskQueueManager,
         IClientNotifier notifier,
         Vora.Plugins.Interfaces.ITaskProgressReporter progress,
@@ -75,6 +77,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         _audioIntroDetector = audioIntroDetector;
         _settingsRepo = settingsRepo;
         _subtitleExtractor = subtitleExtractor;
+        _externalSubtitles = externalSubtitles;
         _taskQueueManager = taskQueueManager;
         _notifier = notifier;
         _progress = progress;
@@ -248,6 +251,8 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // whose file changed on disk (size differs). An unchanged, already-
         // analyzed library isn't re-probed on every scan, but an added or
         // replaced file still gets analyzed.
+        await SyncExternalSubtitleTracksAsync(item.MediaParts, cancellationToken);
+
         var partsToAnalyze = item.MediaParts.Where(PartNeedsAnalysis).ToHashSet();
         if (partsToAnalyze.Count == 0) return;
 
@@ -299,6 +304,32 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     }
 
     public Task AnalyzeMediaFileAsync(Guid mediaItemId, CancellationToken cancellationToken = default) => RunFileAnalysisAsync(mediaItemId, cancellationToken);
+
+    // Dropping a .srt next to a video changes nothing ffprobe can see, so this
+    // deliberately runs on every analysis pass rather than only for parts whose
+    // file changed — otherwise a sidecar added to an unchanged library would
+    // never be picked up.
+    private async Task SyncExternalSubtitleTracksAsync(IEnumerable<MediaPart> parts, CancellationToken cancellationToken)
+    {
+        foreach (var part in parts)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var incoming = _externalSubtitles.Discover(part.FilePath)
+                .Select(found => new MediaSubtitleTrack
+                {
+                    ExternalFilePath = found.FilePath,
+                    Codec = found.Codec,
+                    Language = found.Language,
+                    Title = found.Title,
+                    IsForced = found.IsForced,
+                    IsDefault = false,
+                })
+                .ToList();
+
+            await _mediaRepository.SyncExternalSubtitleTracksAsync(part.Id, incoming);
+        }
+    }
 
     private static bool PartNeedsAnalysis(MediaPart part)
     {

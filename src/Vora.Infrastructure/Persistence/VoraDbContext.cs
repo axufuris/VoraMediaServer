@@ -432,6 +432,8 @@ public class VoraDbContext : DbContext
         modelBuilder.Entity<MediaSubtitleTrack>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.Ignore(e => e.IsExternal);
+            entity.Property(e => e.ExternalFilePath).HasMaxLength(1024);
             entity.Property(e => e.Codec).HasMaxLength(32);
             entity.Property(e => e.Language).HasMaxLength(8);
             entity.Property(e => e.Title).HasMaxLength(256);

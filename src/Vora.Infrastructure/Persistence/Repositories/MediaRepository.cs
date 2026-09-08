@@ -346,7 +346,7 @@ public partial class MediaRepository : IMediaRepository
                 FilePath = p.FilePath,
                 Tracks = p.SubtitleTracks
                     .OrderBy(t => t.StreamIndex)
-                    .Select(t => new SubtitleTrackTargetDto { Id = t.Id, StreamIndex = t.StreamIndex, Codec = t.Codec })
+                    .Select(t => new SubtitleTrackTargetDto { Id = t.Id, StreamIndex = t.StreamIndex, Codec = t.Codec, ExternalFilePath = t.ExternalFilePath })
                     .ToList()
             });
 

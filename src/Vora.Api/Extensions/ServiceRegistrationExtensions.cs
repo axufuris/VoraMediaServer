@@ -461,6 +461,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IRequestNotificationService, RequestNotificationService>();
         services.AddScoped<IUserProfileImageService, UserProfileImageService>();
         services.AddScoped<Vora.Application.Subtitles.ISubtitlePreExtractionManager, Vora.Application.Subtitles.SubtitlePreExtractionManager>();
+        services.AddSingleton<Vora.Application.Subtitles.IExternalSubtitleScanner, Vora.Application.Subtitles.ExternalSubtitleScanner>();
         services.AddScoped<CollectionOrderingService>();
         services.AddScoped<CollectionSyncService>();
         services.AddScoped<CollectionMembershipService>();

@@ -95,8 +95,13 @@ Concurrent misses for the same key are serialized by a per-key `SemaphoreSlim`, 
 ### The FFmpeg call
 
 ```
-ffmpeg -y -i <source> -vn -an -dn -map 0:<streamIndex> -c:s webvtt -f webvtt <output>
+ffmpeg -y -i <source> -vn -an -dn -map 0:<streamIndex> -c:s webvtt -f webvtt <output>   # embedded
+ffmpeg -y [-sub_charenc CP1252] -i <sidecar> -c:s webvtt -f webvtt <output>             # external
 ```
+
+A **`.vtt` sidecar is copied**, not converted. Any other sidecar is converted with no `-map` — it has one stream and that stream is the subtitle. FFmpeg assumes UTF-8 and gives up on anything else, which legacy `.srt` files routinely are, so a failed first pass is retried as `CP1252` rather than leaving the track permanently unusable. The first pass deliberately names **no** encoding: guessing one for a file that is already UTF-8 corrupts it.
+
+An external **image** subtitle (`.sub`/`.idx`) has no text to convert and can only be burned in. `PlaybackDecisionVM.SelectedSubtitleExternalPath` carries the path so `-vf subtitles=` points at the sidecar; without it the filter would be handed the video and burn in the wrong track, or none.
 
 - **`-map 0:<streamIndex>` is the absolute stream index**, the same form `BuildFFmpegArguments` uses for video and audio. `MediaSubtitleTrack.StreamIndex` is the stream's index in the file, not its position among subtitles. `0:s:N` means something different and would pick the wrong track whenever the subtitle isn't the Nth subtitle.
 - **`-f webvtt` names the muxer explicitly** rather than letting FFmpeg infer it from the `.vtt` extension.
@@ -107,7 +112,23 @@ ffmpeg -y -i <source> -vn -an -dn -map 0:<streamIndex> -c:s webvtt -f webvtt <ou
 - Capped at **180 seconds**. Extraction is I/O-bound — FFmpeg reads the whole container to collect interleaved subtitle packets, so a large remux is slow even though the output is a few KB.
 - Logged at Information on both ends: start (source, part, track, stream index) and finish (elapsed ms, output bytes, cache path), plus the full argument list of each attempt.
 
-Only **embedded** subtitle tracks exist. `MediaSubtitleTrack` carries a `StreamIndex` and nothing else, and the only thing that creates one is ffprobe analysis of the media file — nothing scans for sidecar `.srt`/`.ass` files on disk. (`SubtitleFormat` in `Vora.Domain.Enums` is dead and unreferenced.)
+### Sidecar subtitle files
+
+A `MediaSubtitleTrack` is either **embedded** (a stream in the container, addressed by `StreamIndex`) or **external** (`ExternalFilePath` set — a file next to the video). Both are ordinary rows, so a sidecar is selectable, streamable, and pre-extractable exactly like an embedded track, and every VM that projects `p.SubtitleTracks` picks it up with no change.
+
+Discovery runs in `MediaAnalyzerManager` and matches `{video base name}[.segments].{ext}` for `.srt`, `.ass`, `.ssa`, `.vtt`, `.sub`. The dot-separated segments give language (`en`, `eng`, `pt-BR`), `forced`, and `sdh`/`cc`/`hi`; there is no hearing-impaired flag on the entity, so that lands in `Title` alongside the language (`EN SDH`) — the picker prefers `Title` over `Language`, so a bare `SDH` would make two languages read alike.
+
+The separator **must** be a literal dot: `Movie (2026) Part 2.en.srt` must not attach itself to `Movie (2026).mkv`, or a viewer gets subtitles that drift against the picture.
+
+Three things follow from external tracks existing that are easy to get wrong:
+
+- **Discovery runs before the probe-skip guard.** Dropping a `.srt` beside an unchanged video changes nothing ffprobe can see, so a pass gated on "did the file change" would never find it.
+- **Reconciliation is split.** `SyncMediaTracksAsync` matches embedded tracks by `StreamIndex` and now filters to `ExternalFilePath == null`; sidecars reconcile by path in `SyncExternalSubtitleTracksAsync`. Left together, an ffprobe pass would delete every sidecar — and throw first, since sidecars all share the default stream index.
+- **The `0:s:N` ordinal counts container streams only.** External rows are excluded before indexing, in both the endpoint and the pre-extraction pass; counting them shifts every embedded ordinal after them.
+
+An external track's cached VTT is fingerprinted against the **sidecar**, not the video, so re-saving the `.srt` invalidates it while the untouched video stays cached.
+
+`SubtitleFormat` in `Vora.Domain.Enums` remains dead and unreferenced — the codec is a string, parsed from the file extension.
 
 ### Pre-extraction on scan
 
