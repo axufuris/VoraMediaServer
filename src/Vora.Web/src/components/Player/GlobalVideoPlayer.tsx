@@ -18,6 +18,7 @@ import PlayerInfoPanel from './Panels/PlayerInfoPanel';
 import UpNextOverlay from './Panels/UpNextOverlay';
 import { useVideoThumbnails } from '../../hooks/useVideoThumbnails';
 import { isImageSubtitleCodec, isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { ScrubThumbnail } from './VideoScrubThumbnails';
 
 type VideoTrackType = NonNullable<MediaPart['videoTracks']>[number];
@@ -80,6 +81,7 @@ export default function GlobalVideoPlayer() {
     } = usePlayer();
     const { currentTime, duration } = usePlayerTime();
 
+    const flags = useFeatureFlags();
     const playerContainerRef = useRef<HTMLDivElement>(null);
 
     const [mediaDetails, setMediaDetails] = useState<MediaItem | null>(null);
@@ -536,6 +538,20 @@ export default function GlobalVideoPlayer() {
         await sideloadSubtitle(desiredTextSubRef.current);
     };
 
+    const handleSubtitleDownloaded = async (subtitleTrackId: string) => {
+        if (!currentMedia) return;
+
+        try {
+            setMediaDetails(await mediaService.getMediaItem(currentMedia.id, serverId));
+        } catch (e) {
+            console.error('Failed to refresh tracks after downloading a subtitle', e);
+        }
+
+        setSelSub(subtitleTrackId);
+        desiredTextSubRef.current = subtitleTrackId;
+        await sideloadSubtitle(subtitleTrackId);
+    };
+
     const progressPercent = duration > 0 && isFinite(duration) ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
 
     const activeStreamPart = mediaDetails?.mediaParts?.find((p: MediaPart) =>
@@ -857,6 +873,10 @@ export default function GlobalVideoPlayer() {
                     setSelAudio={setSelAudio}
                     setSelSub={setSelSub}
                     caps={caps}
+                    mediaItemId={currentMedia.id}
+                    serverId={serverId}
+                    canFindSubtitles={flags.subtitleSearch && !currentMedia.isExtra}
+                    onSubtitleDownloaded={handleSubtitleDownloaded}
                     onCancel={() => setShowSettings(false)}
                     onApply={handleApplyStreams}
                 />

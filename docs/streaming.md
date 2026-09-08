@@ -161,7 +161,7 @@ POST /api/media/{id}/subtitles/download {providerFileId, language}
 
 Both are authenticated and both **404 when no provider is configured**. An empty list would read as "this title has no subtitles"; a 404 says the feature is not on.
 
-Availability is exposed as `FeatureFlagsVM.SubtitleSearch` so the clients hide the UI. It is **read-only and derived** — it is absent from `UpdateFeatureFlagsRequest`, because it follows the plugin: an admin turns it on by entering an API key, not by flipping a switch.
+Availability is exposed as `FeatureFlagsVM.SubtitleSearch` so the clients hide the UI — the web player shows a **Find subtitles online** entry under the subtitle picker only when the flag is true, and hides rather than disables it, since a button that can only fail is worse than no button. A download refreshes the track list, selects the new track, and sideloads it through the existing `<track>` path: no restart, no new delivery code. It is **read-only and derived** — it is absent from `UpdateFeatureFlagsRequest`, because it follows the plugin: an admin turns it on by entering an API key, not by flipping a switch.
 
 **A query is built from the item, not the row.** An episode searches on its *series* title plus season and episode numbers — a provider matching on an episode's own title finds nothing — and an external id is preferred over a title, because a fuzzy title match is where wrong-film subtitles come from.
 
