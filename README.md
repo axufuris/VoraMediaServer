@@ -107,7 +107,7 @@ docker run -d \
   -e StoragePaths__EpgCache=/app/data/iptv/epg_cache \
   -e StoragePaths__IptvDvr=/app/data/iptv/dvr \
   -e StoragePaths__UserImages=/app/data/users \
-  -e StoragePaths__Plugins=/app/data/plugins \
+  -e StoragePaths__Plugins=/app/data/plugins   -e StoragePaths__Subtitles=/app/data/subtitles \
   -v /srv/vora/data:/app/data \
   -v /mnt/media/movies:/media/movies:ro \
   -v /mnt/media/shows:/media/shows:ro \
@@ -195,6 +195,7 @@ services:
       StoragePaths__IptvDvr: /app/data/iptv/dvr
       StoragePaths__UserImages: /app/data/users
       StoragePaths__Plugins: /app/data/plugins
+      StoragePaths__Subtitles: /app/data/subtitles
     volumes:
       - /srv/vora/data:/app/data
       - /srv/vora/transcode:/transcode
@@ -292,6 +293,7 @@ Apply, then wait for the container to go green in the Docker tab.
 | Variable: `StoragePaths__IptvDvr` | `/app/data/iptv/dvr` |
 | Variable: `StoragePaths__UserImages` | `/app/data/users` |
 | Variable: `StoragePaths__Plugins` | `/app/data/plugins` |
+| Variable: `StoragePaths__Subtitles` | `/app/data/subtitles` |
 | Path: `/transcode` | `/mnt/user/appdata/vora-transcode` (or a fast scratch disk) |
 
 `PUID=99` / `PGID=100` are Unraid's `nobody:users`, which own
@@ -444,6 +446,7 @@ provider keys:
       StoragePaths__IptvDvr: /app/data/iptv/dvr
       StoragePaths__UserImages: /app/data/users
       StoragePaths__Plugins: /app/data/plugins
+      StoragePaths__Subtitles: /app/data/subtitles
 
       # Metadata + artwork
       Vora__PluginSettings__tmdb_metadata__api_key: "YOUR_TMDB_API_KEY"
