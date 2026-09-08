@@ -415,6 +415,7 @@ in addition to the keys shown.
 | `imdb_collection_sync` | IMDb Public Lists | — |
 | `imdb_chronology` | IMDB Community Lists | — |
 | `itunes_podcast_discovery` | iTunes Podcast Discovery | — |
+| `opensubtitles_search` | OpenSubtitles | `api_key`, `auth_mode`, `username`, `password`, `default_languages` |
 | `openai_recommendations` | OpenAI Smart Recommendations | `api_key`, `chat_model`, `schedule_time` |
 | `local_imagesharp_overlays` | Vora Native Overlays | `enable_schedule`, `schedule_time` |
 | `local_metadata` | Local Assets (NFO & Images) | — |
@@ -461,6 +462,15 @@ provider keys:
       Vora__PluginSettings__lastfm_listening__api_key: "YOUR_LASTFM_KEY"
       Vora__PluginSettings__lastfm_listening__api_secret: "YOUR_LASTFM_SECRET"
       Vora__PluginSettings__genius_lyrics__access_token: "YOUR_GENIUS_TOKEN"
+
+      # Subtitle search (Find Subtitles). auth_mode is "apikey" (default) or
+      # "account"; username/password are only read in account mode, and a blank
+      # pair falls back to the anonymous quota with a warning rather than failing.
+      Vora__PluginSettings__opensubtitles_search__api_key: "YOUR_OPENSUBTITLES_KEY"
+      Vora__PluginSettings__opensubtitles_search__auth_mode: "account"
+      Vora__PluginSettings__opensubtitles_search__username: "YOUR_OPENSUBTITLES_USERNAME"
+      Vora__PluginSettings__opensubtitles_search__password: "YOUR_OPENSUBTITLES_PASSWORD"
+      Vora__PluginSettings__opensubtitles_search__default_languages: "en,es"
 
       # Movie showtimes
       Vora__PluginSettings__serpapi_theater__api_key: "YOUR_SERPAPI_KEY"
@@ -511,7 +521,8 @@ Project documentation lives under [`docs/`](docs/). Highlights:
 - [`docs/auth-and-devices.md`](docs/auth-and-devices.md) — auth flow and
   device tracking
 - [`docs/streaming.md`](docs/streaming.md) — playback decision, HLS
-  session output, and how subtitles reach the player
+  session output, how subtitles reach the player, and the Find
+  Subtitles provider plugin
 - [`docs/iptv-and-dvr.md`](docs/iptv-and-dvr.md) — IPTV, EPG, and DVR
   architecture
 - [`docs/music-and-audio.md`](docs/music-and-audio.md) — music subsystem

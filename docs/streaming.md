@@ -161,7 +161,18 @@ POST /api/media/{id}/subtitles/download {providerFileId, language}
 
 Both are authenticated and both **404 when no provider is configured**. An empty list would read as "this title has no subtitles"; a 404 says the feature is not on.
 
-Availability is exposed as `FeatureFlagsVM.SubtitleSearch` so the clients hide the UI — the web player shows a **Find subtitles online** entry under the subtitle picker only when the flag is true, and hides rather than disables it, since a button that can only fail is worse than no button. A download refreshes the track list, selects the new track, and sideloads it through the existing `<track>` path: no restart, no new delivery code. It is **read-only and derived** — it is absent from `UpdateFeatureFlagsRequest`, because it follows the plugin: an admin turns it on by entering an API key, not by flipping a switch.
+**OpenSubtitles supports two authentication modes**, one source either way, chosen by the `auth_mode` plugin setting (default **API key only**):
+
+- **API key only** — the `Api-Key` header on every request, no sign-in. Downloads bill to the shared anonymous quota.
+- **Account** — `POST /api/v1/login` with the key returns a JWT **and a `base_url`**, which can be a different host for a VIP account; later calls go to that host carrying `Authorization: Bearer` *alongside* the key. The token is cached in memory and re-obtained automatically on a 401, so an expiry never looks like the feature breaking at random. Neither the password nor the token is ever logged, and a failed sign-in logs the status only — the body echoes the credentials back.
+
+All five settings seed from the environment like any other plugin's — `Vora__PluginSettings__opensubtitles_search__<key>` for `api_key`, `auth_mode`, `username`, `password`, `default_languages` (see the README matrix). `auth_mode` is matched on containing "account", so both the plain word and the dropdown's own label work; anything else stays on the API key.
+
+Account mode with a blank username or password **falls back to API-key-only with a warning** rather than failing: the anonymous quota still works, and taking the whole feature down over a half-finished settings page helps nobody.
+
+Quota is not a single signal. OpenSubtitles refuses with a 406, a 429, *or* a 200 whose body carries `remaining: 0` and no `link`, so all three are read as out-of-downloads and raised as `SubtitleProviderException` — which the global handler turns into a **429 with the provider's own wording**, so a viewer sees "download limit reached" instead of a generic failure. `remaining: 0` *with* a link is the last allowed download, not a refusal.
+
+Availability is exposed as `FeatureFlagsVM.SubtitleSearch` so the clients hide the UI — the web player shows a **Find subtitles online** entry under the subtitle picker only when the flag is true, and hides rather than disables it, since a button that can only fail is worse than no button. A download refreshes the track list, selects the new track, and sideloads it through the existing `<track>` path: no restart, no new delivery code. The flag is **read-only and derived** — it is absent from `UpdateFeatureFlagsRequest`, because it follows the plugin: an admin turns it on by entering an API key, not by flipping a switch.
 
 **A query is built from the item, not the row.** An episode searches on its *series* title plus season and episode numbers — a provider matching on an episode's own title finds nothing — and an external id is preferred over a title, because a fuzzy title match is where wrong-film subtitles come from.
 
