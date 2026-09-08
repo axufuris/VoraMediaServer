@@ -180,7 +180,11 @@ The id an episode carries is the **show's**, since episodes hold none of their o
 
 **A refused search is not an empty one.** A non-success answer from the provider raises `SubtitleProviderException` rather than returning zero results, so a rejected API key reads as a rejected API key instead of "this title has no subtitles". `VoraGlobalExceptionHandler` maps quota exhaustion to **429** and any other provider failure to **502**, keeping the provider's own wording in `detail` (it survives the usual 5xx redaction), and the player shows that text. The most common misconfiguration — pasting the JWT that `/login` returns into the API Key field, instead of the short consumer key — is detected by shape and named explicitly, both here and in Test Connection.
 
-**Downloads land in the server's store, never beside the media**, at `{StoragePaths:Subtitles}/{shard}/{mediaItemId}/{trackId}.vtt`. The library is read-only. The bytes are converted to WebVTT once, on the way in, so the delivery endpoint later serves them as a straight copy.
+**Downloads land in the server's store, never beside the media**, at `{StoragePaths:Subtitles}/{shard}/{mediaItemId}/{trackId}.vtt`. The library is read-only. The bytes are converted to WebVTT once, on the way in, so the delivery endpoint later serves them as a straight copy — the staged file keeps the source's real extension, because FFmpeg picks its demuxer partly from that.
+
+`StoragePaths:Subtitles` was added after most servers were deployed, so **unset is the normal case** and resolving it to `AppContext.BaseDirectory` is wrong: in Docker that is `/app/subtitles`, part of the read-only image. `SubtitleStorePath.Resolve` falls back beside a directory the deployment already mounts and persists (the parent of `VideoThumbnails`, `CustomArtwork`, …), so an existing server gains the feature with no compose change.
+
+**The store is checked before the download, not after.** `POST /download` spends a quota unit the moment it is called, so an unwritable directory discovered afterwards burns one of the day's allowance and leaves nothing behind. An unwritable store is reported as a configuration problem naming the path, not as an unhandled 500.
 
 The result is an external `MediaSubtitleTrack` with `IsDownloaded = true`, which makes it selectable through the machinery already described — and that flag matters: sidecar reconciliation matches by path against what is on disk next to the video, so a downloaded track must be **excluded from `SyncExternalSubtitleTracksAsync`** or every scan would delete it.
 
