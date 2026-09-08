@@ -78,17 +78,19 @@ public class SubtitleSearchManager : ISubtitleSearchManager
         var partId = await _mediaRepository.GetPrimaryMediaPartIdAsync(mediaItemId);
         if (partId == null) return null;
 
-        var download = await provider.DownloadAsync(providerFileId, cancellationToken);
-        if (download == null || download.Content.Length == 0) return null;
-
         var trackId = Guid.NewGuid();
         var storePath = BuildStorePath(mediaItemId, trackId);
-        Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
+        EnsureStoreIsWritable(Path.GetDirectoryName(storePath)!);
+
+        var download = await provider.DownloadAsync(providerFileId, cancellationToken);
+        if (download == null || download.Content.Length == 0) return null;
 
         // The provider hands back whatever format it holds. It is converted once,
         // here, so the file in the store is already what the delivery endpoint
         // serves — the per-request path then never runs FFmpeg for it at all.
-        var stagedSource = storePath + ".src";
+        // The staging file keeps the source's real extension: FFmpeg picks its
+        // demuxer partly from that, and a neutral suffix makes it guess.
+        var stagedSource = Path.ChangeExtension(storePath, NormalizeExtension(download.Format));
         try
         {
             await File.WriteAllBytesAsync(stagedSource, download.Content, cancellationToken);
@@ -196,12 +198,32 @@ public class SubtitleSearchManager : ISubtitleSearchManager
 
     private string BuildStorePath(Guid mediaItemId, Guid trackId)
     {
-        var root = string.IsNullOrWhiteSpace(_storagePaths.Subtitles)
-            ? Path.Combine(AppContext.BaseDirectory, "subtitles")
-            : _storagePaths.Subtitles;
-
+        var root = SubtitleStorePath.Resolve(_storagePaths);
         var shard = mediaItemId.ToString("N")[..2];
         return Path.Combine(root, shard, mediaItemId.ToString("N"), $"{trackId:N}.vtt");
+    }
+
+    public static string NormalizeExtension(string? format)
+    {
+        var trimmed = format?.Trim().TrimStart('.').ToLowerInvariant();
+        return trimmed is "srt" or "ass" or "ssa" or "vtt" or "sub" ? trimmed : "srt";
+    }
+
+    // A misconfigured path is the admin's to fix, so it is reported as such
+    // rather than surfacing as an unhandled 500 with a stack trace.
+    private void EnsureStoreIsWritable(string directory)
+    {
+        try
+        {
+            Directory.CreateDirectory(directory);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "The subtitle store at {Directory} is not writable.", directory);
+
+            throw new Vora.Plugins.Dtos.SubtitleProviderException(
+                $"Vora cannot write downloaded subtitles to \"{directory}\". Set StoragePaths:Subtitles to a writable path on the data volume and restart.");
+        }
     }
 
     private static void TryDelete(string path)
