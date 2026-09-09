@@ -12,8 +12,9 @@ import { loadHls } from '../../utils/loadHls';
 import { useDialog } from '../../dialogs';
 import { useAutoHideControls } from './Controls/useAutoHideControls';
 import { useFullscreen } from './Controls/useFullscreen';
-import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeButton, CloseButton, EpisodeNavButton } from './Controls/PlayerButtons';
+import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeButton, CloseButton, EpisodeNavButton, SubtitlesButton } from './Controls/PlayerButtons';
 import PlayerSettingsPanel from './Panels/PlayerSettingsPanel';
+import SubtitleTracksPanel from './Panels/SubtitleTracksPanel';
 import PlayerInfoPanel from './Panels/PlayerInfoPanel';
 import UpNextOverlay from './Panels/UpNextOverlay';
 import { useVideoThumbnails } from '../../hooks/useVideoThumbnails';
@@ -87,6 +88,7 @@ export default function GlobalVideoPlayer() {
 
     const [mediaDetails, setMediaDetails] = useState<MediaItem | null>(null);
     const [showSettings, setShowSettings] = useState(false);
+    const [showSubtitles, setShowSubtitles] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
 
     const [selVideo, setSelVideo] = useState('');
@@ -435,7 +437,7 @@ export default function GlobalVideoPlayer() {
     const showControls = useAutoHideControls({
         isMinimized,
         isPlaying,
-        keepVisibleWhen: isEnding || showSettings || showInfo,
+        keepVisibleWhen: isEnding || showSettings || showInfo || showSubtitles,
     });
 
     const toggleFullScreen = useFullscreen(playerContainerRef);
@@ -543,6 +545,30 @@ export default function GlobalVideoPlayer() {
         await sideloadSubtitle(desiredTextSubRef.current);
     };
 
+    const handleSelectSubtitle = async (subtitleTrackId: string) => {
+        const chosen = mediaDetails?.mediaParts
+            ?.flatMap((p: MediaPart) => p.subtitleTracks ?? [])
+            .find((st: SubtitleTrackType) => st.id === subtitleTrackId);
+
+        const wantsBurnIn = !!chosen && isImageSubtitleCodec(chosen.codec);
+        const hasBurnedInSub = currentMedia?.subtitleStrategy === 'BurnIn';
+
+        setSelSub(subtitleTrackId);
+        desiredTextSubRef.current = wantsBurnIn || isNoSubtitle(subtitleTrackId) ? null : subtitleTrackId;
+
+        // Adding a burned-in subtitle, or dropping one that is already burned
+        // into the picture, both need a new encode — nothing the client can undo.
+        if (wantsBurnIn || hasBurnedInSub) {
+            setShowSubtitles(false);
+            detachSideloadedTrack();
+            setTextSubtitleId(null);
+            await changeStreams(selVideo, selAudio, wantsBurnIn ? subtitleTrackId : NoSubtitle);
+            return;
+        }
+
+        await sideloadSubtitle(desiredTextSubRef.current);
+    };
+
     const handleSubtitleDownloaded = async (subtitleTrackId: string) => {
         if (!currentMedia) return;
 
@@ -557,6 +583,8 @@ export default function GlobalVideoPlayer() {
         await sideloadSubtitle(subtitleTrackId);
     };
 
+    const canFindSubtitles = flags.subtitleSearch && !currentMedia.isExtra;
+
     const progressPercent = duration > 0 && isFinite(duration) ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
 
     const activeStreamPart = mediaDetails?.mediaParts?.find((p: MediaPart) =>
@@ -566,6 +594,10 @@ export default function GlobalVideoPlayer() {
     const activeVideoTrack = activeStreamPart?.videoTracks?.find((vt: VideoTrackType) => vt.id === currentMedia.videoTrackId);
     const activeAudioTrack = activeStreamPart?.audioTracks?.find((at: AudioTrackType) => at.id === currentMedia.audioTrackId);
     const effectiveSubtitleId = textSubtitleId ?? currentMedia.subtitleTrackId;
+
+    // Nothing to open when the file carries no subtitles and no provider could
+    // fetch one — the control is hidden rather than shown leading nowhere.
+    const hasSubtitleOptions = (activeStreamPart?.subtitleTracks?.length ?? 0) > 0 || canFindSubtitles;
     const activeSubtitleTrack = activeStreamPart?.subtitleTracks?.find((st: SubtitleTrackType) => st.id === effectiveSubtitleId);
 
     // When a transcode is in play, the player gets WHAT THE SERVER
@@ -737,9 +769,9 @@ export default function GlobalVideoPlayer() {
 
             {!isMinimized && !isEnding && (
                 <div
-                    className={`absolute inset-0 z-30 flex flex-col justify-between transition-opacity duration-500 ${showControls || showSettings || showInfo ? 'opacity-100' : 'opacity-0'}`}
+                    className={`absolute inset-0 z-30 flex flex-col justify-between transition-opacity duration-500 ${showControls || showSettings || showInfo || showSubtitles ? 'opacity-100' : 'opacity-0'}`}
                     style={{
-                        background: showControls || showSettings || showInfo
+                        background: showControls || showSettings || showInfo || showSubtitles
                             ? 'linear-gradient(180deg, rgba(0, 0, 0, 0.7) 0%, transparent 18%, transparent 70%, rgba(0, 0, 0, 0.85) 100%)'
                             : 'transparent',
                     }}
@@ -850,6 +882,12 @@ export default function GlobalVideoPlayer() {
                                 >
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
                                 </button>
+                                {hasSubtitleOptions && (
+                                    <SubtitlesButton
+                                        onClick={() => setShowSubtitles(true)}
+                                        isActive={!isNoSubtitle(effectiveSubtitleId)}
+                                    />
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => setShowSettings(true)}
@@ -873,17 +911,26 @@ export default function GlobalVideoPlayer() {
                     mediaDetails={mediaDetails}
                     selVideo={selVideo}
                     selAudio={selAudio}
-                    selSub={selSub}
                     setSelVideo={setSelVideo}
                     setSelAudio={setSelAudio}
-                    setSelSub={setSelSub}
                     caps={caps}
-                    mediaItemId={currentMedia.id}
-                    serverId={serverId}
-                    canFindSubtitles={flags.subtitleSearch && !currentMedia.isExtra}
-                    onSubtitleDownloaded={handleSubtitleDownloaded}
+                    onVideoPartChanged={() => handleSelectSubtitle(NoSubtitle)}
                     onCancel={() => setShowSettings(false)}
                     onApply={handleApplyStreams}
+                />
+            )}
+
+            {showSubtitles && (
+                <SubtitleTracksPanel
+                    mediaDetails={mediaDetails}
+                    activePart={activeStreamPart}
+                    selectedSubtitleId={selSub}
+                    mediaItemId={currentMedia.id}
+                    serverId={serverId}
+                    canFindSubtitles={canFindSubtitles}
+                    onSelect={handleSelectSubtitle}
+                    onSubtitleDownloaded={handleSubtitleDownloaded}
+                    onClose={() => setShowSubtitles(false)}
                 />
             )}
 
