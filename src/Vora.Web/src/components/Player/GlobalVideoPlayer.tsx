@@ -19,6 +19,7 @@ import PlayerInfoPanel from './Panels/PlayerInfoPanel';
 import UpNextOverlay from './Panels/UpNextOverlay';
 import { useVideoThumbnails } from '../../hooks/useVideoThumbnails';
 import { isImageSubtitleCodec, isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
+import { placeCues } from '../../utils/subtitleCuePlacement';
 import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { ScrubThumbnail } from './VideoScrubThumbnails';
 
@@ -143,8 +144,12 @@ export default function GlobalVideoPlayer() {
 
             // The browser parks a freshly attached track at 'disabled' until the
             // cue file loads, so the mode is set again on load rather than only
-            // here — setting it once can be silently undone.
-            track.addEventListener('load', () => { track.track.mode = 'showing'; }, { once: true });
+            // here — setting it once can be silently undone. The cues only exist
+            // once loaded, which is also the first moment they can be placed.
+            track.addEventListener('load', () => {
+                track.track.mode = 'showing';
+                placeCues(track.track.cues);
+            }, { once: true });
             if (track.track) track.track.mode = 'showing';
 
             // A media element reset (a source swap inside the same session)
