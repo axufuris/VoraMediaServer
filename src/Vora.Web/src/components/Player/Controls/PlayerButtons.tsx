@@ -154,6 +154,33 @@ export function FullscreenButton({ onClick }: FullscreenButtonProps) {
     );
 }
 
+interface SubtitlesButtonProps {
+    onClick: () => void;
+    // Filled when a subtitle is showing, so the control says at a glance whether
+    // captions are on without opening anything.
+    isActive: boolean;
+}
+
+export function SubtitlesButton({ onClick, isActive }: SubtitlesButtonProps) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title="Subtitles"
+            aria-label="Subtitles"
+            aria-pressed={isActive}
+            className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-white/10"
+            style={{ color: isActive ? 'var(--vora-accent-500)' : '#fafafa' }}
+        >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2.5" />
+                <path d="M8.5 10.5a2 2 0 1 0 0 3" />
+                <path d="M15.5 10.5a2 2 0 1 0 0 3" />
+            </svg>
+        </button>
+    );
+}
+
 interface MaximizeButtonProps {
     onClick: () => void;
 }
