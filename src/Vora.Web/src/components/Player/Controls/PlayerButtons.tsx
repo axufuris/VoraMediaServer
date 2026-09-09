@@ -169,13 +169,14 @@ export function SubtitlesButton({ onClick, isActive }: SubtitlesButtonProps) {
             title="Subtitles"
             aria-label="Subtitles"
             aria-pressed={isActive}
-            className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-white/10"
+            className="cursor-pointer rounded-full p-2 transition-colors hover:bg-white/10"
             style={{ color: isActive ? 'var(--vora-accent-500)' : '#fafafa' }}
         >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="5" width="20" height="14" rx="2.5" />
-                <path d="M8.5 10.5a2 2 0 1 0 0 3" />
-                <path d="M15.5 10.5a2 2 0 1 0 0 3" />
+            {/* Filled badge with the two Cs punched out, which stays legible at
+                button size where a stroked outline of the same shape muddies.
+                Sized and padded to the info and gear buttons it sits between. */}
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" fillRule="evenodd">
+                <path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V6c0-1.1-.89-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z" />
             </svg>
         </button>
     );
