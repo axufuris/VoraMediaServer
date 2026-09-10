@@ -11,7 +11,7 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
 
     private static readonly TimeSpan ExtractionTimeout = TimeSpan.FromSeconds(180);
 
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> _perKeyLocks = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, KeyedGate> _perKeyLocks = new(StringComparer.Ordinal);
     private readonly ILogger<FFmpegSubtitleExtractionService> _logger;
 
     public FFmpegSubtitleExtractionService(ILogger<FFmpegSubtitleExtractionService> logger)
@@ -122,8 +122,8 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         var cachePath = CachePath(transcodeTempDirectory, mediaPartId, subtitleTrackId, fingerprint);
         if (IsUsable(cachePath)) return cachePath;
 
-        var gate = _perKeyLocks.GetOrAdd(cachePath, _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(cancellationToken);
+        var gate = AcquireGate(cachePath);
+        await gate.Semaphore.WaitAsync(cancellationToken);
         try
         {
             if (IsUsable(cachePath)) return cachePath;
@@ -134,8 +134,41 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         }
         finally
         {
-            gate.Release();
+            gate.Semaphore.Release();
+            ReleaseGate(cachePath, gate);
         }
+    }
+
+    private KeyedGate AcquireGate(string key)
+    {
+        lock (_perKeyLocks)
+        {
+            if (!_perKeyLocks.TryGetValue(key, out var gate))
+            {
+                gate = new KeyedGate();
+                _perKeyLocks[key] = gate;
+            }
+
+            gate.Waiters++;
+            return gate;
+        }
+    }
+
+    private void ReleaseGate(string key, KeyedGate gate)
+    {
+        lock (_perKeyLocks)
+        {
+            if (--gate.Waiters > 0) return;
+
+            _perKeyLocks.Remove(key);
+            gate.Semaphore.Dispose();
+        }
+    }
+
+    private sealed class KeyedGate
+    {
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+        public int Waiters { get; set; }
     }
 
     // Used when a subtitle arrives from somewhere other than the media file — a
