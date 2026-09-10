@@ -160,13 +160,19 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
 
     public async Task UpdateUserMediaStateAsync(Guid profileId, Guid mediaItemId, double currentPosition, double mediaDuration)
     {
-        var isPlayed = mediaDuration > 0 && (currentPosition / mediaDuration) >= 0.90;
+        var isComplete = WatchStateTransition.IsComplete(currentPosition, mediaDuration);
+        var isRestarted = WatchStateTransition.IsRestarted(currentPosition, mediaDuration);
+        var resumePosition = WatchStateTransition.ResolveResumePosition(currentPosition, mediaDuration);
 
         var rowsAffected = await context.UserMediaStates
             .Where(s => s.ProfileId == profileId && s.MediaItemId == mediaItemId)
             .ExecuteUpdateAsync(s => s
-                .SetProperty(x => x.ResumePositionSeconds, isPlayed ? 0 : currentPosition)
-                .SetProperty(x => x.IsPlayed, x => x.IsPlayed || isPlayed)
+                .SetProperty(x => x.ResumePositionSeconds, resumePosition)
+                // Watching a finished item again un-finishes it. The flag used to
+                // be OR'd with its old value, which meant it could only ever go
+                // true — so a re-watch stored a resume position that the details
+                // page and Continue Watching both ignored.
+                .SetProperty(x => x.IsPlayed, x => isComplete || (x.IsPlayed && !isRestarted))
                 .SetProperty(x => x.LastPlayedAt, DateTime.UtcNow)
                 .SetProperty(x => x.IsHiddenFromContinueWatching, false));
 
@@ -179,8 +185,8 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
         {
             ProfileId = profileId,
             MediaItemId = mediaItemId,
-            ResumePositionSeconds = isPlayed ? 0 : currentPosition,
-            IsPlayed = isPlayed,
+            ResumePositionSeconds = resumePosition,
+            IsPlayed = isComplete,
             LastPlayedAt = DateTime.UtcNow,
             IsHiddenFromContinueWatching = false
         });
