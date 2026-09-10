@@ -36,7 +36,7 @@ export default function MainLayoutSidebar({
             style={{ background: 'var(--vora-bg-sunken)', borderRight: '1px solid var(--vora-border-subtle)' }}
         >
             <div className="flex items-center justify-between p-6">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center">
                     <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true">
                         <defs>
                             <linearGradient id="sidebar-vora-v" x1="0.1" y1="0" x2="0.55" y2="1">
