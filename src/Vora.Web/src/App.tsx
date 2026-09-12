@@ -68,7 +68,8 @@ const ClientSettingsPage = lazy(() => import('./pages/Client/SettingsPage'));
 const MusicPage = lazy(() => import('./pages/Client/Audio/MusicPage'));
 const PodcastsPage = lazy(() => import('./pages/Client/Audio/PodcastsPage'));
 const RadioPage = lazy(() => import('./pages/Client/Audio/RadioPage'));
-const DiscoverHubPage = lazy(() => import('./pages/Client/Discovery/DiscoverHubPage'));
+const ClientDiscoveryPage = lazy(() => import('./pages/Client/Discovery/DiscoveryPage'));
+const ClientCalendarPage = lazy(() => import('./pages/Client/CalendarPage'));
 const LiveTvHubPage = lazy(() => import('./pages/Client/LiveTv/LiveTvHubPage'));
 
 getOrCreateDeviceId();
@@ -170,7 +171,8 @@ export default function App() {
                         <Route path="media/:id" element={<ClientMediaDetailsPage />} />
                         <Route path="collection/:id" element={<ClientCollectionDetailsPage />} />
                         <Route path="/actor/:id" element={<ClientActorDetailsPage />} />
-                        <Route path="discovery" element={<DiscoverHubPage />} />
+                        <Route path="discovery" element={<ClientDiscoveryPage />} />
+                        <Route path="calendar" element={<ClientCalendarPage />} />
                         <Route path="livetv" element={<LiveTvHubPage />} />
                         <Route path="music" element={<MusicPage />} />
                         <Route path="podcasts" element={<PodcastsPage />} />
@@ -189,7 +191,8 @@ export default function App() {
                             <Route path="playlists" element={<ClientPlaylistsPage />} />
                             <Route path="playlist/:id" element={<ClientPlaylistDetailsPage />} />
                             <Route path="smart-playlist/:id" element={<SmartPlaylistDetailsPage />} />
-                            <Route path="discovery" element={<DiscoverHubPage />} />
+                            <Route path="discovery" element={<ClientDiscoveryPage />} />
+                            <Route path="calendar" element={<ClientCalendarPage />} />
                             <Route path="livetv" element={<LiveTvHubPage />} />
                             <Route path="music" element={<MusicPage />} />
                             <Route path="podcasts" element={<PodcastsPage />} />

@@ -23,7 +23,8 @@ import type { FeatureFlagsVM } from '../api/System/featureFlagsService';
 const isNavItemEnabled = (item: NavItem, flags: FeatureFlagsVM): boolean => {
     if (item.type !== 'system') return true;
     switch (item.id) {
-        case 'discovery': return flags.discover || flags.forYou || flags.releaseCalendar;
+        case 'discovery': return flags.discover;
+        case 'calendar': return flags.releaseCalendar;
         case 'podcasts': return flags.podcasts;
         case 'radio': return flags.internetRadio;
         case 'livetv': return flags.liveTv;
@@ -185,7 +186,8 @@ export default function MainLayout() {
                 { id: 'podcasts', title: 'Podcasts', path: '/podcasts', type: 'system', serverName: primaryServerName, isPinned: true, order: 1 },
                 { id: 'livetv', title: 'Live TV', path: '/livetv', type: 'system', isPinned: true, order: 2 },
                 { id: 'radio', title: 'Radio', path: '/radio', type: 'system', isPinned: true, order: 3 },
-                { id: 'discovery', title: 'Discover', path: '/discovery', type: 'system', isPinned: true, order: 5 }
+                { id: 'discovery', title: 'Discover', path: '/discovery', type: 'system', isPinned: true, order: 5 },
+                { id: 'calendar', title: 'Calendar', path: '/calendar', type: 'system', isPinned: true, order: 6 }
             ];
 
             const combinedItems = [...baseItems, ...allLibraries];
