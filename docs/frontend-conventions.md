@@ -135,8 +135,14 @@ pages/Client/LiveTv/      LiveTvPage, LiveTvGuide, DvrDashboard
 ## Tab-host pages and the `embedded` prop
 
 Some client pages are hosted as a tab inside another page rather than living at
-their own route. `HomePage` hosts **Home / For You / Collections / Watchlist / Playlists**;
-`DiscoverHubPage` hosts **Discover / Calendar**.
+their own route. `HomePage` hosts **Home / For You / Collections / Watchlist / Playlists**.
+
+**Discover is no longer a tab host.** The Release Calendar was promoted to its own
+route and nav destination, which left `DiscoverHubPage` wrapping one tab around one
+page, so it is gone and `/discovery` renders `DiscoveryPage` directly. The calendar
+lives at `/calendar` with a **`calendar`** nav id — chosen to match what the Android
+client already writes, because the nav-prefs blob is shared between them and a
+different id would silently fail to round-trip a pin or a reorder.
 
 **For You is recommendations, and they come from your own library**, so it sits
 on Home rather than in Discover — Discover is for titles you don't have. The

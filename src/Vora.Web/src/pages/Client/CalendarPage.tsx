@@ -2,6 +2,27 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { calendarService, type CalendarEventVM } from '../../api/Discovery/calendarService';
 import PageHeader from '../../components/Client/Primitives/PageHeader';
+import { StorageKeys } from '../../utils/storageKeys';
+import {
+    CalendarViewModes,
+    daysInRange,
+    isCalendarViewMode,
+    rangeTitle,
+    step,
+    visibleRange,
+    type CalendarViewMode,
+} from '../../utils/calendarRange';
+
+const VIEW_LABELS: Record<CalendarViewMode, string> = {
+    month: 'Month',
+    week: 'Week',
+    day: 'Day',
+};
+
+const readSavedViewMode = (): CalendarViewMode => {
+    const saved = localStorage.getItem(StorageKeys.calendarViewMode);
+    return isCalendarViewMode(saved) ? saved : 'month';
+};
 
 interface EventTheme {
     background: string;
@@ -35,6 +56,53 @@ const getEventTheme = (mediaType: string): EventTheme => {
     }
 };
 
+function DayAgenda({ day, events, onEventClick }: {
+    day: Date | undefined;
+    events: CalendarEventVM[];
+    onEventClick: (ev: CalendarEventVM) => void;
+}) {
+    if (!day) return null;
+
+    if (events.length === 0) {
+        return (
+            <div className="flex flex-1 items-center justify-center p-10 text-sm" style={{ color: 'var(--vora-text-muted)' }}>
+                Nothing releases on this day.
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex-1 space-y-2 overflow-y-auto p-4" style={{ background: 'var(--vora-bg-canvas)' }}>
+            {events.map(ev => {
+                const theme = getEventTheme(ev.mediaType);
+                return (
+                    <button
+                        key={ev.id}
+                        type="button"
+                        onClick={() => onEventClick(ev)}
+                        className="flex w-full cursor-pointer items-center gap-3 rounded-lg p-3 text-left transition-colors"
+                        style={{ background: theme.background, border: `1px solid ${theme.border}` }}
+                    >
+                        <span className="w-24 shrink-0 text-xs font-bold uppercase" style={{ color: theme.text }}>
+                            {ev.mediaType === 'Movie'
+                                ? (ev.releaseType === 'Theatrical' ? 'Theatrical' : 'Digital')
+                                : (ev.airTime ? new Date(ev.releaseDate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'TV')}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{ev.title}</span>
+                            {ev.subTitle && <span className="block truncate text-xs" style={{ color: 'var(--vora-text-muted)' }}>{ev.subTitle}</span>}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-1.5">
+                            {ev.isWatchlisted && <span className="h-2 w-2 rounded-full" title="On Watchlist" style={{ background: 'var(--vora-info-500)' }} />}
+                            {ev.isInLibrary && <span className="h-2 w-2 rounded-full" title="In Library" style={{ background: 'var(--vora-success-500)' }} />}
+                        </span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 interface CalendarPageProps {
     embedded?: boolean;
 }
@@ -46,31 +114,12 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
     const [events, setEvents] = useState<CalendarEventVM[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [viewMode, setViewMode] = useState<CalendarViewMode>(readSavedViewMode);
 
     const { startDate, endDate, daysInGrid } = useMemo(() => {
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth();
-
-        const firstDayOfMonth = new Date(year, month, 1);
-        const lastDayOfMonth = new Date(year, month + 1, 0);
-
-        const start = new Date(firstDayOfMonth);
-        start.setDate(start.getDate() - start.getDay());
-
-        const end = new Date(lastDayOfMonth);
-        if (end.getDay() !== 6) {
-            end.setDate(end.getDate() + (6 - end.getDay()));
-        }
-
-        const days: Date[] = [];
-        const current = new Date(start);
-        while (current <= end) {
-            days.push(new Date(current));
-            current.setDate(current.getDate() + 1);
-        }
-
-        return { startDate: start, endDate: end, daysInGrid: days };
-    }, [currentDate]);
+        const { start, end } = visibleRange(viewMode, currentDate);
+        return { startDate: start, endDate: end, daysInGrid: daysInRange(start, end) };
+    }, [viewMode, currentDate]);
 
     useEffect(() => {
         const fetchEvents = async () => {
@@ -87,9 +136,14 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
         fetchEvents();
     }, [startDate, endDate, serverId]);
 
-    const handlePreviousMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-    const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    const handlePrevious = () => setCurrentDate(step(viewMode, currentDate, -1));
+    const handleNext = () => setCurrentDate(step(viewMode, currentDate, 1));
     const handleToday = () => setCurrentDate(new Date());
+
+    const handleViewModeChange = (mode: CalendarViewMode) => {
+        setViewMode(mode);
+        localStorage.setItem(StorageKeys.calendarViewMode, mode);
+    };
 
     const handleEventClick = (ev: CalendarEventVM) => {
         const baseRoute = serverId ? `/server/${serverId}` : '';
@@ -102,17 +156,48 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
         }
     };
 
-    const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const rangeLabel = rangeTitle(viewMode, currentDate);
 
-    const navAction = (
+    const eventsOn = (day: Date | undefined) => day
+        ? events.filter(e => new Date(e.releaseDate).toDateString() === day.toDateString())
+        : [];
+
+    const viewToggle = (
+        <div
+            className="flex items-center gap-1 rounded-full p-1"
+            style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)' }}
+            role="group"
+            aria-label="Calendar view"
+        >
+            {CalendarViewModes.map(mode => {
+                const isActive = mode === viewMode;
+                return (
+                    <button
+                        key={mode}
+                        type="button"
+                        onClick={() => handleViewModeChange(mode)}
+                        aria-pressed={isActive}
+                        className="cursor-pointer rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+                        style={isActive
+                            ? { background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }
+                            : { color: 'var(--vora-text-secondary)' }}
+                    >
+                        {VIEW_LABELS[mode]}
+                    </button>
+                );
+            })}
+        </div>
+    );
+
+    const rangeControls = (
         <div
             className="flex items-center gap-2 rounded-full p-1.5"
             style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)' }}
         >
             <button
                 type="button"
-                onClick={handlePreviousMonth}
-                aria-label="Previous month"
+                onClick={handlePrevious}
+                aria-label={`Previous ${viewMode}`}
                 className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
                 style={{ color: 'var(--vora-text-secondary)' }}
             >
@@ -126,16 +211,23 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
             >
                 Today
             </button>
-            <h2 className="m-0 w-40 text-center text-sm font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{monthName}</h2>
+            <h2 className="m-0 w-44 text-center text-sm font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{rangeLabel}</h2>
             <button
                 type="button"
-                onClick={handleNextMonth}
-                aria-label="Next month"
+                onClick={handleNext}
+                aria-label={`Next ${viewMode}`}
                 className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
                 style={{ color: 'var(--vora-text-secondary)' }}
             >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
+        </div>
+    );
+
+    const navAction = (
+        <div className="flex flex-wrap items-center gap-2">
+            {viewToggle}
+            {rangeControls}
         </div>
     );
 
@@ -167,6 +259,13 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
                     className="flex min-h-[500px] flex-1 flex-col overflow-hidden rounded-2xl"
                     style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)' }}
                 >
+                    {viewMode === 'day' ? (
+                        <DayAgenda
+                            day={daysInGrid[0]}
+                            events={eventsOn(daysInGrid[0])}
+                            onEventClick={handleEventClick}
+                        />
+                    ) : (<>
                     <div
                         className="grid shrink-0 grid-cols-7 gap-px"
                         style={{ background: 'var(--vora-border-subtle)', borderBottom: '1px solid var(--vora-border-subtle)' }}
@@ -187,9 +286,9 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
                         style={{ background: 'var(--vora-border-subtle)', gridTemplateRows: `repeat(${daysInGrid.length / 7}, minmax(0, 1fr))` }}
                     >
                         {daysInGrid.map((day, idx) => {
-                            const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                            const isCurrentMonth = viewMode === 'week' || day.getMonth() === currentDate.getMonth();
                             const isToday = new Date().toDateString() === day.toDateString();
-                            const dayEvents = events.filter(e => new Date(e.releaseDate).toDateString() === day.toDateString());
+                            const dayEvents = eventsOn(day);
 
                             return (
                                 <div
@@ -246,6 +345,7 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
                             );
                         })}
                     </div>
+                    </>)}
                 </div>
 
                 <div className="mt-4 flex shrink-0 flex-wrap justify-center gap-x-8 gap-y-2 text-[11px] font-medium" style={{ color: 'var(--vora-text-muted)' }}>
