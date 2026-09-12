@@ -405,7 +405,10 @@ public class BestPathDecisionManager : IBestPathDecisionManager
     public static bool IsImageSubtitleCodec(string? codec)
     {
         var normalized = codec?.Trim().ToLowerInvariant();
-        return normalized is "pgssub" or "hdmv_pgs_subtitle" or "dvd_subtitle" or "vobsub";
+        return normalized is "pgssub" or "hdmv_pgs_subtitle" or "pgs"
+            or "dvd_subtitle" or "vobsub"
+            or "dvb_subtitle" or "dvbsub"
+            or "xsub";
     }
 
     public static int ParseHeightFromResolution(string? resolution)

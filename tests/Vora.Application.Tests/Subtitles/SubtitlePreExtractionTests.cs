@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Vora.Application.Libraries;
 using Vora.Application.Media;
 using Vora.Application.Settings;
@@ -27,9 +28,12 @@ public class SubtitlePreExtractionTests
     private readonly ISubtitleExtractionService _extractor = Substitute.For<ISubtitleExtractionService>();
     private readonly ITranscodeService _transcodes = Substitute.For<ITranscodeService>();
 
+    private readonly string _store = Path.Combine(Path.GetTempPath(), "vora-preextract-store-" + Guid.NewGuid().ToString("N"));
+
     private SubtitlePreExtractionManager NewManager() => new(
         _media, _libraries, _settings, _extractor, _transcodes,
         new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
+        Options.Create(new StoragePathsOptions { Subtitles = _store }),
         NullLogger<SubtitlePreExtractionManager>.Instance);
 
     private void Arrange(bool enabled = true, bool cached = false, params SubtitleTrackTargetDto[] tracks)
@@ -160,6 +164,32 @@ public class SubtitlePreExtractionTests
 
         await act.Should().ThrowAsync<OperationCanceledException>();
         await NothingExtracted();
+    }
+
+    // Downloaded subtitles live in the persistent store, not the derived cache,
+    // so clearing the cache left them on disk forever with nothing referencing
+    // them — one orphaned file per subtitle ever fetched for a deleted item.
+    [Fact]
+    public async Task Deleting_an_item_removes_the_subtitles_downloaded_for_it()
+    {
+        Arrange(tracks: Text(TextTrackId, 3));
+        var itemDirectory = SubtitleStorePath.ItemDirectory(new StoragePathsOptions { Subtitles = _store }, ItemId);
+        Directory.CreateDirectory(itemDirectory);
+        File.WriteAllText(Path.Combine(itemDirectory, "downloaded.vtt"), "WEBVTT");
+
+        await NewManager().PurgeItemAsync(ItemId);
+
+        Directory.Exists(itemDirectory).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Deleting_an_item_that_downloaded_nothing_is_not_an_error()
+    {
+        Arrange(tracks: Text(TextTrackId, 3));
+
+        var act = async () => await NewManager().PurgeItemAsync(ItemId);
+
+        await act.Should().NotThrowAsync();
     }
 
     [Fact]

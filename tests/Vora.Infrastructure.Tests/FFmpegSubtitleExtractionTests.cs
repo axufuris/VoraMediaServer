@@ -48,6 +48,43 @@ public class FFmpegSubtitleExtractionTests : IDisposable
     private string CurrentFingerprint(string sourcePath, int streamIndex) =>
         FFmpegSubtitleExtractionService.FingerprintForSource(sourcePath, streamIndex)!;
 
+    // The gate map used to keep one undisposed SemaphoreSlim per (part, track)
+    // ever asked for — on a pre-extracted library, one per subtitle in the whole
+    // collection, for the life of the process.
+    [Fact]
+    public async Task Extraction_gates_do_not_accumulate_across_requests()
+    {
+        var service = NewService();
+        var source = WriteSource();
+
+        for (var i = 0; i < 25; i++)
+        {
+            await service.GetOrExtractWebVttAsync(SubtitleSource.Embedded(source, 3, 1), _root, Guid.NewGuid(), Guid.NewGuid());
+        }
+
+        InFlightGateCount(service).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_gate_is_released_even_when_extraction_fails()
+    {
+        var service = NewService();
+
+        // No source file: the call bails before ffmpeg, which is still a path
+        // that must not strand a gate.
+        await service.GetOrExtractWebVttAsync(SubtitleSource.Embedded("/no/such/source.mkv", 3, 1), _root, PartId, TrackId);
+
+        InFlightGateCount(service).Should().Be(0);
+    }
+
+    private static int InFlightGateCount(FFmpegSubtitleExtractionService service)
+    {
+        var field = typeof(FFmpegSubtitleExtractionService)
+            .GetField("_perKeyLocks", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+
+        return ((System.Collections.ICollection)field.GetValue(service)!).Count;
+    }
+
     [Fact]
     public void The_cache_lives_in_its_own_subdirectory_of_the_transcode_space()
     {

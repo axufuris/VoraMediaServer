@@ -101,12 +101,16 @@ export default function GlobalVideoPlayer() {
     const [textSubtitleId, setTextSubtitleId] = useState<string | null>(null);
     const [isLoadingSubtitle, setIsLoadingSubtitle] = useState(false);
     const sideloadedTrackRef = useRef<HTMLTrackElement | null>(null);
+    const sideloadListenersRef = useRef<AbortController | null>(null);
     // What the viewer wants showing, kept across the stream restarts that a
     // video/audio change causes: the sidecar URL is per session, so the track
     // has to be re-attached against the new one.
     const desiredTextSubRef = useRef<string | null>(null);
 
     const detachSideloadedTrack = useCallback(() => {
+        sideloadListenersRef.current?.abort();
+        sideloadListenersRef.current = null;
+
         const track = sideloadedTrackRef.current;
         sideloadedTrackRef.current = null;
         if (!track) return;
@@ -146,18 +150,23 @@ export default function GlobalVideoPlayer() {
             // cue file loads, so the mode is set again on load rather than only
             // here — setting it once can be silently undone. The cues only exist
             // once loaded, which is also the first moment they can be placed.
+            const listeners = new AbortController();
+            sideloadListenersRef.current = listeners;
+
             track.addEventListener('load', () => {
                 track.track.mode = 'showing';
                 placeCues(track.track.cues);
-            }, { once: true });
+            }, { once: true, signal: listeners.signal });
             if (track.track) track.track.mode = 'showing';
 
             // A media element reset (a source swap inside the same session)
             // parks every text track at 'disabled' again, which would drop the
-            // subtitle with nothing on screen to explain it.
+            // subtitle with nothing on screen to explain it. The <video> outlives
+            // every track attached to it, so this listener has to come off with
+            // the track rather than piling up one per subtitle change.
             video.addEventListener('loadedmetadata', () => {
                 if (sideloadedTrackRef.current === track) track.track.mode = 'showing';
-            });
+            }, { signal: listeners.signal });
 
             setTextSubtitleId(subtitleTrackId);
         } finally {

@@ -184,6 +184,8 @@ The id an episode carries is the **show's**, since episodes hold none of their o
 
 `StoragePaths:Subtitles` was added after most servers were deployed, so **unset is the normal case** and resolving it to `AppContext.BaseDirectory` is wrong: in Docker that is `/app/subtitles`, part of the read-only image. `SubtitleStorePath.Resolve` falls back beside a directory the deployment already mounts and persists (the parent of `VideoThumbnails`, `CustomArtwork`, …), so an existing server gains the feature with no compose change.
 
+**Deleting an item takes its downloads with it.** Everything fetched for one item shares a directory under the store, so `PurgeItemAsync` removes that directory as well as the derived cache. Clearing only the cache left the originals on disk permanently, referenced by nothing.
+
 **The store is checked before the download, not after.** `POST /download` spends a quota unit the moment it is called, so an unwritable directory discovered afterwards burns one of the day's allowance and leaves nothing behind. An unwritable store is reported as a configuration problem naming the path, not as an unhandled 500.
 
 The result is an external `MediaSubtitleTrack` with `IsDownloaded = true`, which makes it selectable through the machinery already described — and that flag matters: sidecar reconciliation matches by path against what is on disk next to the video, so a downloaded track must be **excluded from `SyncExternalSubtitleTracksAsync`** or every scan would delete it.
@@ -204,7 +206,21 @@ The web player fetches the route and sideloads the result. Two things shape how:
 - **Cues are lifted off the bottom edge.** The browser positions cues against the `<video>` *element*, not the picture inside it, and the player fills the viewport with `object-contain` — so the default placement lands the text in the black bar below the picture, on top of the transport controls. That is the normal case, not an edge one: a scope film hard-matted into a 16:9 frame produces it every time. `utils/subtitleCuePlacement.ts` sets a negative `line` on cues that carry no position of their own, and leaves deliberately-positioned cues alone.
 - **Picking a text subtitle doesn't restart the stream.** `GlobalVideoPlayer` keeps exactly one sideloaded `<track>` and swaps its source; the video keeps playing. Only a video/audio change, or adding or dropping a burn-in subtitle, still goes through `changeStreams`. A text subtitle is never sent to `/streaming/start` either — it's attached after playback begins, so a cold extraction can't delay the play request.
 
-Codec classification is duplicated client-side in `utils/subtitleKind.ts` and **must agree with `BestPathDecisionManager.IsImageSubtitleCodec`**: a codec the server burns in but the client thinks is text renders the subtitle twice, and the reverse renders it not at all.
+Codec classification is duplicated client-side in `utils/subtitleKind.ts` and **must agree with `BestPathDecisionManager.IsImageSubtitleCodec`**: a codec the server burns in but the client thinks is text renders the subtitle twice, and the reverse gives a stream restart and no subtitle at all. `SubtitleCodecParityTests` holds a copy of the client list and fails if the server stops recognising anything in it, because the drift is otherwise invisible until a viewer hits one of the codecs.
+
+The image list is `pgssub`, `hdmv_pgs_subtitle`, `pgs`, `dvd_subtitle`, `vobsub`, `dvb_subtitle`, `dvbsub`, `xsub`. The broadcast formats matter for DVR recordings, which is where they turn up.
+
+## Watch state
+
+A progress ping writes `UserMediaState` through `StreamRepository.UpdateUserMediaStateAsync`, and `WatchStateTransition` decides what it means:
+
+- past **90%** → played, resume cleared to 0
+- a re-watch that gets **15 seconds** in → **not** played any more, resume where the viewer is
+- anything else → left as it was
+
+`IsPlayed` used to be `IsPlayed || completed`, so it could only ever go true. Re-watching a finished item stored a resume position nothing surfaced, because all three consumers require it to be false: the details page (`inProgress = resumePos > 0 && !isPlayed`), the watched check, and the Continue Watching query (`ResumePositionSeconds > 0 && !s.IsPlayed`). The only escape was marking it unwatched by hand.
+
+The 15-second window exists because a ping can land at position 0 before the player has seeked to its resume point — clearing on that would wipe a finished item's state for someone who never restarted it. An unknown duration (Live TV) leaves the flag alone entirely.
 
 ## Gotchas
 

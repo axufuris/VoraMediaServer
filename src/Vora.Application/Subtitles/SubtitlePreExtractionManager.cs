@@ -21,6 +21,7 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
     private readonly ISubtitleExtractionService _extractor;
     private readonly ITranscodeService _transcodeService;
     private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
+    private readonly StoragePathsOptions _storagePaths;
     private readonly ILogger<SubtitlePreExtractionManager> _logger;
 
     public SubtitlePreExtractionManager(
@@ -30,6 +31,7 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
         ISubtitleExtractionService extractor,
         ITranscodeService transcodeService,
         Vora.Plugins.Interfaces.ITaskProgressReporter progress,
+        Microsoft.Extensions.Options.IOptions<StoragePathsOptions> storagePaths,
         ILogger<SubtitlePreExtractionManager> logger)
     {
         _mediaRepository = mediaRepository;
@@ -38,6 +40,7 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
         _extractor = extractor;
         _transcodeService = transcodeService;
         _progress = progress;
+        _storagePaths = storagePaths.Value;
         _logger = logger;
     }
 
@@ -106,6 +109,24 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
         foreach (var target in targets)
         {
             _extractor.PurgePart(root, target.MediaPartId);
+        }
+
+        RemoveDownloadedSubtitles(mediaItemId);
+    }
+
+    // Everything Vora downloaded for an item lives under one directory named for
+    // it, so the whole directory goes when the item does.
+    private void RemoveDownloadedSubtitles(Guid mediaItemId)
+    {
+        var directory = SubtitleStorePath.ItemDirectory(_storagePaths, mediaItemId);
+
+        try
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not remove downloaded subtitles at {Directory}.", directory);
         }
     }
 

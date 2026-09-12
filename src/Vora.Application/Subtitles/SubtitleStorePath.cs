@@ -15,6 +15,11 @@ public static class SubtitleStorePath
 {
     public const string DirectoryName = "subtitles";
 
+    // Everything downloaded for one item shares a directory, which is what makes
+    // deleting the item a single directory removal.
+    public static string ItemDirectory(StoragePathsOptions paths, Guid mediaItemId) =>
+        Path.Combine(Resolve(paths), mediaItemId.ToString("N")[..2], mediaItemId.ToString("N"));
+
     public static string Resolve(StoragePathsOptions paths)
     {
         if (!string.IsNullOrWhiteSpace(paths.Subtitles)) return paths.Subtitles!;
