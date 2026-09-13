@@ -6,6 +6,7 @@ import EmptyState from '../../components/Client/Primitives/EmptyState';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../components/Client/Primitives/MediaGrid';
 import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
+import { discoveryTarget } from '../../utils/discoveryNavigation';
 
 interface WatchlistPageProps {
     embedded?: boolean;
@@ -34,10 +35,7 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
     // A bookmarked title that is in the library opens the local item, where it
     // can actually be played; anything else opens the provider page.
     const openPath = (item: WatchlistItem) => {
-        const prefix = serverId ? `/server/${serverId}` : '';
-        return item.mediaItemId
-            ? `${prefix}/media/${item.mediaItemId}`
-            : `${prefix}/discovery/${item.providerId}/${item.type}/${item.externalId}`;
+        return discoveryTarget(item, serverId);
     };
 
     return (

@@ -8,6 +8,7 @@ import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { discoveryTarget } from '../../../utils/discoveryNavigation';
 
 export default function DiscoveryViewAllPage() {
     const { serverId, providerId, rowId } = useParams<{ serverId?: string, providerId: string, rowId: string }>();
@@ -145,7 +146,7 @@ export default function DiscoveryViewAllPage() {
                                 title={item.title}
                                 captionLines={item.year ? [item.year.toString()] : []}
                                 inWatchlist={watchlistIds.has(item.externalId)}
-                                onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${providerId}/${item.type}/${item.externalId}` : `/discovery/${providerId}/${item.type}/${item.externalId}`)}
+                                onClick={() => navigate(discoveryTarget({ ...item, providerId: providerId! }, serverId))}
                                 bottomLeftBadge={statusBadge}
                                 fill
                             />

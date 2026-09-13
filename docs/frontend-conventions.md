@@ -137,6 +137,8 @@ pages/Client/LiveTv/      LiveTvPage, LiveTvGuide, DvrDashboard
 Some client pages are hosted as a tab inside another page rather than living at
 their own route. `HomePage` hosts **Home / For You / Collections / Watchlist / Playlists**.
 
+**A discovery result that is already in the library opens the library page.** Discovery, search, calendar and watchlist results carry `mediaItemId` when the server recognised the title as one it holds; `utils/discoveryNavigation.ts` turns that into `/media/{id}` and falls back to the discovery route only when it is absent. Routing to discovery regardless shows a Play-less page for a film the viewer owns, so use the helper rather than building the path at the call site.
+
 **Discover is no longer a tab host.** The Release Calendar was promoted to its own
 route and nav destination, which left `DiscoverHubPage` wrapping one tab around one
 page, so it is gone and `/discovery` renders `DiscoveryPage` directly. The calendar
