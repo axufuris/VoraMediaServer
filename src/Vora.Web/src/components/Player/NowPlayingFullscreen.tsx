@@ -5,6 +5,7 @@ import { musicService, type LyricsVM } from '../../api/Music/musicService';
 import { parseLrc, findActiveLineIndex, type LrcLine } from '../../utils/lrcParser';
 import { audioQualityStore, crossfadeStore, eqPresetStore, type AudioQuality, type EqPreset } from '../../utils/audioQuality';
 import { Modal } from '../Common/Modal';
+import { useSpatialNavigation } from '../../hooks/useSpatialNavigation';
 
 const formatTime = (sec: number): string => {
     if (!isFinite(sec) || sec < 0) return '0:00';
@@ -23,6 +24,11 @@ export default function NowPlayingFullscreen() {
         radioSeed, radioLabel,
     } = usePlayer();
     const { currentTime, duration } = usePlayerTime();
+
+    const screenRef = useRef<HTMLDivElement>(null);
+    const playButtonRef = useRef<HTMLButtonElement>(null);
+
+    useSpatialNavigation(screenRef, isFullscreen);
 
     const [lyricsOpen, setLyricsOpen] = useState(false);
     const [queueOpen, setQueueOpen] = useState(false);
@@ -72,6 +78,15 @@ export default function NowPlayingFullscreen() {
 
     const parsedLrc = useMemo<LrcLine[]>(() => parseLrc(lyrics?.syncedLyrics), [lyrics?.syncedLyrics]);
     const activeLineIdx = lyrics?.isSynced ? findActiveLineIndex(parsedLrc, currentTime) : -1;
+
+    // A D-pad can only move focus that already exists. Opening the screen
+    // leaves focus on whatever was behind it, so the first arrow press has
+    // nothing to move and the remote appears dead until something is clicked --
+    // which a remote cannot do. Play/pause is the natural landing point.
+    useEffect(() => {
+        if (!isFullscreen) return;
+        playButtonRef.current?.focus();
+    }, [isFullscreen]);
 
     useEffect(() => {
         if (!isFullscreen) return;
@@ -160,7 +175,7 @@ export default function NowPlayingFullscreen() {
     });
 
     return (
-        <div className="fixed inset-0 z-[100000] flex flex-col overflow-hidden" style={{ background: 'var(--vora-bg-canvas)', color: 'var(--vora-text-primary)' }}>
+        <div ref={screenRef} className="fixed inset-0 z-[100000] flex flex-col overflow-hidden" style={{ background: 'var(--vora-bg-canvas)', color: 'var(--vora-text-primary)' }}>
             <div className="absolute inset-0 z-0">
                 {posterUrl ? (
                     <img
@@ -407,6 +422,7 @@ export default function NowPlayingFullscreen() {
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
                     </button>
                     <button
+                        ref={playButtonRef}
                         type="button"
                         onClick={togglePlayPause}
                         title={isPlaying ? 'Pause' : 'Play'}
