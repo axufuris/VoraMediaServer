@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Vora.Application.Logging;
 using Vora.Application.Logging.ViewModels;
 
+using Vora.Api.Extensions;
+
 namespace Vora.Api.Endpoints;
 
 public static class LogEndpoints
@@ -42,7 +44,7 @@ public static class LogEndpoints
         [FromQuery] long? beforeId,
         [FromQuery] int? limit)
     {
-        var request = BuildRequest(levelsCsv, category, search, sinceUtc, untilUtc, beforeId, limit);
+        var request = BuildRequest(levelsCsv, category, search, sinceUtc.AsUtc(), untilUtc.AsUtc(), beforeId, limit);
         return Results.Ok(manager.Query(request));
     }
 
@@ -55,7 +57,7 @@ public static class LogEndpoints
         [FromQuery] DateTime? sinceUtc,
         [FromQuery] DateTime? untilUtc)
     {
-        var request = BuildRequest(levelsCsv, category, search, sinceUtc, untilUtc, beforeId: null, limit: 100_000);
+        var request = BuildRequest(levelsCsv, category, search, sinceUtc.AsUtc(), untilUtc.AsUtc(), beforeId: null, limit: 100_000);
         var stream = manager.Export(request, format, out var contentType, out var fileName);
         return Results.File(stream, contentType, fileName);
     }
