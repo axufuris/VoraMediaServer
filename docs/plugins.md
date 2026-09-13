@@ -110,3 +110,13 @@ Admin themes are NOT code plugins. They're folder bundles at `<install>/Themes/<
 Author guide: `docs/admin-theme-bundles.md`. Surface in the admin UI: **Admin → Server → Appearance** (`/admin/appearance`).
 
 Theme authors don't need to write or compile C# — a bundle is just JSON + images. If you ever expand this to support compiled themes (with React-component slot overrides), that becomes a code plugin and lives in `<install>/Plugins/` like everything else; the contracts would go in `Vora.Plugins/Interfaces/` next to the existing provider interfaces.
+
+## SerpApi showtimes: diagnosing an empty result
+
+`SerpApiTheaterProvider` asks SerpApi for `engine=google` with `q="<title> showtimes <location>"` and reads the `showtimes` array off the response. Every failure path returns an empty list, and the client renders "No local showtimes found for this location" — which looks identical whether the key is missing, the quota is gone, or Google simply served a page without a showtimes block.
+
+So each path logs its own reason. When the response parses but carries no `showtimes` block, the log names the blocks that *were* present (`ai_overview`, `knowledge_graph`, `organic_results`, …), which is what distinguishes "Google stopped returning showtimes" from a configuration problem. SerpApi also reports some failures as an `error` string inside a 200 response — quota exhaustion among them — so that is read and logged rather than being silently parsed as "no results".
+
+**Only non-empty results are cached.** The 12-hour entry exists to protect a small monthly search quota, but caching an empty result meant a transient upstream failure persisted for 12 hours after it had recovered.
+
+`max_theaters` is resolved **server-side**. The client sends neither `location` nor `maxTheaters`, so the endpoint falls back to `UserProfile.ShowtimesLocation` then the plugin's `default_location`, and the provider falls back to the plugin's `max_theaters`. The web client used to send a hardcoded `6` read from a `client_max_theaters_<profileId>` localStorage key that nothing ever wrote, which silently overrode whatever an admin had configured.

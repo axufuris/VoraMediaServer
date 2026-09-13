@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Text.Json;
 using Vora.Plugins.Dtos;
@@ -105,77 +106,133 @@ public class SerpApiTheaterProvider : IDiscoveryTheaterProvider, IPluginConnecti
     {
         using var scope = _scopeFactory.CreateScope();
         var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<SerpApiTheaterProvider>>();
 
         var searchLocation = string.IsNullOrWhiteSpace(location)
             ? await settings.GetSettingAsync(Id, "default_location")
             : location;
 
-        if (string.IsNullOrWhiteSpace(searchLocation)) return new List<TheaterDto>();
+        if (string.IsNullOrWhiteSpace(searchLocation))
+        {
+            logger.LogWarning("Showtimes lookup for '{MovieTitle}' skipped: no location on the profile and no default_location configured for {PluginId}.", movieTitle, Id);
+            return new List<TheaterDto>();
+        }
 
         var limitStr = await settings.GetSettingAsync(Id, "max_theaters");
         var limit = maxTheaters ?? (int.TryParse(limitStr, out var l) ? l : 6);
 
         var cacheKey = $"serpapi_theaters_{movieTitle.ToLowerInvariant()}_{searchLocation.ToLowerInvariant()}_{date:yyyyMMdd}";
 
-        var cachedTheaters = await _cache.GetOrCreateAsync(cacheKey, async entry =>
+        if (_cache.TryGetValue<List<TheaterDto>>(cacheKey, out var cached) && cached is { Count: > 0 })
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12);
-            entry.Size = CacheEntrySize;
+            return cached.Take(limit);
+        }
 
-            var apiKey = await settings.GetSettingAsync(Id, "api_key");
-            if (string.IsNullOrWhiteSpace(apiKey)) return new List<TheaterDto>();
+        var theaters = await FetchShowtimesAsync(settings, logger, movieTitle, searchLocation);
 
-            var query = $"{movieTitle} showtimes {searchLocation}";
-            var url = $"search.json?engine=google&q={Uri.EscapeDataString(query)}&api_key={apiKey}";
-
-            var response = await _httpClient.GetAsync(url);
-            if (!response.IsSuccessStatusCode) return new List<TheaterDto>();
-
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var doc = await JsonDocument.ParseAsync(stream);
-            var el = doc.RootElement;
-
-            var theaters = new List<TheaterDto>();
-
-            if (el.TryGetProperty("showtimes", out var showtimesArray) && showtimesArray.ValueKind == JsonValueKind.Array)
+        if (theaters.Count > 0)
+        {
+            _cache.Set(cacheKey, theaters, new MemoryCacheEntryOptions
             {
-                if (showtimesArray.GetArrayLength() > 0 && showtimesArray[0].TryGetProperty("theaters", out var theatersData))
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12),
+                Size = CacheEntrySize
+            });
+        }
+
+        return theaters.Take(limit);
+    }
+
+    private async Task<List<TheaterDto>> FetchShowtimesAsync(IPluginSettingsProvider settings, ILogger logger, string movieTitle, string searchLocation)
+    {
+        var apiKey = await settings.GetSettingAsync(Id, "api_key");
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            logger.LogWarning("Showtimes lookup for '{MovieTitle}' skipped: no API key configured for {PluginId}.", movieTitle, Id);
+            return new List<TheaterDto>();
+        }
+
+        var query = $"{movieTitle} showtimes {searchLocation}";
+        var url = $"search.json?engine=google&q={Uri.EscapeDataString(query)}&api_key={Uri.EscapeDataString(apiKey.Trim())}";
+
+        var response = await _httpClient.GetAsync(url);
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning("SerpApi returned {StatusCode} for '{MovieTitle}' near '{Location}'.", (int)response.StatusCode, movieTitle, searchLocation);
+            return new List<TheaterDto>();
+        }
+
+        using var stream = await response.Content.ReadAsStreamAsync();
+        using var doc = await JsonDocument.ParseAsync(stream);
+        var el = doc.RootElement;
+
+        if (el.TryGetProperty("error", out var errorNode) && errorNode.ValueKind == JsonValueKind.String)
+        {
+            logger.LogWarning("SerpApi reported an error for '{MovieTitle}' near '{Location}': {Error}", movieTitle, searchLocation, errorNode.GetString());
+            return new List<TheaterDto>();
+        }
+
+        if (!el.TryGetProperty("showtimes", out var showtimesArray) || showtimesArray.ValueKind != JsonValueKind.Array)
+        {
+            logger.LogWarning(
+                "SerpApi returned no showtimes block for '{MovieTitle}' near '{Location}'. The search succeeded, so Google served a result without showtimes. Blocks present: {Blocks}.",
+                movieTitle,
+                searchLocation,
+                string.Join(", ", el.EnumerateObject().Select(p => p.Name)));
+            return new List<TheaterDto>();
+        }
+
+        var theaters = ParseTheaters(showtimesArray);
+
+        if (theaters.Count == 0)
+        {
+            logger.LogInformation("SerpApi returned a showtimes block with no usable theaters for '{MovieTitle}' near '{Location}'.", movieTitle, searchLocation);
+        }
+
+        return theaters;
+    }
+
+    public static List<TheaterDto> ParseTheaters(JsonElement showtimesArray)
+    {
+        var theaters = new List<TheaterDto>();
+
+        if (showtimesArray.GetArrayLength() == 0 || !showtimesArray[0].TryGetProperty("theaters", out var theatersData))
+        {
+            return theaters;
+        }
+
+        foreach (var theaterNode in theatersData.EnumerateArray())
+        {
+            var theater = new TheaterDto
+            {
+                Name = theaterNode.TryGetProperty("name", out var n) ? n.GetString() ?? "Unknown Theater" : "Unknown Theater",
+                Address = theaterNode.TryGetProperty("address", out var a) ? a.GetString() ?? "" : ""
+            };
+
+            if (theaterNode.TryGetProperty("showing", out var showings))
+            {
+                foreach (var show in showings.EnumerateArray())
                 {
-                    foreach (var theaterNode in theatersData.EnumerateArray())
+                    var timeList = show.TryGetProperty("time", out var t)
+                        ? t.EnumerateArray().Select(x => x.GetString()).ToList()
+                        : new List<string?>();
+
+                    foreach (var time in timeList)
                     {
-                        var theater = new TheaterDto
+                        if (!string.IsNullOrEmpty(time))
                         {
-                            Name = theaterNode.TryGetProperty("name", out var n) ? n.GetString() ?? "Unknown Theater" : "Unknown Theater",
-                            Address = theaterNode.TryGetProperty("address", out var a) ? a.GetString() ?? "" : ""
-                        };
-
-                        if (theaterNode.TryGetProperty("showing", out var showings))
-                        {
-                            foreach (var show in showings.EnumerateArray())
+                            theater.Showtimes.Add(new ShowtimeDto
                             {
-                                var timeList = show.TryGetProperty("time", out var t) ? t.EnumerateArray().Select(x => x.GetString()).ToList() : new List<string?>();
-
-                                foreach (var time in timeList)
-                                {
-                                    if (!string.IsNullOrEmpty(time))
-                                    {
-                                        theater.Showtimes.Add(new ShowtimeDto
-                                        {
-                                            Time = time,
-                                            Format = show.TryGetProperty("type", out var typeNode) ? typeNode.GetString() ?? "Standard" : "Standard"
-                                        });
-                                    }
-                                }
-                            }
+                                Time = time,
+                                Format = show.TryGetProperty("type", out var typeNode) ? typeNode.GetString() ?? "Standard" : "Standard"
+                            });
                         }
-
-                        if (theater.Showtimes.Any()) theaters.Add(theater);
                     }
                 }
             }
-            return theaters;
-        });
 
-        return cachedTheaters?.Take(limit) ?? new List<TheaterDto>();
+            if (theater.Showtimes.Any()) theaters.Add(theater);
+        }
+
+        return theaters;
     }
 }

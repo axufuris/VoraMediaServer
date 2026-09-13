@@ -97,9 +97,11 @@ export const discoveryService = {
         const response = await apiClient.get<DiscoveryActor>(`/discovery/actor/${providerId}/${externalId}`, { serverId });
         return response.data;
     },
-    getShowtimes: async (movieTitle: string, location: string, maxTheaters?: number, serverId?: string): Promise<Theater[]> => {
-        const maxParam = maxTheaters ? `&maxTheaters=${maxTheaters}` : '';
-        const response = await apiClient.get<Theater[]>(`/discovery/theater/showtimes?movieTitle=${encodeURIComponent(movieTitle)}&location=${encodeURIComponent(location)}${maxParam}`, { serverId });
+    getShowtimes: async (movieTitle: string, location?: string, maxTheaters?: number, serverId?: string): Promise<Theater[]> => {
+        const params = new URLSearchParams({ movieTitle });
+        if (location) params.set('location', location);
+        if (maxTheaters) params.set('maxTheaters', String(maxTheaters));
+        const response = await apiClient.get<Theater[]>(`/discovery/theater/showtimes?${params.toString()}`, { serverId });
         return response.data;
     },
 
