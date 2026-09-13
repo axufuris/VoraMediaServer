@@ -64,6 +64,23 @@ These are easy to overflow accidentally — note the limit when sending data fro
 
 When auditing column lengths, look at `ConfigureXxx` helpers in `VoraDbContext.cs` — those have the truth.
 
+## DateTimes crossing the HTTP boundary
+
+Npgsql refuses to write a `DateTime` with `Kind=Unspecified` to a `timestamp with time zone` column — only UTC is supported. Every `DateTime` column in Vora is `timestamptz`, so a query parameter that reaches EF Core with the wrong `Kind` throws `ArgumentException` from inside the query rather than returning a bad result.
+
+Minimal API binding decides the `Kind`, and it depends entirely on what the client sent:
+
+| Query value | Bound `Kind` |
+| --- | --- |
+| `2026-09-06T00:00:00.000Z` | `Utc` |
+| `2026-09-06T00:00:00-05:00` | `Utc` |
+| `2026-09-06T00:00:00` | `Unspecified` |
+| `2026-09-06` | `Unspecified` |
+
+So a client sending an ISO instant works and a client sending a bare date takes the whole endpoint down. The calendar failed exactly this way: the web client sends `Date.toISOString()` and was fine, while a client sending a zone-less date made every request log `Cannot write DateTime with Kind=Unspecified` and return an empty calendar.
+
+**Any endpoint taking a `DateTime` from the query string must normalize it** with `AsUtc()` (`Vora.Api/Extensions/QueryDateExtensions.cs`) before passing it on. `Unspecified` is taken as UTC; `Local` is converted, not relabelled. Note the consequence for a zone-less value: it is read as UTC rather than as the viewer's local midnight, which can shift a range by the client's offset. The alternative is guessing the client's timezone, which is worse — clients should send an instant.
+
 ## Test data / seeds
 
 The DbContext includes API key seeds for testing IPTV / metadata providers. Don't remove them when refactoring; the user keeps them in for testing and removes them manually before release.

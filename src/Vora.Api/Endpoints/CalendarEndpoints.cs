@@ -26,8 +26,8 @@ public static class CalendarEndpoints
         ICalendarManager calendarManager)
     {
         var events = await calendarManager.GetCalendarEventsAsync(
-            startDate,
-            endDate,
+            startDate.AsUtc(),
+            endDate.AsUtc(),
             user.HasAllLibraryAccess(),
             user.GetAllowedLibraryIds(),
             user.HasAllContentRatings(),

@@ -192,8 +192,8 @@ public static class MusicEndpoints
         if (!user.IsAdmin()) return Results.Forbid();
         var result = await manager.GetAdminMusicHistoryAsync(
             profileId,
-            from,
-            to,
+            from.AsUtc(),
+            to.AsUtc(),
             string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
             page ?? 1,
             pageSize ?? 50);
@@ -207,7 +207,7 @@ public static class MusicEndpoints
         IMusicManager manager)
     {
         if (!user.IsAdmin()) return Results.Forbid();
-        var summary = await manager.GetAdminMusicSummaryAsync(from, to);
+        var summary = await manager.GetAdminMusicSummaryAsync(from.AsUtc(), to.AsUtc());
         return Results.Ok(summary);
     }
 
