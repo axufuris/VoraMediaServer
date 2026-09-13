@@ -69,10 +69,7 @@ export default function DiscoveryDetailsPage() {
         if (!details || details.type !== 'Movie') return;
         setIsLoadingTheaters(true);
         try {
-            const savedZip = activeProfileId ? (localStorage.getItem(`client_zipcode_${activeProfileId}`) || '') : '';
-            const savedMax = activeProfileId ? parseInt(localStorage.getItem(`client_max_theaters_${activeProfileId}`) || '6', 10) : 6;
-
-            const showtimeData = await discoveryService.getShowtimes(details.title, savedZip, savedMax, serverId);
+            const showtimeData = await discoveryService.getShowtimes(details.title, undefined, undefined, serverId);
 
             showtimeData.forEach(theater => {
                 theater.showtimes.sort((a, b) => {
@@ -95,7 +92,7 @@ export default function DiscoveryDetailsPage() {
             setIsLoadingTheaters(false);
             setShowtimesFetched(true);
         }
-    }, [details, activeProfileId, serverId]);
+    }, [details, serverId]);
 
     useEffect(() => {
         if (details && details.type === 'Movie' && autoLoad === true && !showtimesFetched && !isLoadingTheaters) {
