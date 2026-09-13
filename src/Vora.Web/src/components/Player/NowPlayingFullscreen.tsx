@@ -30,7 +30,7 @@ export default function NowPlayingFullscreen() {
 
     useSpatialNavigation(screenRef, isFullscreen);
 
-    const [lyricsOpen, setLyricsOpen] = useState(false);
+    const [lyricsOpenTrackId, setLyricsOpenTrackId] = useState<string | null>(null);
     const [queueOpen, setQueueOpen] = useState(false);
     const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
     const [audioQuality, setAudioQualityState] = useState<AudioQuality>(audioQualityStore.get());
@@ -79,6 +79,12 @@ export default function NowPlayingFullscreen() {
     const parsedLrc = useMemo<LrcLine[]>(() => parseLrc(lyrics?.syncedLyrics), [lyrics?.syncedLyrics]);
     const activeLineIdx = lyrics?.isSynced ? findActiveLineIndex(parsedLrc, currentTime) : -1;
 
+    const hasLyrics = parsedLrc.length > 0 || !!lyrics?.plainLyrics?.trim();
+
+    // Derived from the track rather than reset in an effect, so switching tracks
+    // closes the panel without a second render pass.
+    const lyricsOpen = !!currentMedia && lyricsOpenTrackId === currentMedia.id;
+
     // A D-pad can only move focus that already exists. Opening the screen
     // leaves focus on whatever was behind it, so the first arrow press has
     // nothing to move and the remote appears dead until something is clicked --
@@ -108,7 +114,7 @@ export default function NowPlayingFullscreen() {
     }, [isFullscreen, currentMedia, serverId]);
 
     useEffect(() => {
-        if (!isFullscreen || !currentMedia || !lyricsOpen) {
+        if (!isFullscreen || !currentMedia) {
             return;
         }
         let cancelled = false;
@@ -119,7 +125,7 @@ export default function NowPlayingFullscreen() {
             .catch(() => { /* ignore */ })
             .finally(() => { if (!cancelled) setLyricsLoading(false); });
         return () => { cancelled = true; };
-    }, [isFullscreen, currentMedia, serverId, lyricsOpen]);
+    }, [isFullscreen, currentMedia, serverId]);
 
     useEffect(() => {
         if (!lyricsOpen) return;
@@ -234,16 +240,19 @@ export default function NowPlayingFullscreen() {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3" /></svg>
                         Audio
                     </button>
-                    <button
-                        type="button"
-                        onClick={() => setLyricsOpen(v => !v)}
-                        title="Toggle lyrics"
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
-                        style={headerActionStyle(lyricsOpen)}
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h10M4 18h7" /></svg>
-                        Lyrics
-                    </button>
+                    {hasLyrics && (
+                        <button
+                            type="button"
+                            onClick={() => setLyricsOpenTrackId(lyricsOpen ? null : currentMedia.id)}
+                            title="Toggle lyrics"
+                            aria-pressed={lyricsOpen}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
+                            style={headerActionStyle(lyricsOpen)}
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h10M4 18h7" /></svg>
+                            Lyrics
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={() => setQueueOpen(v => !v)}
