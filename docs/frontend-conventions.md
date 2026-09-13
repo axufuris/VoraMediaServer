@@ -305,6 +305,22 @@ Authoring a new built-in theme: see the row in `docs/architecture.md`. Plugin-sh
 - **State management:** none formalized. Ask before introducing Redux/Zustand/React Query.
 - **Other libs in use:** `hls.js` (HLS playback), `react-rnd` (resizable/draggable, used by `OverlayEditor`).
 
+## Remote-control (D-pad) navigation
+
+Browsers move focus on **Tab only** — there is no arrow-key spatial navigation to inherit. A TV remote's D-pad sends `ArrowUp/Down/Left/Right`, so on a screen with no handling the focus ring never moves: it stays on whatever it landed on and every OK press re-activates that one control. That is what made the music player's D-pad appear to "keep pressing play/pause".
+
+`useSpatialNavigation(containerRef, enabled)` (`hooks/useSpatialNavigation.ts`) fixes that for a screen. The geometry lives apart from the DOM wiring in `utils/spatialNavigation.ts` so the interesting cases are testable.
+
+Three rules worth knowing before reusing it:
+
+- **Cross-axis distance is the gap between rects, not between centres.** A full-width seek bar overlaps every transport button below it, so from any of them it reads as directly above rather than far off to one side.
+- **Movement is coned: a candidate further off the axis than along it is rejected.** Pressing Right at the end of a row therefore stops rather than leaping diagonally up to a header button. Stopping is the predictable behaviour on a remote.
+- **Sliders keep the axis they scrub on.** `ownsDirection` lets a focused `input[type=range]` handle Left/Right itself while Up/Down still moves focus off it; text fields keep both axes so caret movement is not stolen.
+
+A screen that opts in must also **give focus somewhere on open** — a D-pad can only move focus that already exists, and a remote cannot click to create it. `NowPlayingFullscreen` focuses play/pause.
+
+The focus ring itself is global: `[data-vora-client] *:focus-visible` in `tokens.css`. A screen rendered outside that scope gets no visible ring, which makes the navigation invisible even when it works.
+
 ## Conventions you must follow
 
 - **Strict TypeScript.** Never leave `any` or `unknown` in the code.
