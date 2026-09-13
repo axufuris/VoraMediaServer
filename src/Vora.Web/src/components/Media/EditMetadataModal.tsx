@@ -7,6 +7,7 @@ import { Modal } from '../Common/Modal';
 import ArtworkPicker from '../Common/ArtworkPicker';
 import { apiClient } from '../../api/client';
 import { useDialog } from '../../dialogs';
+import { errorDetail } from '../../utils/apiError';
 
 interface EditMetadataModalProps {
     isOpen: boolean;
@@ -152,7 +153,7 @@ export default function EditMetadataModal({
             });
             fetchArtworkOptions();
         } catch (err) {
-            await dialog.alert("Failed to add URL");
+            await dialog.alert(errorDetail(err, "Failed to add URL"));
             console.error(err);
         }
     };
