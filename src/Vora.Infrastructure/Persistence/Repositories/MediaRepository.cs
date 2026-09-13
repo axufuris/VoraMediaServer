@@ -1290,6 +1290,27 @@ public partial class MediaRepository : IMediaRepository
         return found.ToHashSet();
     }
 
+    public async Task<Dictionary<string, Vora.Application.Calendar.LibraryMatch>> GetLibraryMatchesByTmdbIdsAsync(IEnumerable<string> tmdbIds)
+    {
+        var ids = tmdbIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<string, Vora.Application.Calendar.LibraryMatch>();
+
+        var items = await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.TmdbId != null && ids.Contains(m.TmdbId) && m.MissingSince == null)
+            .Select(m => new { m.TmdbId, m.Id, m.LibraryId })
+            .ToListAsync();
+
+        var matches = new Dictionary<string, Vora.Application.Calendar.LibraryMatch>();
+        foreach (var item in items)
+        {
+            if (string.IsNullOrEmpty(item.TmdbId)) continue;
+            matches.TryAdd(item.TmdbId, new Vora.Application.Calendar.LibraryMatch(item.Id, item.LibraryId));
+        }
+
+        return matches;
+    }
+
     public async Task<Dictionary<string, Guid>> GetLibraryIdsByTmdbIdsAsync(IEnumerable<string> tmdbIds)
     {
         var items = await _context.MediaItems

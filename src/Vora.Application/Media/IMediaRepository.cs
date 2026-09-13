@@ -89,6 +89,7 @@ public interface IMediaRepository
     Task<Dictionary<string, Guid>> GetLocalIdsByExternalIdsAsync(IEnumerable<string> externalIds, string type);
     Task<string?> GetTmdbIdAsync(Guid mediaItemId);
     Task<Dictionary<string, Guid>> GetLibraryIdsByTmdbIdsAsync(IEnumerable<string> tmdbIds);
+    Task<Dictionary<string, Vora.Application.Calendar.LibraryMatch>> GetLibraryMatchesByTmdbIdsAsync(IEnumerable<string> tmdbIds);
     Task<List<MediaItem>> GetItemsPendingOverlayGenerationAsync(Guid libraryId, DateTime maxTemplateUpdatedDate, int currentLayoutVersion);
     Task<bool> AnyItemHasOverlayAppliedAsync(Guid libraryId);
     Task<HashSet<string>> GetReferencedOverlayFileNamesAsync();

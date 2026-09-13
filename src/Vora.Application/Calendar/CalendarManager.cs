@@ -45,9 +45,14 @@ public class CalendarManager(
         var allEvents = await CollectEventsFromActiveProvidersAsync(startDate, endDate, cancellationToken);
         var libraryMap = await BuildExternalIdToLibraryMapAsync(allEvents);
 
+        foreach (var ev in allEvents)
+        {
+            LinkToLibrary(ev, libraryMap);
+        }
+
         var filtered = allEvents
             .Where(ev => PassesContentRating(ev, hasAllRatings, allowedMovieRatings, allowedTvRatings, blockUnrated))
-            .Where(ev => PassesLibraryAccess(ev, hasAllAccess, allowedLibs, libraryMap))
+            .Where(ev => PassesLibraryAccess(ev, hasAllAccess, allowedLibs))
             .ToList();
 
         return DeduplicateAndMerge(filtered);
@@ -84,7 +89,25 @@ public class CalendarManager(
         }
     }
 
-    private async Task<Dictionary<string, Guid>> BuildExternalIdToLibraryMapAsync(IEnumerable<CalendarEventDto> events)
+    // An event the server already holds carries the id of the item it matched, so
+    // a client can open the library page instead of the discovery page for a
+    // title it owns.
+    public static void LinkToLibrary(CalendarEventDto ev, IReadOnlyDictionary<string, LibraryMatch> libraryMap)
+    {
+        if (ev.LibraryItemId.HasValue)
+        {
+            ev.IsInLibrary = true;
+            return;
+        }
+
+        if (string.IsNullOrEmpty(ev.ExternalId) || !libraryMap.TryGetValue(ev.ExternalId, out var match)) return;
+
+        ev.LibraryItemId = match.MediaItemId;
+        ev.LibraryId = match.LibraryId;
+        ev.IsInLibrary = true;
+    }
+
+    private async Task<Dictionary<string, LibraryMatch>> BuildExternalIdToLibraryMapAsync(IEnumerable<CalendarEventDto> events)
     {
         var externalTmdbIds = events
             .Where(e => !e.LibraryId.HasValue && e.ExternalProviderId == TmdbDiscoveryProviderId && !string.IsNullOrEmpty(e.ExternalId))
@@ -94,10 +117,10 @@ public class CalendarManager(
 
         if (externalTmdbIds.Count == 0)
         {
-            return new Dictionary<string, Guid>();
+            return new Dictionary<string, LibraryMatch>();
         }
 
-        return await mediaRepository.GetLibraryIdsByTmdbIdsAsync(externalTmdbIds);
+        return await mediaRepository.GetLibraryMatchesByTmdbIdsAsync(externalTmdbIds);
     }
 
     private static bool PassesContentRating(CalendarEventDto ev, bool hasAllRatings, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
@@ -120,30 +143,14 @@ public class CalendarManager(
         return isUnrated || listToCheck.Contains(ev.ContentRating, StringComparer.OrdinalIgnoreCase);
     }
 
-    private static bool PassesLibraryAccess(CalendarEventDto ev, bool hasAllAccess, List<Guid> allowedLibs, Dictionary<string, Guid> libraryMap)
+    // Pure check now that linking happens first: an event in a library the
+    // profile cannot see is dropped, and an unmatched one is upcoming rather than
+    // owned, so it stays.
+    public static bool PassesLibraryAccess(CalendarEventDto ev, bool hasAllAccess, List<Guid> allowedLibs)
     {
-        if (hasAllAccess)
-        {
-            return true;
-        }
+        if (hasAllAccess) return true;
 
-        if (ev.LibraryId.HasValue)
-        {
-            return allowedLibs.Contains(ev.LibraryId.Value);
-        }
-
-        if (!string.IsNullOrEmpty(ev.ExternalId) && libraryMap.TryGetValue(ev.ExternalId, out var mappedLibId))
-        {
-            if (!allowedLibs.Contains(mappedLibId))
-            {
-                return false;
-            }
-
-            ev.LibraryId = mappedLibId;
-            ev.IsInLibrary = true;
-        }
-
-        return true;
+        return !ev.LibraryId.HasValue || allowedLibs.Contains(ev.LibraryId.Value);
     }
 
     private static List<CalendarEventDto> DeduplicateAndMerge(List<CalendarEventDto> events)

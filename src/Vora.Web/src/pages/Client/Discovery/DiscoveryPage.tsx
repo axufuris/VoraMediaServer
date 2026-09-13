@@ -11,6 +11,7 @@ import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/Me
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { discoveryTarget } from '../../../utils/discoveryNavigation';
 
 interface DiscoveryPageProps {
     embedded?: boolean;
@@ -255,7 +256,7 @@ function DiscoveryRow({ config, serverId, watchlistIds }: { config: DiscoveryRow
                             title={item.title}
                             captionLines={item.year ? [item.year.toString()] : []}
                             inWatchlist={inWatchlist}
-                            onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${config.providerId}/${item.type}/${item.externalId}` : `/discovery/${config.providerId}/${item.type}/${item.externalId}`)}
+                            onClick={() => navigate(discoveryTarget({ ...item, providerId: config.providerId }, serverId))}
                             bottomLeftBadge={statusBadge}
                         />
                     </MediaRowItem>

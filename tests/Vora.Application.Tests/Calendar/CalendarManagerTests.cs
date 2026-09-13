@@ -259,8 +259,8 @@ public class CalendarManagerTests
             Event("e1", "Disc", new DateTime(2026, 5, 10),
                 externalId: "12345", externalProviderId: "tmdb_discovery")
         });
-        _media.GetLibraryIdsByTmdbIdsAsync(Arg.Any<IEnumerable<string>>())
-            .Returns(new Dictionary<string, Guid> { ["12345"] = libraryId });
+        _media.GetLibraryMatchesByTmdbIdsAsync(Arg.Any<IEnumerable<string>>())
+            .Returns(new Dictionary<string, LibraryMatch> { ["12345"] = new(Guid.NewGuid(), libraryId) });
         var (start, end) = Window();
 
         var result = (await Build(p).GetCalendarEventsAsync(
@@ -285,8 +285,8 @@ public class CalendarManagerTests
             Event("e1", "Disc", new DateTime(2026, 5, 10),
                 externalId: "12345", externalProviderId: "tmdb_discovery")
         });
-        _media.GetLibraryIdsByTmdbIdsAsync(Arg.Any<IEnumerable<string>>())
-            .Returns(new Dictionary<string, Guid> { ["12345"] = mappedLib });
+        _media.GetLibraryMatchesByTmdbIdsAsync(Arg.Any<IEnumerable<string>>())
+            .Returns(new Dictionary<string, LibraryMatch> { ["12345"] = new(Guid.NewGuid(), mappedLib) });
         var (start, end) = Window();
 
         var result = await Build(p).GetCalendarEventsAsync(
@@ -309,8 +309,8 @@ public class CalendarManagerTests
             Event("e1", "External", new DateTime(2026, 5, 10),
                 externalId: "99999", externalProviderId: "tmdb_discovery")
         });
-        _media.GetLibraryIdsByTmdbIdsAsync(Arg.Any<IEnumerable<string>>())
-            .Returns(new Dictionary<string, Guid>());
+        _media.GetLibraryMatchesByTmdbIdsAsync(Arg.Any<IEnumerable<string>>())
+            .Returns(new Dictionary<string, LibraryMatch>());
         var (start, end) = Window();
 
         var result = (await Build(p).GetCalendarEventsAsync(

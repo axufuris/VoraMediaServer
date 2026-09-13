@@ -148,8 +148,7 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
     const handleEventClick = (ev: CalendarEventVM) => {
         const baseRoute = serverId ? `/server/${serverId}` : '';
         if (ev.libraryItemId) {
-            const routeType = ev.mediaType === 'Movie' ? 'movie' : 'show';
-            navigate(`${baseRoute}/library/${routeType}/${ev.libraryItemId}`);
+            navigate(`${baseRoute}/media/${ev.libraryItemId}`);
         } else if (ev.externalId && ev.externalProviderId && ev.externalId !== '0') {
             const discType = ev.mediaType === 'Episode' ? 'TvShow' : ev.mediaType;
             navigate(`${baseRoute}/discovery/${ev.externalProviderId}/${discType}/${ev.externalId}`);
