@@ -10,6 +10,7 @@ import { emptyDefinition, type SmartPlaylistDefinition } from '../../api/Music/s
 import RuleTreeEditor from '../Common/RuleTreeEditor';
 import { apiClient } from '../../api/client';
 import { useDialog } from '../../dialogs';
+import { errorDetail } from '../../utils/apiError';
 
 const SMART_CONTENT = '__smart__';
 const defaultSmartDefinition = (): SmartPlaylistDefinition => ({ ...emptyDefinition(), limit: 2000, sortBy: 'DateAdded', sortDirection: 'Desc' });
@@ -145,7 +146,7 @@ export default function EditCollectionModal({
             await apiClient.post(`/collections/${collection.id}/artwork/url?type=${artType}`, `"${url}"`, { headers: { 'Content-Type': 'application/json' }, serverId });
             fetchArtworkOptions();
         } catch (err) {
-            await dialog.alert("Failed to add URL");
+            await dialog.alert(errorDetail(err, "Failed to add URL"));
             console.error(err);
         }
     };
