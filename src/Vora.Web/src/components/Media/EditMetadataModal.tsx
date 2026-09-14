@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { libraryAdminService, type UpdateMediaRequest } from '../../api/Media/libraryAdminService';
-import { artworkService, type ArtworkResult } from '../../api/Media/artworkService';
+import { artworkService, type ArtworkKind, type ArtworkResult } from '../../api/Media/artworkService';
 import { pluginAdminService } from '../../api/System/pluginAdminService';
 import { Modal } from '../Common/Modal';
 import ArtworkPicker from '../Common/ArtworkPicker';
-import { apiClient } from '../../api/client';
 import { useDialog } from '../../dialogs';
 import { errorDetail } from '../../utils/apiError';
 
@@ -130,27 +129,19 @@ export default function EditMetadataModal({
         }));
     };
 
-    const uploadArtwork = async (artType: 'Poster' | 'Backdrop', file: File) => {
-        const data = new FormData();
-        data.append('file', file);
+    const uploadArtwork = async (artType: ArtworkKind, file: File) => {
         try {
-            await apiClient.post(`/media/${itemId}/artwork/upload?type=${artType}`, data, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-                serverId
-            });
+            await artworkService.uploadArtwork(itemId, artType, file, serverId);
             fetchArtworkOptions();
         } catch (err) {
-            await dialog.alert("Upload failed");
+            await dialog.alert(errorDetail(err, "Upload failed"));
             console.error(err);
         }
     };
 
-    const addArtworkUrl = async (artType: 'Poster' | 'Backdrop', url: string) => {
+    const addArtworkUrl = async (artType: ArtworkKind, url: string) => {
         try {
-            await apiClient.post(`/media/${itemId}/artwork/url?type=${artType}`, `"${url}"`, {
-                headers: { 'Content-Type': 'application/json' },
-                serverId
-            });
+            await artworkService.addArtworkUrl(itemId, artType, url, serverId);
             fetchArtworkOptions();
         } catch (err) {
             await dialog.alert(errorDetail(err, "Failed to add URL"));
@@ -162,7 +153,7 @@ export default function EditMetadataModal({
         e.stopPropagation();
         if (!await dialog.confirm("Delete this custom artwork?")) return;
         try {
-            await apiClient.delete(`/media/artwork/${artworkId}`, { serverId });
+            await artworkService.deleteArtwork(artworkId, serverId);
             fetchArtworkOptions();
         } catch (err) {
             await dialog.alert("Failed to delete artwork");

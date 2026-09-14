@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { ArtworkResult } from '../Media/artworkService';
+import { postArtworkUpload, postArtworkUrl, type ArtworkKind, type ArtworkResult } from '../Media/artworkService';
 import type { CollectionSortOrder } from './collectionService';
 import type { PlaylistMediaType } from '../Music/smartPlaylistService';
 
@@ -89,6 +89,12 @@ export const collectionAdminService = {
     fetchProviderArtwork: async (collectionId: string, providerId: string, serverId?: string): Promise<void> => {
         await apiClient.post(`/collections/${collectionId}/artwork/fetch?providerId=${providerId}`, null, { serverId });
     },
+
+    uploadArtwork: (collectionId: string, kind: ArtworkKind, file: File, serverId?: string): Promise<void> =>
+        postArtworkUpload(`/collections/${collectionId}`, kind, file, serverId),
+
+    addArtworkUrl: (collectionId: string, kind: ArtworkKind, url: string, serverId?: string): Promise<void> =>
+        postArtworkUrl(`/collections/${collectionId}`, kind, url, serverId),
 
     deleteArtwork: async (artworkId: string, serverId?: string): Promise<void> => {
         await apiClient.delete(`/collections/artwork/${artworkId}`, { serverId });
