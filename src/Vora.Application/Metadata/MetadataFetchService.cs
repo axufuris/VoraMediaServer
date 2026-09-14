@@ -94,16 +94,6 @@ public class MetadataFetchService : IMetadataFetchService
     // and a trailing "(year)" both pollute a title search and can stop a title
     // from matching at all (the year is already passed as a separate param).
     // Strip them before falling back to a title lookup.
-    private static string CleanSearchTitle(string title)
-    {
-        var cleaned = System.Text.RegularExpressions.Regex.Replace(
-            title, @"\s*\[(?:imdb|tmdb|tvdb)-[^\]]*\]", string.Empty,
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        cleaned = System.Text.RegularExpressions.Regex.Replace(
-            cleaned, @"\s*\((?:19|20)\d{2}\)\s*$", string.Empty);
-        return cleaned.Trim();
-    }
-
     private async Task<MetadataResult?> FetchMetadataForItemAsync(MediaItem item, IMetadataProvider provider)
     {
         if (provider.Id == "local_metadata")
@@ -147,7 +137,7 @@ public class MetadataFetchService : IMetadataFetchService
                 if (res != null) return res;
             }
 
-            return await provider.FetchMovieMetadataAsync(CleanSearchTitle(movie.Title), movie.ReleaseDate?.Year);
+            return await provider.FetchMovieMetadataAsync(MediaMatchIds.CleanSearchTitle(movie.Title), movie.ReleaseDate?.Year);
         }
 
         if (item is TvShow tvShow)
@@ -176,7 +166,7 @@ public class MetadataFetchService : IMetadataFetchService
                 if (res != null) return res;
             }
 
-            return await provider.FetchTvShowMetadataAsync(CleanSearchTitle(tvShow.Title), tvShow.ReleaseDate?.Year);
+            return await provider.FetchTvShowMetadataAsync(MediaMatchIds.CleanSearchTitle(tvShow.Title), tvShow.ReleaseDate?.Year);
         }
 
         if (item is Season season)

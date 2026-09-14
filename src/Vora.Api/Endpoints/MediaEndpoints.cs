@@ -4,6 +4,7 @@ using Vora.Api.Extensions;
 using Vora.Application.Media;
 using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
+using Vora.Application.Metadata;
 using Vora.Application.Tasks;
 
 namespace Vora.Api.Endpoints;
@@ -61,6 +62,18 @@ public static class MediaEndpoints
 
         adminGroup.MapPost("/{id:guid}/metadata", QueueRefreshMetadataAsync)
             .Produces(StatusCodes.Status202Accepted);
+
+        adminGroup.MapGet("/{id:guid}/match/candidates", SearchMatchCandidatesAsync)
+            .WithName("SearchMediaMatchCandidates")
+            .Produces<IReadOnlyList<MediaMatchCandidateVM>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        adminGroup.MapPost("/{id:guid}/match", ApplyMatchAsync)
+            .WithName("ApplyMediaMatch")
+            .Produces<MediaMatchResultVM>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
 
         adminGroup.MapPost("/{id:guid}/analyze", QueueAnalyzeAsync)
             .Produces(StatusCodes.Status202Accepted);
@@ -219,6 +232,18 @@ public static class MediaEndpoints
     {
         taskQueue.QueueRefreshMediaItemMetadata(id, null, forceOverride: force);
         return Results.Accepted();
+    }
+
+    private static async Task<IResult> SearchMatchCandidatesAsync(Guid id, [FromQuery] string? query, [FromQuery] int? year, IMediaMatchManager matchManager, CancellationToken cancellationToken)
+    {
+        var candidates = await matchManager.SearchAsync(id, query, year, cancellationToken);
+        return Results.Ok(candidates);
+    }
+
+    private static async Task<IResult> ApplyMatchAsync(Guid id, ApplyMediaMatchRequest request, IMediaMatchManager matchManager, CancellationToken cancellationToken)
+    {
+        var result = await matchManager.ApplyAsync(id, request, cancellationToken);
+        return Results.Accepted(value: result);
     }
 
     private static IResult QueueAnalyzeAsync(Guid id, ITaskQueueManager taskQueue)

@@ -135,3 +135,15 @@ The **external-id lookups on `MediaRepository` filter `MissingSince == null` too
 ## Episode counts are live
 
 `SeasonVM.EpisodeCount` (and `SeasonDetailsVM`) project from the actual library episodes (`Episodes.Count`) rather than the stored TMDB/TVDB `Season.EpisodeCount` metadata field. A season therefore reports the number of episodes actually present even before its metadata has been fetched. (`Season.EpisodeCount` is still populated from metadata but is no longer what the clients display.)
+
+## Fixing a match (movies and shows)
+
+A movie or show whose folder carries no usable external id (no tag, or an empty one like `[imdb-]`) is matched by title search, which takes the provider's first hit. When that's wrong, or never ran, an admin uses **Fix match…** on the details page.
+
+- **Search:** `GET /api/media/{id}/match/candidates?query=&year=` returns up to 10 candidates (title, year, overview, poster, source + id) from the library's metadata provider, via `IMetadataProvider.SearchMovieCandidatesAsync` / `SearchTvShowCandidatesAsync`. TMDB and TVDB implement them; the default returns nothing, so a `local_metadata` library searches TMDB. A blank query searches the item's title cleaned by `MediaMatchIds.CleanSearchTitle`, the same cleaner the refresh uses. A year that finds nothing is retried without it. Pasting an IMDb id or link, or a TMDB link, looks that title up by id instead.
+- **Apply:** `POST /api/media/{id}/match` with `{ source, externalId }` (`MediaMatchManager.ApplyAsync`). It **clears all three ids first** and sets the chosen one — refresh prefers stored ids over searching, so a wrong id left in place would keep winning. Links are accepted and reduced to the id.
+- **Duplicates:** if another live item of the same kind in the library already has that id, the item takes that item's ids and, for shows, `MergeDuplicateTvShowsAsync` folds the two together immediately. The response's `mediaItemId` is whichever show survived (the merge keeps the one with more episodes), and the client navigates there. Movies are not merged.
+- **Refresh:** `QueueRefreshMatchedMediaItem` runs a forced metadata, artwork and ratings refresh on the survivor, then — for shows — the duplicate merge again, since the refresh can fill in the TMDB/IMDb ids the merge groups by.
+
+Vora never renames folders to fix a match: the media library is read-only (see `StoragePathsOptions` and `docs/streaming.md`), and paths belong to whatever manages the files. The match lives in the database.
+
