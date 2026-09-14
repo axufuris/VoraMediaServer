@@ -25,6 +25,16 @@ export function RestartIcon({ size = 18 }: { size?: number }) {
     );
 }
 
+export function InfoIcon({ size = 18 }: { size?: number }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} aria-hidden="true">
+            <circle cx="12" cy="12" r="9.5" />
+            <line x1="12" y1="11" x2="12" y2="16.5" />
+            <line x1="12" y1="7.5" x2="12.01" y2="7.5" />
+        </svg>
+    );
+}
+
 export function GearIcon({ size = 18 }: { size?: number }) {
     return (
         <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} aria-hidden="true">

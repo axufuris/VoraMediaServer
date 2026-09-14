@@ -15,7 +15,7 @@ import { useFullscreen } from './Controls/useFullscreen';
 import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeButton, CloseButton, EpisodeNavButton, SubtitlesButton } from './Controls/PlayerButtons';
 import PlayerSettingsPanel from './Panels/PlayerSettingsPanel';
 import SubtitleTracksPanel from './Panels/SubtitleTracksPanel';
-import PlayerInfoPanel from './Panels/PlayerInfoPanel';
+import MediaInfoDialog from '../Media/MediaInfoDialog';
 import UpNextOverlay from './Panels/UpNextOverlay';
 import { useVideoThumbnails } from '../../hooks/useVideoThumbnails';
 import { isImageSubtitleCodec, isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
@@ -90,6 +90,7 @@ export default function GlobalVideoPlayer() {
     const [showSettings, setShowSettings] = useState(false);
     const [showSubtitles, setShowSubtitles] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
+    const closeInfo = useCallback(() => setShowInfo(false), []);
 
     const [selVideo, setSelVideo] = useState('');
     const [selAudio, setSelAudio] = useState('');
@@ -944,9 +945,10 @@ export default function GlobalVideoPlayer() {
             )}
 
             {showInfo && (
-                <PlayerInfoPanel
-                    mediaDetails={mediaDetails}
-                    onClose={() => setShowInfo(false)}
+                <MediaInfoDialog
+                    parts={mediaDetails?.mediaParts ?? []}
+                    placement="absolute"
+                    onClose={closeInfo}
                 />
             )}
         </div>

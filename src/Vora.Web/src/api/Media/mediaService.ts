@@ -21,6 +21,7 @@ export interface VideoTrack {
     profile?: string;
     hdrType?: string;
     bitDepth?: number;
+    bitrateKbps?: number;
     isDefault?: boolean;
 }
 
@@ -40,12 +41,17 @@ export interface SubtitleTrack {
     title?: string;
     isForced?: boolean;
     isDefault?: boolean;
+    isExternal?: boolean;
+    isDownloaded?: boolean;
 }
 
 export interface MediaPart {
     id: string;
     resolution?: string;
     edition?: string;
+    versionName?: string;
+    container?: string;
+    durationSeconds?: number;
     fileSizeBytes?: number;
     bitrateKbps?: number;
     filePath: string;

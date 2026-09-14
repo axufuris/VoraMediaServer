@@ -93,8 +93,10 @@ components/Player/        GlobalVideoPlayer, LiveTvPlayer
 components/Player/Controls/ PlayerButtons (PlayPauseButton, SkipButton,
                           VolumeControl, FullscreenButton, MaximizeButton,
                           CloseButton), useAutoHideControls, useFullscreen
-components/Player/Panels/ PlayerSettingsPanel, PlayerInfoPanel, UpNextOverlay,
+components/Player/Panels/ PlayerSettingsPanel, UpNextOverlay,
                           LiveTvInfoPanel, LiveTvRecordModal
+components/Media/         MediaInfoDialog (Get info: shared by the player and the
+                          media details page), FixMatchModal
 components/Iptv/          GuideProgramModal
 components/Dvr/           DvrSessionCard
 ```

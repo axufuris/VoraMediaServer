@@ -230,6 +230,9 @@ public class MediaDetailsVM
                 Id = p.Id,
                 Resolution = p.Resolution,
                 Edition = p.Edition,
+                VersionName = p.VersionName,
+                Container = p.Container,
+                DurationSeconds = p.Duration.HasValue ? p.Duration.Value.TotalSeconds : (double?)null,
                 FileSizeBytes = p.FileSizeBytes,
                 BitrateKbps = p.OverallBitrate.HasValue ? (int)(p.OverallBitrate.Value / 1000) : (int?)null,
                 FilePath = p.FilePath,
@@ -241,6 +244,7 @@ public class MediaDetailsVM
                     Profile = v.Profile,
                     HdrType = v.HdrType,
                     BitDepth = v.BitDepth,
+                    BitrateKbps = v.Bitrate.HasValue ? (int)(v.Bitrate.Value / 1000) : (int?)null,
                     IsDefault = v.IsDefault
                 }).ToList(),
 
@@ -261,7 +265,9 @@ public class MediaDetailsVM
                     Language = s.Language,
                     Title = s.Title,
                     IsForced = s.IsForced,
-                    IsDefault = s.IsDefault
+                    IsDefault = s.IsDefault,
+                    IsExternal = s.ExternalFilePath != null,
+                    IsDownloaded = s.IsDownloaded
                 }).ToList()
             }).ToList()
         };
@@ -274,6 +280,7 @@ public class MediaDetailsPartVideoTrackVM
     public string? Profile { get; set; }
     public string? HdrType { get; set; }
     public int? BitDepth { get; set; }
+    public int? BitrateKbps { get; set; }
     public bool IsDefault { get; set; }
 }
 
@@ -295,6 +302,8 @@ public class MediaDetailsPartSubtitleTrackVM
     public string? Title { get; set; }
     public bool IsForced { get; set; }
     public bool IsDefault { get; set; }
+    public bool IsExternal { get; set; }
+    public bool IsDownloaded { get; set; }
 }
 
 public class MediaDetailsPartVM
@@ -302,6 +311,9 @@ public class MediaDetailsPartVM
     public Guid Id { get; set; }
     public string? Resolution { get; set; }
     public string? Edition { get; set; }
+    public string? VersionName { get; set; }
+    public string? Container { get; set; }
+    public double? DurationSeconds { get; set; }
     public long? FileSizeBytes { get; set; }
     public int? BitrateKbps { get; set; }
     public string FilePath { get; set; } = string.Empty;
