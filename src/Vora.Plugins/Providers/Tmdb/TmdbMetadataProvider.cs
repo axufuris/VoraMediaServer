@@ -647,4 +647,59 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         "Production" => CastRole.Producer,
         _ => CastRole.None
     };
+
+    public const int MaxSearchCandidates = 10;
+
+    public Task<IReadOnlyList<MetadataSearchCandidate>> SearchMovieCandidatesAsync(string query, int? year = null, CancellationToken cancellationToken = default) =>
+        SearchCandidatesAsync("movie", year.HasValue ? $"&year={year.Value}" : string.Empty, query, "title", "release_date", cancellationToken);
+
+    public Task<IReadOnlyList<MetadataSearchCandidate>> SearchTvShowCandidatesAsync(string query, int? year = null, CancellationToken cancellationToken = default) =>
+        SearchCandidatesAsync("tv", year.HasValue ? $"&first_air_date_year={year.Value}" : string.Empty, query, "name", "first_air_date", cancellationToken);
+
+    private async Task<IReadOnlyList<MetadataSearchCandidate>> SearchCandidatesAsync(string kind, string yearFilter, string query, string titleField, string dateField, CancellationToken cancellationToken)
+    {
+        var apiKey = await GetApiKeyAsync();
+        if (string.IsNullOrEmpty(apiKey)) return [];
+        var lang = await GetLanguageAsync();
+
+        var response = await _httpClient.GetAsync($"search/{kind}?api_key={apiKey}&language={lang}&query={Uri.EscapeDataString(query)}{yearFilter}", cancellationToken);
+        if (!response.IsSuccessStatusCode) return [];
+
+        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        return ParseSearchCandidates(document.RootElement, titleField, dateField);
+    }
+
+    public static IReadOnlyList<MetadataSearchCandidate> ParseSearchCandidates(JsonElement root, string titleField, string dateField)
+    {
+        if (!root.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array) return [];
+
+        var candidates = new List<MetadataSearchCandidate>();
+        foreach (var result in results.EnumerateArray())
+        {
+            if (candidates.Count == MaxSearchCandidates) break;
+            if (!result.TryGetProperty("id", out var id) || id.ValueKind != JsonValueKind.Number) continue;
+
+            var title = ReadString(result, titleField);
+            if (string.IsNullOrWhiteSpace(title)) continue;
+
+            var posterPath = ReadString(result, "poster_path");
+            candidates.Add(new MetadataSearchCandidate
+            {
+                Source = "tmdb",
+                ExternalId = id.GetInt64().ToString(System.Globalization.CultureInfo.InvariantCulture),
+                Title = title,
+                Year = ReadYear(ReadString(result, dateField)),
+                Overview = ReadString(result, "overview"),
+                PosterUrl = string.IsNullOrEmpty(posterPath) ? null : $"https://image.tmdb.org/t/p/w342{posterPath}"
+            });
+        }
+        return candidates;
+    }
+
+    private static string? ReadString(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
+    private static int? ReadYear(string? date) =>
+        date is { Length: >= 4 } && int.TryParse(date.AsSpan(0, 4), out var year) ? year : null;
 }

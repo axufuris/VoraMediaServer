@@ -31,6 +31,7 @@ public interface ITaskQueueManager
     void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueScanNewFile(Guid libraryId, string filePath);
     void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
+    void QueueRefreshMatchedMediaItem(Guid mediaItemId, Guid libraryId, bool isTvShow);
     void QueueAnalyzeMediaItemContent(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueArtworkProviderSwap(Guid libraryId, string libraryName);
     void QueueRefreshLibraryRatings(Guid libraryId, bool forceOverride = false);
@@ -254,6 +255,26 @@ public class TaskQueueManager : ITaskQueueManager
 
             await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
         });
+    }
+
+    public void QueueRefreshMatchedMediaItem(Guid mediaItemId, Guid libraryId, bool isTvShow)
+    {
+        EnqueueTask($"Refresh Matched Media Item: {ResolveDisplayName(mediaItemId, null)}", async (ct, sp) =>
+        {
+            var metadataManager = sp.GetRequiredService<IMetadataManager>();
+            var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
+
+            await metadataManager.TriggerMediaItemMetadataRefreshAsync(mediaItemId, true, ct);
+            await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, true, ct);
+            await metadataManager.TriggerMediaItemRatingsRefreshAsync(mediaItemId, true, ct);
+            await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
+
+            if (isTvShow)
+            {
+                var dedupeManager = sp.GetRequiredService<IMediaDedupeManager>();
+                await dedupeManager.MergeDuplicateTvShowsAsync(libraryId, ct);
+            }
+        }, resourceKey: LibraryKey(libraryId));
     }
 
     public void QueueAnalyzeMediaItemContent(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)

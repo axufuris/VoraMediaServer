@@ -1,6 +1,23 @@
 import { apiClient } from '../client';
 import type { MediaLibrary } from './libraryService';
 
+export type MediaMatchSource = 'tmdb' | 'tvdb' | 'imdb';
+
+export interface MediaMatchCandidate {
+    source: MediaMatchSource;
+    externalId: string;
+    title: string;
+    year?: number | null;
+    overview?: string | null;
+    posterUrl?: string | null;
+    providerName: string;
+}
+
+export interface MediaMatchResult {
+    mediaItemId: string;
+    mergedDuplicate: boolean;
+}
+
 export interface UpdateMediaRequest {
     title: string;
     sortTitle?: string;
@@ -126,6 +143,20 @@ export const libraryAdminService = {
 
     refreshItemMetadata: async (mediaItemId: string, force: boolean = false, serverId?: string): Promise<void> => {
         await apiClient.post(`/media/${mediaItemId}/metadata?force=${force}`, null, { serverId });
+    },
+
+    searchMatchCandidates: async (mediaItemId: string, query?: string, year?: number, serverId?: string): Promise<MediaMatchCandidate[]> => {
+        const params = new URLSearchParams();
+        if (query?.trim()) params.set('query', query.trim());
+        if (year) params.set('year', String(year));
+        const suffix = params.toString() ? `?${params.toString()}` : '';
+        const response = await apiClient.get<MediaMatchCandidate[]>(`/media/${mediaItemId}/match/candidates${suffix}`, { serverId });
+        return response.data;
+    },
+
+    applyMatch: async (mediaItemId: string, source: MediaMatchSource, externalId: string, serverId?: string): Promise<MediaMatchResult> => {
+        const response = await apiClient.post<MediaMatchResult>(`/media/${mediaItemId}/match`, { source, externalId }, { serverId });
+        return response.data;
     },
 
     analyzeMedia: async (mediaItemId: string, serverId?: string): Promise<void> => {

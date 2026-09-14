@@ -3,7 +3,9 @@ using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Media;
+using Vora.Application.Media.Dtos;
 using Vora.Application.Media.ViewModels;
+using Vora.Application.Metadata;
 using Vora.Application.Subtitles;
 using Vora.Application.Subtitles.ViewModels;
 using Vora.Domain.Entities.Actors;
@@ -149,6 +151,28 @@ public partial class MediaRepository : IMediaRepository
 
         return trimmed;
     }
+
+    public Task<MatchedItemIds?> FindOtherItemByExternalIdAsync(Guid libraryId, Guid excludeId, bool tvShow, string source, string externalId)
+    {
+        IQueryable<MediaItem> items = tvShow ? _context.Set<TvShow>() : _context.Set<Movie>();
+        items = items.AsNoTracking().Where(m => m.LibraryId == libraryId && m.Id != excludeId && m.MissingSince == null);
+
+        items = source switch
+        {
+            MediaMatchIds.Tmdb => items.Where(m => m.TmdbId == externalId),
+            MediaMatchIds.Imdb => items.Where(m => m.ImdbId == externalId),
+            MediaMatchIds.Tvdb => items.Where(m => m.TvdbId == externalId),
+            _ => items.Where(m => false)
+        };
+
+        return items
+            .OrderBy(m => m.AddedAt)
+            .Select(m => new MatchedItemIds(m.Id, m.TmdbId, m.ImdbId, m.TvdbId))
+            .FirstOrDefaultAsync();
+    }
+
+    public Task<bool> MediaItemExistsAsync(Guid id) =>
+        _context.Set<MediaItem>().AsNoTracking().AnyAsync(m => m.Id == id);
 
     public Task<Guid?> GetTvShowIdByExternalIdAsync(string? tmdbId, string? imdbId, Guid libraryId)
     {

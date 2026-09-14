@@ -835,4 +835,60 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         "Creator" => CastRole.Creator,
         _ => CastRole.Actor
     };
+
+    public const int MaxSearchCandidates = 10;
+
+    public Task<IReadOnlyList<MetadataSearchCandidate>> SearchMovieCandidatesAsync(string query, int? year = null, CancellationToken cancellationToken = default) =>
+        SearchCandidatesAsync("movie", query, year, cancellationToken);
+
+    public Task<IReadOnlyList<MetadataSearchCandidate>> SearchTvShowCandidatesAsync(string query, int? year = null, CancellationToken cancellationToken = default) =>
+        SearchCandidatesAsync("series", query, year, cancellationToken);
+
+    private async Task<IReadOnlyList<MetadataSearchCandidate>> SearchCandidatesAsync(string type, string query, int? year, CancellationToken cancellationToken)
+    {
+        var token = await GetValidTokenAsync();
+        if (string.IsNullOrEmpty(token)) return [];
+
+        var url = $"search?query={Uri.EscapeDataString(query)}&type={type}";
+        if (year.HasValue) url += $"&year={year.Value}";
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode) return [];
+
+        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        return ParseSearchCandidates(document.RootElement);
+    }
+
+    public static IReadOnlyList<MetadataSearchCandidate> ParseSearchCandidates(JsonElement root)
+    {
+        if (!root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) return [];
+
+        var candidates = new List<MetadataSearchCandidate>();
+        foreach (var result in data.EnumerateArray())
+        {
+            if (candidates.Count == MaxSearchCandidates) break;
+
+            var tvdbId = ReadSearchString(result, "tvdb_id");
+            var title = ReadSearchString(result, "name");
+            if (string.IsNullOrWhiteSpace(tvdbId) || string.IsNullOrWhiteSpace(title)) continue;
+
+            candidates.Add(new MetadataSearchCandidate
+            {
+                Source = "tvdb",
+                ExternalId = tvdbId,
+                Title = title,
+                Year = int.TryParse(ReadSearchString(result, "year"), out var year) ? year : null,
+                Overview = ReadSearchString(result, "overview"),
+                PosterUrl = ReadSearchString(result, "image_url")
+            });
+        }
+        return candidates;
+    }
+
+    private static string? ReadSearchString(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 }

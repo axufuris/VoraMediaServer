@@ -408,6 +408,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMusicRecommendationManager, MusicRecommendationManager>();
         services.AddSingleton<IServerPlaybackTracker, ServerPlaybackTracker>();
         services.AddScoped<IMetadataManager, MetadataManager>();
+        services.AddScoped<IMediaMatchManager, MediaMatchManager>();
         services.AddScoped<IPlaylistManager, PlaylistManager>();
         services.AddScoped<ISmartPlaylistManager, SmartPlaylistManager>();
         services.AddScoped<IPodcastManager, PodcastManager>();

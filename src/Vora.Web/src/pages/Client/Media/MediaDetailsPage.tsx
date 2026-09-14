@@ -29,6 +29,8 @@ import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { formatRuntime } from '../../../utils/formatRuntime';
 import { isFullyWatched, affectedEpisodeCount } from '../../../utils/watchState';
 import { isImageSubtitleCodec, isNoSubtitle } from '../../../utils/subtitleKind';
+import FixMatchModal from '../../../components/Media/FixMatchModal';
+import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -66,6 +68,7 @@ export default function MediaDetailsPage() {
     const [playingTrailer, setPlayingTrailer] = useState<TrailerSource | null>(null);
     const [inWatchlist, setInWatchlist] = useState(false);
     const [isMarkerEditorOpen, setIsMarkerEditorOpen] = useState(false);
+    const [isFixMatchOpen, setIsFixMatchOpen] = useState(false);
     const [isQualityPanelOpen, setIsQualityPanelOpen] = useState(false);
 
     const [selectedVideoId, setSelectedVideoId] = useState<string>('');
@@ -527,7 +530,27 @@ export default function MediaDetailsPage() {
 
     const isEpisode = media.type === 'Episode';
     const isSeason = media.type === 'Season';
-    const showParentNav = (isEpisode && !!media.seasonId) || (isSeason && !!media.tvShowId);
+    const showParentNav = (isEpisode && (!!media.seasonId || !!media.tvShowId)) || (isSeason && !!media.tvShowId);
+    const canFixMatch = isAdmin && (media.type === 'Movie' || media.type === 'TvShow');
+    const mediaPath = (mediaId: string) => serverId ? `/server/${serverId}/media/${mediaId}` : `/media/${mediaId}`;
+
+    const handleMatched = async (result: MediaMatchResult) => {
+        setIsFixMatchOpen(false);
+        if (result.mediaItemId !== media.id) {
+            navigate(mediaPath(result.mediaItemId), { replace: true });
+            await dialog.alert({
+                title: 'Match applied',
+                message: 'This was a second copy of a show already in your library, so the two have been merged. Its metadata is refreshing now.',
+            });
+            return;
+        }
+        await dialog.alert({
+            title: 'Match applied',
+            message: result.mergedDuplicate
+                ? 'A duplicate copy of this show was merged into it. Metadata is refreshing now, and this page will update when it finishes.'
+                : 'Metadata is refreshing now, and this page will update when it finishes.',
+        });
+    };
     // Return to wherever the user came from. When there is no in-app history to
     // go back to (a direct/deep link opened the page), fall back to the parent
     // show so Back never drops the user out of the app.
@@ -653,31 +676,37 @@ export default function MediaDetailsPage() {
                             }}
                         >
                             {isEpisode && media.seasonId && (
-                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.seasonId}` : `/media/${media.seasonId}`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Go to season</button>
+                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.seasonId}` : `/media/${media.seasonId}`); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Go to season</button>
+                            )}
+                            {isEpisode && media.tvShowId && (
+                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Go to show</button>
                             )}
                             {isSeason && media.tvShowId && (
-                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Go to show</button>
+                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Go to show</button>
                             )}
                             {showParentNav && <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />}
-                            <button type="button" onClick={() => { setIsEditModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit metadata</button>
-                            <button type="button" onClick={() => { setIsPlaylistModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Add to playlist</button>
-                            <button type="button" onClick={() => { setIsCollectionModalOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Add to collection</button>
+                            <button type="button" onClick={() => { setIsEditModalOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Edit metadata</button>
+                            <button type="button" onClick={() => { setIsPlaylistModalOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Add to playlist</button>
+                            <button type="button" onClick={() => { setIsCollectionModalOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Add to collection</button>
                             {isAdmin && (
                                 <>
                                     <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />
-                                    <button type="button" onClick={handleRefresh} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Refresh metadata</button>
-                                    <button type="button" onClick={handleScan} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Scan files</button>
-                                    <button type="button" onClick={handleAnalyze} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Analyze media</button>
+                                    {canFixMatch && (
+                                        <button type="button" onClick={() => { setIsFixMatchOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Fix match…</button>
+                                    )}
+                                    <button type="button" onClick={handleRefresh} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Refresh metadata</button>
+                                    <button type="button" onClick={handleScan} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Scan files</button>
+                                    <button type="button" onClick={handleAnalyze} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Analyze media</button>
                                     {(media.type === 'Movie' || media.type === 'Episode') && (
                                         <>
-                                            <button type="button" onClick={handleRegenerateThumbnails} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Regenerate thumbnails</button>
-                                            <button type="button" onClick={handleToggleThumbnailsLock} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>
+                                            <button type="button" onClick={handleRegenerateThumbnails} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Regenerate thumbnails</button>
+                                            <button type="button" onClick={handleToggleThumbnailsLock} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>
                                                 {thumbnailsLocked ? 'Unlock thumbnails' : 'Lock thumbnails'}
                                             </button>
                                         </>
                                     )}
-                                    <button type="button" onClick={() => { setIsMarkerEditorOpen(true); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit markers</button>
-                                    <button type="button" onClick={handleDelete} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/5" style={{ color: 'var(--vora-danger-text)' }}>Delete item</button>
+                                    <button type="button" onClick={() => { setIsMarkerEditorOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Edit markers</button>
+                                    <button type="button" onClick={handleDelete} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium" style={{ color: 'var(--vora-danger-text)' }}>Delete item</button>
                                 </>
                             )}
                         </div>
@@ -716,6 +745,16 @@ export default function MediaDetailsPage() {
 
     return (
         <div className="relative min-h-full pb-20">
+            {isFixMatchOpen && (media.type === 'Movie' || media.type === 'TvShow') && (
+                <FixMatchModal
+                    mediaItemId={media.id}
+                    mediaType={media.type}
+                    currentYear={media.releaseDate ? new Date(media.releaseDate).getFullYear() : undefined}
+                    serverId={serverId}
+                    onClose={() => setIsFixMatchOpen(false)}
+                    onMatched={handleMatched}
+                />
+            )}
             <EditMetadataModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSaved={reloadMedia} itemId={media.id} type="media" initialData={{ ...media, lockedFields: media.lockedFields ?? [] }} />
             <AddToCollectionModal isOpen={isCollectionModalOpen} onClose={() => setIsCollectionModalOpen(false)} mediaId={media.id} libraryId={media.libraryId} mediaType={media.type} initialCollectionIds={media.collectionIds || []} onSaved={reloadMedia} />
             <AddToPlaylistModal isOpen={isPlaylistModalOpen} onClose={() => setIsPlaylistModalOpen(false)} mediaId={media.id} />
