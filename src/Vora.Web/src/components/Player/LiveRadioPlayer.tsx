@@ -11,12 +11,11 @@ import { serverVault } from '../../utils/serverVault';
 import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../utils/storageKeys';
 import { PlayPauseButton, SkipButton, VolumeControl, MaximizeButton, CloseButton } from './Controls/PlayerButtons';
 import RadioNowPlaying from './RadioNowPlaying';
+import PodcastNowPlaying from './PodcastNowPlaying';
 
 export default function LiveRadioPlayer() {
-    const { currentMedia, isPlaying, isMinimized, volume, togglePlayPause, setMinimized, closePlayer, setVolume, videoRef, playMedia, skipForward, skipBackward, seek, nextTrack, previousTrack, hasNext, hasPrevious, queue, queueIndex, jumpToQueueIndex, isShuffled, toggleShuffle, repeatMode, cycleRepeatMode, setFullscreen, isFullscreen } = usePlayer();
+    const { currentMedia, isPlaying, isMinimized, volume, togglePlayPause, setMinimized, closePlayer, setVolume, videoRef, playMedia, skipForward, skipBackward, seek, nextTrack, previousTrack, hasNext, hasPrevious, setFullscreen, isFullscreen } = usePlayer();
     const { currentTime, duration } = usePlayerTime();
-
-    const [showQueue, setShowQueue] = useState(false);
 
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -297,15 +296,6 @@ export default function LiveRadioPlayer() {
         };
     }, [isPodcast, currentMedia?.id, videoRef]);
 
-    const formatTime = (seconds: number): string => {
-        if (!isFinite(seconds) || seconds < 0) return '0:00';
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = Math.floor(seconds % 60);
-        if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        return `${m}:${String(s).padStart(2, '0')}`;
-    };
-
     const playStation = (channel: IptvChannelVM) => {
         if (!currentMedia || channel.id === currentMedia.id) return;
         setIsLoading(true);
@@ -461,241 +451,22 @@ export default function LiveRadioPlayer() {
                     onMinimize={minimizePlayer}
                     onClose={closePlayer}
                 />
-            ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center px-8">
-                    <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
-                        <button
-                            type="button"
-                            onClick={closePlayer}
-                            aria-label="Close player"
-                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10"
-                            style={{ background: 'rgba(20, 20, 28, 0.55)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}
-                        >
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setMinimized(true)}
-                            aria-label="Minimize"
-                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10"
-                            style={{ background: 'rgba(20, 20, 28, 0.55)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}
-                        >
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
-                        </button>
-                    </div>
-
-                    <div
-                        className="mb-10 flex h-72 w-72 items-center justify-center overflow-hidden rounded-2xl md:h-96 md:w-96"
-                        style={{
-                            background: 'var(--vora-bg-surface)',
-                            border: '1px solid var(--vora-border-subtle)',
-                            boxShadow: 'var(--vora-shadow-overlay)',
-                        }}
-                    >
-                        {currentMedia.posterUrl
-                            ? <img src={currentMedia.posterUrl} alt={currentMedia.title} className="max-h-full max-w-full object-contain p-8" />
-                            : <svg width="160" height="160" fill="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--vora-text-disabled)' }}><path d="M12 1a9 9 0 00-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2a7 7 0 1114 0v2h-4v8h3c1.66 0 3-1.34 3-3v-7a9 9 0 00-9-9z" /></svg>}
-                    </div>
-
-                    <h1 className="m-0 mb-1 line-clamp-2 max-w-3xl text-center text-4xl font-semibold" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}>{currentMedia.title}</h1>
-                    <p className="m-0 mb-2 text-center" style={{ color: 'var(--vora-text-secondary)' }}>{currentMedia.subtitle || (isPodcast ? 'Podcast' : isMusic ? 'Music' : 'Live Radio')}</p>
-                    {!isAudioOnDemand && (
-                        <div className="mb-10 flex items-center gap-2">
-                            <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: 'var(--vora-accent-500)' }} />
-                            <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--vora-accent-text)' }}>On air</span>
-                        </div>
-                    )}
-
-                    {isAudioOnDemand && (
-                        <div className="mb-8 mt-4 w-full max-w-2xl">
-                            <input
-                                type="range"
-                                min={0}
-                                max={duration || 100}
-                                value={currentTime}
-                                onChange={e => seek(Number(e.target.value))}
-                                aria-label="Playback position"
-                                className="h-1 w-full cursor-pointer appearance-none rounded-lg accent-[var(--vora-accent-500)]"
-                                style={{ background: 'rgba(255, 255, 255, 0.14)' }}
-                            />
-                            <div className="mt-1 flex justify-between text-xs tabular-nums" style={{ color: 'var(--vora-text-muted)' }}>
-                                <span>{formatTime(currentTime)}</span>
-                                <span>{duration ? `-${formatTime(Math.max(0, duration - currentTime))}` : ''}</span>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex items-center gap-8">
-                        {!isAudioOnDemand && (
-                            <button
-                                type="button"
-                                onClick={() => handleChannelChange('prev')}
-                                title="Previous station"
-                                className="cursor-pointer rounded-full p-2 transition-colors hover:bg-white/5"
-                                style={{ color: 'var(--vora-text-secondary)' }}
-                            >
-                                <svg className="h-10 w-10 fill-current" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
-                            </button>
-                        )}
-                        {isMusic && (
-                            <button
-                                type="button"
-                                onClick={previousTrack}
-                                disabled={!hasPrevious && currentTime <= 3}
-                                title="Previous track"
-                                className="cursor-pointer rounded-full p-2 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-30"
-                                style={{ color: 'var(--vora-text-secondary)' }}
-                            >
-                                <svg className="h-10 w-10 fill-current" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
-                            </button>
-                        )}
-                        {isAudioOnDemand && <SkipButton seconds={10} direction="back" onClick={() => skipBackward(10)} />}
-                        <PlayPauseButton isPlaying={isPlaying} onClick={togglePlayPause} />
-                        {isAudioOnDemand && <SkipButton seconds={30} direction="forward" onClick={() => skipForward(30)} />}
-                        {!isAudioOnDemand && (
-                            <button
-                                type="button"
-                                onClick={() => handleChannelChange('next')}
-                                title="Next station"
-                                className="cursor-pointer rounded-full p-2 transition-colors hover:bg-white/5"
-                                style={{ color: 'var(--vora-text-secondary)' }}
-                            >
-                                <svg className="h-10 w-10 fill-current" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
-                            </button>
-                        )}
-                        {isMusic && (
-                            <button
-                                type="button"
-                                onClick={nextTrack}
-                                disabled={!hasNext}
-                                title="Next track"
-                                className="cursor-pointer rounded-full p-2 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-30"
-                                style={{ color: 'var(--vora-text-secondary)' }}
-                            >
-                                <svg className="h-10 w-10 fill-current" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
-                            </button>
-                        )}
-                    </div>
-
-                    {isMusic && (
-                        <div className="mt-8 flex items-center gap-6">
-                            <button
-                                type="button"
-                                onClick={toggleShuffle}
-                                className="cursor-pointer rounded-full p-2 transition-colors hover:bg-white/5"
-                                title={isShuffled ? 'Shuffle: On' : 'Shuffle: Off'}
-                                style={{ color: isShuffled ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)' }}
-                            >
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l5 5m0 0V5m0 4H5m11-4l5 5m0 0V5m0 4h-4m-2 7l7 7m-7-7l-7 7m14 0v-4m0 4h-4" /></svg>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={cycleRepeatMode}
-                                className="relative cursor-pointer rounded-full p-2 transition-colors hover:bg-white/5"
-                                title={`Repeat: ${repeatMode === 'off' ? 'Off' : repeatMode === 'all' ? 'All' : 'One'}`}
-                                style={{ color: repeatMode !== 'off' ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)' }}
-                            >
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0114.85-3.36L20 7M20 15a9 9 0 01-14.85 3.36L4 17" /></svg>
-                                {repeatMode === 'one' && (
-                                    <span
-                                        className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold leading-none"
-                                        style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}
-                                    >
-                                        1
-                                    </span>
-                                )}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setShowQueue(s => !s)}
-                                className="cursor-pointer rounded-full p-2 transition-colors hover:bg-white/5"
-                                title="Show queue"
-                                style={{ color: showQueue ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)' }}
-                            >
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h10M4 18h7M19 12v6m-3-3l3 3 3-3" /></svg>
-                            </button>
-                        </div>
-                    )}
-
-                    <div className="mt-10">
-                        <VolumeControl value={volume} onChange={setVolume} />
-                    </div>
-
-                    {isMusic && showQueue && queue.length > 0 && (
-                        <div
-                            className="fixed right-0 top-0 z-30 flex h-full w-full flex-col sm:w-96"
-                            style={{ background: 'var(--vora-bg-surface)', borderLeft: '1px solid var(--vora-border-subtle)', boxShadow: 'var(--vora-shadow-overlay)' }}
-                        >
-                            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>
-                                <div>
-                                    <h3 className="m-0 text-sm font-semibold uppercase tracking-widest" style={{ color: 'var(--vora-accent-text)' }}>Queue</h3>
-                                    <p className="m-0 mt-0.5 text-xs" style={{ color: 'var(--vora-text-muted)' }}>{queue.length} tracks</p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowQueue(false)}
-                                    title="Close queue"
-                                    aria-label="Close queue"
-                                    className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
-                                    style={{ background: 'var(--vora-bg-raised)', color: 'var(--vora-text-muted)' }}
-                                >
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                                </button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto py-2">
-                                {queue.map((item, idx) => {
-                                    const isCurrent = idx === queueIndex;
-                                    return (
-                                        <button
-                                            key={`${item.id}-${idx}`}
-                                            type="button"
-                                            onClick={() => jumpToQueueIndex(idx)}
-                                            className="flex w-full cursor-pointer items-center gap-3 px-5 py-2.5 text-left transition-colors hover:bg-white/5"
-                                            style={{
-                                                background: isCurrent ? 'var(--vora-accent-soft)' : 'transparent',
-                                                borderLeft: `2px solid ${isCurrent ? 'var(--vora-accent-500)' : 'transparent'}`,
-                                            }}
-                                        >
-                                            <div className="w-6 shrink-0 text-center text-xs">
-                                                {isCurrent
-                                                    ? <svg className="mx-auto h-4 w-4" fill="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--vora-accent-text)' }}><path d="M8 5v14l11-7z" /></svg>
-                                                    : <span style={{ color: 'var(--vora-text-disabled)' }}>{idx + 1}</span>}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div
-                                                    className="truncate text-sm font-medium"
-                                                    style={{ color: isCurrent ? 'var(--vora-accent-text)' : 'var(--vora-text-primary)' }}
-                                                >
-                                                    {item.title}
-                                                </div>
-                                                <div className="truncate text-xs" style={{ color: 'var(--vora-text-muted)' }}>{item.subtitle}</div>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {streamError ? (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center" style={{ background: 'rgba(0, 0, 0, 0.6)' }}>
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ color: 'var(--vora-accent-500)' }}>
-                                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                <line x1="12" y1="9" x2="12" y2="13" />
-                                <line x1="12" y1="17" x2="12.01" y2="17" />
-                            </svg>
-                            <span className="text-xs font-medium" style={{ color: 'var(--vora-text-secondary)' }}>{streamError}</span>
-                        </div>
-                    ) : isLoading ? (
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0, 0, 0, 0.4)' }}>
-                            <svg className="h-12 w-12 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style={{ color: 'var(--vora-accent-500)' }}>
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                            </svg>
-                        </div>
-                    ) : null}
-                </div>
-            ))}
+            ) : isPodcast ? (
+                <PodcastNowPlaying
+                    episode={currentMedia}
+                    isPlaying={isPlaying}
+                    currentTime={currentTime}
+                    duration={duration}
+                    volume={volume}
+                    onVolumeChange={setVolume}
+                    onTogglePlay={togglePlayPause}
+                    onSeek={seek}
+                    onSkipBack={skipBackward}
+                    onSkipForward={skipForward}
+                    onMinimize={minimizePlayer}
+                    onClose={closePlayer}
+                />
+            ) : null)}
         </div>
     );
 }
