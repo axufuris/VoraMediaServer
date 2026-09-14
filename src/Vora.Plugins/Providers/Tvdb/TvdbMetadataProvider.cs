@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using System.Net.Http.Headers;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text;
@@ -80,31 +79,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         return PluginConnectionTestResult.Fail($"Unexpected response from TVDB (HTTP {(int)response.StatusCode}).");
     }
 
-    private async Task<string?> GetValidTokenAsync()
-    {
-        using var scope = _scopeFactory.CreateScope();
-        var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
-
-        var token = await settings.GetSettingAsync(Id, "tvdb_token");
-        if (string.IsNullOrEmpty(token))
-        {
-            var apiKey = await settings.GetSettingAsync(Id, "api_key");
-            if (string.IsNullOrEmpty(apiKey)) return null;
-
-            var loginRequest = new { apikey = apiKey };
-            var content = new StringContent(JsonSerializer.Serialize(loginRequest), Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PostAsync("login", content);
-            if (response.IsSuccessStatusCode)
-            {
-                using var stream = await response.Content.ReadAsStreamAsync();
-                using var doc = await JsonDocument.ParseAsync(stream);
-                token = doc.RootElement.GetProperty("data").GetProperty("token").GetString();
-                if (token != null) await settings.SetSettingAsync(Id, "tvdb_token", token);
-            }
-        }
-        return token;
-    }
+    private Task<string?> GetValidTokenAsync() => TvdbSession.GetTokenAsync(_httpClient, _scopeFactory);
 
     // The server-wide metadata language as a TVDB 3-letter code (e.g. "eng").
     // Cached for the lifetime of this (transient) provider instance so a single
@@ -237,10 +212,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         var url = $"search?query={Uri.EscapeDataString(query)}&type={type}";
         if (year.HasValue) url += $"&year={year.Value}";
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var response = await _httpClient.SendAsync(request);
+        var response = await TvdbSession.SendAsync(_httpClient, _scopeFactory, url, token);
         if (!response.IsSuccessStatusCode) return null;
 
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -270,9 +242,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         {
             // Resolve the IMDB id via the remote-id endpoint (see the TV method) —
             // `search?query=` does not match an IMDB id string.
-            using var searchReq = new HttpRequestMessage(HttpMethod.Get, $"search/remoteid/{Uri.EscapeDataString(id)}");
-            searchReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            var searchRes = await _httpClient.SendAsync(searchReq);
+            var searchRes = await TvdbSession.SendAsync(_httpClient, _scopeFactory, $"search/remoteid/{Uri.EscapeDataString(id)}", token);
             if (!searchRes.IsSuccessStatusCode) return null;
 
             using var searchStream = await searchRes.Content.ReadAsStreamAsync();
@@ -294,10 +264,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 
         var url = $"movies/{tvdbIdToFetch}/extended";
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var response = await _httpClient.SendAsync(request);
+        var response = await TvdbSession.SendAsync(_httpClient, _scopeFactory, url, token);
         if (!response.IsSuccessStatusCode) return null;
 
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -409,10 +376,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 
     private async Task<SeasonPosterInfo> LoadSeasonPosterInfoAsync(string tvdbId, string token)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"series/{tvdbId}/extended");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var response = await _httpClient.SendAsync(request);
+        var response = await TvdbSession.SendAsync(_httpClient, _scopeFactory, $"series/{tvdbId}/extended", token);
         if (!response.IsSuccessStatusCode) return new SeasonPosterInfo();
 
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -441,9 +405,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             // IMDB id string, so an imdb-tagged show would otherwise fail here and
             // fall back to a title search that never fetches the extended data
             // (and its seasons), leaving season posters blank.
-            using var searchReq = new HttpRequestMessage(HttpMethod.Get, $"search/remoteid/{Uri.EscapeDataString(id)}");
-            searchReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            var searchRes = await _httpClient.SendAsync(searchReq);
+            var searchRes = await TvdbSession.SendAsync(_httpClient, _scopeFactory, $"search/remoteid/{Uri.EscapeDataString(id)}", token);
             if (!searchRes.IsSuccessStatusCode) return null;
 
             using var searchStream = await searchRes.Content.ReadAsStreamAsync();
@@ -465,10 +427,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 
         var url = $"series/{tvdbIdToFetch}/extended";
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var response = await _httpClient.SendAsync(request);
+        var response = await TvdbSession.SendAsync(_httpClient, _scopeFactory, url, token);
         if (!response.IsSuccessStatusCode) return null;
 
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -576,10 +535,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                 if (_fetchExtendedSeasonData && s.Id != 0)
                 {
                     var seasonUrl = $"seasons/{s.Id}/extended";
-                    using var sRequest = new HttpRequestMessage(HttpMethod.Get, seasonUrl);
-                    sRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                    var sResponse = await _httpClient.SendAsync(sRequest);
+                    var sResponse = await TvdbSession.SendAsync(_httpClient, _scopeFactory, seasonUrl, token);
 
                     if (sResponse.IsSuccessStatusCode)
                     {
@@ -669,10 +625,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                 for (int page = 0; page < 5; page++)
                 {
                     var url = $"series/{showTmdbId}/episodes/default/{lang}?page={page}";
-                    using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                    var response = await _httpClient.SendAsync(request);
+                    var response = await TvdbSession.SendAsync(_httpClient, _scopeFactory, url, token);
                     if (!response.IsSuccessStatusCode) break;
 
                     using var stream = await response.Content.ReadAsStreamAsync();
@@ -729,10 +682,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 
         var url = $"people/{personId}/extended";
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var response = await _httpClient.SendAsync(request);
+        var response = await TvdbSession.SendAsync(_httpClient, _scopeFactory, url, token);
         if (!response.IsSuccessStatusCode) return null;
 
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -767,9 +717,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"seasons/{seasonId}/translations/{lang}");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            var response = await _httpClient.SendAsync(request);
+            var response = await TvdbSession.SendAsync(_httpClient, _scopeFactory, $"seasons/{seasonId}/translations/{lang}", token);
             if (!response.IsSuccessStatusCode) return;
 
             using var stream = await response.Content.ReadAsStreamAsync();
@@ -805,9 +753,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{kind}/{tvdbId}/translations/{lang}");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            var response = await _httpClient.SendAsync(request);
+            var response = await TvdbSession.SendAsync(_httpClient, _scopeFactory, $"{kind}/{tvdbId}/translations/{lang}", token);
             if (!response.IsSuccessStatusCode) return;
 
             using var stream = await response.Content.ReadAsStreamAsync();
@@ -852,10 +798,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         var url = $"search?query={Uri.EscapeDataString(query)}&type={type}";
         if (year.HasValue) url += $"&year={year.Value}";
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var response = await _httpClient.SendAsync(request, cancellationToken);
+        var response = await TvdbSession.SendAsync(_httpClient, _scopeFactory, url, token, cancellationToken);
         if (!response.IsSuccessStatusCode) return [];
 
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);

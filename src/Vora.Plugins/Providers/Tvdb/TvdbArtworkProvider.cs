@@ -1,8 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
-using System.Net.Http.Headers;
 using System.Net.Http;
 using System.Text.Json;
-using System.Text;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -31,31 +29,7 @@ public class TvdbArtworkProvider : IArtworkProvider
 
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>();
 
-    private async Task<string?> GetValidTokenAsync()
-    {
-        using var scope = _scopeFactory.CreateScope();
-        var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
-
-        var token = await settings.GetSettingAsync("tvdb_metadata", "tvdb_token");
-        if (string.IsNullOrEmpty(token))
-        {
-            var apiKey = await settings.GetSettingAsync("tvdb_metadata", "api_key");
-            if (string.IsNullOrEmpty(apiKey)) return null;
-
-            var loginRequest = new { apikey = apiKey };
-            var content = new StringContent(JsonSerializer.Serialize(loginRequest), Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PostAsync("login", content);
-            if (response.IsSuccessStatusCode)
-            {
-                var body = await response.Content.ReadAsStringAsync();
-                using var doc = JsonDocument.Parse(body);
-                token = doc.RootElement.GetProperty("data").GetProperty("token").GetString();
-                if (token != null) await settings.SetSettingAsync("tvdb_metadata", "tvdb_token", token);
-            }
-        }
-        return token;
-    }
+    private Task<string?> GetValidTokenAsync() => TvdbSession.GetTokenAsync(_httpClient, _scopeFactory);
 
     public async Task<IEnumerable<ArtworkResult>> GetArtworkAsync(string? tmdbId, string? tvdbId, string? imdbId, string mediaType, string? localPath = null, string? title = null, CancellationToken cancellationToken = default)
     {
@@ -74,10 +48,7 @@ public class TvdbArtworkProvider : IArtworkProvider
         else
             return new List<ArtworkResult>();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var response = await _httpClient.SendAsync(request);
+        var response = await TvdbSession.SendAsync(_httpClient, _scopeFactory, endpoint, token);
         if (!response.IsSuccessStatusCode) return new List<ArtworkResult>();
 
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
