@@ -345,6 +345,33 @@
     border-color: var(--vora-accent-soft-hover);
 }
 
+[data-vora-client] .vora-icon-button {
+    transition: background-color var(--vora-duration-fast) var(--vora-ease-out),
+                color var(--vora-duration-fast) var(--vora-ease-out);
+}
+
+[data-vora-client] .vora-icon-button:not(:disabled):hover,
+[data-vora-client] .vora-icon-button:focus-visible {
+    background: var(--vora-accent-soft);
+}
+
+[data-vora-client] .vora-pill {
+    background: transparent;
+    color: var(--vora-text-secondary);
+    border: 1px solid var(--vora-border-subtle);
+    transition: background-color var(--vora-duration-fast) var(--vora-ease-out),
+                border-color var(--vora-duration-fast) var(--vora-ease-out),
+                color var(--vora-duration-fast) var(--vora-ease-out);
+}
+
+[data-vora-client] .vora-pill[data-active="true"],
+[data-vora-client] .vora-pill:not(:disabled):hover,
+[data-vora-client] .vora-pill:focus-visible {
+    background: var(--vora-accent-soft);
+    border-color: var(--vora-accent-soft-hover);
+    color: var(--vora-accent-text);
+}
+
 [data-vora-client] .vora-guide-row:hover {
     background: rgba(255, 255, 255, 0.025);
 }
