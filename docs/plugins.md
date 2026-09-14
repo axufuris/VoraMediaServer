@@ -120,3 +120,17 @@ So each path logs its own reason. When the response parses but carries no `showt
 **Only non-empty results are cached.** The 12-hour entry exists to protect a small monthly search quota, but caching an empty result meant a transient upstream failure persisted for 12 hours after it had recovered.
 
 `max_theaters` is resolved **server-side**. The client sends neither `location` nor `maxTheaters`, so the endpoint falls back to `UserProfile.ShowtimesLocation` then the plugin's `default_location`, and the provider falls back to the plugin's `max_theaters`. The web client used to send a hardcoded `6` read from a `client_max_theaters_<profileId>` localStorage key that nothing ever wrote, which silently overrode whatever an admin had configured.
+
+## TVDB session tokens
+
+TVDB v4 authenticates with a session token obtained by `POST login` using the API key, stored in plugin settings as `tvdb_metadata:tvdb_token` and shared by `TvdbMetadataProvider` and `TvdbArtworkProvider`. **Tokens expire after about a month.**
+
+All TVDB auth goes through `TvdbSession` (`Providers/Tvdb/TvdbSession.cs`); don't read `tvdb_token` or build a bearer request directly.
+
+- **`GetTokenAsync`** renews the token when none is stored **or when it expires within a day** (it reads the JWT `exp` claim), and returns `null` rather than a stale token if login fails.
+- **`SendAsync`** sends a request and, on `401`, renews once and retries — covering a token revoked before its expiry.
+- Renewal is serialised by a lock and re-checks the stored token inside it, so parallel scan units that hit an expired token together log in **once**, and a caller whose token another caller already replaced just picks up the new one.
+- A failed login is logged as a warning.
+
+Before this, renewal happened only when no token was stored. When the stored token expired on 2026-09-10, every TVDB request got a `401`, each call site treated that as "no result", and nothing was logged: a whole TVDB library quietly stopped receiving metadata and artwork, and newly added shows were never matched.
+
