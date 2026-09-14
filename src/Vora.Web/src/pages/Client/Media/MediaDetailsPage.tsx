@@ -72,7 +72,23 @@ export default function MediaDetailsPage() {
     const [selectedAudioId, setSelectedAudioId] = useState<string>('');
     const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>('none');
 
-    const [qualityMedia, setQualityMedia] = useState<MediaItem | null>(null);
+    const [upNextQuality, setUpNextQuality] = useState<{ showId: string; episode: MediaItem | null } | null>(null);
+    const qualityMedia = !media
+        ? null
+        : media.type !== 'TvShow'
+            ? media
+            : upNextQuality?.showId === media.id ? upNextQuality.episode : null;
+
+    // Navigating between items (e.g. episode → season) reuses this component,
+    // so close any open overlay/menu from the previous item. Adjusted during
+    // render rather than in an effect so the stale overlay never paints.
+    const [overlaysForId, setOverlaysForId] = useState(id);
+    if (overlaysForId !== id) {
+        setOverlaysForId(id);
+        setIsQualityPanelOpen(false);
+        setShowMenu(false);
+        setInWatchlist(false);
+    }
 
     const [thumbnailsLocked, setThumbnailsLocked] = useState<boolean | null>(null);
 
@@ -119,12 +135,6 @@ export default function MediaDetailsPage() {
         let isMounted = true;
         if (!id) return;
 
-        // Navigating between items (e.g. episode → season) reuses this component,
-        // so close any open overlay/menu from the previous item.
-        setIsQualityPanelOpen(false);
-        setShowMenu(false);
-        setInWatchlist(false);
-
         watchlistService.check({ mediaItemId: id }, serverId)
             .then(saved => { if (isMounted) setInWatchlist(saved); })
             .catch(() => { /* a watchlist read failing shouldn't block the page */ });
@@ -144,19 +154,22 @@ export default function MediaDetailsPage() {
     }, [id, serverId]);
 
     useEffect(() => {
-        if (!media) { setQualityMedia(null); return; }
-        if (media.type !== 'TvShow') { setQualityMedia(media); return; }
+        if (!media || media.type !== 'TvShow') return;
 
+        const showId = media.id;
         let cancelled = false;
-        setQualityMedia(null);
         (async () => {
             try {
-                const upNext = await mediaService.getUpNext(media.id, undefined, undefined, serverId);
-                if (cancelled || !upNext.nextItem) return;
+                const upNext = await mediaService.getUpNext(showId, undefined, undefined, serverId);
+                if (cancelled) return;
+                if (!upNext.nextItem) {
+                    setUpNextQuality({ showId, episode: null });
+                    return;
+                }
                 const episode = await mediaService.getMediaItem(upNext.nextItem.id, serverId);
-                if (!cancelled) setQualityMedia(episode);
+                if (!cancelled) setUpNextQuality({ showId, episode });
             } catch {
-                if (!cancelled) setQualityMedia(null);
+                if (!cancelled) setUpNextQuality({ showId, episode: null });
             }
         })();
         return () => { cancelled = true; };
@@ -197,7 +210,7 @@ export default function MediaDetailsPage() {
                 setSelectedSubtitleId(prev => prev !== bestSubId ? bestSubId : prev);
             }, 0);
         }
-    }, [qualityMedia, caps]);
+    }, [qualityMedia, caps, pickBestAudioId]);
 
     useEffect(() => {
         if (!isPlaying && id) {

@@ -273,7 +273,7 @@ export default function LiveTvPlayer() {
                 timeshiftService.stopTimeshift(activeServer?.id).catch(() => { });
             }
         };
-    }, [currentMedia?.id, currentMedia?.streamUrl, videoRef, canTimeshift]);
+    }, [currentMedia?.id, currentMedia?.streamUrl, videoRef, canTimeshift, dialog]);
 
     useEffect(() => {
         if (!canTimeshift || !currentMedia?.id) return;

@@ -20,7 +20,7 @@ export interface FieldDef {
 // Content-only fields for smart collections — no profile-scoped fields
 // (watched / my-rating / last-played) since a collection is shared, not
 // per-profile.
-export const COLLECTION_FIELDS_BY_TYPE: Partial<Record<PlaylistMediaType, FieldDef[]>> = {
+const COLLECTION_FIELDS_BY_TYPE: Partial<Record<PlaylistMediaType, FieldDef[]>> = {
     Movies: [
         { value: 'Title', label: 'Title', kind: 'string' },
         { value: 'Genre', label: 'Genre', kind: 'string' },

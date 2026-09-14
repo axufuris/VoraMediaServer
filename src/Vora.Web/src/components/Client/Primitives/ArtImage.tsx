@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import MediaPlaceholder, { type PlaceholderVariant } from './MediaPlaceholder';
 
 // Drop-in <img> replacement that falls back to the branded MediaPlaceholder when
@@ -11,8 +11,8 @@ export default function ArtImage({ src, alt, variant = 'poster', imgClassName }:
     variant?: PlaceholderVariant;
     imgClassName?: string;
 }) {
-    const [failed, setFailed] = useState(false);
-    useEffect(() => { setFailed(false); }, [src]);
+    const [failedSrc, setFailedSrc] = useState<string | null>(null);
+    const failed = !!src && failedSrc === src;
 
     if (!src || failed) return <MediaPlaceholder title={alt} variant={variant} />;
 
@@ -22,7 +22,7 @@ export default function ArtImage({ src, alt, variant = 'poster', imgClassName }:
             alt={alt}
             loading="lazy"
             decoding="async"
-            onError={() => setFailed(true)}
+            onError={() => setFailedSrc(src)}
             className={imgClassName ?? 'h-full w-full object-cover'}
         />
     );

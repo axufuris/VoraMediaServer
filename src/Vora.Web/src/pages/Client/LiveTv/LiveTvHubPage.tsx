@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useFeatureFlags } from '../../../hooks/useFeatureFlags';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import Tabs from '../../../components/Client/Primitives/Tabs';
@@ -23,14 +23,8 @@ export default function LiveTvHubPage() {
         return tabs;
     }, [flags.dvr]);
 
-    const [activeTab, setActiveTab] = useState<LiveTvTab>(readSavedTab);
-
-    useEffect(() => {
-        if (!visibleTabs.includes(activeTab)) {
-            setActiveTab(visibleTabs[0]);
-            sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, visibleTabs[0]);
-        }
-    }, [visibleTabs, activeTab]);
+    const [savedTab, setActiveTab] = useState<LiveTvTab>(readSavedTab);
+    const activeTab = visibleTabs.includes(savedTab) ? savedTab : visibleTabs[0];
 
     const handleTabChange = (tab: LiveTvTab) => {
         setActiveTab(tab);

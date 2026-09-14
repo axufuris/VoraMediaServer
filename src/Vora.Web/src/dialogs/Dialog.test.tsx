@@ -200,4 +200,24 @@ describe('Dialog system', () => {
         expect(screen.getByText('Yes please')).toBeInTheDocument();
         expect(screen.getByText('No thanks')).toBeInTheDocument();
     });
+
+    // The api object used to be rebuilt on every provider render, including each
+    // time a dialog opened. Any effect depending on it re-ran then — the live TV
+    // player's stream effect would restart the stream, and the tuners-in-use
+    // alert it raises would have looped.
+    it('hands consumers the same api across a dialog opening and closing', async () => {
+        const seen: object[] = [];
+        function Recorder() {
+            const dialog = useDialog();
+            seen.push(dialog);
+            return <button onClick={() => dialog.alert('Stable?')}>Open</button>;
+        }
+
+        render(<DialogProvider><Recorder /></DialogProvider>);
+        await userEvent.click(screen.getByText('Open'));
+        expect(screen.getByText('Stable?')).toBeInTheDocument();
+        await userEvent.click(screen.getByRole('button', { name: 'OK' }));
+
+        expect(new Set(seen).size).toBe(1);
+    });
 });
