@@ -281,8 +281,9 @@ function LibraryToolbar({
 }
 
 function RecommendationsPanel({ providers, libraryId, serverId }: { providers: string[], libraryId: string, serverId?: string }) {
-    const [results, setResults] = useState<Record<string, RecommendationListVM[]>>({});
-    const [loaded, setLoaded] = useState(false);
+    const requestKey = `${serverId ?? ''}|${libraryId}|${providers.join(',')}`;
+    const [loadedFor, setLoadedFor] = useState<{ key: string; results: Record<string, RecommendationListVM[]> } | null>(null);
+    const results = loadedFor?.key === requestKey ? loadedFor.results : null;
 
     const orderedProviders = [...providers].sort((a, b) => {
         if (a === 'openai_recommendations') return -1;
@@ -292,7 +293,6 @@ function RecommendationsPanel({ providers, libraryId, serverId }: { providers: s
 
     useEffect(() => {
         let cancelled = false;
-        setLoaded(false);
         Promise.all(providers.map(providerId =>
             recommendationService.getLibraryRecommendations(libraryId, providerId, serverId)
                 .then(lists => ({ providerId, lists }))
@@ -301,13 +301,12 @@ function RecommendationsPanel({ providers, libraryId, serverId }: { providers: s
             if (cancelled) return;
             const map: Record<string, RecommendationListVM[]> = {};
             all.forEach(r => { map[r.providerId] = r.lists; });
-            setResults(map);
-            setLoaded(true);
+            setLoadedFor({ key: requestKey, results: map });
         });
         return () => { cancelled = true; };
-    }, [providers, libraryId, serverId]);
+    }, [requestKey, providers, libraryId, serverId]);
 
-    if (!loaded) {
+    if (!results) {
         return (
             <div className="mb-8 px-8">
                 <div className="vora-skeleton mb-4 h-6 w-48" />

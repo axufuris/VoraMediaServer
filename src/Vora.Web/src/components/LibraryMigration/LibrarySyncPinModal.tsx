@@ -101,7 +101,7 @@ export function LibrarySyncPinModal({
         return () => {
             if (timer) clearTimeout(timer);
         };
-    }, [phase, pin, providerId, serverId, onAuthorized]);
+    }, [phase, pin, providerId, serverId, onAuthorized, pollPin]);
 
     const handleClose = () => {
         cancelledRef.current = true;

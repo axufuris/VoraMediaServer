@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import type Hls from 'hls.js';
 import { loadHls } from '../../utils/loadHls';
 import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
@@ -10,6 +10,7 @@ import { podcastService } from '../../api/Podcasts/podcastService';
 import { serverVault } from '../../utils/serverVault';
 import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../utils/storageKeys';
 import { PlayPauseButton, SkipButton, VolumeControl, MaximizeButton, CloseButton } from './Controls/PlayerButtons';
+import RadioNowPlaying from './RadioNowPlaying';
 
 export default function LiveRadioPlayer() {
     const { currentMedia, isPlaying, isMinimized, volume, togglePlayPause, setMinimized, closePlayer, setVolume, videoRef, playMedia, skipForward, skipBackward, seek, nextTrack, previousTrack, hasNext, hasPrevious, queue, queueIndex, jumpToQueueIndex, isShuffled, toggleShuffle, repeatMode, cycleRepeatMode, setFullscreen, isFullscreen } = usePlayer();
@@ -25,6 +26,8 @@ export default function LiveRadioPlayer() {
     const isPodcast = currentMedia?.playbackContextType === 'Podcast';
     const isMusic = currentMedia?.playbackContextType === 'Music';
     const isAudioOnDemand = isPodcast || isMusic;
+    const isLiveRadio = currentMedia?.playbackContextType === 'LiveRadio';
+    const minimizePlayer = useCallback(() => setMinimized(true), [setMinimized]);
 
     const canTimeshift = useMemo(() => {
         const token = localStorage.getItem(StorageKeys.profileToken);
@@ -108,7 +111,6 @@ export default function LiveRadioPlayer() {
         // Without these the loading spinner spins forever. Surface a message and
         // stop the spinner on any fatal HLS error, media error, or timeout.
         const STREAM_ERROR = 'This station could not be played. It may be offline or blocking playback.';
-        let loadTimeout: ReturnType<typeof setTimeout>;
         const failStream = (message: string) => {
             if (!isMounted) return;
             clearTimeout(loadTimeout);
@@ -122,9 +124,9 @@ export default function LiveRadioPlayer() {
             setIsLoading(false);
         };
         const onVideoError = () => failStream(STREAM_ERROR);
+        const loadTimeout = setTimeout(() => failStream('This station is not responding. Try another station.'), 20000);
         video.addEventListener('playing', onVideoPlaying);
         video.addEventListener('error', onVideoError);
-        loadTimeout = setTimeout(() => failStream('This station is not responding. Try another station.'), 20000);
 
         const attachPassthrough = async () => {
             const activeServer = serverVault.getActiveServer();
@@ -304,6 +306,21 @@ export default function LiveRadioPlayer() {
         return `${m}:${String(s).padStart(2, '0')}`;
     };
 
+    const playStation = (channel: IptvChannelVM) => {
+        if (!currentMedia || channel.id === currentMedia.id) return;
+        setIsLoading(true);
+        playMedia({
+            ...currentMedia,
+            id: channel.id,
+            title: channel.name,
+            subtitle: channel.groupTitle || 'Live Radio',
+            posterUrl: channel.logoUrl,
+            streamUrl: channel.streamUrl,
+            container: 'hls',
+            playbackContextType: 'LiveRadio'
+        });
+    };
+
     const handleChannelChange = (direction: 'next' | 'prev') => {
         if (!channels.length || !currentMedia) return;
         const currentIndex = channels.findIndex(c => c.id === currentMedia.id);
@@ -313,18 +330,7 @@ export default function LiveRadioPlayer() {
         if (newIndex >= channels.length) newIndex = 0;
         if (newIndex < 0) newIndex = channels.length - 1;
 
-        const nextChannel = channels[newIndex];
-        setIsLoading(true);
-        playMedia({
-            ...currentMedia,
-            id: nextChannel.id,
-            title: nextChannel.name,
-            subtitle: nextChannel.groupTitle || 'Live Radio',
-            posterUrl: nextChannel.logoUrl,
-            streamUrl: nextChannel.streamUrl,
-            container: 'hls',
-            playbackContextType: 'LiveRadio'
-        });
+        playStation(channels[newIndex]);
     };
 
     if (!currentMedia) return null;
@@ -399,9 +405,9 @@ export default function LiveRadioPlayer() {
                                 <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
                             </button>
                         )}
-                        {(isAudioOnDemand || canTimeshift) && <SkipButton seconds={10} direction="back" size="sm" onClick={() => skipBackward(10)} />}
+                        {isAudioOnDemand && <SkipButton seconds={10} direction="back" size="sm" onClick={() => skipBackward(10)} />}
                         <PlayPauseButton isPlaying={isPlaying} onClick={togglePlayPause} size="sm" />
-                        {(isAudioOnDemand || canTimeshift) && <SkipButton seconds={30} direction="forward" size="sm" onClick={() => skipForward(30)} />}
+                        {isAudioOnDemand && <SkipButton seconds={30} direction="forward" size="sm" onClick={() => skipForward(30)} />}
                         {!isAudioOnDemand && (
                             <button
                                 type="button"
@@ -439,6 +445,22 @@ export default function LiveRadioPlayer() {
                         <CloseButton onClick={closePlayer} />
                     </div>
                 </div>
+            ) : isLiveRadio ? (
+                <RadioNowPlaying
+                    station={currentMedia}
+                    stations={channels}
+                    isPlaying={isPlaying}
+                    isLoading={isLoading}
+                    streamError={streamError}
+                    volume={volume}
+                    onVolumeChange={setVolume}
+                    onTogglePlay={togglePlayPause}
+                    onPreviousStation={() => handleChannelChange('prev')}
+                    onNextStation={() => handleChannelChange('next')}
+                    onSelectStation={playStation}
+                    onMinimize={minimizePlayer}
+                    onClose={closePlayer}
+                />
             ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center px-8">
                     <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
@@ -527,9 +549,9 @@ export default function LiveRadioPlayer() {
                                 <svg className="h-10 w-10 fill-current" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
                             </button>
                         )}
-                        {(isAudioOnDemand || canTimeshift) && <SkipButton seconds={10} direction="back" onClick={() => skipBackward(10)} />}
+                        {isAudioOnDemand && <SkipButton seconds={10} direction="back" onClick={() => skipBackward(10)} />}
                         <PlayPauseButton isPlaying={isPlaying} onClick={togglePlayPause} />
-                        {(isAudioOnDemand || canTimeshift) && <SkipButton seconds={30} direction="forward" onClick={() => skipForward(30)} />}
+                        {isAudioOnDemand && <SkipButton seconds={30} direction="forward" onClick={() => skipForward(30)} />}
                         {!isAudioOnDemand && (
                             <button
                                 type="button"

@@ -13,7 +13,7 @@ export default function ActorDetailsPage() {
     const navigate = useNavigate();
     const flags = useFeatureFlags();
     const [actor, setActor] = useState<ActorProfileData | null>(null);
-    const [credits, setCredits] = useState<DiscoveryActor | null>(null);
+    const [creditsFor, setCreditsFor] = useState<{ tmdbId: number; details: DiscoveryActor } | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -32,15 +32,19 @@ export default function ActorDetailsPage() {
     // life dates and wider credit list all come from the provider.
     useEffect(() => {
         let isMounted = true;
-        setCredits(null);
-        if (!flags.discover || !actor?.tmdbId) return;
+        const tmdbId = actor?.tmdbId;
+        if (!flags.discover || !tmdbId) return;
 
-        discoveryService.getActorDetails(DISCOVERY_PROVIDER, actor.tmdbId.toString(), serverId)
-            .then(res => { if (isMounted) setCredits(res); })
+        discoveryService.getActorDetails(DISCOVERY_PROVIDER, tmdbId.toString(), serverId)
+            .then(res => { if (isMounted) setCreditsFor({ tmdbId, details: res }); })
             .catch(() => { /* discovery may be unavailable — the local half still renders */ });
 
         return () => { isMounted = false; };
     }, [flags.discover, actor?.tmdbId, serverId]);
+
+    // Keyed by the person they were fetched for, so moving to another actor
+    // never shows the previous one's biography while the new one loads.
+    const credits = flags.discover && actor?.tmdbId && creditsFor?.tmdbId === actor.tmdbId ? creditsFor.details : null;
 
     const mediaPath = (mediaId: string) => serverId ? `/server/${serverId}/media/${mediaId}` : `/media/${mediaId}`;
 

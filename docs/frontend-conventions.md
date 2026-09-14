@@ -325,7 +325,17 @@ The focus ring itself is global: `[data-vora-client] *:focus-visible` in `tokens
 
 Clickable list rows (tracks, episodes, table rows) take `vora-row-interactive` from `tokens.css` rather than a Tailwind hover background. It fills the row with the template's accent — `--vora-accent-soft` with an `--vora-accent-soft-hover` border, the same pair the sidebar's selected item and the now-playing queue's current track use — and applies the same fill on `:focus-visible` for D-pad focus. Because both are template tokens, a template change recolours every row hover at once.
 
+Buttons follow the same rule. `vora-icon-button` fills with `--vora-accent-soft` on hover and `:focus-visible`; `vora-pill` is a bordered pill that takes the accent fill and `--vora-accent-soft-hover` border when hovered, focused or `data-active="true"`. The now-playing screens use both, replacing the fixed `rgba(255,255,255,0.06)` pills and `hover:bg-white/5` buttons they had.
+
 Hover fills in the client are the accent, not a neutral tint. Don't hover a row to `--vora-bg-sunken` (near-black in every dark template, so the row darkens into the page), to `hover:bg-white/5` (invisible on the light theme), or to any fixed colour that a template can't change.
+
+## Lint must be clean
+
+`npx eslint src` finishes with **no errors and no warnings**. There is no tolerated baseline — fix a problem where it is, including in files a change didn't otherwise touch, and don't silence a rule with an `eslint-disable` comment. The React Compiler rules catch real bugs here, not style:
+
+- **`set-state-in-effect`** — resetting state when a prop changes. Derive it instead (`ArtImage` tracks *which* `src` failed; `LiveTvHubPage` computes the effective tab), key async results by what they were fetched for (`ActorDetailsPage` credits, `LibraryPage` recommendations, `MediaDetailsPage` quality media), or adjust during render behind a guard (`MediaDetailsPage` closing overlays when `id` changes). Setting state inside a promise callback is fine.
+- **`exhaustive-deps`** — before adding a missing dependency, check that its identity is stable, or the effect re-runs. `DialogProvider` rebuilt its `api` object every render, so adding `dialog` to the live TV stream effect would have restarted the stream whenever any dialog opened; the fix was memoising the api, not skipping the dependency.
+- **`purity`** — no `Date.now()` during render. `LiveTvGuide` keeps the current time in state on a one-minute interval and derives both the now line and the current-programme sort from it.
 
 ## Conventions you must follow
 

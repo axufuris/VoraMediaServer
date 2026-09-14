@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { DialogContext, type AlertOptions, type ConfirmOptions, type PromptOptions, type DialogApi } from './useDialog';
 
@@ -19,7 +19,7 @@ const normalizePrompt = (input: PromptOptions | string): PromptOptions =>
 export function DialogProvider({ children }: { children: ReactNode }) {
     const [stack, setStack] = useState<DialogState[]>([]);
 
-    const api: DialogApi = {
+    const api = useMemo<DialogApi>(() => ({
         alert: (input) => new Promise<void>((resolve) => {
             setStack((s) => [...s, { kind: 'alert', options: normalizeAlert(input), resolve }]);
         }),
@@ -29,7 +29,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
         prompt: (input) => new Promise<string | null>((resolve) => {
             setStack((s) => [...s, { kind: 'prompt', options: normalizePrompt(input), resolve }]);
         })
-    };
+    }), []);
 
     const closeTop = useCallback(() => setStack((s) => s.slice(0, -1)), []);
 

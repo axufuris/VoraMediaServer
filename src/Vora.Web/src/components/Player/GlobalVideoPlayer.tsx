@@ -344,7 +344,7 @@ export default function GlobalVideoPlayer() {
 
             hasFetchedUpNext.current = true;
         }
-    }, [currentMedia?.id, currentMedia?.videoTrackId, currentMedia?.audioTrackId, currentMedia?.subtitleTrackId, currentMedia?.playbackContextType, currentMedia?.playbackContextId, serverId]);
+    }, [currentMedia?.id, currentMedia?.videoTrackId, currentMedia?.audioTrackId, currentMedia?.subtitleTrackId, currentMedia?.textSubtitleTrackId, currentMedia?.isExtra, currentMedia?.playbackContextType, currentMedia?.playbackContextId, serverId]);
 
     useEffect(() => {
         const video = videoRef.current;

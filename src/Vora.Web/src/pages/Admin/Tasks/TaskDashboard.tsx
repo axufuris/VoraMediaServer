@@ -10,13 +10,10 @@ export default function TaskDashboard() {
     const { serverId } = useParams<{ serverId?: string }>();
     const [tasks, setTasks] = useState<BackgroundTask[]>([]);
 
-    const fetchTasks = useCallback(async () => {
-        try {
-            const data = await taskService.getTasks(serverId);
-            setTasks(data);
-        } catch (error) {
-            console.error('Failed to fetch tasks', error);
-        }
+    const fetchTasks = useCallback(() => {
+        taskService.getTasks(serverId)
+            .then(setTasks)
+            .catch(error => console.error('Failed to fetch tasks', error));
     }, [serverId]);
 
     // SignalR pushes TasksUpdated for instant updates, but a single event missed

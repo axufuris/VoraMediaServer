@@ -69,22 +69,20 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
     const [showResMenu, setShowResMenu] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeCategory, setActiveCategory] = useState<string>('All');
-    const [currentTimelineX, setCurrentTimelineX] = useState<number>(0);
+    const [nowMs, setNowMs] = useState(() => Date.now());
 
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, channelId: string } | null>(null);
     const [programModal, setProgramModal] = useState<{ isOpen: boolean, channel: IptvChannelVM, program: IptvProgramDto } | null>(null);
     const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
 
+    // One clock drives both the now line and which channels count as having a
+    // programme on, so the two agree and neither reads the time during render.
     useEffect(() => {
-        const updateTimeLine = () => {
-            const now = new Date();
-            const diffMins = (now.getTime() - timelineStart.getTime()) / 60000;
-            setCurrentTimelineX(Math.max(0, diffMins * PX_PER_MINUTE));
-        };
-        updateTimeLine();
-        const intervalId = setInterval(updateTimeLine, 60000);
+        const intervalId = setInterval(() => setNowMs(Date.now()), 60000);
         return () => clearInterval(intervalId);
-    }, [timelineStart]);
+    }, []);
+
+    const currentTimelineX = Math.max(0, ((nowMs - timelineStart.getTime()) / 60000) * PX_PER_MINUTE);
 
     useEffect(() => {
         const closeMenu = () => setContextMenu(null);
@@ -220,7 +218,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
             return matchesCategory && matchesRegion && matchesResolution && matchesSearch && matchesEmpty;
         });
 
-        const now = Date.now();
+        const now = nowMs;
         const parseProgramTime = (t: string): number => new Date(t.endsWith('Z') ? t : t + 'Z').getTime();
         const hasCurrentProgram = (externalChannelId: string): boolean => {
             const programs = guideData[(externalChannelId || '').toLowerCase()] || [];
@@ -248,7 +246,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
             if (!aHasPrograms && bHasPrograms) return 1;
             return a.name.localeCompare(b.name);
         });
-    }, [channels, activeCategory, prefs, searchQuery, guideData]);
+    }, [channels, activeCategory, prefs, searchQuery, guideData, nowMs]);
 
     const { setScrollTop, scrollContainerRef, handleScroll, startIndex, endIndex, offsetY, totalHeight, visibleCount } = useGuideVirtualization(filteredChannels.length);
 
