@@ -161,7 +161,7 @@ export default function MusicAlbumView({
                                             e.preventDefault();
                                             onTrackContextMenu({ x: e.pageX, y: e.pageY, track, index: idx });
                                         }}
-                                        className="w-full text-left flex items-center gap-2 sm:gap-4 p-2 hover:bg-[var(--vora-bg-sunken)] border border-transparent hover:border-[var(--vora-border-subtle)] rounded transition-all cursor-pointer group"
+                                        className="w-full text-left flex items-center gap-2 sm:gap-4 p-2 vora-row-interactive border border-transparent hover:border-[var(--vora-border-subtle)] rounded transition-all cursor-pointer group"
                                     >
                                         <div className="w-6 sm:w-8 text-right text-sm text-[var(--vora-text-muted)] group-hover:text-[var(--vora-accent-text)] shrink-0">
                                             <span className="group-hover:hidden">{track.trackNumber || '—'}</span>

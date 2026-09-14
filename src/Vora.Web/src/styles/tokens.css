@@ -334,6 +334,16 @@
     display: none;
 }
 
+[data-vora-client] .vora-row-interactive {
+    transition: background-color var(--vora-duration-fast) var(--vora-ease-out),
+                border-color var(--vora-duration-fast) var(--vora-ease-out);
+}
+
+[data-vora-client] .vora-row-interactive:hover,
+[data-vora-client] .vora-row-interactive:focus-visible {
+    background: color-mix(in srgb, var(--vora-text-primary) 7%, transparent);
+}
+
 [data-vora-client] .vora-guide-row:hover {
     background: rgba(255, 255, 255, 0.025);
 }

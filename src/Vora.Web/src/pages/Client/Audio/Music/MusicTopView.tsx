@@ -65,7 +65,7 @@ export default function MusicTopView({
                         <div
                             key={t.id}
                             onClick={() => playArtistTrackList(topTracks, idx)}
-                            className="w-full text-left flex items-center gap-3 p-2 hover:bg-[var(--vora-bg-sunken)] border border-transparent hover:border-[var(--vora-border-subtle)] rounded transition-all cursor-pointer group"
+                            className="w-full text-left flex items-center gap-3 p-2 vora-row-interactive border border-transparent hover:border-[var(--vora-border-subtle)] rounded transition-all cursor-pointer group"
                         >
                             <div className="w-8 text-right text-sm text-[var(--vora-text-muted)] group-hover:text-[var(--vora-accent-text)] tabular-nums">{idx + 1}</div>
                             <div className="w-10 h-10 rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shrink-0">

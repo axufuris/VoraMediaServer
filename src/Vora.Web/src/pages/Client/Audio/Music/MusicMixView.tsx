@@ -80,7 +80,7 @@ export default function MusicMixView({
                         <div
                             key={t.id}
                             onClick={() => playMixFromIndex(idx)}
-                            className="w-full text-left flex items-center gap-3 p-2 hover:bg-[var(--vora-bg-sunken)] border border-transparent hover:border-[var(--vora-border-subtle)] rounded transition-all cursor-pointer group"
+                            className="w-full text-left flex items-center gap-3 p-2 vora-row-interactive border border-transparent hover:border-[var(--vora-border-subtle)] rounded transition-all cursor-pointer group"
                         >
                             <div className="w-8 text-right text-sm text-[var(--vora-text-muted)] group-hover:text-[var(--vora-accent-text)] tabular-nums shrink-0">{idx + 1}</div>
                             <div className="flex-1 min-w-0">

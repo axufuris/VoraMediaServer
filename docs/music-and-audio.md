@@ -112,7 +112,11 @@ When `MainLayout` dispatches the player, it inspects this field to pick `GlobalV
 
 `PlayerContext.nowPlaying.test.tsx` renders the real provider and pins these; it fails against the previous effect-based version.
 
-The now-playing control bar holds transport in the centre and the panel toggles — like, lyrics, queue, audio settings — on the right, stacking to two rows below `md`. The audio settings panel is anchored to the control bar (`absolute bottom-full`), not to the viewport, so it opens above the bar at any height. The lyrics toggle renders only when the current track has lyrics.
+The now-playing control bar holds transport in the centre and the panel toggles — like, lyrics, queue, audio settings — on the right, stacking to two rows below `md`. The audio settings panel is anchored to the control bar (`absolute bottom-full`), not to the viewport, so it opens above the bar at any height. The panel toggles are labelled pills (icon plus "Lyrics" / "Queue" / "Audio"), not bare icons — a native `title` tooltip only appears after a hover delay and never on a remote, so an unlabelled icon was the only cue.
+
+**Lyrics stay on across tracks.** Turning them on sets a preference (`lyricsWanted`), not a per-track flag; the panel is open when that preference is set and the current track has lyrics or is still loading them. A track with no lyrics closes the panel without clearing the preference, and it reopens on the next track that has some. The toggle renders when the track has lyrics or the panel is open on its loading state.
+
+**The active synced line sits a third of the way down the panel** (`lyricsScrollTop` in `utils/lyricsScroll.ts`), clamped at the top of the list. Before the first line starts, the lyrics therefore begin at the top rather than below empty space. The list used to be padded 35vh top and bottom with the active line centred, and auto-scroll only began once a line was active, so a song with a long intro showed a third of a screen of nothing until the singing started. Scrolling is instant when the panel opens or the track changes, and smooth while following along.
 
 ## Audio hub page
 

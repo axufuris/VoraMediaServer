@@ -6,6 +6,7 @@ import { parseLrc, findActiveLineIndex, type LrcLine } from '../../utils/lrcPars
 import { audioQualityStore, crossfadeStore, eqPresetStore, type AudioQuality, type EqPreset } from '../../utils/audioQuality';
 import { Modal } from '../Common/Modal';
 import { useSpatialNavigation } from '../../hooks/useSpatialNavigation';
+import { lyricsScrollTop } from '../../utils/lyricsScroll';
 
 const formatTime = (sec: number): string => {
     if (!isFinite(sec) || sec < 0) return '0:00';
@@ -30,7 +31,7 @@ export default function NowPlayingFullscreen() {
 
     useSpatialNavigation(screenRef, isFullscreen);
 
-    const [lyricsOpenTrackId, setLyricsOpenTrackId] = useState<string | null>(null);
+    const [lyricsWanted, setLyricsWanted] = useState(false);
     const [queueOpen, setQueueOpen] = useState(false);
     const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
     const [audioQuality, setAudioQualityState] = useState<AudioQuality>(audioQualityStore.get());
@@ -53,7 +54,7 @@ export default function NowPlayingFullscreen() {
     const [stationName, setStationName] = useState<string>('');
     const [stationDialogOpen, setStationDialogOpen] = useState(false);
     const lyricsScrollRef = useRef<HTMLDivElement>(null);
-    const lastActiveIndexRef = useRef(-1);
+    const lastLyricsScrollRef = useRef<string | null>(null);
 
     useEffect(() => {
         setStationSaved(false);
@@ -81,9 +82,12 @@ export default function NowPlayingFullscreen() {
 
     const hasLyrics = parsedLrc.length > 0 || !!lyrics?.plainLyrics?.trim();
 
-    // Derived from the track rather than reset in an effect, so switching tracks
-    // closes the panel without a second render pass.
-    const lyricsOpen = !!currentMedia && lyricsOpenTrackId === currentMedia.id;
+    // Turning lyrics on is a preference that carries from track to track. While
+    // the next track's lyrics load the panel stays open on its loading state
+    // rather than collapsing and springing back; a track with none closes it
+    // without clearing the preference for the one after.
+    const lyricsOpen = lyricsWanted && (hasLyrics || lyricsLoading);
+    const showLyricsToggle = hasLyrics || lyricsOpen;
 
     // A D-pad can only move focus that already exists. Opening the screen
     // leaves focus on whatever was behind it, so the first arrow press has
@@ -127,19 +131,29 @@ export default function NowPlayingFullscreen() {
         return () => { cancelled = true; };
     }, [isFullscreen, currentMedia, serverId]);
 
+    const currentTrackId = currentMedia?.id;
+
     useEffect(() => {
-        if (!lyricsOpen) return;
-        if (activeLineIdx < 0 || activeLineIdx === lastActiveIndexRef.current) return;
-        lastActiveIndexRef.current = activeLineIdx;
+        if (!lyricsOpen) {
+            lastLyricsScrollRef.current = null;
+            return;
+        }
         const container = lyricsScrollRef.current;
         if (!container) return;
-        const target = container.querySelector<HTMLDivElement>(`[data-line="${activeLineIdx}"]`);
+        const index = Math.max(activeLineIdx, 0);
+        const target = container.querySelector<HTMLDivElement>(`[data-line="${index}"]`);
         if (!target) return;
-        const containerRect = container.getBoundingClientRect();
-        const targetRect = target.getBoundingClientRect();
-        const offset = (targetRect.top - containerRect.top) - (container.clientHeight / 2) + (target.clientHeight / 2);
-        container.scrollTo({ top: container.scrollTop + offset, behavior: 'smooth' });
-    }, [activeLineIdx, lyricsOpen]);
+
+        const key = `${currentTrackId}:${index}`;
+        const previous = lastLyricsScrollRef.current;
+        if (key === previous) return;
+        lastLyricsScrollRef.current = key;
+
+        const lineTop = target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+        const top = lyricsScrollTop(lineTop, target.clientHeight, container.clientHeight);
+        const followingAlong = previous?.startsWith(`${currentTrackId}:`) ?? false;
+        container.scrollTo({ top, behavior: followingAlong ? 'smooth' : 'auto' });
+    }, [activeLineIdx, lyricsOpen, parsedLrc, currentTrackId]);
 
     const toggleLike = async () => {
         if (!currentMedia) return;
@@ -174,12 +188,7 @@ export default function NowPlayingFullscreen() {
         </svg>
     );
 
-    const panelToggleStyle = (active: boolean) => ({
-        background: active ? 'var(--vora-accent-soft)' : 'transparent',
-        color: active ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)',
-    });
-
-    const headerActionStyle = (active: boolean) => ({
+    const pillToggleStyle = (active: boolean) => ({
         background: active ? 'var(--vora-accent-soft)' : 'rgba(255, 255, 255, 0.06)',
         color: active ? 'var(--vora-accent-text)' : 'var(--vora-text-secondary)',
         border: `1px solid ${active ? 'var(--vora-accent-soft-hover)' : 'var(--vora-border-subtle)'}`,
@@ -229,7 +238,7 @@ export default function NowPlayingFullscreen() {
                             disabled={stationSaved}
                             title={stationSaved ? 'Station saved' : 'Save this radio as a station you can replay later'}
                             className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-default disabled:opacity-80"
-                            style={headerActionStyle(stationSaved)}
+                            style={pillToggleStyle(stationSaved)}
                         >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill={stationSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
                             {stationSaved ? 'Saved' : 'Save station'}
@@ -299,7 +308,7 @@ export default function NowPlayingFullscreen() {
                             ) : !lyrics ? (
                                 <div className="py-16 text-center text-sm" style={{ color: 'var(--vora-text-disabled)' }}>No lyrics found for this track.</div>
                             ) : lyrics.isSynced && parsedLrc.length > 0 ? (
-                                <div className="space-y-3 py-[35vh]">
+                                <div className="space-y-3 pb-[60vh] pt-6">
                                     {parsedLrc.map((line, i) => {
                                         const isActive = i === activeLineIdx;
                                         return (
@@ -442,7 +451,7 @@ export default function NowPlayingFullscreen() {
                             {repeatIcon}
                         </button>
                     </div>
-                    <div className="flex items-center justify-center gap-2 md:justify-end">
+                    <div className="flex flex-wrap items-center justify-center gap-2 md:justify-end">
                         <button
                             type="button"
                             onClick={toggleLike}
@@ -458,41 +467,41 @@ export default function NowPlayingFullscreen() {
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
                             )}
                         </button>
-                        {hasLyrics && (
+                        {showLyricsToggle && (
                             <button
                                 type="button"
-                                onClick={() => setLyricsOpenTrackId(lyricsOpen ? null : currentMedia.id)}
-                                title="Lyrics"
-                                aria-label="Lyrics"
+                                onClick={() => setLyricsWanted(!lyricsOpen)}
+                                title={lyricsOpen ? 'Hide lyrics' : 'Show lyrics'}
                                 aria-pressed={lyricsOpen}
-                                className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
-                                style={panelToggleStyle(lyricsOpen)}
+                                className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full px-3.5 text-sm font-medium transition-colors"
+                                style={pillToggleStyle(lyricsOpen)}
                             >
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 5h12M3 10h12M3 15h7" /><path d="M19 17V5l3 1.5" /><circle cx="17" cy="17" r="2" /></svg>
+                                Lyrics
                             </button>
                         )}
                         <button
                             type="button"
                             onClick={() => setQueueOpen(v => !v)}
-                            title="Queue"
-                            aria-label="Queue"
+                            title={queueOpen ? 'Hide queue' : 'Show queue'}
                             aria-pressed={queueOpen}
-                            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
-                            style={panelToggleStyle(queueOpen)}
+                            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full px-3.5 text-sm font-medium transition-colors"
+                            style={pillToggleStyle(queueOpen)}
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="14" y2="18" /><polygon points="17 16 22 19 17 22 17 16" fill="currentColor" /></svg>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="14" y2="18" /><polygon points="17 16 22 19 17 22 17 16" fill="currentColor" /></svg>
+                            Queue
                         </button>
                         <button
                             type="button"
                             onClick={() => setAudioSettingsOpen(v => !v)}
                             title="Audio settings"
-                            aria-label="Audio settings"
                             aria-pressed={audioSettingsOpen}
                             aria-controls="now-playing-audio-settings"
-                            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
-                            style={panelToggleStyle(audioSettingsOpen)}
+                            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full px-3.5 text-sm font-medium transition-colors"
+                            style={pillToggleStyle(audioSettingsOpen)}
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></svg>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></svg>
+                            Audio
                         </button>
                     </div>
                 </div>
