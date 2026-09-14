@@ -22,6 +22,7 @@ import MusicMixView from './Music/MusicMixView';
 import MusicAlbumView from './Music/MusicAlbumView';
 import MusicArtistView from './Music/MusicArtistView';
 import MusicArtistsView from './Music/MusicArtistsView';
+import { trackSubtitle } from '../../../utils/trackSubtitle';
 
 const NAV_STORAGE_KEY = SessionKeys.musicNavState;
 const NAV_PROFILE_KEY = SessionKeys.musicNavProfile;
@@ -450,7 +451,7 @@ export default function MusicTab() {
         return {
             id: track.id,
             title: track.title,
-            subtitle: `${album.artistName} — ${album.title}`,
+            subtitle: trackSubtitle(album.artistName, album.title),
             posterUrl: album.artworkUrl,
             streamUrl: musicService.getTrackStreamUrl(track.id, baseUrl, audioQualityStore.get()),
             serverId: server?.id,
@@ -488,13 +489,13 @@ export default function MusicTab() {
         playQueue(items, startIndex);
     };
 
-    const buildPlayableForArtistTrack = useCallback((t: ArtistTrackVM, artistName: string): PlayableMedia => {
+    const buildPlayableForArtistTrack = useCallback((t: ArtistTrackVM, artistName?: string): PlayableMedia => {
         const server = serverId ? serverVault.getServer(serverId) : serverVault.getActiveServer();
         const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
         return {
             id: t.id,
             title: t.title,
-            subtitle: `${artistName} — ${t.albumTitle ?? ''}`.replace(/ — $/, ''),
+            subtitle: trackSubtitle(artistName ?? t.artist, t.albumTitle),
             posterUrl: t.albumArtworkUrl,
             streamUrl: musicService.getTrackStreamUrl(t.id, baseUrl, audioQualityStore.get()),
             serverId: server?.id,
@@ -505,7 +506,7 @@ export default function MusicTab() {
 
     const playArtistTrackList = useCallback((tracks: ArtistTrackVM[], startIndex: number) => {
         if (tracks.length === 0) return;
-        const items = tracks.map(t => buildPlayableForArtistTrack(t, t.albumTitle ? '' : ''));
+        const items = tracks.map(t => buildPlayableForArtistTrack(t));
         playQueue(items, Math.max(0, Math.min(startIndex, items.length - 1)));
     }, [buildPlayableForArtistTrack, playQueue]);
 

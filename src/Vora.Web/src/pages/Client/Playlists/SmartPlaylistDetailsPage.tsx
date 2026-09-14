@@ -193,7 +193,7 @@ function MusicTable({ tracks, onPlay, formatDuration }: { tracks: ArtistTrackVM[
                 </thead>
                 <tbody>
                     {tracks.map((t, idx) => (
-                        <tr key={t.id} className="border-b border-[var(--vora-border-subtle)] hover:bg-[var(--vora-bg-sunken)]/50 cursor-pointer" onClick={() => onPlay(idx)}>
+                        <tr key={t.id} className="vora-row-interactive border-b border-[var(--vora-border-subtle)] cursor-pointer" onClick={() => onPlay(idx)}>
                             <td className="px-3 py-2 text-[var(--vora-text-muted)]">{idx + 1}</td>
                             <td className="px-3 py-2">
                                 <div className="flex items-center gap-3">
@@ -252,7 +252,7 @@ function EpisodeList({ episodes, onSelect, formatDuration }: { episodes: { id: s
                 </thead>
                 <tbody>
                     {episodes.map((e, idx) => (
-                        <tr key={e.id} className="border-b border-[var(--vora-border-subtle)] hover:bg-[var(--vora-bg-sunken)]/50 cursor-pointer" onClick={() => onSelect(idx)}>
+                        <tr key={e.id} className="vora-row-interactive border-b border-[var(--vora-border-subtle)] cursor-pointer" onClick={() => onSelect(idx)}>
                             <td className="px-3 py-2 text-[var(--vora-text-muted)]">{idx + 1}</td>
                             <td className="px-3 py-2 text-[var(--vora-text-secondary)] truncate max-w-[200px]" title={e.showTitle ?? ''}>{e.showTitle ?? '—'}</td>
                             <td className="px-3 py-2 text-[var(--vora-text-muted)] font-mono">{e.seasonNumber != null && e.episodeNumber != null ? `S${e.seasonNumber.toString().padStart(2, '0')}E${e.episodeNumber.toString().padStart(2, '0')}` : '—'}</td>
