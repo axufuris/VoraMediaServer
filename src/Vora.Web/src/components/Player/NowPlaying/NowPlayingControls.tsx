@@ -1,4 +1,5 @@
 import type { ReactNode, Ref } from 'react';
+import { formatPlaybackTime } from '../../../utils/playbackTime';
 
 interface NowPlayingControlRowProps {
     transport: ReactNode;
@@ -132,5 +133,60 @@ export function NowPlayingVolume({ value, onChange }: NowPlayingVolumeProps) {
                 className="w-24 cursor-pointer accent-[var(--vora-accent-500)]"
             />
         </div>
+    );
+}
+
+interface NowPlayingSeekBarProps {
+    currentTime: number;
+    duration: number;
+    onSeek: (seconds: number) => void;
+}
+
+export function NowPlayingSeekBar({ currentTime, duration, onSeek }: NowPlayingSeekBarProps) {
+    return (
+        <div className="mb-2 flex items-center gap-3 text-xs tabular-nums" style={{ color: 'var(--vora-text-muted)' }}>
+            <span className="min-w-10 text-right">{formatPlaybackTime(currentTime)}</span>
+            <input
+                type="range"
+                min={0}
+                max={duration || 0}
+                step={0.1}
+                value={currentTime}
+                onChange={e => {
+                    const seconds = parseFloat(e.target.value);
+                    if (!Number.isNaN(seconds)) onSeek(seconds);
+                }}
+                aria-label="Playback position"
+                className="flex-1 cursor-pointer accent-[var(--vora-accent-500)]"
+            />
+            <span className="min-w-10">{formatPlaybackTime(duration)}</span>
+        </div>
+    );
+}
+
+interface NowPlayingSkipButtonProps {
+    seconds: number;
+    direction: 'back' | 'forward';
+    onClick: () => void;
+}
+
+export function NowPlayingSkipButton({ seconds, direction, onClick }: NowPlayingSkipButtonProps) {
+    const path = direction === 'back'
+        ? 'M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z'
+        : 'M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z';
+    const label = direction === 'back' ? `Back ${seconds} seconds` : `Forward ${seconds} seconds`;
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title={label}
+            aria-label={label}
+            className="vora-icon-button relative inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full"
+            style={{ color: 'var(--vora-text-primary)' }}
+        >
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={path} /></svg>
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] font-bold" style={{ marginTop: 5 }} aria-hidden="true">{seconds}</span>
+        </button>
     );
 }

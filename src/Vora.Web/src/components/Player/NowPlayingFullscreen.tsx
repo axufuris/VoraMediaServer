@@ -7,15 +7,8 @@ import { audioQualityStore, crossfadeStore, eqPresetStore, type AudioQuality, ty
 import { Modal } from '../Common/Modal';
 import { NowPlayingShell } from './NowPlaying/NowPlayingShell';
 import { NowPlayingArtwork } from './NowPlaying/NowPlayingArtwork';
-import { NowPlayingControlRow, NowPlayingIconButton, NowPlayingPill, NowPlayingPlayButton, NowPlayingVolume } from './NowPlaying/NowPlayingControls';
+import { NowPlayingControlRow, NowPlayingIconButton, NowPlayingPill, NowPlayingPlayButton, NowPlayingSeekBar, NowPlayingVolume } from './NowPlaying/NowPlayingControls';
 import { lyricsScrollTop } from '../../utils/lyricsScroll';
-
-const formatTime = (sec: number): string => {
-    if (!isFinite(sec) || sec < 0) return '0:00';
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-};
 
 export default function NowPlayingFullscreen() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -151,11 +144,6 @@ export default function NowPlayingFullscreen() {
         }
     };
 
-    const onScrubChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const v = parseFloat(e.target.value);
-        if (!isNaN(v)) seek(v);
-    };
-
     if (!isFullscreen || !currentMedia || currentMedia.playbackContextType !== 'Music') return null;
 
     const posterUrl = currentMedia.posterUrl;
@@ -192,20 +180,7 @@ export default function NowPlayingFullscreen() {
             )}
             controls={
                 <>
-                    <div className="mb-2 flex items-center gap-3 text-xs tabular-nums" style={{ color: 'var(--vora-text-muted)' }}>
-                        <span className="w-10 text-right">{formatTime(currentTime)}</span>
-                        <input
-                            type="range"
-                            min={0}
-                            max={duration || 0}
-                            step={0.1}
-                            value={currentTime}
-                            onChange={onScrubChange}
-                            aria-label="Playback position"
-                            className="flex-1 cursor-pointer accent-[var(--vora-accent-500)]"
-                        />
-                        <span className="w-10">{formatTime(duration)}</span>
-                    </div>
+                    <NowPlayingSeekBar currentTime={currentTime} duration={duration} onSeek={seek} />
                     <NowPlayingControlRow
                         transport={
                             <>
