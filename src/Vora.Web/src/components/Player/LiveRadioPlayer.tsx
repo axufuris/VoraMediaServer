@@ -329,15 +329,17 @@ export default function LiveRadioPlayer() {
 
     if (!currentMedia) return null;
 
-    const hiddenForFullscreen = isFullscreen && currentMedia.playbackContextType === 'Music';
+    const hiddenForFullscreen = isFullscreen && isMusic;
+    const showBar = isMinimized || isMusic;
+    const expandPlayer = () => isMusic ? setFullscreen(true) : setMinimized(false);
 
     const containerClass = hiddenForFullscreen
         ? 'fixed bottom-0 left-0 right-0 h-0 overflow-hidden pointer-events-none z-[1]'
-        : `transition-all duration-300 ease-in-out ${isMinimized ? 'fixed bottom-0 left-0 right-0 z-[99999] flex h-24 flex-col vora-glass' : 'fixed inset-0 z-[99999]'}`;
+        : `transition-all duration-300 ease-in-out ${showBar ? 'fixed bottom-0 left-0 right-0 z-[99999] flex h-24 flex-col vora-glass' : 'fixed inset-0 z-[99999]'}`;
 
     const containerStyle: React.CSSProperties | undefined = hiddenForFullscreen
         ? undefined
-        : isMinimized
+        : showBar
             ? { borderTop: '1px solid var(--vora-border-subtle)' }
             : { background: 'var(--vora-bg-canvas)' };
 
@@ -346,12 +348,12 @@ export default function LiveRadioPlayer() {
 
             <video ref={videoRef} autoPlay playsInline className="hidden" />
 
-            {!hiddenForFullscreen && (isMinimized ? (
+            {!hiddenForFullscreen && (showBar ? (
                 <div className="flex h-full w-full items-center justify-between px-6">
                     <div className="flex min-w-0 flex-1 items-center gap-4">
                         <div
                             className="flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md transition-all hover:ring-2"
-                            onClick={() => isMusic ? setFullscreen(true) : setMinimized(false)}
+                            onClick={expandPlayer}
                             title={isMusic ? 'Open Now Playing' : 'Expand player'}
                             style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
                         >
@@ -362,7 +364,7 @@ export default function LiveRadioPlayer() {
                         <div className="flex flex-col overflow-hidden">
                             <span
                                 className="cursor-pointer truncate font-semibold hover:underline"
-                                onClick={() => isMusic ? setFullscreen(true) : setMinimized(false)}
+                                onClick={expandPlayer}
                                 style={{ color: 'var(--vora-text-primary)' }}
                             >
                                 {currentMedia.title}
@@ -371,17 +373,6 @@ export default function LiveRadioPlayer() {
                                 {currentMedia.subtitle || 'Live Radio'}
                             </span>
                         </div>
-                        {isMusic && (
-                            <button
-                                type="button"
-                                onClick={() => setFullscreen(true)}
-                                title="Open Now Playing"
-                                className="ml-2 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
-                                style={{ color: 'var(--vora-text-muted)' }}
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
-                            </button>
-                        )}
                     </div>
 
                     <div className="mx-8 flex items-center gap-4">
@@ -444,7 +435,7 @@ export default function LiveRadioPlayer() {
 
                     <div className="flex items-center gap-3">
                         <VolumeControl value={volume} onChange={setVolume} />
-                        <MaximizeButton onClick={() => setMinimized(false)} />
+                        <MaximizeButton onClick={expandPlayer} />
                         <CloseButton onClick={closePlayer} />
                     </div>
                 </div>

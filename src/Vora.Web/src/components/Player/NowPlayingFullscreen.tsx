@@ -174,6 +174,11 @@ export default function NowPlayingFullscreen() {
         </svg>
     );
 
+    const panelToggleStyle = (active: boolean) => ({
+        background: active ? 'var(--vora-accent-soft)' : 'transparent',
+        color: active ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)',
+    });
+
     const headerActionStyle = (active: boolean) => ({
         background: active ? 'var(--vora-accent-soft)' : 'rgba(255, 255, 255, 0.06)',
         color: active ? 'var(--vora-accent-text)' : 'var(--vora-text-secondary)',
@@ -230,39 +235,6 @@ export default function NowPlayingFullscreen() {
                             {stationSaved ? 'Saved' : 'Save station'}
                         </button>
                     )}
-                    <button
-                        type="button"
-                        onClick={() => setAudioSettingsOpen(v => !v)}
-                        title="Audio settings"
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
-                        style={headerActionStyle(audioSettingsOpen)}
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3" /></svg>
-                        Audio
-                    </button>
-                    {hasLyrics && (
-                        <button
-                            type="button"
-                            onClick={() => setLyricsOpenTrackId(lyricsOpen ? null : currentMedia.id)}
-                            title="Toggle lyrics"
-                            aria-pressed={lyricsOpen}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
-                            style={headerActionStyle(lyricsOpen)}
-                        >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h10M4 18h7" /></svg>
-                            Lyrics
-                        </button>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => setQueueOpen(v => !v)}
-                        title="Toggle queue"
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
-                        style={headerActionStyle(queueOpen)}
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="14" y2="18" /><polygon points="17 16 22 19 17 22 17 16" fill="currentColor" /></svg>
-                        Queue
-                    </button>
                     <button
                         type="button"
                         onClick={() => { setFullscreen(false); closePlayer(); }}
@@ -410,148 +382,195 @@ export default function NowPlayingFullscreen() {
                     />
                     <span className="w-10">{formatTime(duration)}</span>
                 </div>
-                <div className="flex items-center justify-center gap-6">
-                    <button
-                        type="button"
-                        onClick={toggleShuffle}
-                        title={isShuffled ? 'Shuffle: on' : 'Shuffle: off'}
-                        className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
-                        style={{ color: isShuffled ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)' }}
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l5 5m0 0V5m0 4H5m11-4l5 5m0 0V5m0 4h-4m-2 7l7 7m-7-7l-7 7m14 0v-4m0 4h-4" /></svg>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={previousTrack}
-                        disabled={!hasPrevious}
-                        title="Previous"
-                        className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5 disabled:cursor-default disabled:opacity-30"
-                        style={{ color: 'var(--vora-text-primary)' }}
-                    >
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
-                    </button>
-                    <button
-                        ref={playButtonRef}
-                        type="button"
-                        onClick={togglePlayPause}
-                        title={isPlaying ? 'Pause' : 'Play'}
-                        className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105"
-                        style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', boxShadow: 'var(--vora-shadow-lg)' }}
-                    >
-                        {isPlaying ? (
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
-                        ) : (
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 3 }}><path d="M8 5v14l11-7z" /></svg>
-                        )}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={nextTrack}
-                        disabled={!hasNext}
-                        title="Next"
-                        className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5 disabled:cursor-default disabled:opacity-30"
-                        style={{ color: 'var(--vora-text-primary)' }}
-                    >
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z" /></svg>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={cycleRepeatMode}
-                        title={`Repeat: ${repeatMode}`}
-                        className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
-                        style={{ color: repeatMode !== 'off' ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)' }}
-                    >
-                        {repeatIcon}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={toggleLike}
-                        title={isLiked ? 'Remove from Liked Songs' : 'Add to Liked Songs'}
-                        className="ml-2 inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
-                        style={{ color: isLiked ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)' }}
-                    >
-                        {isLiked ? (
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
-                        ) : (
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
-                        )}
-                    </button>
-                </div>
-            </div>
-
-            {audioSettingsOpen && (
-                <div
-                    className="fixed right-6 top-20 z-[105000] w-80 rounded-xl p-5"
-                    style={{
-                        background: 'var(--vora-bg-raised)',
-                        border: '1px solid var(--vora-border-strong)',
-                        boxShadow: 'var(--vora-shadow-overlay)',
-                    }}
-                >
-                    <div className="mb-4 flex items-center justify-between">
-                        <h3 className="m-0 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Audio settings</h3>
+                <div className="flex flex-col items-center gap-3 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-6">
+                    <div className="hidden md:block" />
+                    <div className="flex items-center justify-center gap-6">
                         <button
                             type="button"
-                            onClick={() => setAudioSettingsOpen(false)}
-                            aria-label="Close"
-                            className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
-                            style={{ color: 'var(--vora-text-muted)' }}
+                            onClick={toggleShuffle}
+                            title={isShuffled ? 'Shuffle: on' : 'Shuffle: off'}
+                            aria-label="Shuffle"
+                            aria-pressed={isShuffled}
+                            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                            style={{ color: isShuffled ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)' }}
                         >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" /></svg>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={previousTrack}
+                            disabled={!hasPrevious}
+                            title="Previous"
+                            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5 disabled:cursor-default disabled:opacity-30"
+                            style={{ color: 'var(--vora-text-primary)' }}
+                        >
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
+                        </button>
+                        <button
+                            ref={playButtonRef}
+                            type="button"
+                            onClick={togglePlayPause}
+                            title={isPlaying ? 'Pause' : 'Play'}
+                            className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105"
+                            style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', boxShadow: 'var(--vora-shadow-lg)' }}
+                        >
+                            {isPlaying ? (
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
+                            ) : (
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 3 }}><path d="M8 5v14l11-7z" /></svg>
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={nextTrack}
+                            disabled={!hasNext}
+                            title="Next"
+                            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5 disabled:cursor-default disabled:opacity-30"
+                            style={{ color: 'var(--vora-text-primary)' }}
+                        >
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z" /></svg>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={cycleRepeatMode}
+                            title={`Repeat: ${repeatMode}`}
+                            aria-label={`Repeat: ${repeatMode}`}
+                            aria-pressed={repeatMode !== 'off'}
+                            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                            style={{ color: repeatMode !== 'off' ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)' }}
+                        >
+                            {repeatIcon}
                         </button>
                     </div>
-
-                    <div className="space-y-4">
-                        <div>
-                            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Audio quality</label>
-                            <select
-                                value={audioQuality}
-                                onChange={e => updateAudioQuality(e.target.value as AudioQuality)}
-                                className="w-full cursor-pointer rounded-md p-2 text-sm outline-none transition-colors"
-                                style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-primary)' }}
+                    <div className="flex items-center justify-center gap-2 md:justify-end">
+                        <button
+                            type="button"
+                            onClick={toggleLike}
+                            title={isLiked ? 'Remove from Liked Songs' : 'Add to Liked Songs'}
+                            aria-label={isLiked ? 'Remove from Liked Songs' : 'Add to Liked Songs'}
+                            aria-pressed={isLiked}
+                            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                            style={{ color: isLiked ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)' }}
+                        >
+                            {isLiked ? (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
+                            ) : (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                            )}
+                        </button>
+                        {hasLyrics && (
+                            <button
+                                type="button"
+                                onClick={() => setLyricsOpenTrackId(lyricsOpen ? null : currentMedia.id)}
+                                title="Lyrics"
+                                aria-label="Lyrics"
+                                aria-pressed={lyricsOpen}
+                                className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                                style={panelToggleStyle(lyricsOpen)}
                             >
-                                <option value="Auto">Auto (Original)</option>
-                                <option value="High">High (320 kbps)</option>
-                                <option value="Medium">Medium (192 kbps)</option>
-                                <option value="Low">Low (128 kbps)</option>
-                                <option value="Original">Original (no transcoding)</option>
-                            </select>
-                            <p className="mt-1.5 text-[10px]" style={{ color: 'var(--vora-text-muted)' }}>Lower for mobile / slow connections. Changes apply to the next track.</p>
-                        </div>
-
-                        <div>
-                            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Crossfade: {crossfadeSec === 0 ? 'Off' : `${crossfadeSec}s`}</label>
-                            <input
-                                type="range"
-                                min={0}
-                                max={12}
-                                step={1}
-                                value={crossfadeSec}
-                                onChange={e => updateCrossfade(parseInt(e.target.value, 10))}
-                                className="w-full cursor-pointer accent-[var(--vora-accent-500)]"
-                            />
-                            <p className="mt-1.5 text-[10px]" style={{ color: 'var(--vora-text-muted)' }}>Smooth volume fade as each track approaches its end.</p>
-                        </div>
-
-                        <div>
-                            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>EQ preset</label>
-                            <select
-                                value={eqPreset}
-                                onChange={e => updateEqPreset(e.target.value as EqPreset)}
-                                className="w-full cursor-pointer rounded-md p-2 text-sm outline-none transition-colors"
-                                style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-primary)' }}
-                            >
-                                <option value="Off">Off (Flat)</option>
-                                <option value="BassBoost">Bass Boost</option>
-                                <option value="TrebleBoost">Treble Boost</option>
-                                <option value="Vocal">Vocal Clarity</option>
-                                <option value="Loudness">Loudness</option>
-                            </select>
-                            <p className="mt-1.5 text-[10px]" style={{ color: 'var(--vora-text-muted)' }}>EQ applies in real time. Bass Boost adds low end, Vocal boosts the mids, etc.</p>
-                        </div>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /></svg>
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setQueueOpen(v => !v)}
+                            title="Queue"
+                            aria-label="Queue"
+                            aria-pressed={queueOpen}
+                            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                            style={panelToggleStyle(queueOpen)}
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="14" y2="18" /><polygon points="17 16 22 19 17 22 17 16" fill="currentColor" /></svg>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setAudioSettingsOpen(v => !v)}
+                            title="Audio settings"
+                            aria-label="Audio settings"
+                            aria-pressed={audioSettingsOpen}
+                            aria-controls="now-playing-audio-settings"
+                            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                            style={panelToggleStyle(audioSettingsOpen)}
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></svg>
+                        </button>
                     </div>
                 </div>
-            )}
+                {audioSettingsOpen && (
+                    <div
+                        id="now-playing-audio-settings"
+                        className="absolute bottom-full right-4 z-20 mb-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl p-5 md:right-8"
+                        style={{
+                            background: 'var(--vora-bg-raised)',
+                            border: '1px solid var(--vora-border-strong)',
+                            boxShadow: 'var(--vora-shadow-overlay)',
+                        }}
+                    >
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="m-0 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Audio settings</h3>
+                            <button
+                                type="button"
+                                onClick={() => setAudioSettingsOpen(false)}
+                                aria-label="Close"
+                                className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                                style={{ color: 'var(--vora-text-muted)' }}
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Audio quality</label>
+                                <select
+                                    value={audioQuality}
+                                    onChange={e => updateAudioQuality(e.target.value as AudioQuality)}
+                                    className="w-full cursor-pointer rounded-md p-2 text-sm outline-none transition-colors"
+                                    style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-primary)' }}
+                                >
+                                    <option value="Auto">Auto (Original)</option>
+                                    <option value="High">High (320 kbps)</option>
+                                    <option value="Medium">Medium (192 kbps)</option>
+                                    <option value="Low">Low (128 kbps)</option>
+                                    <option value="Original">Original (no transcoding)</option>
+                                </select>
+                                <p className="mt-1.5 text-[10px]" style={{ color: 'var(--vora-text-muted)' }}>Lower for mobile / slow connections. Changes apply to the next track.</p>
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Crossfade: {crossfadeSec === 0 ? 'Off' : `${crossfadeSec}s`}</label>
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={12}
+                                    step={1}
+                                    value={crossfadeSec}
+                                    onChange={e => updateCrossfade(parseInt(e.target.value, 10))}
+                                    className="w-full cursor-pointer accent-[var(--vora-accent-500)]"
+                                />
+                                <p className="mt-1.5 text-[10px]" style={{ color: 'var(--vora-text-muted)' }}>Smooth volume fade as each track approaches its end.</p>
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>EQ preset</label>
+                                <select
+                                    value={eqPreset}
+                                    onChange={e => updateEqPreset(e.target.value as EqPreset)}
+                                    className="w-full cursor-pointer rounded-md p-2 text-sm outline-none transition-colors"
+                                    style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-primary)' }}
+                                >
+                                    <option value="Off">Off (Flat)</option>
+                                    <option value="BassBoost">Bass Boost</option>
+                                    <option value="TrebleBoost">Treble Boost</option>
+                                    <option value="Vocal">Vocal Clarity</option>
+                                    <option value="Loudness">Loudness</option>
+                                </select>
+                                <p className="mt-1.5 text-[10px]" style={{ color: 'var(--vora-text-muted)' }}>EQ applies in real time. Bass Boost adds low end, Vocal boosts the mids, etc.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             <Modal
                 isOpen={stationDialogOpen}

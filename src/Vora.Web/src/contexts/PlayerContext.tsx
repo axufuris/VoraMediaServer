@@ -5,6 +5,7 @@ import { musicService, type RadioSeed } from '../api/Music/musicService';
 import { serverVault } from '../utils/serverVault';
 import { audioQualityStore, crossfadeStore, eqPresetStore, EQ_PRESETS } from '../utils/audioQuality';
 import { StorageKeys } from '../utils/storageKeys';
+import { usesNowPlayingScreen } from '../utils/nowPlayingScreen';
 import { useDialog } from '../dialogs';
 import {
     PlayerContext,
@@ -42,17 +43,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     useEffect(() => { queueIndexRef.current = queueIndex; }, [queueIndex]);
 
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const handleMediaChangedSyncFullscreen = useCallback(() => {
-        if (!currentMedia || currentMedia.playbackContextType !== 'Music') {
-            setIsFullscreen(false);
-        } else {
-            setIsMinimized(true);
-        }
-    }, [currentMedia]);
-
-    useEffect(() => {
-        queueMicrotask(handleMediaChangedSyncFullscreen);
-    }, [handleMediaChangedSyncFullscreen]);
 
     const [isShuffled, setIsShuffled] = useState(false);
     const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
@@ -313,7 +303,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const playMedia = useCallback((media: PlayableMedia) => {
         if (media.sessionId) setSessionId(media.sessionId);
-        setIsMinimized(false);
+        const nowPlaying = usesNowPlayingScreen(media);
+        setIsMinimized(nowPlaying);
+        if (!nowPlaying) setIsFullscreen(false);
         setIsPlaying(true);
 
         if (media.playbackContextType === 'Music' && media.id) {
@@ -462,6 +454,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             musicService.playbackStop(media.serverId).catch(() => { /* ignore */ });
         }
         setCurrentMedia(null);
+        setIsFullscreen(false);
         setSessionId(null);
         setIsPlaying(false);
         setQueue([]);
@@ -509,6 +502,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setQueueIndex(finalIndex);
         queueRef.current = finalItems;
         queueIndexRef.current = finalIndex;
+        if (usesNowPlayingScreen(finalItems[finalIndex])) setIsFullscreen(true);
         playMediaRef.current(finalItems[finalIndex]);
     }, [isShuffled]);
 
@@ -521,6 +515,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         queueIndexRef.current = 0;
         setRadioSeed(seed);
         setRadioLabel(label);
+        if (usesNowPlayingScreen(items[0])) setIsFullscreen(true);
         playMediaRef.current(items[0]);
     }, []);
 
