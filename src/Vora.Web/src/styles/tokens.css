@@ -341,7 +341,8 @@
 
 [data-vora-client] .vora-row-interactive:hover,
 [data-vora-client] .vora-row-interactive:focus-visible {
-    background: color-mix(in srgb, var(--vora-text-primary) 7%, transparent);
+    background: var(--vora-accent-soft);
+    border-color: var(--vora-accent-soft-hover);
 }
 
 [data-vora-client] .vora-guide-row:hover {
