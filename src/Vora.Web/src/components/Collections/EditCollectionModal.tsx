@@ -2,13 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { collectionAdminService } from '../../api/Collections/collectionAdminService';
 import type { CollectionDetails, CollectionSortOrder } from '../../api/Collections/collectionService';
-import type { ArtworkResult } from '../../api/Media/artworkService';
+import type { ArtworkKind, ArtworkResult } from '../../api/Media/artworkService';
 import { Modal } from '../Common/Modal';
 import ArtworkPicker from '../Common/ArtworkPicker';
 import { pluginAdminService, type PluginOptionVM } from '../../api/System/pluginAdminService';
 import { emptyDefinition, type SmartPlaylistDefinition } from '../../api/Music/smartPlaylistService';
 import RuleTreeEditor from '../Common/RuleTreeEditor';
-import { apiClient } from '../../api/client';
 import { useDialog } from '../../dialogs';
 import { errorDetail } from '../../utils/apiError';
 
@@ -129,21 +128,19 @@ export default function EditCollectionModal({
         if (!lockedFields.includes(artType)) toggleLock(artType);
     };
 
-    const uploadArtwork = async (artType: 'Poster' | 'Backdrop', file: File) => {
-        const data = new FormData();
-        data.append('file', file);
+    const uploadArtwork = async (artType: ArtworkKind, file: File) => {
         try {
-            await apiClient.post(`/collections/${collection.id}/artwork/upload?type=${artType}`, data, { headers: { 'Content-Type': 'multipart/form-data' }, serverId });
+            await collectionAdminService.uploadArtwork(collection.id, artType, file, serverId);
             fetchArtworkOptions();
         } catch (err) {
-            await dialog.alert("Upload failed");
+            await dialog.alert(errorDetail(err, "Upload failed"));
             console.error(err);
         }
     };
 
-    const addArtworkUrl = async (artType: 'Poster' | 'Backdrop', url: string) => {
+    const addArtworkUrl = async (artType: ArtworkKind, url: string) => {
         try {
-            await apiClient.post(`/collections/${collection.id}/artwork/url?type=${artType}`, `"${url}"`, { headers: { 'Content-Type': 'application/json' }, serverId });
+            await collectionAdminService.addArtworkUrl(collection.id, artType, url, serverId);
             fetchArtworkOptions();
         } catch (err) {
             await dialog.alert(errorDetail(err, "Failed to add URL"));
