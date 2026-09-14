@@ -104,6 +104,16 @@ No persistence — restart wipes it.
 
 When `MainLayout` dispatches the player, it inspects this field to pick `GlobalVideoPlayer` vs `LiveRadioPlayer`.
 
+**Music has exactly one expanded view: `NowPlayingFullscreen`.** `LiveRadioPlayer` renders music only as the bottom bar — its older full-screen layout is for radio and podcasts. `usesNowPlayingScreen(media)` (`utils/nowPlayingScreen.ts`) is the single predicate for this, and three rules follow from it:
+
+- **Starting** music (`playQueue`, `startRadio`) opens the screen. **Advancing** it (`nextTrack`, `previousTrack`, `jumpToQueueIndex`, auto-advance) goes through `playMedia` and leaves the screen as it is, so skipping from the mini bar doesn't throw the screen over whatever the viewer was browsing.
+- `playMedia` sets `isMinimized` to `usesNowPlayingScreen(media)` directly, and closes the screen for anything that isn't music; `closePlayer` closes it too. **Don't reintroduce an effect that reconciles these after a media change.** One did, deferred through `queueMicrotask` — it forced `isMinimized = true` on every track change, so a fresh play landed collapsed, and because the microtask captured `currentMedia` from the render that scheduled it, it could undo state set after it.
+- Every mini-bar expand control (artwork, title, the chevron) opens `NowPlayingFullscreen` for music. Routing any of them to `setMinimized(false)` shows the radio layout, which has no lyrics, queue panel or audio settings.
+
+`PlayerContext.nowPlaying.test.tsx` renders the real provider and pins these; it fails against the previous effect-based version.
+
+The now-playing control bar holds transport in the centre and the panel toggles — like, lyrics, queue, audio settings — on the right, stacking to two rows below `md`. The audio settings panel is anchored to the control bar (`absolute bottom-full`), not to the viewport, so it opens above the bar at any height. The lyrics toggle renders only when the current track has lyrics.
+
 ## Audio hub page
 
 `/audio` (`AudioHubPage`) has three tabs persisted to sessionStorage: **Music** (`MusicTab`), **Podcasts** (`PodcastsTab`), **Radio** (live radio stations from IPTV `IptvChannelKind.Radio` + Radio Browser feeds).
