@@ -323,9 +323,9 @@ The focus ring itself is global: `[data-vora-client] *:focus-visible` in `tokens
 
 ## Row hover
 
-Clickable list rows (tracks, episodes, table rows) take `vora-row-interactive` from `tokens.css` rather than a Tailwind hover background. It tints the row with 7% of `--vora-text-primary`, so it lifts the row in dark templates and shades it in the light one, and applies the same fill on `:focus-visible` for D-pad focus.
+Clickable list rows (tracks, episodes, table rows) take `vora-row-interactive` from `tokens.css` rather than a Tailwind hover background. It fills the row with the template's accent — `--vora-accent-soft` with an `--vora-accent-soft-hover` border, the same pair the sidebar's selected item and the now-playing queue's current track use — and applies the same fill on `:focus-visible` for D-pad focus. Because both are template tokens, a template change recolours every row hover at once.
 
-Don't hover a row to `--vora-bg-sunken`. In every dark template that token is near-black (`#050507`, `#000000`), darker than the canvas, so the row disappears on hover instead of lifting. `hover:bg-white/5` has the opposite problem on the light theme.
+Hover fills in the client are the accent, not a neutral tint. Don't hover a row to `--vora-bg-sunken` (near-black in every dark template, so the row darkens into the page), to `hover:bg-white/5` (invisible on the light theme), or to any fixed colour that a template can't change.
 
 ## Conventions you must follow
 
