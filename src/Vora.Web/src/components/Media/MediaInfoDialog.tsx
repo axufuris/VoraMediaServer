@@ -46,7 +46,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function StatList({ children, divided }: { children: ReactNode; divided?: boolean }) {
     return (
-        <dl className={`m-0 space-y-2 ${divided ? 'border-t pt-4' : ''}`} style={divided ? { borderColor: 'var(--vora-border-subtle)' } : undefined}>
+        <dl className={`m-0 space-y-2 ${divided ? 'mt-4 border-t pt-4' : ''}`} style={divided ? { borderColor: 'var(--vora-border-subtle)' } : undefined}>
             {children}
         </dl>
     );
@@ -98,46 +98,50 @@ function PartInfo({ part, index, count }: { part: MediaPart; index: number; coun
     const subtitleTracks = part.subtitleTracks ?? [];
 
     return (
-        <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2 xl:grid-cols-4">
-            <Section title={count > 1 ? `Part ${index + 1}` : 'Part'}>
-                <StatList>
-                    <Stat label="File" value={fileNameOf(part.filePath)} />
-                    <Stat label="Duration" value={formatInfoDuration(part.durationSeconds)} />
-                    <Stat label="Size" value={formatFileSize(part.fileSizeBytes)} />
-                    <Stat label="Bitrate" value={formatBitrate(part.bitrateKbps)} />
-                    <Stat label="Resolution" value={formatResolution(part.resolution)} />
-                    <Stat label="Container" value={formatCodec(part.container)} />
-                    <Stat label="Version" value={part.versionName} />
-                    <Stat label="Edition" value={part.edition} />
-                </StatList>
-            </Section>
+        <article aria-label={count > 1 ? `File ${index + 1} of ${count}` : 'File'}>
+            <h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>
+                {count > 1 ? `File ${index + 1} of ${count}` : 'File'}
+            </h3>
+            <div
+                className="mb-6 select-all break-all rounded p-3 font-mono text-xs"
+                title={fileNameOf(part.filePath) ?? undefined}
+                style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-secondary)' }}
+            >
+                {part.filePath}
+            </div>
 
-            <Section title={videoTracks.length > 1 ? `Video · ${videoTracks.length}` : 'Video'}>
-                {videoTracks.length === 0 ? <Empty /> : videoTracks.map((track, i) => (
-                    <StatList key={track.id} divided={i > 0}><VideoStats track={track} /></StatList>
-                ))}
-            </Section>
+            <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2 xl:grid-cols-4">
+                <Section title="Part">
+                    <StatList>
+                        <Stat label="Duration" value={formatInfoDuration(part.durationSeconds)} />
+                        <Stat label="Size" value={formatFileSize(part.fileSizeBytes)} />
+                        <Stat label="Bitrate" value={formatBitrate(part.bitrateKbps)} />
+                        <Stat label="Resolution" value={formatResolution(part.resolution)} />
+                        <Stat label="Container" value={formatCodec(part.container)} />
+                        <Stat label="Version" value={part.versionName} />
+                        <Stat label="Edition" value={part.edition} />
+                    </StatList>
+                </Section>
 
-            <Section title={audioTracks.length > 1 ? `Audio · ${audioTracks.length}` : 'Audio'}>
-                {audioTracks.length === 0 ? <Empty /> : (
-                    <div className="space-y-4">
-                        {audioTracks.map((track, i) => (
-                            <StatList key={track.id} divided={i > 0}><AudioStats track={track} /></StatList>
-                        ))}
-                    </div>
-                )}
-            </Section>
+                <Section title={videoTracks.length > 1 ? `Video · ${videoTracks.length}` : 'Video'}>
+                    {videoTracks.length === 0 ? <Empty /> : videoTracks.map((track, i) => (
+                        <StatList key={track.id} divided={i > 0}><VideoStats track={track} /></StatList>
+                    ))}
+                </Section>
 
-            <Section title={subtitleTracks.length > 1 ? `Subtitles · ${subtitleTracks.length}` : 'Subtitles'}>
-                {subtitleTracks.length === 0 ? <Empty /> : (
-                    <div className="space-y-4">
-                        {subtitleTracks.map((track, i) => (
-                            <StatList key={track.id} divided={i > 0}><SubtitleStats track={track} /></StatList>
-                        ))}
-                    </div>
-                )}
-            </Section>
-        </div>
+                <Section title={audioTracks.length > 1 ? `Audio · ${audioTracks.length}` : 'Audio'}>
+                    {audioTracks.length === 0 ? <Empty /> : audioTracks.map((track, i) => (
+                        <StatList key={track.id} divided={i > 0}><AudioStats track={track} /></StatList>
+                    ))}
+                </Section>
+
+                <Section title={subtitleTracks.length > 1 ? `Subtitles · ${subtitleTracks.length}` : 'Subtitles'}>
+                    {subtitleTracks.length === 0 ? <Empty /> : subtitleTracks.map((track, i) => (
+                        <StatList key={track.id} divided={i > 0}><SubtitleStats track={track} /></StatList>
+                    ))}
+                </Section>
+            </div>
+        </article>
     );
 }
 
@@ -201,24 +205,7 @@ export default function MediaInfoDialog({ parts, placement, onClose }: MediaInfo
                 </div>
 
                 <div className="flex-1 space-y-8 overflow-y-auto pr-3">
-                    <section>
-                        <h3 className="m-0 mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>
-                            {parts.length > 1 ? `Files · ${parts.length}` : 'File'}
-                        </h3>
-                        {parts.length === 0 ? <Empty /> : (
-                            <div className="space-y-2">
-                                {parts.map(part => (
-                                    <div
-                                        key={part.id}
-                                        className="select-all break-all rounded p-3 font-mono text-xs"
-                                        style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-secondary)' }}
-                                    >
-                                        {part.filePath}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </section>
+                    {parts.length === 0 && <Empty />}
 
                     {parts.map((part, index) => (
                         <div key={part.id} className={index > 0 ? 'border-t pt-8' : undefined} style={index > 0 ? { borderColor: 'var(--vora-border-subtle)' } : undefined}>

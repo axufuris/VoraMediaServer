@@ -168,15 +168,6 @@ export default function CollectionDetailsPage() {
             </div>
 
             <div className="relative z-10 w-full flex-1 px-12 pt-8">
-                <button
-                    type="button"
-                    onClick={() => navigate(-1)}
-                    className="mb-8 inline-flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                    style={{ background: 'rgba(20, 20, 28, 0.65)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#fafafa' }}
-                >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-                    Back
-                </button>
 
                 <div className="flex flex-col md:flex-row gap-10 mb-16">
                     <div className="w-64 shrink-0">

@@ -14,7 +14,7 @@ export default function CollectionsPage() {
     const [searchParams, setSearchParams] = useSearchParams();
 
     // The active tab lives in the URL (?tab=<libraryId|global>) so returning
-    // from a collection (Back = navigate(-1)) restores the tab you were on
+    // from a collection (the browser's back) restores the tab you were on
     // instead of snapping back to Global.
     const activeTab = searchParams.get('tab') ?? 'global';
 

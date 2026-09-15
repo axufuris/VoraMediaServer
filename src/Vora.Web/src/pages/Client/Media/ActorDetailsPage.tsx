@@ -126,7 +126,6 @@ export default function ActorDetailsPage() {
             placeOfBirth={actor.placeOfBirth || credits?.placeOfBirth}
             onServer={onServer}
             knownFor={knownFor}
-            onBack={() => navigate(-1)}
         />
     );
 }

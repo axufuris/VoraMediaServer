@@ -74,7 +74,6 @@ export default function DiscoveryActorPage() {
             placeOfBirth={actor.placeOfBirth}
             onServer={onServer}
             knownFor={knownFor}
-            onBack={() => navigate(-1)}
         />
     );
 }

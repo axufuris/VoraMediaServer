@@ -99,6 +99,7 @@
     --vora-card-caption-size: 0.75rem;
     --vora-card-badge-size: 0.625rem;
     --vora-person-w: clamp(6.5rem, 9vw, 8.5rem);
+    --vora-person-w-sm: clamp(5.25rem, 6.5vw, 6.5rem);
     --vora-video-w: clamp(14rem, 22vw, 18rem);
     --vora-row-title-size: 1.125rem;
     --vora-row-gutter: 2rem;

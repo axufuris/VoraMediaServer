@@ -54,7 +54,15 @@ describe('media info dialog', () => {
         expect(statValue(part, 'Bitrate')).toBe('11,167 kbps');
         expect(statValue(part, 'Container')).toBe('MKV');
         expect(statValue(part, 'Version')).toBe('Remux');
-        expect(statValue(part, 'File')).toBe('Man of War (2026) {imdb-tt34584846} [Remux-1080p][DTS-HD MA 5.1][AVC]-Aisha.mkv');
+    });
+
+    // The path heads its own section; repeating the file name as a row beside
+    // the stats only wrapped over several lines.
+    it('does not repeat the file name as a stat', () => {
+        renderDialog([remux]);
+        const part = screen.getByRole('heading', { name: 'Part' }).closest('section')!;
+
+        expect(within(part).queryByText('File', { selector: 'dt' })).toBeNull();
     });
 
     it('describes the video stream', () => {
@@ -100,12 +108,27 @@ describe('media info dialog', () => {
         expect(screen.getAllByText('None').length).toBeGreaterThanOrEqual(3);
     });
 
-    it('numbers the parts when an item has more than one file', () => {
-        renderDialog([remux, { ...remux, id: 'part-2', filePath: '/movies4k/Man of War (2026)/Man of War (2026) [2160p].mkv', resolution: '2160p' }]);
+    const fourK: MediaPart = { ...remux, id: 'part-2', filePath: '/movies4k/Man of War (2026)/Man of War (2026) [2160p].mkv', resolution: '2160p' };
 
-        expect(screen.getByRole('heading', { name: 'Files · 2' })).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: 'Part 1' })).toBeInTheDocument();
-        expect(statValue(screen.getByRole('heading', { name: 'Part 2' }).closest('section')!, 'Resolution')).toBe('4K');
+    it('numbers the files when an item has more than one', () => {
+        renderDialog([remux, fourK]);
+
+        expect(screen.getByRole('heading', { name: 'File 1 of 2' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'File 2 of 2' })).toBeInTheDocument();
+    });
+
+    // Each file's path belongs to that file's details, not to a list of paths
+    // at the top that the reader has to match up with the sections below.
+    it('puts each file path directly above its own details', () => {
+        renderDialog([remux, fourK]);
+
+        const second = screen.getByRole('article', { name: 'File 2 of 2' });
+        const path = within(second).getByText(fourK.filePath);
+        const resolution = within(second).getByText('Resolution', { selector: 'dt' });
+
+        expect(statValue(second, 'Resolution')).toBe('4K');
+        expect(within(second).queryByText(remux.filePath)).toBeNull();
+        expect(path.compareDocumentPosition(resolution) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it('closes from the close button', () => {
