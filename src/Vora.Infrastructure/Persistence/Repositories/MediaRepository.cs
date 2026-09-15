@@ -990,12 +990,17 @@ public partial class MediaRepository : IMediaRepository
         }
 
         await _context.SaveChangesAsync();
+
+        if (item is Episode episode)
+        {
+            await RefreshSeriesStateAsync(episode.SeasonId, contentAddedAt: null);
+        }
     }
 
     public Task<List<TrashMediaItemVM>> GetMissingMediaAsync() =>
         _context.MediaItems
             .AsNoTracking()
-            .Where(m => m.MissingSince != null)
+            .Where(m => m.MissingSince != null && !(m is TvShow) && !(m is Season))
             .OrderByDescending(m => m.MissingSince)
             .Select(TrashMediaItemVM.Projection)
             .ToListAsync();
@@ -1003,23 +1008,104 @@ public partial class MediaRepository : IMediaRepository
     public Task<List<Guid>> GetExpiredMissingMediaIdsAsync(DateTime cutoffUtc) =>
         _context.MediaItems
             .AsNoTracking()
-            .Where(m => m.MissingSince != null && m.MissingSince < cutoffUtc)
+            .Where(m => m.MissingSince != null && m.MissingSince < cutoffUtc && !(m is TvShow) && !(m is Season))
             .Select(m => m.Id)
             .ToListAsync();
 
-    public Task RestoreMissingMediaAsync(Guid id) =>
-        _context.MediaItems
-            .Where(m => m.Id == id && m.MissingSince != null)
-            .ExecuteUpdateAsync(s => s.SetProperty(m => m.MissingSince, (DateTime?)null));
+    public Task<List<Guid>> GetEmptyTrashedSeasonIdsAsync() =>
+        _context.Set<Season>()
+            .AsNoTracking()
+            .Where(s => s.MissingSince != null && !_context.Set<Episode>().Any(e => e.SeasonId == s.Id))
+            .Select(s => s.Id)
+            .ToListAsync();
+
+    public Task<List<Guid>> GetEmptyTrashedShowIdsAsync() =>
+        _context.Set<TvShow>()
+            .AsNoTracking()
+            .Where(t => t.MissingSince != null && !_context.Set<Season>().Any(s => s.TvShowId == t.Id))
+            .Select(t => t.Id)
+            .ToListAsync();
+
+    public async Task RestoreMissingMediaAsync(Guid id)
+    {
+        var item = await _context.MediaItems
+            .FirstOrDefaultAsync(m => m.Id == id && m.MissingSince != null && !(m is TvShow) && !(m is Season));
+        if (item == null) return;
+
+        item.MissingSince = null;
+        await _context.SaveChangesAsync();
+
+        if (item is Episode episode)
+        {
+            await RefreshSeriesStateAsync(episode.SeasonId, contentAddedAt: null);
+        }
+    }
+
+    public async Task RefreshSeriesStateAsync(Guid seasonId, DateTime? contentAddedAt)
+    {
+        var season = await _context.Set<Season>().FirstOrDefaultAsync(s => s.Id == seasonId);
+        if (season == null) return;
+
+        var now = DateTime.UtcNow;
+        var seasonIsLive = await _context.Set<Episode>().AnyAsync(e => e.SeasonId == seasonId && e.MissingSince == null);
+        season.MissingSince = seasonIsLive ? null : season.MissingSince ?? now;
+        if (seasonIsLive && contentAddedAt.HasValue) season.LastContentAddedAt = Latest(season.LastContentAddedAt, contentAddedAt.Value);
+
+        var show = await _context.Set<TvShow>().FirstOrDefaultAsync(t => t.Id == season.TvShowId);
+        if (show != null)
+        {
+            var showIsLive = await _context.Set<Episode>().AnyAsync(e => e.Season.TvShowId == show.Id && e.MissingSince == null);
+            show.MissingSince = showIsLive ? null : show.MissingSince ?? now;
+            if (showIsLive && contentAddedAt.HasValue) show.LastContentAddedAt = Latest(show.LastContentAddedAt, contentAddedAt.Value);
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task RefreshShowStateAsync(Guid showId)
+    {
+        var revived = await _context.Set<Episode>()
+            .Where(e => e.Season.TvShowId == showId && e.MissingSince != null && e.MediaParts.Any())
+            .ToListAsync();
+        foreach (var episode in revived) episode.MissingSince = null;
+        if (revived.Count > 0) await _context.SaveChangesAsync();
+
+        var seasons = await _context.Set<Season>()
+            .AsNoTracking()
+            .Where(s => s.TvShowId == showId)
+            .Select(s => new
+            {
+                s.Id,
+                Latest = _context.Set<Episode>()
+                    .Where(e => e.SeasonId == s.Id && e.MissingSince == null)
+                    .Max(e => (DateTime?)e.AddedAt)
+            })
+            .ToListAsync();
+
+        foreach (var season in seasons)
+        {
+            await RefreshSeriesStateAsync(season.Id, season.Latest);
+        }
+    }
+
+    private static DateTime Latest(DateTime? current, DateTime candidate) =>
+        current.HasValue && current.Value > candidate ? current.Value : candidate;
 
     public async Task DeleteMediaItemAsync(Guid id)
     {
         var item = await _context.MediaItems.FindAsync(id);
         if (item != null)
         {
+            var seasonId = item is Episode episode ? episode.SeasonId : (Guid?)null;
+
             await ArchiveUserDataForItemAsync(id);
             _context.MediaItems.Remove(item);
             await _context.SaveChangesAsync();
+
+            if (seasonId.HasValue)
+            {
+                await RefreshSeriesStateAsync(seasonId.Value, contentAddedAt: null);
+            }
         }
     }
 
@@ -1188,12 +1274,28 @@ public partial class MediaRepository : IMediaRepository
         // Clearing the thumbnail version likewise re-runs the per-part sprite pass
         // so the new part gets its own cut (or shares a same-runtime sibling's).
         // Also clear the missing flag if the file returned.
+        var addedAt = DateTime.UtcNow;
         await _context.MediaItems
             .Where(m => m.Id == part.MediaItemId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(m => m.LastOverlayGeneratedAt, (DateTime?)null)
                 .SetProperty(m => m.VideoThumbnailSpriteVersion, (string?)null)
-                .SetProperty(m => m.MissingSince, (DateTime?)null));
+                .SetProperty(m => m.MissingSince, (DateTime?)null)
+                .SetProperty(m => m.LastContentAddedAt, addedAt));
+
+        if (part.MediaItemId.HasValue)
+        {
+            var seasonId = await _context.Set<Episode>()
+                .AsNoTracking()
+                .Where(e => e.Id == part.MediaItemId.Value)
+                .Select(e => (Guid?)e.SeasonId)
+                .FirstOrDefaultAsync();
+
+            if (seasonId.HasValue)
+            {
+                await RefreshSeriesStateAsync(seasonId.Value, addedAt);
+            }
+        }
     }
 
     public async Task SyncItemEditionFromPartsAsync(Guid mediaItemId)

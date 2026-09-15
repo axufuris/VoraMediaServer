@@ -16,6 +16,10 @@ public interface IMediaRepository
     Task<Guid?> GetMovieIdByExternalIdAsync(string? tmdbId, string? imdbId, Guid libraryId);
     Task<Guid?> GetTvShowIdByTitleAndYearAsync(string title, int? year, Guid libraryId);
     Task<Guid?> GetTvShowIdByExternalIdAsync(string? tmdbId, string? imdbId, Guid libraryId);
+    Task RefreshSeriesStateAsync(Guid seasonId, DateTime? contentAddedAt);
+    Task RefreshShowStateAsync(Guid showId);
+    Task<List<Guid>> GetEmptyTrashedSeasonIdsAsync();
+    Task<List<Guid>> GetEmptyTrashedShowIdsAsync();
     Task<Dtos.MatchedItemIds?> FindOtherItemByExternalIdAsync(Guid libraryId, Guid excludeId, bool tvShow, string source, string externalId);
     Task<bool> MediaItemExistsAsync(Guid id);
     Task<Guid?> GetSeasonIdByNumberAsync(Guid tvShowId, int seasonNumber);

@@ -238,7 +238,19 @@ public class MediaManager : IMediaManager
             await DeleteMediaAsync(expiredId);
         }
 
-        return expiredIds.Count;
+        var emptySeasonIds = await _repository.GetEmptyTrashedSeasonIdsAsync();
+        foreach (var seasonId in emptySeasonIds)
+        {
+            await DeleteMediaAsync(seasonId);
+        }
+
+        var emptyShowIds = await _repository.GetEmptyTrashedShowIdsAsync();
+        foreach (var showId in emptyShowIds)
+        {
+            await DeleteMediaAsync(showId);
+        }
+
+        return expiredIds.Count + emptySeasonIds.Count + emptyShowIds.Count;
     }
 
     public async Task TriggerTargetedScanAsync(Guid id, CancellationToken cancellationToken = default)

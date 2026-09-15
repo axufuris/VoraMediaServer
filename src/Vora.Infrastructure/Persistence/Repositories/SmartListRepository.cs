@@ -268,7 +268,7 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
             case SmartListSortBy.Random:
                 return query.OrderBy(m => EF.Functions.Random());
             case SmartListSortBy.MostWatched:
-                if (!profileId.HasValue) return query.OrderByDescending(m => m.AddedAt);
+                if (!profileId.HasValue) return query.OrderByDescending(m => m.LastContentAddedAt ?? m.AddedAt);
                 var pid = profileId.Value;
                 return query.OrderByDescending(m =>
                     context.StreamSessions.Count(s => s.UserProfileId == pid && s.MediaItemId == m.Id) +
@@ -276,7 +276,7 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
                         .SelectMany(e => context.StreamSessions.Where(s => s.UserProfileId == pid && s.MediaItemId == e.Id))
                         .Count());
             default:
-                return query.OrderByDescending(m => m.AddedAt);
+                return query.OrderByDescending(m => m.LastContentAddedAt ?? m.AddedAt);
         }
     }
 
