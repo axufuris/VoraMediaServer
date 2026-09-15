@@ -19,7 +19,7 @@ import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import DetailHero, { HeroChip, HeroCredits, HeroIconButton } from '../../../components/Client/Primitives/DetailHero';
 import RatingBadge from '../../../components/Client/Primitives/RatingBadge';
 import TrailerOverlay, { type TrailerSource } from '../../../components/Client/Primitives/TrailerOverlay';
-import { PlayIcon, RestartIcon, GearIcon, FilmReelIcon, BookmarkIcon, CheckIcon, MoreIcon } from '../../../components/Client/Primitives/ActionIcons';
+import { PlayIcon, RestartIcon, GearIcon, FilmReelIcon, BookmarkIcon, CheckIcon, MoreIcon, InfoIcon } from '../../../components/Client/Primitives/ActionIcons';
 import { watchlistService } from '../../../api/Watchlist/watchlistService';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
@@ -30,6 +30,7 @@ import { formatRuntime } from '../../../utils/formatRuntime';
 import { isFullyWatched, affectedEpisodeCount } from '../../../utils/watchState';
 import { isImageSubtitleCodec, isNoSubtitle } from '../../../utils/subtitleKind';
 import FixMatchModal from '../../../components/Media/FixMatchModal';
+import MediaInfoDialog from '../../../components/Media/MediaInfoDialog';
 import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
 
 interface UpcomingEpisodeParsed {
@@ -69,6 +70,8 @@ export default function MediaDetailsPage() {
     const [inWatchlist, setInWatchlist] = useState(false);
     const [isMarkerEditorOpen, setIsMarkerEditorOpen] = useState(false);
     const [isFixMatchOpen, setIsFixMatchOpen] = useState(false);
+    const [isInfoOpen, setIsInfoOpen] = useState(false);
+    const closeInfo = useCallback(() => setIsInfoOpen(false), []);
     const [isQualityPanelOpen, setIsQualityPanelOpen] = useState(false);
 
     const [selectedVideoId, setSelectedVideoId] = useState<string>('');
@@ -532,6 +535,7 @@ export default function MediaDetailsPage() {
     const isSeason = media.type === 'Season';
     const showParentNav = (isEpisode && (!!media.seasonId || !!media.tvShowId)) || (isSeason && !!media.tvShowId);
     const canFixMatch = isAdmin && (media.type === 'Movie' || media.type === 'TvShow');
+    const hasFileInfo = (media.type === 'Movie' || isEpisode) && (media.mediaParts?.length ?? 0) > 0;
     const mediaPath = (mediaId: string) => serverId ? `/server/${serverId}/media/${mediaId}` : `/media/${mediaId}`;
 
     const handleMatched = async (result: MediaMatchResult) => {
@@ -660,6 +664,12 @@ export default function MediaDetailsPage() {
                 </HeroIconButton>
             )}
 
+            {hasFileInfo && (
+                <HeroIconButton label="Get info" onClick={() => setIsInfoOpen(true)}>
+                    <InfoIcon />
+                </HeroIconButton>
+            )}
+
             <div className="relative">
                 <HeroIconButton label="More actions" onClick={() => setShowMenu(v => !v)}>
                     <MoreIcon />
@@ -745,6 +755,9 @@ export default function MediaDetailsPage() {
 
     return (
         <div className="relative min-h-full pb-20">
+            {isInfoOpen && (
+                <MediaInfoDialog parts={media.mediaParts ?? []} placement="fixed" onClose={closeInfo} />
+            )}
             {isFixMatchOpen && (media.type === 'Movie' || media.type === 'TvShow') && (
                 <FixMatchModal
                     mediaItemId={media.id}
