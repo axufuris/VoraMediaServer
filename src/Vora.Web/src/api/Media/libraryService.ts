@@ -40,6 +40,7 @@ export interface LibraryItem {
     sortTitle?: string;
     releaseDate?: string;
     addedAt?: string;
+    lastContentAddedAt?: string | null;
     type: string;
     tvShowTitle?: string;
     seasonNumber?: number;

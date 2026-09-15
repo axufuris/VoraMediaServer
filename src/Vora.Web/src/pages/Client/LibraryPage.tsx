@@ -13,6 +13,7 @@ import MediaCard from '../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../components/Client/Primitives/MediaGrid';
 import LetterRail from '../../components/Client/Primitives/LetterRail';
 import { StorageKeys } from '../../utils/storageKeys';
+import { recentlyAddedTime } from '../../utils/recentlyAdded';
 
 type LibraryTabKey = 'library' | 'collections' | 'recommendations';
 
@@ -566,7 +567,7 @@ export default function LibraryPage() {
                     cmp = (a.releaseDate || '').localeCompare(b.releaseDate || '');
                     break;
                 case 'dateAdded':
-                    cmp = (a.addedAt || '').localeCompare(b.addedAt || '');
+                    cmp = recentlyAddedTime(a) - recentlyAddedTime(b);
                     break;
                 case 'adminRating':
                     cmp = (a.serverAdminRating ?? -1) - (b.serverAdminRating ?? -1);

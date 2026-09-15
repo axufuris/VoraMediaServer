@@ -58,6 +58,7 @@ public class MediaDedupeRepository : IMediaDedupeRepository
                 .ToList();
 
             var keeperId = ordered[0].Id;
+            result.KeeperShowIds.Add(keeperId);
             foreach (var drop in ordered.Skip(1))
             {
                 result.PartsMoved += await MergeShowIntoAsync(keeperId, drop.Id, result.AffectedEpisodeIds);

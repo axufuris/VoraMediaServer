@@ -46,6 +46,12 @@ public class MediaDedupeManager : IMediaDedupeManager
             await _mediaRepository.SyncItemEditionFromPartsAsync(episodeId);
         }
 
+        foreach (var showId in result.KeeperShowIds.Distinct())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await _mediaRepository.RefreshShowStateAsync(showId);
+        }
+
         if (result.ShowsRemoved > 0)
         {
             _logger.LogInformation(

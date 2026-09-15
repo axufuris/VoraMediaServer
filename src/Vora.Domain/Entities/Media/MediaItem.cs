@@ -45,6 +45,7 @@ public abstract class MediaItem : LockableEntity
     public bool HasPostCreditsStinger { get; set; }
 
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? LastContentAddedAt { get; set; }
     public DateTime? MissingSince { get; set; }
     public DateTime? LastMetadataRefresh { get; set; }
     public DateTime? LastOverlayGeneratedAt { get; set; }

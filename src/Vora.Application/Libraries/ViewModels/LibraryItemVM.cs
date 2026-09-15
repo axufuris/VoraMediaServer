@@ -11,6 +11,7 @@ public class LibraryItemVM
     public string? Overview { get; set; }
     public DateTime? ReleaseDate { get; set; }
     public DateTime AddedAt { get; set; }
+    public DateTime? LastContentAddedAt { get; set; }
     public string Type { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
@@ -63,6 +64,7 @@ public class LibraryItemVM
                 : null,
             ReleaseDate = item.ReleaseDate,
             AddedAt = item.AddedAt,
+            LastContentAddedAt = item.LastContentAddedAt,
             IsPlayed = false,
             UnplayedItemCount = null,
             ServerAdminRating = item.ServerAdminRating,
