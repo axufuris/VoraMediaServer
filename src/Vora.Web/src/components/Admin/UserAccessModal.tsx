@@ -3,6 +3,7 @@ import { type LibrarySummary } from '../../api/Media/libraryService';
 import { type IptvPlaylistVM } from '../../api/Iptv/iptvAdminService';
 import { type UserVM } from '../../api/Users/userService';
 import { Modal, ModalHeader } from '../Common/Modal';
+import ProviderAccessList from '../Common/ProviderAccessList';
 
 type AccessTab = 'libraries' | 'liveTv' | 'podcasts' | 'requests';
 
@@ -153,31 +154,25 @@ export default function UserAccessModal({ user, libraries, iptvPlaylists, onSave
 
                     {activeTab === 'liveTv' && (
                         <>
-                            <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-3">What IPTV playlists can this household see?</label>
+                            <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-3">Live TV & Radio providers this household can see</label>
                             <div className="flex gap-6 mb-4">
                                 <label className={`flex items-center gap-2 ${user.isAdmin ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                                     <input type="radio" checked={user.isAdmin || editHasAllIptv} onChange={() => setEditHasAllIptv(true)} disabled={user.isAdmin} className="accent-[var(--vora-accent-500)]" />
-                                    <span className="text-sm text-[var(--vora-text-primary)]">All Playlists</span>
+                                    <span className="text-sm text-[var(--vora-text-primary)]">All Providers</span>
                                 </label>
                                 <label className={`flex items-center gap-2 ${user.isAdmin ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                                     <input type="radio" checked={!user.isAdmin && !editHasAllIptv} onChange={() => setEditHasAllIptv(false)} disabled={user.isAdmin} className="accent-[var(--vora-accent-500)]" />
-                                    <span className="text-sm text-[var(--vora-text-primary)]">Selected Playlists</span>
+                                    <span className="text-sm text-[var(--vora-text-primary)]">Selected Providers</span>
                                 </label>
                             </div>
 
                             {!user.isAdmin && !editHasAllIptv && (
-                                <div className="bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded-[var(--vora-radius-md)] p-3 space-y-2.5 mb-4">
-                                    {iptvPlaylists.map(playlist => (
-                                        <label key={playlist.id} className="flex items-center gap-3 cursor-pointer select-none">
-                                            <input
-                                                type="checkbox"
-                                                checked={editAllowedIptv.includes(playlist.id)}
-                                                onChange={() => setEditAllowedIptv(prev => prev.includes(playlist.id) ? prev.filter(id => id !== playlist.id) : [...prev, playlist.id])}
-                                                className="w-4 h-4 accent-[var(--vora-accent-500)]"
-                                            />
-                                            <span className="text-sm font-medium text-[var(--vora-text-primary)]">{playlist.name}</span>
-                                        </label>
-                                    ))}
+                                <div className="bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded-[var(--vora-radius-md)] p-3 mb-4">
+                                    <ProviderAccessList
+                                        providers={iptvPlaylists}
+                                        selectedIds={editAllowedIptv}
+                                        onToggle={id => setEditAllowedIptv(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id])}
+                                    />
                                 </div>
                             )}
 
