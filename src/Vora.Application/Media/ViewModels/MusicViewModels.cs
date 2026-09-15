@@ -40,6 +40,14 @@ public class AlbumVM
     public List<string> LockedFields { get; set; } = new();
 }
 
+public class AlbumPageVM
+{
+    public List<AlbumVM> Items { get; set; } = new();
+    public int Total { get; set; }
+    public int Offset { get; set; }
+    public int Limit { get; set; }
+}
+
 public class TrackVM
 {
     public Guid Id { get; set; }

@@ -5,7 +5,7 @@ import MediaPlaceholder from './MediaPlaceholder';
 import PosterRemoveButton from './PosterRemoveButton';
 
 export type MediaCardShape = 'poster' | 'still' | 'square' | 'circle';
-export type MediaCardSize = 'sm' | 'md' | 'lg';
+export type MediaCardSize = 'xs' | 'sm' | 'md' | 'lg';
 
 export interface MediaCardProps {
     item?: PosterCaptionItem;
@@ -37,6 +37,7 @@ const ASPECT: Record<MediaCardShape, string> = {
 };
 
 const WIDTH_VAR: Record<MediaCardSize, string> = {
+    xs: 'var(--vora-card-w-xs)',
     sm: 'var(--vora-card-w-sm)',
     md: 'var(--vora-card-w-md)',
     lg: 'var(--vora-card-w-lg)',

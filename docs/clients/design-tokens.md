@@ -23,7 +23,7 @@ When a token slot is added or renamed:
 
 ## Media metrics — deliberately *not* in the manifest
 
-The media-tile tokens live only in `Vora.Web/src/styles/tokens.css` on bare `:root` — **not** in `ThemeManifest`, not applied by `applyTheme()`, not emitted: `--vora-card-w-sm|md|lg` (tile widths), `--vora-card-min-w` (minimum `MediaGrid` track), `--vora-card-gap`, `--vora-card-title-size` / `-caption-size` / `-badge-size`, `--vora-person-w`, `--vora-video-w`, `--vora-row-title-size`, `--vora-row-gutter`.
+The media-tile tokens live only in `Vora.Web/src/styles/tokens.css` on bare `:root` — **not** in `ThemeManifest`, not applied by `applyTheme()`, not emitted: `--vora-card-w-xs|sm|md|lg` (tile widths), `--vora-card-min-w` / `--vora-card-min-w-xs` (minimum `MediaGrid` track), `--vora-card-gap`, `--vora-card-title-size` / `-caption-size` / `-badge-size`, `--vora-person-w`, `--vora-video-w`, `--vora-row-title-size`, `--vora-row-gutter`.
 
 These are **layout constants, not theme choices** — a Thanksgiving template should recolor the client, not resize every poster in it. Keeping them out of the manifest means a theme can't break the grid, and there's nothing per-theme for the emitter to write. Contrast `--vora-shell-topbar-h` / `--vora-shell-sidebar-w`, which *are* in the manifest (`TokenLayout`) because an admin theme may legitimately want a taller bar. The widths are `clamp(rem, vw, rem)`, so a tile follows both the root font size and the viewport instead of snapping at breakpoints.
 

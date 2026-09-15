@@ -1,5 +1,6 @@
 using Vora.Application.Search.ViewModels;
 using Vora.Domain.Entities.Media;
+using Vora.Domain.Enums;
 
 namespace Vora.Application.Media;
 
@@ -21,6 +22,7 @@ public interface IMusicRepository
     Task<List<Track>> GetTopPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<Artist>> GetTopPlayedArtistsAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<Album>> GetRecentlyAddedAlbumsAsync(MusicAccessFilter access, int limit);
+    Task<(List<Album> Albums, int Total)> GetAlbumsPageAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit);
 
     Task<Artist?> GetArtistByNameAsync(Guid libraryId, string name);
     Task<Album?> GetAlbumByTitleAsync(Guid artistId, string title);

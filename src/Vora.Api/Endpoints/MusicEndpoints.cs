@@ -10,6 +10,7 @@ using Vora.Application.Search.ViewModels;
 using Vora.Application.Streaming;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
+using Vora.Domain.Enums;
 
 namespace Vora.Api.Endpoints;
 
@@ -118,6 +119,10 @@ public static class MusicEndpoints
             .RequireAuthorization()
             .WithName("ListRecentAlbums")
             .Produces<IEnumerable<AlbumVM>>(StatusCodes.Status200OK);
+        group.MapGet("/albums", GetAlbumsAsync)
+            .RequireAuthorization()
+            .WithName("ListAlbums")
+            .Produces<AlbumPageVM>(StatusCodes.Status200OK);
 
         group.MapPost("/lastfm/auth/start", StartLastFmAuthAsync).RequireAuthorization()
             .Produces<LastFmAuthStartVM>(StatusCodes.Status200OK);
@@ -532,6 +537,12 @@ public static class MusicEndpoints
         if (profileId == null) return Results.Forbid();
         var artists = await manager.GetTopPlayedArtistsAsync(profileId.Value, BuildFilter(user), limit ?? 12);
         return Results.Ok(artists);
+    }
+
+    private static async Task<IResult> GetAlbumsAsync([FromQuery] Guid? libraryId, [FromQuery] AlbumSortOrder? sort, [FromQuery] int? offset, [FromQuery] int? limit, ClaimsPrincipal user, IMusicManager manager)
+    {
+        var page = await manager.GetAlbumsAsync(libraryId, BuildFilter(user), sort ?? AlbumSortOrder.RecentlyAdded, offset ?? 0, limit ?? MusicManager.DefaultAlbumPageSize);
+        return Results.Ok(page);
     }
 
     private static async Task<IResult> GetRecentlyAddedAlbumsAsync([FromQuery] int? limit, ClaimsPrincipal user, IMusicManager manager)

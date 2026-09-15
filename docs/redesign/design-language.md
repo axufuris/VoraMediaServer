@@ -143,8 +143,8 @@ All composable with Tailwind utility classes; tokens consumed via `var(--vora-*)
 
 | Token | Meaning |
 | --- | --- |
-| `--vora-card-w-sm` / `-md` / `-lg` | Tile widths. `clamp(rem, vw, rem)` — follows both root font size and viewport. |
-| `--vora-card-min-w` | Minimum grid track for `MediaGrid`. |
+| `--vora-card-w-xs` / `-sm` / `-md` / `-lg` | Tile widths. `clamp(rem, vw, rem)` — follows both root font size and viewport. `xs` is the dense size (Music page). |
+| `--vora-card-min-w` / `--vora-card-min-w-xs` | Minimum grid track for `MediaGrid`; `xs` grids use the smaller floor. |
 | `--vora-card-gap` | Gap between tiles, in rows and grids alike. |
 | `--vora-card-title-size` / `--vora-card-caption-size` / `--vora-card-badge-size` | Caption typography. |
 | `--vora-person-w` | `PersonCard` width. |
