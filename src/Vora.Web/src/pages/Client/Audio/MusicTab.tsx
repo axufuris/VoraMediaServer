@@ -11,8 +11,13 @@ import AddToPlaylistModal from '../../../components/Collections/AddToPlaylistMod
 import MusicServerSwitcher from '../../../components/Audio/MusicServerSwitcher';
 import { useDialog } from '../../../dialogs';
 import { audioQualityStore } from '../../../utils/audioQuality';
+import PageHeader from '../../../components/Client/Primitives/PageHeader';
+import Tabs from '../../../components/Client/Primitives/Tabs';
+import MusicSearchToggle from '../../../components/Audio/MusicSearchToggle';
+import PlaylistsPage from '../Playlists/PlaylistsPage';
 
-import { type MusicNavState } from './Music/musicNavState';
+import { type MusicNavState, parseMusicNavState } from './Music/musicNavState';
+import { MUSIC_SUB_TABS, musicSubTabLabel, readMusicSubTab, saveMusicSubTab, type MusicSubTab } from './Music/musicSubTab';
 import MusicRecapView from './Music/MusicRecapView';
 import MusicGenresView from './Music/MusicGenresView';
 import MusicGenreView from './Music/MusicGenreView';
@@ -21,7 +26,9 @@ import MusicTopView from './Music/MusicTopView';
 import MusicMixView from './Music/MusicMixView';
 import MusicAlbumView from './Music/MusicAlbumView';
 import MusicArtistView from './Music/MusicArtistView';
-import MusicArtistsView from './Music/MusicArtistsView';
+import MusicForYouView from './Music/MusicForYouView';
+import MusicArtistsGrid from './Music/MusicArtistsGrid';
+import MusicAlbumsView from './Music/MusicAlbumsView';
 import { trackSubtitle } from '../../../utils/trackSubtitle';
 
 const NAV_STORAGE_KEY = SessionKeys.musicNavState;
@@ -47,14 +54,18 @@ export default function MusicTab() {
         const storedProfile = sessionStorage.getItem(NAV_PROFILE_KEY) || '';
         const currentProfile = readActiveProfileId();
         if (stored && storedProfile && storedProfile === currentProfile) {
-            try { return JSON.parse(stored) as MusicNavState; } catch { /* ignore */ }
+            return parseMusicNavState(stored);
         }
         if (storedProfile !== currentProfile) {
             sessionStorage.removeItem(NAV_STORAGE_KEY);
             sessionStorage.removeItem(NAV_PROFILE_KEY);
         }
-        return { view: 'artists' };
+        return { view: 'root' };
     });
+    const [subTab, setSubTab] = useState<MusicSubTab>(readMusicSubTab);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [homeLoaded, setHomeLoaded] = useState(false);
+    const [libraryVersion, setLibraryVersion] = useState(0);
 
     const [artists, setArtists] = useState<ArtistVM[]>([]);
     const [currentArtist, setCurrentArtist] = useState<ArtistVM | null>(null);
@@ -175,6 +186,8 @@ export default function MusicTab() {
             setHasAnyHistory(years.length > 0);
         } catch (err) {
             console.error('Failed to load music home rows', err);
+        } finally {
+            setHomeLoaded(true);
         }
     }, [serverId]);
 
@@ -325,27 +338,29 @@ export default function MusicTab() {
         setCurrentAlbum(null);
         setAlbums([]);
         setTracks([]);
-        setNav({ view: 'artists' });
+        setNav({ view: 'root' });
         setRefreshSeq(s => s + 1);
+        setLibraryVersion(v => v + 1);
     }, []));
 
-    const resetToArtistsView = useCallback(() => {
+    const resetToRootView = useCallback(() => {
         sessionStorage.removeItem(NAV_STORAGE_KEY);
         setCurrentArtist(null);
         setCurrentAlbum(null);
         setAlbums([]);
         setTracks([]);
-        setNav({ view: 'artists' });
+        setNav({ view: 'root' });
     }, []);
 
+    const showArtistsGrid = nav.view === 'root' && subTab === 'artists';
     useEffect(() => {
-        if (nav.view !== 'artists') return;
+        if (!showArtistsGrid) return;
         queueMicrotask(() => setIsLoading(true));
         musicService.getArtists(undefined, serverId)
             .then(setArtists)
             .catch(err => console.error('Failed to load artists', err))
             .finally(() => setIsLoading(false));
-    }, [nav.view, serverId, refreshSeq]);
+    }, [showArtistsGrid, serverId, refreshSeq]);
 
     useEffect(() => {
         if (nav.view !== 'artist' || !nav.artistId) return;
@@ -360,13 +375,13 @@ export default function MusicTab() {
             })
             .catch(err => {
                 console.error('Failed to load artist detail', err);
-                resetToArtistsView();
+                resetToRootView();
             })
             .finally(() => setIsLoading(false));
         musicService.getSimilarArtists(nav.artistId, serverId)
             .then(setSimilarArtists)
             .catch(() => setSimilarArtists([]));
-    }, [nav.view, nav.artistId, serverId, refreshSeq, resetToArtistsView]);
+    }, [nav.view, nav.artistId, serverId, refreshSeq, resetToRootView]);
 
     useEffect(() => {
         if (nav.view !== 'album' || !nav.albumId) return;
@@ -378,10 +393,10 @@ export default function MusicTab() {
             })
             .catch(err => {
                 console.error('Failed to load album detail', err);
-                resetToArtistsView();
+                resetToRootView();
             })
             .finally(() => setIsLoading(false));
-    }, [nav.view, nav.albumId, serverId, refreshSeq, resetToArtistsView]);
+    }, [nav.view, nav.albumId, serverId, refreshSeq, resetToRootView]);
 
     useEffect(() => {
         if (nav.view !== 'mix' || !nav.mixId) return;
@@ -389,17 +404,17 @@ export default function MusicTab() {
         musicService.getMixDetail(nav.mixId, serverId)
             .then(detail => {
                 if (!detail) {
-                    resetToArtistsView();
+                    resetToRootView();
                     return;
                 }
                 setCurrentMix(detail);
             })
             .catch(err => {
                 console.error('Failed to load mix detail', err);
-                resetToArtistsView();
+                resetToRootView();
             })
             .finally(() => setIsLoading(false));
-    }, [nav.view, nav.mixId, serverId, refreshSeq, resetToArtistsView]);
+    }, [nav.view, nav.mixId, serverId, refreshSeq, resetToRootView]);
 
     useEffect(() => {
         if (nav.view !== 'recap') return;
@@ -409,10 +424,10 @@ export default function MusicTab() {
             .then(setCurrentRecap)
             .catch(err => {
                 console.error('Failed to load year recap', err);
-                resetToArtistsView();
+                resetToRootView();
             })
             .finally(() => setIsLoading(false));
-    }, [nav.view, nav.year, serverId, refreshSeq, resetToArtistsView]);
+    }, [nav.view, nav.year, serverId, refreshSeq, resetToRootView]);
 
     useEffect(() => {
         if (nav.view !== 'genres') return;
@@ -428,15 +443,15 @@ export default function MusicTab() {
         queueMicrotask(() => setIsLoading(true));
         musicService.getGenreContent(nav.genre, serverId)
             .then(content => {
-                if (!content) { resetToArtistsView(); return; }
+                if (!content) { resetToRootView(); return; }
                 setCurrentGenre(content);
             })
             .catch(err => {
                 console.error('Failed to load genre content', err);
-                resetToArtistsView();
+                resetToRootView();
             })
             .finally(() => setIsLoading(false));
-    }, [nav.view, nav.genre, serverId, refreshSeq, resetToArtistsView]);
+    }, [nav.view, nav.genre, serverId, refreshSeq, resetToRootView]);
 
     const formatDuration = (seconds?: number): string => {
         if (!seconds || seconds <= 0) return '';
@@ -527,10 +542,10 @@ export default function MusicTab() {
         }
     };
 
-    const breadcrumbs = (
-        <div className="flex items-center gap-2 text-sm mb-6">
-            <button onClick={() => updateNav({ view: 'artists' })} className={`hover:text-[var(--vora-accent-text)] transition-colors cursor-pointer ${nav.view === 'artists' ? 'text-[var(--vora-accent-text)] font-bold' : 'text-[var(--vora-text-muted)]'}`}>
-                Artists
+    const breadcrumbs = nav.view !== 'root' && (
+        <nav aria-label="Music breadcrumb" className="flex items-center gap-2 text-sm mb-6">
+            <button onClick={() => updateNav({ view: 'root' })} className="text-[var(--vora-text-muted)] hover:text-[var(--vora-accent-text)] transition-colors cursor-pointer">
+                {musicSubTabLabel(subTab)}
             </button>
             {(nav.view === 'artist' || nav.view === 'album') && currentArtist && (
                 <>
@@ -587,11 +602,23 @@ export default function MusicTab() {
                     <span className="text-[var(--vora-accent-text)] font-bold">{nav.genre}</span>
                 </>
             )}
-        </div>
+        </nav>
     );
 
+    const setSearchOpen = (open: boolean) => {
+        setIsSearchOpen(open);
+        if (!open) setSearchQuery('');
+    };
+
+    const selectSubTab = (tab: MusicSubTab) => {
+        setSubTab(tab);
+        saveMusicSubTab(tab);
+        setSearchOpen(false);
+        if (nav.view !== 'root') updateNav({ view: 'root' });
+    };
+
     const handleSearchResultClick = (r: MusicSearchResultVM) => {
-        setSearchQuery('');
+        setSearchOpen(false);
         setSearchResults([]);
         if (r.type === 'Artist' && r.artistId) {
             updateNav({ view: 'artist', artistId: r.artistId });
@@ -602,29 +629,6 @@ export default function MusicTab() {
         }
     };
 
-    const searchBar = (
-        <div className="mb-6 relative">
-            <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--vora-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search artists, albums, tracks..."
-                className="w-full bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded-lg pl-9 pr-9 py-2 text-sm text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)] placeholder-gray-600"
-            />
-            {searchQuery && (
-                <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--vora-text-muted)] hover:text-[var(--vora-accent-text)] transition-colors cursor-pointer"
-                    title="Clear"
-                >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-            )}
-        </div>
-    );
-
     const activeBackgroundUrl = searchActive ? null
         : nav.view === 'album' ? currentAlbum?.backgroundUrl
         : null;
@@ -632,18 +636,39 @@ export default function MusicTab() {
     return (
         <div className="relative">
             {activeBackgroundUrl && (
-                <div className="absolute -inset-x-6 -top-6 z-0 pointer-events-none">
+                <div className="absolute inset-x-0 top-0 z-0 pointer-events-none">
                     <img src={activeBackgroundUrl} className="w-full h-[40vh] object-cover opacity-25" alt="" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-950/70 to-gray-950" />
+                    <div
+                        className="absolute inset-0"
+                        style={{ background: 'linear-gradient(to bottom, transparent, color-mix(in srgb, var(--vora-bg-canvas) 70%, transparent), var(--vora-bg-canvas))' }}
+                    />
                 </div>
             )}
             <div className="relative z-10">
-            <MusicServerSwitcher />
-            {breadcrumbs}
-            {searchBar}
+            <PageHeader
+                title="Music"
+                subtitle="Your artists, albums, mixes, and stations."
+                titleAccessory={(
+                    <MusicSearchToggle
+                        isOpen={isSearchOpen}
+                        query={searchQuery}
+                        onOpenChange={setSearchOpen}
+                        onQueryChange={setSearchQuery}
+                    />
+                )}
+            />
+            <div className="px-8">
+                <MusicServerSwitcher />
+                <Tabs<MusicSubTab>
+                    tabs={MUSIC_SUB_TABS}
+                    active={subTab}
+                    onChange={selectSubTab}
+                    className="mb-6"
+                />
+            </div>
 
-            {searchActive ? (
-                <div>
+            {searchActive && (
+                <div className="px-8">
                     {isSearching ? (
                         <div className="text-[var(--vora-text-muted)] py-12 text-center">Searching...</div>
                     ) : searchResults.length === 0 ? (
@@ -657,7 +682,7 @@ export default function MusicTab() {
                                     key={`${r.type}-${r.id}`}
                                     type="button"
                                     onClick={() => handleSearchResultClick(r)}
-                                    className="w-full flex items-center gap-3 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] hover:border-[var(--vora-accent-500)] rounded-lg p-2.5 transition-all cursor-pointer text-left"
+                                    className="vora-row-interactive w-full flex items-center gap-3 bg-[var(--vora-bg-surface)] border border-[var(--vora-border-subtle)] rounded-lg p-2.5 cursor-pointer text-left"
                                 >
                                     <div className={`w-12 h-12 bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shrink-0 ${r.type === 'Artist' ? 'rounded-full' : 'rounded'}`}>
                                         {r.artworkUrl
@@ -674,32 +699,52 @@ export default function MusicTab() {
                         </div>
                     )}
                 </div>
-            ) : (
-            <>
-            {nav.view === 'artists' && (
-                <MusicArtistsView
-                    isLoading={isLoading}
-                    artists={artists}
-                    serverPlayback={serverPlayback}
-                    dailyMixes={dailyMixes}
-                    stations={stations}
-                    becauseYouPlayed={becauseYouPlayed}
-                    recentlyPlayed={recentlyPlayed}
-                    recentlyAddedAlbums={recentlyAddedAlbums}
-                    topArtists={topArtists}
-                    topTracks={topTracks}
-                    likedCount={likedCount}
-                    availableYears={availableYears}
-                    hasAnyHistory={hasAnyHistory}
-                    isServerAdmin={isServerAdmin}
-                    updateNav={updateNav}
-                    playArtistTrackList={playArtistTrackList}
-                    startStationRadio={startStationRadio}
-                    deleteStation={deleteStation}
-                    onEditArtist={(artist) => setEditing({ kind: 'artist', artist })}
-                    dialog={dialog}
-                />
             )}
+
+            <div hidden={searchActive || nav.view !== 'root'}>
+                {subTab === 'forYou' && (
+                    <MusicForYouView
+                        isLoading={!homeLoaded}
+                        serverPlayback={serverPlayback}
+                        dailyMixes={dailyMixes}
+                        stations={stations}
+                        becauseYouPlayed={becauseYouPlayed}
+                        recentlyPlayed={recentlyPlayed}
+                        recentlyAddedAlbums={recentlyAddedAlbums}
+                        topArtists={topArtists}
+                        topTracks={topTracks}
+                        likedCount={likedCount}
+                        availableYears={availableYears}
+                        hasAnyHistory={hasAnyHistory}
+                        updateNav={updateNav}
+                        playArtistTrackList={playArtistTrackList}
+                        startStationRadio={startStationRadio}
+                        deleteStation={deleteStation}
+                        dialog={dialog}
+                    />
+                )}
+                {subTab === 'artists' && (
+                    <MusicArtistsGrid
+                        isLoading={isLoading}
+                        artists={artists}
+                        isServerAdmin={isServerAdmin}
+                        onOpenArtist={(artist) => updateNav({ view: 'artist', artistId: artist.id })}
+                        onEditArtist={(artist) => setEditing({ kind: 'artist', artist })}
+                    />
+                )}
+                {subTab === 'albums' && (
+                    <MusicAlbumsView
+                        serverId={serverId}
+                        refreshKey={libraryVersion}
+                        onOpenAlbum={(album) => updateNav({ view: 'album', albumId: album.id, artistId: album.artistId })}
+                    />
+                )}
+                {subTab === 'playlists' && <PlaylistsPage embedded lockedType="music" showMixes={false} />}
+            </div>
+
+            {!searchActive && nav.view !== 'root' && (
+                <div className="px-8">
+                {breadcrumbs}
 
             {nav.view === 'artist' && (
                 <MusicArtistView
@@ -805,6 +850,9 @@ export default function MusicTab() {
                 />
             )}
 
+                </div>
+            )}
+
             {editing && (
                 <MusicMetadataEditModal
                     isOpen={true}
@@ -824,9 +872,6 @@ export default function MusicTab() {
                     mediaId={addToPlaylistTrackId}
                 />
             )}
-            </>
-            )}
-
             {trackContextMenu && currentAlbum && (
                 <div
                     style={{ top: trackContextMenu.y, left: trackContextMenu.x }}
@@ -835,39 +880,39 @@ export default function MusicTab() {
                 >
                     <button
                         onClick={() => { playFromIndex(trackContextMenu.index); setTrackContextMenu(null); }}
-                        className="w-full text-left px-4 py-2 hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-primary)]"
+                        className="vora-row-interactive w-full text-left px-4 py-2 text-[var(--vora-text-primary)]"
                     >
                         Play
                     </button>
                     <button
                         onClick={() => { playNext([buildPlayableForTrack(trackContextMenu.track, currentAlbum)]); setTrackContextMenu(null); }}
-                        className="w-full text-left px-4 py-2 hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-primary)]"
+                        className="vora-row-interactive w-full text-left px-4 py-2 text-[var(--vora-text-primary)]"
                     >
                         Play Next
                     </button>
                     <button
                         onClick={() => { addToQueue([buildPlayableForTrack(trackContextMenu.track, currentAlbum)]); setTrackContextMenu(null); }}
-                        className="w-full text-left px-4 py-2 hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-primary)]"
+                        className="vora-row-interactive w-full text-left px-4 py-2 text-[var(--vora-text-primary)]"
                     >
                         Add to Queue
                     </button>
                     <div className="border-t border-[var(--vora-border-subtle)] my-1" />
                     <button
                         onClick={() => { toggleTrackLike(trackContextMenu.track.id, trackContextMenu.track.isLiked); setTrackContextMenu(null); }}
-                        className="w-full text-left px-4 py-2 hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-primary)]"
+                        className="vora-row-interactive w-full text-left px-4 py-2 text-[var(--vora-text-primary)]"
                     >
                         {trackContextMenu.track.isLiked ? 'Remove from Liked Songs' : 'Add to Liked Songs'}
                     </button>
                     <button
                         onClick={() => { setAddToPlaylistTrackId(trackContextMenu.track.id); setTrackContextMenu(null); }}
-                        className="w-full text-left px-4 py-2 hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-primary)]"
+                        className="vora-row-interactive w-full text-left px-4 py-2 text-[var(--vora-text-primary)]"
                     >
                         Add to Playlist...
                     </button>
                     <div className="border-t border-[var(--vora-border-subtle)] my-1" />
                     <button
                         onClick={() => { startRadioFromSeed({ seedKind: 'Track', seedTrackId: trackContextMenu.track.id }); setTrackContextMenu(null); }}
-                        className="w-full text-left px-4 py-2 hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-primary)]"
+                        className="vora-row-interactive w-full text-left px-4 py-2 text-[var(--vora-text-primary)]"
                     >
                         Start Track Radio
                     </button>
@@ -876,7 +921,7 @@ export default function MusicTab() {
                             <div className="border-t border-[var(--vora-border-subtle)] my-1" />
                             <button
                                 onClick={() => { setEditing({ kind: 'track', track: trackContextMenu.track }); setTrackContextMenu(null); }}
-                                className="w-full text-left px-4 py-2 hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)]"
+                                className="vora-row-interactive w-full text-left px-4 py-2 text-[var(--vora-text-secondary)]"
                             >
                                 Edit Track
                             </button>

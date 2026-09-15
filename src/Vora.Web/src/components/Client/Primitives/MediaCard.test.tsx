@@ -124,6 +124,9 @@ describe('MediaCard', () => {
         const { container: sized } = render(<MediaCard {...defaults} size="lg" />);
         expect((sized.firstElementChild as HTMLElement).style.width).toContain('--vora-card-w-lg');
 
+        const { container: dense } = render(<MediaCard {...defaults} size="xs" />);
+        expect((dense.firstElementChild as HTMLElement).style.width).toContain('--vora-card-w-xs');
+
         const { container: filled } = render(<MediaCard {...defaults} fill />);
         expect((filled.firstElementChild as HTMLElement).style.width).toBe('100%');
     });

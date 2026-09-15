@@ -124,11 +124,13 @@ The now-playing control bar holds transport in the centre and the panel toggles 
 
 **The active synced line sits a third of the way down the panel** (`lyricsScrollTop` in `utils/lyricsScroll.ts`), clamped at the top of the list. Before the first line starts, the lyrics therefore begin at the top rather than below empty space. The list used to be padded 35vh top and bottom with the active line centred, and auto-scroll only began once a line was active, so a song with a long intro showed a third of a screen of nothing until the singing started. Scrolling is instant when the panel opens or the track changes, and smooth while following along.
 
-## Audio hub page
+## Music page
 
-`/audio` (`AudioHubPage`) has three tabs persisted to sessionStorage: **Music** (`MusicTab`), **Podcasts** (`PodcastsTab`), **Radio** (live radio stations from IPTV `IptvChannelKind.Radio` + Radio Browser feeds).
+`/music` (`MusicPage` → `MusicTab`) carries its own header: the "Music" title with a round search toggle (`MusicSearchToggle`) beside it. The search field only renders while open, so it costs no vertical space; closing it clears the query. Under the header, four sub-tabs — **For You** (mixes, stations, Because You Played, Recently Played/Added, Top Artists and the Liked Songs / Top Tracks / Genres / Year in Music shortcuts), **Artists** (`MusicArtistsGrid`), **Albums** (`MusicAlbumsView`) and **Playlists** (the existing `PlaylistsPage` with `lockedType="music"` and `showMixes={false}` — no separate playlist system). The selected sub-tab persists in `localStorage` (`music_sub_tab`). Drill-ins (artist, album, mix, genre…) replace the tab content with a breadcrumb rooted at the active sub-tab; the tab content stays mounted but hidden, so returning to Albums keeps the pages already loaded. Tiles are `MediaCard size="xs"`, the dense card size.
 
-Music libraries don't appear in the left nav — they're reached via this hub.
+**All albums** — `GET /api/music/albums?offset=&limit=&sort=&libraryId=` (`ListAlbums`) returns `AlbumPageVM { items, total, offset, limit }` for the profile's accessible libraries and ratings. `sort` is `RecentlyAdded` (default) or `Alphabetical` (`SortTitle ?? Title`), exact case; `limit` defaults to 60 and is capped at 200. An album with no track the profile may play is left out, as with Recently Added.
+
+Podcasts (`/podcasts`) and Radio (`/radio`) are separate pages. Music libraries don't appear in the left nav — they're reached via the Music page.
 
 ## Plugins relevant to music
 

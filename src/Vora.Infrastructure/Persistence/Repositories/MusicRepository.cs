@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Vora.Application.Media;
 using Vora.Application.Search.ViewModels;
 using Vora.Domain.Entities.Media;
+using Vora.Domain.Enums;
 
 namespace Vora.Infrastructure.Persistence.Repositories;
 
@@ -309,6 +310,37 @@ public class MusicRepository : IMusicRepository
             .OrderByDescending(a => a.AddedAt)
             .Take(Math.Max(1, limit))
             .ToListAsync();
+    }
+
+    public async Task<(List<Album> Albums, int Total)> GetAlbumsPageAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit)
+    {
+        IQueryable<Album> query = _context.Albums.AsNoTracking();
+        if (libraryId.HasValue)
+        {
+            var id = libraryId.Value;
+            query = query.Where(a => a.LibraryId == id);
+        }
+        query = ApplyLibraryFilter(query, access);
+
+        var playableAlbumIds = ApplyRatingFilterToTracks(_context.Tracks.AsNoTracking(), access)
+            .Where(t => t.AlbumId.HasValue)
+            .Select(t => t.AlbumId.Value);
+
+        query = query.Where(a => playableAlbumIds.Contains(a.Id));
+
+        var total = await query.CountAsync();
+
+        var ordered = sort == AlbumSortOrder.Alphabetical
+            ? query.OrderBy(a => a.SortTitle ?? a.Title).ThenBy(a => a.Title).ThenBy(a => a.Id)
+            : query.OrderByDescending(a => a.AddedAt).ThenBy(a => a.Id);
+
+        var albums = await ordered
+            .Skip(offset)
+            .Take(limit)
+            .Include(a => a.Artist)
+            .ToListAsync();
+
+        return (albums, total);
     }
 
     public async Task<List<Artist>> GetTopPlayedArtistsAsync(Guid profileId, MusicAccessFilter access, int limit)

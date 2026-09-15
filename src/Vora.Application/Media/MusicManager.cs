@@ -8,6 +8,7 @@ using Vora.Application.Media.ViewModels;
 using Vora.Application.Search.ViewModels;
 using Vora.Application.Settings;
 using Vora.Application.Users;
+using Vora.Domain.Enums;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -55,6 +56,7 @@ public interface IMusicManager
     Task<List<ArtistTrackVM>> GetTopPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<ArtistVM>> GetTopPlayedArtistsAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<AlbumVM>> GetRecentlyAddedAlbumsAsync(MusicAccessFilter access, int limit);
+    Task<AlbumPageVM> GetAlbumsAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit);
 
     Task<List<GenreSummaryVM>> GetGenresAsync(MusicAccessFilter access);
     Task<GenreContentVM?> GetGenreContentAsync(string genre, MusicAccessFilter access);
@@ -75,6 +77,9 @@ public sealed class LastFmAuthStart
 
 public class MusicManager : IMusicManager
 {
+    public const int DefaultAlbumPageSize = 60;
+    public const int MaxAlbumPageSize = 200;
+
     private const string MusicArtworkUrlPrefix = "/api/artwork/custom/";
 
     private readonly IMusicRepository _repository;
@@ -644,6 +649,21 @@ public class MusicManager : IMusicManager
     {
         var albums = await _repository.GetRecentlyAddedAlbumsAsync(access, limit);
         return albums.Select(a => MapAlbum(a, a.Artist?.Name ?? string.Empty)).ToList();
+    }
+
+    public async Task<AlbumPageVM> GetAlbumsAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit)
+    {
+        var pageOffset = Math.Max(0, offset);
+        var pageLimit = Math.Clamp(limit, 1, MaxAlbumPageSize);
+        var (albums, total) = await _repository.GetAlbumsPageAsync(libraryId, access, sort, pageOffset, pageLimit);
+
+        return new AlbumPageVM
+        {
+            Items = albums.Select(a => MapAlbum(a, a.Artist?.Name ?? string.Empty)).ToList(),
+            Total = total,
+            Offset = pageOffset,
+            Limit = pageLimit
+        };
     }
 
     public async Task<List<GenreSummaryVM>> GetGenresAsync(MusicAccessFilter access)

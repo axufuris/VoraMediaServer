@@ -9,6 +9,7 @@ export const StorageKeys = {
     autoLoginProfileId: 'auto_login_profile_id',
     iptvPrefs: (profileId: string, deviceId: string) => `iptv_prefs_${profileId}_${deviceId}`,
     calendarViewMode: 'calendar_view_mode',
+    musicSubTab: 'music_sub_tab',
 } as const;
 
 export const SessionKeys = {

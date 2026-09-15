@@ -15,7 +15,15 @@ type TypeFilter = 'all' | 'music' | 'video';
 
 const TAB_STORAGE_KEY = 'playlists_active_tab';
 
-export default function PlaylistsPage({ embedded = false }: { embedded?: boolean }) {
+interface PlaylistsPageProps {
+    embedded?: boolean;
+    // Pins the list to one media type and hides the type tabs, for hosts that
+    // are already scoped (the Music page shows only music playlists).
+    lockedType?: TypeFilter;
+    showMixes?: boolean;
+}
+
+export default function PlaylistsPage({ embedded = false, lockedType, showMixes = true }: PlaylistsPageProps) {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
@@ -24,10 +32,11 @@ export default function PlaylistsPage({ embedded = false }: { embedded?: boolean
     const [smartPlaylists, setSmartPlaylists] = useState<SmartPlaylistSummaryVM[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const [activeTab, setActiveTab] = useState<TypeFilter>(() => {
+    const [savedTab, setActiveTab] = useState<TypeFilter>(() => {
         const saved = (typeof window !== 'undefined' && window.localStorage.getItem(TAB_STORAGE_KEY)) as TypeFilter | null;
         return saved === 'music' || saved === 'video' ? saved : 'all';
     });
+    const activeTab = lockedType ?? savedTab;
 
     const [chooserOpen, setChooserOpen] = useState(false);
     const [smartEditorType, setSmartEditorType] = useState<PlaylistMediaType | null>(null);
@@ -37,8 +46,8 @@ export default function PlaylistsPage({ embedded = false }: { embedded?: boolean
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        try { window.localStorage.setItem(TAB_STORAGE_KEY, activeTab); } catch { /* ignore */ }
-    }, [activeTab]);
+        try { window.localStorage.setItem(TAB_STORAGE_KEY, savedTab); } catch { /* ignore */ }
+    }, [savedTab]);
 
     const loadSmart = () => {
         smartPlaylistService.list(serverId)
@@ -99,7 +108,7 @@ export default function PlaylistsPage({ embedded = false }: { embedded?: boolean
     }, [playlists, activeTab, matchesTab]);
 
     const visibleSmart = useMemo(() => smartPlaylists.filter(sp => matchesTab(sp.mediaType)), [smartPlaylists, matchesTab]);
-    const visibleMixes = useMemo(() => activeTab === 'all' || activeTab === 'music' ? dailyMixes : [], [dailyMixes, activeTab]);
+    const visibleMixes = useMemo(() => showMixes && (activeTab === 'all' || activeTab === 'music') ? dailyMixes : [], [dailyMixes, activeTab, showMixes]);
 
     if (loading) {
         return (
@@ -137,16 +146,18 @@ export default function PlaylistsPage({ embedded = false }: { embedded?: boolean
             )}
 
             <div className="px-8">
-                <Tabs<TypeFilter>
-                    tabs={[
-                        { key: 'all', label: 'All' },
-                        { key: 'music', label: 'Music' },
-                        { key: 'video', label: 'Movies & Shows' },
-                    ]}
-                    active={activeTab}
-                    onChange={setActiveTab}
-                    className="mb-6"
-                />
+                {!lockedType && (
+                    <Tabs<TypeFilter>
+                        tabs={[
+                            { key: 'all', label: 'All' },
+                            { key: 'music', label: 'Music' },
+                            { key: 'video', label: 'Movies & Shows' },
+                        ]}
+                        active={activeTab}
+                        onChange={setActiveTab}
+                        className="mb-6"
+                    />
+                )}
 
                 {visibleMixes.length > 0 && (
                     <div className="mb-10">

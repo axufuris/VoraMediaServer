@@ -37,6 +37,15 @@ export interface AlbumVM {
     lockedFields: string[];
 }
 
+export type AlbumSortOrder = 'RecentlyAdded' | 'Alphabetical';
+
+export interface AlbumPageVM {
+    items: AlbumVM[];
+    total: number;
+    offset: number;
+    limit: number;
+}
+
 export interface TrackVM {
     id: string;
     title: string;
@@ -462,6 +471,19 @@ export const musicService = {
             serverId
         });
         return response.data.url;
+    },
+
+    getAlbums: async (
+        options: { offset?: number; limit?: number; sort?: AlbumSortOrder; libraryId?: string },
+        serverId?: string,
+    ): Promise<AlbumPageVM> => {
+        const params: Record<string, string | number> = {};
+        if (options.offset !== undefined) params.offset = options.offset;
+        if (options.limit !== undefined) params.limit = options.limit;
+        if (options.sort) params.sort = options.sort;
+        if (options.libraryId) params.libraryId = options.libraryId;
+        const response = await apiClient.get<AlbumPageVM>('/music/albums', { params, serverId });
+        return response.data;
     },
 
     getRecentlyAddedAlbums: async (limit?: number, serverId?: string): Promise<AlbumVM[]> => {
