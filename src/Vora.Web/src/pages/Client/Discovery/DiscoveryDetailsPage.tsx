@@ -161,7 +161,6 @@ export default function DiscoveryDetailsPage() {
                     backdropSrc={details.backgroundUrl || details.posterUrl}
                     transitionKey={details.externalId}
                     posterSrc={details.posterUrl}
-                    onBack={() => navigate(-1)}
                     eyebrow={[details.type === 'TvShow' ? 'TV Series' : 'Movie', details.year].filter(Boolean).join(' · ')}
                     title={details.title}
                     chips={(
@@ -203,7 +202,7 @@ export default function DiscoveryDetailsPage() {
                 />
 
                 <div className="px-12 pb-16">
-                    <div className="mt-16">
+                    <div className="mt-8">
                         <CastRow
                             cast={details.cast.map((actor, idx) => {
                                 const isCrew = actor.role === 'Director' || actor.role === 'Writer' || actor.role === 'Creator' || actor.role === 'Crew';

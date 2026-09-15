@@ -7,12 +7,13 @@ export interface PersonCardProps {
     characterName?: string | null;
     imageUrl?: string | null;
     onClick?: () => void;
+    size?: 'md' | 'sm';
 }
 
 // The single cast/crew tile — used by the media details page, the discovery
 // details page and anywhere else a person appears in a row. Portrait artwork,
 // name, credited role, then the character.
-export default function PersonCard({ name, role, characterName, imageUrl, onClick }: PersonCardProps) {
+export default function PersonCard({ name, role, characterName, imageUrl, onClick, size = 'md' }: PersonCardProps) {
     const [failedUrl, setFailedUrl] = useState<string | null>(null);
     const showImage = !!imageUrl && failedUrl !== imageUrl;
 
@@ -32,7 +33,7 @@ export default function PersonCard({ name, role, characterName, imageUrl, onClic
             onClick={onClick}
             onKeyDown={handleKeyDown}
             className={`group flex flex-col items-center text-center ${onClick ? 'cursor-pointer' : ''}`}
-            style={{ width: 'var(--vora-person-w)' }}
+            style={{ width: size === 'sm' ? 'var(--vora-person-w-sm)' : 'var(--vora-person-w)' }}
         >
             <div
                 className="relative w-full overflow-hidden border border-[var(--vora-border-subtle)] transition-colors group-hover:border-[var(--vora-accent-500)]"

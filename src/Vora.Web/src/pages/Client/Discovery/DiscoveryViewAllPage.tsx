@@ -96,40 +96,20 @@ export default function DiscoveryViewAllPage() {
         return () => observer.disconnect();
     }, [isLoading, hasMore, rowUnavailable]);
 
-    const backAction = (
-        <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="vora-button-secondary cursor-pointer inline-flex items-center gap-2"
-        >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-            Back
-        </button>
-    );
-
     return (
         <div className="min-h-full pb-20">
-            <PageHeader title={rowName} subtitle="Browse everything in this discovery row." actions={backAction} />
+            <PageHeader title={rowName} subtitle="Browse everything in this discovery row." />
 
             <div className="px-8 pt-2">
                 {rowUnavailable ? (
                     <EmptyState
                         title="This Discovery row is no longer available"
-                        description="The server admin has disabled this row, or the provider it relies on isn't installed. Head back to Discover for the rows that are still active."
+                        description="The server admin has disabled this row, or the provider it relies on isn't installed. Discover still lists the rows that are active."
                         icon={(
                             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                 <circle cx="12" cy="12" r="9" />
                                 <line x1="8" y1="12" x2="16" y2="12" />
                             </svg>
-                        )}
-                        action={(
-                            <button
-                                type="button"
-                                onClick={() => navigate(serverId ? `/server/${serverId}/discovery` : '/discovery')}
-                                className="vora-button-primary cursor-pointer"
-                            >
-                                Back to Discover
-                            </button>
                         )}
                     />
                 ) : (

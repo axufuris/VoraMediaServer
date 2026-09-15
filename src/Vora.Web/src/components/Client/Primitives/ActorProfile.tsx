@@ -24,7 +24,6 @@ interface ActorProfileProps {
     placeOfBirth?: string | null;
     onServer: ActorCredit[];
     knownFor: ActorCredit[];
-    onBack: () => void;
     notice?: ReactNode;
 }
 
@@ -75,7 +74,7 @@ function CreditSection({ title, subtitle, credits }: { title: string; subtitle: 
 // "Known for" with an "In library" badge, which is where they least belong.
 export default function ActorProfile({
     name, role, profileImageUrl, biography, birthday, deathday, placeOfBirth,
-    onServer, knownFor, onBack, notice,
+    onServer, knownFor, notice,
 }: ActorProfileProps) {
     const age = ageFrom(birthday, deathday);
     const birthYear = yearOf(birthday);
@@ -89,19 +88,7 @@ export default function ActorProfile({
             </div>
 
             <div className="relative z-10 pt-8">
-                <div className="px-12">
-                    <button
-                        type="button"
-                        onClick={onBack}
-                        className="inline-flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                        style={{ background: 'rgba(20, 20, 28, 0.65)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#fafafa' }}
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-                        Back
-                    </button>
-                </div>
-
-                <div className="mt-12 grid gap-10 px-12 md:grid-cols-[16.25rem_1fr]">
+                <div className="grid gap-10 px-12 md:grid-cols-[16.25rem_1fr]">
                     <div className="shrink-0">
                         <div
                             className="relative aspect-[2/3] overflow-hidden"

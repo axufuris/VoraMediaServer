@@ -45,6 +45,7 @@ export default function CastRow({ cast, onSelect, title = 'Cast & Crew' }: CastR
                         characterName={member.characterName}
                         imageUrl={member.profileImageUrl}
                         onClick={onSelect ? () => onSelect(member) : undefined}
+                        size="sm"
                     />
                 </MediaRowItem>
             ))}

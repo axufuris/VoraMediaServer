@@ -9,7 +9,6 @@ interface DetailHeroProps {
     transitionKey?: string | number;
     posterSrc?: string | null;
     posterShape?: DetailHeroPosterShape;
-    onBack?: () => void;
     eyebrow?: ReactNode;
     title: string;
     titleSuffix?: ReactNode;
@@ -126,13 +125,13 @@ export function HeroCredits({ directors, genres, studios }: {
 // on a hard line.
 export default function DetailHero({
     backdropSrc, transitionKey, posterSrc, posterShape = 'poster',
-    onBack, eyebrow, title, titleSuffix, subtitle,
+    eyebrow, title, titleSuffix, subtitle,
     chips, ratings, credits, actions, notice, overview,
 }: DetailHeroProps) {
     const isStill = posterShape === 'still';
 
     return (
-        <header className="relative" style={{ minHeight: '30rem' }}>
+        <header className="relative" style={{ minHeight: '22rem' }}>
             <div className="pointer-events-none absolute inset-y-0 right-0 z-0 w-full md:w-[70%] lg:w-[64%]">
                 <CinematicBackdrop
                     src={backdropSrc}
@@ -144,20 +143,8 @@ export default function DetailHero({
                 />
             </div>
 
-            <div className="relative z-10 px-12 pb-10 pt-8">
-                {onBack && (
-                    <button
-                        type="button"
-                        onClick={onBack}
-                        className="inline-flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium backdrop-blur-md transition-colors hover:bg-[rgba(20,20,28,0.85)]"
-                        style={{ background: 'rgba(20, 20, 28, 0.65)', border: '1px solid rgba(255, 255, 255, 0.14)', color: '#fafafa' }}
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-                        Back
-                    </button>
-                )}
-
-                <div className={`mt-10 grid gap-10 ${isStill ? 'md:grid-cols-[25rem_1fr]' : 'md:grid-cols-[16.25rem_1fr]'}`}>
+            <div className="relative z-10 px-12 pb-6 pt-6">
+                <div className={`grid gap-8 ${isStill ? 'md:grid-cols-[20rem_1fr]' : 'md:grid-cols-[12.5rem_1fr]'}`}>
                     <div className="shrink-0">
                         <div
                             className={`relative overflow-hidden ${isStill ? 'aspect-video' : 'aspect-[2/3]'}`}
@@ -166,7 +153,7 @@ export default function DetailHero({
                                 boxShadow: 'var(--vora-shadow-lg)',
                                 border: '1px solid var(--vora-border-subtle)',
                                 background: 'var(--vora-bg-surface)',
-                                maxWidth: isStill ? '25rem' : '16.25rem',
+                                maxWidth: isStill ? '20rem' : '12.5rem',
                             }}
                         >
                             <ArtImage
@@ -187,7 +174,7 @@ export default function DetailHero({
 
                         <h1
                             className="m-0 mt-2 font-semibold"
-                            style={{ color: 'var(--vora-text-primary)', fontSize: 'clamp(2rem, 4vw, 2.75rem)', lineHeight: 1.05, letterSpacing: '-0.02em' }}
+                            style={{ color: 'var(--vora-text-primary)', fontSize: 'clamp(1.75rem, 3vw, 2.25rem)', lineHeight: 1.05, letterSpacing: '-0.02em' }}
                         >
                             {title}
                         </h1>
@@ -199,7 +186,7 @@ export default function DetailHero({
                         )}
 
                         {subtitle && (
-                            <div className="mt-1 text-xl" style={{ color: 'var(--vora-text-secondary)' }}>
+                            <div className="mt-1 text-lg" style={{ color: 'var(--vora-text-secondary)' }}>
                                 {subtitle}
                             </div>
                         )}
@@ -210,11 +197,11 @@ export default function DetailHero({
 
                         {credits}
 
-                        {actions && <div className="mt-6 flex flex-wrap items-center gap-3">{actions}</div>}
+                        {actions && <div className="mt-5 flex flex-wrap items-center gap-3">{actions}</div>}
 
                         {notice}
 
-                        <p className="mt-7 max-w-3xl text-[0.9375rem] leading-relaxed" style={{ color: 'var(--vora-text-secondary)' }}>
+                        <p className="mt-5 max-w-3xl text-[0.9375rem] leading-relaxed" style={{ color: 'var(--vora-text-secondary)' }}>
                             {overview || 'No overview available.'}
                         </p>
                     </div>

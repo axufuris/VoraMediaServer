@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { beforeAll, describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { HeroCredits } from './DetailHero';
+import DetailHero, { HeroCredits } from './DetailHero';
 import { directorsFrom } from '../../../utils/credits';
 
 describe('HeroCredits', () => {
@@ -59,5 +59,50 @@ describe('directorsFrom', () => {
 
     it('returns an empty list for no cast', () => {
         expect(directorsFrom(undefined)).toEqual([]);
+    });
+});
+
+describe('DetailHero', () => {
+    beforeAll(() => {
+        if (typeof window.matchMedia === 'function') return;
+        Object.defineProperty(window, 'matchMedia', {
+            configurable: true,
+            value: (query: string): MediaQueryList => ({
+                matches: false,
+                media: query,
+                onchange: null,
+                addListener: () => { },
+                removeListener: () => { },
+                addEventListener: () => { },
+                removeEventListener: () => { },
+                dispatchEvent: () => false,
+            }),
+        });
+    });
+
+    // The client relies on the browser's own back navigation; a Back button in
+    // the hero only took space above the title.
+    it('has no Back button', () => {
+        render(<DetailHero title="House of the Dragon" subtitle="Season 1" />);
+
+        expect(screen.queryByRole('button', { name: /back/i })).toBeNull();
+    });
+
+    it('keeps the poster to the tighter column', () => {
+        const { container } = render(<DetailHero title="House of the Dragon" posterSrc="https://example.test/poster.jpg" />);
+
+        expect(container.querySelector('[style*="max-width: 12.5rem"]')).not.toBeNull();
+    });
+
+    it('widens the column for a still rather than a poster', () => {
+        const { container } = render(<DetailHero title="The Heirs of the Dragon" posterShape="still" posterSrc="https://example.test/still.jpg" />);
+
+        expect(container.querySelector('[style*="max-width: 20rem"]')).not.toBeNull();
+    });
+
+    it('falls back to a line saying there is no overview', () => {
+        render(<DetailHero title="House of the Dragon" />);
+
+        expect(screen.getByText('No overview available.')).toBeInTheDocument();
     });
 });

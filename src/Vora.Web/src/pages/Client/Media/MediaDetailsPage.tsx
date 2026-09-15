@@ -555,17 +555,6 @@ export default function MediaDetailsPage() {
                 : 'Metadata is refreshing now, and this page will update when it finishes.',
         });
     };
-    // Return to wherever the user came from. When there is no in-app history to
-    // go back to (a direct/deep link opened the page), fall back to the parent
-    // show so Back never drops the user out of the app.
-    const goBack = () => {
-        const hasHistory = ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0;
-        if (!hasHistory && media.tvShowId) {
-            navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`);
-            return;
-        }
-        navigate(-1);
-    };
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = (isSeason || isEpisode) ? media.title : undefined;
     const showQualityButton = (media.type === 'Movie' || isEpisode || media.type === 'TvShow') && (versionOptions.length > 1 || sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
@@ -792,7 +781,6 @@ export default function MediaDetailsPage() {
                 transitionKey={media.id}
                 posterSrc={media.posterUrl}
                 posterShape={isEpisode ? 'still' : 'poster'}
-                onBack={goBack}
                 eyebrow={heroEyebrow}
                 title={heroTitle}
                 titleSuffix={isEpisode
@@ -826,7 +814,7 @@ export default function MediaDetailsPage() {
                 </div>
             )}
 
-            <div className="mt-12 space-y-16 px-12">
+            <div className="mt-8 space-y-12 px-12">
                 <CastRow
                     cast={(media.cast || []).map(member => ({
                         id: member.actorId,
