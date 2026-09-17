@@ -504,6 +504,37 @@ already saved a value through the admin UI, you can clear it in the
 UI to let the env var take effect on the next start, or just continue
 to manage it through the UI from then on.
 
+## Versions and releases
+
+Vora follows [semantic versioning](https://semver.org). Released images are
+published to GHCR as
+`ghcr.io/axufuris/vora-media-server:<version>`.
+
+- **Stable releases** — `1.2.3`, plus the rolling `1.2`, `1` and `latest` tags.
+- **Pre-releases** — `0.1.0-beta.1` and friends. A GitHub release marked as a
+  pre-release never moves `latest` or the rolling tags, so `latest` always
+  points at the newest stable build. Pin the exact tag to run a beta.
+- **QA builds** — every push to `main` publishes `:qa` and `:qa-<short-sha>`.
+  Not for production.
+
+While Vora is on `0.x`, breaking changes (schema, endpoints, plugin contracts)
+can land in a minor bump. Read the release notes before upgrading.
+
+The running server reports its own build at `GET /api/system/version`, and the
+admin sidebar shows it at the bottom. Include that version in any bug report.
+
+### Cutting a release (maintainers)
+
+1. Tag the commit: `git tag v0.1.0-beta.1 && git push origin v0.1.0-beta.1`.
+2. Publish a GitHub release for that tag, ticking **Set as a pre-release** for
+   anything that isn't stable.
+3. `deploy-prod.yml` then runs the test suite, builds the image with the tag
+   baked in as its version, and pushes it to GHCR.
+
+The version comes from the tag, not from a file in the tree: the workflow
+passes it to the build, and `Directory.Build.props` only supplies the fallback
+used by local builds.
+
 ## Documentation
 
 Project documentation lives under [`docs/`](docs/). Highlights:

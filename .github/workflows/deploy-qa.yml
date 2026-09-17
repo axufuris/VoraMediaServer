@@ -70,6 +70,8 @@ jobs:
         with:
           context: .
           file: src/Vora.Api/Dockerfile
+          build-args: |
+            VORA_COMMIT=${{ github.sha }}
           # amd64-only — QA never needs arm64, and emulating it under QEMU on
           # the amd64 runner is the single biggest CI time sink. See the note
           # in deploy-prod.yml for how to produce an arm64 image when needed.

@@ -323,8 +323,8 @@ public class MusicRepository : IMusicRepository
         query = ApplyLibraryFilter(query, access);
 
         var playableAlbumIds = ApplyRatingFilterToTracks(_context.Tracks.AsNoTracking(), access)
-            .Where(t => t.AlbumId.HasValue)
-            .Select(t => t.AlbumId.Value);
+            .Where(t => t.AlbumId != null)
+            .Select(t => t.AlbumId);
 
         query = query.Where(a => playableAlbumIds.Contains(a.Id));
 

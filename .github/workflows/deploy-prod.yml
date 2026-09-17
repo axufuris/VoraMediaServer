@@ -56,6 +56,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve version from the release tag
+        id: version
+        run: echo "value=${TAG#v}" >> "$GITHUB_OUTPUT"
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+
       - name: Compute image tags
         id: meta
         uses: docker/metadata-action@v6
@@ -73,6 +79,9 @@ jobs:
         with:
           context: .
           file: src/Vora.Api/Dockerfile
+          build-args: |
+            VORA_VERSION=${{ steps.version.outputs.value }}
+            VORA_COMMIT=${{ github.sha }}
           # amd64-only. Our deploy targets (Unraid, generic Linux, Windows via
           # Docker) are all x86-64. Building linux/arm64 here runs under QEMU
           # emulation on the amd64 runner and dominates build time (5-10x

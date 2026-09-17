@@ -78,6 +78,16 @@ RUN mkdir -p /etc/OpenCL/vendors /etc/vulkan/icd.d /usr/share/vulkan/icd.d && \
 
 # Stage 2: build (Compiles the C# code)
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# The release tag and commit the image was built from. Defaulted in
+# Directory.Build.props so a local `docker build` still works; the deploy
+# workflows pass the real values so the running server can report them.
+ARG VORA_VERSION=
+ARG VORA_COMMIT=
+# MSBuild reads environment variables as properties. Left empty, the
+# conditioned defaults in Directory.Build.props win, so a plain
+# `docker build` still produces a sensibly versioned image.
+ENV Version=$VORA_VERSION
+ENV SourceRevisionId=$VORA_COMMIT
 WORKDIR /src
 # Copy project files for caching
 COPY ["src/Vora.Api/Vora.Api.csproj", "src/Vora.Api/"]

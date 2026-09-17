@@ -130,6 +130,7 @@ public static class WebApplicationExtensions
         app.MapTaskEndpoints();
         app.MapTemplateEndpoints();
         app.MapThemeEndpoints();
+        app.MapSystemEndpoints();
         app.MapTimeshiftEndpoints();
         app.MapUserEndpoints();
         app.MapUserImageEndpoints();

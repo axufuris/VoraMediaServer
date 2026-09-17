@@ -3,6 +3,7 @@ import { NavLink, useParams } from 'react-router-dom';
 import { pluginAdminService } from '../../../api/System/pluginAdminService';
 import StatusDot from '../Primitives/StatusDot';
 import { ADMIN_NAV, Icons, resolveAdminPath, type AdminNavEntry, type IconName, type NavSection } from './adminNavData';
+import ServerVersionBadge from './ServerVersionBadge';
 
 interface NavItemProps {
     to: string;
@@ -115,6 +116,7 @@ export default function SidebarV2() {
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                     Back to Vora client
                 </NavLink>
+                <ServerVersionBadge />
             </div>
         </aside>
     );
