@@ -1,0 +1,7 @@
+{{serverName}} - You're invited
+
+You've been invited to create an account on {{serverName}} using {{inviteEmail}}.
+
+Open the link below to set up your account. This invitation is single-use.
+
+{{inviteLink}}

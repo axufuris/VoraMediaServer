@@ -1,0 +1,9 @@
+{{serverName}} - Your account email was changed
+
+Hi {{userName}},
+
+The email address on your {{serverName}} account was just changed to {{newEmail}}. This message was sent to your previous address.
+
+If you made this change, no action is needed.
+
+If you did NOT make this change, your account may have been accessed by someone else. Contact your server administrator as soon as possible.

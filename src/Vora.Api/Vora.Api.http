@@ -1,0 +1,6 @@
+@Vora.Api_HostAddress = http://localhost:5079
+
+GET {{Vora.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

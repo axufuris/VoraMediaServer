@@ -1,0 +1,238 @@
+﻿using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System.Net.Http;
+using System.Text.Json;
+using Vora.Plugins.Dtos;
+using Vora.Plugins.Interfaces;
+
+namespace Vora.Plugins.Providers.Theaters;
+
+public class SerpApiTheaterProvider : IDiscoveryTheaterProvider, IPluginConnectionTest
+{
+    private const long CacheEntrySize = 1024;
+
+    private readonly HttpClient _httpClient;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IMemoryCache _cache;
+
+    public string Id => "serpapi_theater";
+    public string Name => "SerpApi Google Showtimes";
+    public string ProviderName => "Google Showtimes";
+    public string Version => "1.0.0";
+    public string Description => "Scrapes Google Search to find local theater showtimes. Requires a free API key from serpapi.com.";
+    public bool IsSystemPlugin => true;
+    public string Type => "Theater";
+
+    public SerpApiTheaterProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory, IMemoryCache cache)
+    {
+        _httpClient = httpClient;
+        _scopeFactory = scopeFactory;
+        _cache = cache;
+        _httpClient.BaseAddress = new Uri("https://serpapi.com/");
+    }
+
+    public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions()
+    {
+        return new List<PluginSettingDefinitionDto>
+        {
+            new PluginSettingDefinitionDto
+            {
+                Key = "api_key",
+                Label = "SerpApi Key",
+                Type = "password",
+                Required = true,
+                Placeholder = "Paste your SerpApi key",
+                Description = "SerpApi Private API Key. Sign up at https://serpapi.com/users/sign_up (free tier = 100 searches/month). After signing in, copy the 'Private API Key' from https://serpapi.com/manage-api-key. Showtimes are cached per movie + location + date to minimize search usage."
+            },
+            new PluginSettingDefinitionDto
+            {
+                Key = "default_location",
+                Label = "Admin Default Zipcode/City",
+                Type = "text",
+                Required = false,
+                Placeholder = "e.g. New York, NY",
+                Description = "The default location to search if the user has not set a Zipcode in their Client Settings."
+            },
+            new PluginSettingDefinitionDto
+            {
+                Key = "max_theaters",
+                Label = "Admin Default Max Theaters",
+                Type = "number",
+                Required = false,
+                Placeholder = "5",
+                Description = "Maximum number of theaters to return. Defaults to 6."
+            },
+            new PluginSettingDefinitionDto
+            {
+                Key = "auto_showtimes",
+                Label = "Auto-Load Showtimes",
+                Type = "boolean",
+                Required = false,
+                Description = "Automatically fetch showtimes when a movie page loads. Turn off to show a manual load button (saves API calls)."
+            }
+        };
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("api_key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        var response = await _httpClient.GetAsync($"https://serpapi.com/account?api_key={Uri.EscapeDataString(apiKey.Trim())}", cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            return PluginConnectionTestResult.Ok("SerpApi accepted the API key.");
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            return PluginConnectionTestResult.Fail("SerpApi rejected the API key.");
+        }
+        return PluginConnectionTestResult.Fail($"Unexpected response (HTTP {(int)response.StatusCode}).");
+    }
+
+    public async Task<bool> IsAutoLoadEnabledAsync()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
+
+        var val = await settings.GetSettingAsync(Id, "auto_showtimes");
+        return string.IsNullOrWhiteSpace(val) || val.Equals("true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public async Task<IEnumerable<TheaterDto>> GetShowtimesAsync(string movieTitle, string location, DateTime date, int? maxTheaters = null)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<SerpApiTheaterProvider>>();
+
+        var searchLocation = string.IsNullOrWhiteSpace(location)
+            ? await settings.GetSettingAsync(Id, "default_location")
+            : location;
+
+        if (string.IsNullOrWhiteSpace(searchLocation))
+        {
+            logger.LogWarning("Showtimes lookup for '{MovieTitle}' skipped: no location on the profile and no default_location configured for {PluginId}.", movieTitle, Id);
+            return new List<TheaterDto>();
+        }
+
+        var limitStr = await settings.GetSettingAsync(Id, "max_theaters");
+        var limit = maxTheaters ?? (int.TryParse(limitStr, out var l) ? l : 6);
+
+        var cacheKey = $"serpapi_theaters_{movieTitle.ToLowerInvariant()}_{searchLocation.ToLowerInvariant()}_{date:yyyyMMdd}";
+
+        if (_cache.TryGetValue<List<TheaterDto>>(cacheKey, out var cached) && cached is { Count: > 0 })
+        {
+            return cached.Take(limit);
+        }
+
+        var theaters = await FetchShowtimesAsync(settings, logger, movieTitle, searchLocation);
+
+        if (theaters.Count > 0)
+        {
+            _cache.Set(cacheKey, theaters, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12),
+                Size = CacheEntrySize
+            });
+        }
+
+        return theaters.Take(limit);
+    }
+
+    private async Task<List<TheaterDto>> FetchShowtimesAsync(IPluginSettingsProvider settings, ILogger logger, string movieTitle, string searchLocation)
+    {
+        var apiKey = await settings.GetSettingAsync(Id, "api_key");
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            logger.LogWarning("Showtimes lookup for '{MovieTitle}' skipped: no API key configured for {PluginId}.", movieTitle, Id);
+            return new List<TheaterDto>();
+        }
+
+        var query = $"{movieTitle} showtimes {searchLocation}";
+        var url = $"search.json?engine=google&q={Uri.EscapeDataString(query)}&api_key={Uri.EscapeDataString(apiKey.Trim())}";
+
+        var response = await _httpClient.GetAsync(url);
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning("SerpApi returned {StatusCode} for '{MovieTitle}' near '{Location}'.", (int)response.StatusCode, movieTitle, searchLocation);
+            return new List<TheaterDto>();
+        }
+
+        using var stream = await response.Content.ReadAsStreamAsync();
+        using var doc = await JsonDocument.ParseAsync(stream);
+        var el = doc.RootElement;
+
+        if (el.TryGetProperty("error", out var errorNode) && errorNode.ValueKind == JsonValueKind.String)
+        {
+            logger.LogWarning("SerpApi reported an error for '{MovieTitle}' near '{Location}': {Error}", movieTitle, searchLocation, errorNode.GetString());
+            return new List<TheaterDto>();
+        }
+
+        if (!el.TryGetProperty("showtimes", out var showtimesArray) || showtimesArray.ValueKind != JsonValueKind.Array)
+        {
+            logger.LogWarning(
+                "SerpApi returned no showtimes block for '{MovieTitle}' near '{Location}'. The search succeeded, so Google served a result without showtimes. Blocks present: {Blocks}.",
+                movieTitle,
+                searchLocation,
+                string.Join(", ", el.EnumerateObject().Select(p => p.Name)));
+            return new List<TheaterDto>();
+        }
+
+        var theaters = ParseTheaters(showtimesArray);
+
+        if (theaters.Count == 0)
+        {
+            logger.LogInformation("SerpApi returned a showtimes block with no usable theaters for '{MovieTitle}' near '{Location}'.", movieTitle, searchLocation);
+        }
+
+        return theaters;
+    }
+
+    public static List<TheaterDto> ParseTheaters(JsonElement showtimesArray)
+    {
+        var theaters = new List<TheaterDto>();
+
+        if (showtimesArray.GetArrayLength() == 0 || !showtimesArray[0].TryGetProperty("theaters", out var theatersData))
+        {
+            return theaters;
+        }
+
+        foreach (var theaterNode in theatersData.EnumerateArray())
+        {
+            var theater = new TheaterDto
+            {
+                Name = theaterNode.TryGetProperty("name", out var n) ? n.GetString() ?? "Unknown Theater" : "Unknown Theater",
+                Address = theaterNode.TryGetProperty("address", out var a) ? a.GetString() ?? "" : ""
+            };
+
+            if (theaterNode.TryGetProperty("showing", out var showings))
+            {
+                foreach (var show in showings.EnumerateArray())
+                {
+                    var timeList = show.TryGetProperty("time", out var t)
+                        ? t.EnumerateArray().Select(x => x.GetString()).ToList()
+                        : new List<string?>();
+
+                    foreach (var time in timeList)
+                    {
+                        if (!string.IsNullOrEmpty(time))
+                        {
+                            theater.Showtimes.Add(new ShowtimeDto
+                            {
+                                Time = time,
+                                Format = show.TryGetProperty("type", out var typeNode) ? typeNode.GetString() ?? "Standard" : "Standard"
+                            });
+                        }
+                    }
+                }
+            }
+
+            if (theater.Showtimes.Any()) theaters.Add(theater);
+        }
+
+        return theaters;
+    }
+}

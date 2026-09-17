@@ -1,0 +1,281 @@
+using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
+using Vora.Application.Streaming;
+using Vora.Application.Streaming.Dtos;
+using Vora.Domain.Entities.Media;
+using Vora.Domain.Entities.Streaming;
+using Vora.Domain.Entities.Users;
+
+namespace Vora.Infrastructure.Persistence.Repositories;
+
+public class StreamRepository(VoraDbContext context) : IStreamRepository
+{
+    public async Task<Guid> ResolvePlayableMediaIdAsync(Guid mediaId, Guid? profileId)
+    {
+        var isShow = await context.MediaItems.AsNoTracking().AnyAsync(m => m.Id == mediaId && m is TvShow);
+        if (!isShow) return mediaId;
+
+        Guid? episodeId = null;
+        if (profileId.HasValue)
+        {
+            episodeId = await context.Set<Episode>()
+                .AsNoTracking()
+                .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
+                .Where(e => !context.UserMediaStates.Any(s => s.ProfileId == profileId.Value && s.MediaItemId == e.Id && s.IsPlayed))
+                .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
+                .Select(e => (Guid?)e.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        episodeId ??= await context.Set<Episode>()
+            .AsNoTracking()
+            .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
+            .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
+            .Select(e => (Guid?)e.Id)
+            .FirstOrDefaultAsync();
+
+        return episodeId ?? mediaId;
+    }
+
+    public Task<MediaStreamInfoDto?> GetMediaStreamInfoAsync(Guid mediaId) =>
+        context.MediaItems
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Where(m => m.Id == mediaId)
+            .Select(m => new MediaStreamInfoDto
+            {
+                Id = m.Id,
+                Parts = m.MediaParts.Select(p => new MediaPartStreamInfoDto
+                {
+                    Id = p.Id,
+                    Resolution = p.Resolution,
+                    Container = p.Container,
+                    OverallBitrate = p.OverallBitrate,
+                    VideoTracks = p.VideoTracks.Select(vt => new TrackStreamInfoDto
+                    {
+                        Id = vt.Id,
+                        Codec = vt.Codec,
+                        IsDefault = vt.IsDefault,
+                        HdrType = vt.HdrType,
+                        BitDepth = vt.BitDepth
+                    }).ToList(),
+                    AudioTracks = p.AudioTracks.Select(at => new TrackStreamInfoDto
+                    {
+                        Id = at.Id,
+                        Title = at.Title,
+                        Codec = at.Codec,
+                        IsDefault = at.IsDefault,
+                        Channels = at.Channels
+                    }).ToList(),
+                    SubtitleTracks = p.SubtitleTracks.Select(st => new SubtitleStreamInfoDto
+                    {
+                        Id = st.Id,
+                        Codec = st.Codec,
+                        IsDefault = st.IsDefault,
+                        IsForced = st.IsForced
+                    }).ToList()
+                }).ToList()
+            })
+            .FirstOrDefaultAsync();
+
+    public async Task<List<NowPlayingSessionDto>> GetNowPlayingSessionsAsync(DateTime cutoffTime)
+    {
+        await StreamHistoryProjection.EndDeadSessionsAsync(context);
+
+        return await context.StreamSessions
+            .AsNoTracking()
+            .Where(s => s.EndedAt == null && s.LastPingAt >= cutoffTime)
+            .Select(s => new NowPlayingSessionDto
+            {
+                SessionId = s.Id,
+                MediaId = s.MediaItemId,
+                Title = s.MediaItem.Title,
+                TvShowTitle = s.MediaItem is Episode ? ((Episode)s.MediaItem).Season.TvShow.Title : null,
+                SeasonNumber = s.MediaItem is Episode ? (int?)((Episode)s.MediaItem).Season.SeasonNumber : null,
+                EpisodeNumber = s.MediaItem is Episode ? (int?)((Episode)s.MediaItem).EpisodeNumber : null,
+                PosterUrl = s.MediaItem.PosterUrl,
+                DurationSeconds = s.MediaItem.Analysis != null && s.MediaItem.Analysis.Duration.HasValue
+                    ? s.MediaItem.Analysis.Duration.Value.TotalSeconds
+                    : 0,
+
+                ClientName = s.ClientDevice.ClientName,
+                DeviceName = s.ClientDevice.DeviceName,
+                DeviceType = s.ClientDevice.DeviceType,
+                IpAddress = s.ClientDevice.LastIpAddress,
+                DeviceId = s.ClientDevice.DeviceId,
+
+                Strategy = s.Strategy,
+                VideoStrategy = s.VideoStrategy,
+                AudioStrategy = s.AudioStrategy,
+                SubtitleStrategy = s.SubtitleStrategy,
+
+                Container = s.Container,
+                VideoCodec = s.VideoCodec,
+                AudioCodec = s.AudioCodec,
+                TargetAudioChannels = s.TargetAudioChannels,
+                Quality = s.Quality,
+                BandwidthKbps = s.BandwidthKbps,
+                Resolution = s.Resolution,
+                HdrType = s.HdrType,
+                OutputResolution = s.OutputResolution,
+                OutputHdrType = s.OutputHdrType,
+                DecisionLog = s.DecisionLog,
+
+                CurrentPosition = s.CurrentPosition,
+                IsPaused = s.IsPaused,
+
+                UserName = s.UserProfile != null ? s.UserProfile.Name : "Unknown User",
+                OriginalContainer = context.MediaParts.Where(p => p.Id == s.MediaPartId).Select(p => p.Container).FirstOrDefault(),
+                OriginalVideoCodec = context.MediaVideoTracks.Where(t => t.Id == s.VideoTrackId).Select(t => t.Codec).FirstOrDefault(),
+                OriginalAudioCodec = context.MediaAudioTracks.Where(t => t.Id == s.AudioTrackId).Select(t => t.Codec).FirstOrDefault(),
+                OriginalAudioChannels = context.MediaAudioTracks.Where(t => t.Id == s.AudioTrackId).Select(t => t.Channels).FirstOrDefault(),
+                OriginalSubtitleCodec = context.MediaSubtitleTracks.Where(t => t.Id == s.SubtitleTrackId).Select(t => t.Codec).FirstOrDefault()
+            })
+            .ToListAsync();
+    }
+
+    public Task<ClientDevice?> GetClientDeviceAsync(string deviceId) =>
+        context.ClientDevices.FirstOrDefaultAsync(d => d.DeviceId == deviceId);
+
+    public async Task<StreamSession> CreateSessionAsync(StreamSession session)
+    {
+        context.StreamSessions.Add(session);
+        await context.SaveChangesAsync();
+        return session;
+    }
+
+    public Task<StreamSession?> GetSessionAsync(Guid sessionId) =>
+        context.StreamSessions.FindAsync(sessionId).AsTask();
+
+    public Task EndActiveSessionsForDeviceAsync(Guid clientDeviceId) =>
+        context.StreamSessions
+            .Where(s => s.ClientDeviceId == clientDeviceId && s.EndedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.EndedAt, DateTime.UtcNow));
+
+    public async Task UpdateSessionAsync(StreamSession session)
+    {
+        context.StreamSessions.Update(session);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task UpdateUserMediaStateAsync(Guid profileId, Guid mediaItemId, double currentPosition, double mediaDuration)
+    {
+        var isComplete = WatchStateTransition.IsComplete(currentPosition, mediaDuration);
+        var isRestarted = WatchStateTransition.IsRestarted(currentPosition, mediaDuration);
+        var resumePosition = WatchStateTransition.ResolveResumePosition(currentPosition, mediaDuration);
+
+        var rowsAffected = await context.UserMediaStates
+            .Where(s => s.ProfileId == profileId && s.MediaItemId == mediaItemId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.ResumePositionSeconds, resumePosition)
+                // Watching a finished item again un-finishes it. The flag used to
+                // be OR'd with its old value, which meant it could only ever go
+                // true — so a re-watch stored a resume position that the details
+                // page and Continue Watching both ignored.
+                .SetProperty(x => x.IsPlayed, x => isComplete || (x.IsPlayed && !isRestarted))
+                .SetProperty(x => x.LastPlayedAt, DateTime.UtcNow)
+                .SetProperty(x => x.IsHiddenFromContinueWatching, false));
+
+        if (rowsAffected > 0)
+        {
+            return;
+        }
+
+        context.UserMediaStates.Add(new UserMediaState
+        {
+            ProfileId = profileId,
+            MediaItemId = mediaItemId,
+            ResumePositionSeconds = resumePosition,
+            IsPlayed = isComplete,
+            LastPlayedAt = DateTime.UtcNow,
+            IsHiddenFromContinueWatching = false
+        });
+        await context.SaveChangesAsync();
+    }
+
+    public Task<MediaExtra?> GetMediaExtraAsync(Guid extraId) =>
+        context.MediaExtras.AsNoTracking().FirstOrDefaultAsync(e => e.Id == extraId);
+
+    public Task<MediaStreamInfoDto?> GetExtraStreamInfoAsync(Guid extraId) =>
+        context.MediaExtras
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Where(e => e.Id == extraId)
+            .Select(e => new MediaStreamInfoDto
+            {
+                Id = e.Id,
+                Parts = e.Parts.Select(p => new MediaPartStreamInfoDto
+                {
+                    Id = p.Id,
+                    Resolution = p.Resolution,
+                    Container = p.Container,
+                    OverallBitrate = p.OverallBitrate,
+                    VideoTracks = p.VideoTracks.Select(vt => new TrackStreamInfoDto
+                    {
+                        Id = vt.Id,
+                        Codec = vt.Codec,
+                        IsDefault = vt.IsDefault,
+                        HdrType = vt.HdrType,
+                        BitDepth = vt.BitDepth
+                    }).ToList(),
+                    AudioTracks = p.AudioTracks.Select(at => new TrackStreamInfoDto
+                    {
+                        Id = at.Id,
+                        Title = at.Title,
+                        Codec = at.Codec,
+                        IsDefault = at.IsDefault,
+                        Channels = at.Channels
+                    }).ToList(),
+                    SubtitleTracks = p.SubtitleTracks.Select(st => new SubtitleStreamInfoDto
+                    {
+                        Id = st.Id,
+                        Codec = st.Codec,
+                        IsDefault = st.IsDefault,
+                        IsForced = st.IsForced
+                    }).ToList()
+                }).ToList()
+            })
+            .FirstOrDefaultAsync();
+
+    public async Task<MediaPart?> GetMediaPartForSessionAsync(Guid sessionId)
+    {
+        var session = await context.StreamSessions.FindAsync(sessionId);
+        if (session == null)
+        {
+            return null;
+        }
+
+        // Resolve the actual selected part by session.MediaPartId — falling
+        // back to the first-by-MediaItemId only when MediaPartId is empty
+        // (e.g. legacy sessions). Include the track lists so the play
+        // handler can look up StreamIndex by Track Guid for FFmpeg's `-map`
+        // flags. Without this, FFmpeg's auto-selection grabbed the file's
+        // default-flagged stream regardless of which one the user picked
+        // in the Quality panel.
+        var query = context.MediaParts
+            .Include(p => p.VideoTracks)
+            .Include(p => p.AudioTracks)
+            .Include(p => p.SubtitleTracks)
+            .AsQueryable();
+
+        if (session.MediaPartId != Guid.Empty)
+        {
+            return await query.FirstOrDefaultAsync(p => p.Id == session.MediaPartId);
+        }
+        return await query.FirstOrDefaultAsync(p => p.MediaItemId == session.MediaItemId);
+    }
+
+    public Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search) =>
+        StreamHistoryProjection.LoadAsync(context, page, pageSize, search);
+
+    public async Task<IEnumerable<T>> GetProjectedActiveStreamsAsync<T>(TimeSpan activeThreshold, Expression<Func<StreamSession, T>> projection)
+    {
+        var cutoffTime = DateTime.UtcNow.Subtract(activeThreshold);
+
+        return await context.StreamSessions
+            .AsNoTracking()
+            .Where(s => s.EndedAt == null && s.LastPingAt >= cutoffTime)
+            .Select(projection)
+            .ToListAsync();
+    }
+}

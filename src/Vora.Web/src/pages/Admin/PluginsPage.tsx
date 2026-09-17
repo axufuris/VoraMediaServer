@@ -1,0 +1,395 @@
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
+import { pluginAdminService, type PluginVM } from '../../api/System/pluginAdminService';
+import { systemSettingsAdminService } from '../../api/System/systemSettingsAdminService';
+import { useDialog } from '../../dialogs';
+import PageHeader from '../../components/Admin/Primitives/PageHeader';
+import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
+import EmptyState from '../../components/Admin/Primitives/EmptyState';
+import PluginSettingsForm from '../../components/Admin/Settings/PluginSettingsForm';
+
+interface PluginReleaseData {
+    tag_name?: string;
+    version?: string;
+    Version?: string;
+}
+
+function formatTypeLabel(type: string): string {
+    const withSpaces = type.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+    return withSpaces.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function PluginCard({
+    plugin,
+    serverId,
+    showModal,
+    onUninstall,
+    onToggled,
+}: {
+    plugin: PluginVM;
+    serverId?: string;
+    showModal: (title: string, message: string, isError?: boolean) => void;
+    onUninstall: (id: string, name: string) => void;
+    onToggled: (id: string, enabled: boolean) => void;
+}) {
+    const [latestVersion, setLatestVersion] = useState<string | null>(null);
+    const [checkingVersion, setCheckingVersion] = useState(!!plugin.latestVersionApiUrl);
+    const [enabled, setEnabled] = useState(plugin.isEnabled);
+    const [isToggling, setIsToggling] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    useEffect(() => {
+        if (!plugin.latestVersionApiUrl) return;
+        fetch(plugin.latestVersionApiUrl)
+            .then(res => res.json() as Promise<PluginReleaseData>)
+            .then(data => {
+                const ver = data.tag_name || data.version || data.Version;
+                if (ver) setLatestVersion(ver.replace(/^v/, ''));
+            })
+            .catch(err => console.warn(`Failed to fetch version for ${plugin.name}`, err))
+            .finally(() => setCheckingVersion(false));
+    }, [plugin.latestVersionApiUrl, plugin.name]);
+
+    const isLatest = latestVersion && latestVersion === plugin.version;
+    const hasUpdate = latestVersion && latestVersion !== plugin.version;
+
+    const handleToggle = async () => {
+        const next = !enabled;
+        setEnabled(next);
+        setIsToggling(true);
+        try {
+            await systemSettingsAdminService.updatePluginSettings(plugin.id, { is_enabled: next ? 'true' : 'false' }, serverId);
+            onToggled(plugin.id, next);
+        } catch {
+            setEnabled(!next);
+            showModal('Error', `Failed to ${next ? 'enable' : 'disable'} ${plugin.name}.`, true);
+        } finally {
+            setIsToggling(false);
+        }
+    };
+
+    const canExpand = plugin.hasSettings;
+
+    return (
+        <div className={`vora-card overflow-hidden transition-opacity ${enabled ? '' : 'opacity-60'}`}>
+            <div
+                className={`flex items-start gap-3 p-4 ${canExpand ? 'cursor-pointer hover:bg-[var(--vora-bg-sunken)]/40' : ''} transition-colors`}
+                onClick={() => canExpand && setIsExpanded(e => !e)}
+            >
+                {canExpand ? (
+                    <svg className={`w-4 h-4 mt-0.5 text-[var(--vora-text-muted)] shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                ) : (
+                    <span className="w-4 shrink-0" />
+                )}
+
+                <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-[var(--vora-text-primary)]">{plugin.name}</span>
+                        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] text-[var(--vora-text-secondary)]">v{plugin.version}</span>
+                        {checkingVersion && <span className="text-[11px] text-[var(--vora-text-muted)] italic">Checking…</span>}
+                        {isLatest && <HealthBadge tone="ok">Latest</HealthBadge>}
+                        {hasUpdate && <HealthBadge tone="warn">Update to v{latestVersion}</HealthBadge>}
+                        {plugin.isSystemPlugin && <HealthBadge tone="info" showDot={false}>System Core</HealthBadge>}
+                        {plugin.requiresConfiguration && <HealthBadge tone="warn">Setup needed</HealthBadge>}
+                    </div>
+                    <p className="text-xs text-[var(--vora-text-secondary)] leading-relaxed mt-1.5">{plugin.description}</p>
+                    {plugin.externalConfigurationHint && (
+                        <p className="text-[11px] text-[var(--vora-info-text)] leading-relaxed mt-2 flex items-start gap-1.5">
+                            <svg className="w-3.5 h-3.5 shrink-0 mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span>{plugin.externalConfigurationHint}</span>
+                        </p>
+                    )}
+                    {plugin.developerName && (
+                        <p className="text-[11px] text-[var(--vora-text-muted)] mt-1">
+                            By <span className="text-[var(--vora-text-secondary)] font-medium">{plugin.developerName}</span>
+                        </p>
+                    )}
+                    {canExpand && !isExpanded && (
+                        <span className="inline-block text-[11px] font-semibold text-[var(--vora-info-text)] mt-2">Configure settings →</span>
+                    )}
+                </div>
+
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleToggle(); }}
+                        disabled={isToggling}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 ${enabled ? 'bg-[var(--vora-accent-500)]' : 'bg-[var(--vora-border-strong)]'}`}
+                        aria-pressed={enabled}
+                        title={enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+                    >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--vora-text-muted)]">{enabled ? 'Enabled' : 'Disabled'}</span>
+                </div>
+            </div>
+
+            {canExpand && isExpanded && (
+                <div className="border-t border-[var(--vora-border-subtle)] p-4 bg-[var(--vora-bg-sunken)]/40">
+                    <PluginSettingsForm
+                        serverId={serverId}
+                        pluginId={plugin.id}
+                        pluginName={plugin.name}
+                        supportsConnectionTest={plugin.supportsConnectionTest}
+                        showModal={showModal}
+                    />
+                </div>
+            )}
+
+            <div className="px-4 py-2.5 border-t border-[var(--vora-border-subtle)] flex justify-between items-center">
+                {plugin.documentationUrl ? (
+                    <a
+                        href={plugin.documentationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-semibold text-[var(--vora-info-text)] hover:text-[var(--vora-info-500)] flex items-center gap-1 transition-colors"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        Docs
+                    </a>
+                ) : <span className="font-mono text-[10px] text-[var(--vora-text-disabled)] truncate">{plugin.id}</span>}
+
+                {plugin.isSystemPlugin ? (
+                    <span className="text-[11px] font-semibold text-[var(--vora-text-disabled)] uppercase tracking-wider">Cannot uninstall</span>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => onUninstall(plugin.id, plugin.name)}
+                        className="text-xs font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] px-3 py-1 rounded-[var(--vora-radius-md)] transition-colors cursor-pointer"
+                    >
+                        Uninstall
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+export default function PluginsPage() {
+    const dialog = useDialog();
+    const { serverId } = useParams<{ serverId?: string }>();
+    const [plugins, setPlugins] = useState<PluginVM[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isUploading, setIsUploading] = useState(false);
+    const [query, setQuery] = useState('');
+    const [setupOnly, setSetupOnly] = useState(false);
+    const [enabledFilter, setEnabledFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const toggleGroup = useCallback((type: string) => {
+        setExpandedGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(type)) next.delete(type); else next.add(type);
+            return next;
+        });
+    }, []);
+
+    const showModal = useCallback((title: string, message: string, isError: boolean = false) => {
+        dialog.alert({ title, message, tone: isError ? 'danger' : 'default' });
+    }, [dialog]);
+
+    const fetchPlugins = useCallback(() => {
+        setLoading(true);
+        pluginAdminService.getPlugins(serverId)
+            .then(setPlugins)
+            .catch(console.error)
+            .finally(() => setLoading(false));
+    }, [serverId]);
+
+    useEffect(() => {
+        fetchPlugins();
+    }, [fetchPlugins]);
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.name.endsWith('.dll')) {
+            await dialog.alert('Please select a valid .dll plugin file.');
+            return;
+        }
+        setIsUploading(true);
+        try {
+            await pluginAdminService.uploadPlugin(file, serverId);
+            await dialog.alert('Plugin uploaded successfully. Restart the Vora server to load the new plugin.');
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            fetchPlugins();
+        } catch (error) {
+            await dialog.alert('Failed to upload plugin.');
+            console.error(error);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleUninstall = async (id: string, name: string) => {
+        if (!await dialog.confirm(`Are you sure you want to uninstall ${name}?`)) return;
+        try {
+            await pluginAdminService.uninstallPlugin(id, serverId);
+            await dialog.alert('Plugin scheduled for deletion. Restart the Vora server to complete the uninstall.');
+            setPlugins(plugins.filter(p => p.id !== id));
+        } catch (error) {
+            await dialog.alert('Failed to uninstall plugin.');
+            console.error(error);
+        }
+    };
+
+    const handlePluginToggled = useCallback((id: string, enabled: boolean) => {
+        setPlugins(prev => prev.map(p => p.id === id ? { ...p, isEnabled: enabled } : p));
+    }, []);
+
+    const setupNeededCount = useMemo(() => plugins.filter(p => p.requiresConfiguration).length, [plugins]);
+
+    const filtered = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        return plugins.filter(p => {
+            if (setupOnly && !p.requiresConfiguration) return false;
+            if (enabledFilter === 'enabled' && !p.isEnabled) return false;
+            if (enabledFilter === 'disabled' && p.isEnabled) return false;
+            if (!q) return true;
+            return (
+                p.name.toLowerCase().includes(q) ||
+                p.id.toLowerCase().includes(q) ||
+                p.type.toLowerCase().includes(q) ||
+                formatTypeLabel(p.type).toLowerCase().includes(q) ||
+                (p.description?.toLowerCase().includes(q) ?? false) ||
+                (p.developerName?.toLowerCase().includes(q) ?? false)
+            );
+        });
+    }, [plugins, query, setupOnly, enabledFilter]);
+
+    const filtersActive = setupOnly || enabledFilter !== 'all';
+
+    const groupedPlugins = useMemo(() => {
+        const acc: Record<string, PluginVM[]> = {};
+        for (const plugin of filtered) {
+            const group = plugin.type || 'Other';
+            (acc[group] ??= []).push(plugin);
+        }
+        for (const key of Object.keys(acc)) {
+            acc[key].sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return acc;
+    }, [filtered]);
+
+    const groupNames = Object.keys(groupedPlugins).sort((a, b) => formatTypeLabel(a).localeCompare(formatTypeLabel(b)));
+
+    return (
+        <div data-vora-page="">
+            <PageHeader
+                title="Plugins"
+                description="Every metadata agent, artwork source, scanner, ratings provider, and integration in one place — enable, configure, and manage them all here."
+                actions={
+                    <>
+                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".dll" className="hidden" />
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploading}
+                            className="vora-button-primary flex items-center gap-2"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                            {isUploading ? 'Uploading…' : 'Upload .dll'}
+                        </button>
+                    </>
+                }
+            />
+
+            <div className="p-8 max-w-5xl mx-auto space-y-8">
+                {!loading && plugins.length > 0 && (
+                    <div className="space-y-3">
+                        <div className="relative">
+                            <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--vora-text-muted)] pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+                            <input
+                                type="text"
+                                value={query}
+                                onChange={e => setQuery(e.target.value)}
+                                placeholder="Search plugins by name, type, key, or description (e.g. OMDb, ratings, showtimes)…"
+                                className="vora-input w-full"
+                                style={{ paddingLeft: '2.5rem' }}
+                            />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setSetupOnly(v => !v)}
+                                className={`text-xs font-semibold px-3 py-1.5 rounded-[var(--vora-radius-md)] border transition-colors cursor-pointer ${setupOnly ? 'border-[var(--vora-warning-500)] bg-[var(--vora-warning-soft)] text-[var(--vora-warning-text)]' : 'border-[var(--vora-border-subtle)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]/40'}`}
+                                title="Show only plugins that still need configuration"
+                            >
+                                Setup needed{setupNeededCount > 0 && <span className="ml-1.5 opacity-80">· {setupNeededCount}</span>}
+                            </button>
+
+                            <div className="inline-flex rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] overflow-hidden">
+                                {(['all', 'enabled', 'disabled'] as const).map(opt => (
+                                    <button
+                                        key={opt}
+                                        type="button"
+                                        onClick={() => setEnabledFilter(opt)}
+                                        className={`text-xs font-semibold px-3 py-1.5 transition-colors cursor-pointer capitalize ${enabledFilter === opt ? 'bg-[var(--vora-accent-500)] text-white' : 'text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]/40'}`}
+                                    >
+                                        {opt}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {loading ? (
+                    <div className="space-y-4">
+                        {[1, 2, 3, 4, 5].map(i => <div key={i} className="vora-skeleton h-28" />)}
+                    </div>
+                ) : plugins.length === 0 ? (
+                    <div className="vora-card">
+                        <EmptyState
+                            title="No plugins installed"
+                            description="Upload a .dll plugin to extend Vora with new providers, scanners, or integrations."
+                        />
+                    </div>
+                ) : groupNames.length === 0 ? (
+                    <div className="vora-card">
+                        <EmptyState
+                            title="No matching plugins"
+                            description={query.trim().length > 0
+                                ? `Nothing matches “${query}” with the current filters. Try a different search or clear the filters.`
+                                : 'No plugins match the current filters.'}
+                        />
+                    </div>
+                ) : (
+                    groupNames.map(type => {
+                        const isGroupOpen = query.trim().length > 0 || filtersActive || expandedGroups.has(type);
+                        return (
+                            <section key={type} className="space-y-3">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleGroup(type)}
+                                    className="flex items-center gap-2 w-full text-left group"
+                                >
+                                    <svg className={`w-3.5 h-3.5 text-[var(--vora-text-muted)] shrink-0 transition-transform ${isGroupOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                    <h2 className="text-xs font-bold text-[var(--vora-text-muted)] uppercase tracking-widest group-hover:text-[var(--vora-text-secondary)] transition-colors">
+                                        {formatTypeLabel(type)}
+                                        <span className="ml-2 text-[var(--vora-text-disabled)] font-medium normal-case tracking-normal">· {groupedPlugins[type].length}</span>
+                                    </h2>
+                                </button>
+                                {isGroupOpen && (
+                                    <div className="space-y-3">
+                                        {groupedPlugins[type].map(plugin => (
+                                            <PluginCard
+                                                key={plugin.id}
+                                                plugin={plugin}
+                                                serverId={serverId}
+                                                showModal={showModal}
+                                                onUninstall={handleUninstall}
+                                                onToggled={handlePluginToggled}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+                        );
+                    })
+                )}
+            </div>
+        </div>
+    );
+}

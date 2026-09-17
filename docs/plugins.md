@@ -1,0 +1,136 @@
+# Plugin system
+
+Plugins extend Vora at runtime with new providers — metadata sources, artwork sources, IPTV providers, collection sync sources, chronology providers, etc.
+
+## Layout
+
+- **`/src/Vora.Plugins/`** — single project containing:
+  - `Interfaces/` — provider contracts (`IVoraPlugin`, `IArtworkProvider`, `ICollectionSyncProvider`, `ILibrarySyncProvider`, …) and adapter interfaces (`IPluginSettingsProvider`, `IRequestServerLookup`).
+  - `Dtos/` — DTOs that cross the plugin boundary (`PluginSettingDefinitionDto`, `CollectionSyncItemDto`, `LibrarySyncPinDto`, …).
+  - `Providers/<Source>/` — built-in concrete providers (e.g. `Tmdb/`, `Trakt/`, `Plex/`). One folder per upstream source; a folder may contain multiple provider classes (e.g. `Radarr/RadarrRequestProvider.cs` + `Radarr/RadarrCalendarProvider.cs`).
+- **`<install>/Plugins/*.dll`** — external (third-party) plugin assemblies dropped in at runtime. The loader scans this folder recursively at startup. External plugins reference `Vora.Plugins` for the contracts and `Vora.Domain` only if entity shapes are required.
+
+## Provider categories
+
+Vora plugins fall into these provider interfaces (defined in `Vora.Plugins/Interfaces/`):
+
+- **Metadata provider** — looks up media metadata by external ID or title (e.g. TMDB, IMDB, TVDB). The built-in TMDB provider (`Providers/Tmdb/TmdbMetadataProvider.cs`) also maps `external_ids.tvdb_id` onto results — free for TV shows. **Movies** don't get a TVDB id from TMDB; the opt-in `ServerSetting.ResolveMovieTvdbIds` (off by default) makes the nightly metadata pass run an extra TVDB search to backfill missing movie **and** show `TvdbId`s (`MetadataManager.ResolveTvdbIdForMovieAsync` / `ResolveTvdbIdForShowAsync`). Admins can also trigger a one-time backfill via `POST /metadata/resolve-tvdb-ids` (Core Settings → "Resolve now"). Items that already have a `TvdbId`, and movies that come back empty, aren't re-searched every night.
+- **Artwork provider** — fetches posters/backdrops/banners
+- **IPTV provider** — supplies channels, EPG, stream URLs at the plugin contract level. Distinct from the user-facing `IptvPlaylist` / `IptvEpgSource` aggregates documented in `docs/iptv-and-dvr.md`; an IPTV provider plugin would typically feed data into those aggregates (e.g. HDHomeRun integration).
+- **Discovery provider** — supplies browsable rows, search, and item details for titles that aren't in the library (built-ins: `Providers/Tmdb/TmdbDiscoveryProvider.cs`, `Providers/MyAnimeList/`). `GetItemDetailsAsync` returns a `DiscoveryItemDetailsDto` carrying overview, backdrop, next air date, runtime, rating, genres, studios, cast **and crew**, and trailers. Fill in every field the source actually has — the client hero renders whatever it's given and omits the rest, so a sparse provider silently produces a sparse page. Two things to copy from the TMDB provider: crew is matched on the member's **job** (`"Director"`), not their `department` (`"Directing"` also contains assistant and second-unit directors, which credits seven people on a one-director film), and crew is appended to the same `Cast` list rather than a separate collection, so the shared `CastRow` picks it up with no extra wiring. Provider results are memory-cached for 24h per `{type}/{externalId}/{language}`.
+- **Collection sync provider** — pulls list contents from external sources (Trakt lists, custom feeds)
+- **Chronology provider** — supplies a custom watch order for a collection (e.g. timeline-based MCU order)
+- **Subtitle search provider** — searches an online source for subtitles and downloads them (built-in: `Providers/OpenSubtitles/`). Configurable from Docker like any other plugin — `Vora__PluginSettings__opensubtitles_search__api_key`, `__auth_mode` (`apikey` / `account`), `__username`, `__password`, `__default_languages`; see the matrix in the README. `IsConfiguredAsync` gates the whole feature: `FeatureFlagsVM.SubtitleSearch` is derived from it, and the clients hide Find Subtitles when nothing reports ready — so an unconfigured provider must answer **false** rather than surfacing a button whose every search comes back empty. `SubtitleSearchManager` honours `ServerSetting.SubtitleSearchProviderId` only while that provider is configured, then falls through to any other that is. See `docs/streaming.md`.
+
+When adding a **new** provider interface:
+
+1. Add the interface to `Vora.Plugins/Interfaces/`.
+2. Add it to the `PluginProviderInterfaces` array in `Vora.Api/Extensions/PluginLoaderExtensions.cs` so the loader discovers it.
+
+**Never return a `Vora.Plugins` DTO straight out of an API endpoint.** Map it to a `*VM` in `Vora.Application` first (e.g. `DiscoveryItemDetailsVM.FromDto`). A plugin DTO on the wire ends up in the OpenAPI document and therefore in every generated native client — see `docs/clients/openapi-codegen.md`.
+
+## Loader
+
+`Vora.Api/Extensions/PluginLoaderExtensions.cs` exposes `services.AddVoraPlugins(path)`. It:
+
+- Scans built-in and external assemblies under the given path.
+- Finds every concrete `IVoraPlugin` and every concrete implementation of one of the `PluginProviderInterfaces`.
+- Registers them with DI.
+
+**Constraint — plugins are not hot-unloadable.** External plugin DLLs are loaded into `AssemblyLoadContext.Default` (`PluginLoaderExtensions.cs`), which is non-collectible: once loaded, an assembly stays loaded for the lifetime of the process and the DLL file stays locked on disk. This is why uninstall does **not** delete the DLL directly — `PluginManager` renames it to `*.dll.deleted` (`File.Move(..., assemblyPath + ".deleted")`) and the loader skips `.deleted` files on the next startup; the actual removal happens on restart. Enabling/disabling a plugin is a DB flag, not a load/unload. Plugin code also runs at full host trust (no sandbox). If true hot-unload is ever needed, each plugin would have to load into its own collectible `AssemblyLoadContext` — a larger change than the current model warrants.
+
+`Vora.Api/Extensions/PluginSettingsAdapter.cs` adapts the application-layer `ISystemSettingsRepository` to the plugin-facing `IPluginSettingsProvider`, so plugins can read/write their own settings without knowing about EF Core.
+
+`Vora.Application/Requests/RequestServerLookupAdapter.cs` implements `IRequestServerLookup` (declared in `Vora.Plugins.Interfaces`). Plugins that need to consume credentials owned by a different aggregate — most prominently the Radarr/Sonarr calendar providers — resolve `IRequestServerLookup` and ask for "calendar servers" by request-provider id (e.g. `radarr_requester`). This is how the calendar plugins share credentials with the Request Servers admin page; see the section on the `ProvidesReleaseCalendar` flag in `docs/database.md`.
+
+## Seeding plugin settings from environment variables
+
+`Vora.Application/Plugins/PluginSettingsEnvSeeder.cs` runs as a startup task (after database migrations, before workers). It reads `Vora:PluginSettings:<pluginId>:<settingKey>` from `IConfiguration` — env var form `Vora__PluginSettings__<pluginId>__<settingKey>` — and writes values into the database **only when the row is empty**. Once a value lives in the database, the seeder leaves it alone so admin-UI edits survive container restarts.
+
+The seeder validates that `<pluginId>` matches a registered `IVoraPlugin.Id` and that `<settingKey>` exists in that plugin's `GetSettingDefinitions()` (or is the special `is_enabled` toggle). Anything else is skipped with a `WARN` log. Values are redacted from logs — only key names appear, so seeded API keys never end up in the in-app log viewer or the file sink.
+
+User-facing docs and the full plugin/setting matrix live in the README's **Bootstrapping plugin API keys from environment variables** section.
+
+## Writing a plugin
+
+**Built-in providers** live inside the `Vora.Plugins` project. To add one: drop a new file under `Providers/<Source>/<Whatever>Provider.cs`, implement `IVoraPlugin` plus the relevant provider interface, and the loader picks it up automatically on the next build.
+
+**External (third-party) plugins** are separate assemblies dropped into `<install>/Plugins/`. An external plugin project:
+
+- References `Vora.Plugins` (and `Vora.Domain` only if entity shapes are required).
+- Implements one or more of the provider interfaces.
+- Builds to a `*.dll` placed under the `Plugins` folder the loader scans at runtime.
+
+Plugin settings (API keys, endpoints) come through `IPluginSettingsProvider`. The settings UI on the admin pages reads/writes via `pluginAdminService` on the frontend, which calls the corresponding backend endpoint. New settings fields are declared by the plugin and surfaced generically — you don't have to hand-build admin UI for them.
+
+### Server-wide metadata language
+
+`IPluginSettingsProvider.GetMetadataLanguageAsync()` returns the admin's chosen metadata language (Admin → Settings → Core) as a **TVDB-style ISO 639-2 (3-letter) code** — e.g. `"eng"`, `"kor"`. Any metadata/artwork provider should read it so titles, overviews, and localized artwork come back in the admin's language instead of the item's original language. TVDB endpoints take the 3-letter code verbatim; for APIs that expect ISO 639-1 (2-letter, e.g. TMDB) call `Vora.Plugins.MetadataLanguageCodes.ToIso6391(code)` rather than re-deriving the table — adding a language to the admin dropdown then lights up every provider at once. Prefer skipping the extra translation call when the item is already in the target language (TVDB exposes `originalLanguage`), and always fall back to the original language when no translation exists. Built-in consumers: `TvdbMetadataProvider`, `TmdbMetadataProvider`, `TmdbArtworkProvider`.
+
+### Setting definitions, required fields, and connection tests
+
+A plugin declares its settings by returning `PluginSettingDefinitionDto`s from `GetSettingDefinitions()`. Each definition carries `Key`, `Label`, `Type` (`text`, `password`, `select`, …), `DefaultValue`, `Description`, `Options` (for `select`), plus two fields that shape the generic admin form:
+
+- **`Required`** — renders a `*` on the label. It's a UI affordance for "you should fill this in"; it does not by itself block saving.
+- **`Placeholder`** — greyed example text in the input (e.g. `https://radarr.example.com`).
+
+Two plugin-level flags surface on `PluginVM` and drive admin UX:
+
+- **`RequiresConfiguration`** (computed, not authored) — true when any definition has an empty `DefaultValue` **and** no saved value yet (`PluginManager.RequiresConfiguration`). The admin list uses it to badge plugins that are installed but not yet usable.
+- **`ExternalConfigurationHint`** (`IVoraPlugin.ExternalConfigurationHint`, default `null`) — a short string for plugins whose credentials live elsewhere, so the settings form shows a pointer instead of empty fields. The Radarr/Sonarr **calendar** providers set this because their credentials come from Request Servers via `IRequestServerLookup` (see the `ProvidesReleaseCalendar` note in `docs/database.md`); they return no setting definitions of their own.
+
+**Connection test.** A plugin that can verify its credentials implements `IPluginConnectionTest.TestConnectionAsync(settings, ct)` and returns `PluginConnectionTestResult.Ok(msg)` / `.Fail(msg)` (exceptions are caught and reported as a failure, 15s timeout). `PluginManager` sets `SupportsConnectionTest = plugin is IPluginConnectionTest`; when true, the admin form renders a **Test connection** button that POSTs the current (unsaved) field values to `POST /api/settings/plugins/{pluginId}/test` (AdminOnly) and shows the ✓/✕ message inline. Test against a cheap, auth-only upstream endpoint — the built-in providers (TMDB, TVDB, OMDb, Fanart, MDbList, Last.fm, Genius, SerpApi) each probe a lightweight authenticated call.
+
+## Where plugin settings render in the admin UI
+
+The `PluginSection` component in `components/Admin/Settings/PluginSettingsTab.tsx` renders one plugin's settings inline. It's exported so feature pages can mount it directly. The `FeaturePluginList` wrapper in `components/Admin/Features/FeaturePluginList.tsx` takes a list of plugin type names (matching the interface name without the `I` prefix and `Provider` suffix — e.g. `Discovery` for `IDiscoveryProvider`), fetches plugins, filters, and renders a `PluginSection` per match.
+
+Each plugin category has a canonical home:
+
+| Plugin type | Lives on |
+| --- | --- |
+| `Discovery`, `Theater` | Discover (`/admin/discovery`) |
+| `Recommendation` | For You (`/admin/for-you`) |
+| `Calendar` | Release Calendar (`/admin/release-calendar`) |
+| `PodcastDiscovery` | Podcasts (`/admin/podcasts`) |
+| `Artwork`, `Metadata`, `Ratings`, `FolderWatcher`, `LocalScanner`, `Chronology` | Libraries (TBD) |
+| `CollectionSync` | Collections (TBD) |
+| `OverlayEngine` | Poster Overlays (TBD) |
+| `Request` | Request Queue (TBD) |
+| `Lyrics`, `ListeningData` | Music (TBD) |
+
+Categories marked TBD don't have a dedicated admin page yet, so their plugin settings are still reachable via the System Settings → Plugins sub-sidebar. That sub-sidebar filters out the homed categories automatically — when every category has a home, the section disappears entirely.
+
+The **Plugin Management** page at `/admin/plugins` is a separate concern: it lists every installed plugin and lets admins upload, enable, disable, and uninstall whole plugin packages. It does not host per-plugin settings.
+
+## Admin theme bundles (separate from code plugins)
+
+Admin themes are NOT code plugins. They're folder bundles at `<install>/Themes/<theme-id>/` containing a `manifest.json` and an optional `assets/` directory. They have their own loader (`IThemeBundleLoader` in `Vora.Application.Themes`) and are deliberately kept outside `<install>/Plugins/` so the code-plugin loader's recursive `*.dll` scan never walks into theme assets.
+
+Author guide: `docs/admin-theme-bundles.md`. Surface in the admin UI: **Admin → Server → Appearance** (`/admin/appearance`).
+
+Theme authors don't need to write or compile C# — a bundle is just JSON + images. If you ever expand this to support compiled themes (with React-component slot overrides), that becomes a code plugin and lives in `<install>/Plugins/` like everything else; the contracts would go in `Vora.Plugins/Interfaces/` next to the existing provider interfaces.
+
+## SerpApi showtimes: diagnosing an empty result
+
+`SerpApiTheaterProvider` asks SerpApi for `engine=google` with `q="<title> showtimes <location>"` and reads the `showtimes` array off the response. Every failure path returns an empty list, and the client renders "No local showtimes found for this location" — which looks identical whether the key is missing, the quota is gone, or Google simply served a page without a showtimes block.
+
+So each path logs its own reason. When the response parses but carries no `showtimes` block, the log names the blocks that *were* present (`ai_overview`, `knowledge_graph`, `organic_results`, …), which is what distinguishes "Google stopped returning showtimes" from a configuration problem. SerpApi also reports some failures as an `error` string inside a 200 response — quota exhaustion among them — so that is read and logged rather than being silently parsed as "no results".
+
+**Only non-empty results are cached.** The 12-hour entry exists to protect a small monthly search quota, but caching an empty result meant a transient upstream failure persisted for 12 hours after it had recovered.
+
+`max_theaters` is resolved **server-side**. The client sends neither `location` nor `maxTheaters`, so the endpoint falls back to `UserProfile.ShowtimesLocation` then the plugin's `default_location`, and the provider falls back to the plugin's `max_theaters`. The web client used to send a hardcoded `6` read from a `client_max_theaters_<profileId>` localStorage key that nothing ever wrote, which silently overrode whatever an admin had configured.
+
+## TVDB session tokens
+
+TVDB v4 authenticates with a session token obtained by `POST login` using the API key, stored in plugin settings as `tvdb_metadata:tvdb_token` and shared by `TvdbMetadataProvider` and `TvdbArtworkProvider`. **Tokens expire after about a month.**
+
+All TVDB auth goes through `TvdbSession` (`Providers/Tvdb/TvdbSession.cs`); don't read `tvdb_token` or build a bearer request directly.
+
+- **`GetTokenAsync`** renews the token when none is stored **or when it expires within a day** (it reads the JWT `exp` claim), and returns `null` rather than a stale token if login fails.
+- **`SendAsync`** sends a request and, on `401`, renews once and retries — covering a token revoked before its expiry.
+- Renewal is serialised by a lock and re-checks the stored token inside it, so parallel scan units that hit an expired token together log in **once**, and a caller whose token another caller already replaced just picks up the new one.
+- A failed login is logged as a warning.
+
+Before this, renewal happened only when no token was stored. When the stored token expired on 2026-09-10, every TVDB request got a `401`, each call site treated that as "no result", and nothing was logged: a whole TVDB library quietly stopped receiving metadata and artwork, and newly added shows were never matched.
+

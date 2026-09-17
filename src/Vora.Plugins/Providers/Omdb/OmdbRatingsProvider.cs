@@ -1,0 +1,289 @@
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using System.Net.Http;
+using System.Text.Json;
+using Vora.Plugins.Dtos;
+using Vora.Plugins.Interfaces;
+
+namespace Vora.Plugins.Providers.Omdb;
+
+public static class OmdbCircuitBreaker
+{
+    public static DateTime? BlockedUntil { get; set; }
+    public static bool IsBlocked => BlockedUntil.HasValue && DateTime.UtcNow < BlockedUntil.Value;
+}
+
+public class OmdbImdbRatingsProvider : IRatingsProvider, IPluginConnectionTest
+{
+    private readonly HttpClient _httpClient;
+    private readonly IServiceScopeFactory _scopeFactory;
+
+    public string Id => "omdb_imdb";
+    public string Name => "OMDb - IMDb Ratings";
+    public string Version => "1.0.0";
+    public string Description => "Fetches IMDb ratings from the OMDb API.";
+    public bool IsSystemPlugin => true;
+    public string Type => "Ratings";
+    public string DeveloperName => "Andy Xufuris";
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
+
+    public string RatingSourceName => "Internet Movie Database";
+
+    public bool IsCurrentlyAvailable => !OmdbCircuitBreaker.IsBlocked;
+
+    public OmdbImdbRatingsProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory)
+    {
+        _httpClient = httpClient;
+        _scopeFactory = scopeFactory;
+        if (_httpClient.BaseAddress == null)
+        {
+            _httpClient.BaseAddress = new Uri("http://www.omdbapi.com/");
+        }
+    }
+
+    public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions()
+    {
+        return new List<PluginSettingDefinitionDto>
+        {
+            new PluginSettingDefinitionDto
+            {
+                Key = "api_key",
+                Label = "OMDb API Key",
+                Type = "password",
+                Required = true,
+                Placeholder = "Paste your OMDb API key",
+                Description = "OMDb API key. Request a free key at https://www.omdbapi.com/apikey.aspx (1,000 daily requests on the free tier). Click the activation link in the confirmation email before using the key. Paid tiers are available for higher quotas. This single key is shared by the OMDb IMDb, Rotten Tomatoes, and Metacritic ratings providers."
+            }
+        };
+    }
+
+    public async Task<decimal?> FetchRatingAsync(string? imdbId, string? tmdbId, string? tvdbId, string mediaType, CancellationToken cancellationToken = default)
+    {
+        return await OmdbFetcher.FetchRatingCoreAsync(_httpClient, _scopeFactory, imdbId, RatingSourceName, cancellationToken);
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("api_key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        var response = await _httpClient.GetAsync($"?apikey={Uri.EscapeDataString(apiKey.Trim())}&i=tt3896198", cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (body.Contains("\"Response\":\"True\"", StringComparison.OrdinalIgnoreCase))
+        {
+            return PluginConnectionTestResult.Ok("OMDb accepted the API key.");
+        }
+        if (body.Contains("Invalid API key", StringComparison.OrdinalIgnoreCase) || body.Contains("No API key", StringComparison.OrdinalIgnoreCase))
+        {
+            return PluginConnectionTestResult.Fail("OMDb rejected the API key. Check the key and that you clicked the activation link in the confirmation email.");
+        }
+        return PluginConnectionTestResult.Fail($"Unexpected response from OMDb (HTTP {(int)response.StatusCode}).");
+    }
+}
+
+public class OmdbRottenTomatoesRatingsProvider : IRatingsProvider
+{
+    private readonly HttpClient _httpClient;
+    private readonly IServiceScopeFactory _scopeFactory;
+
+    public string Id => "omdb_rotten_tomatoes";
+    public string Name => "OMDb - Rotten Tomatoes";
+    public string Version => "1.0.0";
+    public string Description => "Fetches Rotten Tomatoes ratings from the OMDb API.";
+    public bool IsSystemPlugin => true;
+    public string Type => "Ratings";
+    public string DeveloperName => "Andy Xufuris";
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
+
+    public string RatingSourceName => "Rotten Tomatoes";
+
+    public bool IsCurrentlyAvailable => !OmdbCircuitBreaker.IsBlocked;
+
+    public OmdbRottenTomatoesRatingsProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory)
+    {
+        _httpClient = httpClient;
+        _scopeFactory = scopeFactory;
+        if (_httpClient.BaseAddress == null)
+        {
+            _httpClient.BaseAddress = new Uri("http://www.omdbapi.com/");
+        }
+    }
+
+    public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions()
+    {
+        return new List<PluginSettingDefinitionDto>();
+    }
+
+    public async Task<decimal?> FetchRatingAsync(string? imdbId, string? tmdbId, string? tvdbId, string mediaType, CancellationToken cancellationToken = default)
+    {
+        return await OmdbFetcher.FetchRatingCoreAsync(_httpClient, _scopeFactory, imdbId, RatingSourceName, cancellationToken);
+    }
+}
+
+public class OmdbMetacriticRatingsProvider : IRatingsProvider
+{
+    private readonly HttpClient _httpClient;
+    private readonly IServiceScopeFactory _scopeFactory;
+
+    public string Id => "omdb_metacritic";
+    public string Name => "OMDb - Metacritic";
+    public string Version => "1.0.0";
+    public string Description => "Fetches Metacritic ratings from the OMDb API.";
+    public bool IsSystemPlugin => true;
+    public string Type => "Ratings";
+    public string DeveloperName => "Andy Xufuris";
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
+
+    public string RatingSourceName => "Metacritic";
+
+    public bool IsCurrentlyAvailable => !OmdbCircuitBreaker.IsBlocked;
+
+    public OmdbMetacriticRatingsProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory)
+    {
+        _httpClient = httpClient;
+        _scopeFactory = scopeFactory;
+        if (_httpClient.BaseAddress == null)
+        {
+            _httpClient.BaseAddress = new Uri("http://www.omdbapi.com/");
+        }
+    }
+
+    public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions()
+    {
+        return new List<PluginSettingDefinitionDto>();
+    }
+
+    public async Task<decimal?> FetchRatingAsync(string? imdbId, string? tmdbId, string? tvdbId, string mediaType, CancellationToken cancellationToken = default)
+    {
+        return await OmdbFetcher.FetchRatingCoreAsync(_httpClient, _scopeFactory, imdbId, RatingSourceName, cancellationToken);
+    }
+}
+
+internal static class OmdbFetcher
+{
+    // A single OMDb response carries IMDb, Rotten Tomatoes and Metacritic all
+    // at once. The three rating providers each ask for one source, and the two
+    // configured on a library fire in parallel per item — so cache the parsed
+    // response per IMDb id and share it, turning up to 3 HTTP calls per movie
+    // into 1. This roughly halves consumption of the (small) OMDb daily quota.
+    private sealed class OmdbData
+    {
+        public Dictionary<string, string> RatingsBySource { get; } = new(StringComparer.Ordinal);
+        public string? ImdbRating { get; set; }
+        public string? Metascore { get; set; }
+    }
+
+    private static readonly ConcurrentDictionary<string, Lazy<Task<OmdbData?>>> _cache = new();
+    private static readonly ConcurrentDictionary<string, DateTime> _cacheTime = new();
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
+
+    public static async Task<decimal?> FetchRatingCoreAsync(HttpClient httpClient, IServiceScopeFactory scopeFactory, string? imdbId, string sourceName, CancellationToken cancellationToken = default)
+    {
+        if (OmdbCircuitBreaker.IsBlocked || string.IsNullOrEmpty(imdbId)) return null;
+
+        var data = await GetOrFetchAsync(httpClient, scopeFactory, imdbId, cancellationToken);
+        if (data == null) return null;
+
+        if (data.RatingsBySource.TryGetValue(sourceName, out var value) && !string.IsNullOrEmpty(value))
+        {
+            return ParseRating(value);
+        }
+
+        if (sourceName == "Internet Movie Database" && !string.IsNullOrEmpty(data.ImdbRating) && data.ImdbRating != "N/A")
+        {
+            return ParseRating(data.ImdbRating);
+        }
+
+        if (sourceName == "Metacritic" && !string.IsNullOrEmpty(data.Metascore) && data.Metascore != "N/A")
+        {
+            return ParseRating(data.Metascore);
+        }
+
+        return null;
+    }
+
+    private static Task<OmdbData?> GetOrFetchAsync(HttpClient httpClient, IServiceScopeFactory scopeFactory, string imdbId, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        if (_cacheTime.TryGetValue(imdbId, out var fetchedAt) && now - fetchedAt > CacheTtl)
+        {
+            _cache.TryRemove(imdbId, out _);
+            _cacheTime.TryRemove(imdbId, out _);
+        }
+
+        var lazy = _cache.GetOrAdd(imdbId, key =>
+        {
+            _cacheTime[key] = now;
+            return new Lazy<Task<OmdbData?>>(() => FetchAndParseAsync(httpClient, scopeFactory, key, cancellationToken));
+        });
+
+        return lazy.Value;
+    }
+
+    private static async Task<OmdbData?> FetchAndParseAsync(HttpClient httpClient, IServiceScopeFactory scopeFactory, string imdbId, CancellationToken cancellationToken)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
+
+        var apiKey = await settings.GetSettingAsync("omdb_imdb", "api_key") ?? await settings.GetSettingAsync("omdb_rotten_tomatoes", "api_key");
+        if (string.IsNullOrEmpty(apiKey)) return null;
+
+        var url = $"?i={imdbId}&apikey={apiKey}";
+        var response = await httpClient.GetAsync(url, cancellationToken);
+
+        if (!response.IsSuccessStatusCode) return null;
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+
+        if (root.TryGetProperty("Response", out var res) && res.GetString() == "False")
+        {
+            if (root.TryGetProperty("Error", out var err) && err.GetString() == "Request limit reached!")
+            {
+                OmdbCircuitBreaker.BlockedUntil = DateTime.UtcNow.AddDays(1);
+                scope.ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("Omdb")
+                    .LogWarning("OMDb daily request limit reached; rating lookups are paused until {BlockedUntil:u}. Existing ratings are preserved. Use a higher-quota OMDb API key or wait for the quota to reset to fill the rest.", OmdbCircuitBreaker.BlockedUntil);
+            }
+            return null;
+        }
+
+        var data = new OmdbData();
+
+        if (root.TryGetProperty("Ratings", out var ratings) && ratings.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var rating in ratings.EnumerateArray())
+            {
+                var source = rating.TryGetProperty("Source", out var s) ? s.GetString() : null;
+                var value = rating.TryGetProperty("Value", out var v) ? v.GetString() : null;
+                if (!string.IsNullOrEmpty(source) && !string.IsNullOrEmpty(value))
+                {
+                    data.RatingsBySource[source] = value;
+                }
+            }
+        }
+
+        if (root.TryGetProperty("imdbRating", out var imdbRating) && imdbRating.ValueKind != JsonValueKind.Null)
+        {
+            data.ImdbRating = imdbRating.GetString();
+        }
+
+        if (root.TryGetProperty("Metascore", out var metascore) && metascore.ValueKind != JsonValueKind.Null)
+        {
+            data.Metascore = metascore.GetString();
+        }
+
+        return data;
+    }
+
+    private static decimal? ParseRating(string value)
+    {
+        value = value.Replace("%", "").Split('/')[0].Trim();
+        if (decimal.TryParse(value, out var result)) return result;
+        return null;
+    }
+}
