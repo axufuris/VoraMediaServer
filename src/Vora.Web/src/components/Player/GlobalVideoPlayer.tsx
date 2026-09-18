@@ -11,6 +11,7 @@ import type Hls from 'hls.js';
 import { loadHls } from '../../utils/loadHls';
 import { useDialog } from '../../dialogs';
 import { useAutoHideControls } from './Controls/useAutoHideControls';
+import { useUpNextEnding } from './useUpNextEnding';
 import { useFullscreen } from './Controls/useFullscreen';
 import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeButton, CloseButton, EpisodeNavButton, SubtitlesButton } from './Controls/PlayerButtons';
 import PlayerSettingsPanel from './Panels/PlayerSettingsPanel';
@@ -182,9 +183,7 @@ export default function GlobalVideoPlayer() {
         return getEffectiveCapabilities(profileId, deviceId);
     }, []);
 
-    const [isEnding, setIsEnding] = useState(false);
     const [upNextData, setUpNextData] = useState<UpNextResultVM | null>(null);
-    const hasFetchedUpNext = useRef(false);
 
     const [hiddenCommercialId, setHiddenCommercialId] = useState<string | null>(null);
 
@@ -340,10 +339,7 @@ export default function GlobalVideoPlayer() {
                 const committedText = currentMedia.textSubtitleTrackId ?? null;
                 desiredTextSubRef.current = committedText;
                 setSelSub(committedText || currentMedia.subtitleTrackId || NoSubtitle);
-                setIsEnding(false);
             }, 0);
-
-            hasFetchedUpNext.current = true;
         }
     }, [currentMedia?.id, currentMedia?.videoTrackId, currentMedia?.audioTrackId, currentMedia?.subtitleTrackId, currentMedia?.textSubtitleTrackId, currentMedia?.isExtra, currentMedia?.playbackContextType, currentMedia?.playbackContextId, serverId]);
 
@@ -423,26 +419,24 @@ export default function GlobalVideoPlayer() {
         };
     }, [sessionId, detachSideloadedTrack]);
 
-    useEffect(() => {
-        if (!currentMedia || isMinimized || duration === 0) return;
+    const refreshUpNext = useCallback(() => {
+        if (!currentMedia) return;
+        mediaService.getUpNext(currentMedia.id, currentMedia.playbackContextType, currentMedia.playbackContextId, serverId)
+            .then(setUpNextData)
+            .catch(console.error);
+    }, [currentMedia, serverId]);
 
-        if (currentMedia.playbackContextType === 'Dvr' || currentMedia.playbackContextType === 'LiveTv') return;
-
-        const timeRemaining = duration - currentTime;
-
-        if (timeRemaining <= 15 && timeRemaining > 0 && !hasFetchedUpNext.current) {
-            hasFetchedUpNext.current = true;
-            window.setTimeout(() => setIsEnding(true), 0);
-            mediaService.getUpNext(currentMedia.id, currentMedia.playbackContextType, currentMedia.playbackContextId, serverId)
-                .then(setUpNextData)
-                .catch(console.error);
-        }
-
-        if (timeRemaining > 15 && isEnding) {
-            hasFetchedUpNext.current = false;
-            window.setTimeout(() => setIsEnding(false), 0);
-        }
-    }, [currentTime, duration, currentMedia, isMinimized, isEnding, serverId]);
+    const isEnding = useUpNextEnding({
+        mediaId: currentMedia?.id,
+        eligible: !!currentMedia
+            && !isMinimized
+            && !currentMedia.isExtra
+            && currentMedia.playbackContextType !== 'Dvr'
+            && currentMedia.playbackContextType !== 'LiveTv',
+        currentTime,
+        duration,
+        onEnterEnding: refreshUpNext,
+    });
 
     const showControls = useAutoHideControls({
         isMinimized,
