@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { discoveryService, type DiscoveryItemDetails, type Trailer, type Theater } from '../../../api/Discovery/discoveryService';
+import { discoveryService, type DiscoveryItemDetails, type DiscoveryRequestStatus, type Trailer, type Theater } from '../../../api/Discovery/discoveryService';
 import { useDialog } from '../../../dialogs';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import CastRow from '../../../components/Client/Primitives/CastRow';
@@ -33,7 +33,7 @@ export default function DiscoveryDetailsPage() {
 
     const profileToken = localStorage.getItem(StorageKeys.profileToken);
     const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
-    const [requestStatus, setRequestStatus] = useState<number>(-1);
+    const [requestStatus, setRequestStatus] = useState<DiscoveryRequestStatus | null>(null);
 
     useEffect(() => {
         if (!providerId || !type || !externalId) return;
@@ -169,9 +169,9 @@ export default function DiscoveryDetailsPage() {
                             {details.contentRating && <HeroChip>{details.contentRating}</HeroChip>}
                             {details.inLibrary && <HeroChip tone="accent">In your library</HeroChip>}
                             {details.nextAirDate && <HeroChip>Next air date {new Date(details.nextAirDate).toLocaleDateString()}</HeroChip>}
-                            {requestStatus === 0 && <HeroChip>Request pending</HeroChip>}
-                            {requestStatus === 3 && <HeroChip>Downloading</HeroChip>}
-                            {requestStatus === 4 && <HeroChip tone="accent">Available in library</HeroChip>}
+                            {requestStatus === 'Pending' && <HeroChip>Request pending</HeroChip>}
+                            {requestStatus === 'Processing' && <HeroChip>Downloading</HeroChip>}
+                            {requestStatus === 'Available' && <HeroChip tone="accent">Available in library</HeroChip>}
                         </>
                     )}
                     ratings={details.rating != null && details.rating > 0

@@ -12,6 +12,7 @@ import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { discoveryTarget } from '../../../utils/discoveryNavigation';
+import { watchlistKey } from '../../../utils/watchlistKey';
 
 interface DiscoveryPageProps {
     embedded?: boolean;
@@ -52,13 +53,13 @@ export default function DiscoveryPage({ embedded = false }: DiscoveryPageProps =
                         ...c,
                         serverId,
                         serverName: serverNameStr,
-                        uniqueId: `${serverId || 'global'}_${c.providerId}_${c.rowId}`,
+                        uniqueId: `${c.providerId}_${c.rowId}`,
                     }));
                 setConfigs(mappedConfigs);
 
                 if (activeProfileId) {
                     const wItems = await watchlistService.getWatchlist(serverId);
-                    setWatchlistIds(new Set(wItems.map(i => i.externalId)));
+                    setWatchlistIds(new Set(wItems.map(i => watchlistKey(i.providerId, i.externalId))));
                 }
             } catch (error) {
                 console.error('Failed to load discovery data', error);
@@ -245,7 +246,7 @@ function DiscoveryRow({ config, serverId, watchlistIds }: { config: DiscoveryRow
             onMore={() => navigate(serverId ? `/server/${serverId}/discovery/${config.providerId}/row/${config.rowId}` : `/discovery/${config.providerId}/row/${config.rowId}`)}
         >
             {items.map(item => {
-                const inWatchlist = watchlistIds.has(item.externalId);
+                const inWatchlist = watchlistIds.has(watchlistKey(item.providerId, item.externalId));
                 const statusBadge = (item.inLibrary || item.requestStatus)
                     ? <DiscoveryStatusBadge inLibrary={item.inLibrary} requestStatus={item.requestStatus} />
                     : undefined;

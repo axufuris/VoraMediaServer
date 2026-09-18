@@ -22,7 +22,16 @@ export default function ProvidersTab({ activeProfileId, serverId, onSaved }: { a
                 const provs = await iptvClientService.getPlaylists(userId, activeProfileId, serverId);
                 setProviders(provs);
                 const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
-                const savedIptv = localStorage.getItem(StorageKeys.iptvPrefs(activeProfileId, deviceId));
+                let savedIptv = localStorage.getItem(StorageKeys.iptvPrefs(activeProfileId, deviceId));
+                if (!savedIptv || savedIptv === '[]') {
+                    const serverIptv = await profileDeviceSettingsService
+                        .getIptvPrefs(activeProfileId, deviceId, serverId)
+                        .catch(() => null);
+                    if (serverIptv && serverIptv !== '[]' && serverIptv !== '{}') {
+                        savedIptv = serverIptv;
+                        localStorage.setItem(StorageKeys.iptvPrefs(activeProfileId, deviceId), serverIptv);
+                    }
+                }
 
                 let parsedIptv = {
                     enabledProviders: [] as string[],

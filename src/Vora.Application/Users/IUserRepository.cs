@@ -53,7 +53,7 @@ public interface IUserRepository
     Task<string?> GetProfileDeviceNavPrefsAsync(Guid profileId, string deviceId);
     Task SaveProfileDeviceNavPrefsAsync(Guid profileId, string deviceId, string navPrefsJson);
     Task<string?> GetProfileDevicePlaybackPrefsAsync(Guid profileId, string deviceId);
-    Task SaveProfileDeviceSettingsAsync(Guid profileId, string deviceId, string playbackPrefs, string iptvPrefs);
+    Task SaveProfileDeviceSettingsAsync(Guid profileId, string deviceId, string? playbackPrefs, string? iptvPrefs);
     Task<string?> GetProfileDeviceDiscoveryLayoutAsync(Guid profileId, string deviceId);
     Task SaveProfileDeviceDiscoveryLayoutAsync(Guid profileId, string deviceId, string layoutJson);
     Task<string?> GetProfileDeviceHomeLayoutAsync(Guid profileId, string deviceId);

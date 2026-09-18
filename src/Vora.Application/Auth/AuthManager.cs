@@ -44,7 +44,7 @@ public interface IAuthManager
     Task<(bool IsClaimed, RegistrationMode Mode)> GetSetupStatusAsync();
     Task<AuthResponseDto> ClaimServerAsync(string email, string password, string displayName);
     Task<AuthResponseDto?> LoginAsync(string email, string password);
-    Task<string?> GenerateProfileTokenAsync(Guid accountId, Guid profileId);
+    Task<ProfileTokenResult> GenerateProfileTokenAsync(Guid accountId, Guid profileId, string? pin = null);
     Task<AuthResponseDto> RegisterAsync(string email, string password, string displayName, string? secretCode, string? inviteToken = null);
     Task<string> IssueRefreshTokenAsync(Guid accountId, string? deviceId);
     Task<AuthResponseDto?> RefreshAsync(string refreshToken, Guid? profileId, string? deviceId);
@@ -257,12 +257,17 @@ public class AuthManager(
         }
     }
 
-    public async Task<string?> GenerateProfileTokenAsync(Guid accountId, Guid profileId)
+    public async Task<ProfileTokenResult> GenerateProfileTokenAsync(Guid accountId, Guid profileId, string? pin = null)
     {
         var profile = await repository.GetProfileWithUserAsync(accountId, profileId);
         if (profile == null)
         {
-            return null;
+            return ProfileTokenResult.NotFound();
+        }
+
+        if (ProfilePin.IsSet(profile.PinHash) && !ProfilePin.Verify(profile.PinHash, pin))
+        {
+            return ProfileTokenResult.PinRejected(string.IsNullOrEmpty(pin));
         }
 
         var userAccount = profile.User;
@@ -306,7 +311,7 @@ public class AuthManager(
             claims.AddRange(profile.AllowedMusicRatings.Select(r => new Claim("allowedMusicRating", r)));
         }
 
-        return CreateToken(claims, TimeSpan.FromDays(ProfileTokenLifetimeDays));
+        return ProfileTokenResult.Issued(CreateToken(claims, TimeSpan.FromDays(ProfileTokenLifetimeDays)));
     }
 
     public async Task<string> IssueRefreshTokenAsync(Guid accountId, string? deviceId)
@@ -380,7 +385,7 @@ public class AuthManager(
         response.RefreshToken = newToken;
         if (profileId.HasValue)
         {
-            response.ProfileToken = await GenerateProfileTokenAsync(user.Id, profileId.Value);
+            response.ProfileToken = (await GenerateProfileTokenAsync(user.Id, profileId.Value)).Token;
         }
 
         return response;

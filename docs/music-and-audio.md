@@ -82,6 +82,14 @@ No persistence — restart wipes it.
 
 ## Audio playback pipeline
 
+**Play** — `POST /api/music/tracks/{id}/play` returns `{ url, container, contentType }`.
+The URL carries a signed token and no file extension, so the container (`mp3`,
+`flac`, `m4a`, …) and its MIME type are stated up front: a client whose audio
+player needs the format before it opens the stream (Roku's `Audio` node) would
+otherwise have to fetch the first bytes of every track to sniff it. The values
+describe what the stream will actually be — a transcode request reports `mp3`,
+a direct play reports the file's own container.
+
 **Streaming** — `GET /api/music/tracks/{id}/stream?quality=`:
 
 - No `quality` param → original file, range-supported direct serve.

@@ -99,7 +99,10 @@ public static class MusicEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
-        group.MapGet("/tracks/{trackId:guid}/lyrics", GetTrackLyricsAsync).RequireAuthorization();
+        group.MapGet("/tracks/{trackId:guid}/lyrics", GetTrackLyricsAsync)
+            .RequireAuthorization()
+            .WithName("GetTrackLyrics")
+            .Produces<TrackLyricsVM>(StatusCodes.Status200OK);
 
         group.MapPost("/tracks/{trackId:guid}/played", RecordTrackPlayAsync).RequireAuthorization();
         group.MapPost("/tracks/{trackId:guid}/now-playing", UpdateNowPlayingAsync).RequireAuthorization();
@@ -452,13 +455,13 @@ public static class MusicEndpoints
     {
         var lyrics = await manager.GetTrackLyricsAsync(trackId, BuildFilter(user), cancellationToken);
         if (lyrics == null) return Results.NotFound();
-        return Results.Ok(new
+        return Results.Ok(new TrackLyricsVM
         {
-            plainLyrics = lyrics.PlainLyrics,
-            syncedLyrics = lyrics.SyncedLyrics,
-            isSynced = lyrics.IsSynced,
-            providerName = lyrics.ProviderName,
-            sourceUrl = lyrics.SourceUrl
+            PlainLyrics = lyrics.PlainLyrics,
+            SyncedLyrics = lyrics.SyncedLyrics,
+            IsSynced = lyrics.IsSynced,
+            ProviderName = lyrics.ProviderName,
+            SourceUrl = lyrics.SourceUrl
         });
     }
 
@@ -803,18 +806,51 @@ public static class MusicEndpoints
         public string? SeedGenre { get; set; }
     }
 
-    private static async Task<IResult> GetMusicStreamUrlAsync(Guid trackId, [FromQuery] string? quality, ClaimsPrincipal user, IMusicManager manager, IStreamingTokenSigner signer)
+    private static async Task<IResult> GetMusicStreamUrlAsync(Guid trackId, [FromQuery] string? quality, ClaimsPrincipal user, IMusicManager manager, IStreamingTokenSigner signer, IAudioTranscodeService audioTranscodeService)
     {
         var path = await manager.GetTrackFilePathAsync(trackId, BuildFilter(user));
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return Results.NotFound();
 
         var token = signer.Sign(StreamTokenScope, trackId.ToString(), StreamTokenTtl);
         var qualityParam = !string.IsNullOrWhiteSpace(quality) ? $"&quality={Uri.EscapeDataString(quality)}" : string.Empty;
+        var transcoding = ResolveAudioBitrate(quality) > 0;
+        var container = transcoding ? TranscodedContainer : DirectContainer(path);
+
         return Results.Ok(new MusicStreamUrlResponse
         {
             Url = $"/api/music/tracks/{trackId}/stream?t={token}{qualityParam}",
+            Container = container,
+            ContentType = transcoding ? audioTranscodeService.ResolveContentType(container) : AudioContentType(container)
         });
     }
+
+    private const string TranscodedContainer = "mp3";
+
+    private static string AudioContentType(string container) => container switch
+    {
+        "mp3" => "audio/mpeg",
+        "flac" => "audio/flac",
+        "m4a" => "audio/mp4",
+        "aac" => "audio/aac",
+        "ogg" => "audio/ogg",
+        "opus" => "audio/opus",
+        "wav" => "audio/wav",
+        "wma" => "audio/x-ms-wma",
+        _ => "application/octet-stream"
+    };
+
+    private static string DirectContainer(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".mp3" => "mp3",
+        ".flac" => "flac",
+        ".m4a" => "m4a",
+        ".aac" => "aac",
+        ".ogg" => "ogg",
+        ".opus" => "opus",
+        ".wav" => "wav",
+        ".wma" => "wma",
+        _ => string.Empty
+    };
 
     private static async Task<IResult> StreamTrackAsync(Guid trackId, [FromQuery] string? t, [FromQuery] string? quality, IMusicManager manager, IAudioTranscodeService audioTranscodeService, IStreamingTokenSigner signer, HttpContext httpContext)
     {
@@ -829,22 +865,10 @@ public static class MusicEndpoints
         var bitrate = ResolveAudioBitrate(quality);
         if (bitrate <= 0)
         {
-            var directContentType = Path.GetExtension(path).ToLowerInvariant() switch
-            {
-                ".mp3" => "audio/mpeg",
-                ".flac" => "audio/flac",
-                ".m4a" => "audio/mp4",
-                ".aac" => "audio/aac",
-                ".ogg" => "audio/ogg",
-                ".opus" => "audio/opus",
-                ".wav" => "audio/wav",
-                ".wma" => "audio/x-ms-wma",
-                _ => "application/octet-stream"
-            };
-            return Results.File(path, directContentType, enableRangeProcessing: true);
+            return Results.File(path, AudioContentType(DirectContainer(path)), enableRangeProcessing: true);
         }
 
-        const string targetCodec = "mp3";
+        const string targetCodec = TranscodedContainer;
         var contentType = audioTranscodeService.ResolveContentType(targetCodec);
         var ct = httpContext.RequestAborted;
         return Results.Stream(output => audioTranscodeService.WriteTranscodedAudioAsync(path, bitrate, targetCodec, output, ct), contentType: contentType);

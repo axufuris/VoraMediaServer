@@ -262,11 +262,11 @@ public class UserRepository(VoraDbContext context) : IUserRepository
     public Task<string?> GetProfileDevicePlaybackPrefsAsync(Guid profileId, string deviceId) =>
         ReadProfileDeviceFieldAsync(profileId, deviceId, s => s.PlaybackPrefs);
 
-    public Task SaveProfileDeviceSettingsAsync(Guid profileId, string deviceId, string playbackPrefs, string iptvPrefs) =>
+    public Task SaveProfileDeviceSettingsAsync(Guid profileId, string deviceId, string? playbackPrefs, string? iptvPrefs) =>
         UpsertProfileDeviceSettingAsync(profileId, deviceId, s =>
         {
-            s.PlaybackPrefs = playbackPrefs;
-            s.IptvPrefsJson = iptvPrefs;
+            if (playbackPrefs != null) s.PlaybackPrefs = playbackPrefs;
+            if (iptvPrefs != null) s.IptvPrefsJson = iptvPrefs;
         });
 
     public Task<string?> GetProfileDeviceDiscoveryLayoutAsync(Guid profileId, string deviceId) =>

@@ -6,7 +6,7 @@ import { authService } from '../../api/Auth/authService';
 import { useDialog } from '../../dialogs';
 import { StorageKeys, decodeJwtPayload } from '../../utils/storageKeys';
 
-import { profileService, type UserProfileVM } from '../../api/Users/profileService';
+import { type UserProfileVM } from '../../api/Users/profileService';
 import { type UserVM, userService } from '../../api/Users/userService';
 
 const resolveUserIdFromPayload = (payload: ReturnType<typeof decodeJwtPayload>): string | null => {
@@ -179,8 +179,7 @@ export default function ServerManagerModal({
         if (!selectedProfile || !tempAccountData) return;
         setIsLoading(true);
         try {
-            await profileService.validatePinWithToken(tempAccountData.url, tempAccountData.accountToken, selectedProfile.id, pin);
-            await finalizeConnection(selectedProfile.id);
+            await finalizeConnection(selectedProfile.id, pin);
         } catch {
             setPinError(true);
             setPin('');
@@ -189,7 +188,7 @@ export default function ServerManagerModal({
         }
     };
 
-    const finalizeConnection = async (profileId: string) => {
+    const finalizeConnection = async (profileId: string, pin?: string | null) => {
         if (!tempAccountData || !userAccount) return;
         setIsLoading(true);
         try {
@@ -197,7 +196,8 @@ export default function ServerManagerModal({
                 tempAccountData.url,
                 tempAccountData.accountToken,
                 tempAccountData.userId,
-                profileId
+                profileId,
+                pin
             );
 
             const decodedToken = decodeJwtPayload(profileToken);

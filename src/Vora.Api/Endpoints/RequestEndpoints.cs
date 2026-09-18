@@ -56,7 +56,7 @@ public static class RequestEndpoints
     private static async Task<IResult> GetRequestStatusAsync([FromQuery] string externalId, [FromQuery] string type, IRequestManager manager)
     {
         var status = await manager.GetRequestStatusAsync(externalId, type);
-        return Results.Ok(new RequestStatusVM { Status = status ?? -1 });
+        return Results.Ok(new RequestStatusVM { Status = status });
     }
 
     private static async Task<IResult> ApproveRequestAsync(Guid id, [FromQuery] int? profileId, IRequestManager manager)

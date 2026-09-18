@@ -84,6 +84,7 @@ public static class AuthEndpoints
         group.MapPost("/exchange-profile-token", ExchangeProfileTokenAsync)
             .WithName("ExchangeProfileToken")
             .Produces<ExchangeProfileTokenResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
             .RequireAuthorization()
             .RequireRateLimiting(VoraRateLimitPolicies.AuthBurst);
         group.MapPost("/forgot-password", RequestPasswordResetAsync)
@@ -191,7 +192,7 @@ public static class AuthEndpoints
     private static string? ReadDeviceId(HttpContext httpContext) =>
         httpContext.Request.Headers["X-Vora-Device-Id"].FirstOrDefault();
 
-    private static async Task<IResult> ExchangeProfileTokenAsync([FromQuery] Guid accountId, [FromQuery] Guid profileId, ClaimsPrincipal user, IAuthManager manager)
+    private static async Task<IResult> ExchangeProfileTokenAsync([FromQuery] Guid accountId, [FromQuery] Guid profileId, [FromBody] ExchangeProfileTokenRequest? request, ClaimsPrincipal user, IAuthManager manager)
     {
         var callerAccountId = user.GetAccountId();
         if (callerAccountId == null || callerAccountId.Value != accountId)
@@ -199,10 +200,23 @@ public static class AuthEndpoints
             return Results.Forbid();
         }
 
-        var token = await manager.GenerateProfileTokenAsync(callerAccountId.Value, profileId);
-        return token != null
-            ? Results.Ok(new ExchangeProfileTokenResponse { Token = token })
-            : Results.Unauthorized();
+        var result = await manager.GenerateProfileTokenAsync(callerAccountId.Value, profileId, request?.Pin);
+        if (result.Token != null)
+        {
+            return Results.Ok(new ExchangeProfileTokenResponse { Token = result.Token });
+        }
+
+        if (result.PinRequired)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "PIN required", detail: "This profile is protected by a PIN.");
+        }
+
+        if (result.PinIncorrect)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Incorrect PIN", detail: "That PIN does not match this profile.");
+        }
+
+        return Results.Unauthorized();
     }
 
 

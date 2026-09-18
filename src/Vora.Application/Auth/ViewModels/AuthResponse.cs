@@ -6,6 +6,11 @@ namespace Vora.Application.Auth.ViewModels;
 // has to be preserved for the web client. AuthResponseDto already covers
 // login/register/claim, so those endpoints reuse it directly instead.
 
+public class ExchangeProfileTokenRequest
+{
+    public string? Pin { get; set; }
+}
+
 public class ExchangeProfileTokenResponse
 {
     public required string Token { get; set; }

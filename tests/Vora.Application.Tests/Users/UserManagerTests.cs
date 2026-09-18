@@ -98,6 +98,7 @@ public class UserManagerTests
             hasAllIptvAccess: false, allowedIptvPlaylists: new List<Guid>(),
             schedules: new List<ProfileScheduleVM>(),
             canAddCustomPodcastFeeds: false,
+            canRecordLiveTv: false,
             showtimesLocation: null);
 
         id.Should().NotBe(Guid.Empty);
@@ -120,7 +121,7 @@ public class UserManagerTests
             Guid.NewGuid(), "Kid", null, pin: "1234",
             new List<string>(), new List<string>(), new List<string>(),
             true, false, new List<Guid>(), true, new List<Guid>(),
-            new List<ProfileScheduleVM>(), true, null);
+            new List<ProfileScheduleVM>(), true, false, null);
 
         captured.Should().NotBeNull();
         captured!.PinHash.Should().StartWith("$2");
@@ -137,7 +138,7 @@ public class UserManagerTests
             Guid.NewGuid(), "Kid", null, pin: "   ",
             new List<string>(), new List<string>(), new List<string>(),
             true, false, new List<Guid>(), true, new List<Guid>(),
-            new List<ProfileScheduleVM>(), true, null);
+            new List<ProfileScheduleVM>(), true, false, null);
 
         captured!.PinHash.Should().BeNull();
     }
@@ -152,7 +153,7 @@ public class UserManagerTests
             Guid.NewGuid(), "Andy", null, null,
             new List<string>(), new List<string>(), new List<string>(),
             true, false, new List<Guid>(), true, new List<Guid>(),
-            new List<ProfileScheduleVM>(), true,
+            new List<ProfileScheduleVM>(), true, false,
             showtimesLocation: "  Seattle, WA  ");
 
         captured!.ShowtimesLocation.Should().Be("Seattle, WA");
@@ -168,7 +169,7 @@ public class UserManagerTests
             Guid.NewGuid(), "Andy", null, null,
             new List<string>(), new List<string>(), new List<string>(),
             true, false, new List<Guid>(), true, new List<Guid>(),
-            new List<ProfileScheduleVM>(), true,
+            new List<ProfileScheduleVM>(), true, false,
             showtimesLocation: "   ");
 
         captured!.ShowtimesLocation.Should().BeNull();

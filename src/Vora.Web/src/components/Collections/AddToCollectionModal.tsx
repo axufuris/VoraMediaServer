@@ -31,7 +31,7 @@ export default function AddToCollectionModal({
         if (isOpen) {
             const fetchCollections = () => {
                 setLoading(true);
-                const fetchPromise = mediaType === 'Episode'
+                const fetchPromise = mediaType === 'Episode' || !libraryId
                     ? collectionService.getGlobalCollections(serverId)
                     : collectionService.getLibraryCollections(libraryId, serverId);
 
@@ -67,8 +67,13 @@ export default function AddToCollectionModal({
             }
             onSaved();
         } catch {
+            setCheckedIds(prev => {
+                const reverted = new Set(prev);
+                if (isCurrentlyChecked) reverted.add(collectionId);
+                else reverted.delete(collectionId);
+                return reverted;
+            });
             await dialog.alert('Failed to update collection.');
-            setCheckedIds(new Set(initialCollectionIds));
         }
     };
 

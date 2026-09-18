@@ -29,12 +29,8 @@ export default function ProfileSelectionPage() {
 
     const authenticateProfile = useCallback(async (profileId: string, enteredPin: string | null, isAutoLoginFlag = false, prefetchedUser: UserVM | null = null) => {
         try {
-            if (enteredPin) {
-                await profileService.validatePin(profileId, enteredPin);
-            }
-
             const userId = sessionStorage.getItem('pending_user_id') || localStorage.getItem(StorageKeys.userId)!;
-            const profileToken = await authService.exchangeProfileToken(userId, profileId);
+            const profileToken = await authService.exchangeProfileToken(userId, profileId, enteredPin);
 
             let fullUser = prefetchedUser;
             if (!fullUser) fullUser = await userService.getUserAccount(userId);

@@ -26,6 +26,7 @@ public class CreateProfileDto
     public bool HasAllIptvAccess { get; set; } = true;
     public List<Guid> AllowedIptvPlaylistIds { get; set; } = new();
     public bool CanAddCustomPodcastFeeds { get; set; } = true;
+    public bool CanRecordLiveTv { get; set; }
     public string? ShowtimesLocation { get; set; }
 }
 
@@ -38,10 +39,15 @@ public class ValidatePinDto
     public required string Pin { get; set; }
 }
 
+public class ValidatePinResponse
+{
+    public bool Valid { get; set; }
+}
+
 public class UpdateClientSettingsDto
 {
-    public required string PlaybackPrefs { get; set; }
-    public required string IptvPrefsJson { get; set; }
+    public string? PlaybackPrefs { get; set; }
+    public string? IptvPrefsJson { get; set; }
 }
 
 public class UpdateIptvPrefsDto
@@ -131,8 +137,8 @@ public static class ProfileEndpoints
         group.MapPost("/profiles/{profileId:guid}/validate-pin", ValidatePinAsync)
             .WithName("ValidateProfilePin")
             .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict)
-            .Produces(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status401Unauthorized);
+            .Produces<ValidatePinResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
         group.MapPut("/profiles/{profileId:guid}", UpdateProfileAsync)
             .WithName("UpdateProfile")
@@ -234,6 +240,7 @@ public static class ProfileEndpoints
             request.AllowedIptvPlaylistIds,
             request.AccessSchedules,
             request.CanAddCustomPodcastFeeds,
+            request.CanRecordLiveTv,
             request.ShowtimesLocation);
 
         return Results.Created($"/api/users/{userId}", new { ProfileId = profileId });
@@ -242,7 +249,9 @@ public static class ProfileEndpoints
     private static async Task<IResult> ValidatePinAsync(Guid profileId, [FromBody] ValidatePinDto request, IUserManager manager)
     {
         var isValid = await manager.ValidateProfilePinAsync(profileId, request.Pin);
-        return isValid ? Results.Ok(new { Success = true }) : Results.Unauthorized();
+        return isValid
+            ? Results.Ok(new ValidatePinResponse { Valid = true })
+            : Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Incorrect PIN", detail: "That PIN does not match this profile.");
     }
 
     private static async Task<IResult> UpdateProfileAsync(Guid profileId, [FromBody] UpdateProfileDto request, IUserManager manager)
@@ -262,6 +271,7 @@ public static class ProfileEndpoints
             request.AllowedIptvPlaylistIds,
             request.AccessSchedules,
             request.CanAddCustomPodcastFeeds,
+            request.CanRecordLiveTv,
             request.ShowtimesLocation);
         return Results.NoContent();
     }

@@ -25,21 +25,27 @@ export default function SearchPage() {
         const fetchResults = async () => {
             setIsLoading(true);
             try {
-                const [localData, discData] = await Promise.all([
+                const [local, discovery] = await Promise.allSettled([
                     searchService.searchAllServers(query),
                     discoveryService.search(query, serverId)
                 ]);
 
+                if (local.status === 'rejected') {
+                    console.error('Local search failed', local.reason);
+                }
+                const localData = local.status === 'fulfilled' ? local.value : null;
                 setResults(localData);
 
-                const localTitles = new Set([
-                    ...localData.movies.map(m => m.title.toLowerCase()),
-                    ...localData.tvShows.map(s => s.title.toLowerCase())
-                ]);
-
-                setDiscoveryResults(discData.filter(d => !localTitles.has(d.title.toLowerCase())));
-            } catch {
-                console.error("Failed to fetch search results");
+                if (discovery.status === 'rejected') {
+                    console.error('Discovery search failed', discovery.reason);
+                    setDiscoveryResults([]);
+                } else {
+                    const localTitles = new Set([
+                        ...(localData?.movies ?? []).map(m => m.title.toLowerCase()),
+                        ...(localData?.tvShows ?? []).map(s => s.title.toLowerCase())
+                    ]);
+                    setDiscoveryResults(discovery.value.filter(d => !localTitles.has(d.title.toLowerCase())));
+                }
             } finally {
                 setIsLoading(false);
             }
