@@ -42,8 +42,12 @@ export const authService = {
         return response.data;
     },
 
-    exchangeProfileToken: async (accountId: string, profileId: string, serverId?: string): Promise<string> => {
-        const response = await apiClient.post<{ token: string }>(`/auth/exchange-profile-token?accountId=${accountId}&profileId=${profileId}`, null, { serverId });
+    exchangeProfileToken: async (accountId: string, profileId: string, pin?: string | null, serverId?: string): Promise<string> => {
+        const response = await apiClient.post<{ token: string }>(
+            `/auth/exchange-profile-token?accountId=${accountId}&profileId=${profileId}`,
+            { pin: pin ?? null },
+            { serverId },
+        );
         return response.data.token;
     },
 
@@ -70,9 +74,12 @@ export const authService = {
         return response.data;
     },
 
-    exchangeProfileTokenWithToken: async (baseUrl: string, accountToken: string, accountId: string, profileId: string): Promise<string> => {
+    exchangeProfileTokenWithToken: async (baseUrl: string, accountToken: string, accountId: string, profileId: string, pin?: string | null): Promise<string> => {
         const client = createDirectClient(baseUrl, accountToken);
-        const response = await client.post<{ token: string }>(`/auth/exchange-profile-token?accountId=${accountId}&profileId=${profileId}`, null);
+        const response = await client.post<{ token: string }>(
+            `/auth/exchange-profile-token?accountId=${accountId}&profileId=${profileId}`,
+            { pin: pin ?? null },
+        );
         return response.data.token;
     },
 

@@ -26,7 +26,7 @@ public interface IRequestManager
     Task<IEnumerable<ProviderOptionDto>> GetProviderOptionsAsync(string providerId, string optionType, string host, int port, bool useSsl, string urlBase, string apiKey, CancellationToken cancellationToken = default);
     Task DeleteRequestAsync(Guid id);
     Task ResolveRequestAsync(string externalId, string type, Guid? mediaItemId = null);
-    Task<int?> GetRequestStatusAsync(string externalId, string type);
+    Task<RequestStatus?> GetRequestStatusAsync(string externalId, string type);
 }
 
 public class RequestManager : IRequestManager
@@ -247,9 +247,9 @@ public class RequestManager : IRequestManager
         }
     }
 
-    public async Task<int?> GetRequestStatusAsync(string externalId, string type)
+    public async Task<RequestStatus?> GetRequestStatusAsync(string externalId, string type)
     {
         var request = await _requestRepo.GetRequestAsync(externalId, type);
-        return request != null ? (int)request.Status : null;
+        return request?.Status;
     }
 }

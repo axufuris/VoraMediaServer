@@ -12,9 +12,9 @@ public interface IUserManager
     Task<List<UserVM>> GetAllUsersAsync();
     Task<UserVM?> GetUserAccountAsync(Guid userId);
     Task<bool> ValidateProfilePinAsync(Guid profileId, string pin);
-    Task<Guid> CreateManagedProfileAsync(Guid primaryUserId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, string? showtimesLocation);
+    Task<Guid> CreateManagedProfileAsync(Guid primaryUserId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, bool canRecordLiveTv, string? showtimesLocation);
     Task UpdateUserAccountAsync(Guid userId, Guid callingAccountId, bool callerIsAdmin, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null);
-    Task UpdateManagedProfileAsync(Guid profileId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, string? showtimesLocation);
+    Task UpdateManagedProfileAsync(Guid profileId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, bool canRecordLiveTv, string? showtimesLocation);
     Task DeleteManagedProfileAsync(Guid profileId);
     Task<bool> AccountOwnsProfileAsync(Guid accountId, Guid profileId);
     Task UpdateUserAccessAsync(Guid userId, bool hasAllLibraryAccess, List<Guid> allowedLibraries, bool canRequest, bool autoApprove, bool enableAiRecommendations, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, bool canRecordLiveTv, long dvrStorageQuotaBytes, bool canTimeshiftIptv, bool canAddCustomPodcastFeeds);
@@ -23,7 +23,7 @@ public interface IUserManager
     Task<string?> GetProfileDeviceNavPrefsAsync(Guid profileId, string deviceId);
     Task SaveProfileDeviceNavPrefsAsync(Guid profileId, string deviceId, string navPrefsJson);
     Task<string?> GetProfileDevicePlaybackPrefsAsync(Guid profileId, string deviceId);
-    Task SaveProfileDeviceSettingsAsync(Guid profileId, string deviceId, string playbackPrefs, string iptvPrefsJson);
+    Task SaveProfileDeviceSettingsAsync(Guid profileId, string deviceId, string? playbackPrefs, string? iptvPrefsJson);
     Task<string?> GetProfileDeviceDiscoveryLayoutAsync(Guid profileId, string deviceId);
     Task SaveProfileDeviceDiscoveryLayoutAsync(Guid profileId, string deviceId, string layoutJson);
     Task<string?> GetProfileDeviceHomeLayoutAsync(Guid profileId, string deviceId);
@@ -63,19 +63,7 @@ public class UserManager(
     public async Task<bool> ValidateProfilePinAsync(Guid profileId, string pin)
     {
         var dbPinHash = await repository.GetProjectedProfileByIdAsync(profileId, p => p.PinHash);
-        if (string.IsNullOrEmpty(dbPinHash))
-        {
-            return true;
-        }
-
-        if (dbPinHash.StartsWith("$2"))
-        {
-            return BCrypt.Net.BCrypt.Verify(pin, dbPinHash);
-        }
-
-        return CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(dbPinHash),
-            Encoding.UTF8.GetBytes(HashPin(pin)));
+        return ProfilePin.Verify(dbPinHash, pin);
     }
 
     public async Task<Guid> CreateManagedProfileAsync(
@@ -93,6 +81,7 @@ public class UserManager(
         List<Guid> allowedIptvPlaylists,
         List<ProfileScheduleVM> schedules,
         bool canAddCustomPodcastFeeds,
+        bool canRecordLiveTv,
         string? showtimesLocation)
     {
         var profile = new UserProfile
@@ -109,6 +98,7 @@ public class UserManager(
             HasAllIptvAccess = hasAllIptvAccess,
             AllowedIptvPlaylistIds = allowedIptvPlaylists ?? new List<Guid>(),
             CanAddCustomPodcastFeeds = canAddCustomPodcastFeeds,
+            CanRecordLiveTv = canRecordLiveTv,
             ShowtimesLocation = string.IsNullOrWhiteSpace(showtimesLocation) ? null : showtimesLocation.Trim()
         };
 
@@ -182,6 +172,7 @@ public class UserManager(
         List<Guid> allowedIptvPlaylists,
         List<ProfileScheduleVM> schedules,
         bool canAddCustomPodcastFeeds,
+        bool canRecordLiveTv,
         string? showtimesLocation)
     {
         var profile = await repository.GetProfileByIdAsync(profileId)
@@ -192,7 +183,7 @@ public class UserManager(
             imageService.DeleteImage(profile.ProfileImageUrl);
         }
 
-        ApplyProfileUpdates(profile, name, imageUrl, pin, allowedMovieRatings, allowedTvRatings, allowedMusicRatings, hasAllLibraryAccess, blockUnrated, allowedLibraries, hasAllIptvAccess, allowedIptvPlaylists, canAddCustomPodcastFeeds, showtimesLocation);
+        ApplyProfileUpdates(profile, name, imageUrl, pin, allowedMovieRatings, allowedTvRatings, allowedMusicRatings, hasAllLibraryAccess, blockUnrated, allowedLibraries, hasAllIptvAccess, allowedIptvPlaylists, canAddCustomPodcastFeeds, canRecordLiveTv, showtimesLocation);
         profile.SecurityStamp = Guid.NewGuid().ToString("N");
 
         try
@@ -293,7 +284,7 @@ public class UserManager(
     public Task<string?> GetProfileDevicePlaybackPrefsAsync(Guid profileId, string deviceId) =>
         repository.GetProfileDevicePlaybackPrefsAsync(profileId, deviceId);
 
-    public Task SaveProfileDeviceSettingsAsync(Guid profileId, string deviceId, string playbackPrefs, string iptvPrefsJson) =>
+    public Task SaveProfileDeviceSettingsAsync(Guid profileId, string deviceId, string? playbackPrefs, string? iptvPrefsJson) =>
         repository.SaveProfileDeviceSettingsAsync(profileId, deviceId, playbackPrefs, iptvPrefsJson);
 
     public Task<string?> GetProfileDeviceDiscoveryLayoutAsync(Guid profileId, string deviceId) =>
@@ -346,6 +337,7 @@ public class UserManager(
         bool hasAllIptvAccess,
         List<Guid> allowedIptvPlaylists,
         bool canAddCustomPodcastFeeds,
+        bool canRecordLiveTv,
         string? showtimesLocation)
     {
         profile.Name = name;
@@ -359,7 +351,11 @@ public class UserManager(
         profile.HasAllIptvAccess = hasAllIptvAccess;
         profile.AllowedIptvPlaylistIds = allowedIptvPlaylists ?? new List<Guid>();
         profile.CanAddCustomPodcastFeeds = canAddCustomPodcastFeeds;
-        profile.ShowtimesLocation = string.IsNullOrWhiteSpace(showtimesLocation) ? null : showtimesLocation.Trim();
+        profile.CanRecordLiveTv = canRecordLiveTv;
+        if (showtimesLocation != null)
+        {
+            profile.ShowtimesLocation = string.IsNullOrWhiteSpace(showtimesLocation) ? null : showtimesLocation.Trim();
+        }
 
         if (pin != null)
         {
@@ -426,9 +422,4 @@ public class UserManager(
         }
     }
 
-    private static string HashPin(string pin)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(pin));
-        return Convert.ToBase64String(bytes);
-    }
 }

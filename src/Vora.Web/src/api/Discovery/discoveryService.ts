@@ -114,8 +114,8 @@ export const discoveryService = {
         const response = await apiClient.get<DiscoveryItem[]>(`/discovery/search?q=${encodeURIComponent(query)}`, { serverId });
         return response.data;
     },
-    getRequestStatus: async (externalId: string, type: string, serverId?: string): Promise<number> => {
-        const response = await apiClient.get<{ status: number }>(`/requests/status?externalId=${externalId}&type=${type}`, { serverId });
-        return response.data.status;
+    getRequestStatus: async (externalId: string, type: string, serverId?: string): Promise<DiscoveryRequestStatus | null> => {
+        const response = await apiClient.get<{ status: DiscoveryRequestStatus | null }>(`/requests/status?externalId=${externalId}&type=${type}`, { serverId });
+        return response.data.status ?? null;
     },
 };

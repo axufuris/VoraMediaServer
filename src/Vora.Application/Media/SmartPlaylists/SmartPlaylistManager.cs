@@ -102,8 +102,8 @@ public sealed class SmartPlaylistManager : ISmartPlaylistManager
         var existing = await _repo.GetByIdAsync(id, profileId);
         if (existing == null) return null;
         existing.Name = request.Name?.Trim() ?? existing.Name;
-        existing.Description = request.Description;
-        existing.ArtworkUrl = request.ArtworkUrl;
+        existing.Description = request.Description ?? existing.Description;
+        existing.ArtworkUrl = request.ArtworkUrl ?? existing.ArtworkUrl;
         existing.MediaType = request.MediaType;
         existing.RulesJson = SerializeRules(request.Definition.Root);
         existing.Limit = request.Definition.Limit;

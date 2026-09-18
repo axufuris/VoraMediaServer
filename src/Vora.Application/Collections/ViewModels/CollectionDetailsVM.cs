@@ -32,7 +32,7 @@ public class CollectionDetailsVM
     public string? RulesJson { get; set; }
     public PlaylistMediaType? SmartMediaType { get; set; }
     public bool IsPlayed { get; set; }
-    public int? UnplayedItemcount { get; set; }
+    public int? UnplayedItemCount { get; set; }
     public List<string> LockedFields { get; set; } = new();
     public List<CollectionDetailsLibraryItemVM> Items { get; set; } = new();
 
@@ -64,7 +64,7 @@ public class CollectionDetailsVM
             RulesJson = c.RulesJson,
             SmartMediaType = c.SmartMediaType,
             IsPlayed = false,
-            UnplayedItemcount = null,
+            UnplayedItemCount = null,
             Items = c.Items.Select(item => new CollectionDetailsLibraryItemVM
             {
                 Id = item.Id,

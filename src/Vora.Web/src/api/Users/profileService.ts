@@ -1,4 +1,4 @@
-import { apiClient, createDirectClient } from '../client';
+import { apiClient } from '../client';
 
 export interface ProfileScheduleVM {
     dayOfWeek: number;
@@ -64,20 +64,6 @@ export const profileService = {
 
     deleteProfile: async (profileId: string, serverId?: string): Promise<void> => {
         await apiClient.delete(`/users/profiles/${profileId}`, { serverId });
-    },
-
-    validatePin: async (profileId: string, pin: string, serverId?: string): Promise<boolean> => {
-        try {
-            await apiClient.post(`/users/profiles/${profileId}/validate-pin`, { pin }, { serverId });
-            return true;
-        } catch {
-            return false;
-        }
-    },
-
-    validatePinWithToken: async (baseUrl: string, token: string, profileId: string, pin: string): Promise<void> => {
-        const client = createDirectClient(baseUrl, token);
-        await client.post(`/users/profiles/${profileId}/validate-pin`, { pin });
     },
 
     getMyShowtimesLocation: async (serverId?: string): Promise<ShowtimesLocationDto> => {

@@ -18,6 +18,25 @@ The `profile_token` payload includes claims read by `Vora.Api/Extensions/AuthExt
 
 **Always** use the `AuthExtensions` helpers. Never call `user.FindFirst("...")` directly.
 
+### The profile PIN is enforced at the exchange
+
+`POST /auth/exchange-profile-token` takes an optional body `{ "pin": "1234" }` and
+**verifies it server-side** for a profile that has one. A missing or wrong PIN is
+**403** (a ProblemDetails titled "PIN required" or "Incorrect PIN") — never 401,
+which every client reads as an expired session. `POST /users/profiles/{id}/validate-pin`
+still exists for a pre-flight check and now answers `200 { "valid": true }` or 403
+for the same reason.
+
+The PIN used to be checked only by whichever client asked, so anything talking to
+the API could take any profile, including an admin one, by skipping the check.
+`AuthManager.GenerateProfileTokenAsync` now returns a `ProfileTokenResult` saying
+whether the PIN was missing or wrong, and `ProfilePin.Verify` (BCrypt, with a
+fixed-time compare for pre-BCrypt hashes) is the one place that decides.
+
+`POST /auth/refresh` names a `profileId` chosen by the caller, so it enforces the
+PIN the same way: refreshing into a PIN-protected profile returns no
+`profileToken` and the client must ask for the PIN again.
+
 ## Auth pages
 
 - `pages/Auth/LoginPage.tsx` — Email + password only. Derives the server URL from `import.meta.env.VITE_API_BASE_URL` or falls back to `window.location.origin` and probes it on mount. **No** server URL input shown to the user. Renders a "Forgot password?" link only when `setup-status.emailEnabled` is true.

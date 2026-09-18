@@ -3,6 +3,17 @@ namespace Vora.Application.Media.ViewModels;
 public class MusicStreamUrlResponse
 {
     public string Url { get; set; } = string.Empty;
+    public string ContentType { get; set; } = string.Empty;
+    public string Container { get; set; } = string.Empty;
+}
+
+public class TrackLyricsVM
+{
+    public string? PlainLyrics { get; set; }
+    public string? SyncedLyrics { get; set; }
+    public bool IsSynced { get; set; }
+    public string? ProviderName { get; set; }
+    public string? SourceUrl { get; set; }
 }
 
 public class ArtistVM

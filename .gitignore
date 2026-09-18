@@ -410,3 +410,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Screenshots and scratch output from assistant sessions
+Claude outputs/

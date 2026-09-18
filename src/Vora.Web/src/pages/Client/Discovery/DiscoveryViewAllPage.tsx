@@ -9,6 +9,7 @@ import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { discoveryTarget } from '../../../utils/discoveryNavigation';
+import { watchlistKey } from '../../../utils/watchlistKey';
 
 export default function DiscoveryViewAllPage() {
     const { serverId, providerId, rowId } = useParams<{ serverId?: string, providerId: string, rowId: string }>();
@@ -43,7 +44,7 @@ export default function DiscoveryViewAllPage() {
 
                 if (activeProfileId) {
                     const wItems = await watchlistService.getWatchlist(serverId);
-                    setWatchlistIds(new Set(wItems.map(i => i.externalId)));
+                    setWatchlistIds(new Set(wItems.map(i => watchlistKey(i.providerId, i.externalId))));
                 }
             } catch (error) {
                 console.error('Failed to load initial data', error);
@@ -125,7 +126,7 @@ export default function DiscoveryViewAllPage() {
                                 imageUrl={item.posterUrl}
                                 title={item.title}
                                 captionLines={item.year ? [item.year.toString()] : []}
-                                inWatchlist={watchlistIds.has(item.externalId)}
+                                inWatchlist={watchlistIds.has(watchlistKey(item.providerId, item.externalId))}
                                 onClick={() => navigate(discoveryTarget({ ...item, providerId: providerId! }, serverId))}
                                 bottomLeftBadge={statusBadge}
                                 fill

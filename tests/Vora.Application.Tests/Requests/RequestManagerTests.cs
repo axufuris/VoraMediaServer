@@ -247,14 +247,14 @@ public class RequestManagerTests
     }
 
     [Fact]
-    public async Task GetRequestStatusAsync_returns_status_as_int_when_request_found()
+    public async Task GetRequestStatusAsync_returns_the_status_when_a_request_is_found()
     {
         _requests.GetRequestAsync("603", "Movie")
             .Returns(new MediaRequest { ExternalId = "603", Type = "Movie", Status = RequestStatus.Processing });
 
         var result = await _manager.GetRequestStatusAsync("603", "Movie");
 
-        result.Should().Be((int)RequestStatus.Processing);
+        result.Should().Be(RequestStatus.Processing);
     }
 
     [Fact]
