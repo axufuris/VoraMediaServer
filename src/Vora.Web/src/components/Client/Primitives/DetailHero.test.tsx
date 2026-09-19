@@ -88,6 +88,37 @@ describe('DetailHero', () => {
         expect(screen.queryByRole('button', { name: /back/i })).toBeNull();
     });
 
+    // An episode reads show, then episode, then the numbers that label it.
+    it('puts the episode title above its season and episode numbers', () => {
+        const { container } = render(
+            <DetailHero
+                title="House of the Dragon"
+                subtitle="The Heirs of the Dragon"
+                titleSuffix="S1 E1"
+            />,
+        );
+
+        const text = container.textContent ?? '';
+        expect(text.indexOf('The Heirs of the Dragon')).toBeLessThan(text.indexOf('S1 E1'));
+    });
+
+    it('sets the season and episode line smaller than the episode title', () => {
+        render(<DetailHero title="House of the Dragon" subtitle="The Heirs of the Dragon" titleSuffix="S1 E1" />);
+
+        const episodeTitle = screen.getByText('The Heirs of the Dragon');
+        const numbers = screen.getByText('S1 E1');
+
+        expect(episodeTitle.className).toContain('text-lg');
+        expect(numbers.className).toContain('text-sm');
+    });
+
+    it('centres the poster against the text beside it', () => {
+        const { container } = render(<DetailHero title="House of the Dragon" posterSrc="https://example.test/poster.jpg" />);
+
+        const grid = container.querySelector('div[class*="md:grid-cols-"]');
+        expect(grid?.className).toContain('md:items-center');
+    });
+
     it('keeps the poster to the tighter column', () => {
         const { container } = render(<DetailHero title="House of the Dragon" posterSrc="https://example.test/poster.jpg" />);
 
