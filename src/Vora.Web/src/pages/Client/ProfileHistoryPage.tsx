@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { useParams } from 'react-router-dom';
 import { type UserProfileHistoryDto, type UserVM, userService } from '../../api/Users/userService';
 import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
+import { formatTime, parseServerDate } from '../../utils/serverTime';
 export default function ProfileHistoryPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const [data, setData] = useState<UserProfileHistoryDto[]>([]);
@@ -60,13 +61,14 @@ export default function ProfileHistoryPage() {
 
     const formatLocalDate = (iso?: string) => {
         if (!iso) return '';
-        const d = new Date(iso);
+        const d = parseServerDate(iso);
+        if (!d) return '';
         return `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}-${d.getFullYear()}`;
     };
 
     const formatLocalTime = (iso?: string) => {
         if (!iso) return <span className="text-[var(--vora-accent-text)] font-bold text-xs uppercase">Playing</span>;
-        return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        return formatTime(iso);
     };
 
     const formatDuration = (mins: number) => {

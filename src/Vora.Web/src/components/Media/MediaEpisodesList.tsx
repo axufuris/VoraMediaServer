@@ -4,6 +4,7 @@ import { mediaService, type Episode } from '../../api/Media/mediaService';
 import StarRating from '../Client/Primitives/StarRating';
 import ArtImage from '../Client/Primitives/ArtImage';
 import { StorageKeys } from '../../utils/storageKeys';
+import { formatDate } from '../../utils/serverTime';
 
 interface Props {
     episodes: Episode[];
@@ -68,7 +69,7 @@ export default function MediaEpisodesList({ episodes, serverId }: Props) {
                                     {ep.endEpisodeNumber && ep.endEpisodeNumber > ep.episodeNumber ? `${ep.episodeNumber}-${ep.endEpisodeNumber}` : ep.episodeNumber}. {ep.title}
                                 </h4>
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold mt-1 mb-2" style={{ color: 'var(--vora-text-muted)' }}>
-                                    {ep.releaseDate && <span>{new Date(ep.releaseDate).toLocaleDateString()}</span>}
+                                    {ep.releaseDate && <span>{formatDate(ep.releaseDate)}</span>}
                                     {ep.durationMinutes && <span>{Math.round(ep.durationMinutes)} min</span>}
                                     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                                         <StarRating

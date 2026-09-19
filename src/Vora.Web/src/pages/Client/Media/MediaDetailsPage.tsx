@@ -32,6 +32,8 @@ import { isImageSubtitleCodec, isNoSubtitle } from '../../../utils/subtitleKind'
 import FixMatchModal from '../../../components/Media/FixMatchModal';
 import MediaInfoDialog from '../../../components/Media/MediaInfoDialog';
 import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
+import { audioChipLabel, pickChipAudioTrack, resolutionChipLabel } from '../../../utils/heroQualityChips';
+import { formatDate, serverTimeMs, yearOf } from '../../../utils/serverTime';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -255,7 +257,7 @@ export default function MediaDetailsPage() {
                 : `E${media.episodeNumber}`;
             subtitle = `S${media.seasonNumber} ${epLabel} - ${media.tvShowTitle}`;
         }
-        else if (media.releaseDate) subtitle = new Date(media.releaseDate).getFullYear().toString();
+        else if (media.releaseDate) subtitle = String(yearOf(media.releaseDate) ?? '');
 
         const deviceId = localStorage.getItem(StorageKeys.deviceId);
         if (!deviceId) return;
@@ -277,7 +279,7 @@ export default function MediaDetailsPage() {
             const sessionInfo = await streamingService.startSession(media.id, deviceId, startPos, selectedVideoId || undefined, selectedAudioId || undefined, subId, serverId, activePart?.id);
 
             const activeVideoTrack = activePart?.videoTracks?.find(v => v.id === selectedVideoId) || activePart?.videoTracks?.[0];
-            const activeAudioTrack = activePart?.audioTracks?.find(a => a.id === selectedAudioId) || activePart?.audioTracks?.[0];
+            const activeAudioTrack = pickChipAudioTrack(activePart?.audioTracks, selectedAudioId);
 
             playMedia({
                 id: media.id, title: media.title, subtitle: subtitle,
@@ -481,6 +483,10 @@ export default function MediaDetailsPage() {
         ? [...activePart.audioTracks].sort((a, b) => (b.channels || 0) - (a.channels || 0))
         : [];
 
+    // What the chips advertise is what Quality & tracks has selected, not the
+    // richest track the file happens to carry.
+    const chipAudioLabel = audioChipLabel(pickChipAudioTrack(activePart?.audioTracks, selectedAudioId));
+
     const videoOptions: QualityOption<string>[] = sortedVideoTracks.map(v => {
         const displayRes = v.part.resolution === '2160p' ? '4K' : (v.part.resolution || 'Unknown');
         const playbackBadge = isVideoDirectPlayable(v.track, v.part, caps) ? 'Direct Play' : 'Transcode';
@@ -520,9 +526,9 @@ export default function MediaDetailsPage() {
     if (media.upcomingEpisodesJson && media.upcomingEpisodesJson !== '[]') {
         try {
             const upcoming: UpcomingEpisodeParsed[] = JSON.parse(media.upcomingEpisodesJson);
-            const futureEps = upcoming.filter((ep) => new Date(ep.AirDate) >= new Date());
+            const futureEps = upcoming.filter((ep) => serverTimeMs(ep.AirDate) >= new Date().getTime());
             if (futureEps.length > 0) {
-                nextEpisode = futureEps.sort((a, b) => new Date(a.AirDate).getTime() - new Date(b.AirDate).getTime())[0];
+                nextEpisode = futureEps.sort((a, b) => serverTimeMs(a.AirDate) - serverTimeMs(b.AirDate))[0];
             } else if (upcoming.length > 0) {
                 nextEpisode = upcoming[0];
             }
@@ -569,15 +575,15 @@ export default function MediaDetailsPage() {
 
     const heroEyebrow = [
         isEpisode ? 'Episode' : isSeason ? `Season ${media.seasonNumber ?? ''}`.trim() : media.type === 'TvShow' ? 'TV Series' : 'Movie',
-        media.releaseDate ? String(new Date(media.releaseDate).getFullYear()) : null,
+        media.releaseDate ? String(yearOf(media.releaseDate) ?? '') : null,
     ].filter(Boolean).join(' · ');
 
     const heroChips = (
         <>
             {playRuntime && <HeroChip>{playRuntime}</HeroChip>}
             {media.contentRating && <HeroChip>{media.contentRating}</HeroChip>}
-            {activePart?.resolution && <HeroChip tone="accent">{activePart.resolution === '2160p' ? '4K' : activePart.resolution}</HeroChip>}
-            {sortedAudioTracks[0]?.codec && <HeroChip>{sortedAudioTracks[0].codec.toUpperCase()}{sortedAudioTracks[0].channels ? ` ${sortedAudioTracks[0].channels}ch` : ''}</HeroChip>}
+            {resolutionChipLabel(activePart?.resolution) && <HeroChip tone="accent">{resolutionChipLabel(activePart?.resolution)}</HeroChip>}
+            {chipAudioLabel && <HeroChip>{chipAudioLabel}</HeroChip>}
         </>
     );
 
@@ -734,7 +740,7 @@ export default function MediaDetailsPage() {
                             Season {nextEpisode.SeasonNumber} · Episode {nextEpisode.EpisodeNumber} — {nextEpisode.Title}
                         </p>
                         <p className="m-0 mt-0.5 text-xs" style={{ color: 'var(--vora-info-text)' }}>
-                            Airs {new Date(nextEpisode.AirDate).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            Airs {formatDate(nextEpisode.AirDate, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </p>
                     </div>
                 </div>
@@ -751,7 +757,7 @@ export default function MediaDetailsPage() {
                 <FixMatchModal
                     mediaItemId={media.id}
                     mediaType={media.type}
-                    currentYear={media.releaseDate ? new Date(media.releaseDate).getFullYear() : undefined}
+                    currentYear={yearOf(media.releaseDate) ?? undefined}
                     serverId={serverId}
                     onClose={() => setIsFixMatchOpen(false)}
                     onMatched={handleMatched}

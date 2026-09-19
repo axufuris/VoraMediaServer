@@ -12,6 +12,7 @@ import {
     visibleRange,
     type CalendarViewMode,
 } from '../../utils/calendarRange';
+import { formatTime, isSameLocalDay, parseServerDate } from '../../utils/serverTime';
 
 const VIEW_LABELS: Record<CalendarViewMode, string> = {
     month: 'Month',
@@ -86,7 +87,7 @@ function DayAgenda({ day, events, onEventClick }: {
                         <span className="w-24 shrink-0 text-xs font-bold uppercase" style={{ color: theme.text }}>
                             {ev.mediaType === 'Movie'
                                 ? (ev.releaseType === 'Theatrical' ? 'Theatrical' : 'Digital')
-                                : (ev.airTime ? new Date(ev.releaseDate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'TV')}
+                                : (ev.airTime ? formatTime(ev.releaseDate) : 'TV')}
                         </span>
                         <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{ev.title}</span>
@@ -158,7 +159,7 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
     const rangeLabel = rangeTitle(viewMode, currentDate);
 
     const eventsOn = (day: Date | undefined) => day
-        ? events.filter(e => new Date(e.releaseDate).toDateString() === day.toDateString())
+        ? events.filter(e => isSameLocalDay(parseServerDate(e.releaseDate), day))
         : [];
 
     const viewToggle = (
@@ -327,7 +328,7 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
                                                         <span className="truncate text-[10px] font-bold uppercase" style={{ color: theme.text }}>
                                                             {ev.mediaType === 'Movie'
                                                                 ? (ev.releaseType === 'Theatrical' ? 'Theatrical' : 'Digital')
-                                                                : (ev.airTime ? new Date(ev.releaseDate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'TV')}
+                                                                : (ev.airTime ? formatTime(ev.releaseDate) : 'TV')}
                                                         </span>
                                                         <div className="flex shrink-0 items-center gap-1">
                                                             {ev.isWatchlisted && <span className="h-1.5 w-1.5 rounded-full" title="On Watchlist" style={{ background: 'var(--vora-info-500)' }} />}

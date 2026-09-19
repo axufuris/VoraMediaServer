@@ -6,6 +6,7 @@ import { StorageKeys, decodeJwtPayload } from '../../../utils/storageKeys';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { useDialog } from '../../../dialogs';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
+import { calendarDaysBetween, parseServerDate } from '../../../utils/serverTime';
 
 const SELECTED_SUB_STORAGE_KEY = 'podcast_selected_sub';
 const VIEW_MODE_STORAGE_KEY = 'podcast_view_mode';
@@ -376,10 +377,9 @@ export default function PodcastsTab() {
 
     const formatPublished = (iso?: string): string => {
         if (!iso) return '';
-        const date = new Date(iso);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const date = parseServerDate(iso);
+        if (!date) return '';
+        const diffDays = calendarDaysBetween(date, new Date());
         if (diffDays === 0) return 'Today';
         if (diffDays === 1) return 'Yesterday';
         if (diffDays < 7) return `${diffDays} days ago`;

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { historyService, type HistorySessionDto } from '../../api/Media/historyService';
 import { libraryService, type LibrarySummary } from '../../api/Media/libraryService';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
+import { formatTime, parseServerDate } from '../../utils/serverTime';
 
 interface DecisionLogEntry {
     Reason?: string;
@@ -114,13 +115,14 @@ export default function HistoryPage() {
 
     const formatLocalDate = (isoString: string) => {
         if (!isoString) return '';
-        const d = new Date(isoString);
+        const d = parseServerDate(isoString);
+        if (!d) return '';
         return `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}-${d.getFullYear()}`;
     };
 
     const formatLocalTime = (isoString: string) => {
         if (!isoString) return '';
-        return new Date(isoString).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        return formatTime(isoString);
     };
 
     const renderStreamDetails = (row: HistorySessionDto) => (

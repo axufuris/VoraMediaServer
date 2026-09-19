@@ -3,6 +3,7 @@ import CinematicBackdrop from './CinematicBackdrop';
 import MediaCard from './MediaCard';
 import MediaGrid from './MediaGrid';
 import EmptyState from './EmptyState';
+import { parseServerDate, yearOf } from '../../../utils/serverTime';
 
 // One tile in either of the actor's two credit sections.
 export interface ActorCredit {
@@ -29,20 +30,16 @@ interface ActorProfileProps {
 
 function ageFrom(birthday?: string | null, deathday?: string | null): number | null {
     if (!birthday) return null;
-    const birth = new Date(birthday);
-    if (Number.isNaN(birth.getTime())) return null;
-    const end = deathday ? new Date(deathday) : new Date();
+    const birth = parseServerDate(birthday);
+    if (!birth) return null;
+    const end = (deathday ? parseServerDate(deathday) : new Date()) ?? new Date();
     let age = end.getFullYear() - birth.getFullYear();
     const months = end.getMonth() - birth.getMonth();
     if (months < 0 || (months === 0 && end.getDate() < birth.getDate())) age--;
     return age;
 }
 
-function yearOf(value?: string | null): number | null {
-    if (!value) return null;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed.getFullYear();
-}
+
 
 function CreditSection({ title, subtitle, credits }: { title: string; subtitle: string; credits: ActorCredit[] }) {
     if (credits.length === 0) return null;

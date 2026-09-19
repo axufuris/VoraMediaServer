@@ -43,14 +43,16 @@ public class UserMediaStateRepository : IUserMediaStateRepository
             var currentPlaylistItem = await _context.PlaylistItems
                 .AsNoTracking()
                 .Where(p => p.PlaylistId == contextId.Value && p.MediaItemId == mediaId)
-                .Select(p => p.Order)
+                .Select(p => (int?)p.Order)
                 .FirstOrDefaultAsync();
 
-            if (currentPlaylistItem > 0)
+            if (currentPlaylistItem.HasValue)
             {
+                var currentOrder = currentPlaylistItem.Value;
+
                 result.NextItem = await _context.PlaylistItems
                     .AsNoTracking()
-                    .Where(p => p.PlaylistId == contextId.Value && p.Order > currentPlaylistItem && p.MediaItem.MissingSince == null)
+                    .Where(p => p.PlaylistId == contextId.Value && p.Order > currentOrder && p.MediaItem.MissingSince == null)
                     .OrderBy(p => p.Order)
                     .Select(p => new UpNextItemVM
                     {
@@ -68,7 +70,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
 
                 result.PreviousItem = await _context.PlaylistItems
                     .AsNoTracking()
-                    .Where(p => p.PlaylistId == contextId.Value && p.Order < currentPlaylistItem && p.MediaItem.MissingSince == null)
+                    .Where(p => p.PlaylistId == contextId.Value && p.Order < currentOrder && p.MediaItem.MissingSince == null)
                     .OrderByDescending(p => p.Order)
                     .Select(p => new UpNextItemVM
                     {

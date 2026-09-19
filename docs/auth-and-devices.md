@@ -109,6 +109,31 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 
 `sessionStorage` is used for **pending pre-vault** state during the login/setup flow (`pending_server_url`, `pending_user_token`, `pending_user_id`, `pending_server_name`).
 
+## Times on the wire
+
+The server stores and emits **UTC**; every client renders in the viewer's own
+zone. Two pieces make that hold:
+
+- `UtcDateTimeConverter` / `NullableUtcDateTimeConverter` (registered in
+  `AddVoraJsonOptions`) write every `DateTime` as `…Z`, converting a `Local`
+  value and stamping an `Unspecified` one. Without it, System.Text.Json emits an
+  `Unspecified` instant with no zone at all and `new Date(...)` in the browser
+  reads it as local time — the same string meaning a different moment per client.
+  Inbound, the converters accept `Z`, an offset, or a zone-less string and hand
+  the app a `Kind=Utc` value.
+- `Vora.Web/src/utils/serverTime.ts` is the client half: `parseServerDate`,
+  `serverTimeMs`, `formatTime`/`formatDate`/`formatDateTime`, `yearOf`,
+  `isSameLocalDay` and `calendarDaysBetween`. Nothing renders a server timestamp
+  with a bare `new Date(...)`.
+
+**Date-only values are not instants.** A release date, an air date or a birthday
+is a calendar date and must read the same everywhere, so `serverTime` detects the
+`YYYY-MM-DD` shape and builds local midnight instead of applying an offset, and
+`yearOf` reads the year off the string. Note the storage side is still
+`DateTime` in a `timestamptz` column, so those values arrive as midnight UTC;
+the client refuses to shift them. Moving them to `DateOnly` + `date` columns is
+the structural fix and is not done.
+
 ## Live permission refetch
 
 The profile JWT carries permission claims (`canTimeshiftIptv`, `canRecordLiveTv`, etc.) at the moment the user signed in. If an admin edits those permissions afterwards, the JWT is stale until the user re-signs-in or switches profile.

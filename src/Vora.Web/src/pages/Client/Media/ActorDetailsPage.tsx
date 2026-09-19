@@ -5,6 +5,7 @@ import { discoveryService, type DiscoveryActor } from '../../../api/Discovery/di
 import { useFeatureFlags } from '../../../hooks/useFeatureFlags';
 import ActorProfile, { type ActorCredit } from '../../../components/Client/Primitives/ActorProfile';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
+import { yearOf } from '../../../utils/serverTime';
 
 const DISCOVERY_PROVIDER = 'tmdb_discovery';
 
@@ -59,7 +60,7 @@ export default function ActorDetailsPage() {
     const byMediaId = new Map<string, ActorCredit>();
 
     for (const local of actor?.filmography ?? []) {
-        const year = local.releaseDate ? new Date(local.releaseDate).getFullYear() : null;
+        const year = yearOf(local.releaseDate);
         byMediaId.set(local.id, {
             key: local.id,
             title: local.title,

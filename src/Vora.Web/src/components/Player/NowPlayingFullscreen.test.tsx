@@ -6,6 +6,23 @@ import { PlayerContext, PlayerTimeContext, type PlayableMedia, type PlayerContex
 import type { LyricsVM } from '../../api/Music/musicService';
 
 const getTrackLyrics = vi.fn<(trackId: string, serverId?: string) => Promise<LyricsVM | null>>();
+const addToPlaylist = vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
+
+vi.mock('../../dialogs', () => ({
+    useDialog: () => ({ alert: () => Promise.resolve(), confirm: () => Promise.resolve(true), prompt: () => Promise.resolve(null) }),
+}));
+
+// jsdom has no scrollTo on elements; the synced-lyrics auto-scroll calls it.
+Element.prototype.scrollTo = vi.fn();
+
+vi.mock('../../api/Collections/playlistService', () => ({
+    playlistService: {
+        getPlaylists: () => Promise.resolve([{ id: 'pl-1', name: 'Road Trip', mediaType: 'Music', itemCount: 4, posterUrls: [], backdropUrls: [] }]),
+        getPlaylistsContainingItem: () => Promise.resolve([]),
+        addToPlaylist: (...args: unknown[]) => addToPlaylist(...args),
+        removeMediaFromPlaylist: () => Promise.resolve(),
+    },
+}));
 
 vi.mock('../../api/Music/musicService', () => ({
     musicService: {
@@ -147,5 +164,48 @@ describe('music now playing', () => {
 
         expect(screen.getByText('blink-182 Radio')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Save station/ })).toBeInTheDocument();
+    });
+
+    it('offers the current track to a playlist, the way the album menu does', async () => {
+        getTrackLyrics.mockResolvedValue(null);
+        renderScreen(player());
+
+        fireEvent.click(screen.getByRole('button', { name: 'Playlist' }));
+
+        expect(await screen.findByText('Road Trip')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Road Trip'));
+        await waitFor(() => expect(addToPlaylist).toHaveBeenCalledWith('pl-1', 'carousel', undefined));
+    });
+
+    it('has no playlist button while a radio station is playing', () => {
+        getTrackLyrics.mockResolvedValue(null);
+        renderScreen(player({ radioSeed: { seedKind: 'Artist', seedArtistId: 'a1' }, radioLabel: 'blink-182 radio' }));
+
+        expect(screen.queryByRole('button', { name: 'Playlist' })).toBeNull();
+    });
+
+    it('lets plain lyrics ride along with the song instead of being scrolled', async () => {
+        getTrackLyrics.mockResolvedValue({ plainLyrics: `Line one
+Line two
+Line three`, syncedLyrics: null, isSynced: false, providerName: 'LRClib', sourceUrl: null });
+        renderScreen(player());
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Lyrics' }));
+
+        const panel = await screen.findByTestId('lyrics-panel');
+        expect(panel.className).toContain('overflow-hidden');
+        expect(panel.className).not.toContain('overflow-y-auto');
+        expect(panel).not.toHaveAttribute('tabindex');
+    });
+
+    it('keeps synced lyrics scrollable so a line can be clicked', async () => {
+        getTrackLyrics.mockResolvedValue({ plainLyrics: null, syncedLyrics: `[00:10.00]Line one
+[00:20.00]Line two`, isSynced: true, providerName: 'LRClib', sourceUrl: null });
+        renderScreen(player());
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Lyrics' }));
+
+        const panel = await screen.findByTestId('lyrics-panel');
+        expect(panel.className).toContain('overflow-y-auto');
     });
 });

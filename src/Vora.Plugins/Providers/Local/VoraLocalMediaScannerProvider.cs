@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Globalization;
+using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
@@ -475,9 +476,9 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                 episodeTitle = epMatch.Groups["EpisodeTitle"].Value.Trim(' ', '.', '-');
             }
 
-            if (epMatch.Groups["AirDate"].Success && DateTime.TryParse(epMatch.Groups["AirDate"].Value, out DateTime parsedDate))
+            if (epMatch.Groups["AirDate"].Success && DateTime.TryParse(epMatch.Groups["AirDate"].Value, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out DateTime parsedDate))
             {
-                airDate = parsedDate;
+                airDate = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
             }
         }
 

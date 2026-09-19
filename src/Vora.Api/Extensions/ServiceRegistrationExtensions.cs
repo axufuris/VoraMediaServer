@@ -820,12 +820,16 @@ public static class ServiceRegistrationExtensions
         {
             options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
             options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+            options.SerializerOptions.Converters.Add(new Vora.Application.Serialization.UtcDateTimeConverter());
+            options.SerializerOptions.Converters.Add(new Vora.Application.Serialization.NullableUtcDateTimeConverter());
         });
 
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options =>
         {
             options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
             options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+            options.JsonSerializerOptions.Converters.Add(new Vora.Application.Serialization.UtcDateTimeConverter());
+            options.JsonSerializerOptions.Converters.Add(new Vora.Application.Serialization.NullableUtcDateTimeConverter());
         });
 
         return services;

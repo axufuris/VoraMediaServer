@@ -3,6 +3,7 @@ import { type IptvChannelVM } from '../../../../api/Iptv/iptvAdminService';
 import { type IptvProgramDto } from '../../../../api/Iptv/iptvClientService';
 import { type IptvRecordingSessionVM } from '../../../../api/Iptv/dvrService';
 import { HOURS_TO_SHOW, PX_PER_MINUTE } from '../guideConstants';
+import { serverTimeMs } from '../../../../utils/serverTime';
 
 export type CleanedProgram = IptvProgramDto & { _safeStart: number, _safeEnd: number };
 
@@ -138,8 +139,8 @@ export default function GuideRow({
 
                         if (s.title !== program.title || s.schedule?.channel?.name !== channel.name) return false;
 
-                        const sStart = new Date(s.startTime).getTime();
-                        const sEnd = new Date(s.endTime).getTime();
+                        const sStart = serverTimeMs(s.startTime);
+                        const sEnd = serverTimeMs(s.endTime);
                         const pStart = new Date(program._safeStart).getTime();
                         const pEnd = new Date(program._safeEnd).getTime();
 
