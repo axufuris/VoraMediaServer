@@ -144,7 +144,7 @@ export default function DetailHero({
             </div>
 
             <div className="relative z-10 px-12 pb-6 pt-6">
-                <div className={`grid gap-8 ${isStill ? 'md:grid-cols-[20rem_1fr]' : 'md:grid-cols-[12.5rem_1fr]'}`}>
+                <div className={`grid gap-8 md:items-center ${isStill ? 'md:grid-cols-[20rem_1fr]' : 'md:grid-cols-[12.5rem_1fr]'}`}>
                     <div className="shrink-0">
                         <div
                             className={`relative overflow-hidden ${isStill ? 'aspect-video' : 'aspect-[2/3]'}`}
@@ -179,15 +179,15 @@ export default function DetailHero({
                             {title}
                         </h1>
 
-                        {titleSuffix && (
-                            <div className="mt-2 text-lg font-semibold" style={{ color: 'var(--vora-accent-text)' }}>
-                                {titleSuffix}
+                        {subtitle && (
+                            <div className="mt-2 text-lg" style={{ color: 'var(--vora-text-secondary)' }}>
+                                {subtitle}
                             </div>
                         )}
 
-                        {subtitle && (
-                            <div className="mt-1 text-lg" style={{ color: 'var(--vora-text-secondary)' }}>
-                                {subtitle}
+                        {titleSuffix && (
+                            <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--vora-accent-text)' }}>
+                                {titleSuffix}
                             </div>
                         )}
 
