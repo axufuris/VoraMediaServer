@@ -789,6 +789,7 @@ export default function MediaDetailsPage() {
                 posterShape={isEpisode ? 'still' : 'poster'}
                 eyebrow={heroEyebrow}
                 title={heroTitle}
+                logoUrl={media.logoUrl}
                 titleSuffix={isEpisode
                     ? (media.endEpisodeNumber && media.endEpisodeNumber > (media.episodeNumber ?? 0)
                         ? `S${media.seasonNumber} E${media.episodeNumber}-E${media.endEpisodeNumber}`

@@ -2,8 +2,10 @@
 // resized JPEGs instead of full-resolution artwork. Only local custom artwork
 // and remote http(s) provider images are cached; anything else (data URIs,
 // unknown schemes) is returned unchanged. `kind` selects the cache bucket
-// (posters vs stills vs backdrops) so different image classes stay separate.
-type ThumbKind = 'poster' | 'still' | 'backdrop';
+// (posters vs stills vs backdrops vs logos) so different image classes stay
+// separate — and so a logo is cached as a PNG with its transparency intact
+// rather than flattened onto black by the JPEG encoder.
+type ThumbKind = 'poster' | 'still' | 'backdrop' | 'logo';
 
 export function thumbUrl(src: string | undefined | null, width: number, kind: ThumbKind = 'poster'): string | undefined {
     if (!src) return src ?? undefined;

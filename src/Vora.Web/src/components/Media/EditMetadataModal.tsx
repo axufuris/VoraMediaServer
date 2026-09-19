@@ -58,6 +58,7 @@ export default function EditMetadataModal({
                 releaseDate: initialData.releaseDate ? initialData.releaseDate.split('T')[0] : '',
                 posterUrl: initialData.posterUrl || '',
                 backgroundUrl: initialData.backgroundUrl || '',
+                logoUrl: initialData.logoUrl || '',
                 lockedFields: initialData.lockedFields || []
             });
             setActiveTab('general');

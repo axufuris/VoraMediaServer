@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import CinematicBackdrop from './CinematicBackdrop';
 import ArtImage from './ArtImage';
+import { thumbUrl } from '../../../utils/thumbnails';
 
 export type DetailHeroPosterShape = 'poster' | 'still';
 
@@ -11,6 +12,9 @@ interface DetailHeroProps {
     posterShape?: DetailHeroPosterShape;
     eyebrow?: ReactNode;
     title: string;
+    // The title treatment: the title drawn as artwork. Shown in place of the
+    // text when the item has one.
+    logoUrl?: string | null;
     titleSuffix?: ReactNode;
     subtitle?: ReactNode;
     chips?: ReactNode;
@@ -125,7 +129,7 @@ export function HeroCredits({ directors, genres, studios }: {
 // on a hard line.
 export default function DetailHero({
     backdropSrc, transitionKey, posterSrc, posterShape = 'poster',
-    eyebrow, title, titleSuffix, subtitle,
+    eyebrow, title, logoUrl, titleSuffix, subtitle,
     chips, ratings, credits, actions, notice, overview,
 }: DetailHeroProps) {
     const isStill = posterShape === 'still';
@@ -172,12 +176,23 @@ export default function DetailHero({
                             </div>
                         )}
 
-                        <h1
-                            className="m-0 mt-2 font-semibold"
-                            style={{ color: 'var(--vora-text-primary)', fontSize: 'clamp(1.75rem, 3vw, 2.25rem)', lineHeight: 1.05, letterSpacing: '-0.02em' }}
-                        >
-                            {title}
-                        </h1>
+                        {logoUrl ? (
+                            <h1 className="m-0 mt-2">
+                                <img
+                                    src={thumbUrl(logoUrl, 780, 'logo')}
+                                    alt={title}
+                                    className="block w-auto max-w-full object-contain object-left"
+                                    style={{ maxHeight: 'clamp(3.5rem, 7vw, 5.5rem)' }}
+                                />
+                            </h1>
+                        ) : (
+                            <h1
+                                className="m-0 mt-2 font-semibold"
+                                style={{ color: 'var(--vora-text-primary)', fontSize: 'clamp(1.75rem, 3vw, 2.25rem)', lineHeight: 1.05, letterSpacing: '-0.02em' }}
+                            >
+                                {title}
+                            </h1>
+                        )}
 
                         {subtitle && (
                             <div className="mt-2 text-lg" style={{ color: 'var(--vora-text-secondary)' }}>
