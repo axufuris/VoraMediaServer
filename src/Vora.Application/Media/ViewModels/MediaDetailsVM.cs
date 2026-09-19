@@ -17,6 +17,7 @@ public class MediaDetailsVM
     public string Type { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
+    public string? LogoUrl { get; set; }
     public string? ContentRating { get; set; }
     public string? Resolution { get; set; }
     public Guid LibraryId { get; set; }
@@ -75,6 +76,9 @@ public class MediaDetailsVM
                 ?? (item is Episode ? ((Episode)item).Season.TvShow.BackgroundUrl
                     : item is Season ? ((Season)item).TvShow.BackgroundUrl
                     : null),
+            LogoUrl = item is Episode ? ((Episode)item).Season.TvShow.LogoUrl
+                : item is Season ? ((Season)item).TvShow.LogoUrl
+                : item.LogoUrl,
             ContentRating = item is Episode ? ((Episode)item).Season.TvShow.ContentRating : item.ContentRating,
             Resolution = item.MediaParts.FirstOrDefault() != null ? item.MediaParts.FirstOrDefault()!.Resolution : null,
             LockedFields = item.LockedFields,

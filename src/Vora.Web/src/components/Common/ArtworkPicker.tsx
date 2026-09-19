@@ -2,7 +2,7 @@ import { type ReactNode, useRef, useState } from 'react';
 import type { ArtworkResult } from '../../api/Media/artworkService';
 
 interface ArtworkPickerProps {
-    artType: 'Poster' | 'Backdrop';
+    artType: 'Poster' | 'Backdrop' | 'Logo';
     artwork: ArtworkResult[];
     loading: boolean;
     selectedUrl: string;
@@ -55,10 +55,17 @@ export default function ArtworkPicker({
         sorted.unshift({ id: 'current', url: selectedUrl, type: artType, language: 'Current', isUserUploaded: false });
     }
 
-    const aspectClass = artType === 'Poster' ? 'aspect-[2/3]' : 'aspect-video';
+    const aspectClass = artType === 'Poster' ? 'aspect-[2/3]' : artType === 'Logo' ? 'aspect-[5/2]' : 'aspect-video';
     const gridClass = artType === 'Poster'
         ? 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4'
-        : 'grid grid-cols-2 md:grid-cols-3 gap-4';
+        : artType === 'Logo'
+            ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4'
+            : 'grid grid-cols-2 md:grid-cols-3 gap-4';
+    // A logo is a wordmark on transparency, usually near-white. Shown on the
+    // panel's own surface it would be invisible, so these sit on a dark tile.
+    const tileStyle = artType === 'Logo'
+        ? { background: 'var(--vora-bg-canvas)', backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.04) 75%), linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.04) 75%)', backgroundSize: '16px 16px', backgroundPosition: '0 0, 8px 8px' }
+        : undefined;
     const labelLower = artType.toLowerCase();
 
     return (
@@ -112,9 +119,10 @@ export default function ArtworkPicker({
                             <div
                                 key={`${art.id}-${idx}`}
                                 onClick={() => onSelect(art.url)}
+                                style={tileStyle}
                                 className={`${aspectClass} rounded bg-[var(--vora-bg-canvas)] overflow-hidden cursor-pointer relative transition-all group ${isSelected ? 'ring-4 ring-orange-500 scale-95' : 'hover:ring-2 hover:ring-gray-500'}`}
                             >
-                                <img src={art.url} alt={`${labelLower} option`} loading="lazy" className="w-full h-full object-cover" />
+                                <img src={art.url} alt={`${labelLower} option`} loading="lazy" className={`w-full h-full ${artType === 'Logo' ? 'object-contain p-3' : 'object-cover'}`} />
 
                                 {art.isUserUploaded && (
                                     <>

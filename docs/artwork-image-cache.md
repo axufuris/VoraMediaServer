@@ -2,6 +2,25 @@
 
 Two related server-side image subsystems. **This is not the scrub-bar thumbnail pipeline** — those are per-video sprite sheets covered in `docs/video-thumbnails.md`. This doc is about (1) the resized poster/still/backdrop cache the clients render, and (2) the badge overlays composited onto posters.
 
+## Clear logos keep their transparency
+
+The cache buckets by kind (`posters` / `stills` / `backdrops` / `logos`), and the
+**container follows the kind**: `logo` is written as `.png` and served as
+`image/png`, everything else stays JPEG at quality 82.
+
+This is not an optimisation, it is the whole feature. JPEG has no alpha channel,
+and a clear logo stores its transparent background as RGB(0,0,0) with alpha 0 —
+drop the alpha and those pixels become opaque black, so the wordmark arrives in a
+black rectangle, as a perfectly healthy `200`. The decision lives in
+`IsTransparentKind` / `CacheExtension` in `ArtworkThumbnailService` so the
+save branch, the cache path and the eviction path cannot disagree.
+
+Two matching details: `NormalizeKind` in `ArtworkEndpoints` must list `logo`,
+because its fallback is `poster` and an unrecognised kind is silently cached as
+a JPEG; and `RemoveThumbnailsForSource` deletes both `.jpg` and `.png` for a
+source, since it is given no kind and a stale logo would otherwise outlive an
+artwork change.
+
 ## Resized artwork cache
 
 Clients never load full-resolution TMDB/TVDB/fanart images. They request a bucketed, server-resized copy through:

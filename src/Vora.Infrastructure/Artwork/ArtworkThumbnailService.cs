@@ -28,7 +28,17 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
         ["poster"] = "posters",
         ["still"] = "stills",
         ["backdrop"] = "backdrops",
+        ["logo"] = "logos",
     };
+
+    // A clear logo is a wordmark on a transparent background; every other kind
+    // is photographic, where JPEG is correct and far smaller. JPEG has no alpha
+    // channel, and a transparent pixel stored as RGB(0,0,0) turns opaque black
+    // when the alpha is dropped — a black rectangle with the title inside it,
+    // served as a perfectly healthy 200.
+    private const string LogoKind = "logo";
+    private const string JpegExtension = ".jpg";
+    private const string PngExtension = ".png";
 
     private static readonly HashSet<string> AllowedRemoteHosts = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -69,7 +79,8 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
         if (string.IsNullOrWhiteSpace(src)) return null;
 
         var kindDir = Path.Combine(_cacheRoot, ResolveKindFolder(kind));
-        var cacheFile = Path.Combine(kindDir, CacheKey(src, width) + ".jpg");
+        var keepAlpha = IsTransparentKind(kind);
+        var cacheFile = Path.Combine(kindDir, CacheKey(src, width) + CacheExtension(kind));
         if (File.Exists(cacheFile)) return cacheFile;
 
         byte[]? sourceBytes;
@@ -100,7 +111,18 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
 
             Directory.CreateDirectory(kindDir);
             var tempFile = cacheFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            await image.SaveAsJpegAsync(tempFile, new JpegEncoder { Quality = 82 }, cancellationToken);
+
+            if (keepAlpha)
+            {
+                // The image is already Rgba32, so the default encoder keeps the
+                // alpha channel. A JPEG encoder here would flatten it.
+                await image.SaveAsPngAsync(tempFile, cancellationToken);
+            }
+            else
+            {
+                await image.SaveAsJpegAsync(tempFile, new JpegEncoder { Quality = 82 }, cancellationToken);
+            }
+
             File.Move(tempFile, cacheFile, overwrite: true);
         }
         catch (Exception ex)
@@ -126,13 +148,22 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
             var kindDir = Path.Combine(_cacheRoot, folder);
             foreach (var width in WidthBuckets)
             {
-                var cacheFile = Path.Combine(kindDir, CacheKey(src, width) + ".jpg");
-                if (!File.Exists(cacheFile)) continue;
-                try { File.Delete(cacheFile); }
-                catch (Exception ex) { _logger.LogWarning(ex, "Failed to remove cached thumbnail {Path}.", cacheFile); }
+                foreach (var extension in new[] { JpegExtension, PngExtension })
+                {
+                    var cacheFile = Path.Combine(kindDir, CacheKey(src, width) + extension);
+                    if (!File.Exists(cacheFile)) continue;
+                    try { File.Delete(cacheFile); }
+                    catch (Exception ex) { _logger.LogWarning(ex, "Failed to remove cached thumbnail {Path}.", cacheFile); }
+                }
             }
         }
     }
+
+    private static bool IsTransparentKind(string? kind) =>
+        string.Equals(kind, LogoKind, StringComparison.OrdinalIgnoreCase);
+
+    private static string CacheExtension(string? kind) =>
+        IsTransparentKind(kind) ? PngExtension : JpegExtension;
 
     private static string ResolveKindFolder(string? kind)
     {
@@ -186,7 +217,9 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
             var root = new DirectoryInfo(_cacheRoot);
             if (!root.Exists) return;
 
-            var files = root.GetFiles("*.jpg", SearchOption.AllDirectories);
+            var files = root.GetFiles("*.jpg", SearchOption.AllDirectories)
+                .Concat(root.GetFiles("*.png", SearchOption.AllDirectories))
+                .ToArray();
             long total = files.Sum(f => f.Length);
             if (total <= MaxCacheBytes) return;
 

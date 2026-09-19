@@ -128,6 +128,7 @@ export interface MediaItem {
     contentRating?: string;
     posterUrl?: string;
     backgroundUrl?: string;
+    logoUrl?: string;
     releaseDate?: string;
     type: string;
     numberOfSeasons?: number;
@@ -173,6 +174,7 @@ export interface UpNextItemVM {
     type: string;
     posterUrl?: string;
     backgroundUrl?: string;
+    logoUrl?: string;
     overview?: string;
 }
 

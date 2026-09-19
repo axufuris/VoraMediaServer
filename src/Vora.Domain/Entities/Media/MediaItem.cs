@@ -39,6 +39,7 @@ public abstract class MediaItem : LockableEntity
     public string? PosterUrl { get; set; }
     public string? OriginalPosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
+    public string? LogoUrl { get; set; }
 
     public DateOnly? ReleaseDate { get; set; }
     public bool HasMidCreditsStinger { get; set; }

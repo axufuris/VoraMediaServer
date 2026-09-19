@@ -239,6 +239,7 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.PosterUrl).HasMaxLength(1024);
             entity.Property(e => e.OriginalPosterUrl).HasMaxLength(1024);
             entity.Property(e => e.BackgroundUrl).HasMaxLength(1024);
+            entity.Property(e => e.LogoUrl).HasMaxLength(1024);
             entity.HasIndex(e => e.TmdbId).HasFilter("\"TmdbId\" IS NOT NULL");
             entity.HasIndex(e => e.ImdbId).HasFilter("\"ImdbId\" IS NOT NULL");
             entity.HasIndex(e => e.TvdbId).HasFilter("\"TvdbId\" IS NOT NULL");

@@ -15,6 +15,7 @@ public class LibraryItemVM
     public string Type { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
+    public string? LogoUrl { get; set; }
     public string? ContentRating { get; set; }
     public string? Resolution { get; set; }
     public int? DurationSeconds { get; set; }
@@ -55,6 +56,9 @@ public class LibraryItemVM
                 ? (((Episode)item).Season.PosterUrl ?? ((Episode)item).Season.TvShow.PosterUrl)
                 : (item.PosterUrl ?? (item is Season ? ((Season)item).TvShow.PosterUrl : null)),
             BackgroundUrl = item.BackgroundUrl ?? (item is Season ? ((Season)item).TvShow.BackgroundUrl : null),
+            LogoUrl = item is Episode
+                ? ((Episode)item).Season.TvShow.LogoUrl
+                : (item is Season ? ((Season)item).TvShow.LogoUrl : item.LogoUrl),
             ContentRating = item.ContentRating,
             Resolution = item.MediaParts.FirstOrDefault() != null
                 ? item.MediaParts.FirstOrDefault()!.Resolution

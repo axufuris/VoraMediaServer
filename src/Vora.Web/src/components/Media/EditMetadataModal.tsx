@@ -21,7 +21,7 @@ export default function EditMetadataModal({
     isOpen, onClose, onSaved, itemId, type, initialData }: EditMetadataModalProps) {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
-    const [activeTab, setActiveTab] = useState<'general' | 'poster' | 'backdrop'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'poster' | 'backdrop' | 'logo'>('general');
     const [saving, setSaving] = useState(false);
     const [loadingArt, setLoadingArt] = useState(false);
     const [artwork, setArtwork] = useState<ArtworkResult[]>([]);
@@ -91,7 +91,7 @@ export default function EditMetadataModal({
     // default provider so the picker isn't limited to the single stored image.
     useEffect(() => {
         if (!isOpen || type !== 'media') return;
-        if (activeTab !== 'poster' && activeTab !== 'backdrop') return;
+        if (activeTab !== 'poster' && activeTab !== 'backdrop' && activeTab !== 'logo') return;
 
         if (!autoFetchedRef.current) {
             autoFetchedRef.current = true;
@@ -121,10 +121,16 @@ export default function EditMetadataModal({
         });
     };
 
-    const handleSelectArt = (url: string, artType: 'PosterUrl' | 'BackgroundUrl') => {
+    const artFormField: Record<'PosterUrl' | 'BackgroundUrl' | 'LogoUrl', 'posterUrl' | 'backgroundUrl' | 'logoUrl'> = {
+        PosterUrl: 'posterUrl',
+        BackgroundUrl: 'backgroundUrl',
+        LogoUrl: 'logoUrl',
+    };
+
+    const handleSelectArt = (url: string, artType: 'PosterUrl' | 'BackgroundUrl' | 'LogoUrl') => {
         setFormData(prev => ({
             ...prev,
-            [artType === 'PosterUrl' ? 'posterUrl' : 'backgroundUrl']: url,
+            [artFormField[artType]]: url,
             lockedFields: prev.lockedFields.includes(artType) ? prev.lockedFields : [...prev.lockedFields, artType]
         }));
     };
@@ -208,6 +214,9 @@ export default function EditMetadataModal({
                                 </button>
                                 <button onClick={() => setActiveTab('backdrop')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'backdrop' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>
                                     Backdrops
+                                </button>
+                                <button onClick={() => setActiveTab('logo')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'logo' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>
+                                    Logos
                                 </button>
                             </>
                         )}
@@ -336,6 +345,41 @@ export default function EditMetadataModal({
                             actionRowRight={
                                 <button type="button" onClick={() => handleLockToggle('BackgroundUrl')} className="flex items-center gap-2 text-sm text-[var(--vora-text-secondary)] cursor-pointer">
                                     <LockIcon locked={formData.lockedFields.includes('BackgroundUrl')} /> Lock Backdrop
+                                </button>
+                            }
+                        />
+                    )}
+
+                    {activeTab === 'logo' && (
+                        <ArtworkPicker
+                            artType="Logo"
+                            artwork={artwork}
+                            loading={loadingArt}
+                            selectedUrl={formData.logoUrl || ''}
+                            onSelect={(url) => handleSelectArt(url, 'LogoUrl')}
+                            onUpload={(file) => uploadArtwork('Logo', file)}
+                            onAddUrl={(url) => addArtworkUrl('Logo', url)}
+                            onDeleteArtwork={deleteArtwork}
+                            actionRowLeft={
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        value={selectedProviderId}
+                                        onChange={e => setSelectedProviderId(e.target.value)}
+                                        className="p-1.5 bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)] text-xs rounded outline-none focus:border-[var(--vora-accent-500)] cursor-pointer"
+                                    >
+                                        <option value="">Default provider</option>
+                                        {artworkProviders.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                    <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-[var(--vora-text-primary)] text-xs font-bold rounded cursor-pointer transition-colors">
+                                        Fetch Artwork
+                                    </button>
+                                </div>
+                            }
+                            actionRowRight={
+                                <button type="button" onClick={() => handleLockToggle('LogoUrl')} className="flex items-center gap-2 text-sm text-[var(--vora-text-secondary)] cursor-pointer">
+                                    <LockIcon locked={formData.lockedFields.includes('LogoUrl')} /> Lock Logo
                                 </button>
                             }
                         />

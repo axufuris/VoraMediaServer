@@ -84,15 +84,21 @@ public static partial class ArtworkEndpoints
         }
 
         httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
-        return Results.File(path, "image/jpeg");
+        return Results.File(path, ThumbnailContentType(path));
     }
 
     private static string NormalizeKind(string? kind) => kind?.ToLowerInvariant() switch
     {
         "still" => "still",
         "backdrop" => "backdrop",
+        "logo" => "logo",
         _ => "poster"
     };
+
+    // A logo keeps its transparency, so it is cached as a PNG; everything else
+    // is re-encoded to JPEG. The extension the cache chose is the answer.
+    private static string ThumbnailContentType(string path) =>
+        Path.GetExtension(path).Equals(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg";
 
     private static int ClampThumbnailWidth(int w) => w switch
     {

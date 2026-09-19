@@ -11,7 +11,7 @@ export interface ArtworkResult {
     voteAverage?: number;
 }
 
-export type ArtworkKind = 'Poster' | 'Backdrop';
+export type ArtworkKind = 'Poster' | 'Backdrop' | 'Logo';
 
 // The API binds `[FromQuery] ArtworkKind kind`. The edit modals sent `type=`,
 // which left the required parameter unbound, so every upload and add-from-URL
