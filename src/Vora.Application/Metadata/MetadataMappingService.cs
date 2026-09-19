@@ -11,6 +11,7 @@ using Vora.Domain.Entities.Media;
 using Vora.Domain.Enums;
 using Vora.Plugins;
 using Vora.Plugins.Dtos;
+using Vora.Plugins.Interfaces;
 using ArtworkKind = Vora.Domain.Enums.ArtworkKind;
 
 namespace Vora.Application.Metadata;
@@ -32,6 +33,7 @@ public class MetadataMappingService : IMetadataMappingService
     private readonly IReferenceRepository _referenceRepository;
     private readonly ReferenceWriteGate _referenceGate;
     private readonly StoragePathsOptions _storagePaths;
+    private readonly IPluginSettingsProvider _pluginSettings;
 
     public MetadataMappingService(
         IMediaRepository repository,
@@ -40,7 +42,8 @@ public class MetadataMappingService : IMetadataMappingService
         ICollectionRepository collectionRepository,
         IReferenceRepository referenceRepository,
         ReferenceWriteGate referenceGate,
-        IOptions<StoragePathsOptions> storagePaths)
+        IOptions<StoragePathsOptions> storagePaths,
+        IPluginSettingsProvider pluginSettings)
     {
         _repository = repository;
         _artworkRepository = artworkRepository;
@@ -49,6 +52,7 @@ public class MetadataMappingService : IMetadataMappingService
         _referenceRepository = referenceRepository;
         _referenceGate = referenceGate;
         _storagePaths = storagePaths.Value;
+        _pluginSettings = pluginSettings;
     }
 
     public async Task ApplyTextMetadataAsync(MediaItem item, MetadataResult metadata, bool forceOverride, string providerId, string providerName)
@@ -116,6 +120,17 @@ public class MetadataMappingService : IMetadataMappingService
             var topPoster = artworkEntities.OrderByDescending(a => a.VoteAverage).FirstOrDefault(a => a.Kind == ArtworkKind.Poster);
             var topBackdrop = artworkEntities.OrderByDescending(a => a.VoteAverage).FirstOrDefault(a => a.Kind == ArtworkKind.Backdrop);
 
+            // A logo carries the title as artwork, so the wrong language is the
+            // wrong picture: prefer the server's metadata language, then English,
+            // then whatever exists.
+            var metadataLanguage = MetadataLanguageCodes.ToIso6391(await _pluginSettings.GetMetadataLanguageAsync());
+            var topLogo = artworkEntities
+                .Where(a => a.Kind == ArtworkKind.Logo)
+                .OrderByDescending(a => a.Language == metadataLanguage)
+                .ThenByDescending(a => a.Language == "en")
+                .ThenByDescending(a => a.VoteAverage)
+                .FirstOrDefault();
+
             if (topPoster != null && (!item.IsLocked(nameof(item.PosterUrl)) || forceOverride))
             {
                 if (item.OriginalPosterUrl != topPoster.Url)
@@ -144,6 +159,17 @@ public class MetadataMappingService : IMetadataMappingService
                     item.BackgroundUrl = topBackdrop.Url;
                     updated = true;
                 }
+            }
+
+            // A logo belongs to the film or the show. Seasons and episodes
+            // inherit the show's at the view-model layer rather than storing a
+            // copy that would drift.
+            if (topLogo != null && item is not Episode && item is not Season
+                && (!item.IsLocked(nameof(item.LogoUrl)) || forceOverride)
+                && item.LogoUrl != topLogo.Url)
+            {
+                item.LogoUrl = topLogo.Url;
+                updated = true;
             }
 
             await _artworkRepository.ReplaceMediaArtworkAsync(item.Id, artworkEntities);

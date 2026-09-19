@@ -49,6 +49,7 @@ export interface LibraryItem {
     edition?: string;
     posterUrl?: string;
     backgroundUrl?: string;
+    logoUrl?: string;
     contentRating?: string;
     resolution?: string;
     durationSeconds?: number;

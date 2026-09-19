@@ -161,6 +161,7 @@ public class MediaManager : IMediaManager
 
         ApplyPosterChange(item, request.PosterUrl);
         ApplyBackgroundChange(item, request.BackgroundUrl);
+        ApplyLogoChange(item, request.LogoUrl);
 
         item.Title = request.Title;
         item.SortTitle = request.SortTitle;
@@ -209,6 +210,7 @@ public class MediaManager : IMediaManager
         CleanupOrphanedOverlay(item);
         _artworkThumbnails.RemoveThumbnailsForSource(item.PosterUrl);
         _artworkThumbnails.RemoveThumbnailsForSource(item.BackgroundUrl);
+        _artworkThumbnails.RemoveThumbnailsForSource(item.LogoUrl);
         _thumbnailStorage.DeleteItemDirectory(id);
         await _subtitlePreExtraction.PurgeItemAsync(id);
 
@@ -288,6 +290,14 @@ public class MediaManager : IMediaManager
         _artworkThumbnails.RemoveThumbnailsForSource(item.PosterUrl);
         item.OriginalPosterUrl = newPosterUrl;
         item.PosterUrl = newPosterUrl;
+    }
+
+    private void ApplyLogoChange(MediaItem item, string? newLogoUrl)
+    {
+        if (string.IsNullOrEmpty(newLogoUrl) || newLogoUrl == item.LogoUrl) return;
+
+        _artworkThumbnails.RemoveThumbnailsForSource(item.LogoUrl);
+        item.LogoUrl = newLogoUrl;
     }
 
     private void ApplyBackgroundChange(MediaItem item, string? newBackgroundUrl)

@@ -97,6 +97,24 @@ public class TmdbArtworkProvider : IArtworkProvider
             }
         }
 
+        // Title treatments. TMDB tags most of them "en" or as language-neutral,
+        // both of which the include_image_language above already asks for.
+        if (root.TryGetProperty("logos", out var logos))
+        {
+            foreach (var l in logos.EnumerateArray())
+            {
+                results.Add(new ArtworkResult
+                {
+                    Kind = ArtworkKind.Logo,
+                    Url = $"https://image.tmdb.org/t/p/original{l.GetProperty("file_path").GetString()}",
+                    Language = l.TryGetProperty("iso_639_1", out var lang) && lang.ValueKind == JsonValueKind.String ? lang.GetString() : "None",
+                    Width = l.TryGetProperty("width", out var w) ? w.GetInt32() : null,
+                    Height = l.TryGetProperty("height", out var h) ? h.GetInt32() : null,
+                    VoteAverage = l.TryGetProperty("vote_average", out var va) ? va.GetDouble() : null
+                });
+            }
+        }
+
         return results.OrderByDescending(r => r.VoteAverage).ToList();
     }
 }

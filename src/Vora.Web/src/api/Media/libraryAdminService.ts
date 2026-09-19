@@ -26,6 +26,7 @@ export interface UpdateMediaRequest {
     releaseDate?: string;
     posterUrl?: string;
     backgroundUrl?: string;
+    logoUrl?: string;
     thirdPartyRating1ProviderId?: string;
     thirdPartyRating2ProviderId?: string;
     artworkProviderId?: string;

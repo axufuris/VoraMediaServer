@@ -14,5 +14,6 @@ public class UpdateMediaRequest
     public DateOnly? ReleaseDate { get; set; }
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
+    public string? LogoUrl { get; set; }
     public List<string> LockedFields { get; set; } = new();
 }
