@@ -102,7 +102,7 @@ public class MetadataManagerTests
         _fetch.GetActorMetadataAsync(42, Arg.Any<int>()).Returns(new ActorMetadataResult
         {
             Biography = "bio",
-            Birthday = new DateTime(1970, 1, 1),
+            Birthday = new DateOnly(1970, 1, 1),
             Deathday = null,
             PlaceOfBirth = "Earth",
             ImdbId = "nm0000001",
@@ -112,7 +112,7 @@ public class MetadataManagerTests
         await _manager.TriggerActorMetadataRefreshAsync();
 
         actor.Biography.Should().Be("bio");
-        actor.Birthday.Should().Be(new DateTime(1970, 1, 1));
+        actor.Birthday.Should().Be(new DateOnly(1970, 1, 1));
         actor.PlaceOfBirth.Should().Be("Earth");
         actor.ImdbId.Should().Be("nm0000001");
         actor.HomePage.Should().Be("https://example.com");

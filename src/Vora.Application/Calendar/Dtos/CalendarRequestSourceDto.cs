@@ -11,7 +11,7 @@ public class CalendarRequestSourceDto
     public string Title { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
-    public DateTime? ExpectedReleaseDate { get; set; }
+    public DateOnly? ExpectedReleaseDate { get; set; }
 
     public static Expression<Func<MediaRequest, CalendarRequestSourceDto>> Projection =>
         r => new CalendarRequestSourceDto

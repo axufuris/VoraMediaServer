@@ -4,7 +4,7 @@ public class DiscoveryItemDetailsDto : DiscoveryItemDto
 {
     public string? Overview { get; set; }
     public string? BackgroundUrl { get; set; }
-    public DateTime? NextAirDate { get; set; }
+    public DateOnly? NextAirDate { get; set; }
     public int? RuntimeMinutes { get; set; }
     public decimal? Rating { get; set; }
     public List<string> Genres { get; set; } = new();

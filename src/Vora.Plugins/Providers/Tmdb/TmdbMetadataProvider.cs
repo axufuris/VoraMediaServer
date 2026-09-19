@@ -189,8 +189,7 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             Title = el.TryGetProperty(isTv ? "name" : "title", out var t) ? t.GetString() : null,
             OriginalTitle = el.TryGetProperty(isTv ? "original_name" : "original_title", out var ot) ? ot.GetString() : null,
             Overview = el.TryGetProperty("overview", out var ov) ? ov.GetString() : null,
-            ReleaseDate = DateTime.TryParse(el.TryGetProperty(isTv ? "first_air_date" : "release_date", out var rd) ? rd.GetString() : "", out var d)
-                ? DateTime.SpecifyKind(d, DateTimeKind.Utc) : null,
+            ReleaseDate = DateOnly.TryParse(el.TryGetProperty(isTv ? "first_air_date" : "release_date", out var rd) ? rd.GetString() : "", out var d) ? d : null,
             PosterUrl = el.TryGetProperty("poster_path", out var p) && p.GetString() != null ? $"https://image.tmdb.org/t/p/w500{p.GetString()}" : null,
             BackgroundUrl = el.TryGetProperty("backdrop_path", out var b) && b.GetString() != null ? $"https://image.tmdb.org/t/p/w1280{b.GetString()}" : null,
             IsAdult = el.TryGetProperty("adult", out var ad) && ad.GetBoolean(),
@@ -278,8 +277,7 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             result.NumberOfEpisodes = el.TryGetProperty("number_of_episodes", out var noe) ? noe.GetInt32() : null;
             result.NumberOfSeasons = el.TryGetProperty("number_of_seasons", out var nos) ? nos.GetInt32() : null;
 
-            result.LastAirDate = DateTime.TryParse(el.TryGetProperty("last_air_date", out var lad) ? lad.GetString() : "", out var lDate)
-                ? DateTime.SpecifyKind(lDate, DateTimeKind.Utc) : null;
+            result.LastAirDate = DateOnly.TryParse(el.TryGetProperty("last_air_date", out var lad) ? lad.GetString() : "", out var lDate) ? lDate : null;
 
             if (el.TryGetProperty("last_episode_to_air", out var le) && le.ValueKind != JsonValueKind.Null)
                 result.LastEpisodeToAirName = le.TryGetProperty("name", out var len) ? len.GetString() : null;
@@ -289,9 +287,9 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                 result.NextEpisodeToAirName = ne.TryGetProperty("name", out var nen) ? nen.GetString() : null;
                 var nextAirDateStr = ne.TryGetProperty("air_date", out var nda) ? nda.GetString() : "";
 
-                if (DateTime.TryParse(nextAirDateStr, out var nDate))
+                if (DateOnly.TryParse(nextAirDateStr, out var nDate))
                 {
-                    result.NextAirDate = DateTime.SpecifyKind(nDate, DateTimeKind.Utc);
+                    result.NextAirDate = nDate;
 
                     result.UpcomingEpisodes.Add(new UpcomingEpisodeResult
                     {
@@ -328,7 +326,7 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                         Name = season.GetProperty("name").GetString() ?? "Unknown",
                         Overview = season.TryGetProperty("overview", out var sov) ? sov.GetString() : null,
                         PosterUrl = season.TryGetProperty("poster_path", out var sp) && sp.GetString() != null ? $"https://image.tmdb.org/t/p/w500{sp.GetString()}" : null,
-                        AirDate = DateTime.TryParse(season.TryGetProperty("air_date", out var sad) ? sad.GetString() : "", out var sDate) ? DateTime.SpecifyKind(sDate, DateTimeKind.Utc) : null,
+                        AirDate = DateOnly.TryParse(season.TryGetProperty("air_date", out var sad) ? sad.GetString() : "", out var sDate) ? sDate : null,
                         EpisodeCount = season.TryGetProperty("episode_count", out var sec) ? sec.GetInt32() : 0,
                         VoteAverage = season.TryGetProperty("vote_average", out var sva) && sva.TryGetDecimal(out var sr) ? sr : null
                     });
@@ -541,7 +539,7 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                             TmdbId = ep.TryGetProperty("id", out var idProp) ? idProp.GetInt32().ToString() : null,
                             Title = ep.TryGetProperty("name", out var t) ? t.GetString() : null,
                             Overview = ep.TryGetProperty("overview", out var ov) ? ov.GetString() : null,
-                            ReleaseDate = DateTime.TryParse(ep.TryGetProperty("air_date", out var rd) ? rd.GetString() : "", out var d) ? DateTime.SpecifyKind(d, DateTimeKind.Utc) : null,
+                            ReleaseDate = DateOnly.TryParse(ep.TryGetProperty("air_date", out var rd) ? rd.GetString() : "", out var d) ? d : null,
                             Rating = ep.TryGetProperty("vote_average", out var va) && va.TryGetDecimal(out var rating) ? rating : null,
                             RuntimeMinutes = ep.TryGetProperty("runtime", out var rt) ? rt.GetInt32() : null
                         };
@@ -631,10 +629,8 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         {
             Biography = el.TryGetProperty("biography", out var bio) ? bio.GetString() : null,
             PlaceOfBirth = el.TryGetProperty("place_of_birth", out var pob) ? pob.GetString() : null,
-            Birthday = DateTime.TryParse(el.TryGetProperty("birthday", out var bday) ? bday.GetString() : "", out var b)
-                ? DateTime.SpecifyKind(b, DateTimeKind.Utc) : null,
-            Deathday = DateTime.TryParse(el.TryGetProperty("deathday", out var dday) ? dday.GetString() : "", out var d)
-                ? DateTime.SpecifyKind(d, DateTimeKind.Utc) : null,
+            Birthday = DateOnly.TryParse(el.TryGetProperty("birthday", out var bday) ? bday.GetString() : "", out var b) ? b : null,
+            Deathday = DateOnly.TryParse(el.TryGetProperty("deathday", out var dday) ? dday.GetString() : "", out var d) ? d : null,
             ImdbId = el.TryGetProperty("imdb_id", out var imdb) ? imdb.GetString() : null,
             HomePage = el.TryGetProperty("homepage", out var hp) ? hp.GetString() : null
         };

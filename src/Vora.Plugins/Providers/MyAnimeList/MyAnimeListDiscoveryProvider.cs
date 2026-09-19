@@ -112,7 +112,7 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
                     var isMovie = mediaType == "movie";
 
                     var rawDate = node.TryGetProperty("start_date", out var d) ? d.GetString() : "";
-                    var parsedDate = DateTime.TryParse(rawDate, out var date) ? (DateTime?)DateTime.SpecifyKind(date, DateTimeKind.Utc) : null;
+                    var parsedDate = DateOnly.TryParse(rawDate, out var date) ? date : (DateOnly?)null;
 
                     results.Add(new DiscoveryItemDto
                     {
@@ -169,7 +169,7 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
 
             var mediaType = node.TryGetProperty("media_type", out var mt) ? mt.GetString() : "tv";
             var rawDate = node.TryGetProperty("start_date", out var d) ? d.GetString() : "";
-            var parsedDate = DateTime.TryParse(rawDate, out var date) ? (DateTime?)DateTime.SpecifyKind(date, DateTimeKind.Utc) : null;
+            var parsedDate = DateOnly.TryParse(rawDate, out var date) ? date : (DateOnly?)null;
 
             var details = new DiscoveryItemDetailsDto
             {
@@ -263,7 +263,7 @@ public class MyAnimeListDiscoveryProvider : IDiscoveryProvider
                     var node = el.GetProperty("node");
                     var mediaType = node.TryGetProperty("media_type", out var mt) ? mt.GetString() : "tv";
                     var rawDate = node.TryGetProperty("start_date", out var d) ? d.GetString() : "";
-                    var parsedDate = DateTime.TryParse(rawDate, out var date) ? (DateTime?)DateTime.SpecifyKind(date, DateTimeKind.Utc) : null;
+                    var parsedDate = DateOnly.TryParse(rawDate, out var date) ? date : (DateOnly?)null;
 
                     results.Add(new DiscoveryItemDto
                     {

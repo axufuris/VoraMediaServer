@@ -179,7 +179,7 @@ public class RequestManagerTests
         _requests.GetAllServersAsync().Returns(new List<RequestServerVM> { NewServer("Movie") });
         _requests.GetRequestAsync("603", "Movie").Returns((MediaRequest?)null);
 
-        var expectedRelease = new DateTime(2025, 12, 25);
+        var expectedRelease = new DateOnly(2025, 12, 25);
         await _manager.ProcessWatchlistAdditionAsync("603", "tmdb", "Matrix", "Movie", "poster.jpg", profileId, expectedRelease);
 
         await _requests.Received(1).AddRequestAsync(Arg.Is<MediaRequest>(r =>

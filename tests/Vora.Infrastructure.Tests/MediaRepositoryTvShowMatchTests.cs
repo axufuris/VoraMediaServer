@@ -21,7 +21,7 @@ public class MediaRepositoryTvShowMatchTests
             Id = Guid.NewGuid(),
             Title = title,
             LibraryId = libraryId,
-            ReleaseDate = new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            ReleaseDate = new DateOnly(year, 1, 1)
         };
         db.Set<TvShow>().Add(show);
         db.SaveChanges();

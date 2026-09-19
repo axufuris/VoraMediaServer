@@ -9,8 +9,8 @@ public class Actor
     public string? PlaceOfBirth { get; set; }
     public string? HomePage { get; set; }
 
-    public DateTime? Birthday { get; set; }
-    public DateTime? Deathday { get; set; }
+    public DateOnly? Birthday { get; set; }
+    public DateOnly? Deathday { get; set; }
 
     // A person is identified by whichever provider supplied them. Only one of
     // these is normally set; enrichment routes to the matching provider, since

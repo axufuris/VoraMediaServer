@@ -73,8 +73,8 @@ public class LocalMetadataProvider : IMetadataProvider
                     result.Tagline = root.Element("tagline")?.Value;
                     result.ContentRating = root.Element("mpaa")?.Value;
 
-                    if (DateTime.TryParse(root.Element("premiered")?.Value ?? root.Element("releasedate")?.Value, out var date))
-                        result.ReleaseDate = DateTime.SpecifyKind(date, DateTimeKind.Utc);
+                    if (DateOnly.TryParse(root.Element("premiered")?.Value ?? root.Element("releasedate")?.Value, out var date))
+                        result.ReleaseDate = date;
 
                     if (decimal.TryParse(root.Element("rating")?.Value ?? root.Element("userrating")?.Value, out var rating))
                         result.Rating = rating;
@@ -176,8 +176,8 @@ public class LocalMetadataProvider : IMetadataProvider
                     result.Overview = root.Element("plot")?.Value;
                     result.ContentRating = root.Element("mpaa")?.Value;
 
-                    if (DateTime.TryParse(root.Element("premiered")?.Value, out var date))
-                        result.ReleaseDate = DateTime.SpecifyKind(date, DateTimeKind.Utc);
+                    if (DateOnly.TryParse(root.Element("premiered")?.Value, out var date))
+                        result.ReleaseDate = date;
 
                     if (decimal.TryParse(root.Element("rating")?.Value, out var rating))
                         result.Rating = rating;
@@ -267,8 +267,8 @@ public class LocalMetadataProvider : IMetadataProvider
                 result.Title = root.Element("title")?.Value;
                 result.Overview = root.Element("plot")?.Value;
 
-                if (DateTime.TryParse(root.Element("aired")?.Value, out var date))
-                    result.ReleaseDate = DateTime.SpecifyKind(date, DateTimeKind.Utc);
+                if (DateOnly.TryParse(root.Element("aired")?.Value, out var date))
+                    result.ReleaseDate = date;
 
                 if (decimal.TryParse(root.Element("rating")?.Value, out var rating))
                     result.Rating = rating;

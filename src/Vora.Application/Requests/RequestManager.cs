@@ -15,7 +15,7 @@ namespace Vora.Application.Requests;
 
 public interface IRequestManager
 {
-    Task ProcessWatchlistAdditionAsync(string externalId, string providerId, string title, string type, string posterUrl, Guid profileId, DateTime? expectedReleaseDate);
+    Task ProcessWatchlistAdditionAsync(string externalId, string providerId, string title, string type, string posterUrl, Guid profileId, DateOnly? expectedReleaseDate);
 
     Task<bool> ApproveRequestAsync(Guid requestId, Guid? specificServerId = null, int? overrideProfileId = null, CancellationToken cancellationToken = default);
     Task<List<RequestServerVM>> GetAllServersAsync();
@@ -51,7 +51,7 @@ public class RequestManager : IRequestManager
         _serviceProvider = serviceProvider;
     }
 
-    public async Task ProcessWatchlistAdditionAsync(string externalId, string providerId, string title, string type, string posterUrl, Guid profileId, DateTime? expectedReleaseDate)
+    public async Task ProcessWatchlistAdditionAsync(string externalId, string providerId, string title, string type, string posterUrl, Guid profileId, DateOnly? expectedReleaseDate)
     {
         var alreadyInLibrary = await _mediaRepo.MediaExistsByExternalIdAsync(externalId, type);
         if (alreadyInLibrary) return;

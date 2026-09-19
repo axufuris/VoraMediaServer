@@ -126,13 +126,21 @@ zone. Two pieces make that hold:
   `isSameLocalDay` and `calendarDaysBetween`. Nothing renders a server timestamp
   with a bare `new Date(...)`.
 
-**Date-only values are not instants.** A release date, an air date or a birthday
-is a calendar date and must read the same everywhere, so `serverTime` detects the
-`YYYY-MM-DD` shape and builds local midnight instead of applying an offset, and
-`yearOf` reads the year off the string. Note the storage side is still
-`DateTime` in a `timestamptz` column, so those values arrive as midnight UTC;
-the client refuses to shift them. Moving them to `DateOnly` + `date` columns is
-the structural fix and is not done.
+**Date-only values are not instants**, all the way down. A release date, an air
+date or a birthday is a calendar date and must read the same everywhere, so it is
+`DateOnly` in the domain, a `date` column in PostgreSQL, and `"2026-01-01"` on the
+wire — `DateOnlyConverter` / `NullableDateOnlyConverter`. The converters read
+leniently (a client still sending `2026-01-01T00:00:00Z` keeps working, and its
+date is taken as written rather than shifted) and always write the plain form.
+Client-side, `serverTime` builds local midnight for that shape and `yearOf` reads
+the year off the string.
+
+The fields: `MediaItem.ReleaseDate` (inherited by movies, shows, seasons,
+episodes and tracks), `Movie.TheatricalReleaseDate` / `DigitalReleaseDate`,
+`TvShow.LastAirDate` / `NextAirDate`, `Actor.Birthday` / `Deathday`, and
+`ExpectedReleaseDate` on requests and watchlist items. `CalendarEventDto.ReleaseDate`
+stays a `DateTime` on purpose — it carries a TV airing's time of day alongside
+`AirTime`, so it is a real instant.
 
 ## Live permission refetch
 

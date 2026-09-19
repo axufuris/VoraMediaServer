@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { searchService, type AggregatedGlobalSearchResponse } from '../../api/Discovery/searchService';
 import { discoveryService, type DiscoveryItem } from '../../api/Discovery/discoveryService';
 import { StorageKeys, SessionKeys, getProfileIdFromToken } from '../../utils/storageKeys';
+import { formatDate, parseServerDate, yearOf } from '../../utils/serverTime';
 
 export default function SearchBar() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -73,11 +74,12 @@ export default function SearchBar() {
 
     const formatReleaseDisplay = (releaseDate?: string, fallbackYear?: number | null) => {
         if (!releaseDate) return fallbackYear ? fallbackYear.toString() : 'Unknown';
-        const date = new Date(releaseDate);
+        const date = parseServerDate(releaseDate);
+        if (!date) return fallbackYear ? fallbackYear.toString() : 'Unknown';
         if (date > new Date()) {
-            return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            return formatDate(releaseDate, { year: 'numeric', month: 'short', day: 'numeric' });
         }
-        return date.getFullYear().toString();
+        return String(yearOf(releaseDate) ?? date.getFullYear());
     };
 
     const totalLocalResults = localResults ?

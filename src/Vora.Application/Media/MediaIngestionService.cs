@@ -113,7 +113,7 @@ public class MediaIngestionService : IMediaIngestionService
             Title = title,
             LibraryId = libraryId,
             AddedAt = DateTime.UtcNow,
-            ReleaseDate = year.HasValue ? new DateTime(year.Value, 1, 1, 0, 0, 0, DateTimeKind.Utc) : null,
+            ReleaseDate = year.HasValue ? new DateOnly(year.Value, 1, 1) : null,
             TmdbId = tmdbId,
             ImdbId = imdbId,
             TvdbId = tvdbId,
@@ -153,7 +153,7 @@ public class MediaIngestionService : IMediaIngestionService
                 OriginalTitle = title,
                 LibraryId = libraryId,
                 AddedAt = DateTime.UtcNow,
-                ReleaseDate = year.HasValue ? new DateTime(year.Value, 1, 1, 0, 0, 0, DateTimeKind.Utc) : null,
+                ReleaseDate = year.HasValue ? new DateOnly(year.Value, 1, 1) : null,
                 TmdbId = tmdbId,
                 ImdbId = imdbId,
                 TvdbId = tvdbId
@@ -209,7 +209,7 @@ public class MediaIngestionService : IMediaIngestionService
         return new SeasonHandle(resultId);
     }
 
-    public async Task<MediaItemHandle> EnsureEpisodeAsync(LibraryHandle library, SeasonHandle season, int episodeNumber, string title, DateTime? airDate, string? edition = null, int? endEpisodeNumber = null)
+    public async Task<MediaItemHandle> EnsureEpisodeAsync(LibraryHandle library, SeasonHandle season, int episodeNumber, string title, DateOnly? airDate, string? edition = null, int? endEpisodeNumber = null)
     {
         var libraryId = library.Value;
         var seasonId = season.Value;

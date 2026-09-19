@@ -11,8 +11,8 @@ public class ActorVM
     public string Name { get; set; } = string.Empty;
     public string? ProfileImageUrl { get; set; }
     public string? Biography { get; set; }
-    public DateTime? Birthday { get; set; }
-    public DateTime? Deathday { get; set; }
+    public DateOnly? Birthday { get; set; }
+    public DateOnly? Deathday { get; set; }
     public string? PlaceOfBirth { get; set; }
     public List<ActorRoleVM> Filmography { get; set; } = new();
 

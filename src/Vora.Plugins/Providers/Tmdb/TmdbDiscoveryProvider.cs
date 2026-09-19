@@ -145,7 +145,7 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
             foreach (var el in doc.RootElement.GetProperty("results").EnumerateArray())
             {
                 var rawDate = el.TryGetProperty(isTv ? "first_air_date" : "release_date", out var d) ? d.GetString() : "";
-                var parsedDate = DateTime.TryParse(rawDate, out var date) ? (DateTime?)DateTime.SpecifyKind(date, DateTimeKind.Utc) : null;
+                var parsedDate = DateOnly.TryParse(rawDate, out var date) ? date : (DateOnly?)null;
 
                 results.Add(new DiscoveryItemDto
                 {
@@ -190,15 +190,15 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
             var el = doc.RootElement;
 
             var rawDate = el.TryGetProperty(isTv ? "first_air_date" : "release_date", out var dStr) ? dStr.GetString() : "";
-            var parsedDate = DateTime.TryParse(rawDate, out var dateParsed) ? (DateTime?)DateTime.SpecifyKind(dateParsed, DateTimeKind.Utc) : null;
+            var parsedDate = DateOnly.TryParse(rawDate, out var dateParsed) ? dateParsed : (DateOnly?)null;
 
-            DateTime? parsedNextAirDate = null;
+            DateOnly? parsedNextAirDate = null;
             if (isTv && el.TryGetProperty("next_episode_to_air", out var ne) && ne.ValueKind != JsonValueKind.Null)
             {
                 var nextRaw = ne.TryGetProperty("air_date", out var nd) ? nd.GetString() : "";
-                if (DateTime.TryParse(nextRaw, out var nextParsed))
+                if (DateOnly.TryParse(nextRaw, out var nextParsed))
                 {
-                    parsedNextAirDate = DateTime.SpecifyKind(nextParsed, DateTimeKind.Utc);
+                    parsedNextAirDate = nextParsed;
                 }
             }
 
@@ -405,7 +405,7 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
                     if (!seenKeys.Add($"{mediaType}:{externalId}")) continue;
 
                     var rawDate = role.TryGetProperty(mediaType == "tv" ? "first_air_date" : "release_date", out var rd) ? rd.GetString() : "";
-                    var parsedDate = DateTime.TryParse(rawDate, out var date) ? (DateTime?)DateTime.SpecifyKind(date, DateTimeKind.Utc) : null;
+                    var parsedDate = DateOnly.TryParse(rawDate, out var date) ? date : (DateOnly?)null;
 
                     actor.Filmography.Add(new DiscoveryItemDto
                     {
@@ -450,7 +450,7 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
                 if (mediaType != "movie" && mediaType != "tv") continue;
 
                 var rawDate = el.TryGetProperty(mediaType == "tv" ? "first_air_date" : "release_date", out var d) ? d.GetString() : "";
-                var parsedDate = DateTime.TryParse(rawDate, out var date) ? (DateTime?)DateTime.SpecifyKind(date, DateTimeKind.Utc) : null;
+                var parsedDate = DateOnly.TryParse(rawDate, out var date) ? date : (DateOnly?)null;
 
                 results.Add(new DiscoveryItemDto
                 {

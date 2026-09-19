@@ -41,15 +41,17 @@ public class LocalCalendarProvider(
     {
         var events = new List<CalendarEventDto>();
         var movies = await repository.GetMoviesReleasingInRangeAsync(startDate, endDate);
+        var firstDay = DateOnly.FromDateTime(startDate);
+        var lastDay = DateOnly.FromDateTime(endDate);
 
         foreach (var movie in movies)
         {
-            if (movie.TheatricalReleaseDate >= startDate && movie.TheatricalReleaseDate <= endDate)
+            if (movie.TheatricalReleaseDate >= firstDay && movie.TheatricalReleaseDate <= lastDay)
             {
                 events.Add(MapMovieToEvent(movie, movie.TheatricalReleaseDate.Value, "Theatrical"));
             }
 
-            if (movie.DigitalReleaseDate >= startDate && movie.DigitalReleaseDate <= endDate)
+            if (movie.DigitalReleaseDate >= firstDay && movie.DigitalReleaseDate <= lastDay)
             {
                 events.Add(MapMovieToEvent(movie, movie.DigitalReleaseDate.Value, "Digital"));
             }
@@ -71,7 +73,7 @@ public class LocalCalendarProvider(
                 continue;
             }
 
-            foreach (var ep in upcoming.Where(e => e.AirDate >= startDate && e.AirDate <= endDate))
+            foreach (var ep in upcoming.Where(e => e.AirDate >= DateOnly.FromDateTime(startDate) && e.AirDate <= DateOnly.FromDateTime(endDate)))
             {
                 events.Add(new CalendarEventDto
                 {
@@ -83,7 +85,7 @@ public class LocalCalendarProvider(
                     Title = show.Title,
                     SubTitle = $"S{ep.SeasonNumber:D2}E{ep.EpisodeNumber:D2} - {ep.Title}",
                     MediaType = "Episode",
-                    ReleaseDate = ep.AirDate,
+                    ReleaseDate = ep.AirDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
                     AirTime = ep.AirTime,
                     ReleaseType = "TV Airing",
                     ContentRating = show.ContentRating ?? UnratedRating,
@@ -113,7 +115,7 @@ public class LocalCalendarProvider(
                 Title = r.Title,
                 SubTitle = "Watchlist Request",
                 MediaType = r.Type,
-                ReleaseDate = r.ExpectedReleaseDate!.Value,
+                ReleaseDate = r.ExpectedReleaseDate!.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
                 ReleaseType = "Release",
                 ContentRating = UnratedRating,
                 PosterUrl = r.PosterUrl,
@@ -137,7 +139,7 @@ public class LocalCalendarProvider(
                 Title = i.Title,
                 SubTitle = "Watchlist",
                 MediaType = i.Type,
-                ReleaseDate = i.ExpectedReleaseDate!.Value,
+                ReleaseDate = i.ExpectedReleaseDate!.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
                 ReleaseType = "Release",
                 ContentRating = UnratedRating,
                 PosterUrl = i.PosterUrl,
@@ -146,7 +148,7 @@ public class LocalCalendarProvider(
             });
     }
 
-    private static CalendarEventDto MapMovieToEvent(CalendarMovieSourceDto movie, DateTime releaseDate, string releaseType) => new()
+    private static CalendarEventDto MapMovieToEvent(CalendarMovieSourceDto movie, DateOnly releaseDate, string releaseType) => new()
     {
         Id = $"local_movie_{movie.Id}_{releaseType}",
         LibraryId = movie.LibraryId,
@@ -156,7 +158,7 @@ public class LocalCalendarProvider(
         Title = movie.Title,
         SubTitle = null,
         MediaType = "Movie",
-        ReleaseDate = releaseDate,
+        ReleaseDate = releaseDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
         ReleaseType = releaseType,
         ContentRating = movie.ContentRating ?? UnratedRating,
         PosterUrl = movie.PosterUrl,

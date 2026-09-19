@@ -15,7 +15,7 @@ public class MediaItemVM
     public string? ContentRating { get; set; }
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public string Type { get; set; } = string.Empty;
     public int? NumberOfSeasons { get; set; }
 

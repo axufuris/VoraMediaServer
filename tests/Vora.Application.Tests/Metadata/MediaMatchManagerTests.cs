@@ -119,7 +119,7 @@ public class MediaMatchManagerTests
     {
         Holds(DuplicateShow());
         _tvdb.FetchTvShowMetadataByIdAsync("tt18546730", "imdb", Arg.Any<CancellationToken>())
-            .Returns(new MetadataResult { Title = "The Walking Dead: Dead City", ReleaseDate = new DateTime(2023, 6, 18) });
+            .Returns(new MetadataResult { Title = "The Walking Dead: Dead City", ReleaseDate = new DateOnly(2023, 6, 18) });
 
         var results = await Manager().SearchAsync(DuplicateShowId, "https://www.imdb.com/title/tt18546730/", null);
 

@@ -8,7 +8,7 @@ public class EpisodeVM
     public string Title { get; set; } = string.Empty;
     public string? Overview { get; set; }
     public string? PosterUrl { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public double? DurationMinutes { get; set; }
     public bool IsPlayed { get; set; }
     public double? ResumePositionSeconds { get; set; }
