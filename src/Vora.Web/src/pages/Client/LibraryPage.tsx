@@ -14,6 +14,7 @@ import MediaGrid from '../../components/Client/Primitives/MediaGrid';
 import LetterRail from '../../components/Client/Primitives/LetterRail';
 import { StorageKeys } from '../../utils/storageKeys';
 import { recentlyAddedTime } from '../../utils/recentlyAdded';
+import { yearOf } from '../../utils/serverTime';
 
 type LibraryTabKey = 'library' | 'collections' | 'recommendations';
 
@@ -507,8 +508,8 @@ export default function LibraryPage() {
         for (const i of items) {
             i.genres?.forEach(g => genres.add(g));
             if (i.releaseDate) {
-                const y = new Date(i.releaseDate).getFullYear();
-                if (!isNaN(y)) {
+                const y = yearOf(i.releaseDate);
+                if (y !== null) {
                     years.add(y);
                     decades.add(Math.floor(y / 10) * 10);
                 }
@@ -526,7 +527,7 @@ export default function LibraryPage() {
     // Apply filter then sort to the raw items list. Letter grouping only makes sense
     // when sorting by title, so the rendering branch checks sortBy below.
     const visibleItems = useMemo(() => {
-        const year = (i: LibraryItem) => i.releaseDate ? new Date(i.releaseDate).getFullYear() : null;
+        const year = (i: LibraryItem) => yearOf(i.releaseDate);
         const matchesFilter = (i: LibraryItem): boolean => {
             if (filter.kind === 'preset') {
                 switch (filter.preset) {

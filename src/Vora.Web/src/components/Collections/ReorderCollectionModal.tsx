@@ -4,6 +4,7 @@ import { collectionAdminService } from '../../api/Collections/collectionAdminSer
 import type { CollectionDetails, CollectionDetailsLibraryItem } from '../../api/Collections/collectionService';
 import { useDialog } from '../../dialogs';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../Common/Modal';
+import { yearOf } from '../../utils/serverTime';
 
 interface ReorderCollectionModalProps {
     isOpen: boolean;
@@ -131,7 +132,7 @@ export default function ReorderCollectionModal({
 
                         <div className="flex-1 min-w-0">
                             <h4 className="font-bold text-[var(--vora-text-secondary)] text-sm truncate">{item.tvShowTitle ? `${item.tvShowTitle}: ${item.title}` : item.title}</h4>
-                            <p className="text-xs text-[var(--vora-text-muted)]">{item.releaseDate ? new Date(item.releaseDate).getFullYear() : 'Unknown'}</p>
+                            <p className="text-xs text-[var(--vora-text-muted)]">{yearOf(item.releaseDate) ?? 'Unknown'}</p>
                         </div>
 
                         {isChronology && (

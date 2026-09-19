@@ -12,6 +12,7 @@ import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import Tabs from '../../../components/Client/Primitives/Tabs';
 import { Modal } from '../../../components/Common/Modal';
+import { parseServerDate, serverTimeMs } from '../../../utils/serverTime';
 
 type DvrTabKey = 'Completed' | 'Upcoming' | 'Failed';
 
@@ -82,12 +83,12 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
     }, []));
 
     const formatTime = (dateStr: string) => {
-        const date = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
+        const date = (parseServerDate(dateStr) ?? new Date(0));
         return date.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     };
 
     const getDurationString = (start: string, end: string) => {
-        const diff = new Date(end.endsWith('Z') ? end : end + 'Z').getTime() - new Date(start.endsWith('Z') ? start : start + 'Z').getTime();
+        const diff = (parseServerDate(end) ?? new Date(0)).getTime() - (parseServerDate(start) ?? new Date(0)).getTime();
         return Math.max(1, Math.round(diff / 60000)) + ' min';
     };
 
@@ -120,8 +121,8 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
 
         return Object.entries(groups).map(([title, groupSessions]) => {
             const targetTime = activeTab === 'Upcoming'
-                ? Math.min(...groupSessions.map(x => new Date(x.startTime).getTime()))
-                : Math.max(...groupSessions.map(x => new Date(x.startTime).getTime()));
+                ? Math.min(...groupSessions.map(x => serverTimeMs(x.startTime)))
+                : Math.max(...groupSessions.map(x => serverTimeMs(x.startTime)));
 
             return {
                 title,

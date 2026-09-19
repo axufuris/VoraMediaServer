@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Globalization;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http;
 using System.Text.Json;
 using Vora.Plugins.Dtos;
@@ -77,7 +78,7 @@ public class SonarrCalendarProvider : ICalendarProvider
 
                     if (episode.TryGetProperty("airDateUtc", out var airDate) && airDate.ValueKind != JsonValueKind.Null)
                     {
-                        if (DateTime.TryParse(airDate.GetString(), out var parsedDate))
+                        if (DateTime.TryParse(airDate.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var parsedDate))
                         {
                             var utcDate = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
                             var dtoId = $"sonarr_{id}";

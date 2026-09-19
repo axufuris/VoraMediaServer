@@ -13,6 +13,7 @@ import { BookmarkIcon } from '../../../components/Client/Primitives/ActionIcons'
 import { directorsFrom } from '../../../utils/credits';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { formatRuntime } from '../../../utils/formatRuntime';
+import { formatDate } from '../../../utils/serverTime';
 
 export default function DiscoveryDetailsPage() {
     const dialog = useDialog();
@@ -168,7 +169,7 @@ export default function DiscoveryDetailsPage() {
                             {runtimeLabel && <HeroChip>{runtimeLabel}</HeroChip>}
                             {details.contentRating && <HeroChip>{details.contentRating}</HeroChip>}
                             {details.inLibrary && <HeroChip tone="accent">In your library</HeroChip>}
-                            {details.nextAirDate && <HeroChip>Next air date {new Date(details.nextAirDate).toLocaleDateString()}</HeroChip>}
+                            {details.nextAirDate && <HeroChip>Next air date {formatDate(details.nextAirDate)}</HeroChip>}
                             {requestStatus === 'Pending' && <HeroChip>Request pending</HeroChip>}
                             {requestStatus === 'Processing' && <HeroChip>Downloading</HeroChip>}
                             {requestStatus === 'Available' && <HeroChip tone="accent">Available in library</HeroChip>}

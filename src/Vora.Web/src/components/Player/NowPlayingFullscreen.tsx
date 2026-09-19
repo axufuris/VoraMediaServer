@@ -9,6 +9,8 @@ import { NowPlayingShell } from './NowPlaying/NowPlayingShell';
 import { NowPlayingArtwork } from './NowPlaying/NowPlayingArtwork';
 import { NowPlayingControlRow, NowPlayingIconButton, NowPlayingPill, NowPlayingPlayButton, NowPlayingSeekBar, NowPlayingVolume } from './NowPlaying/NowPlayingControls';
 import { lyricsScrollTop } from '../../utils/lyricsScroll';
+import { plainLyricsScrollTop } from '../../utils/plainLyricsScroll';
+import AddToPlaylistModal from '../Collections/AddToPlaylistModal';
 
 export default function NowPlayingFullscreen() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -46,6 +48,7 @@ export default function NowPlayingFullscreen() {
     const [stationSaved, setStationSaved] = useState(false);
     const [stationName, setStationName] = useState<string>('');
     const [stationDialogOpen, setStationDialogOpen] = useState(false);
+    const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false);
     const lyricsScrollRef = useRef<HTMLDivElement>(null);
     const lastLyricsScrollRef = useRef<string | null>(null);
 
@@ -81,6 +84,9 @@ export default function NowPlayingFullscreen() {
     // without clearing the preference for the one after.
     const lyricsOpen = lyricsWanted && (hasLyrics || lyricsLoading);
     const showLyricsToggle = hasLyrics || lyricsOpen;
+    // Plain lyrics carry no timings, so the panel travels with the song's
+    // progress instead. It is not something the viewer scrolls or tabs into.
+    const plainLyricsOpen = lyricsOpen && !!lyrics && !(lyrics.isSynced && parsedLrc.length > 0);
 
     useEffect(() => {
         if (!isFullscreen || !currentMedia) return;
@@ -107,6 +113,14 @@ export default function NowPlayingFullscreen() {
     }, [isFullscreen, currentMedia, serverId]);
 
     const currentTrackId = currentMedia?.id;
+
+    useEffect(() => {
+        if (!plainLyricsOpen) return;
+        const container = lyricsScrollRef.current;
+        if (!container) return;
+
+        container.scrollTop = plainLyricsScrollTop(currentTime, duration, container.scrollHeight, container.clientHeight);
+    }, [plainLyricsOpen, currentTime, duration, lyrics?.plainLyrics]);
 
     useEffect(() => {
         if (!lyricsOpen) {
@@ -213,6 +227,15 @@ export default function NowPlayingFullscreen() {
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
                                     )}
                                 </NowPlayingIconButton>
+                                {!radioSeed && (
+                                    <NowPlayingPill
+                                        label="Playlist"
+                                        title="Add this track to a playlist"
+                                        active={addToPlaylistOpen}
+                                        onClick={() => setAddToPlaylistOpen(true)}
+                                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="3" y1="6" x2="15" y2="6" /><line x1="3" y1="12" x2="15" y2="12" /><line x1="3" y1="18" x2="11" y2="18" /><line x1="18" y1="9" x2="18" y2="19" /><line x1="13" y1="14" x2="23" y2="14" /></svg>}
+                                    />
+                                )}
                                 {showLyricsToggle && (
                                     <NowPlayingPill
                                         label="Lyrics"
@@ -319,6 +342,14 @@ export default function NowPlayingFullscreen() {
             }
             overlays={
                 <>
+                    {addToPlaylistOpen && currentMedia && (
+                        <AddToPlaylistModal
+                            isOpen={true}
+                            onClose={() => setAddToPlaylistOpen(false)}
+                            mediaId={currentMedia.id}
+                            serverId={currentMedia.serverId ?? serverId}
+                        />
+                    )}
                     <Modal
                         isOpen={stationDialogOpen}
                         onClose={() => { if (!savingStation) setStationDialogOpen(false); }}
@@ -376,7 +407,12 @@ export default function NowPlayingFullscreen() {
                 />
 
                 {lyricsOpen && (
-                    <div ref={lyricsScrollRef} className="mt-6 min-h-0 w-full max-w-[640px] flex-1 overflow-y-auto px-4">
+                    <div
+                        ref={lyricsScrollRef}
+                        data-testid="lyrics-panel"
+                        aria-label="Lyrics"
+                        className={`mt-6 min-h-0 w-full max-w-[640px] flex-1 px-4 ${plainLyricsOpen ? 'overflow-hidden' : 'overflow-y-auto'}`}
+                    >
                         {lyricsLoading ? (
                             <div className="py-16 text-center text-sm" style={{ color: 'var(--vora-text-muted)' }}>Loading lyrics…</div>
                         ) : !lyrics ? (

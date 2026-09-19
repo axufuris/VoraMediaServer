@@ -12,6 +12,7 @@ import { ROW_HEIGHT, PX_PER_MINUTE, HOURS_TO_SHOW, CHANNEL_COLUMN_WIDTH, parseDa
 import { useGuideData } from './hooks/useGuideData';
 import { useGuideVirtualization } from './hooks/useGuideVirtualization';
 import GuideRow, { type CleanedProgram } from './components/GuideRow';
+import { serverTimeMs } from '../../../utils/serverTime';
 
 export interface LiveTvGuideProps {
     isEmbedded?: boolean;
@@ -219,7 +220,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
         });
 
         const now = nowMs;
-        const parseProgramTime = (t: string): number => new Date(t.endsWith('Z') ? t : t + 'Z').getTime();
+        const parseProgramTime = (t: string): number => serverTimeMs(t);
         const hasCurrentProgram = (externalChannelId: string): boolean => {
             const programs = guideData[(externalChannelId || '').toLowerCase()] || [];
             return programs.some(p => {
@@ -281,12 +282,12 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
     const cleanedGuideData = useMemo(() => {
         const cleaned = new Map<string, CleanedProgram[]>();
         for (const [channelKey, rawPrograms] of Object.entries(guideData)) {
-            const sorted = [...rawPrograms].sort((a, b) => new Date(a.startTime.endsWith('Z') ? a.startTime : a.startTime + 'Z').getTime() - new Date(b.startTime.endsWith('Z') ? b.startTime : b.startTime + 'Z').getTime());
+            const sorted = [...rawPrograms].sort((a, b) => serverTimeMs(a.startTime) - serverTimeMs(b.startTime));
             const cleanPrograms: CleanedProgram[] = [];
             let lastEnd = 0;
             for (const p of sorted) {
-                let pStart = new Date(p.startTime.endsWith('Z') ? p.startTime : p.startTime + 'Z').getTime();
-                const pEnd = new Date(p.endTime.endsWith('Z') ? p.endTime : p.endTime + 'Z').getTime();
+                let pStart = serverTimeMs(p.startTime);
+                const pEnd = serverTimeMs(p.endTime);
                 if (pEnd <= lastEnd) continue;
                 if (pStart < lastEnd) pStart = lastEnd;
                 if (pEnd > pStart) { cleanPrograms.push({ ...p, _safeStart: pStart, _safeEnd: pEnd }); lastEnd = pEnd; }

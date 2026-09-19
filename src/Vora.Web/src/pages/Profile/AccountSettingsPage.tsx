@@ -13,6 +13,8 @@ import { authService } from '../../api/Auth/authService';
 import { musicService } from '../../api/Music/musicService';
 import PlexImportPanel from '../../components/LibraryMigration/PlexImportPanel';
 import ProviderAccessList from '../../components/Common/ProviderAccessList';
+import Spinner from '../../components/Common/Spinner';
+import { errorDetail } from '../../utils/apiError';
 export default function AccountSettingsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const [user, setUser] = useState<UserVM | null>(null);
@@ -27,7 +29,8 @@ export default function AccountSettingsPage() {
     const [accountMsg, setAccountMsg] = useState('');
 
     const [editingProfile, setEditingProfile] = useState<UserProfileVM | null>(null);
-    const [refreshTrigger, setRefreshTrigger] = useState(0); // Safely triggers re-fetches
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [loadError, setLoadError] = useState<string | null>(null); // Safely triggers re-fetches
 
     const isProfileAdmin = localStorage.getItem(StorageKeys.isProfileAdmin) === 'true';
     const profileToken = localStorage.getItem(StorageKeys.profileToken);
@@ -38,7 +41,10 @@ export default function AccountSettingsPage() {
 
         const fetchData = async () => {
             const userId = localStorage.getItem(StorageKeys.userId);
-            if (!userId) return;
+            if (!userId) {
+                if (isMounted) setLoadError('You are not signed in on this device.');
+                return;
+            }
 
             try {
                 const [userData, libs, iptvData, setupStatus] = await Promise.all([
@@ -62,8 +68,9 @@ export default function AccountSettingsPage() {
                     const myProfile = userData.profiles.find(p => p.id === activeProfileId);
                     if (myProfile) setEditingProfile(myProfile);
                 }
-            } catch {
-                if (isMounted) console.error("Failed to load account settings.");
+            } catch (error) {
+                console.error('Failed to load account settings.', error);
+                if (isMounted) setLoadError(errorDetail(error, 'We could not load your profile. Check your connection and try again.'));
             }
         };
 
@@ -104,10 +111,24 @@ export default function AccountSettingsPage() {
         }
     };
 
+    const retryLoad = () => {
+        setLoadError(null);
+        setRefreshTrigger(prev => prev + 1);
+    };
+
+    const loadFailure = loadError && (
+        <div role="alert" className="text-sm text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] border border-[var(--vora-danger-500)] rounded p-3">
+            <p className="m-0">{loadError}</p>
+            <button type="button" onClick={retryLoad} className="vora-button-secondary mt-3 cursor-pointer">Try again</button>
+        </div>
+    );
+
     if (!isProfileAdmin) {
         return (
             <div className="p-8 pt-24 max-w-lg mx-auto text-[var(--vora-text-primary)] pb-20">
                 <h1 className="text-3xl font-bold mb-8 text-[var(--vora-accent-text)]">My Profile</h1>
+                {loadFailure}
+                {!loadError && !editingProfile && <Spinner size="lg" label="Loading your profile…" />}
                 {editingProfile && (
                     <ProfileEditor
                         profile={editingProfile}
@@ -124,7 +145,22 @@ export default function AccountSettingsPage() {
         );
     }
 
-    if (!user) return <div className="p-8 text-[var(--vora-text-primary)]">Loading...</div>;
+    if (loadError) {
+        return (
+            <div className="p-8 pt-24 max-w-4xl mx-auto text-[var(--vora-text-primary)] pb-20">
+                <h1 className="text-3xl font-bold mb-8 text-[var(--vora-accent-text)]">Account Settings</h1>
+                {loadFailure}
+            </div>
+        );
+    }
+
+    if (!user) {
+        return (
+            <div className="p-8 pt-24 text-[var(--vora-text-primary)]">
+                <Spinner size="lg" label="Loading account settings…" />
+            </div>
+        );
+    }
 
     return (
         <div className="p-8 pt-24 max-w-4xl mx-auto text-[var(--vora-text-primary)] pb-20">

@@ -19,6 +19,7 @@ import LiveTvRecordModal from './Panels/LiveTvRecordModal';
 import { useCallback } from 'react';
 import { useDialog } from '../../dialogs';
 import { userService } from '../../api/Users/userService';
+import { parseServerDate, serverTimeMs } from '../../utils/serverTime';
 
 export default function LiveTvPlayer() {
     const dialog = useDialog();
@@ -338,7 +339,7 @@ export default function LiveTvPlayer() {
 
     const formatTime = (dateStr: string) => {
         if (!dateStr) return '';
-        const date = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
+        const date = (parseServerDate(dateStr) ?? new Date(0));
         return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     };
 
@@ -348,8 +349,8 @@ export default function LiveTvPlayer() {
         const internalNow = new Date();
         const rawPrograms = currentChannel ? guideData[(currentChannel.externalChannelId || '').toLowerCase()] || [] : [];
         return rawPrograms.find(p => {
-            const s = new Date(p.startTime.endsWith('Z') ? p.startTime : p.startTime + 'Z');
-            const e = new Date(p.endTime.endsWith('Z') ? p.endTime : p.endTime + 'Z');
+            const s = (parseServerDate(p.startTime) ?? new Date(0));
+            const e = (parseServerDate(p.endTime) ?? new Date(0));
             return s <= internalNow && e > internalNow;
         });
     }, [currentChannel, guideData]);
@@ -366,10 +367,10 @@ export default function LiveTvPlayer() {
 
             if (s.title !== activeProgram.title || s.schedule?.channel?.name !== currentChannel.name) return false;
 
-            const sStart = new Date(s.startTime).getTime();
-            const sEnd = new Date(s.endTime).getTime();
-            const pStart = new Date(activeProgram.startTime.endsWith('Z') ? activeProgram.startTime : activeProgram.startTime + 'Z').getTime();
-            const pEnd = new Date(activeProgram.endTime.endsWith('Z') ? activeProgram.endTime : activeProgram.endTime + 'Z').getTime();
+            const sStart = serverTimeMs(s.startTime);
+            const sEnd = serverTimeMs(s.endTime);
+            const pStart = serverTimeMs(activeProgram.startTime);
+            const pEnd = serverTimeMs(activeProgram.endTime);
 
             const overlapStart = Math.max(sStart, pStart);
             const overlapEnd = Math.min(sEnd, pEnd);

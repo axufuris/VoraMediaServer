@@ -8,12 +8,14 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     mediaId: string;
+    serverId?: string;
 }
 
 export default function AddToPlaylistModal({
-    isOpen, onClose, mediaId }: Props) {
+    isOpen, onClose, mediaId, serverId: serverIdProp }: Props) {
     const dialog = useDialog();
-    const { serverId } = useParams<{ serverId?: string }>();
+    const { serverId: routeServerId } = useParams<{ serverId?: string }>();
+    const serverId = serverIdProp ?? routeServerId;
     const [playlists, setPlaylists] = useState<PlaylistSummaryVM[]>([]);
     const [activePlaylistIds, setActivePlaylistIds] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);

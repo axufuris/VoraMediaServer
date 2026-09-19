@@ -10,6 +10,7 @@ import { userService, type UserVM } from '../../api/Users/userService';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import StatCard from '../../components/Admin/Primitives/StatCard';
 import ListCard from '../../components/Admin/Primitives/ListCard';
+import { formatTime, parseServerDate } from '../../utils/serverTime';
 
 interface ProfileOption {
     id: string;
@@ -111,8 +112,9 @@ export default function MusicHistoryPage() {
     const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize]);
 
     const formatPlayedAt = (iso: string): string => {
-        const d = new Date(iso);
-        return `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}/${d.getFullYear()} ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+        const d = parseServerDate(iso);
+        if (!d) return '';
+        return `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}/${d.getFullYear()} ${formatTime(iso)}`;
     };
 
     const formatDuration = (seconds: number): string => {
