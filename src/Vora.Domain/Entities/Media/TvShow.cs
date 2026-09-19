@@ -7,8 +7,8 @@ public class TvShow : MediaItem
     public int? NumberOfSeasons { get; set; }
     public int? NumberOfEpisodes { get; set; }
 
-    public DateTime? LastAirDate { get; set; }
-    public DateTime? NextAirDate { get; set; }
+    public DateOnly? LastAirDate { get; set; }
+    public DateOnly? NextAirDate { get; set; }
     public string? LastEpisodeToAirName { get; set; }
     public string? NextEpisodeToAirName { get; set; }
 

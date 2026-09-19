@@ -227,7 +227,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             Title = el.GetProperty("name").GetString(),
             Overview = el.TryGetProperty("overview", out var ov) && ov.ValueKind != JsonValueKind.Null ? ov.GetString() : null,
             PosterUrl = el.TryGetProperty("image_url", out var img) && img.ValueKind != JsonValueKind.Null ? img.GetString() : null,
-            ReleaseDate = DateTime.TryParse(el.TryGetProperty("first_air_time", out var d) && d.ValueKind != JsonValueKind.Null ? d.GetString() : "", out var dt) ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : null
+            ReleaseDate = DateOnly.TryParse(el.TryGetProperty("first_air_time", out var d) && d.ValueKind != JsonValueKind.Null ? d.GetString() : "", out var dt) ? dt : null
         };
     }
 
@@ -286,9 +286,9 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         if (data.TryGetProperty("first_release", out var firstReleaseObj) && firstReleaseObj.ValueKind == JsonValueKind.Object)
         {
             var releaseDateStr = firstReleaseObj.TryGetProperty("date", out var fr) && fr.ValueKind != JsonValueKind.Null ? fr.GetString() : null;
-            if (!string.IsNullOrEmpty(releaseDateStr) && DateTime.TryParse(releaseDateStr, out var d))
+            if (!string.IsNullOrEmpty(releaseDateStr) && DateOnly.TryParse(releaseDateStr, out var d))
             {
-                result.ReleaseDate = DateTime.SpecifyKind(d, DateTimeKind.Utc);
+                result.ReleaseDate = d;
             }
         }
 
@@ -469,9 +469,9 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         }
 
         var releaseDateStr = data.TryGetProperty("firstAired", out var fa) && fa.ValueKind != JsonValueKind.Null ? fa.GetString() : null;
-        if (!string.IsNullOrEmpty(releaseDateStr) && DateTime.TryParse(releaseDateStr, out var d))
+        if (!string.IsNullOrEmpty(releaseDateStr) && DateOnly.TryParse(releaseDateStr, out var d))
         {
-            result.ReleaseDate = DateTime.SpecifyKind(d, DateTimeKind.Utc);
+            result.ReleaseDate = d;
         }
 
         if (data.TryGetProperty("characters", out var chars) && chars.ValueKind == JsonValueKind.Array)
@@ -561,20 +561,20 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                                     if (ep.TryGetProperty("aired", out var airedProp) && airedProp.ValueKind != JsonValueKind.Null)
                                     {
                                         var airDateStr = airedProp.GetString();
-                                        if (!string.IsNullOrEmpty(airDateStr) && DateTime.TryParse(airDateStr, out var sDate))
+                                        if (!string.IsNullOrEmpty(airDateStr) && DateOnly.TryParse(airDateStr, out var sDate))
                                         {
-                                            var utcDate = DateTime.SpecifyKind(sDate, DateTimeKind.Utc);
+                                            var airedOn = sDate;
 
-                                            if (seasonResult.AirDate == null) seasonResult.AirDate = utcDate;
+                                            if (seasonResult.AirDate == null) seasonResult.AirDate = airedOn;
 
-                                            if (utcDate >= now.Date)
+                                            if (airedOn >= DateOnly.FromDateTime(now))
                                             {
                                                 seasonResult.UpcomingEpisodes.Add(new UpcomingEpisodeResult
                                                 {
                                                     SeasonNumber = s.Number,
                                                     EpisodeNumber = ep.TryGetProperty("number", out var en) && en.ValueKind == JsonValueKind.Number ? en.GetInt32() : 0,
                                                     Title = ep.TryGetProperty("name", out var ename) && ename.ValueKind != JsonValueKind.Null ? ename.GetString() ?? "TBA" : "TBA",
-                                                    AirDate = utcDate
+                                                    AirDate = airedOn
                                                 });
                                             }
                                         }
@@ -646,7 +646,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                                     TvdbId = ep.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.Number ? idProp.GetInt32().ToString() : null,
                                     Title = ep.TryGetProperty("name", out var t) && t.ValueKind != JsonValueKind.Null ? t.GetString() : null,
                                     Overview = ep.TryGetProperty("overview", out var ov) && ov.ValueKind != JsonValueKind.Null ? ov.GetString() : null,
-                                    ReleaseDate = DateTime.TryParse(ep.TryGetProperty("aired", out var rd) && rd.ValueKind != JsonValueKind.Null ? rd.GetString() : "", out var dt) ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : null,
+                                    ReleaseDate = DateOnly.TryParse(ep.TryGetProperty("aired", out var rd) && rd.ValueKind != JsonValueKind.Null ? rd.GetString() : "", out var dt) ? dt : null,
                                     PosterUrl = PrefixArtwork(ep.TryGetProperty("image", out var img) && img.ValueKind != JsonValueKind.Null ? img.GetString() : null),
                                     BackgroundUrl = PrefixArtwork(ep.TryGetProperty("image", out var bImg) && bImg.ValueKind != JsonValueKind.Null ? bImg.GetString() : null),
                                     RuntimeMinutes = ep.TryGetProperty("runtime", out var rt) && rt.ValueKind == JsonValueKind.Number ? rt.GetInt32() : null,
@@ -700,8 +700,8 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         {
             Biography = biographyStr,
             PlaceOfBirth = data.TryGetProperty("birthPlace", out var pb) && pb.ValueKind != JsonValueKind.Null ? pb.GetString() : null,
-            Birthday = DateTime.TryParse(data.TryGetProperty("birth", out var b) && b.ValueKind != JsonValueKind.Null ? b.GetString() : "", out var bd) ? DateTime.SpecifyKind(bd, DateTimeKind.Utc) : null,
-            Deathday = DateTime.TryParse(data.TryGetProperty("death", out var d) && d.ValueKind != JsonValueKind.Null ? d.GetString() : "", out var dd) ? DateTime.SpecifyKind(dd, DateTimeKind.Utc) : null
+            Birthday = DateOnly.TryParse(data.TryGetProperty("birth", out var b) && b.ValueKind != JsonValueKind.Null ? b.GetString() : "", out var bd) ? bd : null,
+            Deathday = DateOnly.TryParse(data.TryGetProperty("death", out var d) && d.ValueKind != JsonValueKind.Null ? d.GetString() : "", out var dd) ? dd : null
         };
     }
 

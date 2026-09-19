@@ -13,7 +13,7 @@ public class MediaDetailsVM
     public string? SortTitle { get; set; }
     public string? Overview { get; set; }
     public int? DurationMinutes { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public string Type { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }

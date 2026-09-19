@@ -11,7 +11,7 @@ public class UpdateMediaRequest
     public string? Tagline { get; set; }
     public string? HomePage { get; set; }
     public string? ContentRating { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
     public List<string> LockedFields { get; set; } = new();

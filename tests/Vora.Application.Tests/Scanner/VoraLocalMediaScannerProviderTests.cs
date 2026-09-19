@@ -54,7 +54,7 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
                 Arg.Any<SeasonHandle>(),
                 Arg.Any<int>(),
                 Arg.Any<string>(),
-                Arg.Any<DateTime?>(),
+                Arg.Any<DateOnly?>(),
                 Arg.Any<string?>())
             .Returns(_ => new MediaItemHandle(Guid.NewGuid()));
     }
@@ -385,7 +385,7 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
             Arg.Any<SeasonHandle>(),
             3,
             "And the Bag's in the River",
-            Arg.Any<DateTime?>(),
+            Arg.Any<DateOnly?>(),
             Arg.Any<string?>());
     }
 
@@ -401,7 +401,7 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
             Arg.Any<SeasonHandle>(),
             Arg.Any<int>(),
             Arg.Any<string>(),
-            new DateTime(2024, 1, 15),
+            new DateOnly(2024, 1, 15),
             Arg.Any<string?>());
     }
 

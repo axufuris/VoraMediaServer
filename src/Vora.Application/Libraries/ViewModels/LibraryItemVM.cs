@@ -9,7 +9,7 @@ public class LibraryItemVM
     public string Title { get; set; } = string.Empty;
     public string? SortTitle { get; set; }
     public string? Overview { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public DateTime AddedAt { get; set; }
     public DateTime? LastContentAddedAt { get; set; }
     public string Type { get; set; } = string.Empty;

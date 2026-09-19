@@ -8,6 +8,7 @@ import PersonCard from '../../components/Client/Primitives/PersonCard';
 import MediaGrid from '../../components/Client/Primitives/MediaGrid';
 import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
+import { formatDate, parseServerDate, yearOf } from '../../utils/serverTime';
 
 export default function SearchPage() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -56,11 +57,12 @@ export default function SearchPage() {
 
     const formatReleaseDisplay = (releaseDate?: string, fallbackYear?: number | null) => {
         if (!releaseDate) return fallbackYear ? fallbackYear.toString() : null;
-        const date = new Date(releaseDate);
+        const date = parseServerDate(releaseDate);
+        if (!date) return fallbackYear ? fallbackYear.toString() : null;
         if (date > new Date()) {
-            return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            return formatDate(releaseDate, { year: 'numeric', month: 'short', day: 'numeric' });
         }
-        return date.getFullYear().toString();
+        return String(yearOf(releaseDate) ?? date.getFullYear());
     };
 
     if (isLoading) {

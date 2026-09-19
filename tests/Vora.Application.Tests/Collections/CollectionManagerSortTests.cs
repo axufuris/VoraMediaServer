@@ -17,10 +17,10 @@ public class CollectionManagerSortTests
         var manager = new CollectionManager(repo, Substitute.For<ITaskQueueManager>(), Substitute.For<IClientNotifier>());
 
         var collectionId = Guid.NewGuid();
-        var ordered1 = new CollectionDetailsLibraryItemVM { Id = Guid.NewGuid(), Title = "First", ReleaseDate = new DateTime(2011, 1, 1) };
-        var ordered2 = new CollectionDetailsLibraryItemVM { Id = Guid.NewGuid(), Title = "Second", ReleaseDate = new DateTime(2008, 1, 1) };
-        var freshOld = new CollectionDetailsLibraryItemVM { Id = Guid.NewGuid(), Title = "FreshOld", ReleaseDate = new DateTime(2021, 1, 1) };
-        var freshNew = new CollectionDetailsLibraryItemVM { Id = Guid.NewGuid(), Title = "FreshNew", ReleaseDate = new DateTime(2023, 1, 1) };
+        var ordered1 = new CollectionDetailsLibraryItemVM { Id = Guid.NewGuid(), Title = "First", ReleaseDate = new DateOnly(2011, 1, 1) };
+        var ordered2 = new CollectionDetailsLibraryItemVM { Id = Guid.NewGuid(), Title = "Second", ReleaseDate = new DateOnly(2008, 1, 1) };
+        var freshOld = new CollectionDetailsLibraryItemVM { Id = Guid.NewGuid(), Title = "FreshOld", ReleaseDate = new DateOnly(2021, 1, 1) };
+        var freshNew = new CollectionDetailsLibraryItemVM { Id = Guid.NewGuid(), Title = "FreshNew", ReleaseDate = new DateOnly(2023, 1, 1) };
 
         var vm = new CollectionDetailsVM
         {

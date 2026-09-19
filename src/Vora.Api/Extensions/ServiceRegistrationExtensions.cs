@@ -822,6 +822,8 @@ public static class ServiceRegistrationExtensions
             options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
             options.SerializerOptions.Converters.Add(new Vora.Application.Serialization.UtcDateTimeConverter());
             options.SerializerOptions.Converters.Add(new Vora.Application.Serialization.NullableUtcDateTimeConverter());
+            options.SerializerOptions.Converters.Add(new Vora.Application.Serialization.DateOnlyConverter());
+            options.SerializerOptions.Converters.Add(new Vora.Application.Serialization.NullableDateOnlyConverter());
         });
 
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options =>
@@ -830,6 +832,8 @@ public static class ServiceRegistrationExtensions
             options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
             options.JsonSerializerOptions.Converters.Add(new Vora.Application.Serialization.UtcDateTimeConverter());
             options.JsonSerializerOptions.Converters.Add(new Vora.Application.Serialization.NullableUtcDateTimeConverter());
+            options.JsonSerializerOptions.Converters.Add(new Vora.Application.Serialization.DateOnlyConverter());
+            options.JsonSerializerOptions.Converters.Add(new Vora.Application.Serialization.NullableDateOnlyConverter());
         });
 
         return services;

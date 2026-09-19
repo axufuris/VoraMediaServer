@@ -463,7 +463,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         int seasonNumber = 1, episodeNumber = 1;
         int? endEpisodeNumber = null;
         string? episodeTitle = null;
-        DateTime? airDate = null;
+        DateOnly? airDate = null;
 
         if (epMatch.Success)
         {
@@ -476,9 +476,9 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                 episodeTitle = epMatch.Groups["EpisodeTitle"].Value.Trim(' ', '.', '-');
             }
 
-            if (epMatch.Groups["AirDate"].Success && DateTime.TryParse(epMatch.Groups["AirDate"].Value, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out DateTime parsedDate))
+            if (epMatch.Groups["AirDate"].Success && DateOnly.TryParse(epMatch.Groups["AirDate"].Value, CultureInfo.InvariantCulture, out DateOnly parsedDate))
             {
-                airDate = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
+                airDate = parsedDate;
             }
         }
 

@@ -9,7 +9,7 @@ public class ContinueWatchingVM
     public string Type { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public string? ContentRating { get; set; }
     public List<string> Genres { get; set; } = new();
     public double ResumePositionSeconds { get; set; }

@@ -11,7 +11,7 @@ public class CalendarWatchlistSourceDto
     public string Title { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
-    public DateTime? ExpectedReleaseDate { get; set; }
+    public DateOnly? ExpectedReleaseDate { get; set; }
 
     public static Expression<Func<UserWatchlistItem, CalendarWatchlistSourceDto>> Projection =>
         w => new CalendarWatchlistSourceDto

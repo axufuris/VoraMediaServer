@@ -9,7 +9,7 @@ public class ActorRoleVM
     public string? TmdbId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? SortTitle { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public string Type { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
     public Guid LibraryId { get; set; }

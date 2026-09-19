@@ -40,7 +40,7 @@ public abstract class MediaItem : LockableEntity
     public string? OriginalPosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
 
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public bool HasMidCreditsStinger { get; set; }
     public bool HasPostCreditsStinger { get; set; }
 

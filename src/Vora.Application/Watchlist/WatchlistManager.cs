@@ -13,7 +13,7 @@ public class WatchlistRequest
     public string Type { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
-    public DateTime? ExpectedReleaseDate { get; set; }
+    public DateOnly? ExpectedReleaseDate { get; set; }
 }
 
 public interface IWatchlistManager

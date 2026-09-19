@@ -23,12 +23,12 @@ public class DiscoveryItemDetailsVM
     public string Title { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
     public int? Year { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
     public string? Overview { get; set; }
     public string? ContentRating { get; set; }
-    public DateTime? NextAirDate { get; set; }
+    public DateOnly? NextAirDate { get; set; }
     public int? RuntimeMinutes { get; set; }
     public decimal? Rating { get; set; }
     public List<string> Genres { get; set; } = new();

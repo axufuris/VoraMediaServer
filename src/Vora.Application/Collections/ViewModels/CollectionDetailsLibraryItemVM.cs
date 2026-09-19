@@ -5,7 +5,7 @@ public class CollectionDetailsLibraryItemVM
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? SortTitle { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public DateTime AddedAt { get; set; }
     public string Type { get; set; } = string.Empty;
     public int? NumberOfSeasons { get; set; }

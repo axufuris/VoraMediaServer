@@ -4,7 +4,7 @@ public class MetadataResult
 {
     public string? Title { get; set; }
     public string? Overview { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
     public string? TmdbId { get; set; }
@@ -28,8 +28,8 @@ public class MetadataResult
     public string? TvType { get; set; }
     public int? NumberOfEpisodes { get; set; }
     public int? NumberOfSeasons { get; set; }
-    public DateTime? LastAirDate { get; set; }
-    public DateTime? NextAirDate { get; set; }
+    public DateOnly? LastAirDate { get; set; }
+    public DateOnly? NextAirDate { get; set; }
     public string? LastEpisodeToAirName { get; set; }
     public string? NextEpisodeToAirName { get; set; }
 
@@ -50,8 +50,8 @@ public class MetadataResult
 public class ActorMetadataResult
 {
     public string? Biography { get; set; }
-    public DateTime? Birthday { get; set; }
-    public DateTime? Deathday { get; set; }
+    public DateOnly? Birthday { get; set; }
+    public DateOnly? Deathday { get; set; }
     public string? PlaceOfBirth { get; set; }
     public string? ImdbId { get; set; }
     public string? HomePage { get; set; }
@@ -106,7 +106,7 @@ public class SeasonResult
     public string Name { get; set; } = string.Empty;
     public string? Overview { get; set; }
     public string? PosterUrl { get; set; }
-    public DateTime? AirDate { get; set; }
+    public DateOnly? AirDate { get; set; }
     public int EpisodeCount { get; set; }
     public decimal? VoteAverage { get; set; }
     public List<UpcomingEpisodeResult> UpcomingEpisodes { get; set; } = new List<UpcomingEpisodeResult>();
@@ -126,5 +126,5 @@ public class UpcomingEpisodeResult
     public int SeasonNumber { get; set; }
     public int EpisodeNumber { get; set; }
     public string Title { get; set; } = string.Empty;
-    public DateTime AirDate { get; set; }
+    public DateOnly AirDate { get; set; }
 }

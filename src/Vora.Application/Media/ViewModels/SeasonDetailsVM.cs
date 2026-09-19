@@ -19,7 +19,7 @@ public class SeasonDetailsVM
     public Guid TvShowId { get; set; }
     public string TvShowTitle { get; set; } = string.Empty;
     public string? UpcomingEpisodesJson { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
 
     public List<EpisodeVM> Episodes { get; set; } = new();
 

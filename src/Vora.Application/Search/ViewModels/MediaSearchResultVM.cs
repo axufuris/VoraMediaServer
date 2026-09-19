@@ -12,7 +12,7 @@ public class MediaSearchResultVM
     public string? ContentRating { get; set; }
     public string? PosterUrl { get; set; }
     public string? BackgroundUrl { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
 
     public static Expression<Func<MediaItem, MediaSearchResultVM>> Projection =>
         m => new MediaSearchResultVM

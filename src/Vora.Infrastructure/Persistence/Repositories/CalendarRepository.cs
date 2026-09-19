@@ -9,13 +9,21 @@ namespace Vora.Infrastructure.Persistence.Repositories;
 
 public class CalendarRepository(VoraDbContext context) : ICalendarRepository
 {
-    public async Task<List<CalendarMovieSourceDto>> GetMoviesReleasingInRangeAsync(DateTime startDate, DateTime endDate) =>
-        await context.Set<Movie>()
+    // A release date is a whole day, so the window is compared in days: an item
+    // released on the last day of the view belongs in it regardless of the time
+    // of day the caller's range happens to end at.
+    public async Task<List<CalendarMovieSourceDto>> GetMoviesReleasingInRangeAsync(DateTime startDate, DateTime endDate)
+    {
+        var firstDay = DateOnly.FromDateTime(startDate);
+        var lastDay = DateOnly.FromDateTime(endDate);
+
+        return await context.Set<Movie>()
             .AsNoTracking()
-            .Where(m => (m.TheatricalReleaseDate >= startDate && m.TheatricalReleaseDate <= endDate)
-                || (m.DigitalReleaseDate >= startDate && m.DigitalReleaseDate <= endDate))
+            .Where(m => (m.TheatricalReleaseDate >= firstDay && m.TheatricalReleaseDate <= lastDay)
+                || (m.DigitalReleaseDate >= firstDay && m.DigitalReleaseDate <= lastDay))
             .Select(CalendarMovieSourceDto.Projection)
             .ToListAsync();
+    }
 
     public async Task<List<CalendarShowSourceDto>> GetActiveShowsWithUpcomingEpisodesAsync() =>
         await context.Set<TvShow>()
@@ -26,17 +34,27 @@ public class CalendarRepository(VoraDbContext context) : ICalendarRepository
             .Select(CalendarShowSourceDto.Projection)
             .ToListAsync();
 
-    public async Task<List<CalendarRequestSourceDto>> GetRequestsReleasingInRangeAsync(DateTime startDate, DateTime endDate) =>
-        await context.Set<MediaRequest>()
+    public async Task<List<CalendarRequestSourceDto>> GetRequestsReleasingInRangeAsync(DateTime startDate, DateTime endDate)
+    {
+        var firstDay = DateOnly.FromDateTime(startDate);
+        var lastDay = DateOnly.FromDateTime(endDate);
+
+        return await context.Set<MediaRequest>()
             .AsNoTracking()
-            .Where(r => r.ExpectedReleaseDate >= startDate && r.ExpectedReleaseDate <= endDate)
+            .Where(r => r.ExpectedReleaseDate >= firstDay && r.ExpectedReleaseDate <= lastDay)
             .Select(CalendarRequestSourceDto.Projection)
             .ToListAsync();
+    }
 
-    public async Task<List<CalendarWatchlistSourceDto>> GetWatchlistItemsReleasingInRangeAsync(DateTime startDate, DateTime endDate) =>
-        await context.Set<UserWatchlistItem>()
+    public async Task<List<CalendarWatchlistSourceDto>> GetWatchlistItemsReleasingInRangeAsync(DateTime startDate, DateTime endDate)
+    {
+        var firstDay = DateOnly.FromDateTime(startDate);
+        var lastDay = DateOnly.FromDateTime(endDate);
+
+        return await context.Set<UserWatchlistItem>()
             .AsNoTracking()
-            .Where(w => w.ExpectedReleaseDate >= startDate && w.ExpectedReleaseDate <= endDate)
+            .Where(w => w.ExpectedReleaseDate >= firstDay && w.ExpectedReleaseDate <= lastDay)
             .Select(CalendarWatchlistSourceDto.Projection)
             .ToListAsync();
+    }
 }

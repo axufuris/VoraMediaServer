@@ -9,7 +9,7 @@ public class DiscoveryItemVM
     public string Title { get; set; } = string.Empty;
     public string Type { get; set; } = "Movie";
     public int? Year { get; set; }
-    public DateTime? ReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public string? PosterUrl { get; set; }
     public string? ContentRating { get; set; }
     public bool InLibrary { get; set; }

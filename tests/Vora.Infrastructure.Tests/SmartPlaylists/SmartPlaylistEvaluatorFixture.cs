@@ -45,7 +45,7 @@ public sealed class SmartPlaylistEvaluatorFixture : IDisposable
         var movie = new Movie
         {
             Title = title,
-            ReleaseDate = year.HasValue ? new DateTime(year.Value, 1, 1, 0, 0, 0, DateTimeKind.Utc) : null,
+            ReleaseDate = year.HasValue ? new DateOnly(year.Value, 1, 1) : null,
             ContentRating = rating,
             LibraryId = LibraryId,
             AddedAt = addedAt ?? DateTime.UtcNow,
@@ -134,7 +134,7 @@ public sealed class SmartPlaylistEvaluatorFixture : IDisposable
             Title = title,
             SeasonId = season.Id,
             EpisodeNumber = episodeNumber,
-            ReleaseDate = releaseYear.HasValue ? new DateTime(releaseYear.Value, 1, 1, 0, 0, 0, DateTimeKind.Utc) : null,
+            ReleaseDate = releaseYear.HasValue ? new DateOnly(releaseYear.Value, 1, 1) : null,
             ContentRating = contentRating,
             ServerAdminRating = adminRating,
             ThirdPartyRating1 = audienceRating,

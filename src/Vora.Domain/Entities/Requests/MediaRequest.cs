@@ -15,7 +15,7 @@ public class MediaRequest
 
     public RequestStatus Status { get; set; } = RequestStatus.Pending;
 
-    public DateTime? ExpectedReleaseDate { get; set; }
+    public DateOnly? ExpectedReleaseDate { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
