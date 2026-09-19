@@ -1,5 +1,5 @@
 import { beforeAll, describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import DetailHero, { HeroCredits } from './DetailHero';
 import { directorsFrom } from '../../../utils/credits';
 
@@ -117,6 +117,26 @@ describe('DetailHero', () => {
 
         const grid = container.querySelector('div[class*="md:grid-cols-"]');
         expect(grid?.className).toContain('md:items-center');
+    });
+
+    it('draws the title treatment in place of the text when the item has one', () => {
+        render(<DetailHero title="Toy Story 5" logoUrl="https://image.tmdb.org/t/p/original/logo.png" />);
+
+        const heading = screen.getByRole('heading', { level: 1 });
+        const logo = within(heading).getByRole('img', { name: 'Toy Story 5' });
+
+        // Through the cache, in the logo bucket, so it keeps its transparency.
+        expect(logo.getAttribute('src')).toContain('kind=logo');
+        expect(heading).toHaveTextContent('');
+    });
+
+    it('falls back to the text title when there is no logo', () => {
+        render(<DetailHero title="Toy Story 5" />);
+
+        const heading = screen.getByRole('heading', { level: 1 });
+
+        expect(heading).toHaveTextContent('Toy Story 5');
+        expect(within(heading).queryByRole('img')).toBeNull();
     });
 
     it('keeps the poster to the tighter column', () => {
