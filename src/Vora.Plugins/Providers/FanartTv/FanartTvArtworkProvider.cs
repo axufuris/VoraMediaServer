@@ -1,0 +1,148 @@
+using Microsoft.Extensions.DependencyInjection;
+using System.Net.Http;
+using System.Text.Json;
+using Vora.Plugins.Dtos;
+using Vora.Plugins.Interfaces;
+
+namespace Vora.Plugins.Providers.FanartTv;
+
+public class FanartTvArtworkProvider : IArtworkProvider, IPluginConnectionTest
+{
+    private readonly HttpClient _httpClient;
+    private readonly IServiceScopeFactory _scopeFactory;
+
+    public string Id => "fanart_artwork";
+    public string Name => "Fanart.tv Artwork";
+    public string Version => "1.0.0";
+    public string Description => "Fetches high-quality, textless posters and backdrops from Fanart.tv.";
+    public bool IsSystemPlugin => true;
+    public string Type => "Artwork";
+    public string DeveloperName => "Andy Xufuris";
+    public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow };
+
+    public FanartTvArtworkProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory)
+    {
+        _httpClient = httpClient;
+        _scopeFactory = scopeFactory;
+        _httpClient.BaseAddress = new Uri("https://webservice.fanart.tv/v3/");
+    }
+
+    public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions()
+    {
+        return new List<PluginSettingDefinitionDto>
+        {
+            new PluginSettingDefinitionDto
+            {
+                Key = "api_key",
+                Label = "Fanart.tv Project API Key",
+                Type = "password",
+                Required = true,
+                Placeholder = "Paste your Fanart.tv project key",
+                Description = "Fanart.tv Project API Key (free). Create an account at https://fanart.tv/register, then generate a project key at https://fanart.tv/get-an-api-key/ and copy the 'Project Key' value. Personal Keys are not supported — use a Project Key."
+            }
+        };
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("api_key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        var response = await _httpClient.GetAsync($"https://webservice.fanart.tv/v3/movies/12445?api_key={Uri.EscapeDataString(apiKey.Trim())}", cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            return PluginConnectionTestResult.Ok("Fanart.tv accepted the API key.");
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            return PluginConnectionTestResult.Fail("Fanart.tv rejected the API key.");
+        }
+        return PluginConnectionTestResult.Fail($"Unexpected response (HTTP {(int)response.StatusCode}).");
+    }
+
+    public async Task<IEnumerable<ArtworkResult>> GetArtworkAsync(string? tmdbId, string? tvdbId, string? imdbId, string mediaType, string? localPath = null, string? title = null, CancellationToken cancellationToken = default)
+    {
+        var results = new List<ArtworkResult>();
+
+        using var scope = _scopeFactory.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<IPluginSettingsProvider>();
+        var apiKey = await settings.GetSettingAsync(Id, "api_key");
+
+        if (string.IsNullOrEmpty(apiKey)) return results;
+
+        string endpoint = "";
+
+        if (mediaType.Equals("Movie", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(tmdbId))
+        {
+            endpoint = $"movies/{tmdbId}?api_key={apiKey}";
+        }
+        else if (mediaType.Equals("TvShow", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(tvdbId))
+        {
+            endpoint = $"tv/{tvdbId}?api_key={apiKey}";
+        }
+        else
+        {
+            return results;
+        }
+
+        var response = await _httpClient.GetAsync(endpoint);
+        if (!response.IsSuccessStatusCode) return results;
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = doc.RootElement;
+
+        if (mediaType.Equals("Movie", StringComparison.OrdinalIgnoreCase))
+        {
+            ExtractArray(root, "movieposter", ArtworkKind.Poster, results);
+            ExtractArray(root, "moviebackground", ArtworkKind.Backdrop, results);
+            ExtractArray(root, "movielogo", ArtworkKind.Logo, results);
+            ExtractArray(root, "hdmovielogo", ArtworkKind.Logo, results);
+        }
+        else
+        {
+            ExtractArray(root, "tvposter", ArtworkKind.Poster, results);
+            ExtractArray(root, "showbackground", ArtworkKind.Backdrop, results);
+            ExtractArray(root, "clearlogo", ArtworkKind.Logo, results);
+            ExtractArray(root, "hdtvlogo", ArtworkKind.Logo, results);
+        }
+
+        return results.OrderByDescending(r => r.VoteAverage).ToList();
+    }
+
+    private static void ExtractArray(JsonElement root, string propertyName, ArtworkKind kind, List<ArtworkResult> results)
+    {
+        if (root.TryGetProperty(propertyName, out var items) && items.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in items.EnumerateArray())
+            {
+                double voteAvg = 0;
+                if (item.TryGetProperty("likes", out var likesProp))
+                {
+                    if (likesProp.ValueKind == JsonValueKind.String && double.TryParse(likesProp.GetString(), out var parsedLikes))
+                    {
+                        voteAvg = parsedLikes;
+                    }
+                    else if (likesProp.ValueKind == JsonValueKind.Number)
+                    {
+                        voteAvg = likesProp.GetDouble();
+                    }
+                }
+
+                int? width = kind == ArtworkKind.Poster ? 1000 : 1920;
+                int? height = kind == ArtworkKind.Poster ? 1426 : 1080;
+
+                results.Add(new ArtworkResult
+                {
+                    Kind = kind,
+                    Url = item.TryGetProperty("url", out var u) && u.ValueKind != JsonValueKind.Null ? u.GetString() ?? "" : "",
+                    Language = item.TryGetProperty("lang", out var l) && l.ValueKind != JsonValueKind.Null ? l.GetString() : "None",
+                    VoteAverage = voteAvg,
+                    Width = width,
+                    Height = height
+                });
+            }
+        }
+    }
+}

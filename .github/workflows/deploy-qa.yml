@@ -1,0 +1,118 @@
+name: Deploy QA
+
+on:
+  push:
+    branches: [ main ]
+  # Manual trigger. A push event that GitHub drops — an Actions outage, a
+  # failover — never creates a run, so there is nothing to re-run from the
+  # Actions tab. This makes the QA image rebuildable from any ref without
+  # pushing an empty commit to main.
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-qa
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/vora-media-server
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Vora.slnx
+
+      - name: Test
+        run: dotnet test Vora.slnx --no-restore --configuration Release --verbosity minimal
+
+  build-and-push:
+    name: Build & Push (QA)
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=qa
+            type=sha,prefix=qa-,format=short
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: src/Vora.Api/Dockerfile
+          build-args: |
+            VORA_COMMIT=${{ github.sha }}
+          # amd64-only — QA never needs arm64, and emulating it under QEMU on
+          # the amd64 runner is the single biggest CI time sink. See the note
+          # in deploy-prod.yml for how to produce an arm64 image when needed.
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # scope= keeps QA and production out of each other's cache. Sharing
+          # the default scope meant each workflow evicted the other's layers,
+          # and with mode=max on a .NET + Node multi-stage build the repo's
+          # 10 GB cache limit was reached constantly.
+          #
+          # ignore-error=true because the image is already pushed by the time
+          # this runs. A cache write is an optimisation; losing one must never
+          # fail a build that produced and published a good image — that is
+          # what turned a successful merge into a red run with
+          # "error writing layer blob: not_found".
+          cache-from: type=gha,scope=qa
+          cache-to: type=gha,mode=max,scope=qa,ignore-error=true
+
+      - name: Trivy scan (table to log)
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:qa
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      - name: Trivy scan (JSON report)
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:qa
+          format: json
+          output: trivy-report.json
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      - name: Upload Trivy report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: trivy-report-qa
+          path: trivy-report.json
+          retention-days: 30

@@ -1,0 +1,154 @@
+import { useEffect, useState, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { discoveryService, type DiscoveryItem, type DiscoveryRowConfig } from '../../../api/Discovery/discoveryService';
+import { watchlistService } from '../../../api/Watchlist/watchlistService';
+import PageHeader from '../../../components/Client/Primitives/PageHeader';
+import MediaCard from '../../../components/Client/Primitives/MediaCard';
+import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
+import EmptyState from '../../../components/Client/Primitives/EmptyState';
+import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
+import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { discoveryTarget } from '../../../utils/discoveryNavigation';
+import { watchlistKey } from '../../../utils/watchlistKey';
+
+export default function DiscoveryViewAllPage() {
+    const { serverId, providerId, rowId } = useParams<{ serverId?: string, providerId: string, rowId: string }>();
+    const navigate = useNavigate();
+
+    const [items, setItems] = useState<DiscoveryItem[]>([]);
+    const [page, setPage] = useState(1);
+    const [isLoading, setIsLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const [rowName, setRowName] = useState<string>('Loading…');
+    const [rowUnavailable, setRowUnavailable] = useState(false);
+    const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
+
+    const observerTarget = useRef<HTMLDivElement>(null);
+
+    const profileToken = localStorage.getItem(StorageKeys.profileToken);
+    const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
+
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            if (!providerId || !rowId) return;
+            try {
+                const configs = await discoveryService.getAdminConfigs(serverId);
+                const matchingConfig = configs.find((c: DiscoveryRowConfig) => c.providerId === providerId && c.rowId === rowId);
+                if (!matchingConfig || !matchingConfig.isEnabled) {
+                    setRowUnavailable(true);
+                    setHasMore(false);
+                    setRowName('Row unavailable');
+                } else {
+                    setRowName(matchingConfig.name);
+                }
+
+                if (activeProfileId) {
+                    const wItems = await watchlistService.getWatchlist(serverId);
+                    setWatchlistIds(new Set(wItems.map(i => watchlistKey(i.providerId, i.externalId))));
+                }
+            } catch (error) {
+                console.error('Failed to load initial data', error);
+            }
+        };
+        fetchInitialData();
+    }, [providerId, rowId, serverId, activeProfileId]);
+
+    useEffect(() => {
+        if (!providerId || !rowId || !hasMore || rowUnavailable) return;
+        const loadPage = async () => {
+            setIsLoading(true);
+            try {
+                const newItems = await discoveryService.getRowItems(providerId, rowId, page, serverId);
+                if (newItems.length === 0) {
+                    setHasMore(false);
+                } else {
+                    setItems(prev => {
+                        const existingIds = new Set(prev.map(i => i.externalId));
+                        const uniqueNew = newItems.filter(i => !existingIds.has(i.externalId));
+                        return [...prev, ...uniqueNew];
+                    });
+                }
+            } catch (error: unknown) {
+                const status = (error as { response?: { status?: number } })?.response?.status;
+                if (status === 404) {
+                    setRowUnavailable(true);
+                } else {
+                    console.error('Failed to fetch discovery items', error);
+                }
+                setHasMore(false);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadPage();
+    }, [providerId, rowId, page, serverId, hasMore, rowUnavailable]);
+
+    useEffect(() => {
+        if (rowUnavailable) return;
+        const observer = new IntersectionObserver(
+            entries => {
+                if (entries[0].isIntersecting && !isLoading && hasMore) {
+                    setPage(prev => prev + 1);
+                }
+            },
+            { threshold: 0.1 }
+        );
+        if (observerTarget.current) observer.observe(observerTarget.current);
+        return () => observer.disconnect();
+    }, [isLoading, hasMore, rowUnavailable]);
+
+    return (
+        <div className="min-h-full pb-20">
+            <PageHeader title={rowName} subtitle="Browse everything in this discovery row." />
+
+            <div className="px-8 pt-2">
+                {rowUnavailable ? (
+                    <EmptyState
+                        title="This Discovery row is no longer available"
+                        description="The server admin has disabled this row, or the provider it relies on isn't installed. Discover still lists the rows that are active."
+                        icon={(
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <circle cx="12" cy="12" r="9" />
+                                <line x1="8" y1="12" x2="16" y2="12" />
+                            </svg>
+                        )}
+                    />
+                ) : (
+                <>
+                <MediaGrid>
+                    {items.map(item => {
+                        const statusBadge = (item.inLibrary || item.requestStatus)
+                            ? <DiscoveryStatusBadge inLibrary={item.inLibrary} requestStatus={item.requestStatus} />
+                            : undefined;
+                        return (
+                            <MediaCard
+                                key={item.externalId}
+                                imageUrl={item.posterUrl}
+                                title={item.title}
+                                captionLines={item.year ? [item.year.toString()] : []}
+                                inWatchlist={watchlistIds.has(watchlistKey(item.providerId, item.externalId))}
+                                onClick={() => navigate(discoveryTarget({ ...item, providerId: providerId! }, serverId))}
+                                bottomLeftBadge={statusBadge}
+                                fill
+                            />
+                        );
+                    })}
+                </MediaGrid>
+
+                <div ref={observerTarget} className="mt-10 flex h-12 items-center justify-center">
+                    {isLoading && (
+                        <div className="flex items-center gap-3 text-sm font-semibold" style={{ color: 'var(--vora-accent-text)' }}>
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            <span>Loading more…</span>
+                        </div>
+                    )}
+                    {!hasMore && items.length > 0 && (
+                        <div className="text-sm font-medium" style={{ color: 'var(--vora-text-muted)' }}>You've reached the end of the list.</div>
+                    )}
+                </div>
+                </>
+                )}
+            </div>
+        </div>
+    );
+}
