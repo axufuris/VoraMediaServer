@@ -196,25 +196,31 @@ public class PluginManager(
         }
     }
 
+    // Only a setting the plugin declared Required can make it unconfigured.
+    // Both of these used to test every definition, so one optional setting left
+    // blank — which is the normal state for most of them — marked the plugin
+    // "Setup needed" for good and dropped it out of the provider pickers.
+    private static bool IsSatisfied(
+        Vora.Plugins.Dtos.PluginSettingDefinitionDto definition,
+        IReadOnlyDictionary<string, string> savedSettings) =>
+        !string.IsNullOrEmpty(definition.DefaultValue)
+        || (savedSettings.TryGetValue(definition.Key, out var value) && !string.IsNullOrWhiteSpace(value));
+
     private static bool RequiresConfiguration(
         IReadOnlyList<Vora.Plugins.Dtos.PluginSettingDefinitionDto> definitions,
-        IReadOnlyDictionary<string, string> savedSettings)
-    {
-        return definitions.Any(def =>
-            string.IsNullOrEmpty(def.DefaultValue) &&
-            (!savedSettings.TryGetValue(def.Key, out var value) || string.IsNullOrWhiteSpace(value)));
-    }
+        IReadOnlyDictionary<string, string> savedSettings) =>
+        definitions.Any(def => def.Required && !IsSatisfied(def, savedSettings));
 
     private async Task<bool> HasAllRequiredSettingsAsync(IVoraPlugin plugin)
     {
-        var definitions = plugin.GetSettingDefinitions().ToList();
-        if (definitions.Count == 0)
+        var required = plugin.GetSettingDefinitions().Where(def => def.Required).ToList();
+        if (required.Count == 0)
         {
             return true;
         }
 
         var savedSettings = await settingsRepo.GetAllPluginSettingsAsync(plugin.Id);
-        return definitions.All(def => savedSettings.TryGetValue(def.Key, out var val) && !string.IsNullOrWhiteSpace(val));
+        return required.All(def => IsSatisfied(def, savedSettings));
     }
 
     private static string ResolveExternalIdLabel(IVoraPlugin plugin) => plugin switch
