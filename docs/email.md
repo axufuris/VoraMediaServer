@@ -18,6 +18,8 @@ All email config lives on `ServerSetting`. Admin edits through **Admin → Syste
 
 **Secret storage.** SMTP password is encrypted via `IDataProtector` (purpose `"Vora.Email.SmtpPassword.v1"`). Keys persist to `StoragePaths:DataProtection` (default `<base>/DataProtectionKeys`). **Mount this directory as a Docker volume** — otherwise keys roll on every container rebuild and the saved SMTP password becomes undecryptable.
 
+**The key files themselves are not encrypted at rest**, which is what the startup warning `No XML encryptor configured. Key {id} may be persisted to storage in unencrypted form` is telling you. It is expected, not a misconfiguration: at-rest key encryption needs a platform key store, and a Linux container has no DPAPI equivalent — the alternative is an X.509 certificate, which Vora does not currently ask for. The consequence is concrete: **anyone who can read that directory can decrypt the stored SMTP password**, so treat it as a secret — restrict its permissions, and don't include it in a backup that travels somewhere less protected than the server. Everything else Vora protects with these keys is session-scoped and low-value by comparison.
+
 ## Architecture
 
 | Type | Lifetime | File |

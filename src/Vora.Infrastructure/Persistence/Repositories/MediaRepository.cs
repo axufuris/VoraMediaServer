@@ -1464,6 +1464,7 @@ public partial class MediaRepository : IMediaRepository
                 .ThenInclude(p => p.AudioTracks)
             .Include(m => m.MediaParts)
                 .ThenInclude(p => p.VideoTracks)
+            .AsSplitQuery()
             .AsQueryable();
 
         if (libraryId != Guid.Empty)

@@ -33,7 +33,18 @@ public static class WebApplicationExtensions
             app.UseHsts();
         }
 
-        app.UseHttpsRedirection();
+        // Only redirect when an HTTPS port actually exists to redirect to.
+        // The container listens on HTTP alone and terminates TLS at a reverse
+        // proxy, so the middleware could never do anything there — it just
+        // logged "Failed to determine the https port for redirect" on the
+        // first request of every deployment. HSTS above is unaffected: its
+        // middleware already skips non-HTTPS requests, so a plain-HTTP LAN
+        // install is never told to upgrade.
+        if (!string.IsNullOrWhiteSpace(app.Configuration["HTTPS_PORT"])
+            || !string.IsNullOrWhiteSpace(app.Configuration["ASPNETCORE_HTTPS_PORTS"]))
+        {
+            app.UseHttpsRedirection();
+        }
         app.UseMiddleware<SecurityHeadersMiddleware>();
         app.UseResponseCompression();
         app.UseStaticFiles();
