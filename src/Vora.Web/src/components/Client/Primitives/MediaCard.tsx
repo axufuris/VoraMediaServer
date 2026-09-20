@@ -3,6 +3,7 @@ import { thumbUrl } from '../../../utils/thumbnails';
 import { posterCaption, type PosterCaptionItem } from '../../../utils/posterCaption';
 import MediaPlaceholder from './MediaPlaceholder';
 import PosterRemoveButton from './PosterRemoveButton';
+import { WatchedBadge } from './WatchedBadge';
 
 export type MediaCardShape = 'poster' | 'still' | 'square' | 'circle';
 export type MediaCardSize = 'xs' | 'sm' | 'md' | 'lg';
@@ -118,12 +119,7 @@ export default function MediaCard({
                 {unplayedCount}
             </span>
         ) : isPlayed ? (
-            <span
-                className="inline-flex h-6 w-6 items-center justify-center rounded-full backdrop-blur-sm"
-                style={{ background: 'rgba(8, 8, 11, 0.72)', border: '1px solid rgba(255, 255, 255, 0.2)', color: 'var(--vora-accent-500)' }}
-            >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-            </span>
+            <WatchedBadge />
         ) : undefined
     );
 

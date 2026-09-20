@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { mediaService, type Episode } from '../../api/Media/mediaService';
 import StarRating from '../Client/Primitives/StarRating';
 import ArtImage from '../Client/Primitives/ArtImage';
+import { CornerLabelChip } from '../Client/Primitives/WatchedBadge';
 import { StorageKeys } from '../../utils/storageKeys';
 import { formatDate } from '../../utils/serverTime';
 
@@ -48,11 +49,14 @@ export default function MediaEpisodesList({ episodes, serverId }: Props) {
                                 <ArtImage src={ep.posterUrl} alt={ep.title} variant="still" imgClassName="w-full h-full object-contain bg-black" />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
-                                {ep.isPlayed && (
-                                    <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full p-1 shadow-lg border border-white/10 z-10">
-                                        <svg className="w-4 h-4 text-[var(--vora-text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                    </div>
-                                )}
+                                <div className="absolute top-2 right-2 z-10">
+                                    <CornerLabelChip
+                                        label={ep.endEpisodeNumber && ep.endEpisodeNumber > ep.episodeNumber
+                                            ? `E${ep.episodeNumber}-${ep.endEpisodeNumber}`
+                                            : `E${ep.episodeNumber}`}
+                                        watched={ep.isPlayed}
+                                    />
+                                </div>
 
                                 {ep.resumePositionSeconds && ep.resumePositionSeconds > 0 && !ep.isPlayed && ep.durationMinutes && (
                                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--vora-bg-sunken)] z-10">
