@@ -182,7 +182,7 @@ public class PluginManagerTests
     {
         var plugin = MakePlugin("p1", definitions: new List<PluginSettingDefinitionDto>
         {
-            new() { Key = "api_key" }
+            new() { Key = "api_key", Required = true }
         });
         _settings.GetAllPluginSettingsAsync("p1").Returns(new Dictionary<string, string>());
 
@@ -197,7 +197,7 @@ public class PluginManagerTests
     {
         var plugin = MakePlugin("p1", definitions: new List<PluginSettingDefinitionDto>
         {
-            new() { Key = "api_key" }
+            new() { Key = "api_key", Required = true }
         });
         _settings.GetAllPluginSettingsAsync("p1").Returns(new Dictionary<string, string> { ["api_key"] = "abc123" });
 
@@ -211,7 +211,7 @@ public class PluginManagerTests
     {
         var plugin = MakePlugin("p1", definitions: new List<PluginSettingDefinitionDto>
         {
-            new() { Key = "region", DefaultValue = "US" }
+            new() { Key = "region", Required = true, DefaultValue = "US" }
         });
         _settings.GetAllPluginSettingsAsync("p1").Returns(new Dictionary<string, string>());
 
@@ -261,7 +261,7 @@ public class PluginManagerTests
     {
         var plugin = MakePlugin("p1", type: "Metadata", definitions: new List<PluginSettingDefinitionDto>
         {
-            new() { Key = "api_key" }
+            new() { Key = "api_key", Required = true }
         });
         _settings.GetAllPluginSettingsAsync("p1").Returns(new Dictionary<string, string>());
 
@@ -275,7 +275,7 @@ public class PluginManagerTests
     {
         var plugin = MakePlugin("p1", type: "Metadata", definitions: new List<PluginSettingDefinitionDto>
         {
-            new() { Key = "api_key" }
+            new() { Key = "api_key", Required = true }
         });
         _settings.GetAllPluginSettingsAsync("p1").Returns(new Dictionary<string, string> { ["api_key"] = "   " });
 
@@ -397,4 +397,114 @@ public class PluginManagerTests
             .WithMessage("*system*");
     }
 
+    // ---------- Optional settings must not count as missing configuration ----------
+    //
+    // A plugin is unconfigured when something it declared Required is blank.
+    // An optional setting left empty is the ordinary state of most plugins —
+    // treating it as missing marked them "Setup needed" permanently AND hid
+    // them from the metadata/artwork pickers, which is how adding a TVDB
+    // subscriber PIN removed TVDB from the provider list entirely.
+
+    private static PluginSettingDefinitionDto Setting(string key, bool required, string? defaultValue = null) => new()
+    {
+        Key = key,
+        Label = key,
+        Type = "text",
+        Required = required,
+        DefaultValue = defaultValue ?? string.Empty
+    };
+
+    private void SavedSettings(string pluginId, Dictionary<string, string> values) =>
+        _settings.GetAllPluginSettingsAsync(pluginId).Returns(values);
+
+    private static List<PluginSettingDefinitionDto> KeyAndOptionalPin() =>
+        new() { Setting("api_key", required: true), Setting("subscriber_pin", required: false) };
+
+    [Fact]
+    public async Task A_filled_required_setting_leaves_an_empty_optional_one_configured()
+    {
+        var plugin = MakePlugin("tvdb_metadata", definitions: KeyAndOptionalPin());
+        SavedSettings("tvdb_metadata", new Dictionary<string, string> { ["api_key"] = "key-123" });
+
+        var vm = (await Build(plugin).GetActivePluginsAsync()).Single();
+
+        vm.RequiresConfiguration.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_plugin_with_its_required_setting_filled_is_offered_as_a_provider()
+    {
+        var plugin = MakePlugin("tvdb_metadata", definitions: KeyAndOptionalPin());
+        SavedSettings("tvdb_metadata", new Dictionary<string, string> { ["api_key"] = "key-123" });
+
+        var options = (await Build(plugin).GetPluginOptionsAsync("Metadata")).ToList();
+
+        options.Should().ContainSingle().Which.Id.Should().Be("tvdb_metadata");
+    }
+
+    [Fact]
+    public async Task A_missing_required_setting_still_means_setup_is_needed()
+    {
+        var plugin = MakePlugin("tvdb_metadata", definitions: KeyAndOptionalPin());
+        SavedSettings("tvdb_metadata", new Dictionary<string, string> { ["subscriber_pin"] = "ABCD" });
+
+        var vm = (await Build(plugin).GetActivePluginsAsync()).Single();
+
+        vm.RequiresConfiguration.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_plugin_missing_its_required_setting_is_not_offered_as_a_provider()
+    {
+        var plugin = MakePlugin("tvdb_metadata", definitions: KeyAndOptionalPin());
+        SavedSettings("tvdb_metadata", new Dictionary<string, string>());
+
+        var options = (await Build(plugin).GetPluginOptionsAsync("Metadata")).ToList();
+
+        options.Should().BeEmpty();
+    }
+
+    // tmdb_discovery is the real case: two optional settings, no required one.
+    // It was permanently "Setup needed" before this, despite needing nothing.
+    [Fact]
+    public async Task A_plugin_whose_settings_are_all_optional_needs_no_setup()
+    {
+        var plugin = MakePlugin("tmdb_discovery", definitions: new List<PluginSettingDefinitionDto>
+        {
+            Setting("discovery_region", required: false),
+            Setting("discovery_language", required: false)
+        });
+        SavedSettings("tmdb_discovery", new Dictionary<string, string>());
+
+        var vm = (await Build(plugin).GetActivePluginsAsync()).Single();
+
+        vm.RequiresConfiguration.Should().BeFalse();
+        (await Build(plugin).GetPluginOptionsAsync("Metadata")).Should().ContainSingle();
+    }
+
+    // A required setting shipping a default is already answered.
+    [Fact]
+    public async Task A_required_setting_with_a_default_counts_as_configured()
+    {
+        var plugin = MakePlugin("p", definitions: new List<PluginSettingDefinitionDto>
+        {
+            Setting("mode", required: true, defaultValue: "auto")
+        });
+        SavedSettings("p", new Dictionary<string, string>());
+
+        var vm = (await Build(plugin).GetActivePluginsAsync()).Single();
+
+        vm.RequiresConfiguration.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_required_setting_saved_as_whitespace_is_not_configured()
+    {
+        var plugin = MakePlugin("p", definitions: new List<PluginSettingDefinitionDto> { Setting("api_key", required: true) });
+        SavedSettings("p", new Dictionary<string, string> { ["api_key"] = "   " });
+
+        var vm = (await Build(plugin).GetActivePluginsAsync()).Single();
+
+        vm.RequiresConfiguration.Should().BeTrue();
+    }
 }
