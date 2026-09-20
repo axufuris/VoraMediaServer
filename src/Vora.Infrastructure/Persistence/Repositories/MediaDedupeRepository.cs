@@ -230,6 +230,7 @@ public class MediaDedupeRepository : IMediaDedupeRepository
             .Include(m => m.MediaParts).ThenInclude(p => p.VideoTracks)
             .Include(m => m.MediaParts).ThenInclude(p => p.AudioTracks)
             .Where(m => m.MediaParts.Count > 1)
+            .AsSplitQuery()
             .AsNoTracking().ToListAsync();
 
         var episodes = await _context.MediaItems.OfType<Episode>()
@@ -237,6 +238,7 @@ public class MediaDedupeRepository : IMediaDedupeRepository
             .Include(e => e.MediaParts).ThenInclude(p => p.VideoTracks)
             .Include(e => e.MediaParts).ThenInclude(p => p.AudioTracks)
             .Where(e => e.MediaParts.Count > 1)
+            .AsSplitQuery()
             .AsNoTracking().ToListAsync();
 
         var tracks = await _context.MediaItems.OfType<Track>()

@@ -258,10 +258,14 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
         // flags. Without this, FFmpeg's auto-selection grabbed the file's
         // default-flagged stream regardless of which one the user picked
         // in the Quality panel.
+        // Split, because three sibling collections in one statement is a
+        // cartesian product: a part with 1 video, 8 audio and 20 subtitle
+        // tracks returns 160 rows to carry 29, and this runs on every play.
         var query = context.MediaParts
             .Include(p => p.VideoTracks)
             .Include(p => p.AudioTracks)
             .Include(p => p.SubtitleTracks)
+            .AsSplitQuery()
             .AsQueryable();
 
         if (session.MediaPartId != Guid.Empty)
