@@ -189,6 +189,16 @@ public class FolderWatcherService : IFolderWatcherService
             var uningested = FindUningestedFiles(filesOnDisk, ingested, target.ExcludeFilters, target.Type);
             if (uningested.Count == 0) return;
 
+            if (ShouldQueueFullScan(ingested.Count, uningested.Count))
+            {
+                _logger.LogInformation(
+                    "Watcher reconciliation for library {LibraryName} found {Count} un-ingested file(s); queueing one library scan rather than a task per file.",
+                    target.Name, uningested.Count);
+
+                taskQueue.QueueScanLibrary(libraryId, target.Name);
+                return;
+            }
+
             _logger.LogInformation(
                 "Watcher reconciliation for library {LibraryName} found {Count} file(s) on disk that were never ingested; queueing them.",
                 target.Name, uningested.Count);
@@ -213,6 +223,22 @@ public class FolderWatcherService : IFolderWatcherService
         ResilientDirectory.EnumerateFiles(
             directory,
             (skipped, ex) => _logger.LogWarning(ex, "Could not read {Directory} during watcher reconciliation; skipping it.", skipped));
+
+    // Reconciliation exists to catch the handful of files the watcher missed —
+    // it is not a scanner. Fanning out one task per file is right for a few
+    // stragglers and wrong for a backlog: a freshly added library has EVERY file
+    // un-ingested, so the sweep queued hundreds of per-file tasks that merely
+    // duplicated the full scan the add had already queued. Worse, each music
+    // task re-reads the library's entire ingested-path set, making the fan-out
+    // quadratic, and per-file ingest resolves artist and album artwork from one
+    // file instead of best-of-group.
+    //
+    // A library with nothing ingested is the full scan's job by definition, and
+    // so is any backlog past the fan-out limit.
+    internal const int ReconcileFanOutLimit = 50;
+
+    internal static bool ShouldQueueFullScan(int ingestedCount, int uningestedCount) =>
+        ingestedCount == 0 || uningestedCount > ReconcileFanOutLimit;
 
     internal static List<string> FindUningestedFiles(IEnumerable<string> filesOnDisk, ISet<string> ingestedPaths, IReadOnlyList<string> excludeFilters, LibraryType libraryType)
     {
