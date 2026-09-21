@@ -31,7 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         gosu \
         libchromaprint-tools \
-        ca-certificates && \
+        ca-certificates \
+        tzdata && \
     rm -rf /var/lib/apt/lists/*
 
 # Step 2: comskip (optional). Lives in `contrib` on bookworm and isn't
