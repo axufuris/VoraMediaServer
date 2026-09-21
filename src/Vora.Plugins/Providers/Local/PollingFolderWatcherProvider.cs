@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -26,6 +27,13 @@ public class PollingFolderWatcherProvider : IFolderWatcherProvider, IDisposable
 
     private readonly object _lock = new();
 
+    private readonly ILogger<PollingFolderWatcherProvider> _logger;
+
+    public PollingFolderWatcherProvider(ILogger<PollingFolderWatcherProvider> logger)
+    {
+        _logger = logger;
+    }
+
     public void StartWatching(Guid libraryId, IEnumerable<string> directories, int pollingInterval, Func<string, Task> onFileAdded, Func<string, Task> onFileDeleted)
     {
         var paths = directories.Where(Directory.Exists).ToList();
@@ -34,7 +42,7 @@ public class PollingFolderWatcherProvider : IFolderWatcherProvider, IDisposable
         var interval = TimeSpan.FromSeconds(pollingInterval > 0 ? pollingInterval : DefaultPollingSeconds);
 
         _watchedDirectories[libraryId] = paths;
-        _knownFiles[libraryId] = GetCurrentFiles(paths);
+        _knownFiles[libraryId] = GetCurrentFiles(paths).Files;
         _callbacks[libraryId] = (onFileAdded, onFileDeleted);
 
         lock (_lock)
@@ -68,14 +76,13 @@ public class PollingFolderWatcherProvider : IFolderWatcherProvider, IDisposable
         if (!_pollingLibraries.TryAdd(libraryId, 0)) return;
         try
         {
-            var currentFiles = GetCurrentFiles(paths);
-            var addedFiles = currentFiles.Except(previousFiles).ToList();
-            var deletedFiles = previousFiles.Except(currentFiles).ToList();
+            var (currentFiles, complete) = GetCurrentFiles(paths);
+            var changes = ResolveChanges(currentFiles, previousFiles, complete);
 
-            _knownFiles[libraryId] = currentFiles;
+            _knownFiles[libraryId] = changes.Known;
 
-            foreach (var file in addedFiles) _ = callbacks.OnAdded(file);
-            foreach (var file in deletedFiles) _ = callbacks.OnDeleted(file);
+            foreach (var file in changes.Added) _ = callbacks.OnAdded(file);
+            foreach (var file in changes.Deleted) _ = callbacks.OnDeleted(file);
         }
         finally
         {
@@ -83,21 +90,52 @@ public class PollingFolderWatcherProvider : IFolderWatcherProvider, IDisposable
         }
     }
 
-    private HashSet<string> GetCurrentFiles(List<string> directories)
+    // A file missing from an INCOMPLETE listing has not been shown to be gone —
+    // the share may simply have been unreachable this tick. Inferring deletion
+    // there would queue a cleanup for every file in the library on one network
+    // blip. (ProcessFileDeletedAsync re-checks File.Exists before acting, so the
+    // rows survive, but the queue still fills with thousands of no-op tasks, and
+    // a share that is genuinely unreachable answers "gone" to that check too.)
+    //
+    // Additions stay safe either way: a path that turned up really is there.
+    // Known is unioned rather than replaced on an incomplete pass, so what we
+    // could not see this time stays known and does not read as a deletion on the
+    // next complete one.
+    internal static (List<string> Added, List<string> Deleted, HashSet<string> Known) ResolveChanges(
+        HashSet<string> currentFiles,
+        HashSet<string> previousFiles,
+        bool complete)
+    {
+        var added = currentFiles.Except(previousFiles).ToList();
+
+        if (!complete)
+        {
+            var known = new HashSet<string>(currentFiles, StringComparer.OrdinalIgnoreCase);
+            known.UnionWith(previousFiles);
+            return (added, new List<string>(), known);
+        }
+
+        return (added, previousFiles.Except(currentFiles).ToList(), currentFiles);
+    }
+
+    private (HashSet<string> Files, bool Complete) GetCurrentFiles(List<string> directories)
     {
         var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var complete = true;
+
         foreach (var dir in directories)
         {
-            try
+            foreach (var file in ResilientDirectory.EnumerateFiles(dir, (directory, ex) =>
             {
-                foreach (var f in Directory.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories))
-                {
-                    files.Add(f);
-                }
+                complete = false;
+                _logger.LogWarning(ex, "Could not read {Directory} while polling; treating this pass as incomplete.", directory);
+            }))
+            {
+                files.Add(file);
             }
-            catch { }
         }
-        return files;
+
+        return (files, complete);
     }
 
     public void Dispose()

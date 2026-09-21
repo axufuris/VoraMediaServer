@@ -629,19 +629,25 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         return GetNewFilesInDirectories(directories, existingPaths, MediaFileExtensions.Video);
     }
 
-    private static IEnumerable<string> GetNewFilesInDirectories(IEnumerable<string> directories, HashSet<string> existingPaths, IReadOnlyList<string> extensions)
+    private IEnumerable<string> GetNewFilesInDirectories(IEnumerable<string> directories, HashSet<string> existingPaths, IReadOnlyList<string> extensions)
     {
         var newFiles = new List<string>();
         foreach (var dir in directories.Where(Directory.Exists))
         {
-            var files = Directory.GetFiles(dir, "*.*", SearchOption.AllDirectories)
-                .Where(f => extensions.Contains(Path.GetExtension(f).ToLower()))
-                .Where(f => !existingPaths.Contains(f));
-
-            newFiles.AddRange(files);
+            foreach (var file in EnumerateFilesResiliently(dir))
+            {
+                if (!extensions.Contains(Path.GetExtension(file).ToLowerInvariant())) continue;
+                if (existingPaths.Contains(file)) continue;
+                newFiles.Add(file);
+            }
         }
         return newFiles;
     }
+
+    private IEnumerable<string> EnumerateFilesResiliently(string root) =>
+        ResilientDirectory.EnumerateFiles(
+            root,
+            (directory, ex) => _logger.LogWarning(ex, "Could not read {Directory}; skipping it and continuing the scan.", directory));
 
     private async Task ProcessMusicDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, IReadOnlyList<string> excludeFilters)
     {
