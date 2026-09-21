@@ -204,17 +204,15 @@ public class FolderWatcherService : IFolderWatcherService
         }
     }
 
-    private static IEnumerable<string> EnumerateSupportedFiles(string directory)
-    {
-        try
-        {
-            return Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories);
-        }
-        catch
-        {
-            return Enumerable.Empty<string>();
-        }
-    }
+    // The catch here used to wrap a LAZY EnumerateFiles, so it caught nothing:
+    // the enumeration only runs once the caller iterates, by which point the
+    // try/catch is long gone and the exception surfaces in ReconcileLibraryAsync,
+    // abandoning the whole sweep. Even caught, AllDirectories would have lost the
+    // entire tree over one bad folder.
+    private IEnumerable<string> EnumerateSupportedFiles(string directory) =>
+        ResilientDirectory.EnumerateFiles(
+            directory,
+            (skipped, ex) => _logger.LogWarning(ex, "Could not read {Directory} during watcher reconciliation; skipping it.", skipped));
 
     internal static List<string> FindUningestedFiles(IEnumerable<string> filesOnDisk, ISet<string> ingestedPaths, IReadOnlyList<string> excludeFilters, LibraryType libraryType)
     {

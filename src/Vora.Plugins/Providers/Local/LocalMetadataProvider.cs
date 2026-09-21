@@ -1,4 +1,5 @@
 ﻿using System.Xml.Linq;
+using Microsoft.Extensions.Logging;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -16,6 +17,13 @@ public class LocalMetadataProvider : IMetadataProvider
     public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { LibraryKind.Movie, LibraryKind.TvShow, LibraryKind.Music, LibraryKind.HomeVideo };
 
     public string ProviderName => "Local";
+
+    private readonly ILogger<LocalMetadataProvider> _logger;
+
+    public LocalMetadataProvider(ILogger<LocalMetadataProvider> logger)
+    {
+        _logger = logger;
+    }
 
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>();
 
@@ -53,7 +61,7 @@ public class LocalMetadataProvider : IMetadataProvider
     {
         if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) return null;
 
-        var nfoFiles = Directory.GetFiles(path, "*.nfo");
+        var nfoFiles = SafeGetFiles(path, "*.nfo");
         var movieNfo = nfoFiles.FirstOrDefault(f => Path.GetFileName(f).Equals("movie.nfo", StringComparison.OrdinalIgnoreCase))
                        ?? nfoFiles.FirstOrDefault(); // Fallback to any NFO in the folder
 
@@ -145,8 +153,8 @@ public class LocalMetadataProvider : IMetadataProvider
             }
         }
 
-        var poster = Directory.GetFiles(path, "poster.*").FirstOrDefault() ?? Directory.GetFiles(path, "folder.*").FirstOrDefault();
-        var backdrop = Directory.GetFiles(path, "fanart.*").FirstOrDefault() ?? Directory.GetFiles(path, "backdrop.*").FirstOrDefault();
+        var poster = SafeGetFiles(path, "poster.*").FirstOrDefault() ?? SafeGetFiles(path, "folder.*").FirstOrDefault();
+        var backdrop = SafeGetFiles(path, "fanart.*").FirstOrDefault() ?? SafeGetFiles(path, "backdrop.*").FirstOrDefault();
 
         if (poster != null) result.PosterUrl = poster;
         if (backdrop != null) result.BackgroundUrl = backdrop;
@@ -231,8 +239,8 @@ public class LocalMetadataProvider : IMetadataProvider
             catch { }
         }
 
-        var poster = Directory.GetFiles(path, "poster.*").FirstOrDefault() ?? Directory.GetFiles(path, "folder.*").FirstOrDefault();
-        var backdrop = Directory.GetFiles(path, "fanart.*").FirstOrDefault() ?? Directory.GetFiles(path, "backdrop.*").FirstOrDefault();
+        var poster = SafeGetFiles(path, "poster.*").FirstOrDefault() ?? SafeGetFiles(path, "folder.*").FirstOrDefault();
+        var backdrop = SafeGetFiles(path, "fanart.*").FirstOrDefault() ?? SafeGetFiles(path, "backdrop.*").FirstOrDefault();
 
         if (poster != null) result.PosterUrl = poster;
         if (backdrop != null) result.BackgroundUrl = backdrop;
@@ -242,18 +250,40 @@ public class LocalMetadataProvider : IMetadataProvider
         return result;
     }
 
+    private string? FindEpisodeNfo(string showPath, string token)
+    {
+        return ResilientDirectory.EnumerateFiles(
+                showPath,
+                (directory, ex) => _logger.LogWarning(ex, "Could not read {Directory} looking for episode NFOs; skipping it.", directory))
+            .FirstOrDefault(file =>
+                file.EndsWith(".nfo", StringComparison.OrdinalIgnoreCase)
+                && Path.GetFileName(file).Contains(token, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // A media folder can stop being readable at any moment — it lives on a
+    // network share. Throwing here aborted the whole metadata refresh for the
+    // item, so an unreadable folder degrades to "no local assets" and is logged.
+    private string[] SafeGetFiles(string directory, string pattern)
+    {
+        try
+        {
+            return Directory.GetFiles(directory, pattern);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not read {Directory} looking for {Pattern}; treating it as having no local assets.", directory, pattern);
+            return Array.Empty<string>();
+        }
+    }
+
     private MetadataResult? ParseEpisode(string showPath, int seasonNumber, int episodeNumber)
     {
         if (string.IsNullOrWhiteSpace(showPath) || !Directory.Exists(showPath)) return null;
 
-        var searchPattern = $"*S{seasonNumber:D2}E{episodeNumber:D2}*.nfo";
-        var nfoFile = Directory.GetFiles(showPath, searchPattern, SearchOption.AllDirectories).FirstOrDefault();
-
-        if (nfoFile == null)
-        {
-            var altPattern = $"*{seasonNumber}x{episodeNumber:D2}*.nfo";
-            nfoFile = Directory.GetFiles(showPath, altPattern, SearchOption.AllDirectories).FirstOrDefault();
-        }
+        // Two walks rather than one, to keep the original precedence: an S01E01
+        // file anywhere in the tree beats a 1x01 file.
+        var nfoFile = FindEpisodeNfo(showPath, $"S{seasonNumber:D2}E{episodeNumber:D2}")
+            ?? FindEpisodeNfo(showPath, $"{seasonNumber}x{episodeNumber:D2}");
 
         if (nfoFile == null) return null;
 
@@ -282,9 +312,9 @@ public class LocalMetadataProvider : IMetadataProvider
         var baseName = Path.GetFileNameWithoutExtension(nfoFile);
         var dir = Path.GetDirectoryName(nfoFile) ?? showPath;
 
-        var thumb = Directory.GetFiles(dir, $"{baseName}-thumb.*").FirstOrDefault() ??
-                    Directory.GetFiles(dir, $"{baseName}.jpg").FirstOrDefault() ??
-                    Directory.GetFiles(dir, $"{baseName}.png").FirstOrDefault();
+        var thumb = SafeGetFiles(dir, $"{baseName}-thumb.*").FirstOrDefault() ??
+                    SafeGetFiles(dir, $"{baseName}.jpg").FirstOrDefault() ??
+                    SafeGetFiles(dir, $"{baseName}.png").FirstOrDefault();
 
         if (thumb != null)
         {

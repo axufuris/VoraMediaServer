@@ -644,68 +644,10 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         return newFiles;
     }
 
-    // Directory.GetFiles with AllDirectories abandons the ENTIRE tree on the
-    // first unreadable subdirectory — it throws rather than returning a partial
-    // list. One bad folder on a network share (a permission, a broken symlink, a
-    // transient SMB error) and the library scans as though it were empty.
-    //
-    // Walking a directory at a time costs only the directory that actually
-    // failed. The skip is logged rather than swallowed: a scan that quietly finds
-    // nothing is the failure this exists to prevent, and it would be
-    // indistinguishable from a library that really is empty.
     private IEnumerable<string> EnumerateFilesResiliently(string root) =>
-        EnumerateFilesResiliently(
+        ResilientDirectory.EnumerateFiles(
             root,
-            Directory.GetDirectories,
-            Directory.GetFiles,
             (directory, ex) => _logger.LogWarning(ex, "Could not read {Directory}; skipping it and continuing the scan.", directory));
-
-    internal static IEnumerable<string> EnumerateFilesResiliently(
-        string root,
-        Func<string, string[]> getDirectories,
-        Func<string, string[]> getFiles,
-        Action<string, Exception> onSkipped)
-    {
-        var pending = new Stack<string>();
-        pending.Push(root);
-
-        while (pending.Count > 0)
-        {
-            var current = pending.Pop();
-
-            string[] subdirectories;
-            try
-            {
-                subdirectories = getDirectories(current);
-            }
-            catch (Exception ex)
-            {
-                onSkipped(current, ex);
-                subdirectories = Array.Empty<string>();
-            }
-
-            foreach (var subdirectory in subdirectories)
-            {
-                pending.Push(subdirectory);
-            }
-
-            string[] files;
-            try
-            {
-                files = getFiles(current);
-            }
-            catch (Exception ex)
-            {
-                onSkipped(current, ex);
-                continue;
-            }
-
-            foreach (var file in files)
-            {
-                yield return file;
-            }
-        }
-    }
 
     private async Task ProcessMusicDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, IReadOnlyList<string> excludeFilters)
     {

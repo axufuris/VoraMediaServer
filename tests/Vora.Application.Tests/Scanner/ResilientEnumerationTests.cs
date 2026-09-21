@@ -1,4 +1,4 @@
-using Vora.Plugins.Providers.Local;
+using Vora.Plugins;
 
 namespace Vora.Application.Tests.Scanner;
 
@@ -16,7 +16,7 @@ public class ResilientEnumerationTests
         Dictionary<string, string[]> files,
         Action<string, Exception>? onSkipped = null)
     {
-        return VoraLocalMediaScannerProvider.EnumerateFilesResiliently(
+        return ResilientDirectory.EnumerateFiles(
             root,
             dir => directories.TryGetValue(dir, out var d) ? d : throw new UnauthorizedAccessException(dir),
             dir => files.TryGetValue(dir, out var f) ? f : throw new IOException(dir),
