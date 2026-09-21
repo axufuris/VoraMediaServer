@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { overlayService } from '../../../api/Streaming/overlayService';
 import { useDialog } from '../../../dialogs';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
+import { CornerLabelChip, WatchedBadge } from '../../../components/Client/Primitives/WatchedBadge';
 
 type MediaType = 'Movie' | 'Season' | 'TvShow' | 'Episode';
 type BadgeType = 'resolution' | 'content_rating' | 'audio_codec' | 'stinger' | 'edition' | 'composite_ratings' | 'critic_rating';
@@ -488,12 +489,17 @@ export default function OverlayEditor() {
                     <img src={BACKGROUNDS[mediaType]} className="absolute inset-0 w-full h-full object-cover rounded-md" alt="Canvas Mockup" />
                     <div className="absolute inset-0 bg-black/20 pointer-events-none rounded-md"></div>
 
+                    {/* The client's real watched treatment, so the collision an
+                        admin is judging is the one their viewers will see. An
+                        episode folds the check into its number chip; every
+                        other canvas gets the standalone circular badge. The
+                        episode number is a sample — E1 stands in for whatever
+                        the episode actually is. */}
                     {mockUI === 'watched' && (
-                        <div
-                            className="absolute bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg border border-white/10 z-10 pointer-events-none"
-                            style={{ top: '4%', right: '4%', width: '14%', aspectRatio: '1' }}
-                        >
-                            <svg className="w-3/5 h-3/5 text-[var(--vora-text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                        <div className="absolute z-10 pointer-events-none" style={{ top: '4%', right: '4%' }}>
+                            {mediaType === 'Episode'
+                                ? <CornerLabelChip label="E1" watched fontSize={Math.max(10, canvasSize.width * 0.022)} />
+                                : <WatchedBadge diameter={Math.max(24, canvasSize.width * 0.12)} />}
                         </div>
                     )}
                     {mockUI === 'unplayed' && (

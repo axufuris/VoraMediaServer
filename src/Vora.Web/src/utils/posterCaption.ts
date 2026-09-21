@@ -18,6 +18,9 @@ export interface PosterCaptionItem {
     seasonNumber?: number | null;
     seasonName?: string | null;
     episodeNumber?: number | null;
+    // Set when one file holds several episodes ("E1-E2"), so a card labels a
+    // double episode the same way the season list does.
+    endEpisodeNumber?: number | null;
     edition?: string | null;
     releaseDate?: string | null;
     // Music
@@ -107,4 +110,22 @@ export function posterCaption(item: PosterCaptionItem): PosterCaption {
         default:
             return { title: item.title, lines: [year].filter((l): l is string => !!l) };
     }
+}
+
+// What an episode's corner chip says. Every surface that draws an episode goes
+// through this, so a card in a rail and a row in the season list can never
+// label the same episode differently.
+export interface EpisodeLabelItem {
+    type?: string;
+    episodeNumber?: number | null;
+    endEpisodeNumber?: number | null;
+}
+
+export function episodeCornerLabel(item: EpisodeLabelItem | undefined): string | null {
+    if (item?.type !== 'Episode' || item.episodeNumber == null) return null;
+
+    // "E1-E2", the form the details page already uses for a double episode.
+    return item.endEpisodeNumber != null && item.endEpisodeNumber > item.episodeNumber
+        ? `E${item.episodeNumber}-E${item.endEpisodeNumber}`
+        : `E${item.episodeNumber}`;
 }
