@@ -9,6 +9,13 @@ public class ServerSetting
 
     public RegistrationMode RegistrationMode { get; set; } = RegistrationMode.SecretWord;
 
+    // Which clock every scheduled time on this server is read against, as an
+    // IANA id ("America/Chicago"). Empty means the container's own clock, which
+    // is UTC unless a TZ environment variable says otherwise — so a server left
+    // at the default ran "02:00" at 02:00 UTC while the admin who typed it
+    // meant their own 2am.
+    public string ScheduleTimeZone { get; set; } = string.Empty;
+
     public bool EnableNightlyScan { get; set; } = true;
     public TimeSpan NightlyScanTime { get; set; } = new(2, 0, 0);
 

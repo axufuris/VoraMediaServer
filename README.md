@@ -140,6 +140,13 @@ Key environment variables:
 - `Jwt__SecretKey` — long random string used to sign profile and
   account tokens. Generate once and keep it stable; rotating it
   invalidates every existing session.
+- `TZ` — the container's time zone, e.g. `America/Chicago`. Without
+  it a container runs on **UTC**, and every scheduled time in the
+  admin settings (nightly scan, intro/credit detection, thumbnail
+  generation, IPTV syncs, poster overlays) is read against UTC — so
+  "02:00" runs at 02:00 UTC, which is the previous evening in the
+  Americas. Either set this, or pick a zone under **Settings → Core
+  → Scanning → Schedule Time Zone**, which overrides it.
 - `StoragePaths__*` — locations inside the container for
   user-uploaded artwork, the original-artwork download cache, the IPTV
   EPG cache, DVR recordings, user profile images, and uploaded
@@ -189,6 +196,10 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=vora;Username=vora;Password=change-me-to-a-strong-password"
       Jwt__SecretKey: "REPLACE_WITH_A_LONG_RANDOM_STRING"
+
+      # Without this the container runs on UTC and every scheduled
+      # time in the admin settings is read against UTC.
+      TZ: "America/Chicago"
       StoragePaths__CustomArtwork: /app/data/custom_artwork
       StoragePaths__OriginalArtworkCache: /app/data/original_artwork_cache
       StoragePaths__EpgCache: /app/data/iptv/epg_cache

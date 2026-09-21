@@ -6,6 +6,7 @@ namespace Vora.Application.Settings.ViewModels;
 public class ServerSettingsVM
 {
     public string ServerName { get; set; } = "Vora Server";
+    public string ScheduleTimeZone { get; set; } = string.Empty;
     public bool EnableNightlyScan { get; set; }
     public string NightlyScanTime { get; set; } = "02:00";
     public List<string> ScanIgnoredFolders { get; set; } = new();
@@ -85,6 +86,7 @@ public class ServerSettingsVM
         s => new ServerSettingsVM
         {
             ServerName = s.ServerName,
+            ScheduleTimeZone = s.ScheduleTimeZone,
             EnableNightlyScan = s.EnableNightlyScan,
             NightlyScanTime = s.NightlyScanTime.ToString(@"hh\:mm"),
             ScanIgnoredFolders = s.ScanIgnoredFolders,

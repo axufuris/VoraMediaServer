@@ -2,6 +2,7 @@ import { apiClient } from '../client';
 
 export interface ServerSettings {
     serverName: string;
+    scheduleTimeZone: string;
     enableNightlyScan: boolean;
     nightlyScanTime: string;
     scanIgnoredFolders: string[];

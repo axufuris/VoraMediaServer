@@ -84,6 +84,13 @@ public class SystemSettingsManager : ISystemSettingsManager
 
         settings.ServerName = request.ServerName;
 
+        // An unknown id is rejected rather than stored: a typo here would
+        // silently move every scheduled job back to the container's clock.
+        if (ScheduleClock.IsKnown(request.ScheduleTimeZone))
+        {
+            settings.ScheduleTimeZone = (request.ScheduleTimeZone ?? string.Empty).Trim();
+        }
+
         settings.EnableNightlyScan = request.EnableNightlyScan;
         if (TimeSpan.TryParse(request.NightlyScanTime, out var nsTime)) settings.NightlyScanTime = nsTime;
         settings.ScanIgnoredFolders = (request.ScanIgnoredFolders ?? new List<string>())

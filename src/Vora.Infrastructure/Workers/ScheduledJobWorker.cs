@@ -83,7 +83,12 @@ public class ScheduledJobWorker : BackgroundService
         var collectionManager = scope.ServiceProvider.GetRequiredService<ICollectionManager>();
 
         var settings = await settingsRepo.GetSettingsAsync();
-        var now = DateTime.Now;
+
+        // Read against the admin's own clock, not the container's. Every time on
+        // the settings page is a wall-clock time somebody typed meaning their
+        // own night; a container with no TZ set would otherwise compare them
+        // against UTC.
+        var now = ScheduleClock.Now(settings.ScheduleTimeZone, DateTime.UtcNow);
         var timeOfDay = now.TimeOfDay;
         var today = now.Date;
 
@@ -139,6 +144,36 @@ public class ScheduledJobWorker : BackgroundService
             }
 
             _lastTrashPurgeDate = today;
+        }
+
+        // Queued before analysis on purpose: the two share the library-maint
+        // resource key, so whichever is queued first holds it and the other
+        // waits. Thumbnails are the cheaper pass and the one a viewer notices
+        // missing, so they go first when both fall due together.
+        bool shouldRunThumbnails = settings.VideoThumbnailGeneration == Domain.Enums.DetectionTrigger.OnSchedule ||
+                                   settings.VideoThumbnailGeneration == Domain.Enums.DetectionTrigger.OnAdditionAndSchedule;
+
+        if (shouldRunThumbnails && timeOfDay >= settings.VideoThumbnailScheduleTime && _lastVideoThumbnailDate < today)
+        {
+            _logger.LogInformation("Triggering Scheduled Video Thumbnail Generation.");
+
+            var libraryRepo = scope.ServiceProvider.GetRequiredService<ILibraryRepository>();
+            var thumbnailLibraries = await libraryRepo.GetAllProjectedAsync(l => new
+            {
+                l.Id,
+                l.Name,
+                l.Type,
+                l.EnableVideoPreviewThumbnails
+            });
+
+            foreach (var lib in thumbnailLibraries)
+            {
+                if (!lib.EnableVideoPreviewThumbnails) continue;
+                if (!VideoThumbnailManager.IsVideoBearingLibrary(lib.Type)) continue;
+                taskQueue.QueueGenerateLibraryVideoThumbnails(lib.Id, lib.Name, isScheduleTrigger: true);
+            }
+
+            _lastVideoThumbnailDate = today;
         }
 
         bool shouldRunDetections = settings.RunDetections == Domain.Enums.DetectionTrigger.OnSchedule ||
@@ -248,30 +283,5 @@ public class ScheduledJobWorker : BackgroundService
             _lastIptvHealthCheckDate = today;
         }
 
-        bool shouldRunThumbnails = settings.VideoThumbnailGeneration == Domain.Enums.DetectionTrigger.OnSchedule ||
-                                   settings.VideoThumbnailGeneration == Domain.Enums.DetectionTrigger.OnAdditionAndSchedule;
-
-        if (shouldRunThumbnails && timeOfDay >= settings.VideoThumbnailScheduleTime && _lastVideoThumbnailDate < today)
-        {
-            _logger.LogInformation("Triggering Scheduled Video Thumbnail Generation.");
-
-            var libraryRepo = scope.ServiceProvider.GetRequiredService<ILibraryRepository>();
-            var thumbnailLibraries = await libraryRepo.GetAllProjectedAsync(l => new
-            {
-                l.Id,
-                l.Name,
-                l.Type,
-                l.EnableVideoPreviewThumbnails
-            });
-
-            foreach (var lib in thumbnailLibraries)
-            {
-                if (!lib.EnableVideoPreviewThumbnails) continue;
-                if (!VideoThumbnailManager.IsVideoBearingLibrary(lib.Type)) continue;
-                taskQueue.QueueGenerateLibraryVideoThumbnails(lib.Id, lib.Name, isScheduleTrigger: true);
-            }
-
-            _lastVideoThumbnailDate = today;
-        }
     }
 }

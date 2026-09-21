@@ -3,6 +3,25 @@ import { systemSettingsAdminService, type ServerSettings } from '../../../api/Sy
 import { libraryAdminService } from '../../../api/Media/libraryAdminService';
 import FolderPathInput from '../FolderBrowser/FolderPathInput';
 
+// A short list rather than the full IANA database: these cover where people
+// actually run a home server, and a wrong-but-plausible pick from 400 entries
+// is worse than a short list plus the TZ variable for anywhere else.
+const SCHEDULE_TIME_ZONES = [
+    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix',
+    'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu',
+    'America/Toronto', 'America/Vancouver', 'America/Sao_Paulo', 'America/Mexico_City',
+    'Europe/London', 'Europe/Dublin', 'Europe/Lisbon', 'Europe/Madrid', 'Europe/Paris',
+    'Europe/Amsterdam', 'Europe/Brussels', 'Europe/Berlin', 'Europe/Zurich', 'Europe/Rome',
+    'Europe/Stockholm', 'Europe/Oslo', 'Europe/Copenhagen', 'Europe/Helsinki',
+    'Europe/Warsaw', 'Europe/Prague', 'Europe/Athens', 'Europe/Bucharest',
+    'Europe/Kyiv', 'Europe/Moscow', 'Europe/Istanbul',
+    'Asia/Jerusalem', 'Asia/Dubai', 'Asia/Karachi', 'Asia/Kolkata', 'Asia/Bangkok',
+    'Asia/Singapore', 'Asia/Hong_Kong', 'Asia/Shanghai', 'Asia/Tokyo', 'Asia/Seoul',
+    'Australia/Perth', 'Australia/Adelaide', 'Australia/Brisbane', 'Australia/Sydney',
+    'Pacific/Auckland', 'Africa/Johannesburg', 'Africa/Lagos', 'Africa/Cairo', 'UTC',
+];
+
+
 interface CoreSettingsTabProps {
     serverId?: string;
     scanners: { id: string, name: string }[];
@@ -396,6 +415,28 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
             </>)}
 
             {subTab === 'scanning' && (<>
+            <SettingsCard title="Schedule Time Zone">
+                <FieldLabel>Time Zone</FieldLabel>
+                <select
+                    value={serverSettings.scheduleTimeZone || ''}
+                    onChange={e => setServerSettings({ ...serverSettings, scheduleTimeZone: e.target.value })}
+                    className="vora-input max-w-md cursor-pointer"
+                >
+                    <option value="">Server default (container clock)</option>
+                    {SCHEDULE_TIME_ZONES.map(tz => (
+                        <option key={tz} value={tz}>{tz}</option>
+                    ))}
+                </select>
+                <FieldHint>
+                    Which clock every scheduled time below is read against — the nightly scan, intro/credit
+                    detection, thumbnails, IPTV syncs and the poster overlay pass. Leave on the server default
+                    only if the container's own clock is already your local time; a container has no time zone
+                    unless one was given to it, so the default is <strong>UTC</strong> and "02:00" then means
+                    2am UTC rather than 2am where you are. Setting <code>TZ</code> on the container does the
+                    same job; this setting wins when both are present.
+                </FieldHint>
+            </SettingsCard>
+
             <SettingsCard
                 title="Nightly Library Scan"
                 headingControl={
