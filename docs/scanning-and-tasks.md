@@ -103,6 +103,12 @@ taskQueue.QueueScanNewFile(libraryId, filePath);        // Movie / TvShow
 taskQueue.QueueScanNewMusicFile(libraryId, filePath);   // Music
 ```
 
+### A bad folder costs one folder, not the library
+
+The scanner walks the library **a directory at a time** (`EnumerateFilesResiliently`), not via `Directory.GetFiles(root, "*.*", SearchOption.AllDirectories)`. That overload throws on the first unreadable subdirectory and yields **nothing for the whole tree** rather than a partial list, so one bad folder on a network share made a populated library scan as though it were empty. Each directory's listing is guarded independently and **every skip is logged** — a scan that quietly finds nothing is indistinguishable from an empty library, which is the failure the guard exists to prevent. Don't replace it with the one-line `AllDirectories` call.
+
+The same applies to the **write** side: `IngestMusicFilesAsync` guards per track and per artist, and a run that skipped anything ends with a single warning naming the count. Before that, one row the database rejected (a `varchar(32)` overflow on `Track.AudioCodec`) aborted the entire scan task, leaving the library holding whatever had been committed first — an arbitrary-looking subset, since the file order is the filesystem's, not alphabetical. **`Track.AudioCodec` holds a short codec token** (`mp3`, `flac`, `alac`, `aac`, …) resolved from the container by `ResolveAudioCodec`, not TagLib's prose `Properties.Description`: `BadgeResolver` and `MediaDedupeManager` both substring-match those tokens, and the prose form matched neither *and* overflowed the column.
+
 ### One extension list, read by both halves
 
 `Vora.Plugins/MediaFileExtensions.cs` is the **single source of truth** for which files Vora ingests — `Video` (`.mkv/.mp4/.avi/.m4v`), `Audio` (`.mp3/.flac/.m4a/.ogg/.opus/.wav/.aac/.wma`), and the `IsVideo`/`IsAudio`/`IsMedia` predicates. The scanner and the watcher both read it; neither keeps a copy. Add a format there, **never beside a caller**.
