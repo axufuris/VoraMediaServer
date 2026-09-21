@@ -130,4 +130,40 @@ describe('MediaCard', () => {
         const { container: filled } = render(<MediaCard {...defaults} fill />);
         expect((filled.firstElementChild as HTMLElement).style.width).toBe('100%');
     });
+
+    // An episode looks the same wherever it is drawn — a rail card here, a row
+    // in the season list — so the number chip has to come from the card itself
+    // rather than from whatever the call site remembered to pass.
+    describe('episode corner chip', () => {
+        const episode = { type: 'Episode', title: 'Pilot', tvShowTitle: 'The Show', seasonNumber: 1, episodeNumber: 2 };
+
+        it('labels an episode card with its number without being asked to', () => {
+            render(<MediaCard item={episode} />);
+
+            expect(screen.getByText('E2')).toBeInTheDocument();
+        });
+
+        it('folds the watched check into that chip instead of a second badge', () => {
+            const { container } = render(<MediaCard item={episode} isPlayed />);
+
+            // Scoped to the check's own path — the card also draws a
+            // placeholder graphic when it has no artwork.
+            const checks = container.querySelectorAll('path[d="M5 13l4 4L19 7"]');
+            expect(checks).toHaveLength(1);
+            expect(screen.getByText('E2').closest('span')!.contains(checks[0])).toBe(true);
+        });
+
+        it('gives a movie the standalone badge and no number', () => {
+            render(<MediaCard item={{ type: 'Movie', title: 'Dune' }} isPlayed />);
+
+            expect(screen.queryByText(/^E\d/)).toBeNull();
+        });
+
+        it('leaves an explicit badge in charge of the corner', () => {
+            render(<MediaCard item={episode} isPlayed badge={<span>LIVE</span>} />);
+
+            expect(screen.getByText('LIVE')).toBeInTheDocument();
+            expect(screen.queryByText('E2')).toBeNull();
+        });
+    });
 });

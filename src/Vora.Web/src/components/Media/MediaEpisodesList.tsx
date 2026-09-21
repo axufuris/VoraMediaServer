@@ -4,6 +4,7 @@ import { mediaService, type Episode } from '../../api/Media/mediaService';
 import StarRating from '../Client/Primitives/StarRating';
 import ArtImage from '../Client/Primitives/ArtImage';
 import { CornerLabelChip } from '../Client/Primitives/WatchedBadge';
+import { episodeCornerLabel } from '../../utils/posterCaption';
 import { StorageKeys } from '../../utils/storageKeys';
 import { formatDate } from '../../utils/serverTime';
 
@@ -51,9 +52,7 @@ export default function MediaEpisodesList({ episodes, serverId }: Props) {
 
                                 <div className="absolute top-2 right-2 z-10">
                                     <CornerLabelChip
-                                        label={ep.endEpisodeNumber && ep.endEpisodeNumber > ep.episodeNumber
-                                            ? `E${ep.episodeNumber}-${ep.endEpisodeNumber}`
-                                            : `E${ep.episodeNumber}`}
+                                        label={episodeCornerLabel({ type: 'Episode', ...ep }) ?? `E${ep.episodeNumber}`}
                                         watched={ep.isPlayed}
                                     />
                                 </div>

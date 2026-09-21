@@ -1,9 +1,9 @@
 import React, { useState, type ReactNode } from 'react';
 import { thumbUrl } from '../../../utils/thumbnails';
-import { posterCaption, type PosterCaptionItem } from '../../../utils/posterCaption';
+import { episodeCornerLabel, posterCaption, type PosterCaptionItem } from '../../../utils/posterCaption';
 import MediaPlaceholder from './MediaPlaceholder';
 import PosterRemoveButton from './PosterRemoveButton';
-import { WatchedBadge } from './WatchedBadge';
+import { CornerLabelChip, WatchedBadge } from './WatchedBadge';
 
 export type MediaCardShape = 'poster' | 'still' | 'square' | 'circle';
 export type MediaCardSize = 'xs' | 'sm' | 'md' | 'lg';
@@ -110,8 +110,17 @@ export default function MediaCard({
         }
         : undefined;
 
+    // Derived from the item rather than passed in, so an episode is labelled
+    // the same wherever it is drawn — a Continue Watching rail, a search
+    // result, the season list — without every call site remembering to ask.
+    const cornerLabel = episodeCornerLabel(item);
+
+    // An episode's chip owns the top-right slot: that is where its check goes,
+    // folded in, instead of taking a second circle beside the number.
     const statusBadge = badge ?? (
-        unplayedCount != null && unplayedCount > 0 ? (
+        cornerLabel ? (
+            <CornerLabelChip label={cornerLabel} watched={isPlayed} />
+        ) : unplayedCount != null && unplayedCount > 0 ? (
             <span
                 className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full px-1.5 py-0.5 font-bold"
                 style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', fontSize: 'var(--vora-card-badge-size)' }}
