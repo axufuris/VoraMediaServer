@@ -30,6 +30,7 @@ public interface ITaskQueueManager
     void QueueAnalyzeLibraryMediaContent(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false);
     void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueScanNewFile(Guid libraryId, string filePath);
+    void QueueScanNewMusicFile(Guid libraryId, string filePath);
     void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueRefreshMatchedMediaItem(Guid mediaItemId, Guid libraryId, bool isTvShow);
     void QueueAnalyzeMediaItemContent(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
@@ -181,6 +182,15 @@ public class TaskQueueManager : ITaskQueueManager
 
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, isAdditionTrigger: true, cancellationToken: ct);
         });
+    }
+
+    public void QueueScanNewMusicFile(Guid libraryId, string filePath)
+    {
+        EnqueueTask($"Scan File: {Path.GetFileName(filePath)}", async (ct, sp) =>
+        {
+            var libraryManager = sp.GetRequiredService<ILibraryManager>();
+            await libraryManager.TriggerMusicFileScanAsync(libraryId, filePath, ct);
+        }, resourceKey: LibraryKey(libraryId));
     }
 
     public void QueueScanNewFile(Guid libraryId, string filePath)

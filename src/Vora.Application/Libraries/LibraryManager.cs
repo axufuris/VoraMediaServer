@@ -23,6 +23,7 @@ public interface ILibraryManager
     Task<List<ScanUnit>> DiscoverScanUnitsAsync(Guid libraryId, CancellationToken cancellationToken = default);
     Task<Guid?> ScanAndEnrichUnitAsync(Guid libraryId, LibraryType libraryType, IReadOnlyList<string> filePaths, bool forceOverride, CancellationToken cancellationToken = default);
     Task<ScanFileResult> TriggerFileScanAsync(Guid libraryId, string filePath, CancellationToken cancellationToken = default);
+    Task<Guid?> TriggerMusicFileScanAsync(Guid libraryId, string filePath, CancellationToken cancellationToken = default);
     Task DeleteLibraryAsync(Guid id, CancellationToken cancellationToken = default);
     Task ToggleWatchingAsync(Guid libraryId, bool enable);
 }
@@ -323,13 +324,30 @@ public class LibraryManager : ILibraryManager
         }
         else
         {
-            // Music (and anything else) — the watcher only fires for video
-            // files today; nothing to single-file ingest here.
+            // Music goes through TriggerMusicFileScanAsync instead: a Track is not
+            // a MediaItem the video post-processing pipeline can act on, so it must
+            // not travel back as a ScanFileResult.
             result = ScanFileResult.None;
         }
 
         if (result.MediaItemId != null) await notifier.NotifyLibraryUpdatedAsync(libraryId);
         return result;
+    }
+
+    public async Task<Guid?> TriggerMusicFileScanAsync(Guid libraryId, string filePath, CancellationToken cancellationToken = default)
+    {
+        var library = await _repository.GetProjectedByIdAsync(libraryId, l => new { l.Id, l.Type });
+        if (library == null || library.Type != LibraryType.Music) return null;
+
+        using var scope = _serviceProvider.CreateScope();
+        var notifier = scope.ServiceProvider.GetRequiredService<IClientNotifier>();
+        var scanner = await ResolveScannerAsync(scope.ServiceProvider);
+        if (scanner == null) return null;
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var trackId = await scanner.ScanMusicFileAsync(libraryId, filePath);
+        if (trackId != null) await notifier.NotifyLibraryUpdatedAsync(libraryId);
+        return trackId;
     }
 
     public async Task ToggleWatchingAsync(Guid libraryId, bool enable)
