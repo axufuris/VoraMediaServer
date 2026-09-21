@@ -72,6 +72,7 @@ public interface IMediaRepository
     Task SetThumbnailsLockedAsync(Guid mediaItemId, bool locked);
     Task UpdateMediaItemAsync(MediaItem item);
     Task SaveChangesAsync();
+    Task ReleaseTrackedEntitiesAsync();
     Task AddMediaItemAsync(MediaItem item);
     Task AddMediaVideosAsync(IEnumerable<MediaVideo> videos);
     Task RemoveMediaVideosAsync(IEnumerable<MediaVideo> videos);

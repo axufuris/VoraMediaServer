@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -398,7 +398,13 @@ public class MediaIngestionService : IMediaIngestionService
         return new MediaItemHandle(track.Id);
     }
 
-    public async Task AddMediaPartAsync(MediaItemHandle item, string filePath, string? resolution, string? edition = null)
+    public Task ReleaseTrackedEntitiesAsync() => _repository.ReleaseTrackedEntitiesAsync();
+
+    // syncEdition is a movie/TV concern: Edition is Director's Cut, IMAX and the
+    // like, and the sync loads the item WITH its parts to pick the best one. A
+    // track has no edition, so for music that read is pure cost — and it was paid
+    // once per track.
+    public async Task AddMediaPartAsync(MediaItemHandle item, string filePath, string? resolution, string? edition = null, bool syncEdition = true)
     {
         var fileInfo = new FileInfo(filePath);
         var part = new MediaPart
@@ -411,7 +417,7 @@ public class MediaIngestionService : IMediaIngestionService
             Container = Path.GetExtension(filePath).TrimStart('.').ToLower()
         };
         await _repository.AddMediaPartAsync(part);
-        await _repository.SyncItemEditionFromPartsAsync(item.Value);
+        if (syncEdition) await _repository.SyncItemEditionFromPartsAsync(item.Value);
     }
 
     public async Task AttachLocalExtraAsync(LibraryHandle library, string parentTitle, int? parentYear, string filePath, string extraType, string title)

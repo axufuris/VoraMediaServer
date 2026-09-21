@@ -665,6 +665,12 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
         Guid? lastTrackId = null;
         var failures = 0;
+
+        // The parse loop below reports per file, then the write phase reported
+        // nothing at all — so a large library sat on "(n/n)" for as long as the
+        // writes took and looked hung. The two phases are separately slow; both
+        // have to be visible.
+        var written = 0;
         var parsed = new List<MusicFileMeta>();
         for (int i = 0; i < filesToProcess.Count; i++)
         {
@@ -888,6 +894,9 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
                     foreach (var track in albumGroup.OrderBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber))
                     {
+                        written++;
+                        _progress.Report($"Saving {artistGroup.Key} - {albumGroup.Key} ({written}/{filesToProcess.Count})");
+
                         // One unwritable track must not cost the library every track
                         // queued behind it. This loop used to be unguarded, so a
                         // single row the database rejected aborted the whole scan
@@ -909,7 +918,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                                 track.ContentRating,
                                 trackArtist: track.TrackArtist);
 
-                            await _ingestionService.AddMediaPartAsync(trackId, track.FilePath, resolution: null);
+                            await _ingestionService.AddMediaPartAsync(trackId, track.FilePath, resolution: null, syncEdition: false);
                             lastTrackId = trackId.Value;
                         }
                         catch (Exception ex)
@@ -918,6 +927,12 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                             _logger.LogError(ex, "Failed to ingest track {FilePath}; continuing with the rest of the library.", track.FilePath);
                         }
                     }
+
+                    // Every save re-runs change detection over everything tracked
+                    // so far, so a library-sized ingest on one DbContext gets
+                    // slower with each album. Nothing here holds an entity across
+                    // albums — only ids — so releasing them keeps that cost flat.
+                    await _ingestionService.ReleaseTrackedEntitiesAsync();
                 }
             }
             catch (Exception ex)
