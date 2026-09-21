@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Vora.Application.Artwork;
 using Vora.Domain.Entities.Media;
 
@@ -34,10 +34,10 @@ public class MediaArtworkRepository(VoraDbContext context) : IMediaArtworkReposi
         await context.SaveChangesAsync();
     }
 
-    public Task ClearArtworkForLibraryAsync(Guid libraryId) =>
+    public Task ClearArtworkForLibraryAsync(Guid libraryId, CancellationToken cancellationToken = default) =>
         context.Set<MediaArtwork>()
             .Where(a => a.MediaItem.LibraryId == libraryId && !a.IsUserUploaded)
-            .ExecuteDeleteAsync();
+            .ExecuteDeleteAsync(cancellationToken);
 
     public async Task AddMediaArtworkAsync(MediaArtwork artwork)
     {

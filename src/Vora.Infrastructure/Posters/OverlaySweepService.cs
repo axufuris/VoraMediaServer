@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vora.Application.Artwork;
 using Vora.Application.Posters;
@@ -22,25 +22,52 @@ public class OverlaySweepService : IOverlaySweepService
         _logger = logger;
     }
 
-    public void SweepPhysicalOverlays(IEnumerable<string?> urls)
+    // Both halves used to stat per URL — 48 File.Exists inside
+    // RemoveThumbnailsForSource plus one for the overlay file — so sweeping a
+    // library of thousands of items meant hundreds of thousands of stat calls
+    // against a bind-mounted volume. Each half now reads its directory once and
+    // tests membership instead.
+    public void SweepPhysicalOverlays(IEnumerable<string?> urls, CancellationToken cancellationToken = default)
     {
         var overlayDir = !string.IsNullOrWhiteSpace(_storagePaths.CustomArtwork)
             ? _storagePaths.CustomArtwork
             : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
 
-        foreach (var url in urls)
+        var present = urls.Where(u => !string.IsNullOrEmpty(u)).ToList();
+        if (present.Count == 0) return;
+
+        _artworkThumbnails.RemoveThumbnailsForSources(present, cancellationToken);
+
+        var overlayFiles = present
+            .Where(u => u!.Contains(OverlayMarker, StringComparison.Ordinal))
+            .Where(u => u!.StartsWith(CustomArtworkUrlPrefix, StringComparison.Ordinal))
+            .Select(u => u!.Split('/').Last())
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (overlayFiles.Count == 0) return;
+
+        HashSet<string> onDisk;
+        try
         {
-            if (string.IsNullOrEmpty(url)) continue;
+            if (!Directory.Exists(overlayDir)) return;
+            onDisk = new HashSet<string>(
+                Directory.EnumerateFiles(overlayDir).Select(Path.GetFileName)!,
+                StringComparer.Ordinal);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not list overlays in {OverlayDir}; leaving them in place.", overlayDir);
+            return;
+        }
 
-            _artworkThumbnails.RemoveThumbnailsForSource(url);
+        foreach (var fileName in overlayFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
 
-            if (!url.Contains(OverlayMarker, StringComparison.Ordinal)) continue;
-            if (!url.StartsWith(CustomArtworkUrlPrefix, StringComparison.Ordinal)) continue;
+            if (!onDisk.Contains(fileName)) continue;
 
-            var fileName = url.Split('/').Last();
             var physicalPath = Path.Combine(overlayDir, fileName);
-            if (!File.Exists(physicalPath)) continue;
-
             try
             {
                 File.Delete(physicalPath);

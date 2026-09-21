@@ -35,6 +35,8 @@ public class LocalRecommendationProvider(IRecommendationRepository repository) :
 
         foreach (var genre in topGenres)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var recommendedIds = await repository.GetTopUnwatchedMediaByGenreAsync(genre.Id, profileId, libraryId, RecommendationsPerGenre);
             if (recommendedIds.Count == 0)
             {

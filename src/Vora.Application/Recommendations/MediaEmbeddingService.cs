@@ -7,7 +7,7 @@ namespace Vora.Application.Recommendations;
 
 public interface IMediaEmbeddingService
 {
-    Task<int> ProcessMissingEmbeddingsAsync(int batchSize = 100);
+    Task<int> ProcessMissingEmbeddingsAsync(int batchSize = 100, CancellationToken cancellationToken = default);
 }
 
 public class MediaEmbeddingService : IMediaEmbeddingService
@@ -23,7 +23,7 @@ public class MediaEmbeddingService : IMediaEmbeddingService
         _httpClient = httpClient;
     }
 
-    public async Task<int> ProcessMissingEmbeddingsAsync(int batchSize = 100)
+    public async Task<int> ProcessMissingEmbeddingsAsync(int batchSize = 100, CancellationToken cancellationToken = default)
     {
         var apiKey = await _settings.GetPluginSettingAsync("openai_recommendations", "api_key");
         if (string.IsNullOrWhiteSpace(apiKey)) return 0;
@@ -44,15 +44,15 @@ public class MediaEmbeddingService : IMediaEmbeddingService
         {
             model = "text-embedding-3-small",
             input = inputStrings
-        });
+        }, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
-            var error = await response.Content.ReadAsStringAsync();
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException($"OpenAI API Error: {error}");
         }
 
-        var embedData = await response.Content.ReadFromJsonAsync<OpenAiBulkEmbedResponse>();
+        var embedData = await response.Content.ReadFromJsonAsync<OpenAiBulkEmbedResponse>(cancellationToken);
         if (embedData?.Data == null || !embedData.Data.Any()) return 0;
 
         var newEmbeddings = new List<MediaItemEmbedding>();

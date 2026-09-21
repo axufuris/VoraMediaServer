@@ -1,6 +1,6 @@
-namespace Vora.Application.Posters;
+﻿namespace Vora.Application.Posters;
 
 public interface IOverlaySweepService
 {
-    void SweepPhysicalOverlays(IEnumerable<string?> urls);
+    void SweepPhysicalOverlays(IEnumerable<string?> urls, CancellationToken cancellationToken = default);
 }

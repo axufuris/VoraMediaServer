@@ -99,13 +99,15 @@ public class OpenAiRecommendationProvider : IRecommendationProvider
 
         foreach (var cat in categories?.Categories ?? new List<CategoryDto>())
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var embedResponse = await _httpClient.PostAsJsonAsync("https://api.openai.com/v1/embeddings", new
             {
                 model = "text-embedding-3-small",
                 input = $"{cat.Title} {cat.Description} {cat.Vibe_Keywords}"
-            });
+            }, cancellationToken);
 
-            var embedData = await embedResponse.Content.ReadFromJsonAsync<OpenAiEmbedResponse>();
+            var embedData = await embedResponse.Content.ReadFromJsonAsync<OpenAiEmbedResponse>(cancellationToken);
             if (embedData?.Data == null || !embedData.Data.Any()) continue;
 
             await _repository.LogAiUsageAsync(new AiUsageLog

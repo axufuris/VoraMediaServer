@@ -1,4 +1,4 @@
-namespace Vora.Application.Thumbnails;
+﻿namespace Vora.Application.Thumbnails;
 
 public interface IVideoThumbnailManager
 {
@@ -6,5 +6,6 @@ public interface IVideoThumbnailManager
     Task TriggerLibraryThumbnailGenerationAsync(Guid libraryId, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false, CancellationToken cancellationToken = default);
     Task GenerateForItemAsync(Guid mediaItemId, bool forceOverride, CancellationToken cancellationToken = default);
     Task<(int Total, int WithThumbnails)> GetCoverageAsync(Guid libraryId);
-    Task PurgeLibraryThumbnailsAsync(Guid libraryId);
+    Task PurgeLibraryThumbnailsAsync(Guid libraryId, CancellationToken cancellationToken = default);
+    Task PurgeLibraryThumbnailFilesAsync(Guid libraryId, CancellationToken cancellationToken = default);
 }
