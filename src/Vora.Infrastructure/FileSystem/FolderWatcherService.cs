@@ -209,7 +209,7 @@ public class FolderWatcherService : IFolderWatcherService
     // try/catch is long gone and the exception surfaces in ReconcileLibraryAsync,
     // abandoning the whole sweep. Even caught, AllDirectories would have lost the
     // entire tree over one bad folder.
-    private IEnumerable<string> EnumerateSupportedFiles(string directory) =>
+    internal IEnumerable<string> EnumerateSupportedFiles(string directory) =>
         ResilientDirectory.EnumerateFiles(
             directory,
             (skipped, ex) => _logger.LogWarning(ex, "Could not read {Directory} during watcher reconciliation; skipping it.", skipped));
