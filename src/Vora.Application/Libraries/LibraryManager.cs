@@ -199,6 +199,12 @@ public class LibraryManager : ILibraryManager
 
     public async Task DeleteLibraryAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        // Stop the watcher first. It holds the library id in its active set, so
+        // without this it keeps polling the folders of a library that no longer
+        // exists — a timer running against a network share for the rest of the
+        // process's life — and keeps handing the queue work to reject.
+        _folderWatcher.StopWatching(id);
+
         using var scope = _serviceProvider.CreateScope();
         var thumbnailManager = scope.ServiceProvider.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
         await thumbnailManager.PurgeLibraryThumbnailsAsync(id);

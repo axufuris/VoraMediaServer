@@ -50,6 +50,7 @@ public interface ITaskQueueManager
     void QueueReevaluateCollectionOrder(Guid collectionId);
     Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null, string? dedupeKey = null);
     bool CancelTask(Guid taskId);
+    int CancelTasksForLibrary(Guid libraryId);
     CancellationToken? GetTaskCancellationToken(Guid taskId);
     void UpdateTaskName(Guid taskId, string name);
     Func<IServiceProvider, Task<string?>>? GetTaskNameResolver(Guid taskId);
@@ -123,6 +124,14 @@ public class TaskQueueManager : ITaskQueueManager
 
     public void QueueDeleteLibrary(Guid libraryId, string? libraryName = null)
     {
+        // Every ingestion task for a library shares its resource key, and the
+        // dispatcher is FIFO within a key — so the delete queued BEHIND whatever
+        // was already in flight. Deleting a library with a full scan pending
+        // meant watching hundreds of scans of the very thing being deleted run
+        // to completion first. Cancel them before enqueuing, never after, or the
+        // delete cancels itself.
+        CancelTasksForLibrary(libraryId);
+
         EnqueueTask($"Delete Library: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
             {
                 var manager = sp.GetRequiredService<Vora.Application.Libraries.ILibraryManager>();
@@ -535,6 +544,17 @@ public class TaskQueueManager : ITaskQueueManager
             _lastProgressNotifyUtc = now;
             _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
         }
+    }
+
+    public int CancelTasksForLibrary(Guid libraryId)
+    {
+        var key = LibraryKey(libraryId);
+        var ids = _taskStates.Values
+            .Where(t => t.ResourceKey == key)
+            .Select(t => t.Id)
+            .ToList();
+
+        return ids.Count(CancelTask);
     }
 
     public bool CancelTask(Guid taskId)
