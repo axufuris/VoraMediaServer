@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Libraries;
@@ -6,14 +6,14 @@ using Vora.Application.Media;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Application.Watchers;
+using Vora.Domain.Enums;
+using Vora.Plugins;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Infrastructure.FileSystem;
 
 public class FolderWatcherService : IFolderWatcherService
 {
-    private static readonly string[] SupportedExtensions = { ".mkv", ".mp4", ".avi", ".m4v" };
-
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<FolderWatcherService> _logger;
     private readonly IEnumerable<IFolderWatcherProvider> _providers;
@@ -106,16 +106,27 @@ public class FolderWatcherService : IFolderWatcherService
 
     private async Task ProcessFileAddedAsync(Guid libraryId, string filePath)
     {
-        if (!SupportedExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return;
+        // Cheap reject of the non-media noise (.nfo, .srt, artwork) before paying
+        // for the settle delay and a DI scope. The library's own type decides which
+        // of the two sets actually applies, once it is known.
+        if (!MediaFileExtensions.IsMedia(filePath)) return;
 
         await Task.Delay(5000);
 
         using var scope = _serviceProvider.CreateScope();
 
+        var library = await GetWatchTargetAsync(scope, libraryId);
+        if (library == null) return;
+
+        // A video file dropped into a music library (or the reverse) is not ours to
+        // ingest — the single-file scanners are dispatched by library type and would
+        // parse it as the wrong kind of media.
+        if (!IsSupportedFor(filePath, library.Type)) return;
+
         // Honor the library's exclude filters here so excluded files (e.g. a
         // *.TDARR copy still transcoding) don't even queue a scan task — the
         // scanner would reject them anyway, but this keeps them off the task list.
-        if (await IsExcludedAsync(scope, libraryId, Path.GetFileName(filePath)))
+        if (MatchesExcludeFilter(Path.GetFileName(filePath), library.ExcludeFilters))
         {
             _logger.LogInformation("Skipping excluded file {FilePath}.", filePath);
             return;
@@ -123,12 +134,12 @@ public class FolderWatcherService : IFolderWatcherService
 
         _logger.LogInformation("New media detected: {FilePath}. Triggering single-file ingestion.", filePath);
         var taskQueue = scope.ServiceProvider.GetRequiredService<ITaskQueueManager>();
-        taskQueue.QueueScanNewFile(libraryId, filePath);
+        QueueSingleFileScan(taskQueue, library.Type, libraryId, filePath);
     }
 
     private async Task ProcessFileDeletedAsync(Guid libraryId, string filePath)
     {
-        if (!SupportedExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return;
+        if (!MediaFileExtensions.IsMedia(filePath)) return;
 
         // A rename/move (e.g. an import upgrading a release in place) surfaces as a
         // delete immediately followed by a create. Let it settle and re-check: if
@@ -138,15 +149,24 @@ public class FolderWatcherService : IFolderWatcherService
 
         using var scope = _serviceProvider.CreateScope();
 
+        var library = await GetWatchTargetAsync(scope, libraryId);
+        if (library == null) return;
+        if (!IsSupportedFor(filePath, library.Type)) return;
+
         // Excluded files (e.g. *.TDARR temp copies) were never ingested, so a
         // deletion must not queue an orphan-cleanup task for them.
-        if (await IsExcludedAsync(scope, libraryId, Path.GetFileName(filePath)))
-        {
-            return;
-        }
+        if (MatchesExcludeFilter(Path.GetFileName(filePath), library.ExcludeFilters)) return;
 
         var taskQueue = scope.ServiceProvider.GetRequiredService<ITaskQueueManager>();
         taskQueue.QueueRemoveOrphanedMedia(filePath);
+    }
+
+    private static void QueueSingleFileScan(ITaskQueueManager taskQueue, LibraryType type, Guid libraryId, string filePath)
+    {
+        if (type == LibraryType.Music)
+            taskQueue.QueueScanNewMusicFile(libraryId, filePath);
+        else
+            taskQueue.QueueScanNewFile(libraryId, filePath);
     }
 
     private async Task ReconcileLibraryAsync(Guid libraryId, IEnumerable<string> directoryPaths)
@@ -158,24 +178,24 @@ public class FolderWatcherService : IFolderWatcherService
 
             using var scope = _serviceProvider.CreateScope();
             var mediaRepo = scope.ServiceProvider.GetRequiredService<IMediaRepository>();
-            var libraryManager = scope.ServiceProvider.GetRequiredService<ILibraryManager>();
             var taskQueue = scope.ServiceProvider.GetRequiredService<ITaskQueueManager>();
 
+            var target = await GetWatchTargetAsync(scope, libraryId);
+            if (target == null) return;
+
             var ingested = await mediaRepo.GetExistingLibraryPathsAsync(libraryId);
-            var library = await libraryManager.GetLibraryByIdAsync(libraryId);
-            var excludeFilters = library?.ExcludeFilters ?? new List<string>();
 
             var filesOnDisk = paths.SelectMany(EnumerateSupportedFiles);
-            var uningested = FindUningestedFiles(filesOnDisk, ingested, excludeFilters);
+            var uningested = FindUningestedFiles(filesOnDisk, ingested, target.ExcludeFilters, target.Type);
             if (uningested.Count == 0) return;
 
             _logger.LogInformation(
                 "Watcher reconciliation for library {LibraryName} found {Count} file(s) on disk that were never ingested; queueing them.",
-                library?.Name ?? libraryId.ToString(), uningested.Count);
+                target.Name, uningested.Count);
 
             foreach (var filePath in uningested)
             {
-                taskQueue.QueueScanNewFile(libraryId, filePath);
+                QueueSingleFileScan(taskQueue, target.Type, libraryId, filePath);
             }
         }
         catch (Exception ex)
@@ -196,12 +216,13 @@ public class FolderWatcherService : IFolderWatcherService
         }
     }
 
-    internal static List<string> FindUningestedFiles(IEnumerable<string> filesOnDisk, ISet<string> ingestedPaths, IReadOnlyList<string> excludeFilters)
+    internal static List<string> FindUningestedFiles(IEnumerable<string> filesOnDisk, ISet<string> ingestedPaths, IReadOnlyList<string> excludeFilters, LibraryType libraryType)
     {
+        var supported = ExtensionsFor(libraryType);
         var result = new List<string>();
         foreach (var file in filesOnDisk)
         {
-            if (!SupportedExtensions.Contains(Path.GetExtension(file).ToLowerInvariant())) continue;
+            if (!supported.Contains(Path.GetExtension(file).ToLowerInvariant())) continue;
             if (ingestedPaths.Contains(file)) continue;
             if (MatchesExcludeFilter(Path.GetFileName(file), excludeFilters)) continue;
             result.Add(file);
@@ -209,11 +230,22 @@ public class FolderWatcherService : IFolderWatcherService
         return result;
     }
 
-    private static async Task<bool> IsExcludedAsync(IServiceScope scope, Guid libraryId, string fileName)
+    // Which of the two shared sets applies is the library's type, not the file's:
+    // the single-file scanners are dispatched by type, so a stray .mp3 in a movie
+    // library would otherwise be handed to the movie parser.
+    internal static IReadOnlyList<string> ExtensionsFor(LibraryType libraryType) =>
+        libraryType == LibraryType.Music ? MediaFileExtensions.Audio : MediaFileExtensions.Video;
+
+    private static bool IsSupportedFor(string filePath, LibraryType libraryType) =>
+        ExtensionsFor(libraryType).Contains(Path.GetExtension(filePath).ToLowerInvariant());
+
+    private sealed record WatchTarget(string Name, LibraryType Type, List<string> ExcludeFilters);
+
+    private static async Task<WatchTarget?> GetWatchTargetAsync(IServiceScope scope, Guid libraryId)
     {
-        var libraryManager = scope.ServiceProvider.GetRequiredService<ILibraryManager>();
-        var library = await libraryManager.GetLibraryByIdAsync(libraryId);
-        return MatchesExcludeFilter(fileName, library?.ExcludeFilters);
+        var libraryRepo = scope.ServiceProvider.GetRequiredService<ILibraryRepository>();
+        var projected = await libraryRepo.GetProjectedByIdAsync(libraryId, l => new { l.Name, l.Type, l.ExcludeFilters });
+        return projected == null ? null : new WatchTarget(projected.Name, projected.Type, projected.ExcludeFilters);
     }
 
     private static bool MatchesExcludeFilter(string fileName, IReadOnlyList<string>? excludeFilters)

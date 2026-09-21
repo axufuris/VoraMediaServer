@@ -96,13 +96,24 @@ A task can show a friendly name even when the caller didn't pass one. `EnqueueTa
 
 ## Folder watcher → per-file ingest
 
-`FolderWatcherService` (`Vora.Infrastructure/FileSystem`) starts a watcher provider per library with real-time watching enabled (restarted on boot by `StartupWatcherService`). On a new supported video file (`.mkv/.mp4/.avi/.m4v`) it debounces 5s then calls:
+`FolderWatcherService` (`Vora.Infrastructure/FileSystem`) starts a watcher provider per library with real-time watching enabled (restarted on boot by `StartupWatcherService`). On a new supported media file it debounces 5s then queues a single-file ingest:
 
 ```csharp
-taskQueue.QueueScanNewFile(libraryId, filePath);
+taskQueue.QueueScanNewFile(libraryId, filePath);        // Movie / TvShow
+taskQueue.QueueScanNewMusicFile(libraryId, filePath);   // Music
 ```
 
-`QueueScanNewFile` ingests **just that one file** — NOT a full library scan. This is deliberate: copying a season folder with N episodes produces N cheap per-file ingests, each doing its own distinct file, so there's no scan flood and no dedupe needed. (The old behaviour queued a full `QueueScanLibrary` per file → N redundant full scans.)
+### One extension list, read by both halves
+
+`Vora.Plugins/MediaFileExtensions.cs` is the **single source of truth** for which files Vora ingests — `Video` (`.mkv/.mp4/.avi/.m4v`), `Audio` (`.mp3/.flac/.m4a/.ogg/.opus/.wav/.aac/.wma`), and the `IsVideo`/`IsAudio`/`IsMedia` predicates. The scanner and the watcher both read it; neither keeps a copy. Add a format there, **never beside a caller**.
+
+This is not a style preference. The two used to hold private copies, and the watcher's had no audio formats in it at all — so a music library with real-time watching on reported itself as watched and then silently discarded every event. New albums only appeared on a manual "Run scan" or the nightly scan. `FolderWatcherReconciliationTests` asserts with `BeSameAs` (reference identity, not equivalence) that the watcher hands back the shared lists rather than copies, so reintroducing a literal fails the build.
+
+Note that `Vora.Plugins` references nothing else in the solution, so it can hold the lists but not the `LibraryType` mapping. **The watcher picks the set from the library's type, not the file's** — `FolderWatcherService.ExtensionsFor(LibraryType)` — because the single-file scanners are dispatched by type, so a stray `.mp3` in a movie library would otherwise be handed to the movie parser. A cheap `MediaFileExtensions.IsMedia` union check rejects the non-media noise (`.nfo`, `.srt`, cover art) *before* the 5s delay and the DI scope; the exact per-type check runs once the library is resolved. Both gates apply on the **add, delete and reconciliation** paths alike.
+
+Unrelated extension lists elsewhere (`MusicEndpoints`' extension→format map, `IptvPassthroughService`' audio-stream sniffing) answer different questions and are deliberately *not* folded in here.
+
+`QueueScanNewFile` / `QueueScanNewMusicFile` ingest **just that one file** — NOT a full library scan. This is deliberate: copying a season folder with N episodes produces N cheap per-file ingests, each doing its own distinct file, so there's no scan flood and no dedupe needed. (The old behaviour queued a full `QueueScanLibrary` per file → N redundant full scans.)
 
 **Exclude filters are enforced watcher-side, on both adds and deletes.** Before enqueuing, `FolderWatcherService` checks the file name against the library's `ExcludeFilters` (e.g. `.TDARR`, transcoder working dirs) via the shared `IsExcludedAsync` helper. A single-file scan also re-checks, but the watcher must reject first — otherwise the task is queued (and shows up in the UI) before the scanner no-ops it. The **delete** path checks too: an excluded file was never ingested, so its deletion must not queue an `Auto-Cleanup` (`QueueRemoveOrphanedMedia`) task — otherwise a transcoder churning `*.TDARR` temp files floods the queue with no-op cleanups.
 
@@ -115,7 +126,9 @@ The per-file work item:
 
 ## Single-file scanner + new-season metadata
 
-`ILocalMediaScannerProvider` gained `ScanMovieFileAsync(libraryId, filePath)` and `ScanTvFileAsync(libraryId, filePath)`. They reuse the same parsing as the full-library scan — the per-file body was factored into `IngestMovieFileAsync` / `IngestTvFileAsync` and the regex setup into `BuildMovieRegexes` / `BuildTvRegexes`, so library and single-file scans share one code path. Both skip a path already in the library.
+`ILocalMediaScannerProvider` gained `ScanMovieFileAsync(libraryId, filePath)`, `ScanTvFileAsync(libraryId, filePath)` and `ScanMusicFileAsync(libraryId, filePath)`. They reuse the same parsing as the full-library scan — the per-file body was factored into `IngestMovieFileAsync` / `IngestTvFileAsync` and the regex setup into `BuildMovieRegexes` / `BuildTvRegexes`, so library and single-file scans share one code path. All three skip a path already in the library.
+
+**Music dispatches on its own path, not through `TriggerFileScanAsync`.** `ProcessMusicDirectoriesAsync` was split so its tag-parse-and-group body lives in `IngestMusicFilesAsync(library, filePaths)`; the library scan calls it with every new file, `ScanMusicFileAsync` calls it with one. A single file is simply a group of one, so `EnsureArtistAsync` / `EnsureAlbumAsync` upsert onto the existing rows — the only behavioural difference is that artist/album artwork resolves from that file and its folder rather than best-of-group. The result is a **`Track` id, not a `MediaItem` id the video pipeline can act on**, so it travels back through `ILibraryManager.TriggerMusicFileScanAsync` (returning `Guid?`) instead of as a `ScanFileResult`; `TriggerFileScanAsync` still returns `ScanFileResult.None` for a music library. Don't route a track id into `QueueScanNewFile` — it would run ffprobe analysis, TMDB metadata/artwork/ratings, poster overlays and silence detection against a track.
 
 A **season's** poster and (metadata) fields come from the parent **show's** metadata mapping, not from scanning the episode files. So when an episode is added under a season that didn't exist yet, the new season would otherwise have no poster. To fix this without re-mapping the show on every file:
 
@@ -142,7 +155,7 @@ Removing a file from disk no longer hard-deletes its library item. When the fold
 
 The **external-id lookups on `MediaRepository` filter `MissingSince == null` too** — `GetExistingExternalIdsAsync`, `GetLocalIdsByExternalIdsAsync`, and `MediaExistsByExternalIdAsync`. These answer "does the library hold this title?" for Discovery's In-Library badge (rows, search, and actor filmography all go through `DiscoveryManager.EnrichWithStatusAsync`), for the watchlist's link to a local copy, and for `RequestManager`'s already-owned short-circuit. A trashed title must answer *no* to all three: it is hidden from every client read, so badging it as held routes the tile at an item the client won't show, and treating it as owned silently drops a request to re-acquire it.
 
-- **Music `Track` still hard-deletes** — the soft-delete tombstone is video-only. Don't assume symmetry.
+- **Music `Track` still hard-deletes** — the soft-delete tombstone is video-only. Don't assume symmetry. The watcher's delete path needs no music-specific branch: `MarkMediaMissingByFilePathAsync` already drops the part and then removes the row outright when `item is Track`, rather than stamping `MissingSince`. So a deleted track is gone with no Media Trash entry and no restore.
 **Seasons and shows follow their episodes.** A season or show has no files of its own, so it is stamped `MissingSince` when it has **no live episodes left**, and cleared as soon as one comes back. That hides the empty shell everywhere the Trash filter already applies, with no separate check. `MediaRepository.RefreshSeriesStateAsync(seasonId, contentAddedAt)` recomputes a season and its show, and runs after every change to an episode's state: a file added (`AddMediaPartAsync`), a file gone (`MarkMediaMissingByFilePathAsync`), a restore, and a hard delete. After a duplicate-show merge, `RefreshShowStateAsync` does the same for each keeper, also reviving any trashed keeper episode that received a moved file. Shells are derived state: they are left off the Trash page and cannot be restored by id. Before this, moving a show's files (a Sonarr rename, say) trashed the old episodes and left the old show and seasons on screen with nothing in them.
 
 **Recently added follows new content, not creation.** `MediaItem.LastContentAddedAt` is set on the item when a part is added and, for an episode, raised on its season and show, never moved backwards. Home rows sorted by date added (`SmartListRepository`, `DateAddedDesc`) and the Library page's Date Added sort (`utils/recentlyAdded.ts`) order by `LastContentAddedAt ?? AddedAt`. Sorting by `AddedAt` alone meant an episode arriving in a season created months earlier never surfaced. Scans and the folder watcher only add parts for paths not already in the library, so a rescan doesn't reshuffle the row. The `TrackLastContentAddedAt` migration backfills the column from each season's newest live episode and stamps existing empty shells.

@@ -11,8 +11,6 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
     private readonly ILogger<VoraLocalMediaScannerProvider> _logger;
     private readonly IMediaIngestionService _ingestionService;
     private readonly ITaskProgressReporter _progress;
-    private readonly string[] _supportedExtensions = { ".mkv", ".mp4", ".avi", ".m4v" };
-    private readonly string[] _supportedAudioExtensions = { ".mp3", ".flac", ".m4a", ".ogg", ".opus", ".wav", ".aac", ".wma" };
 
     private static readonly string[] ExtraFileSuffixes =
     {
@@ -511,7 +509,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
     public async Task<Guid?> ScanMovieFileAsync(Guid libraryId, string filePath)
     {
-        if (!_supportedExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return null;
+        if (!MediaFileExtensions.IsVideo(filePath)) return null;
 
         var library = LibraryHandle.FromGuid(libraryId);
         var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
@@ -533,7 +531,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
     public async Task<ScanFileResult> ScanTvFileAsync(Guid libraryId, string filePath)
     {
-        if (!_supportedExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return ScanFileResult.None;
+        if (!MediaFileExtensions.IsVideo(filePath)) return ScanFileResult.None;
 
         var library = LibraryHandle.FromGuid(libraryId);
         var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
@@ -551,6 +549,20 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         }
 
         return await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
+    }
+
+    public async Task<Guid?> ScanMusicFileAsync(Guid libraryId, string filePath)
+    {
+        if (!MediaFileExtensions.IsAudio(filePath)) return null;
+
+        var library = LibraryHandle.FromGuid(libraryId);
+        var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        if (existing.Contains(filePath) || !File.Exists(filePath)) return null;
+
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        if (IsExcluded(filePath, details.ExcludeFilters)) return null;
+
+        return await IngestMusicFilesAsync(library, new[] { filePath });
     }
 
     // Files ingested as standalone media items before extras existed (e.g. a
@@ -614,10 +626,10 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
     private IEnumerable<string> GetNewFilesInDirectories(IEnumerable<string> directories, HashSet<string> existingPaths)
     {
-        return GetNewFilesInDirectories(directories, existingPaths, _supportedExtensions);
+        return GetNewFilesInDirectories(directories, existingPaths, MediaFileExtensions.Video);
     }
 
-    private static IEnumerable<string> GetNewFilesInDirectories(IEnumerable<string> directories, HashSet<string> existingPaths, string[] extensions)
+    private static IEnumerable<string> GetNewFilesInDirectories(IEnumerable<string> directories, HashSet<string> existingPaths, IReadOnlyList<string> extensions)
     {
         var newFiles = new List<string>();
         foreach (var dir in directories.Where(Directory.Exists))
@@ -634,12 +646,18 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
     private async Task ProcessMusicDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, IReadOnlyList<string> excludeFilters)
     {
         var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
-        var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet, _supportedAudioExtensions)
+        var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet, MediaFileExtensions.Audio)
             .Where(f => !IsExcluded(f, excludeFilters))
             .ToList();
 
-        if (filesToProcess.Count == 0) return;
+        await IngestMusicFilesAsync(library, filesToProcess);
+    }
 
+    private async Task<Guid?> IngestMusicFilesAsync(LibraryHandle library, IReadOnlyList<string> filesToProcess)
+    {
+        if (filesToProcess.Count == 0) return null;
+
+        Guid? lastTrackId = null;
         var parsed = new List<MusicFileMeta>();
         for (int i = 0; i < filesToProcess.Count; i++)
         {
@@ -875,9 +893,12 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                         trackArtist: track.TrackArtist);
 
                     await _ingestionService.AddMediaPartAsync(trackId, track.FilePath, resolution: null);
+                    lastTrackId = trackId.Value;
                 }
             }
         }
+
+        return lastTrackId;
     }
 
     private static string FirstNonEmpty(params string?[] values) =>
