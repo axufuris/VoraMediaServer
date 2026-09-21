@@ -3,7 +3,7 @@
   <PropertyGroup>
     <!-- The one place the product version is declared. Release builds override
          it from the git tag: dotnet publish -p:Version=0.1.0-beta.1 -->
-    <Version Condition="'$(Version)' == ''">0.1.0-beta.1</Version>
+    <Version Condition="'$(Version)' == ''">0.1.0-beta.2</Version>
     <SourceRevisionId Condition="'$(SourceRevisionId)' == ''">local</SourceRevisionId>
     <Product>Vora Media Server</Product>
     <Company>Vora</Company>
