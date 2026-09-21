@@ -76,6 +76,42 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task ScanMovieLibrary_finds_files_nested_several_directories_deep()
+    {
+        TouchFile(Path.Combine("A", "B", "C", "Inception (2010).mkv"));
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).EnsureMovieAsync(
+            Arg.Any<LibraryHandle>(),
+            "Inception",
+            2010,
+            tmdbId: null,
+            imdbId: null,
+            tvdbId: null,
+            edition: null);
+    }
+
+    // The extension comparison used ToLower(), which is culture-sensitive: in a
+    // Turkish locale ".AVI" lowercases to ".avı" and stops matching.
+    [Fact]
+    public async Task ScanMovieLibrary_matches_an_uppercase_extension()
+    {
+        TouchFile("Inception (2010).MKV");
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).EnsureMovieAsync(
+            Arg.Any<LibraryHandle>(),
+            "Inception",
+            2010,
+            tmdbId: null,
+            imdbId: null,
+            tvdbId: null,
+            edition: null);
+    }
+
+    [Fact]
     public async Task ScanMovieLibrary_extracts_title_and_year_from_standard_naming()
     {
         TouchFile("Inception (2010).mkv");
