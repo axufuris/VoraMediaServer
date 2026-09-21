@@ -1,8 +1,10 @@
+using Microsoft.Extensions.DependencyInjection;
 using Vora.Application.Analysis;
 using Vora.Application.Libraries;
 using Vora.Application.Libraries.Requests;
 using Vora.Application.Tasks;
 using Vora.Application.Watchers;
+using Vora.Application.Thumbnails;
 using Vora.Domain.Enums;
 
 namespace Vora.Application.Tests.Libraries;
@@ -25,6 +27,49 @@ public class LibraryManagerTests
         _notifier = Substitute.For<IClientNotifier>();
 
         _manager = new LibraryManager(_repo, _services, _watcher, _queue, _notifier);
+    }
+
+    private IVideoThumbnailManager WireThumbnailManager()
+    {
+        var thumbnails = Substitute.For<IVideoThumbnailManager>();
+        var scope = Substitute.For<IServiceScope>();
+        var scopeProvider = Substitute.For<IServiceProvider>();
+        var factory = Substitute.For<IServiceScopeFactory>();
+
+        scopeProvider.GetService(typeof(IVideoThumbnailManager)).Returns(thumbnails);
+        scope.ServiceProvider.Returns(scopeProvider);
+        factory.CreateScope().Returns(scope);
+        _services.GetService(typeof(IServiceScopeFactory)).Returns(factory);
+
+        return thumbnails;
+    }
+
+    // Deleting a library removes its rows moments later via a bulk delete, so
+    // reading each item back to null its thumbnail columns is work thrown away —
+    // and it did a read plus a SaveChanges per item on one DbContext, which is
+    // quadratic once change detection re-scans everything tracked so far. Only
+    // the files need to go.
+    [Fact]
+    public async Task DeleteLibraryAsync_purges_thumbnail_files_without_the_per_item_column_reset()
+    {
+        var thumbnails = WireThumbnailManager();
+        var libraryId = Guid.NewGuid();
+
+        await _manager.DeleteLibraryAsync(libraryId);
+
+        await thumbnails.Received(1).PurgeLibraryThumbnailFilesAsync(libraryId);
+        await thumbnails.DidNotReceive().PurgeLibraryThumbnailsAsync(Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task DeleteLibraryAsync_stops_the_folder_watcher()
+    {
+        WireThumbnailManager();
+        var libraryId = Guid.NewGuid();
+
+        await _manager.DeleteLibraryAsync(libraryId);
+
+        _watcher.Received(1).StopWatching(libraryId);
     }
 
     [Fact]

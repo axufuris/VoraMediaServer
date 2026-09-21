@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
@@ -198,6 +198,32 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         }
 
         await _mediaRepository.UpdateMediaItemAsync(item);
+    }
+
+    // For a library that is being DELETED, only the files matter: the rows are
+    // removed moments later by the repository's bulk delete, so reading each item
+    // back and writing its thumbnail columns to null is work thrown away.
+    //
+    // It was not merely wasteful, it was quadratic. PurgeLibraryThumbnailsAsync
+    // does a read (with its parts) and a SaveChanges PER ITEM on one scoped
+    // DbContext, so every save re-runs change detection over every entity tracked
+    // so far. On a music library — thousands of tracks that never had a video
+    // thumbnail in the first place — deleting the library sat there for many
+    // minutes doing nothing that would outlive it.
+    public async Task PurgeLibraryThumbnailFilesAsync(Guid libraryId)
+    {
+        var ids = await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId);
+        foreach (var id in ids)
+        {
+            try
+            {
+                _storage.DeleteItemDirectory(id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to remove video thumbnail directory for {MediaItemId}.", id);
+            }
+        }
     }
 
     public async Task PurgeLibraryThumbnailsAsync(Guid libraryId)
