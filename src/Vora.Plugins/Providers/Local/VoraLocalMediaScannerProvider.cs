@@ -658,6 +658,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         if (filesToProcess.Count == 0) return null;
 
         Guid? lastTrackId = null;
+        var failures = 0;
         var parsed = new List<MusicFileMeta>();
         for (int i = 0; i < filesToProcess.Count; i++)
         {
@@ -700,7 +701,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                     Year = (int)tag.Year,
                     Genre = tag.FirstGenre,
                     DurationSeconds = (int?)tagFile.Properties?.Duration.TotalSeconds,
-                    AudioCodec = tagFile.Properties?.Description,
+                    AudioCodec = ResolveAudioCodec(filePath, tagFile.Properties?.Description),
                     SampleRate = tagFile.Properties?.AudioSampleRate,
                     Bitrate = tagFile.Properties?.AudioBitrate,
                     ArtworkBytes = artworkBytes,
@@ -721,185 +722,249 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
         foreach (var artistGroup in byArtist)
         {
-            var firstArtwork = artistGroup.FirstOrDefault(p => p.ArtworkBytes != null);
-            byte[]? artistArtworkBytes = firstArtwork?.ArtworkBytes;
-            string? artistArtworkMime = firstArtwork?.ArtworkMimeType;
-            byte[]? artistBackgroundBytes = null;
-            string? artistBackgroundMime = null;
-
-            var artistFolders = artistGroup
-                .Select(p => Path.GetDirectoryName(Path.GetDirectoryName(p.FilePath)))
-                .Where(d => !string.IsNullOrEmpty(d))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (artistArtworkBytes == null)
+            try
             {
-                foreach (var folder in artistFolders)
-                {
-                    var local = TryReadFolderArtwork(folder!, ArtistFolderArtworkNames, folderArtworkCache);
-                    if (local != null)
-                    {
-                        artistArtworkBytes = local.Value.Bytes;
-                        artistArtworkMime = local.Value.Mime;
-                        break;
-                    }
-                }
-            }
+                var firstArtwork = artistGroup.FirstOrDefault(p => p.ArtworkBytes != null);
+                byte[]? artistArtworkBytes = firstArtwork?.ArtworkBytes;
+                string? artistArtworkMime = firstArtwork?.ArtworkMimeType;
+                byte[]? artistBackgroundBytes = null;
+                string? artistBackgroundMime = null;
 
-            foreach (var folder in artistFolders)
-            {
-                var local = TryReadFolderArtwork(folder!, FolderBackgroundNames, folderArtworkCache);
-                if (local != null)
-                {
-                    artistBackgroundBytes = local.Value.Bytes;
-                    artistBackgroundMime = local.Value.Mime;
-                    break;
-                }
-            }
-
-            byte[]? artistBannerBytes = null;
-            string? artistBannerMime = null;
-            foreach (var folder in artistFolders)
-            {
-                var local = TryReadFolderArtwork(folder!, ArtistBannerNames, folderArtworkCache);
-                if (local != null)
-                {
-                    artistBannerBytes = local.Value.Bytes;
-                    artistBannerMime = local.Value.Mime;
-                    break;
-                }
-            }
-
-            byte[]? artistLogoBytes = null;
-            string? artistLogoMime = null;
-            foreach (var folder in artistFolders)
-            {
-                var local = TryReadFolderArtwork(folder!, ArtistClearLogoNames, folderArtworkCache);
-                if (local != null)
-                {
-                    artistLogoBytes = local.Value.Bytes;
-                    artistLogoMime = local.Value.Mime;
-                    break;
-                }
-            }
-
-            var artistId = await _ingestionService.EnsureArtistAsync(
-                library,
-                artistGroup.Key,
-                sortName: null,
-                artworkBytes: artistArtworkBytes,
-                artworkMimeType: artistArtworkMime,
-                backgroundBytes: artistBackgroundBytes,
-                backgroundMimeType: artistBackgroundMime,
-                bannerBytes: artistBannerBytes,
-                bannerMimeType: artistBannerMime,
-                clearLogoBytes: artistLogoBytes,
-                clearLogoMimeType: artistLogoMime);
-
-            var byAlbum = artistGroup.GroupBy(p => p.AlbumTitle, StringComparer.OrdinalIgnoreCase);
-            foreach (var albumGroup in byAlbum)
-            {
-                var sample = albumGroup.FirstOrDefault(p => p.ArtworkBytes != null);
-                byte[]? albumArtworkBytes = sample?.ArtworkBytes;
-                string? albumArtworkMime = sample?.ArtworkMimeType;
-                byte[]? albumBackgroundBytes = null;
-                string? albumBackgroundMime = null;
-
-                var albumFolders = albumGroup
-                    .Select(p => Path.GetDirectoryName(p.FilePath))
+                var artistFolders = artistGroup
+                    .Select(p => Path.GetDirectoryName(Path.GetDirectoryName(p.FilePath)))
                     .Where(d => !string.IsNullOrEmpty(d))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-                if (albumArtworkBytes == null)
+                if (artistArtworkBytes == null)
                 {
-                    foreach (var folder in albumFolders)
+                    foreach (var folder in artistFolders)
                     {
-                        var local = TryReadFolderArtwork(folder!, AlbumFolderArtworkNames, folderArtworkCache);
+                        var local = TryReadFolderArtwork(folder!, ArtistFolderArtworkNames, folderArtworkCache);
                         if (local != null)
                         {
-                            albumArtworkBytes = local.Value.Bytes;
-                            albumArtworkMime = local.Value.Mime;
+                            artistArtworkBytes = local.Value.Bytes;
+                            artistArtworkMime = local.Value.Mime;
                             break;
                         }
                     }
                 }
 
-                foreach (var folder in albumFolders)
+                foreach (var folder in artistFolders)
                 {
                     var local = TryReadFolderArtwork(folder!, FolderBackgroundNames, folderArtworkCache);
                     if (local != null)
                     {
-                        albumBackgroundBytes = local.Value.Bytes;
-                        albumBackgroundMime = local.Value.Mime;
+                        artistBackgroundBytes = local.Value.Bytes;
+                        artistBackgroundMime = local.Value.Mime;
                         break;
                     }
                 }
 
-                byte[]? albumDiscArtBytes = null;
-                string? albumDiscArtMime = null;
-                foreach (var folder in albumFolders)
+                byte[]? artistBannerBytes = null;
+                string? artistBannerMime = null;
+                foreach (var folder in artistFolders)
                 {
-                    var local = TryReadFolderArtwork(folder!, AlbumDiscArtNames, folderArtworkCache);
+                    var local = TryReadFolderArtwork(folder!, ArtistBannerNames, folderArtworkCache);
                     if (local != null)
                     {
-                        albumDiscArtBytes = local.Value.Bytes;
-                        albumDiscArtMime = local.Value.Mime;
+                        artistBannerBytes = local.Value.Bytes;
+                        artistBannerMime = local.Value.Mime;
                         break;
                     }
                 }
 
-                var albumArtistDisplay = albumGroup
-                    .Select(t => t.AlbumArtistTag)
-                    .FirstOrDefault(a => !string.IsNullOrWhiteSpace(a))
-                    ?? artistGroup.Key;
-                var compilationFromTag = albumGroup.Any(t => t.IsCompilationFlag);
-                var distinctTrackArtists = albumGroup
-                    .Select(t => t.TrackArtist)
-                    .Where(a => !string.IsNullOrWhiteSpace(a))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Count();
-                var isCompilation = compilationFromTag || distinctTrackArtists > 1;
-
-                var albumId = await _ingestionService.EnsureAlbumAsync(
-                    library,
-                    artistId,
-                    albumGroup.Key,
-                    year: albumGroup.Select(t => t.Year).FirstOrDefault(y => y > 0) is int yr && yr > 0 ? yr : null,
-                    genre: albumGroup.Select(t => t.Genre).FirstOrDefault(g => !string.IsNullOrWhiteSpace(g)),
-                    artworkBytes: albumArtworkBytes,
-                    artworkMimeType: albumArtworkMime,
-                    backgroundBytes: albumBackgroundBytes,
-                    backgroundMimeType: albumBackgroundMime,
-                    discArtBytes: albumDiscArtBytes,
-                    discArtMimeType: albumDiscArtMime,
-                    albumArtist: albumArtistDisplay,
-                    isCompilation: isCompilation);
-
-                foreach (var track in albumGroup.OrderBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber))
+                byte[]? artistLogoBytes = null;
+                string? artistLogoMime = null;
+                foreach (var folder in artistFolders)
                 {
-                    var trackId = await _ingestionService.EnsureTrackAsync(
-                        library,
-                        albumId,
-                        track.TrackTitle,
-                        track.TrackNumber,
-                        track.DiscNumber > 0 ? track.DiscNumber : null,
-                        track.DurationSeconds,
-                        track.AudioCodec,
-                        track.SampleRate,
-                        track.Bitrate,
-                        track.ContentRating,
-                        trackArtist: track.TrackArtist);
+                    var local = TryReadFolderArtwork(folder!, ArtistClearLogoNames, folderArtworkCache);
+                    if (local != null)
+                    {
+                        artistLogoBytes = local.Value.Bytes;
+                        artistLogoMime = local.Value.Mime;
+                        break;
+                    }
+                }
 
-                    await _ingestionService.AddMediaPartAsync(trackId, track.FilePath, resolution: null);
-                    lastTrackId = trackId.Value;
+                var artistId = await _ingestionService.EnsureArtistAsync(
+                    library,
+                    artistGroup.Key,
+                    sortName: null,
+                    artworkBytes: artistArtworkBytes,
+                    artworkMimeType: artistArtworkMime,
+                    backgroundBytes: artistBackgroundBytes,
+                    backgroundMimeType: artistBackgroundMime,
+                    bannerBytes: artistBannerBytes,
+                    bannerMimeType: artistBannerMime,
+                    clearLogoBytes: artistLogoBytes,
+                    clearLogoMimeType: artistLogoMime);
+
+                var byAlbum = artistGroup.GroupBy(p => p.AlbumTitle, StringComparer.OrdinalIgnoreCase);
+                foreach (var albumGroup in byAlbum)
+                {
+                    var sample = albumGroup.FirstOrDefault(p => p.ArtworkBytes != null);
+                    byte[]? albumArtworkBytes = sample?.ArtworkBytes;
+                    string? albumArtworkMime = sample?.ArtworkMimeType;
+                    byte[]? albumBackgroundBytes = null;
+                    string? albumBackgroundMime = null;
+
+                    var albumFolders = albumGroup
+                        .Select(p => Path.GetDirectoryName(p.FilePath))
+                        .Where(d => !string.IsNullOrEmpty(d))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    if (albumArtworkBytes == null)
+                    {
+                        foreach (var folder in albumFolders)
+                        {
+                            var local = TryReadFolderArtwork(folder!, AlbumFolderArtworkNames, folderArtworkCache);
+                            if (local != null)
+                            {
+                                albumArtworkBytes = local.Value.Bytes;
+                                albumArtworkMime = local.Value.Mime;
+                                break;
+                            }
+                        }
+                    }
+
+                    foreach (var folder in albumFolders)
+                    {
+                        var local = TryReadFolderArtwork(folder!, FolderBackgroundNames, folderArtworkCache);
+                        if (local != null)
+                        {
+                            albumBackgroundBytes = local.Value.Bytes;
+                            albumBackgroundMime = local.Value.Mime;
+                            break;
+                        }
+                    }
+
+                    byte[]? albumDiscArtBytes = null;
+                    string? albumDiscArtMime = null;
+                    foreach (var folder in albumFolders)
+                    {
+                        var local = TryReadFolderArtwork(folder!, AlbumDiscArtNames, folderArtworkCache);
+                        if (local != null)
+                        {
+                            albumDiscArtBytes = local.Value.Bytes;
+                            albumDiscArtMime = local.Value.Mime;
+                            break;
+                        }
+                    }
+
+                    var albumArtistDisplay = albumGroup
+                        .Select(t => t.AlbumArtistTag)
+                        .FirstOrDefault(a => !string.IsNullOrWhiteSpace(a))
+                        ?? artistGroup.Key;
+                    var compilationFromTag = albumGroup.Any(t => t.IsCompilationFlag);
+                    var distinctTrackArtists = albumGroup
+                        .Select(t => t.TrackArtist)
+                        .Where(a => !string.IsNullOrWhiteSpace(a))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Count();
+                    var isCompilation = compilationFromTag || distinctTrackArtists > 1;
+
+                    var albumId = await _ingestionService.EnsureAlbumAsync(
+                        library,
+                        artistId,
+                        albumGroup.Key,
+                        year: albumGroup.Select(t => t.Year).FirstOrDefault(y => y > 0) is int yr && yr > 0 ? yr : null,
+                        genre: albumGroup.Select(t => t.Genre).FirstOrDefault(g => !string.IsNullOrWhiteSpace(g)),
+                        artworkBytes: albumArtworkBytes,
+                        artworkMimeType: albumArtworkMime,
+                        backgroundBytes: albumBackgroundBytes,
+                        backgroundMimeType: albumBackgroundMime,
+                        discArtBytes: albumDiscArtBytes,
+                        discArtMimeType: albumDiscArtMime,
+                        albumArtist: albumArtistDisplay,
+                        isCompilation: isCompilation);
+
+                    foreach (var track in albumGroup.OrderBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber))
+                    {
+                        // One unwritable track must not cost the library every track
+                        // queued behind it. This loop used to be unguarded, so a
+                        // single row the database rejected aborted the whole scan
+                        // task and left the library holding whatever happened to be
+                        // written first — an arbitrary subset, because the file order
+                        // is the filesystem's, not alphabetical.
+                        try
+                        {
+                            var trackId = await _ingestionService.EnsureTrackAsync(
+                                library,
+                                albumId,
+                                track.TrackTitle,
+                                track.TrackNumber,
+                                track.DiscNumber > 0 ? track.DiscNumber : null,
+                                track.DurationSeconds,
+                                track.AudioCodec,
+                                track.SampleRate,
+                                track.Bitrate,
+                                track.ContentRating,
+                                trackArtist: track.TrackArtist);
+
+                            await _ingestionService.AddMediaPartAsync(trackId, track.FilePath, resolution: null);
+                            lastTrackId = trackId.Value;
+                        }
+                        catch (Exception ex)
+                        {
+                            failures++;
+                            _logger.LogError(ex, "Failed to ingest track {FilePath}; continuing with the rest of the library.", track.FilePath);
+                        }
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                failures++;
+                _logger.LogError(ex, "Failed to ingest artist {Artist}; continuing with the rest of the library.", artistGroup.Key);
+            }
+        }
+
+        // Surfaced as a single line so a partial ingest is visible in the admin
+        // Logs page without reading every per-track error. A silent skip would
+        // repeat the original failure mode in a quieter form.
+        if (failures > 0)
+        {
+            _logger.LogWarning("Music scan finished with {Failures} of {Total} file(s) not ingested.", failures, filesToProcess.Count);
         }
 
         return lastTrackId;
     }
+
+    // TagLib's Properties.Description is prose ("MPEG Version 1 Audio, Layer 3
+    // VBR"), and Track.AudioCodec is varchar(32). The VBR form is 33 characters,
+    // so storing it raw threw 22001 and — because the ingest loop had no
+    // isolation — killed the whole library scan at the first VBR mp3.
+    //
+    // Length was only half of it. Every consumer substring-matches a short codec
+    // token (BadgeResolver picks mp3.png/flac.png; MediaDedupeManager scores
+    // lossless vs lossy), and the prose form matches none of them, so even the
+    // tracks that did fit got no audio badge and the wrong dedupe score. The
+    // container is the reliable signal; the description only disambiguates the
+    // two codecs that share the .m4a container.
+    internal static string? ResolveAudioCodec(string filePath, string? description)
+    {
+        var lossless = description != null
+            && (description.Contains("lossless", StringComparison.OrdinalIgnoreCase)
+                || description.Contains("alac", StringComparison.OrdinalIgnoreCase));
+
+        return Path.GetExtension(filePath).ToLowerInvariant() switch
+        {
+            ".mp3" => "mp3",
+            ".flac" => "flac",
+            ".m4a" => lossless ? "alac" : "aac",
+            ".aac" => "aac",
+            ".ogg" => "vorbis",
+            ".opus" => "opus",
+            ".wav" => "pcm",
+            ".wma" => "wma",
+            _ => Truncate(description, 32)
+        };
+    }
+
+    private static string? Truncate(string? value, int maxLength) =>
+        value != null && value.Length > maxLength ? value[..maxLength] : value;
 
     private static string FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v)) ?? string.Empty;
