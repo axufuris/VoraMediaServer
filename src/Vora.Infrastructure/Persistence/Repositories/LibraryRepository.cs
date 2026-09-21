@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using Vora.Application.Libraries;
 using Vora.Application.Posters;
@@ -229,7 +229,7 @@ public class LibraryRepository : ILibraryRepository
             .Select(m => new { m.PosterUrl, m.BackgroundUrl })
             .ToListAsync(cancellationToken);
 
-        _overlaySweep.SweepPhysicalOverlays(itemsToDelete.Select(i => i.PosterUrl).Concat(itemsToDelete.Select(i => i.BackgroundUrl)));
+        _overlaySweep.SweepPhysicalOverlays(itemsToDelete.Select(i => i.PosterUrl).Concat(itemsToDelete.Select(i => i.BackgroundUrl)), cancellationToken);
 
         var showIds = await _context.MediaItems
             .AsNoTracking()

@@ -210,11 +210,12 @@ public class VideoThumbnailManager : IVideoThumbnailManager
     // so far. On a music library — thousands of tracks that never had a video
     // thumbnail in the first place — deleting the library sat there for many
     // minutes doing nothing that would outlive it.
-    public async Task PurgeLibraryThumbnailFilesAsync(Guid libraryId)
+    public async Task PurgeLibraryThumbnailFilesAsync(Guid libraryId, CancellationToken cancellationToken = default)
     {
         var ids = await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId);
         foreach (var id in ids)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 _storage.DeleteItemDirectory(id);
@@ -226,11 +227,12 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         }
     }
 
-    public async Task PurgeLibraryThumbnailsAsync(Guid libraryId)
+    public async Task PurgeLibraryThumbnailsAsync(Guid libraryId, CancellationToken cancellationToken = default)
     {
         var ids = await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId);
         foreach (var id in ids)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 await PurgeMediaItemThumbnailsAsync(id);

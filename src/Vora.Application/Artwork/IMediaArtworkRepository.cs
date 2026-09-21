@@ -8,7 +8,7 @@ public interface IMediaArtworkRepository
     Task<IEnumerable<MediaArtwork>> GetMediaArtworkAsync(Guid mediaItemId);
     Task ReplaceMediaArtworkAsync(Guid mediaItemId, IEnumerable<MediaArtwork> artwork);
     Task ReplaceProviderMediaArtworkAsync(Guid mediaItemId, IEnumerable<MediaArtwork> artwork);
-    Task ClearArtworkForLibraryAsync(Guid libraryId);
+    Task ClearArtworkForLibraryAsync(Guid libraryId, CancellationToken cancellationToken = default);
     Task AddMediaArtworkAsync(MediaArtwork artwork);
     Task DeleteMediaArtworkAsync(Guid id);
 }

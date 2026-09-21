@@ -207,7 +207,7 @@ public class LibraryManager : ILibraryManager
 
         using var scope = _serviceProvider.CreateScope();
         var thumbnailManager = scope.ServiceProvider.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
-        await thumbnailManager.PurgeLibraryThumbnailFilesAsync(id);
+        await thumbnailManager.PurgeLibraryThumbnailFilesAsync(id, cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
         await _repository.DeleteLibraryAsync(id, cancellationToken);

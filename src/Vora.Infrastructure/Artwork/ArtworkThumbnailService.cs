@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
@@ -139,6 +139,63 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
         return File.Exists(cacheFile) ? cacheFile : null;
     }
 
+    // Removing one source costs 4 kind folders x 6 width buckets x 2 extensions
+    // = 48 File.Exists calls, nearly all of them misses. Done per source while
+    // sweeping a library that is thousands of items, those stats dominate — and
+    // on a container bind-mount each one is a round trip, not a memory lookup.
+    //
+    // Listing each kind folder ONCE and testing membership turns that into four
+    // directory reads plus hash lookups, whatever the number of sources.
+    public void RemoveThumbnailsForSources(IEnumerable<string?> sources, CancellationToken cancellationToken = default)
+    {
+        var distinct = sources
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (distinct.Count == 0) return;
+
+        foreach (var folder in KindFolders.Values.Distinct())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var kindDir = Path.Combine(_cacheRoot, folder);
+
+            HashSet<string> present;
+            try
+            {
+                if (!Directory.Exists(kindDir)) continue;
+                present = new HashSet<string>(
+                    Directory.EnumerateFiles(kindDir).Select(Path.GetFileName)!,
+                    StringComparer.Ordinal);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not list cached thumbnails in {Directory}; leaving them in place.", kindDir);
+                continue;
+            }
+
+            if (present.Count == 0) continue;
+
+            foreach (var src in distinct)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                foreach (var width in WidthBuckets)
+                {
+                    foreach (var extension in new[] { JpegExtension, PngExtension })
+                    {
+                        var fileName = CacheKey(src!, width) + extension;
+                        if (!present.Contains(fileName)) continue;
+
+                        try { File.Delete(Path.Combine(kindDir, fileName)); }
+                        catch (Exception ex) { _logger.LogWarning(ex, "Failed to remove cached thumbnail {Path}.", Path.Combine(kindDir, fileName)); }
+                    }
+                }
+            }
+        }
+    }
+
     public void RemoveThumbnailsForSource(string? src)
     {
         if (string.IsNullOrWhiteSpace(src)) return;
@@ -204,7 +261,7 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
         return null;
     }
 
-    private static string CacheKey(string src, int width)
+    internal static string CacheKey(string src, int width)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{src}|{width}"));
         return Convert.ToHexString(bytes);

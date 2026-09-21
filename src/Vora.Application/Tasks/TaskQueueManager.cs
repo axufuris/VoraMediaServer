@@ -316,7 +316,7 @@ public class TaskQueueManager : ITaskQueueManager
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
-            await artworkRepo.ClearArtworkForLibraryAsync(libraryId);
+            await artworkRepo.ClearArtworkForLibraryAsync(libraryId, ct);
             await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, forceOverride: true, cancellationToken: ct);
 
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
@@ -653,7 +653,7 @@ public class TaskQueueManager : ITaskQueueManager
 
             do
             {
-                processed = await embeddingService.ProcessMissingEmbeddingsAsync(AiEmbeddingsBatchSize);
+                processed = await embeddingService.ProcessMissingEmbeddingsAsync(AiEmbeddingsBatchSize, ct);
             } while (processed == AiEmbeddingsBatchSize && !ct.IsCancellationRequested);
         });
     }
