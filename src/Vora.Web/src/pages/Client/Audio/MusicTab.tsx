@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { StorageKeys, SessionKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type ArtistTrackVM, type MusicSearchResultVM, type GeneratedMixSummaryVM, type GeneratedMixDetailVM, type BecauseYouPlayedRowVM, type RadioSeed, type StationVM, type YearRecapVM, type GenreSummaryVM, type GenreContentVM, type ServerPlaybackSessionVM } from '../../../api/Music/musicService';
 import { mediaService } from '../../../api/Media/mediaService';
@@ -46,6 +46,8 @@ const readActiveProfileId = (): string => {
 export default function MusicTab() {
     const { serverId } = useParams<{ serverId?: string }>();
     const [searchParams, setSearchParams] = useSearchParams();
+    const location = useLocation();
+    const navigate = useNavigate();
     const dialog = useDialog();
     const { playQueue, addToQueue, playNext, isShuffled, toggleShuffle, startRadio } = usePlayer();
 
@@ -115,11 +117,47 @@ export default function MusicTab() {
         && localStorage.getItem(StorageKeys.isProfileAdmin) === 'true'
     , []);
 
+    // Every view change pushes a history entry carrying the nav state. Without
+    // one, drilling into an artist or album changed no URL, so the browser's Back
+    // — the only way back, since the client has no in-page Back buttons — left
+    // the Music route entirely and landed on Home.
+    const locationRef = useRef(location);
+    locationRef.current = location;
+
     const updateNav = useCallback((next: MusicNavState) => {
         setNav(next);
         sessionStorage.setItem(NAV_STORAGE_KEY, JSON.stringify(next));
         sessionStorage.setItem(NAV_PROFILE_KEY, readActiveProfileId());
-    }, []);
+        const { pathname, search } = locationRef.current;
+        navigate(`${pathname}${search}`, { state: { musicNav: next } });
+    }, [navigate]);
+
+    // The other direction: Back and Forward change the entry, so the view has to
+    // follow it. An entry with no nav state is one we did not create (arriving on
+    // the route, or the mix deep-link clearing its query string with a replace),
+    // so stamp the current view onto it rather than resetting to the root.
+    const navRef = useRef(nav);
+    navRef.current = nav;
+    const syncedHistoryKey = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (syncedHistoryKey.current === location.key) return;
+
+        const isFirstEntry = syncedHistoryKey.current === null;
+        syncedHistoryKey.current = location.key;
+
+        const fromHistory = (location.state as { musicNav?: MusicNavState } | null)?.musicNav;
+        if (!fromHistory) {
+            if (isFirstEntry && navRef.current.view === 'root') return;
+            navigate(`${location.pathname}${location.search}`, { replace: true, state: { musicNav: navRef.current } });
+            return;
+        }
+
+        if (JSON.stringify(navRef.current) !== JSON.stringify(fromHistory)) {
+            setNav(fromHistory);
+            sessionStorage.setItem(NAV_STORAGE_KEY, JSON.stringify(fromHistory));
+        }
+    }, [location, navigate]);
 
     useEffect(() => {
         const mixParam = searchParams.get('mix');
@@ -151,7 +189,44 @@ export default function MusicTab() {
         return () => clearTimeout(handle);
     }, [searchQuery, searchActive, serverId]);
 
-    const bumpRefresh = useCallback(() => setRefreshSeq(s => s + 1), []);
+    // Enrichment notifies per item, so a scan of a few thousand tracks fires these
+    // several times a second. refreshSeq is a dependency of every loader and
+    // libraryVersion is the KEY of the album grid, so each event remounted the
+    // grid and threw infinite-scroll paging back to the first page — the page
+    // appeared to reload continuously. Coalesce the burst: refresh once things go
+    // quiet, and at most once a minute while they do not, so a long scan still
+    // shows progress without fighting whoever is browsing.
+    const REFRESH_QUIET_MS = 3000;
+    const REFRESH_MAX_WAIT_MS = 60000;
+
+    const pendingRefresh = useRef({ seq: false, library: false });
+    const refreshTimer = useRef<number | null>(null);
+    const firstPendingAt = useRef<number | null>(null);
+
+    const flushRefresh = useCallback(() => {
+        refreshTimer.current = null;
+        firstPendingAt.current = null;
+        const pending = pendingRefresh.current;
+        pendingRefresh.current = { seq: false, library: false };
+        if (pending.seq) setRefreshSeq(s => s + 1);
+        if (pending.library) setLibraryVersion(v => v + 1);
+    }, []);
+
+    const scheduleRefresh = useCallback((kind: 'seq' | 'library') => {
+        pendingRefresh.current[kind] = true;
+        const now = Date.now();
+        if (firstPendingAt.current === null) firstPendingAt.current = now;
+        if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
+        const waited = now - firstPendingAt.current;
+        const delay = Math.min(REFRESH_QUIET_MS, Math.max(0, REFRESH_MAX_WAIT_MS - waited));
+        refreshTimer.current = window.setTimeout(flushRefresh, delay);
+    }, [flushRefresh]);
+
+    useEffect(() => () => {
+        if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
+    }, []);
+
+    const bumpRefresh = useCallback(() => scheduleRefresh('seq'), [scheduleRefresh]);
 
     const loadLikedTracks = useCallback(async () => {
         try {
@@ -332,16 +407,15 @@ export default function MusicTab() {
 
     useEffect(() => { queueMicrotask(() => { void loadServerPlayback(); }); }, [loadServerPlayback]);
     useSignalREvent<unknown>("ServerPlaybackUpdated", useCallback(() => { loadServerPlayback(); }, [loadServerPlayback]));
+    // LibraryUpdated fires on every ingest, so throwing the viewer back to the
+    // root grid meant that during a scan you could not stay on an artist for more
+    // than a few seconds. Refresh in place instead: bumping the sequence re-runs
+    // whichever view is open, and if the artist or album really has gone, that
+    // loader's catch already falls back to the root on its own.
     useSignalREvent<string>("LibraryUpdated", useCallback(() => {
-        sessionStorage.removeItem(NAV_STORAGE_KEY);
-        setCurrentArtist(null);
-        setCurrentAlbum(null);
-        setAlbums([]);
-        setTracks([]);
-        setNav({ view: 'root' });
-        setRefreshSeq(s => s + 1);
-        setLibraryVersion(v => v + 1);
-    }, []));
+        scheduleRefresh('seq');
+        scheduleRefresh('library');
+    }, [scheduleRefresh]));
 
     const resetToRootView = useCallback(() => {
         sessionStorage.removeItem(NAV_STORAGE_KEY);

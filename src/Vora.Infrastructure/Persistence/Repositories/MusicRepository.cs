@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Vora.Application.Media;
 using Vora.Application.Search.ViewModels;
 using Vora.Domain.Entities.Media;
@@ -330,8 +330,15 @@ public class MusicRepository : IMusicRepository
 
         var total = await query.CountAsync();
 
+        // A-Z follows the ARTIST, because that is what the album card shows as its
+        // title — the album name sits underneath in smaller text next to the year.
+        // Ordering by album title made an A-Z grid look unsorted: the big labels
+        // ran in no discernible order.
         var ordered = sort == AlbumSortOrder.Alphabetical
-            ? query.OrderBy(a => a.SortTitle ?? a.Title).ThenBy(a => a.Title).ThenBy(a => a.Id)
+            ? query
+                .OrderBy(a => a.Artist!.SortName ?? a.Artist!.Name)
+                .ThenBy(a => a.SortTitle ?? a.Title)
+                .ThenBy(a => a.Id)
             : query.OrderByDescending(a => a.AddedAt).ThenBy(a => a.Id);
 
         var albums = await ordered
