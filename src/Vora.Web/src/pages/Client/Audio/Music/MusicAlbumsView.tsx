@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { musicService, type AlbumSortOrder, type AlbumVM } from '../../../../api/Music/musicService';
-import MediaCard from '../../../../components/Client/Primitives/MediaCard';
-import MediaGrid from '../../../../components/Client/Primitives/MediaGrid';
 import EmptyState from '../../../../components/Client/Primitives/EmptyState';
-import { albumCaption } from './musicCaptions';
+import { thumbUrl } from '../../../../utils/thumbnails';
 
 const ALBUM_PAGE_SIZE = 60;
 
@@ -134,27 +132,32 @@ function AlbumPages({ sort, serverId, sortControl, onOpenAlbum }: AlbumPagesProp
 
     return (
         <div className="px-8">
-            <MediaGrid
-                size="xs"
-                title="All Albums"
-                subtitle={total === null ? undefined : `${total} ${total === 1 ? 'album' : 'albums'}`}
-                actions={sortControl}
-            >
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h2 className="text-2xl font-bold" style={{ color: 'var(--vora-text-primary)' }}>All Albums</h2>
+                    {total !== null && (
+                        <p className="text-sm" style={{ color: 'var(--vora-text-muted)' }}>
+                            {total} {total === 1 ? 'album' : 'albums'}
+                        </p>
+                    )}
+                </div>
+                {sortControl}
+            </div>
+
+            <div>
                 {albums.map(album => (
-                    <MediaCard
-                        key={album.id}
-                        item={albumCaption(album)}
-                        imageUrl={album.artworkUrl}
-                        shape="square"
-                        size="xs"
-                        fill
-                        onClick={() => onOpenAlbum(album)}
-                    />
+                    <AlbumRow key={album.id} album={album} onOpen={onOpenAlbum} />
                 ))}
-                {isLoading && Array.from({ length: albums.length === 0 ? 18 : 6 }, (_, i) => (
-                    <div key={`skeleton-${i}`} className="vora-skeleton aspect-square" aria-hidden="true" />
+                {isLoading && Array.from({ length: albums.length === 0 ? 12 : 4 }, (_, i) => (
+                    <div key={`skeleton-${i}`} className="flex items-center gap-4 p-2" aria-hidden="true">
+                        <div className="vora-skeleton h-14 w-14 shrink-0 rounded" />
+                        <div className="flex-1 space-y-2">
+                            <div className="vora-skeleton h-3.5 w-40 rounded" />
+                            <div className="vora-skeleton h-3 w-64 rounded" />
+                        </div>
+                    </div>
                 ))}
-            </MediaGrid>
+            </div>
 
             <div ref={sentinelRef} className="flex justify-center py-6" aria-live="polite">
                 {failed ? (
@@ -169,5 +172,57 @@ function AlbumPages({ sort, serverId, sortControl, onOpenAlbum }: AlbumPagesProp
                 ) : null}
             </div>
         </div>
+    );
+}
+
+// A list rather than a grid of small tiles: an album name needs horizontal room,
+// and A-Z reads far better down one column than left-to-right across a grid. The
+// artist leads because that is what the A-Z sort orders by, so the first column
+// runs in the order the page claims to be in.
+function AlbumRow({ album, onOpen }: { album: AlbumVM; onOpen: (album: AlbumVM) => void }) {
+    return (
+        <button
+            type="button"
+            onClick={() => onOpen(album)}
+            title={`${album.artistName} — ${album.title}`}
+            className="vora-row-interactive group flex w-full cursor-pointer items-center gap-4 rounded border border-transparent p-2 text-left transition-all"
+        >
+            <div
+                className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded"
+                style={{ background: 'var(--vora-bg-canvas)' }}
+            >
+                {album.artworkUrl ? (
+                    <img
+                        src={thumbUrl(album.artworkUrl, 200) ?? album.artworkUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                    />
+                ) : (
+                    <svg className="h-6 w-6" style={{ color: 'var(--vora-text-disabled)' }} fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                    </svg>
+                )}
+            </div>
+
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-4">
+                <span
+                    className="truncate font-medium transition-colors group-hover:text-[var(--vora-accent-text)] sm:w-1/3 sm:shrink-0"
+                    style={{ color: 'var(--vora-text-primary)' }}
+                >
+                    {album.artistName}
+                </span>
+                <span className="truncate" style={{ color: 'var(--vora-text-secondary)' }}>
+                    {album.title}
+                </span>
+            </div>
+
+            <span
+                className="shrink-0 text-sm"
+                style={{ color: 'var(--vora-text-muted)', fontVariantNumeric: 'tabular-nums' }}
+            >
+                {album.year || ''}
+            </span>
+        </button>
     );
 }

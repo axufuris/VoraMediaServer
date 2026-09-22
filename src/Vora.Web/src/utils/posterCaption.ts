@@ -100,8 +100,14 @@ export function posterCaption(item: PosterCaptionItem): PosterCaption {
             return { title: item.title, lines: [dotJoin([itemCountLabel(item.itemCount), item.mediaTypeLabel])].filter((l): l is string => !!l) };
         case 'Artist':
             return { title: item.title, lines: [] };
+        // The album name gets the line to itself. Prefixing it with the year left
+        // the part people actually read sharing a narrow card with a number, and
+        // it was the first thing to be truncated.
         case 'Album':
-            return { title: item.artistName || item.title, lines: [dotJoin([year, item.albumTitle || item.title])].filter((l): l is string => !!l) };
+            return {
+                title: item.artistName || item.title,
+                lines: [item.albumTitle || item.title, year].filter((l): l is string => !!l),
+            };
         case 'Track':
             return {
                 title: item.artistName || item.title,
