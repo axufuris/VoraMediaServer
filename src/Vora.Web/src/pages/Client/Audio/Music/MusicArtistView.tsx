@@ -8,6 +8,7 @@ interface MusicArtistViewProps {
     currentArtist: ArtistVM | null;
     albums: AlbumVM[];
     similarArtists: ArtistVM[];
+    coPlayedArtists: ArtistVM[];
     isServerAdmin: boolean;
     playArtist: (shuffle: boolean) => Promise<void>;
     startRadioFromSeed: (seed: RadioSeed) => Promise<void>;
@@ -23,6 +24,7 @@ export default function MusicArtistView({
     currentArtist,
     albums,
     similarArtists,
+    coPlayedArtists,
     isServerAdmin,
     playArtist,
     startRadioFromSeed,
@@ -178,6 +180,30 @@ export default function MusicArtistView({
                             <h3 className="text-lg font-bold text-[var(--vora-text-primary)] mb-3">Fans Also Listen To</h3>
                             <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2">
                                 {similarArtists.map(a => (
+                                    <button
+                                        key={a.id}
+                                        type="button"
+                                        onClick={() => updateNav({ view: 'artist', artistId: a.id })}
+                                        className="w-28 sm:w-32 shrink-0 group text-left cursor-pointer"
+                                        title={a.name}
+                                    >
+                                        <div className="w-full aspect-square rounded-full bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-all overflow-hidden mb-2">
+                                            {a.artworkUrl
+                                                ? <img src={a.artworkUrl} alt="" className="w-full h-full object-cover" />
+                                                : <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-disabled)]"><svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg></div>}
+                                        </div>
+                                        <div className="text-sm font-bold text-[var(--vora-text-primary)] truncate text-center" title={a.name}>{a.name}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {coPlayedArtists.length > 0 && (
+                        <div className="mt-10">
+                            <h3 className="text-lg font-bold text-[var(--vora-text-primary)] mb-1">Also Played Here</h3>
+                            <p className="text-xs text-[var(--vora-text-muted)] mb-3">Played by the same listeners, across every profile on this server</p>
+                            <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2">
+                                {coPlayedArtists.map(a => (
                                     <button
                                         key={a.id}
                                         type="button"

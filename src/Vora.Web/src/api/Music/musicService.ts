@@ -688,6 +688,13 @@ export const musicService = {
         return response.data;
     },
 
+    // What this server plays alongside the artist, across every profile. Distinct
+    // from getSimilarArtists, which is Last.fm's global view of what sounds alike.
+    getCoPlayedArtists: async (artistId: string, serverId?: string): Promise<ArtistVM[]> => {
+        const response = await apiClient.get<ArtistVM[]>(`/music/artists/${artistId}/also-played`, { serverId });
+        return response.data;
+    },
+
     getGenres: async (serverId?: string): Promise<GenreSummaryVM[]> => {
         const response = await apiClient.get<GenreSummaryVM[]>(`/music/genres`, { serverId });
         return response.data;

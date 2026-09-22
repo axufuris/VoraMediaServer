@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Vora.Api.Extensions;
@@ -165,6 +165,7 @@ public static class MusicEndpoints
             .Produces<IEnumerable<int>>(StatusCodes.Status200OK);
 
         group.MapGet("/artists/{artistId:guid}/similar", GetSimilarArtistsAsync).RequireAuthorization();
+        group.MapGet("/artists/{artistId:guid}/also-played", GetCoPlayedArtistsAsync).RequireAuthorization();
 
         group.MapGet("/genres", GetGenresAsync)
             .RequireAuthorization()
@@ -681,6 +682,14 @@ public static class MusicEndpoints
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
         var artists = await manager.GetSimilarArtistsAsync(artistId, BuildFilter(user), cancellationToken);
+        return Results.Ok(artists);
+    }
+
+    private static async Task<IResult> GetCoPlayedArtistsAsync(Guid artistId, ClaimsPrincipal user, IMusicRecommendationManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        var artists = await manager.GetCoPlayedArtistsAsync(artistId, BuildFilter(user));
         return Results.Ok(artists);
     }
 
