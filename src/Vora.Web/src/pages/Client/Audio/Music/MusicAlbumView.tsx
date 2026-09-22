@@ -61,7 +61,22 @@ export default function MusicAlbumView({
 
     return (
         <>
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 mb-8 pb-6 border-b border-[var(--vora-border-subtle)] text-center sm:text-left">
+            <div className="relative mb-8 pb-6 border-b border-[var(--vora-border-subtle)] overflow-hidden rounded-lg">
+                {/* The server fills backgroundUrl for albums, and until now nothing
+                    rendered it. Behind the header at low opacity it gives the page
+                    the album's own colour without competing with the cover. */}
+                {currentAlbum.backgroundUrl && (
+                    <>
+                        <img
+                            src={currentAlbum.backgroundUrl}
+                            alt=""
+                            aria-hidden="true"
+                            className="absolute inset-0 w-full h-full object-cover opacity-30"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[var(--vora-bg-canvas)] via-[var(--vora-bg-canvas)]/75 to-[var(--vora-bg-canvas)]/45" />
+                    </>
+                )}
+                <div className={`relative flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 text-center sm:text-left ${currentAlbum.backgroundUrl ? 'p-5 sm:p-6' : ''}`}>
                 <div className="relative shrink-0" style={{ width: currentAlbum.discArtUrl ? '14rem' : '10rem', height: '10rem' }}>
                     {currentAlbum.discArtUrl && (
                         <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-black border border-[var(--vora-border-subtle)] overflow-hidden shadow-lg hidden sm:block">
@@ -137,6 +152,7 @@ export default function MusicAlbumView({
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
 
             {discKeys.map(discNum => {
