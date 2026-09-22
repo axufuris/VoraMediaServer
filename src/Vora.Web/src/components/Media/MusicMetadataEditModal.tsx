@@ -612,7 +612,6 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
         : shape === 'wide'
         ? 'w-56 h-28 rounded'
         : 'w-28 h-28 ' + shapeClass;
-    const hideBrowse = shape === 'wide' || shape === 'banner';
 
     const [suggestionsOpen, setSuggestionsOpen] = useState(false);
     const [suggestionsLoading, setSuggestionsLoading] = useState(false);
@@ -693,16 +692,14 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" /></svg>
                             {uploading ? 'Uploading...' : 'Upload image'}
                         </button>
-                        {!hideBrowse && (
-                            <button
-                                type="button"
-                                onClick={handleBrowse}
-                                className="text-xs px-3 py-1.5 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] rounded transition-colors cursor-pointer flex items-center gap-1"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                                {suggestionsOpen ? 'Hide alternatives' : 'Browse alternatives'}
-                            </button>
-                        )}
+                        <button
+                            type="button"
+                            onClick={handleBrowse}
+                            className="text-xs px-3 py-1.5 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] rounded transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            {suggestionsOpen ? 'Hide alternatives' : 'Browse alternatives'}
+                        </button>
                         {onRefreshFromProviders && (
                             <button
                                 type="button"
