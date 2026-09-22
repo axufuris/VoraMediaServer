@@ -51,7 +51,7 @@ public class ArtworkThumbnailRemovalTests : IDisposable
         var small = CachedFile("posters", src, SomeWidth);
         var large = CachedFile("posters", src, AnotherWidth);
 
-        _service.RemoveThumbnailsForSources(new[] { src });
+        _service.RemoveThumbnailsForSources(new[] { src }, TestContext.Current.CancellationToken);
 
         File.Exists(small).Should().BeFalse();
         File.Exists(large).Should().BeFalse();
@@ -65,7 +65,7 @@ public class ArtworkThumbnailRemovalTests : IDisposable
         var backdrop = CachedFile("backdrops", src, SomeWidth);
         var still = CachedFile("stills", src, SomeWidth);
 
-        _service.RemoveThumbnailsForSources(new[] { src });
+        _service.RemoveThumbnailsForSources(new[] { src }, TestContext.Current.CancellationToken);
 
         File.Exists(poster).Should().BeFalse();
         File.Exists(backdrop).Should().BeFalse();
@@ -78,7 +78,7 @@ public class ArtworkThumbnailRemovalTests : IDisposable
         var doomed = CachedFile("posters", "https://example.com/doomed.jpg", SomeWidth);
         var keep = CachedFile("posters", "https://example.com/keep.jpg", SomeWidth);
 
-        _service.RemoveThumbnailsForSources(new[] { "https://example.com/doomed.jpg" });
+        _service.RemoveThumbnailsForSources(new[] { "https://example.com/doomed.jpg" }, TestContext.Current.CancellationToken);
 
         File.Exists(doomed).Should().BeFalse();
         File.Exists(keep).Should().BeTrue();
@@ -90,7 +90,7 @@ public class ArtworkThumbnailRemovalTests : IDisposable
         var sources = Enumerable.Range(0, 50).Select(i => $"https://example.com/{i}.jpg").ToList();
         var files = sources.Select(s => CachedFile("posters", s, SomeWidth)).ToList();
 
-        _service.RemoveThumbnailsForSources(sources);
+        _service.RemoveThumbnailsForSources(sources, TestContext.Current.CancellationToken);
 
         files.Should().OnlyContain(f => !File.Exists(f));
     }
@@ -98,7 +98,7 @@ public class ArtworkThumbnailRemovalTests : IDisposable
     [Fact]
     public void Ignores_null_and_empty_sources()
     {
-        var act = () => _service.RemoveThumbnailsForSources(new string?[] { null, "", "   " });
+        var act = () => _service.RemoveThumbnailsForSources(new string?[] { null, "", "   " }, TestContext.Current.CancellationToken);
 
         act.Should().NotThrow();
     }

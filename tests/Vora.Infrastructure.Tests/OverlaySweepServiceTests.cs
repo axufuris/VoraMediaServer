@@ -45,7 +45,7 @@ public class OverlaySweepServiceTests : IDisposable
     [Fact]
     public void Hands_every_source_to_the_thumbnail_cache_in_one_call()
     {
-        _sweep.SweepPhysicalOverlays(new[] { "/a/one.jpg", "/a/two.jpg", null, "", "/a/three.jpg" });
+        _sweep.SweepPhysicalOverlays(new[] { "/a/one.jpg", "/a/two.jpg", null, "", "/a/three.jpg" }, TestContext.Current.CancellationToken);
 
         _thumbnails.Received(1).RemoveThumbnailsForSources(
             Arg.Is<IEnumerable<string?>>(s => s.Count() == 3),
@@ -56,7 +56,7 @@ public class OverlaySweepServiceTests : IDisposable
     [Fact]
     public void Does_not_touch_the_cache_when_there_is_nothing_to_sweep()
     {
-        _sweep.SweepPhysicalOverlays(new string?[] { null, "" });
+        _sweep.SweepPhysicalOverlays(new string?[] { null, "" }, TestContext.Current.CancellationToken);
 
         _thumbnails.DidNotReceive().RemoveThumbnailsForSources(Arg.Any<IEnumerable<string?>>(), Arg.Any<CancellationToken>());
     }
@@ -66,7 +66,7 @@ public class OverlaySweepServiceTests : IDisposable
     {
         var overlay = Touch("abc_overlay_1.jpg");
 
-        _sweep.SweepPhysicalOverlays(new[] { "/api/artwork/custom/abc_overlay_1.jpg" });
+        _sweep.SweepPhysicalOverlays(new[] { "/api/artwork/custom/abc_overlay_1.jpg" }, TestContext.Current.CancellationToken);
 
         File.Exists(overlay).Should().BeFalse();
     }
@@ -78,7 +78,7 @@ public class OverlaySweepServiceTests : IDisposable
     {
         var uploaded = Touch("user-poster.jpg");
 
-        _sweep.SweepPhysicalOverlays(new[] { "/api/artwork/custom/user-poster.jpg" });
+        _sweep.SweepPhysicalOverlays(new[] { "/api/artwork/custom/user-poster.jpg" }, TestContext.Current.CancellationToken);
 
         File.Exists(uploaded).Should().BeTrue();
     }
@@ -88,7 +88,7 @@ public class OverlaySweepServiceTests : IDisposable
     {
         var remote = Touch("remote_overlay_9.jpg");
 
-        _sweep.SweepPhysicalOverlays(new[] { "https://example.com/remote_overlay_9.jpg" });
+        _sweep.SweepPhysicalOverlays(new[] { "https://example.com/remote_overlay_9.jpg" }, TestContext.Current.CancellationToken);
 
         File.Exists(remote).Should().BeTrue();
     }
