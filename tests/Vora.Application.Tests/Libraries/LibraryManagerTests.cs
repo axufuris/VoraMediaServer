@@ -55,10 +55,12 @@ public class LibraryManagerTests
         var thumbnails = WireThumbnailManager();
         var libraryId = Guid.NewGuid();
 
-        await _manager.DeleteLibraryAsync(libraryId);
+        await _manager.DeleteLibraryAsync(libraryId, TestContext.Current.CancellationToken);
 
-        await thumbnails.Received(1).PurgeLibraryThumbnailFilesAsync(libraryId);
-        await thumbnails.DidNotReceive().PurgeLibraryThumbnailsAsync(Arg.Any<Guid>());
+        // Asserting on the same token also proves the delete threads it through
+        // rather than dropping it and starting an uncancellable purge.
+        await thumbnails.Received(1).PurgeLibraryThumbnailFilesAsync(libraryId, TestContext.Current.CancellationToken);
+        await thumbnails.DidNotReceive().PurgeLibraryThumbnailsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -67,7 +69,7 @@ public class LibraryManagerTests
         WireThumbnailManager();
         var libraryId = Guid.NewGuid();
 
-        await _manager.DeleteLibraryAsync(libraryId);
+        await _manager.DeleteLibraryAsync(libraryId, TestContext.Current.CancellationToken);
 
         _watcher.Received(1).StopWatching(libraryId);
     }
