@@ -34,13 +34,14 @@ describe('MusicAlbumsView', () => {
         getAlbums.mockReset();
     });
 
-    it('loads the first page recently added first and shows the total', async () => {
+    it('loads the first page A-Z by default and shows the total', async () => {
         getAlbums.mockResolvedValueOnce(page(0, 2, 2));
 
         render(<MusicAlbumsView serverId="srv1" refreshKey={0} onOpenAlbum={vi.fn()} />);
 
         expect(await screen.findByText('2 albums')).toBeInTheDocument();
-        expect(getAlbums).toHaveBeenCalledWith({ offset: 0, limit: 60, sort: 'RecentlyAdded' }, 'srv1');
+        expect(getAlbums).toHaveBeenCalledWith({ offset: 0, limit: 60, sort: 'Alphabetical' }, 'srv1');
+        expect(screen.getByRole('radio', { name: 'A–Z' })).toHaveAttribute('aria-checked', 'true');
         expect(screen.getAllByRole('button', { name: /blink-182/ })).toHaveLength(2);
         expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
     });
@@ -52,7 +53,7 @@ describe('MusicAlbumsView', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Load more' }));
 
         await waitFor(() => expect(screen.getAllByRole('button', { name: /blink-182/ })).toHaveLength(61));
-        expect(getAlbums).toHaveBeenLastCalledWith({ offset: 60, limit: 60, sort: 'RecentlyAdded' }, undefined);
+        expect(getAlbums).toHaveBeenLastCalledWith({ offset: 60, limit: 60, sort: 'Alphabetical' }, undefined);
         expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
     });
 
@@ -61,11 +62,11 @@ describe('MusicAlbumsView', () => {
         render(<MusicAlbumsView refreshKey={0} onOpenAlbum={vi.fn()} />);
         await screen.findByText('100 albums');
 
-        fireEvent.click(screen.getByRole('radio', { name: 'A–Z' }));
+        fireEvent.click(screen.getByRole('radio', { name: 'Recently added' }));
 
         expect(await screen.findByText('3 albums')).toBeInTheDocument();
-        expect(getAlbums).toHaveBeenLastCalledWith({ offset: 0, limit: 60, sort: 'Alphabetical' }, undefined);
-        expect(screen.getByRole('radio', { name: 'A–Z' })).toHaveAttribute('aria-checked', 'true');
+        expect(getAlbums).toHaveBeenLastCalledWith({ offset: 0, limit: 60, sort: 'RecentlyAdded' }, undefined);
+        expect(screen.getByRole('radio', { name: 'Recently added' })).toHaveAttribute('aria-checked', 'true');
         expect(screen.getAllByRole('button', { name: /blink-182/ })).toHaveLength(3);
     });
 

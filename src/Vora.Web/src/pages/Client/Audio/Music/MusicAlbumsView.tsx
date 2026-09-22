@@ -7,9 +7,11 @@ import { albumCaption } from './musicCaptions';
 
 const ALBUM_PAGE_SIZE = 60;
 
+// A-Z first, and the default: a library of hundreds of albums is browsed by
+// looking for a name far more often than by what arrived last.
 const SORTS: { key: AlbumSortOrder; label: string }[] = [
-    { key: 'RecentlyAdded', label: 'Recently added' },
     { key: 'Alphabetical', label: 'A–Z' },
+    { key: 'RecentlyAdded', label: 'Recently added' },
 ];
 
 interface MusicAlbumsViewProps {
@@ -22,7 +24,7 @@ interface MusicAlbumsViewProps {
 // invalidates the loaded pages, so a new sort or a library change starts from a
 // fresh first page instead of resetting state inside an effect.
 export default function MusicAlbumsView({ serverId, refreshKey, onOpenAlbum }: MusicAlbumsViewProps) {
-    const [sort, setSort] = useState<AlbumSortOrder>('RecentlyAdded');
+    const [sort, setSort] = useState<AlbumSortOrder>('Alphabetical');
 
     const sortPills = (
         <div role="radiogroup" aria-label="Sort albums" className="flex items-center gap-2">
