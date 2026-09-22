@@ -1,4 +1,4 @@
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -84,12 +84,12 @@ public class TheAudioDbMusicArtworkProvider : IMusicArtworkProvider
 
             foreach (var album in albums.EnumerateArray())
             {
-                AddIfPresent(album, "strAlbumThumb", results, seenUrls);
-                AddIfPresent(album, "strAlbumThumbHQ", results, seenUrls);
-                AddIfPresent(album, "strAlbumThumbBack", results, seenUrls);
-                AddIfPresent(album, "strAlbumCDart", results, seenUrls);
-                AddIfPresent(album, "strAlbum3DCase", results, seenUrls);
-                AddIfPresent(album, "strAlbum3DFlat", results, seenUrls);
+                AddIfPresent(album, "strAlbumThumbHQ", MusicArtworkKind.Cover, results, seenUrls);
+                AddIfPresent(album, "strAlbumThumb", MusicArtworkKind.Cover, results, seenUrls);
+                AddIfPresent(album, "strAlbumThumbBack", MusicArtworkKind.Cover, results, seenUrls);
+                AddIfPresent(album, "strAlbum3DCase", MusicArtworkKind.Cover, results, seenUrls);
+                AddIfPresent(album, "strAlbum3DFlat", MusicArtworkKind.Cover, results, seenUrls);
+                AddIfPresent(album, "strAlbumCDart", MusicArtworkKind.Logo, results, seenUrls);
             }
 
             return results;
@@ -124,16 +124,16 @@ public class TheAudioDbMusicArtworkProvider : IMusicArtworkProvider
 
             foreach (var artist in artists.EnumerateArray())
             {
-                AddIfPresent(artist, "strArtistThumb", results, seenUrls);
-                AddIfPresent(artist, "strArtistLogo", results, seenUrls);
-                AddIfPresent(artist, "strArtistCutout", results, seenUrls);
-                AddIfPresent(artist, "strArtistClearart", results, seenUrls);
-                AddIfPresent(artist, "strArtistWideThumb", results, seenUrls);
-                AddIfPresent(artist, "strArtistFanart", results, seenUrls);
-                AddIfPresent(artist, "strArtistFanart2", results, seenUrls);
-                AddIfPresent(artist, "strArtistFanart3", results, seenUrls);
-                AddIfPresent(artist, "strArtistFanart4", results, seenUrls);
-                AddIfPresent(artist, "strArtistBanner", results, seenUrls);
+                AddIfPresent(artist, "strArtistThumb", MusicArtworkKind.Thumb, results, seenUrls);
+                AddIfPresent(artist, "strArtistCutout", MusicArtworkKind.Thumb, results, seenUrls);
+                AddIfPresent(artist, "strArtistClearart", MusicArtworkKind.Thumb, results, seenUrls);
+                AddIfPresent(artist, "strArtistLogo", MusicArtworkKind.Logo, results, seenUrls);
+                AddIfPresent(artist, "strArtistBanner", MusicArtworkKind.Banner, results, seenUrls);
+                AddIfPresent(artist, "strArtistWideThumb", MusicArtworkKind.Background, results, seenUrls);
+                AddIfPresent(artist, "strArtistFanart", MusicArtworkKind.Background, results, seenUrls);
+                AddIfPresent(artist, "strArtistFanart2", MusicArtworkKind.Background, results, seenUrls);
+                AddIfPresent(artist, "strArtistFanart3", MusicArtworkKind.Background, results, seenUrls);
+                AddIfPresent(artist, "strArtistFanart4", MusicArtworkKind.Background, results, seenUrls);
             }
 
             return results;
@@ -145,7 +145,7 @@ public class TheAudioDbMusicArtworkProvider : IMusicArtworkProvider
         }
     }
 
-    private void AddIfPresent(JsonElement element, string property, List<MusicArtworkResult> results, HashSet<string> seen)
+    private void AddIfPresent(JsonElement element, string property, MusicArtworkKind kind, List<MusicArtworkResult> results, HashSet<string> seen)
     {
         if (!element.TryGetProperty(property, out var prop)) return;
         if (prop.ValueKind != JsonValueKind.String) return;
@@ -157,7 +157,8 @@ public class TheAudioDbMusicArtworkProvider : IMusicArtworkProvider
         {
             Url = url,
             ThumbnailUrl = url,
-            ProviderName = ProviderName
+            ProviderName = ProviderName,
+            Kind = kind
         });
     }
 }

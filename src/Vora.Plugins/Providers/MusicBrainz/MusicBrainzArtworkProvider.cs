@@ -1,4 +1,4 @@
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -113,7 +113,8 @@ public class MusicBrainzArtworkProvider : IMusicArtworkProvider
                     {
                         Url = imageUrl,
                         ThumbnailUrl = thumbUrl ?? imageUrl,
-                        ProviderName = ProviderName
+                        ProviderName = ProviderName,
+                        Kind = MusicArtworkKind.Cover
                     });
                 }
             }

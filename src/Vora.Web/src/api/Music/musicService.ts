@@ -226,12 +226,17 @@ export interface LyricsVM {
     sourceUrl?: string;
 }
 
+// Providers return several kinds of image from one lookup, so each result says
+// what it is. 'Unknown' means the provider did not classify it.
+export type MusicArtworkKind = 'Unknown' | 'Thumb' | 'Cover' | 'Background' | 'Banner' | 'Logo';
+
 export interface MusicArtworkResultVM {
     url: string;
     thumbnailUrl?: string;
     width?: number;
     height?: number;
     providerName: string;
+    kind: MusicArtworkKind;
 }
 
 export interface MusicSearchResultVM {
