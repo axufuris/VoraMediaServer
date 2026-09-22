@@ -21,7 +21,6 @@ public static class StartupTaskExtensions
 
         await MigrateDatabaseAsync(app);
         await SeedPluginSettingsFromEnvironmentAsync(app);
-        await InitializeFolderWatchersAsync(app);
         await PreloadIptvEpgCacheAsync(app);
     }
 
@@ -95,33 +94,11 @@ public static class StartupTaskExtensions
         }
     }
 
-    private static async Task InitializeFolderWatchersAsync(WebApplication app)
-    {
-        using var scope = app.Services.CreateScope();
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-
-        try
-        {
-            var libraryRepo = scope.ServiceProvider.GetRequiredService<ILibraryRepository>();
-            var folderWatcher = scope.ServiceProvider.GetRequiredService<IFolderWatcherService>();
-            var libraries = await libraryRepo.GetAllLibrariesAsync();
-
-            foreach (var library in libraries)
-            {
-                if (!library.EnableRealTimeWatching || library.FolderPaths == null || library.FolderPaths.Count == 0)
-                {
-                    continue;
-                }
-
-                folderWatcher.StartWatching(library.Id, library.FolderPaths);
-                logger.LogInformation("Auto-started folder watching for library: {LibraryName}", library.Name);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "An error occurred while initializing folder watchers.");
-        }
-    }
+    // Folder watching is started by StartupWatcherService, the hosted service, and
+    // used to ALSO be started here. StartWatching reconciles the library against
+    // disk, so booting ran that sweep twice and could queue two library scans for
+    // the same library — which is what put two "Scan Library" tasks in the queue
+    // on every restart.
 
     private static async Task PreloadIptvEpgCacheAsync(WebApplication app)
     {

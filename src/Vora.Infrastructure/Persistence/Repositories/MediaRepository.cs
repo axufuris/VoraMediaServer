@@ -639,10 +639,16 @@ public partial class MediaRepository : IMediaRepository
             .FirstOrDefaultAsync(m => m.Id == id);
     }
 
+    // Tracks are deliberately out of scope here, as they already are for ratings.
+    // Nothing in the generic metadata pipeline can enrich one: the providers
+    // answer for movies, shows and seasons, so a track's LastMetadataRefresh is
+    // never stamped and it matches "missing" forever. A music library therefore
+    // re-walked every track on every scan, asking providers that had nothing to
+    // say about them. Music metadata and artwork come from MusicManager instead.
     public async Task<IEnumerable<Guid>> GetMediaIdsMissingMetadataAsync(Guid libraryId)
     {
         return await _context.MediaItems
-            .Where(m => m.LibraryId == libraryId &&
+            .Where(m => m.LibraryId == libraryId && !(m is Track) &&
                 (
                     m.LastMetadataRefresh == null
                     ||
@@ -670,10 +676,12 @@ public partial class MediaRepository : IMediaRepository
             .ToListAsync();
     }
 
+    // Same exclusion: a track's cover art lives on its Album, so PosterUrl on the
+    // track itself is always null and every track looked permanently un-arted.
     public async Task<IEnumerable<Guid>> GetMediaIdsMissingArtworkAsync(Guid libraryId)
     {
         return await _context.MediaItems
-            .Where(m => m.LibraryId == libraryId && m.PosterUrl == null)
+            .Where(m => m.LibraryId == libraryId && !(m is Track) && m.PosterUrl == null)
             .Select(m => m.Id)
             .ToListAsync();
     }
