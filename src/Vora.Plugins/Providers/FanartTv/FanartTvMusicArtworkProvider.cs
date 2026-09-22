@@ -1,4 +1,4 @@
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -82,11 +82,11 @@ public class FanartTvMusicArtworkProvider : IMusicArtworkProvider
             var root = doc.RootElement;
 
             var results = new List<MusicArtworkResult>();
-            ExtractImages(root, "artistthumb", results);
-            ExtractImages(root, "artistbackground", results);
-            ExtractImages(root, "hdmusiclogo", results);
-            ExtractImages(root, "musiclogo", results);
-            ExtractImages(root, "musicbanner", results);
+            ExtractImages(root, "artistthumb", MusicArtworkKind.Thumb, results);
+            ExtractImages(root, "artistbackground", MusicArtworkKind.Background, results);
+            ExtractImages(root, "hdmusiclogo", MusicArtworkKind.Logo, results);
+            ExtractImages(root, "musiclogo", MusicArtworkKind.Logo, results);
+            ExtractImages(root, "musicbanner", MusicArtworkKind.Banner, results);
 
             return results;
         }
@@ -130,7 +130,7 @@ public class FanartTvMusicArtworkProvider : IMusicArtworkProvider
         return null;
     }
 
-    private void ExtractImages(JsonElement root, string propertyName, List<MusicArtworkResult> results)
+    private void ExtractImages(JsonElement root, string propertyName, MusicArtworkKind kind, List<MusicArtworkResult> results)
     {
         if (!root.TryGetProperty(propertyName, out var items) || items.ValueKind != JsonValueKind.Array) return;
 
@@ -143,7 +143,8 @@ public class FanartTvMusicArtworkProvider : IMusicArtworkProvider
             {
                 Url = imageUrl,
                 ThumbnailUrl = imageUrl,
-                ProviderName = ProviderName
+                ProviderName = ProviderName,
+                Kind = kind
             });
         }
     }

@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -429,32 +429,69 @@ public class MusicManager : IMusicManager
         return MergeAndDedupe(results);
     }
 
+    // Unknown means the provider did not classify its results, so it only stands
+    // in for the primary image — never for a background, banner or logo, where an
+    // unclassified photo would be the wrong shape.
+    private static string? PickArtwork(IReadOnlyList<MusicArtworkResult> suggestions, MusicArtworkKind kind)
+    {
+        var exact = suggestions.FirstOrDefault(s => s.Kind == kind && !string.IsNullOrWhiteSpace(s.Url));
+        if (exact != null) return exact.Url;
+
+        if (kind is MusicArtworkKind.Thumb or MusicArtworkKind.Cover)
+        {
+            return suggestions.FirstOrDefault(s => s.Kind == MusicArtworkKind.Unknown && !string.IsNullOrWhiteSpace(s.Url))?.Url;
+        }
+
+        return null;
+    }
+
     public async Task<string?> RefreshArtistArtworkFromProvidersAsync(Guid artistId, bool force, CancellationToken cancellationToken)
     {
         var artist = await _repository.GetArtistForUpdateAsync(artistId);
         if (artist == null) return null;
 
-        if (artist.IsLocked(nameof(artist.ArtworkUrl)))
+        // Each slot is locked and filled on its own. A single early return on the
+        // artist image meant a locked photo also blocked the background, banner
+        // and logo — and before results carried a Kind those three were never
+        // filled at all: every image arrived in one list, the first was taken as
+        // the artist photo, and the rest were discarded.
+        var wanted = new (string Field, MusicArtworkKind Kind, Func<string?> Get, Action<string> Set)[]
         {
-            _logger.LogDebug("Skipping artwork refresh for artist {ArtistId} — field is locked", artistId);
-            return null;
-        }
+            (nameof(artist.ArtworkUrl), MusicArtworkKind.Thumb, () => artist.ArtworkUrl, v => artist.ArtworkUrl = v),
+            (nameof(artist.BackgroundUrl), MusicArtworkKind.Background, () => artist.BackgroundUrl, v => artist.BackgroundUrl = v),
+            (nameof(artist.BannerUrl), MusicArtworkKind.Banner, () => artist.BannerUrl, v => artist.BannerUrl = v),
+            (nameof(artist.ClearLogoUrl), MusicArtworkKind.Logo, () => artist.ClearLogoUrl, v => artist.ClearLogoUrl = v),
+        };
 
-        if (!force && !string.IsNullOrEmpty(artist.ArtworkUrl)) return null;
+        var fillable = wanted
+            .Where(slot => !artist.IsLocked(slot.Field))
+            .Where(slot => force || string.IsNullOrEmpty(slot.Get()))
+            .ToList();
+
+        if (fillable.Count == 0) return artist.ArtworkUrl;
 
         var suggestions = await GetArtistArtworkSuggestionsAsync(artistId, cancellationToken);
-        var pick = suggestions.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.Url))?.Url;
-        if (string.IsNullOrEmpty(pick))
+        if (suggestions.Count == 0)
         {
             _logger.LogInformation("No artwork suggestions available for artist {Artist}", artist.Name);
             return null;
         }
 
-        artist.ArtworkUrl = pick;
+        var applied = 0;
+        foreach (var slot in fillable)
+        {
+            var pick = PickArtwork(suggestions, slot.Kind);
+            if (string.IsNullOrWhiteSpace(pick)) continue;
+            slot.Set(pick);
+            applied++;
+        }
+
+        if (applied == 0) return null;
+
         await _repository.UpdateArtistAsync(artist);
         await _notifier.NotifyMusicArtistUpdatedAsync(artistId);
-        _logger.LogInformation("Auto-applied artwork for artist {Artist} from {Url}", artist.Name, pick);
-        return pick;
+        _logger.LogInformation("Applied {Count} artwork image(s) for artist {Artist}", applied, artist.Name);
+        return artist.ArtworkUrl;
     }
 
     public async Task<string?> RefreshAlbumArtworkFromProvidersAsync(Guid albumId, bool force, CancellationToken cancellationToken)
@@ -462,27 +499,42 @@ public class MusicManager : IMusicManager
         var album = await _repository.GetAlbumForUpdateAsync(albumId);
         if (album == null) return null;
 
-        if (album.IsLocked(nameof(album.ArtworkUrl)))
+        var wanted = new (string Field, MusicArtworkKind Kind, Func<string?> Get, Action<string> Set)[]
         {
-            _logger.LogDebug("Skipping artwork refresh for album {AlbumId} — field is locked", albumId);
-            return null;
-        }
+            (nameof(album.ArtworkUrl), MusicArtworkKind.Cover, () => album.ArtworkUrl, v => album.ArtworkUrl = v),
+            (nameof(album.BackgroundUrl), MusicArtworkKind.Background, () => album.BackgroundUrl, v => album.BackgroundUrl = v),
+            (nameof(album.DiscArtUrl), MusicArtworkKind.Logo, () => album.DiscArtUrl, v => album.DiscArtUrl = v),
+        };
 
-        if (!force && !string.IsNullOrEmpty(album.ArtworkUrl)) return null;
+        var fillable = wanted
+            .Where(slot => !album.IsLocked(slot.Field))
+            .Where(slot => force || string.IsNullOrEmpty(slot.Get()))
+            .ToList();
+
+        if (fillable.Count == 0) return album.ArtworkUrl;
 
         var suggestions = await GetAlbumArtworkSuggestionsAsync(albumId, cancellationToken);
-        var pick = suggestions.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.Url))?.Url;
-        if (string.IsNullOrEmpty(pick))
+        if (suggestions.Count == 0)
         {
             _logger.LogInformation("No artwork suggestions available for album {Album}", album.Title);
             return null;
         }
 
-        album.ArtworkUrl = pick;
+        var applied = 0;
+        foreach (var slot in fillable)
+        {
+            var pick = PickArtwork(suggestions, slot.Kind);
+            if (string.IsNullOrWhiteSpace(pick)) continue;
+            slot.Set(pick);
+            applied++;
+        }
+
+        if (applied == 0) return null;
+
         await _repository.UpdateAlbumAsync(album);
         await _notifier.NotifyMusicAlbumUpdatedAsync(albumId);
-        _logger.LogInformation("Auto-applied artwork for album {Album} from {Url}", album.Title, pick);
-        return pick;
+        _logger.LogInformation("Applied {Count} artwork image(s) for album {Album}", applied, album.Title);
+        return album.ArtworkUrl;
     }
 
     public async Task<List<MusicSearchResultVM>> SearchAsync(string query, MusicAccessFilter access, int limit)

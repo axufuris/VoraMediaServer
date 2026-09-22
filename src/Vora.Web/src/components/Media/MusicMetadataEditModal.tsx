@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type MusicArtworkResultVM } from '../../api/Music/musicService';
+import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type MusicArtworkResultVM, type MusicArtworkKind } from '../../api/Music/musicService';
 import { Modal, ModalHeader } from '../Common/Modal';
 import { useDialog } from '../../dialogs';
 
 export type MusicEntityKind = 'artist' | 'album' | 'track';
-type MusicEditTab = 'details' | 'image';
+// One image per tab. Four artwork sections stacked in a single tab meant the
+// modal scrolled past its own Save button, and the alternatives grid for the
+// artist image pushed everything below it off-screen.
+type MusicEditTab = 'details' | 'image' | 'background' | 'banner' | 'logo';
 
 interface MusicMetadataEditModalProps {
     isOpen: boolean;
@@ -275,12 +278,35 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
     const inputClass = (field: string) =>
         `w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded p-2 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)] ${isLocked(field) ? 'opacity-60' : ''}`;
 
-    const tabs: { id: MusicEditTab; label: string }[] = hasImageTab
-        ? [{ id: 'details', label: 'Details' }, { id: 'image', label: kind === 'artist' ? 'Image' : 'Cover Art' }]
-        : [];
+    const tabs: { id: MusicEditTab; label: string }[] = !hasImageTab
+        ? []
+        : kind === 'artist'
+            ? [
+                { id: 'details', label: 'Details' },
+                { id: 'image', label: 'Image' },
+                { id: 'background', label: 'Background' },
+                { id: 'banner', label: 'Banner' },
+                { id: 'logo', label: 'Clear Logo' },
+            ]
+            : [
+                { id: 'details', label: 'Details' },
+                { id: 'image', label: 'Cover Art' },
+                { id: 'background', label: 'Background' },
+                { id: 'logo', label: 'Disc Art' },
+            ];
+
+    // Each slot browses only the images the providers classified as that kind, so
+    // a wordmark logo is no longer offered as a candidate artist photo. Unknown
+    // stands in for the primary image only, matching the server's own fallback.
+    const suggestionsFor = (wanted: MusicArtworkKind[]) => async (): Promise<MusicArtworkResultVM[]> => {
+        const all = kind === 'artist'
+            ? artist ? await musicService.getArtistArtworkSuggestions(artist.id, serverId) : []
+            : album ? await musicService.getAlbumArtworkSuggestions(album.id, serverId) : [];
+        return all.filter(s => wanted.includes(s.kind));
+    };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} size="2xl" surface="gray-900" cardClassName="p-8 flex flex-col max-h-[90vh]">
+        <Modal isOpen={isOpen} onClose={onClose} size="4xl" surface="gray-900" cardClassName="p-8 flex flex-col max-h-[90vh]">
             <ModalHeader title={title_modal} onClose={onClose} closeDisabled={saving} bordered={false} />
             <div className="border-b border-[var(--vora-border-subtle)] mb-4" />
 
@@ -355,64 +381,71 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                     )}
 
                     {kind === 'artist' && activeTab === 'image' && (
-                        <>
-                            <ArtworkSection
-                                label="Artist Image"
-                                shape="circle"
-                                artworkUrl={artworkUrl}
-                                onUrlChange={setArtworkUrl}
-                                onUploadClick={() => fileInputRef.current?.click()}
-                                uploading={uploading}
-                                isLocked={isLocked('ArtworkUrl')}
-                                onLockToggle={() => toggleLock('ArtworkUrl')}
-                                inputClassName={inputClass('ArtworkUrl')}
-                                onLoadSuggestions={() => artist ? musicService.getArtistArtworkSuggestions(artist.id, serverId) : Promise.resolve([])}
-                                onRefreshFromProviders={artist ? async () => {
-                                    const result = await musicService.refreshArtistArtwork(artist.id, true, serverId);
-                                    if (result.updated && result.artworkUrl) {
-                                        setArtworkUrl(result.artworkUrl);
-                                        onSaved();
-                                    }
-                                    return result.updated;
-                                } : undefined}
-                            />
-                            <ArtworkSection
-                                label="Background Image"
-                                shape="wide"
-                                artworkUrl={backgroundUrl}
-                                onUrlChange={setBackgroundUrl}
-                                onUploadClick={() => backgroundFileInputRef.current?.click()}
-                                uploading={uploadingBackground}
-                                isLocked={isLocked('BackgroundUrl')}
-                                onLockToggle={() => toggleLock('BackgroundUrl')}
-                                inputClassName={inputClass('BackgroundUrl')}
-                                onLoadSuggestions={() => Promise.resolve([])}
-                            />
-                            <ArtworkSection
-                                label="Banner (5:1 strip)"
-                                shape="banner"
-                                artworkUrl={bannerUrl}
-                                onUrlChange={setBannerUrl}
-                                onUploadClick={() => bannerFileInputRef.current?.click()}
-                                uploading={uploadingBanner}
-                                isLocked={isLocked('BannerUrl')}
-                                onLockToggle={() => toggleLock('BannerUrl')}
-                                inputClassName={inputClass('BannerUrl')}
-                                onLoadSuggestions={() => Promise.resolve([])}
-                            />
-                            <ArtworkSection
-                                label="Clear Logo (transparent PNG)"
-                                shape="wide"
-                                artworkUrl={clearLogoUrl}
-                                onUrlChange={setClearLogoUrl}
-                                onUploadClick={() => clearLogoFileInputRef.current?.click()}
-                                uploading={uploadingClearLogo}
-                                isLocked={isLocked('ClearLogoUrl')}
-                                onLockToggle={() => toggleLock('ClearLogoUrl')}
-                                inputClassName={inputClass('ClearLogoUrl')}
-                                onLoadSuggestions={() => Promise.resolve([])}
-                            />
-                        </>
+                        <ArtworkSection
+                            label="Artist Image"
+                            shape="circle"
+                            artworkUrl={artworkUrl}
+                            onUrlChange={setArtworkUrl}
+                            onUploadClick={() => fileInputRef.current?.click()}
+                            uploading={uploading}
+                            isLocked={isLocked('ArtworkUrl')}
+                            onLockToggle={() => toggleLock('ArtworkUrl')}
+                            inputClassName={inputClass('ArtworkUrl')}
+                            onLoadSuggestions={suggestionsFor(['Thumb', 'Unknown'])}
+                            onRefreshFromProviders={artist ? async () => {
+                                const result = await musicService.refreshArtistArtwork(artist.id, true, serverId);
+                                if (result.updated && result.artworkUrl) {
+                                    setArtworkUrl(result.artworkUrl);
+                                    onSaved();
+                                }
+                                return result.updated;
+                            } : undefined}
+                        />
+                    )}
+
+                    {kind === 'artist' && activeTab === 'background' && (
+                        <ArtworkSection
+                            label="Background Image"
+                            shape="wide"
+                            artworkUrl={backgroundUrl}
+                            onUrlChange={setBackgroundUrl}
+                            onUploadClick={() => backgroundFileInputRef.current?.click()}
+                            uploading={uploadingBackground}
+                            isLocked={isLocked('BackgroundUrl')}
+                            onLockToggle={() => toggleLock('BackgroundUrl')}
+                            inputClassName={inputClass('BackgroundUrl')}
+                            onLoadSuggestions={suggestionsFor(['Background'])}
+                        />
+                    )}
+
+                    {kind === 'artist' && activeTab === 'banner' && (
+                        <ArtworkSection
+                            label="Banner (5:1 strip)"
+                            shape="banner"
+                            artworkUrl={bannerUrl}
+                            onUrlChange={setBannerUrl}
+                            onUploadClick={() => bannerFileInputRef.current?.click()}
+                            uploading={uploadingBanner}
+                            isLocked={isLocked('BannerUrl')}
+                            onLockToggle={() => toggleLock('BannerUrl')}
+                            inputClassName={inputClass('BannerUrl')}
+                            onLoadSuggestions={suggestionsFor(['Banner'])}
+                        />
+                    )}
+
+                    {kind === 'artist' && activeTab === 'logo' && (
+                        <ArtworkSection
+                            label="Clear Logo (transparent PNG)"
+                            shape="wide"
+                            artworkUrl={clearLogoUrl}
+                            onUrlChange={setClearLogoUrl}
+                            onUploadClick={() => clearLogoFileInputRef.current?.click()}
+                            uploading={uploadingClearLogo}
+                            isLocked={isLocked('ClearLogoUrl')}
+                            onLockToggle={() => toggleLock('ClearLogoUrl')}
+                            inputClassName={inputClass('ClearLogoUrl')}
+                            onLoadSuggestions={suggestionsFor(['Logo'])}
+                        />
                     )}
 
                     {kind === 'album' && activeTab === 'details' && (
@@ -439,52 +472,56 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                     )}
 
                     {kind === 'album' && activeTab === 'image' && (
-                        <>
-                            <ArtworkSection
-                                label="Cover Art"
-                                shape="square"
-                                artworkUrl={artworkUrl}
-                                onUrlChange={setArtworkUrl}
-                                onUploadClick={() => fileInputRef.current?.click()}
-                                uploading={uploading}
-                                isLocked={isLocked('ArtworkUrl')}
-                                onLockToggle={() => toggleLock('ArtworkUrl')}
-                                inputClassName={inputClass('ArtworkUrl')}
-                                onLoadSuggestions={() => album ? musicService.getAlbumArtworkSuggestions(album.id, serverId) : Promise.resolve([])}
-                                onRefreshFromProviders={album ? async () => {
-                                    const result = await musicService.refreshAlbumArtwork(album.id, true, serverId);
-                                    if (result.updated && result.artworkUrl) {
-                                        setArtworkUrl(result.artworkUrl);
-                                        onSaved();
-                                    }
-                                    return result.updated;
-                                } : undefined}
-                            />
-                            <ArtworkSection
-                                label="Background Image"
-                                shape="wide"
-                                artworkUrl={backgroundUrl}
-                                onUrlChange={setBackgroundUrl}
-                                onUploadClick={() => backgroundFileInputRef.current?.click()}
-                                uploading={uploadingBackground}
-                                isLocked={isLocked('BackgroundUrl')}
-                                onLockToggle={() => toggleLock('BackgroundUrl')}
-                                inputClassName={inputClass('BackgroundUrl')}
-                                onLoadSuggestions={() => Promise.resolve([])}
-                            />
-                            <ArtworkSection
-                                label="Disc Art (vinyl/CD)"
-                                shape="circle"
-                                artworkUrl={discArtUrl}
-                                onUrlChange={setDiscArtUrl}
-                                onUploadClick={() => discArtFileInputRef.current?.click()}
-                                uploading={uploadingDiscArt}
-                                isLocked={isLocked('DiscArtUrl')}
-                                onLockToggle={() => toggleLock('DiscArtUrl')}
-                                inputClassName={inputClass('DiscArtUrl')}
-                                onLoadSuggestions={() => Promise.resolve([])}
-                            />
-                        </>
+                        <ArtworkSection
+                            label="Cover Art"
+                            shape="square"
+                            artworkUrl={artworkUrl}
+                            onUrlChange={setArtworkUrl}
+                            onUploadClick={() => fileInputRef.current?.click()}
+                            uploading={uploading}
+                            isLocked={isLocked('ArtworkUrl')}
+                            onLockToggle={() => toggleLock('ArtworkUrl')}
+                            inputClassName={inputClass('ArtworkUrl')}
+                            onLoadSuggestions={suggestionsFor(['Cover', 'Unknown'])}
+                            onRefreshFromProviders={album ? async () => {
+                                const result = await musicService.refreshAlbumArtwork(album.id, true, serverId);
+                                if (result.updated && result.artworkUrl) {
+                                    setArtworkUrl(result.artworkUrl);
+                                    onSaved();
+                                }
+                                return result.updated;
+                            } : undefined}
+                        />
+                    )}
+
+                    {kind === 'album' && activeTab === 'background' && (
+                        <ArtworkSection
+                            label="Background Image"
+                            shape="wide"
+                            artworkUrl={backgroundUrl}
+                            onUrlChange={setBackgroundUrl}
+                            onUploadClick={() => backgroundFileInputRef.current?.click()}
+                            uploading={uploadingBackground}
+                            isLocked={isLocked('BackgroundUrl')}
+                            onLockToggle={() => toggleLock('BackgroundUrl')}
+                            inputClassName={inputClass('BackgroundUrl')}
+                            onLoadSuggestions={suggestionsFor(['Background'])}
+                        />
+                    )}
+
+                    {kind === 'album' && activeTab === 'logo' && (
+                        <ArtworkSection
+                            label="Disc Art (vinyl/CD)"
+                            shape="circle"
+                            artworkUrl={discArtUrl}
+                            onUrlChange={setDiscArtUrl}
+                            onUploadClick={() => discArtFileInputRef.current?.click()}
+                            uploading={uploadingDiscArt}
+                            isLocked={isLocked('DiscArtUrl')}
+                            onLockToggle={() => toggleLock('DiscArtUrl')}
+                            inputClassName={inputClass('DiscArtUrl')}
+                            onLoadSuggestions={suggestionsFor(['Logo'])}
+                        />
                     )}
 
                     {kind === 'track' && (

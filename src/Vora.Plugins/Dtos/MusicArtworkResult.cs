@@ -1,4 +1,4 @@
-namespace Vora.Plugins.Dtos;
+﻿namespace Vora.Plugins.Dtos;
 
 public class MusicArtworkResult
 {
@@ -7,4 +7,5 @@ public class MusicArtworkResult
     public int? Width { get; init; }
     public int? Height { get; init; }
     public required string ProviderName { get; init; }
+    public MusicArtworkKind Kind { get; init; } = MusicArtworkKind.Unknown;
 }
