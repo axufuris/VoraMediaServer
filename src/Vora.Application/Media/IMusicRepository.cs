@@ -21,6 +21,7 @@ public interface IMusicRepository
     Task<List<Track>> GetRecentlyPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<Track>> GetTopPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<Artist>> GetTopPlayedArtistsAsync(Guid profileId, MusicAccessFilter access, int limit);
+    Task<List<Artist>> GetCoPlayedArtistsAsync(Guid artistId, MusicAccessFilter access, int limit);
     Task<List<Album>> GetRecentlyAddedAlbumsAsync(MusicAccessFilter access, int limit);
     Task<(List<Album> Albums, int Total)> GetAlbumsPageAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit);
 

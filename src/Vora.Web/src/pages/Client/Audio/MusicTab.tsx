@@ -102,6 +102,7 @@ export default function MusicTab() {
     const [availableYears, setAvailableYears] = useState<number[]>([]);
     const [hasAnyHistory, setHasAnyHistory] = useState(false);
     const [similarArtists, setSimilarArtists] = useState<ArtistVM[]>([]);
+    const [coPlayedArtists, setCoPlayedArtists] = useState<ArtistVM[]>([]);
     const [genres, setGenres] = useState<GenreSummaryVM[]>([]);
     const [currentGenre, setCurrentGenre] = useState<GenreContentVM | null>(null);
     const [serverPlayback, setServerPlayback] = useState<ServerPlaybackSessionVM[]>([]);
@@ -448,6 +449,7 @@ export default function MusicTab() {
         queueMicrotask(() => {
             setIsLoading(true);
             setSimilarArtists([]);
+            setCoPlayedArtists([]);
         });
         musicService.getArtistDetail(nav.artistId, serverId)
             .then(detail => {
@@ -462,6 +464,9 @@ export default function MusicTab() {
         musicService.getSimilarArtists(nav.artistId, serverId)
             .then(setSimilarArtists)
             .catch(() => setSimilarArtists([]));
+        musicService.getCoPlayedArtists(nav.artistId, serverId)
+            .then(setCoPlayedArtists)
+            .catch(() => setCoPlayedArtists([]));
     }, [nav.view, nav.artistId, serverId, refreshSeq, resetToRootView]);
 
     useEffect(() => {
@@ -833,6 +838,7 @@ export default function MusicTab() {
                     currentArtist={currentArtist}
                     albums={albums}
                     similarArtists={similarArtists}
+                    coPlayedArtists={coPlayedArtists}
                     isServerAdmin={isServerAdmin}
                     playArtist={playArtist}
                     startRadioFromSeed={startRadioFromSeed}
