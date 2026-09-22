@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Vora.Application.Media;
 using Vora.Application.Search.ViewModels;
 using Vora.Domain.Entities.Media;
@@ -412,6 +412,44 @@ public class MusicRepository : IMusicRepository
         _context.Albums
             .Where(a => a.Title == albumTitle && a.Artist.Name == artistName)
             .FirstOrDefaultAsync();
+    // What else the people who play this artist play, across every profile on the
+    // server. Ranked by how MANY of them overlap first and total plays second, so
+    // one profile looping an album cannot outrank an artist several people share.
+    //
+    // Deliberately server-wide rather than per-profile: the Music page's For You
+    // tab is the personal view, and this row exists to answer the different
+    // question of what this server listens to alongside the artist.
+    public async Task<List<Artist>> GetCoPlayedArtistsAsync(Guid artistId, MusicAccessFilter access, int limit)
+    {
+        var listeners = from history in _context.TrackPlayHistory.AsNoTracking()
+                        join track in _context.Tracks.AsNoTracking() on history.TrackId equals track.Id
+                        join album in _context.Albums.AsNoTracking() on track.AlbumId equals album.Id
+                        where album.ArtistId == artistId
+                        select history.ProfileId;
+
+        var coPlays = from history in _context.TrackPlayHistory.AsNoTracking()
+                      where listeners.Contains(history.ProfileId)
+                      join track in _context.Tracks.AsNoTracking() on history.TrackId equals track.Id
+                      join album in _context.Albums.AsNoTracking() on track.AlbumId equals album.Id
+                      where album.ArtistId != artistId
+                      group history by album.ArtistId into grp
+                      select new
+                      {
+                          ArtistId = grp.Key,
+                          Listeners = grp.Select(h => h.ProfileId).Distinct().Count(),
+                          Plays = grp.Count()
+                      };
+
+        IQueryable<Artist> artists = _context.Artists.AsNoTracking();
+        artists = ApplyLibraryFilter(artists, access);
+
+        var query = from artist in artists
+                    join stat in coPlays on artist.Id equals stat.ArtistId
+                    orderby stat.Listeners descending, stat.Plays descending, artist.Name
+                    select artist;
+
+        return await query.Take(Math.Max(1, limit)).ToListAsync();
+    }
 
     public async Task<List<MusicSearchResultVM>> SearchAsync(string query, MusicAccessFilter access, int limit)
     {
