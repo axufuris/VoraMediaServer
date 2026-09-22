@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
@@ -532,12 +532,18 @@ public static class ServiceRegistrationExtensions
             client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Podcast Reader)");
             client.DefaultRequestHeaders.Add("Accept", "application/rss+xml, application/xml, text/xml");
         });
+        // Singleton, not per-client-instance: the gap has to hold across every
+        // request the process makes to MusicBrainz, and a handler created per
+        // client would each keep their own idea of when the last one went out.
+        services.AddSingleton<MusicBrainzRateLimitHandler>();
         services.AddHttpClient(MusicBrainzArtworkProvider.HttpClientName, client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora-MusicMetadata/1.0 (https://github.com/zenith/vora)");
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-        }).AddVoraResilience(totalTimeoutSeconds: 30);
+        })
+        .AddVoraResilience(totalTimeoutSeconds: 30)
+        .AddHttpMessageHandler<MusicBrainzRateLimitHandler>();
         services.AddHttpClient(FanartTvMusicArtworkProvider.HttpClientName, client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
