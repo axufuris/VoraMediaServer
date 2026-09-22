@@ -18,6 +18,7 @@ public class FolderWatcherService : IFolderWatcherService
     private readonly ILogger<FolderWatcherService> _logger;
     private readonly IEnumerable<IFolderWatcherProvider> _providers;
     private readonly ConcurrentDictionary<Guid, IFolderWatcherProvider> _activeWatchers = new();
+    private readonly ConcurrentDictionary<Guid, byte> _starting = new();
 
     public FolderWatcherService(IServiceProvider serviceProvider, ILogger<FolderWatcherService> logger, IEnumerable<IFolderWatcherProvider> providers)
     {
@@ -29,6 +30,12 @@ public class FolderWatcherService : IFolderWatcherService
     public void StartWatching(Guid libraryId, IEnumerable<string> directoryPaths)
     {
         if (_activeWatchers.ContainsKey(libraryId)) return;
+
+        // Reserve the library synchronously. The provider only lands in
+        // _activeWatchers once the body below has read settings and started it, so
+        // two callers arriving together both passed the check above, both started a
+        // watcher and both reconciled — queueing the work twice.
+        if (!_starting.TryAdd(libraryId, 0)) return;
 
         _ = Task.Run(async () =>
         {
@@ -70,6 +77,10 @@ public class FolderWatcherService : IFolderWatcherService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to start folder watcher for library {LibraryId}.", libraryId);
+            }
+            finally
+            {
+                _starting.TryRemove(libraryId, out _);
             }
         });
     }
