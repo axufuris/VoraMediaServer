@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 using Vora.Application.Libraries.ViewModels;
@@ -897,6 +897,12 @@ public partial class MediaRepository : IMediaRepository
 
     public Task SaveChangesAsync() => _context.SaveChangesAsync();
 
+    public Task ReleaseTrackedEntitiesAsync()
+    {
+        _context.ChangeTracker.Clear();
+        return Task.CompletedTask;
+    }
+
     public async Task AddMediaItemAsync(MediaItem item)
     {
         try
@@ -1197,6 +1203,10 @@ public partial class MediaRepository : IMediaRepository
 
     private async Task RestoreUserDataForItemAsync(Guid id)
     {
+        // Deliberately NOT memoized. Caching "the table is empty" for the life of
+        // the scope is wrong: a trash purge can write preserved data while a scan
+        // is running, and a stale false silently drops the restore —
+        // MediaRepositoryPreservationTests catches exactly that.
         if (!await _context.PreservedUserMediaData.AnyAsync()) return;
 
         var contentKey = await GetContentKeyAsync(id);
