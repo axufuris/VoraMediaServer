@@ -43,6 +43,9 @@ public partial class MediaRepository : IMediaRepository
             .Select(m => m.Id)
             .ToListAsync();
 
+    private static string JoinNonEmpty(params string?[] parts) =>
+        string.Join(" — ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+
     public async Task<Dictionary<Guid, string>> GetDisplayTitlesByIdsAsync(IReadOnlyCollection<Guid> ids)
     {
         if (ids.Count == 0) return new Dictionary<Guid, string>();
@@ -54,14 +57,19 @@ public partial class MediaRepository : IMediaRepository
             {
                 m.Id,
                 m.Title,
-                Kind = m is Episode ? "episode" : m is Season ? "season" : "other",
+                Kind = m is Episode ? "episode" : m is Season ? "season" : m is Track ? "track" : "other",
                 SeasonNumber = m is Episode ? ((Episode)m).Season.SeasonNumber
                     : m is Season ? ((Season)m).SeasonNumber
                     : (int?)null,
                 EpisodeNumber = m is Episode ? ((Episode)m).EpisodeNumber : (int?)null,
                 ShowTitle = m is Episode ? ((Episode)m).Season.TvShow.Title
                     : m is Season ? ((Season)m).TvShow.Title
-                    : null
+                    : null,
+                // A track title on its own says nothing useful in a progress line
+                // — half a library shares titles like "Intro" — so it is qualified
+                // by its artist and album the way an episode is by its show.
+                AlbumTitle = m is Track ? ((Track)m).Album!.Title : null,
+                ArtistName = m is Track ? ((Track)m).Album!.Artist.Name : null
             })
             .ToListAsync();
 
@@ -69,6 +77,7 @@ public partial class MediaRepository : IMediaRepository
         {
             "episode" => $"{r.ShowTitle} — S{r.SeasonNumber:D2}E{r.EpisodeNumber:D2} — {r.Title}",
             "season" => $"{r.ShowTitle} — {r.Title}",
+            "track" => JoinNonEmpty(r.ArtistName, r.AlbumTitle, r.Title),
             _ => r.Title
         });
     }

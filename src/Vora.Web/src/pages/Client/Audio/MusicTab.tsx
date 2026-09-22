@@ -132,10 +132,8 @@ export default function MusicTab() {
         navigate(`${pathname}${search}`, { state: { musicNav: next } });
     }, [navigate]);
 
-    // The other direction: Back and Forward change the entry, so the view has to
-    // follow it. An entry with no nav state is one we did not create (arriving on
-    // the route, or the mix deep-link clearing its query string with a replace),
-    // so stamp the current view onto it rather than resetting to the root.
+    // The other direction: Back and Forward change the entry, so the view follows
+    // it.
     const navRef = useRef(nav);
     navRef.current = nav;
     const syncedHistoryKey = useRef<string | null>(null);
@@ -146,12 +144,21 @@ export default function MusicTab() {
         const isFirstEntry = syncedHistoryKey.current === null;
         syncedHistoryKey.current = location.key;
 
-        const fromHistory = (location.state as { musicNav?: MusicNavState } | null)?.musicNav;
-        if (!fromHistory) {
-            if (isFirstEntry && navRef.current.view === 'root') return;
+        // Stamp the entry we arrived on, the root view included. Leaving the root
+        // entry bare meant Back out of the first drill-down found no state to
+        // restore and fell through to re-stamping the CURRENT view onto it — so
+        // that Back press was swallowed without moving, and the next one left
+        // Music altogether. Artists → artist → album needed three Backs to reach
+        // the artist list, and the third went Home instead.
+        if (isFirstEntry) {
             navigate(`${location.pathname}${location.search}`, { replace: true, state: { musicNav: navRef.current } });
             return;
         }
+
+        // Past the first entry every music entry carries state, so one without it
+        // is the query-string replace below — treat it as the root rather than
+        // holding the current view.
+        const fromHistory = (location.state as { musicNav?: MusicNavState } | null)?.musicNav ?? { view: 'root' as const };
 
         if (JSON.stringify(navRef.current) !== JSON.stringify(fromHistory)) {
             setNav(fromHistory);
@@ -164,7 +171,7 @@ export default function MusicTab() {
         if (mixParam) {
             queueMicrotask(() => updateNav({ view: 'mix', mixId: mixParam }));
             searchParams.delete('mix');
-            setSearchParams(searchParams, { replace: true });
+            setSearchParams(searchParams, { replace: true, state: { musicNav: navRef.current } });
         }
     }, [searchParams, setSearchParams, updateNav]);
 
