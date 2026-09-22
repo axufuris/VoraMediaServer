@@ -34,6 +34,7 @@ public class ArtistArtworkKindTests : IDisposable
             Array.Empty<IListeningDataProvider>(),
             Substitute.For<IClientNotifier>(),
             Options.Create(new StoragePathsOptions { CustomArtwork = _artworkDir }),
+            new NullTaskProgressReporter(),
             NullLogger<MusicManager>.Instance);
     }
 

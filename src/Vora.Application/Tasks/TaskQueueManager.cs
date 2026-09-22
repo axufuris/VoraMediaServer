@@ -153,6 +153,11 @@ public class TaskQueueManager : ITaskQueueManager
             await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, forceOverride: forceOverride, cancellationToken: ct);
             await metadataManager.TriggerActorMetadataRefreshAsync(ct);
 
+            // Artists and albums are not MediaItems, so none of the calls above
+            // touch them. Without this, "Refresh metadata" on a music library did
+            // nothing for its artwork at all.
+            await sp.GetRequiredService<IMusicManager>().RefreshLibraryArtworkFromProvidersAsync(libraryId, forceOverride, ct);
+
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
         }, resourceKey: LibraryKey(libraryId));
     }
@@ -866,6 +871,7 @@ public class TaskQueueManager : ITaskQueueManager
             var musicStopwatch = Stopwatch.StartNew();
             await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId, ct);
             await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false, cancellationToken: ct);
+            await sp.GetRequiredService<IMusicManager>().RefreshLibraryArtworkFromProvidersAsync(libraryId, forceOverride, ct);
             logger?.LogInformation("Scan+enrich (whole-library) for {LibraryId} took {Wall:n1}s.", libraryId, musicStopwatch.Elapsed.TotalSeconds);
         }
 

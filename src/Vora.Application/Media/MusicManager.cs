@@ -38,6 +38,7 @@ public interface IMusicManager
     Task<List<MusicArtworkResult>> GetArtistArtworkSuggestionsAsync(Guid artistId, CancellationToken cancellationToken);
 
     Task<string?> RefreshArtistArtworkFromProvidersAsync(Guid artistId, bool force, CancellationToken cancellationToken);
+    Task RefreshLibraryArtworkFromProvidersAsync(Guid libraryId, bool force, CancellationToken cancellationToken);
     Task<string?> RefreshAlbumArtworkFromProvidersAsync(Guid albumId, bool force, CancellationToken cancellationToken);
 
     Task<List<MusicSearchResultVM>> SearchAsync(string query, MusicAccessFilter access, int limit);
@@ -89,11 +90,13 @@ public class MusicManager : IMusicManager
     private readonly IEnumerable<ILyricsProvider> _lyricsProviders;
     private readonly IEnumerable<IListeningDataProvider> _listeningProviders;
     private readonly IClientNotifier _notifier;
+    private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
     private readonly ILogger<MusicManager> _logger;
     private readonly string _artworkBasePath;
 
-    public MusicManager(IMusicRepository repository, IUserRepository userRepository, IUserMediaStateRepository userMediaStateRepository, IEnumerable<IMusicArtworkProvider> artworkProviders, IEnumerable<ILyricsProvider> lyricsProviders, IEnumerable<IListeningDataProvider> listeningProviders, IClientNotifier notifier, IOptions<StoragePathsOptions> storagePaths, ILogger<MusicManager> logger)
+    public MusicManager(IMusicRepository repository, IUserRepository userRepository, IUserMediaStateRepository userMediaStateRepository, IEnumerable<IMusicArtworkProvider> artworkProviders, IEnumerable<ILyricsProvider> lyricsProviders, IEnumerable<IListeningDataProvider> listeningProviders, IClientNotifier notifier, IOptions<StoragePathsOptions> storagePaths, Vora.Plugins.Interfaces.ITaskProgressReporter progress, ILogger<MusicManager> logger)
     {
+        _progress = progress;
         _repository = repository;
         _userRepository = userRepository;
         _userMediaStateRepository = userMediaStateRepository;
@@ -443,6 +446,57 @@ public class MusicManager : IMusicManager
         }
 
         return null;
+    }
+
+    // Artists and Albums are not MediaItems, so the library enrichment pass walks
+    // straight past them — nothing was refreshing music artwork for a library that
+    // already existed. The per-artist refresh only ever ran at the moment an
+    // artist was created without embedded art, so an artist whose folder art had
+    // filled ArtworkUrl never asked a provider for a background, banner or logo.
+    public async Task RefreshLibraryArtworkFromProvidersAsync(Guid libraryId, bool force, CancellationToken cancellationToken)
+    {
+        var artistIds = await _repository.GetArtistIdsForArtworkRefreshAsync(libraryId, force);
+        var albumIds = await _repository.GetAlbumIdsForArtworkRefreshAsync(libraryId, force);
+
+        var total = artistIds.Count + albumIds.Count;
+        if (total == 0) return;
+
+        var done = 0;
+
+        foreach (var artistId in artistIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            done++;
+            _progress.Report($"Fetching music artwork ({done}/{total})");
+            try
+            {
+                await RefreshArtistArtworkFromProvidersAsync(artistId, force, cancellationToken);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Artwork refresh failed for artist {ArtistId}; continuing with the rest of the library.", artistId);
+            }
+        }
+
+        foreach (var albumId in albumIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            done++;
+            _progress.Report($"Fetching music artwork ({done}/{total})");
+            try
+            {
+                await RefreshAlbumArtworkFromProvidersAsync(albumId, force, cancellationToken);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Artwork refresh failed for album {AlbumId}; continuing with the rest of the library.", albumId);
+            }
+        }
+
+        _progress.Report(null);
+        _logger.LogInformation("Music artwork refresh for library {LibraryId} covered {Total} item(s).", libraryId, total);
     }
 
     public async Task<string?> RefreshArtistArtworkFromProvidersAsync(Guid artistId, bool force, CancellationToken cancellationToken)

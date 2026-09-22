@@ -51,6 +51,38 @@ public class MusicRepository : IMusicRepository
         await _context.SaveChangesAsync();
     }
 
+    // Pre-filter so a non-forced refresh does not pay a provider round trip for
+    // an artist whose slots are all filled. The per-slot lock and force rules
+    // still live in MusicManager; this only avoids loading the hopeless cases.
+    public async Task<List<Guid>> GetArtistIdsForArtworkRefreshAsync(Guid libraryId, bool force)
+    {
+        var query = _context.Set<Artist>().AsNoTracking().Where(a => a.LibraryId == libraryId);
+
+        if (!force)
+        {
+            query = query.Where(a => a.ArtworkUrl == null
+                || a.BackgroundUrl == null
+                || a.BannerUrl == null
+                || a.ClearLogoUrl == null);
+        }
+
+        return await query.OrderBy(a => a.Name).Select(a => a.Id).ToListAsync();
+    }
+
+    public async Task<List<Guid>> GetAlbumIdsForArtworkRefreshAsync(Guid libraryId, bool force)
+    {
+        var query = _context.Set<Album>().AsNoTracking().Where(a => a.LibraryId == libraryId);
+
+        if (!force)
+        {
+            query = query.Where(a => a.ArtworkUrl == null
+                || a.BackgroundUrl == null
+                || a.DiscArtUrl == null);
+        }
+
+        return await query.OrderBy(a => a.Title).Select(a => a.Id).ToListAsync();
+    }
+
     public async Task<List<Artist>> GetArtistsAsync(Guid? libraryId, MusicAccessFilter access, int? limit = null)
     {
         var query = _context.Artists.AsNoTracking().AsQueryable();
