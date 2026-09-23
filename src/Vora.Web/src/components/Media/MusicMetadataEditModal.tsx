@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type MusicArtworkResultVM, type MusicArtworkKind } from '../../api/Music/musicService';
 import { Modal, ModalHeader } from '../Common/Modal';
+import { pluginAdminService, type PluginOptionVM } from '../../api/System/pluginAdminService';
 import { useDialog } from '../../dialogs';
 
 export type MusicEntityKind = 'artist' | 'album' | 'track';
@@ -30,6 +31,18 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
     const [activeTab, setActiveTab] = useState<MusicEditTab>('details');
 
     const hasImageTab = kind === 'artist' || kind === 'album';
+
+    // Only the artwork plugins that declare Music. The server does the filtering,
+    // so this list cannot drift from what the plugins actually say they support.
+    const [artworkProviders, setArtworkProviders] = useState<PluginOptionVM[]>([]);
+    const [providerFilter, setProviderFilter] = useState('');
+
+    useEffect(() => {
+        if (!isOpen || !hasImageTab) return;
+        pluginAdminService.getArtworkProviders(serverId, 'Music')
+            .then(setArtworkProviders)
+            .catch(() => setArtworkProviders([]));
+    }, [isOpen, hasImageTab, serverId]);
 
     const [name, setName] = useState('');
     const [sortName, setSortName] = useState('');
@@ -288,15 +301,10 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                 { id: 'banner', label: 'Banner' },
                 { id: 'logo', label: 'Clear Logo' },
             ]
-            // No album Background tab. No artwork provider offers one — Fanart.tv's
-            // music API has artistbackground but no album equivalent, and
-            // TheAudioDB has no album fanart — so the tab could only ever show an
-            // empty slot and a Browse button that returns nothing. Album.BackgroundUrl,
-            // the Background kind and the album header that renders it all stay,
-            // so a plugin that can supply one needs no further change here.
             : [
                 { id: 'details', label: 'Details' },
                 { id: 'image', label: 'Cover Art' },
+                { id: 'background', label: 'Background' },
                 { id: 'logo', label: 'Disc Art' },
             ];
 
@@ -307,8 +315,31 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
         const all = kind === 'artist'
             ? artist ? await musicService.getArtistArtworkSuggestions(artist.id, serverId) : []
             : album ? await musicService.getAlbumArtworkSuggestions(album.id, serverId) : [];
-        return all.filter(s => wanted.includes(s.kind));
+
+        // A result names itself by ProviderName ("Fanart.tv"), not by the plugin
+        // name ("Fanart.tv Music Artwork"), so the dropdown matches on that.
+        const selected = artworkProviders.find(p => p.id === providerFilter);
+        return all
+            .filter(s => wanted.includes(s.kind))
+            .filter(s => !selected || s.providerName === selected.providerName);
     };
+
+    const providerPicker = artworkProviders.length > 1 ? (
+        <div className="flex items-center gap-2">
+            <label htmlFor="music-artwork-provider" className="text-xs text-[var(--vora-text-muted)]">Provider</label>
+            <select
+                id="music-artwork-provider"
+                value={providerFilter}
+                onChange={e => setProviderFilter(e.target.value)}
+                className="p-1.5 bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)] text-xs rounded outline-none focus:border-[var(--vora-accent-500)] cursor-pointer"
+            >
+                <option value="">All providers</option>
+                {artworkProviders.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+            </select>
+        </div>
+    ) : null;
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} size="4xl" surface="gray-900" cardClassName="p-8 flex flex-col max-h-[90vh]">
@@ -352,17 +383,22 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
             />
 
             {hasImageTab && (
-                <div className="flex gap-1 mb-6 -mt-2">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`px-4 py-2 text-sm font-bold rounded-md transition-colors cursor-pointer ${activeTab === tab.id ? 'bg-[var(--vora-bg-sunken)] text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)]/50'}`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6 -mt-2">
+                    <div className="flex gap-1">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-4 py-2 text-sm font-bold rounded-md transition-colors cursor-pointer ${activeTab === tab.id ? 'bg-[var(--vora-bg-sunken)] text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)]/50'}`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                    {/* Beside the tabs rather than inside a slot, because the choice
+                        applies to whichever image is open rather than to one of them. */}
+                    {activeTab !== 'details' && providerPicker}
                 </div>
             )}
 
@@ -496,6 +532,28 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                                 }
                                 return result.updated;
                             } : undefined}
+                        />
+                    )}
+
+                    {/* No artwork provider returns an album background today —
+                        Fanart.tv's music API has artistbackground with no album
+                        equivalent, and TheAudioDB has no album fanart — so Browse
+                        comes back empty here. The slot stays because the album
+                        header renders it, so upload and paste are the way to set
+                        one, and because a plugin that starts returning the
+                        Background kind lights it up with no change. */}
+                    {kind === 'album' && activeTab === 'background' && (
+                        <ArtworkSection
+                            label="Background Image"
+                            shape="wide"
+                            artworkUrl={backgroundUrl}
+                            onUrlChange={setBackgroundUrl}
+                            onUploadClick={() => backgroundFileInputRef.current?.click()}
+                            uploading={uploadingBackground}
+                            isLocked={isLocked('BackgroundUrl')}
+                            onLockToggle={() => toggleLock('BackgroundUrl')}
+                            inputClassName={inputClass('BackgroundUrl')}
+                            onLoadSuggestions={suggestionsFor(['Background'])}
                         />
                     )}
 
