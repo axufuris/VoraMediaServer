@@ -136,6 +136,7 @@ public class PluginManager(
             {
                 Id = plugin.Id,
                 Name = plugin.Name,
+                ProviderName = plugin.ProviderName,
                 ExternalIdLabel = ResolveExternalIdLabel(plugin),
                 ExternalIdPlaceholder = ResolveExternalIdPlaceholder(plugin),
                 IsAiPlugin = plugin.IsAiPlugin,
