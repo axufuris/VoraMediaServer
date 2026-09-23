@@ -84,11 +84,18 @@ public class TheAudioDbMusicArtworkProvider : IMusicArtworkProvider
 
             foreach (var album in albums.EnumerateArray())
             {
+                // Order is the order the modal offers them in, and the first Cover
+                // is what an automatic fill takes — so the flat front cover leads
+                // and the novelty renders trail it.
                 AddIfPresent(album, "strAlbumThumbHQ", MusicArtworkKind.Cover, results, seenUrls);
                 AddIfPresent(album, "strAlbumThumb", MusicArtworkKind.Cover, results, seenUrls);
-                AddIfPresent(album, "strAlbumThumbBack", MusicArtworkKind.Cover, results, seenUrls);
+                // strAlbumBack, not strAlbumThumbBack: the latter is not a field
+                // TheAudioDB returns, so the back cover was never once picked up.
+                AddIfPresent(album, "strAlbumBack", MusicArtworkKind.Cover, results, seenUrls);
+                AddIfPresent(album, "strAlbumSpine", MusicArtworkKind.Cover, results, seenUrls);
                 AddIfPresent(album, "strAlbum3DCase", MusicArtworkKind.Cover, results, seenUrls);
                 AddIfPresent(album, "strAlbum3DFlat", MusicArtworkKind.Cover, results, seenUrls);
+                AddIfPresent(album, "strAlbum3DThumb", MusicArtworkKind.Cover, results, seenUrls);
                 AddIfPresent(album, "strAlbumCDart", MusicArtworkKind.Logo, results, seenUrls);
             }
 
@@ -129,11 +136,17 @@ public class TheAudioDbMusicArtworkProvider : IMusicArtworkProvider
                 AddIfPresent(artist, "strArtistClearart", MusicArtworkKind.Thumb, results, seenUrls);
                 AddIfPresent(artist, "strArtistLogo", MusicArtworkKind.Logo, results, seenUrls);
                 AddIfPresent(artist, "strArtistBanner", MusicArtworkKind.Banner, results, seenUrls);
-                AddIfPresent(artist, "strArtistWideThumb", MusicArtworkKind.Background, results, seenUrls);
+                // The fanarts are 1920x1080 backdrops and lead the Background slot.
+                // WideThumb is a ~5:1 strip, and listing it first meant the
+                // automatic fill took a strip as the backdrop for every artist that
+                // had one — which is what a background is least able to be.
                 AddIfPresent(artist, "strArtistFanart", MusicArtworkKind.Background, results, seenUrls);
                 AddIfPresent(artist, "strArtistFanart2", MusicArtworkKind.Background, results, seenUrls);
                 AddIfPresent(artist, "strArtistFanart3", MusicArtworkKind.Background, results, seenUrls);
                 AddIfPresent(artist, "strArtistFanart4", MusicArtworkKind.Background, results, seenUrls);
+                // Kept as an alternative rather than dropped: it is still a usable
+                // backdrop for an artist with no fanart, and the modal offers it.
+                AddIfPresent(artist, "strArtistWideThumb", MusicArtworkKind.Background, results, seenUrls);
             }
 
             return results;
