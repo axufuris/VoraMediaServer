@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Text.Json;
@@ -283,6 +283,7 @@ public class VoraDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => new { e.LibraryId, e.Name }).IsUnique();
+            entity.Property(e => e.MusicBrainzId).HasMaxLength(36);
         });
 
         modelBuilder.Entity<TrackLike>(entity =>
@@ -314,6 +315,7 @@ public class VoraDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Title).IsRequired().HasMaxLength(500);
             entity.Property(e => e.SortTitle).HasMaxLength(500);
+            entity.Property(e => e.MusicBrainzId).HasMaxLength(36);
             entity.Property(e => e.Genre).HasMaxLength(200);
             entity.Property(e => e.ArtworkUrl).HasMaxLength(2048);
             entity.Property(e => e.BackgroundUrl).HasMaxLength(2048);

@@ -402,6 +402,17 @@ public class MusicRepository : IMusicRepository
         return await query.Take(Math.Max(1, limit)).ToListAsync();
     }
 
+    // Name-only lookups for the MusicBrainz id cache. A provider is handed the
+    // artist and album as text — it never sees an id — so this is the only handle
+    // it has, and it is the same handle the scanner groups by.
+    public Task<Artist?> FindArtistByNameAsync(string name) =>
+        _context.Artists.FirstOrDefaultAsync(a => a.Name == name);
+
+    public Task<Album?> FindAlbumByArtistAndTitleAsync(string artistName, string albumTitle) =>
+        _context.Albums
+            .Where(a => a.Title == albumTitle && a.Artist.Name == artistName)
+            .FirstOrDefaultAsync();
+
     public async Task<List<MusicSearchResultVM>> SearchAsync(string query, MusicAccessFilter access, int limit)
     {
         var searchPattern = $"%{query}%";
