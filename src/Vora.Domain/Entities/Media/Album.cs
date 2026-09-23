@@ -1,4 +1,4 @@
-using Vora.Domain.Entities.Common;
+﻿using Vora.Domain.Entities.Common;
 using Vora.Domain.Entities.Library;
 
 namespace Vora.Domain.Entities.Media;
@@ -8,6 +8,11 @@ public class Album : LockableEntity
     public Guid Id { get; set; } = Guid.NewGuid();
     public required string Title { get; set; }
     public string? SortTitle { get; set; }
+
+    // The MusicBrainz RELEASE-GROUP id, which is what both Fanart.tv and the
+    // Cover Art Archive key album artwork by. Kept for the same reason as the
+    // artist's: resolving it is a rate-limited search.
+    public string? MusicBrainzId { get; set; }
     public int? Year { get; set; }
     public string? Genre { get; set; }
     public string? ArtworkUrl { get; set; }

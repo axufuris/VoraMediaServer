@@ -349,6 +349,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMediaDedupeRepository, MediaDedupeRepository>();
         services.AddScoped<IMediaRepository, MediaRepository>();
         services.AddScoped<IMusicRepository, MusicRepository>();
+        services.AddScoped<Vora.Plugins.Interfaces.IMusicBrainzIdCache, Vora.Application.Media.MusicBrainzIdCache>();
         services.AddScoped<IMusicRecommendationRepository, MusicRecommendationRepository>();
         services.AddScoped<IOpenAiRecommendationRepository, OpenAiRecommendationRepository>();
         services.AddScoped<IAiUsageRepository, AiUsageRepository>();

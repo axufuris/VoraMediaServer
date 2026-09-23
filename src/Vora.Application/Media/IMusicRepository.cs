@@ -25,6 +25,8 @@ public interface IMusicRepository
     Task<(List<Album> Albums, int Total)> GetAlbumsPageAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit);
 
     Task<Artist?> GetArtistByNameAsync(Guid libraryId, string name);
+    Task<Artist?> FindArtistByNameAsync(string name);
+    Task<Album?> FindAlbumByArtistAndTitleAsync(string artistName, string albumTitle);
     Task<Album?> GetAlbumByTitleAsync(Guid artistId, string title);
     Task<Track?> GetTrackByAlbumAndNumberAsync(Guid albumId, int trackNumber, int? discNumber);
     Task AddArtistAsync(Artist artist);
