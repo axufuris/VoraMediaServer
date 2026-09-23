@@ -35,20 +35,25 @@ export default function MusicArtistView({
     return (
         <>
             {currentArtist && (() => {
-                // Each image gets one slot that suits its shape, so none of them is
-                // left with nowhere to go.
+                // Each image gets the slot its SHAPE suits.
                 //
-                //   background (16:9)  -> the backdrop, cropped to fill
-                //   banner     (5:1)   -> the title, drawn whole
-                //   clear logo (wide)  -> the title, preferred over the banner
+                //   banner     (5:1)   -> the backdrop, which is a wide strip
+                //   background (16:9)  -> the backdrop only if there is no banner
+                //   clear logo (wide)  -> the title, drawn whole
                 //   artwork    (square)-> the round avatar
                 //
-                // Backdrop and title are different slots, so a background and a
-                // banner now appear together instead of one hiding the other. Logo
-                // and banner do compete, but they are both the artist's name set as
-                // an image, so that is a fallback chain rather than a lost image.
-                const heroBackdrop = currentArtist.backgroundUrl;
-                const titleImage = currentArtist.clearLogoUrl || currentArtist.bannerUrl;
+                // The banner leads because the header is a ~12:1 strip and the
+                // banner is the only artwork drawn to be one. Filling that strip
+                // with a 16:9 background scales it to the strip's width and crops
+                // away everything but a horizontal sliver of the middle — at this
+                // width a shirt and half a logo, which is not recognisable as the
+                // picture it came from. A 5:1 banner loses a fraction of that.
+                //
+                // The background is kept as the fallback rather than dropped: a
+                // badly cropped image still reads better than the flat gradient,
+                // and some artists have one and no banner.
+                const heroBackdrop = currentArtist.bannerUrl || currentArtist.backgroundUrl;
+                const titleImage = currentArtist.clearLogoUrl;
                 const hasArtwork = !!currentArtist.artworkUrl;
                 return (
                     <div className="relative w-full rounded-lg overflow-hidden mb-6 border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)]" style={{ minHeight: '13rem' }}>
@@ -71,9 +76,9 @@ export default function MusicArtistView({
                                     <div className="text-xs uppercase tracking-widest text-[var(--vora-text-secondary)] font-bold mb-1">Artist</div>
                                     {titleImage ? (
                                         // object-contain with a height cap, never
-                                        // object-cover: a 5:1 banner cropped to fill
-                                        // a box loses its middle to the edges, which
-                                        // is what made it read as a broken backdrop.
+                                        // object-cover: a wordmark cropped to fill a
+                                        // box loses the ends of the name, and the
+                                        // name is the whole point of the image.
                                         <img
                                             src={titleImage}
                                             alt={currentArtist.name}
