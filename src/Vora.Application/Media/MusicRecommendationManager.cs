@@ -115,6 +115,12 @@ public class MusicRecommendationManager : IMusicRecommendationManager
     private const int TopArtistsWindowDays = 90;
     private const int TopArtistsLimit = 50;
     private const int BecauseYouPlayedWindowDays = 7;
+
+    // The row scrolls horizontally, so its length is not bounded by what fits on
+    // screen. It was 6 with at most 2 per album, which on a three-album artist is
+    // three pairs of identical-looking covers and nothing else.
+    private const int BecauseYouPlayedRowSize = 24;
+    private const int BecauseYouPlayedMaxPerAlbum = 3;
     private const int RecentDriftWindowDays = 7;
 
     private readonly IMusicRecommendationRepository _repo;
@@ -198,7 +204,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         var rows = new List<BecauseYouPlayedRowVM>();
         foreach (var seedArtist in topArtists)
         {
-            var seedTracks = await _repo.GetTopTracksByArtistAsync(seedArtist.ArtistId, access, profileId, limit: 6, maxPerAlbum: 2);
+            var seedTracks = await _repo.GetTopTracksByArtistAsync(seedArtist.ArtistId, access, profileId, BecauseYouPlayedRowSize, BecauseYouPlayedMaxPerAlbum);
             if (seedTracks.Count == 0) continue;
 
             var rowTracks = seedTracks.ToList();

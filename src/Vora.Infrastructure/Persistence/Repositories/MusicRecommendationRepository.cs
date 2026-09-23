@@ -175,15 +175,41 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
             playCounts = new Dictionary<Guid, int>();
         }
 
-        return tracks
+        var ranked = tracks
             .OrderByDescending(t => playCounts.TryGetValue(t.Id, out var c) ? c : 0)
-            .ThenBy(t => t.AlbumId)
             .ThenBy(t => t.DiscNumber ?? 1)
             .ThenBy(t => t.TrackNumber)
-            .GroupBy(t => t.AlbumId ?? Guid.Empty)
-            .SelectMany(g => g.Take(maxPerAlbum))
-            .Take(limit)
             .ToList();
+
+        // GroupBy keeps groups in first-appearance order, so the album holding
+        // the most-played track leads.
+        var perAlbum = ranked
+            .GroupBy(t => t.AlbumId ?? Guid.Empty)
+            .Select(g => g.Take(maxPerAlbum).ToList())
+            .ToList();
+
+        // One track from each album, then a second from each, rather than every
+        // track of one album before the next. A row tiles tracks under their
+        // ALBUM cover, so consecutive picks from one album drew the same image
+        // twice in a row and read as a duplicated entry rather than as two
+        // different songs. Interleaving keeps the same tracks and stops any cover
+        // repeating until every other album has had a turn.
+        var interleaved = new List<Track>(Math.Min(limit, ranked.Count));
+        for (var depth = 0; interleaved.Count < limit; depth++)
+        {
+            var placedAny = false;
+            foreach (var album in perAlbum)
+            {
+                if (depth >= album.Count) continue;
+                interleaved.Add(album[depth]);
+                placedAny = true;
+                if (interleaved.Count == limit) break;
+            }
+
+            if (!placedAny) break;
+        }
+
+        return interleaved;
     }
 
     public async Task<Dictionary<Guid, List<string>>> GetGenresForArtistsAsync(IEnumerable<Guid> artistIds)
