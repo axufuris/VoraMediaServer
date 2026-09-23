@@ -35,11 +35,20 @@ export default function MusicArtistView({
     return (
         <>
             {currentArtist && (() => {
-                // Background first. A banner is a 5:1 strip and this hero is a wide
-                // BOX, so object-cover crops a banner to its middle sliver and it
-                // reads as a badly framed background — while the real background,
-                // which is the right shape for the slot, never gets shown at all.
-                const heroBackdrop = currentArtist.backgroundUrl || currentArtist.bannerUrl;
+                // Each image gets one slot that suits its shape, so none of them is
+                // left with nowhere to go.
+                //
+                //   background (16:9)  -> the backdrop, cropped to fill
+                //   banner     (5:1)   -> the title, drawn whole
+                //   clear logo (wide)  -> the title, preferred over the banner
+                //   artwork    (square)-> the round avatar
+                //
+                // Backdrop and title are different slots, so a background and a
+                // banner now appear together instead of one hiding the other. Logo
+                // and banner do compete, but they are both the artist's name set as
+                // an image, so that is a fallback chain rather than a lost image.
+                const heroBackdrop = currentArtist.backgroundUrl;
+                const titleImage = currentArtist.clearLogoUrl || currentArtist.bannerUrl;
                 const hasArtwork = !!currentArtist.artworkUrl;
                 return (
                     <div className="relative w-full rounded-lg overflow-hidden mb-6 border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)]" style={{ minHeight: '13rem' }}>
@@ -60,12 +69,15 @@ export default function MusicArtistView({
                             <div className="flex-1 min-w-0 flex flex-col justify-end gap-3">
                                 <div>
                                     <div className="text-xs uppercase tracking-widest text-[var(--vora-text-secondary)] font-bold mb-1">Artist</div>
-                                    {currentArtist.clearLogoUrl ? (
+                                    {titleImage ? (
+                                        // object-contain with a height cap, never
+                                        // object-cover: a 5:1 banner cropped to fill
+                                        // a box loses its middle to the edges, which
+                                        // is what made it read as a broken backdrop.
                                         <img
-                                            src={currentArtist.clearLogoUrl}
+                                            src={titleImage}
                                             alt={currentArtist.name}
-                                            className="max-h-16 sm:max-h-20 max-w-full object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]"
-                                            style={{ objectPosition: 'left center' }}
+                                            className="max-h-16 sm:max-h-20 max-w-full w-auto object-contain object-left drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]"
                                         />
                                     ) : (
                                         <h2 className="text-3xl sm:text-4xl font-bold text-[var(--vora-text-primary)] drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] truncate">{currentArtist.name}</h2>
