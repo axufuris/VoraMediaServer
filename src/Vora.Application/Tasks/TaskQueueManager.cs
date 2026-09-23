@@ -15,6 +15,7 @@ using Vora.Application.Recommendations;
 using Vora.Application.Tasks.Dtos;
 using Vora.Application.Tasks.ViewModels;
 using Vora.Domain.Enums;
+using Vora.Domain.Entities.Library;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -957,7 +958,18 @@ public class TaskQueueManager : ITaskQueueManager
         // chained to the thumbnail step above, so either can be off with the
         // other on. Queued rather than run inline: the pass parks while anything
         // is transcoding, which must not hold a scan open.
-        if ((await sp.GetRequiredService<Vora.Application.Settings.ISystemSettingsRepository>().GetSettingsAsync()).PreExtractSubtitlesOnScan)
+        //
+        // Only for libraries that hold video. A music scan used to queue one too:
+        // it found nothing, since the target query matches Movie and Episode
+        // parts only, but it still showed up in the task list as "Pre-extract
+        // Subtitles: Music" and sat Pending behind the real job, because every
+        // subtitle task shares one resource key and runs at concurrency 1.
+        var subtitleLibraryType = await sp.GetRequiredService<ILibraryRepository>()
+            .GetProjectedByIdAsync(libraryId, l => (LibraryType?)l.Type);
+
+        if (subtitleLibraryType.HasValue
+            && subtitleLibraryType.Value.HasVideoContent()
+            && (await sp.GetRequiredService<Vora.Application.Settings.ISystemSettingsRepository>().GetSettingsAsync()).PreExtractSubtitlesOnScan)
         {
             sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractLibrarySubtitles(libraryId, libraryName);
         }

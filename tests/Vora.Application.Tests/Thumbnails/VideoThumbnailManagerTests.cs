@@ -58,17 +58,6 @@ public class VideoThumbnailManagerTests
             NullLogger<VideoThumbnailManager>.Instance);
     }
 
-    [Theory]
-    [InlineData(LibraryType.Movie, true)]
-    [InlineData(LibraryType.TvShow, true)]
-    [InlineData(LibraryType.HomeVideo, true)]
-    [InlineData(LibraryType.Music, false)]
-    [InlineData(LibraryType.LiveTv, false)]
-    public void IsVideoBearingLibrary_classifies_library_types(LibraryType type, bool expected)
-    {
-        VideoThumbnailManager.IsVideoBearingLibrary(type).Should().Be(expected);
-    }
-
     [Fact]
     public void ComputeSpriteVersion_is_deterministic_for_same_inputs()
     {

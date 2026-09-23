@@ -10,6 +10,7 @@ using Vora.Application.Metadata;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Application.Thumbnails;
+using Vora.Domain.Entities.Library;
 
 namespace Vora.Infrastructure.Workers;
 
@@ -169,7 +170,7 @@ public class ScheduledJobWorker : BackgroundService
             foreach (var lib in thumbnailLibraries)
             {
                 if (!lib.EnableVideoPreviewThumbnails) continue;
-                if (!VideoThumbnailManager.IsVideoBearingLibrary(lib.Type)) continue;
+                if (!lib.Type.HasVideoContent()) continue;
                 taskQueue.QueueGenerateLibraryVideoThumbnails(lib.Id, lib.Name, isScheduleTrigger: true);
             }
 
