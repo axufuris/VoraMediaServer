@@ -288,10 +288,15 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                 { id: 'banner', label: 'Banner' },
                 { id: 'logo', label: 'Clear Logo' },
             ]
+            // No album Background tab. No artwork provider offers one — Fanart.tv's
+            // music API has artistbackground but no album equivalent, and
+            // TheAudioDB has no album fanart — so the tab could only ever show an
+            // empty slot and a Browse button that returns nothing. Album.BackgroundUrl,
+            // the Background kind and the album header that renders it all stay,
+            // so a plugin that can supply one needs no further change here.
             : [
                 { id: 'details', label: 'Details' },
                 { id: 'image', label: 'Cover Art' },
-                { id: 'background', label: 'Background' },
                 { id: 'logo', label: 'Disc Art' },
             ];
 
@@ -491,21 +496,6 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                                 }
                                 return result.updated;
                             } : undefined}
-                        />
-                    )}
-
-                    {kind === 'album' && activeTab === 'background' && (
-                        <ArtworkSection
-                            label="Background Image"
-                            shape="wide"
-                            artworkUrl={backgroundUrl}
-                            onUrlChange={setBackgroundUrl}
-                            onUploadClick={() => backgroundFileInputRef.current?.click()}
-                            uploading={uploadingBackground}
-                            isLocked={isLocked('BackgroundUrl')}
-                            onLockToggle={() => toggleLock('BackgroundUrl')}
-                            inputClassName={inputClass('BackgroundUrl')}
-                            onLoadSuggestions={suggestionsFor(['Background'])}
                         />
                     )}
 

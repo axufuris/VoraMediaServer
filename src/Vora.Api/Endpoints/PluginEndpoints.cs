@@ -34,8 +34,8 @@ public static class PluginEndpoints
         return Results.Ok(plugins);
     }
 
-    private static async Task<IResult> GetPluginOptionsAsync([FromQuery] string type, IPluginManager manager) =>
-        Results.Ok(await manager.GetPluginOptionsAsync(type));
+    private static async Task<IResult> GetPluginOptionsAsync([FromQuery] string type, [FromQuery] string? libraryType, IPluginManager manager) =>
+        Results.Ok(await manager.GetPluginOptionsAsync(type, libraryType));
 
     private static async Task<IResult> UploadPluginAsync(IFormFile file, IPluginManager manager)
     {

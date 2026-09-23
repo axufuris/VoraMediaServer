@@ -62,8 +62,12 @@ export const pluginAdminService = {
         return response.data;
     },
 
-    getArtworkProviders: async (serverId?: string): Promise<PluginOptionVM[]> => {
-        const response = await apiClient.get<PluginOptionVM[]>('/plugins/options?type=Artwork', { serverId });
+    // libraryType narrows the list to plugins that declare support for that kind,
+    // so a film's artwork picker does not offer the music providers. Trailing and
+    // optional, so callers that genuinely want every provider are unaffected.
+    getArtworkProviders: async (serverId?: string, libraryType?: string): Promise<PluginOptionVM[]> => {
+        const query = libraryType ? `?type=Artwork&libraryType=${encodeURIComponent(libraryType)}` : '?type=Artwork';
+        const response = await apiClient.get<PluginOptionVM[]>(`/plugins/options${query}`, { serverId });
         return response.data;
     },
 
