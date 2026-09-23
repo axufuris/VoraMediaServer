@@ -39,7 +39,8 @@ public partial class MediaRepository : IMediaRepository
     public Task<List<Guid>> GetMediaIdsMissingTvdbIdAsync() =>
         _context.MediaItems
             .AsNoTracking()
-            .Where(m => (m is Movie || m is TvShow) && m.TvdbId == null)
+            .Where(MediaCapabilities.HasProviderIdentity)
+            .Where(m => m.TvdbId == null)
             .Select(m => m.Id)
             .ToListAsync();
 
@@ -245,7 +246,8 @@ public partial class MediaRepository : IMediaRepository
     public Task<Vora.Application.Media.Dtos.MediaMatchInfoDto?> GetMediaMatchInfoAsync(Guid mediaItemId) =>
         _context.MediaItems
             .AsNoTracking()
-            .Where(m => m.Id == mediaItemId && (m is Movie || m is TvShow))
+            .Where(MediaCapabilities.HasProviderIdentity)
+            .Where(m => m.Id == mediaItemId)
             .Select(m => new Vora.Application.Media.Dtos.MediaMatchInfoDto
             {
                 TmdbId = m.TmdbId,
@@ -341,7 +343,7 @@ public partial class MediaRepository : IMediaRepository
     {
         var query = _context.MediaItems
             .AsNoTracking()
-            .Where(m => m is Movie || m is Episode)
+            .Where(MediaCapabilities.IsPlayableVideo)
             .Where(m => m.MissingSince == null)
             .Where(m =>
                 (m is Movie && m.LibraryId == libraryId) ||
@@ -648,7 +650,8 @@ public partial class MediaRepository : IMediaRepository
     public async Task<IEnumerable<Guid>> GetMediaIdsMissingMetadataAsync(Guid libraryId)
     {
         return await _context.MediaItems
-            .Where(m => m.LibraryId == libraryId && !(m is Track) &&
+            .Where(MediaCapabilities.SupportsMetadataEnrichment)
+            .Where(m => m.LibraryId == libraryId &&
                 (
                     m.LastMetadataRefresh == null
                     ||
@@ -681,7 +684,8 @@ public partial class MediaRepository : IMediaRepository
     public async Task<IEnumerable<Guid>> GetMediaIdsMissingArtworkAsync(Guid libraryId)
     {
         return await _context.MediaItems
-            .Where(m => m.LibraryId == libraryId && !(m is Track) && m.PosterUrl == null)
+            .Where(MediaCapabilities.SupportsMetadataEnrichment)
+            .Where(m => m.LibraryId == libraryId && m.PosterUrl == null)
             .Select(m => m.Id)
             .ToListAsync();
     }
@@ -706,8 +710,8 @@ public partial class MediaRepository : IMediaRepository
         var recheckCutoff = DateTime.UtcNow.AddDays(-RatingsRecheckDays);
 
         return await _context.MediaItems
+            .Where(MediaCapabilities.HasProviderIdentity)
             .Where(m => m.LibraryId == libraryId
-                && (m is Movie || m is TvShow)
                 && ((wantsRating1 && m.ThirdPartyRating1 == null) || (wantsRating2 && m.ThirdPartyRating2 == null))
                 && (m.RatingsCheckedAt == null || m.RatingsCheckedAt < recheckCutoff))
             .Select(m => m.Id)
@@ -791,7 +795,7 @@ public partial class MediaRepository : IMediaRepository
     {
         var playable = _context.MediaItems
             .AsNoTracking()
-            .Where(m => m is Movie || m is Episode)
+            .Where(MediaCapabilities.IsPlayableVideo)
             .Where(m => m.MissingSince == null)
             .Where(m =>
                 (m is Movie && m.LibraryId == libraryId) ||
@@ -820,7 +824,7 @@ public partial class MediaRepository : IMediaRepository
 
         var playable = _context.MediaItems
             .AsNoTracking()
-            .Where(m => m is Movie || m is Episode)
+            .Where(MediaCapabilities.IsPlayableVideo)
             .Where(m => m.MissingSince == null)
             .Where(m =>
                 (m is Movie && m.LibraryId == libraryId) ||
@@ -1002,7 +1006,7 @@ public partial class MediaRepository : IMediaRepository
 
         if (item.MediaParts.Count == 0)
         {
-            if (item is Track)
+            if (!item.CanBeSoftDeleted())
             {
                 _context.MediaItems.Remove(item);
             }

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.SmartLists;
 using Vora.Application.SmartLists.Dtos;
@@ -192,7 +192,7 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
 
         if (rules == null)
         {
-            return query.Where(m => m is Movie || m is TvShow);
+            return query.Where(MediaCapabilities.IsBrowsableTitle);
         }
 
         if (rules.GenreIds != null && rules.GenreIds.Any())
@@ -220,7 +220,7 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         }
         else
         {
-            query = query.Where(m => m is Movie || m is TvShow);
+            query = query.Where(MediaCapabilities.IsBrowsableTitle);
         }
 
         if (!string.IsNullOrEmpty(rules.ContentRating))
