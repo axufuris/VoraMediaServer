@@ -11,7 +11,7 @@ namespace Vora.Application.Plugins;
 public interface IPluginManager
 {
     Task<IEnumerable<PluginVM>> GetActivePluginsAsync();
-    Task<IEnumerable<PluginOptionVM>> GetPluginOptionsAsync(string type);
+    Task<IEnumerable<PluginOptionVM>> GetPluginOptionsAsync(string type, string? libraryType = null);
     Task<PluginConnectionTestResult> TestPluginConnectionAsync(string pluginId, IReadOnlyDictionary<string, string> settings);
     Task UploadPluginAsync(UploadedFile file);
     bool UninstallPlugin(string id);
@@ -95,10 +95,19 @@ public class PluginManager(
         }
     }
 
-    public async Task<IEnumerable<PluginOptionVM>> GetPluginOptionsAsync(string type)
+    // Plugins have always declared the library kinds they apply to and nothing
+    // ever read it, so an artwork picker for a movie listed the music artwork
+    // providers alongside the film ones. Filtering here rather than in each
+    // caller means every picker gets it, and the rule lives with the plugin
+    // contract that states it.
+    //
+    // An unrecognised or absent libraryType returns everything, so an existing
+    // caller that does not care keeps working.
+    public async Task<IEnumerable<PluginOptionVM>> GetPluginOptionsAsync(string type, string? libraryType = null)
     {
         var targetPlugins = plugins
             .Where(p => p.Type.Equals(type, StringComparison.OrdinalIgnoreCase))
+            .Where(p => AppliesToLibraryType(p, libraryType))
             .OrderBy(p => p.Id)
             .ToList();
 
@@ -135,6 +144,18 @@ public class PluginManager(
         }
 
         return validOptions;
+    }
+
+    private static bool AppliesToLibraryType(IVoraPlugin plugin, string? libraryType)
+    {
+        if (string.IsNullOrWhiteSpace(libraryType)) return true;
+
+        var supported = plugin.SupportedLibraryTypes?.ToList();
+        // A plugin that declares nothing is treated as applying everywhere, which
+        // is what the interface default already means.
+        if (supported == null || supported.Count == 0) return true;
+
+        return supported.Any(k => k.Equals(libraryType, StringComparison.OrdinalIgnoreCase));
     }
 
     public async Task UploadPluginAsync(UploadedFile file)

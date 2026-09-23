@@ -763,7 +763,7 @@ export default function MediaDetailsPage() {
                     onMatched={handleMatched}
                 />
             )}
-            <EditMetadataModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSaved={reloadMedia} itemId={media.id} type="media" initialData={{ ...media, lockedFields: media.lockedFields ?? [] }} />
+            <EditMetadataModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSaved={reloadMedia} itemId={media.id} type="media" libraryType={media.type === 'Movie' ? 'Movie' : 'TvShow'} initialData={{ ...media, lockedFields: media.lockedFields ?? [] }} />
             <AddToCollectionModal isOpen={isCollectionModalOpen} onClose={() => setIsCollectionModalOpen(false)} mediaId={media.id} libraryId={media.libraryId} mediaType={media.type} initialCollectionIds={media.collectionIds || []} onSaved={reloadMedia} />
             <AddToPlaylistModal isOpen={isPlaylistModalOpen} onClose={() => setIsPlaylistModalOpen(false)} mediaId={media.id} />
             <TrailerOverlay trailer={playingTrailer} onClose={() => setPlayingTrailer(null)} />

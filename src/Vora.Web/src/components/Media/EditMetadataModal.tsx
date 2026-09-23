@@ -14,11 +14,12 @@ interface EditMetadataModalProps {
     onSaved: () => void;
     itemId: string;
     type: 'media' | 'season';
+    libraryType?: string;
     initialData: UpdateMediaRequest & { lockedFields?: string[]; libraryArtworkProviderId?: string };
 }
 
 export default function EditMetadataModal({
-    isOpen, onClose, onSaved, itemId, type, initialData }: EditMetadataModalProps) {
+    isOpen, onClose, onSaved, itemId, type, libraryType, initialData }: EditMetadataModalProps) {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const [activeTab, setActiveTab] = useState<'general' | 'poster' | 'backdrop' | 'logo'>('general');
@@ -68,7 +69,7 @@ export default function EditMetadataModal({
 
     useEffect(() => {
         if (isOpen && type === 'media') {
-            pluginAdminService.getArtworkProviders(serverId).then(providers => {
+            pluginAdminService.getArtworkProviders(serverId, libraryType).then(providers => {
                 setArtworkProviders(providers);
                 // Pre-select the library's default provider (falling back to TMDB)
                 // so the dropdown names the provider the fetch actually uses,
@@ -79,7 +80,7 @@ export default function EditMetadataModal({
                 }
             }).catch(console.error);
         }
-    }, [isOpen, type, serverId, initialData.libraryArtworkProviderId]);
+    }, [isOpen, type, libraryType, serverId, initialData.libraryArtworkProviderId]);
 
     const handleFetchProvider = useCallback(() => {
         setLoadingArt(true);
