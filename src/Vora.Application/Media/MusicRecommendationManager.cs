@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Media.ViewModels;
 using Vora.Application.Settings;
@@ -30,6 +30,7 @@ public interface IMusicRecommendationManager
     Task<List<int>> GetYearsWithHistoryAsync(Guid profileId);
 
     Task<List<ArtistVM>> GetSimilarArtistsAsync(Guid artistId, MusicAccessFilter access, CancellationToken cancellationToken);
+    Task<List<ArtistVM>> GetCoPlayedArtistsAsync(Guid artistId, MusicAccessFilter access);
     Task<List<string>> GetArtistTagsAsync(Guid artistId, CancellationToken cancellationToken);
 
     Task RefreshWeeklyMixesForAllAsync(CancellationToken cancellationToken);
@@ -880,6 +881,19 @@ public class MusicRecommendationManager : IMusicRecommendationManager
     };
 
     private static readonly TimeSpan SimilarityCacheTtl = TimeSpan.FromDays(30);
+    private const int CoPlayedArtistLimit = 12;
+
+    // Kept separate from GetSimilarArtistsAsync rather than blended into it. That
+    // one is Last.fm's global opinion of what sounds alike; this is what this
+    // server actually plays alongside the artist. Merging them would put two
+    // different claims under one heading, and a server with little history would
+    // silently shift the meaning of the row rather than simply not showing this
+    // one.
+    public async Task<List<ArtistVM>> GetCoPlayedArtistsAsync(Guid artistId, MusicAccessFilter access)
+    {
+        var artists = await _musicRepo.GetCoPlayedArtistsAsync(artistId, access, CoPlayedArtistLimit);
+        return artists.Select(MapArtistVm).ToList();
+    }
 
     public async Task<List<ArtistVM>> GetSimilarArtistsAsync(Guid artistId, MusicAccessFilter access, CancellationToken cancellationToken)
     {
