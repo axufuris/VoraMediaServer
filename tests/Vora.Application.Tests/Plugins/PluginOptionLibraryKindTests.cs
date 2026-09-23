@@ -103,6 +103,19 @@ public class PluginOptionLibraryKindTests
         result.Select(o => o.Id).Should().BeEquivalentTo(new[] { "anything" });
     }
 
+    // A picker that narrows results by provider matches on ProviderName, which is
+    // what a result calls itself — "Fanart.tv" where Name is "Fanart.tv Music
+    // Artwork". Surfacing only Name would give it nothing to match on.
+    [Fact]
+    public async Task Carries_the_name_a_result_identifies_itself_by()
+    {
+        var manager = Build(Artwork("music_art", LibraryKind.Music));
+
+        var option = (await manager.GetPluginOptionsAsync("Artwork", "Music")).Single();
+
+        option.ProviderName.Should().NotBeNullOrWhiteSpace();
+    }
+
     [Fact]
     public async Task Still_filters_by_plugin_type_first()
     {

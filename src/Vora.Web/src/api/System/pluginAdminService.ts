@@ -21,11 +21,27 @@ export interface PluginVM {
 export interface PluginOptionVM {
     id: string;
     name: string;
+    // What the plugin calls itself in results it returns — "Fanart.tv" where
+    // name is "Fanart.tv Music Artwork". Match results on this, not on name.
+    providerName: string;
     externalIdLabel: string;
     externalIdPlaceholder: string;
     isAiPlugin: boolean;
     supportedLibraryTypes: string[];
 }
+
+// libraryType narrows a provider list to the plugins that declare support for
+// that kind, so a film's picker does not offer the music providers.
+//
+// The filtering itself is deliberately NOT done here. Every caller sends the kind
+// and the server applies one rule, because the rule previously existed in three
+// places — this file's callers filtered client-side, twice, with different type
+// derivations and different case sensitivity — and three copies of a rule is
+// three chances for it to drift.
+const optionsQuery = (type: string, libraryType?: string) =>
+    libraryType
+        ? `?type=${encodeURIComponent(type)}&libraryType=${encodeURIComponent(libraryType)}`
+        : `?type=${encodeURIComponent(type)}`;
 
 export const pluginAdminService = {
     getPlugins: async (serverId?: string): Promise<PluginVM[]> => {
@@ -52,22 +68,18 @@ export const pluginAdminService = {
         return response.data;
     },
 
-    getMetadataProviders: async (serverId?: string): Promise<PluginOptionVM[]> => {
-        const response = await apiClient.get<PluginOptionVM[]>('/plugins/options?type=Metadata', { serverId });
+    getMetadataProviders: async (serverId?: string, libraryType?: string): Promise<PluginOptionVM[]> => {
+        const response = await apiClient.get<PluginOptionVM[]>(`/plugins/options${optionsQuery('Metadata', libraryType)}`, { serverId });
         return response.data;
     },
 
-    getRatingsProviders: async (serverId?: string): Promise<PluginOptionVM[]> => {
-        const response = await apiClient.get<PluginOptionVM[]>('/plugins/options?type=Ratings', { serverId });
+    getRatingsProviders: async (serverId?: string, libraryType?: string): Promise<PluginOptionVM[]> => {
+        const response = await apiClient.get<PluginOptionVM[]>(`/plugins/options${optionsQuery('Ratings', libraryType)}`, { serverId });
         return response.data;
     },
 
-    // libraryType narrows the list to plugins that declare support for that kind,
-    // so a film's artwork picker does not offer the music providers. Trailing and
-    // optional, so callers that genuinely want every provider are unaffected.
     getArtworkProviders: async (serverId?: string, libraryType?: string): Promise<PluginOptionVM[]> => {
-        const query = libraryType ? `?type=Artwork&libraryType=${encodeURIComponent(libraryType)}` : '?type=Artwork';
-        const response = await apiClient.get<PluginOptionVM[]>(`/plugins/options${query}`, { serverId });
+        const response = await apiClient.get<PluginOptionVM[]>(`/plugins/options${optionsQuery('Artwork', libraryType)}`, { serverId });
         return response.data;
     },
 

@@ -240,12 +240,18 @@ export default function ManageLibrary() {
 
     useEffect(() => {
         if (id) {
-            Promise.all([
-                libraryService.getLibraryById(id, serverId),
-                pluginAdminService.getMetadataProviders(serverId),
-                pluginAdminService.getRatingsProviders(serverId),
-                pluginAdminService.getArtworkProviders(serverId),
-            ]).then(([lib, meta, ratings, artwork]) => {
+            // The library is fetched first because its type decides which plugins
+            // apply, and that decision is the server's to make — asking for the
+            // full list and filtering it here is what let the rule exist in three
+            // places at once.
+            libraryService.getLibraryById(id, serverId).then(async lib => {
+                const [meta, ratings, artwork] = await Promise.all([
+                    pluginAdminService.getMetadataProviders(serverId, lib.type),
+                    pluginAdminService.getRatingsProviders(serverId, lib.type),
+                    pluginAdminService.getArtworkProviders(serverId, lib.type),
+                ]);
+                return [lib, meta, ratings, artwork] as const;
+            }).then(([lib, meta, ratings, artwork]) => {
                 setLibrary(lib);
                 setProviders(meta);
                 setRatingProviders(ratings);
@@ -326,10 +332,10 @@ export default function ManageLibrary() {
         }
     };
 
-    const currentTypeStr = library.type.toString();
-    const availableMetadataProviders = providers.filter(p => !p.supportedLibraryTypes || p.supportedLibraryTypes.includes(currentTypeStr));
-    const availableRatingProviders = ratingProviders.filter(p => !p.supportedLibraryTypes || p.supportedLibraryTypes.includes(currentTypeStr));
-    const availableArtworkProviders = artworkProviders.filter(p => !p.supportedLibraryTypes || p.supportedLibraryTypes.includes(currentTypeStr));
+    // Already narrowed to this library's type by the server.
+    const availableMetadataProviders = providers;
+    const availableRatingProviders = ratingProviders;
+    const availableArtworkProviders = artworkProviders;
     const isTvShow = library.type.toLowerCase() === 'tvshow';
     const showVideoOptions = library.type.toLowerCase() === 'movie' || library.type.toLowerCase() === 'tvshow';
     const showVideoPreviewThumbnails = library.type.toLowerCase() === 'movie' || library.type.toLowerCase() === 'tvshow' || library.type.toLowerCase() === 'homevideo';
