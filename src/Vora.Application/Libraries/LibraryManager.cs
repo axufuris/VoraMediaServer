@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Vora.Application.Analysis;
 using Vora.Application.Libraries.Requests;
 using Vora.Application.Libraries.ViewModels;
@@ -66,7 +66,7 @@ public class LibraryManager : ILibraryManager
 
             FindExtras = request.FindExtras,
             OnlyShowTrailers = request.OnlyShowTrailers,
-            EnableVideoPreviewThumbnails = request.EnableVideoPreviewThumbnails && Vora.Application.Thumbnails.VideoThumbnailManager.IsVideoBearingLibrary(request.Type),
+            EnableVideoPreviewThumbnails = request.EnableVideoPreviewThumbnails && request.Type.HasVideoContent(),
             EnableCreditsDetection = request.EnableCreditsDetection,
             EnablePreviewDetection = request.EnablePreviewDetection,
             MinimumCollectionSize = request.MinimumCollectionSize,
@@ -133,7 +133,7 @@ public class LibraryManager : ILibraryManager
 
         bool artworkProviderChanged = library.ArtworkProviderId != request.ArtworkProviderId;
         var requestedThumbnails = request.EnableVideoPreviewThumbnails &&
-            Vora.Application.Thumbnails.VideoThumbnailManager.IsVideoBearingLibrary(library.Type);
+            library.Type.HasVideoContent();
         bool thumbnailsTurnedOff = library.EnableVideoPreviewThumbnails && !requestedThumbnails;
 
         library.Name = request.Name;

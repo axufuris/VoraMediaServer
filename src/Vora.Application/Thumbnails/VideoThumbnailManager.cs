@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +9,7 @@ using Vora.Application.Media;
 using Vora.Application.Settings;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Enums;
+using Vora.Domain.Entities.Library;
 
 namespace Vora.Application.Thumbnails;
 
@@ -87,7 +88,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
     public async Task TriggerLibraryThumbnailGenerationAsync(Guid libraryId, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false, CancellationToken cancellationToken = default)
     {
         var (libraryType, enabled) = await GetLibraryThumbnailStateAsync(libraryId);
-        if (!IsVideoBearingLibrary(libraryType)) return;
+        if (!libraryType.HasVideoContent()) return;
         if (!enabled && !forceOverride) return;
 
         // On a non-forced run only pull the items that still need thumbnails
@@ -166,7 +167,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
     public async Task<(int Total, int WithThumbnails)> GetCoverageAsync(Guid libraryId)
     {
         var (libraryType, _) = await GetLibraryThumbnailStateAsync(libraryId);
-        if (!IsVideoBearingLibrary(libraryType)) return (0, 0);
+        if (!libraryType.HasVideoContent()) return (0, 0);
 
         return await _mediaRepository.GetVideoThumbnailCoverageAsync(libraryId);
     }
@@ -258,7 +259,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         });
 
         if (meta == null) return;
-        if (!IsVideoBearingLibrary(meta.LibraryType)) return;
+        if (!meta.LibraryType.HasVideoContent()) return;
         if (!meta.LibraryEnabled && !forceOverride) return;
         if (meta.LockedFields != null && meta.LockedFields.Contains(ThumbnailsLockField, StringComparer.OrdinalIgnoreCase)) return;
 
@@ -451,9 +452,6 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         });
         return meta == null ? (LibraryType.Movie, false) : (meta.Type, meta.Enabled);
     }
-
-    public static bool IsVideoBearingLibrary(LibraryType type) =>
-        type == LibraryType.Movie || type == LibraryType.TvShow || type == LibraryType.HomeVideo;
 
     internal static string ComputeSpriteVersion(int interval, int width, int height, int quality, int columns)
     {

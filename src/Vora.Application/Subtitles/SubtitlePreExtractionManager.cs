@@ -4,6 +4,7 @@ using Vora.Application.Media;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
 using Vora.Domain.Enums;
+using Vora.Domain.Entities.Library;
 
 namespace Vora.Application.Subtitles;
 
@@ -72,7 +73,7 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
 
         var libraries = await _libraryRepository.GetAllProjectedAsync(l => new { l.Id, l.Type });
         var videoLibraries = libraries
-            .Where(l => Thumbnails.VideoThumbnailManager.IsVideoBearingLibrary(l.Type))
+            .Where(l => l.Type.HasVideoContent())
             .Select(l => l.Id)
             .ToList();
 
