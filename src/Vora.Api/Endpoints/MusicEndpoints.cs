@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Vora.Api.Extensions;
@@ -553,9 +553,11 @@ public static class MusicEndpoints
         return Results.Ok(artists);
     }
 
-    private static async Task<IResult> GetAlbumsAsync([FromQuery] Guid? libraryId, [FromQuery] AlbumSortOrder? sort, [FromQuery] int? offset, [FromQuery] int? limit, ClaimsPrincipal user, IMusicManager manager)
+    // q, not "search" or "query", because GET /api/music/search already calls it
+    // q and a second convention for the same idea is one the caller has to learn.
+    private static async Task<IResult> GetAlbumsAsync([FromQuery] Guid? libraryId, [FromQuery] AlbumSortOrder? sort, [FromQuery] int? offset, [FromQuery] int? limit, [FromQuery] string? q, ClaimsPrincipal user, IMusicManager manager)
     {
-        var page = await manager.GetAlbumsAsync(libraryId, BuildFilter(user), sort ?? AlbumSortOrder.RecentlyAdded, offset ?? 0, limit ?? MusicManager.DefaultAlbumPageSize);
+        var page = await manager.GetAlbumsAsync(libraryId, BuildFilter(user), sort ?? AlbumSortOrder.RecentlyAdded, offset ?? 0, limit ?? MusicManager.DefaultAlbumPageSize, q);
         return Results.Ok(page);
     }
 

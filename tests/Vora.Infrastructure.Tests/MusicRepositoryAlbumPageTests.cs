@@ -44,6 +44,25 @@ public class MusicRepositoryAlbumPageTests
         return new Shelf { Db = db, Library = library, Artist = artist };
     }
 
+    // Every call that exists today passes no term. The parameter is optional, so
+    // this pins that the two spellings are the same call and cannot drift.
+    [Fact]
+    public async Task An_absent_term_and_an_explicit_null_are_the_same_query()
+    {
+        await using var db = NewContext();
+        var shelf = NewShelf(db);
+        shelf.Album("Old", 1);
+        shelf.Album("Newest", 30);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var repository = new MusicRepository(db);
+        var absent = await repository.GetAlbumsPageAsync(null, MusicAccessFilter.Unrestricted, AlbumSortOrder.RecentlyAdded, 0, 10);
+        var explicitNull = await repository.GetAlbumsPageAsync(null, MusicAccessFilter.Unrestricted, AlbumSortOrder.RecentlyAdded, 0, 10, null);
+
+        explicitNull.Total.Should().Be(absent.Total);
+        explicitNull.Albums.Select(a => a.Title).Should().Equal(absent.Albums.Select(a => a.Title));
+    }
+
     [Fact]
     public async Task Recently_added_lists_the_newest_albums_first_with_their_artist()
     {

@@ -8,6 +8,11 @@ namespace Vora.Infrastructure.Persistence.Repositories;
 
 public class MusicRepository : IMusicRepository
 {
+    // Postgres defaults LIKE's escape character to backslash, but passing it
+    // explicitly means the escaping in EscapeLikePattern cannot be silently
+    // undone by a server configured otherwise.
+    private const string LikeEscapeCharacter = "\\";
+
     private readonly VoraDbContext _context;
 
     public MusicRepository(VoraDbContext context)
@@ -344,7 +349,13 @@ public class MusicRepository : IMusicRepository
             .ToListAsync();
     }
 
-    public async Task<(List<Album> Albums, int Total)> GetAlbumsPageAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit)
+    // A user typing % or _ means those characters, not "match anything" and
+    // "match one of anything". Backslash goes first, or it would escape the
+    // escapes added after it.
+    internal static string EscapeLikePattern(string term) =>
+        term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+
+    public async Task<(List<Album> Albums, int Total)> GetAlbumsPageAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit, string? search = null)
     {
         IQueryable<Album> query = _context.Albums.AsNoTracking();
         if (libraryId.HasValue)
@@ -359,6 +370,21 @@ public class MusicRepository : IMusicRepository
             .Select(t => t.AlbumId);
 
         query = query.Where(a => playableAlbumIds.Contains(a.Id));
+
+        // After the access filters and before the count, so a search can only ever
+        // narrow what the profile could already see, and Total counts matches
+        // rather than the library — otherwise the client pages through a total it
+        // will never reach.
+        //
+        // Title OR artist name, because the card's primary label is the artist and
+        // its secondary is the album, so a user typing either expects a hit.
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{EscapeLikePattern(search.Trim())}%";
+            query = query.Where(a =>
+                EF.Functions.ILike(a.Title, pattern, LikeEscapeCharacter)
+                || EF.Functions.ILike(a.Artist.Name, pattern, LikeEscapeCharacter));
+        }
 
         var total = await query.CountAsync();
 
