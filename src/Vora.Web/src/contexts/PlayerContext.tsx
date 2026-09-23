@@ -6,6 +6,7 @@ import { serverVault } from '../utils/serverVault';
 import { audioQualityStore, crossfadeStore, eqPresetStore, EQ_PRESETS } from '../utils/audioQuality';
 import { StorageKeys } from '../utils/storageKeys';
 import { usesNowPlayingScreen } from '../utils/nowPlayingScreen';
+import { playQualifies } from '../utils/playQualification';
 import { useDialog } from '../dialogs';
 import {
     PlayerContext,
@@ -15,6 +16,14 @@ import {
     type PlayerContextType,
     type PlayerTimeContextType,
 } from './usePlayer';
+
+interface PendingPlay {
+    trackId: string;
+    serverId?: string;
+    furthestSeconds: number;
+    trackDuration: number;
+    completed: boolean;
+}
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
     const dialog = useDialog();
@@ -50,17 +59,51 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
     const linearQueueRef = useRef<PlayableMedia[]>([]);
 
-    const recordedPlayTrackIdRef = useRef<string | null>(null);
+    // The listen in progress. It is posted when the track ENDS rather than the
+    // moment it qualifies, because the old code recorded at the thirty-second
+    // mark and then blocked itself from recording again — so every row stored
+    // "30 seconds, not completed" no matter how much was really heard, and the
+    // depth of a listen was never captured even though the column existed.
+    const pendingPlayRef = useRef<PendingPlay | null>(null);
+
+    const flushPendingPlay = useCallback(() => {
+        const pending = pendingPlayRef.current;
+        pendingPlayRef.current = null;
+        if (!pending) return;
+        if (!playQualifies(pending.furthestSeconds, pending.trackDuration)) return;
+
+        musicService
+            .recordPlay(pending.trackId, Math.floor(pending.furthestSeconds), pending.completed, pending.serverId)
+            .catch(() => { /* ignore */ });
+    }, []);
+
     const currentServerIdRef = useRef<string | undefined>(undefined);
     useEffect(() => {
         currentServerIdRef.current = currentMedia?.serverId;
     }, [currentMedia?.serverId]);
     useEffect(() => {
-        recordedPlayTrackIdRef.current = null;
+        // Runs after currentMedia has already changed, so the pending listen still
+        // belongs to the track being left.
+        flushPendingPlay();
         if (currentMedia?.playbackContextType === 'Music' && currentMedia.id) {
+            pendingPlayRef.current = {
+                trackId: currentMedia.id,
+                serverId: currentMedia.serverId,
+                furthestSeconds: 0,
+                trackDuration: 0,
+                completed: false,
+            };
             musicService.updateNowPlaying(currentMedia.id, currentMedia.serverId).catch(() => { /* ignore */ });
         }
-    }, [currentMedia?.id, currentMedia?.serverId, currentMedia?.playbackContextType]);
+    }, [currentMedia?.id, currentMedia?.serverId, currentMedia?.playbackContextType, flushPendingPlay]);
+
+    // Closing the tab mid-track would otherwise throw the listen away, and a
+    // track someone played out and then closed is the strongest signal there is.
+    useEffect(() => {
+        const onPageHide = () => flushPendingPlay();
+        window.addEventListener('pagehide', onPageHide);
+        return () => window.removeEventListener('pagehide', onPageHide);
+    }, [flushPendingPlay]);
 
     useEffect(() => {
         if (currentMedia?.playbackContextType !== 'Music' || !currentMedia.id) return;
@@ -340,15 +383,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const updateTime = () => {
             setCurrentTime(video.currentTime);
             const media = currentMediaRef.current;
-            if (media?.playbackContextType === 'Music' && media.id) {
-                if (recordedPlayTrackIdRef.current !== media.id) {
-                    const t = video.currentTime;
-                    const d = video.duration || 0;
-                    if (t >= 30 || (d > 0 && t / d >= 0.5)) {
-                        recordedPlayTrackIdRef.current = media.id;
-                        musicService.recordPlay(media.id, Math.floor(t), false, media.serverId).catch(() => { /* ignore */ });
-                    }
-                }
+            const pending = pendingPlayRef.current;
+            if (media?.playbackContextType === 'Music' && media.id && pending?.trackId === media.id) {
+                // Furthest reached, not latest: seeking backwards to replay a
+                // passage should not reduce how much of the track was heard.
+                pending.furthestSeconds = Math.max(pending.furthestSeconds, video.currentTime);
+                if (video.duration > 0) pending.trackDuration = video.duration;
             }
         };
 
@@ -367,9 +407,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             setIsPlaying(false);
             const media = currentMediaRef.current;
             if (media?.playbackContextType !== 'Music') return;
-            if (media.id && recordedPlayTrackIdRef.current !== media.id) {
-                recordedPlayTrackIdRef.current = media.id;
-                musicService.recordPlay(media.id, Math.floor(video.currentTime), true, media.serverId).catch(() => { /* ignore */ });
+
+            const pending = pendingPlayRef.current;
+            if (pending?.trackId === media.id) {
+                pending.furthestSeconds = Math.max(pending.furthestSeconds, video.currentTime);
+                pending.completed = true;
+                flushPendingPlay();
             }
             const q = queueRef.current;
             const idx = queueIndexRef.current;
@@ -413,7 +456,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         // element re-mounts when it changes (e.g. a quality switch starts a new
         // session). Re-run so these listeners bind to the new element — otherwise
         // timeupdate/duration stop updating and the scrubber freezes at 0:00.
-    }, [currentMediaId, currentMedia?.sessionId]);
+    }, [currentMediaId, currentMedia?.sessionId, flushPendingPlay]);
 
     useEffect(() => {
         if (!sessionId) return;

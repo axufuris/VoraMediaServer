@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vora.Application.Analysis;
+using Vora.Domain.Entities.Media;
 using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
 using Vora.Application.Search.ViewModels;
@@ -621,6 +622,28 @@ public class MusicManager : IMusicManager
 
     public async Task RecordTrackPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed)
     {
+        // Looked up rather than taken from the scrobble info, which also comes
+        // back null for a track that exists but carries no artist tag. Only a
+        // genuinely missing track should stop the play being recorded.
+        var track = await _repository.GetTrackByIdAsync(trackId, MusicAccessFilter.Unrestricted);
+        if (track == null)
+        {
+            _logger.LogDebug("Not recording a play of track {Track}, which no longer exists.", trackId);
+            return;
+        }
+
+        // The gate lives here rather than in the player, because the player is
+        // only one of the clients that post plays. A web build, a TV client and a
+        // phone each deciding for itself what counts would put several different
+        // definitions of a play into one history table.
+        if (!completed && !PlayQualification.Qualifies(durationListenedSeconds, track.DurationSeconds))
+        {
+            _logger.LogDebug(
+                "Not recording a play of track {Track}: {Seconds}s of {Duration}s is below the threshold.",
+                trackId, durationListenedSeconds, track.DurationSeconds);
+            return;
+        }
+
         await _repository.RecordPlayAsync(profileId, trackId, durationListenedSeconds, completed);
         if (!_listeningProviders.Any()) return;
 
