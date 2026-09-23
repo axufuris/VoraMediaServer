@@ -21,6 +21,9 @@ export interface PluginVM {
 export interface PluginOptionVM {
     id: string;
     name: string;
+    // What the plugin calls itself in results it returns — "Fanart.tv" where
+    // name is "Fanart.tv Music Artwork". Match results on this, not on name.
+    providerName: string;
     externalIdLabel: string;
     externalIdPlaceholder: string;
     isAiPlugin: boolean;
