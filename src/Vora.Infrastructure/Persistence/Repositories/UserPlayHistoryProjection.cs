@@ -87,7 +87,7 @@ internal static class UserPlayHistoryProjection
             query = typeFilter switch
             {
                 "Movies" => query.Where(x => x.Media is Movie),
-                "TV Shows" => query.Where(x => x.Media is TvShow || x.Media is Season || x.Media is Episode),
+                "TV Shows" => query.Where(MediaCapabilities.IsPartOfATvShow.On((SessionMediaPair x) => x.Media)),
                 _ => query
             };
         }

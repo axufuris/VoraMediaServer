@@ -198,7 +198,7 @@ internal static class StreamHistoryProjection
             ShowTitle = episodeInfo?.ShowTitle,
             SeasonNumber = episodeInfo?.SeasonNumber,
             EpisodeNumber = episodeInfo?.EpisodeNumber,
-            MediaType = session.MediaItem is Episode || session.MediaItem is Season || session.MediaItem is TvShow ? "TvShow" : "Movie",
+            MediaType = session.MediaItem?.BelongsToATvShow() == true ? "TvShow" : "Movie",
             LibraryId = session.MediaItem?.LibraryId ?? Guid.Empty,
             LibraryName = libName,
 

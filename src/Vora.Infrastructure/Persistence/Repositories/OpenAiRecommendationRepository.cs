@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 using Vora.Application.Recommendations;
 using Vora.Application.Ai.Dtos;
@@ -33,7 +33,8 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
 
         var query = context.Set<MediaItemEmbedding>()
             .AsNoTracking()
-            .Where(e => e.Embedding != null && (e.MediaItem is Movie || e.MediaItem is TvShow));
+            .Where(e => e.Embedding != null)
+            .Where(MediaCapabilities.IsBrowsableTitle.On((MediaItemEmbedding e) => e.MediaItem));
 
         if (libraryId.HasValue)
         {
@@ -54,8 +55,8 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
     public Task<List<MediaItemForEmbeddingDto>> GetMediaItemsMissingEmbeddingsAsync(int batchSize) =>
         context.MediaItems
             .AsNoTracking()
-            .Where(m => (m is Movie || m is TvShow)
-                && !context.MediaItemEmbeddings.Any(e => e.MediaItemId == m.Id))
+            .Where(MediaCapabilities.IsBrowsableTitle)
+            .Where(m => !context.MediaItemEmbeddings.Any(e => e.MediaItemId == m.Id))
             .Take(batchSize)
             .Select(MediaItemForEmbeddingDto.Projection)
             .ToListAsync();

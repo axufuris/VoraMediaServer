@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Recommendations;
 using Vora.Domain.Entities.Media;
@@ -60,7 +60,8 @@ public class RecommendationRepository(VoraDbContext context) : IRecommendationRe
     {
         var query = context.MediaItems
             .AsNoTracking()
-            .Where(m => m.MissingSince == null && m.Genres.Any(g => g.Id == genreId) && (m is Movie || m is TvShow));
+            .Where(MediaCapabilities.IsBrowsableTitle)
+            .Where(m => m.MissingSince == null && m.Genres.Any(g => g.Id == genreId));
 
         if (libraryId.HasValue)
         {
