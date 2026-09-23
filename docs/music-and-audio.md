@@ -76,6 +76,30 @@ Surfaced through `/api/music/recommendations/mixes`, rendered in the Music tab "
 
 No persistence — restart wipes it.
 
+## Recording a play
+
+`POST /api/music/tracks/{trackId}/played` with `{ durationListenedSeconds, completed }`. **Every client posts here** — web, TV, phone — so the rules below are the contract, not the web player's implementation.
+
+- **Post once, when the listen ENDS**: the track finished, the queue moved on, or the app is closing. Not when a threshold is crossed. The web player held a `recordedPlayTrackIdRef` set at the threshold and checked the same ref in `onEnded`, so `onEnded` never fired and every row stored "~30 seconds, not completed" regardless of what was heard.
+- **`durationListenedSeconds` is the FURTHEST position reached**, not the latest. Seeking back to replay a passage must not reduce it.
+- **`completed`** means the track played out. It is trusted over the position, because players stop reporting position slightly before the end.
+
+### What counts as a play
+
+`PlayQualification` in `Vora.Domain` is authoritative and `MusicManager.RecordTrackPlayAsync` enforces it — a post below the bar is **silently discarded** (204 either way, logged at Debug). A client that posts at its own threshold loses those plays without being told.
+
+```
+qualifies = listened >= 240s  OR  listened / trackDuration >= 0.5
+```
+
+The 240s arm is a **ceiling, not a floor**: for anything under 8 minutes the 50% arm always fires first, so a 3-minute song qualifies at 1:30 and only tracks longer than 8 minutes benefit from the absolute cap. A track with no scanned duration falls back to 30s, since there is no fraction to take. This is Last.fm's own scrobble rule, and a scrobble goes out on the same call.
+
+`Vora.Web/src/utils/playQualification.ts` mirrors it so the player does not post something that will be dropped. `PlayQualificationParityTests` reads that file and fails if the constants or the comparisons drift. **A native client should mirror it the same way** — the copy is an optimisation, never the decision.
+
+### How plays are scored
+
+Recommendations weight each row by how much was heard rather than counting it as one (`PlayQualification.Weight`): played out or >=95% → 1.0, >=75% → 0.8, >=50% → 0.5, qualifying but shallower → 0.25. Unknown depth or unknown track length → 0.5, because that is absence of evidence rather than a shallow listen. Used by `GetTopArtistsForProfileAsync` and `GetTopTracksByArtistAsync`; `GetCoPlayedArtistsAsync` stays on distinct-listeners-then-plays, since the gate already keeps shallow listens out of the table entirely.
+
 ## Admin music history
 
 `/api/admin/music/history` and `/api/admin/music/summary` (server-admin only). Backend queries `TrackPlayHistory` joined with profiles, tracks, albums, artists. Frontend at `/admin/music-history` — summary cards + top-tracks/top-artists/plays-per-profile panels + filterable paginated table.

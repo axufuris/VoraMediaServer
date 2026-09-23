@@ -104,15 +104,27 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
         }
 
         var rawPlays = await playsQuery
-            .Select(x => new { x.Album.ArtistId, x.Play.PlayedAt })
+            .Select(x => new
+            {
+                x.Album.ArtistId,
+                x.Play.PlayedAt,
+                x.Play.DurationListenedSeconds,
+                x.Play.Completed,
+                x.Track.DurationSeconds
+            })
             .ToListAsync();
 
+        // Recency decay says how long ago, the weight says how much of the track
+        // they actually sat through. Counting each play as one made an artist
+        // abandoned halfway through every time rank level with one played out.
         var scored = rawPlays
             .GroupBy(x => x.ArtistId)
             .Select(g => new
             {
                 ArtistId = g.Key,
-                Score = g.Sum(p => Math.Exp(-(now - p.PlayedAt).TotalDays / 30.0))
+                Score = g.Sum(p =>
+                    PlayQualification.Weight(p.DurationListenedSeconds, p.DurationSeconds, p.Completed)
+                    * Math.Exp(-(now - p.PlayedAt).TotalDays / 30.0))
             })
             .OrderByDescending(s => s.Score)
             .Take(limit)
@@ -157,26 +169,36 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
         var tracks = await query.ToListAsync();
         if (tracks.Count == 0) return tracks;
 
-        Dictionary<Guid, int> playCounts;
+        // Scored, not counted: a track skipped past halfway every time should not
+        // lead the row over one played to the end.
+        Dictionary<Guid, double> playScores;
         if (profileId.HasValue)
         {
-            var trackIds = tracks.Select(t => t.Id).ToList();
+            var durationByTrack = tracks.ToDictionary(t => t.Id, t => t.DurationSeconds);
+            var trackIds = durationByTrack.Keys.ToList();
             var pid = profileId.Value;
-            var counts = await _context.TrackPlayHistory
+            var plays = await _context.TrackPlayHistory
                 .AsNoTracking()
                 .Where(p => p.ProfileId == pid && trackIds.Contains(p.TrackId))
-                .GroupBy(p => p.TrackId)
-                .Select(g => new { g.Key, Count = g.Count() })
+                .Select(p => new { p.TrackId, p.DurationListenedSeconds, p.Completed })
                 .ToListAsync();
-            playCounts = counts.ToDictionary(c => c.Key, c => c.Count);
+
+            playScores = plays
+                .GroupBy(p => p.TrackId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Sum(p => PlayQualification.Weight(
+                        p.DurationListenedSeconds,
+                        durationByTrack.TryGetValue(p.TrackId, out var d) ? d : null,
+                        p.Completed)));
         }
         else
         {
-            playCounts = new Dictionary<Guid, int>();
+            playScores = new Dictionary<Guid, double>();
         }
 
         var ranked = tracks
-            .OrderByDescending(t => playCounts.TryGetValue(t.Id, out var c) ? c : 0)
+            .OrderByDescending(t => playScores.TryGetValue(t.Id, out var c) ? c : 0)
             .ThenBy(t => t.DiscNumber ?? 1)
             .ThenBy(t => t.TrackNumber)
             .ToList();
