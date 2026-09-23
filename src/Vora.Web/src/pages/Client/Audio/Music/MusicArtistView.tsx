@@ -35,7 +35,11 @@ export default function MusicArtistView({
     return (
         <>
             {currentArtist && (() => {
-                const heroBackdrop = currentArtist.bannerUrl || currentArtist.backgroundUrl;
+                // Background first. A banner is a 5:1 strip and this hero is a wide
+                // BOX, so object-cover crops a banner to its middle sliver and it
+                // reads as a badly framed background — while the real background,
+                // which is the right shape for the slot, never gets shown at all.
+                const heroBackdrop = currentArtist.backgroundUrl || currentArtist.bannerUrl;
                 const hasArtwork = !!currentArtist.artworkUrl;
                 return (
                     <div className="relative w-full rounded-lg overflow-hidden mb-6 border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)]" style={{ minHeight: '13rem' }}>
