@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Vora.Application.Requests;
 using Vora.Application.Requests.Dtos;
 using Vora.Application.Requests.ViewModels;
+using Vora.Plugins.Interfaces;
 
 namespace Vora.Api.Endpoints;
 
@@ -38,14 +39,18 @@ public static class RequestEndpoints
     {
         var group = routes.MapGroup("/api/requests").WithTags("Requests (Admin)").RequireAuthorization("AdminOnly");
 
-        group.MapGet("/", GetAllRequestsAsync);
+        group.MapGet("/", GetAllRequestsAsync)
+            .Produces<IEnumerable<MediaRequestVM>>(StatusCodes.Status200OK);
         group.MapPut("/{id:guid}/approve", ApproveRequestAsync);
         group.MapDelete("/{id:guid}", DeleteRequestAsync);
 
         var serversGroup = group.MapGroup("/servers");
-        serversGroup.MapGet("/", GetServersAsync);
-        serversGroup.MapPost("/", AddServerAsync);
-        serversGroup.MapPost("/options", GetProviderOptionsAsync);
+        serversGroup.MapGet("/", GetServersAsync)
+            .Produces<IEnumerable<RequestServerVM>>(StatusCodes.Status200OK);
+        serversGroup.MapPost("/", AddServerAsync)
+            .Produces<RequestServerVM>(StatusCodes.Status200OK);
+        serversGroup.MapPost("/options", GetProviderOptionsAsync)
+            .Produces<IEnumerable<ProviderOptionDto>>(StatusCodes.Status200OK);
         serversGroup.MapPut("/{id:guid}", UpdateServerAsync);
         serversGroup.MapDelete("/{id:guid}", DeleteServerAsync);
     }
@@ -79,7 +84,7 @@ public static class RequestEndpoints
     private static async Task<IResult> AddServerAsync([FromBody] SaveRequestServerDto dto, IRequestManager manager)
     {
         var created = await manager.AddServerAsync(dto);
-        return Results.Ok(created);
+        return Results.Ok(RequestServerVM.FromEntity(created));
     }
 
     private static async Task<IResult> GetProviderOptionsAsync([FromBody] ProviderOptionsRequestDto req, IRequestManager manager)

@@ -11,7 +11,8 @@ public static class OverlayTemplateEndpoints
     {
         var group = routes.MapGroup("/api/overlays/templates").WithTags("Overlay Templates").RequireAuthorization("AdminOnly");
 
-        group.MapGet("/{libraryId:guid?}", GetTemplatesAsync);
+        group.MapGet("/{libraryId:guid?}", GetTemplatesAsync)
+            .Produces<IEnumerable<OverlayTemplateDto>>(StatusCodes.Status200OK);
         group.MapPost("/", CreateTemplateAsync);
         group.MapPut("/{id:guid}", UpdateTemplateAsync);
         group.MapDelete("/{id:guid}", DeleteTemplateAsync);

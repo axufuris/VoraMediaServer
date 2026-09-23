@@ -3,12 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Vora.Api.Extensions;
 using Vora.Application.Analysis;
+using Vora.Application.Artwork;
 using Vora.Application.Media;
 using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
 using Vora.Application.Search.ViewModels;
 using Vora.Application.Streaming;
 using Vora.Application.Tasks;
+using Vora.Plugins.Dtos;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Enums;
 
@@ -46,19 +48,30 @@ public static class MusicEndpoints
         group.MapPut("/albums/{albumId:guid}", UpdateAlbumAsync).RequireAuthorization();
         group.MapPut("/tracks/{trackId:guid}", UpdateTrackAsync).RequireAuthorization();
 
-        group.MapPost("/artists/{artistId:guid}/artwork/upload", UploadArtistArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
-        group.MapPost("/albums/{albumId:guid}/artwork/upload", UploadAlbumArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
-        group.MapPost("/artists/{artistId:guid}/background/upload", UploadArtistBackgroundAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
-        group.MapPost("/albums/{albumId:guid}/background/upload", UploadAlbumBackgroundAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
-        group.MapPost("/artists/{artistId:guid}/banner/upload", UploadArtistBannerAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
-        group.MapPost("/artists/{artistId:guid}/clearlogo/upload", UploadArtistClearLogoAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
-        group.MapPost("/albums/{albumId:guid}/discart/upload", UploadAlbumDiscArtAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
+        group.MapPost("/artists/{artistId:guid}/artwork/upload", UploadArtistArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
+        group.MapPost("/albums/{albumId:guid}/artwork/upload", UploadAlbumArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
+        group.MapPost("/artists/{artistId:guid}/background/upload", UploadArtistBackgroundAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
+        group.MapPost("/albums/{albumId:guid}/background/upload", UploadAlbumBackgroundAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
+        group.MapPost("/artists/{artistId:guid}/banner/upload", UploadArtistBannerAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
+        group.MapPost("/artists/{artistId:guid}/clearlogo/upload", UploadArtistClearLogoAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
+        group.MapPost("/albums/{albumId:guid}/discart/upload", UploadAlbumDiscArtAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
 
-        group.MapGet("/artists/{artistId:guid}/artwork/suggestions", GetArtistArtworkSuggestionsAsync).RequireAuthorization();
-        group.MapGet("/albums/{albumId:guid}/artwork/suggestions", GetAlbumArtworkSuggestionsAsync).RequireAuthorization();
+        group.MapGet("/artists/{artistId:guid}/artwork/suggestions", GetArtistArtworkSuggestionsAsync).RequireAuthorization()
+            .Produces<IEnumerable<MusicArtworkResult>>(StatusCodes.Status200OK);
+        group.MapGet("/albums/{albumId:guid}/artwork/suggestions", GetAlbumArtworkSuggestionsAsync).RequireAuthorization()
+            .Produces<IEnumerable<MusicArtworkResult>>(StatusCodes.Status200OK);
 
-        group.MapPost("/artists/{artistId:guid}/artwork/refresh", RefreshArtistArtworkAsync).RequireAuthorization();
-        group.MapPost("/albums/{albumId:guid}/artwork/refresh", RefreshAlbumArtworkAsync).RequireAuthorization();
+        group.MapPost("/artists/{artistId:guid}/artwork/refresh", RefreshArtistArtworkAsync).RequireAuthorization()
+            .Produces<ArtworkRefreshResponse>(StatusCodes.Status200OK);
+        group.MapPost("/albums/{albumId:guid}/artwork/refresh", RefreshAlbumArtworkAsync).RequireAuthorization()
+            .Produces<ArtworkRefreshResponse>(StatusCodes.Status200OK);
 
         group.MapPost("/tracks/{trackId:guid}/play", GetMusicStreamUrlAsync)
             .RequireAuthorization()
@@ -104,7 +117,8 @@ public static class MusicEndpoints
             .WithName("GetTrackLyrics")
             .Produces<TrackLyricsVM>(StatusCodes.Status200OK);
 
-        group.MapPost("/tracks/{trackId:guid}/played", RecordTrackPlayAsync).RequireAuthorization();
+        group.MapPost("/tracks/{trackId:guid}/played", RecordTrackPlayAsync).RequireAuthorization()
+            .Produces<RecordPlayResponse>(StatusCodes.Status200OK);
         group.MapPost("/tracks/{trackId:guid}/now-playing", UpdateNowPlayingAsync).RequireAuthorization();
         group.MapGet("/history/recent", GetRecentlyPlayedAsync)
             .RequireAuthorization()
@@ -129,7 +143,8 @@ public static class MusicEndpoints
 
         group.MapPost("/lastfm/auth/start", StartLastFmAuthAsync).RequireAuthorization()
             .Produces<LastFmAuthStartVM>(StatusCodes.Status200OK);
-        group.MapPost("/lastfm/auth/complete", CompleteLastFmAuthAsync).RequireAuthorization();
+        group.MapPost("/lastfm/auth/complete", CompleteLastFmAuthAsync).RequireAuthorization()
+            .Produces<LastFmAuthCompleteResponse>(StatusCodes.Status200OK);
         group.MapDelete("/lastfm/auth", DisconnectLastFmAsync).RequireAuthorization();
 
         group.MapGet("/recommendations/mixes", GetMixesAsync)
@@ -147,11 +162,15 @@ public static class MusicEndpoints
             .Produces<IEnumerable<BecauseYouPlayedRowVM>>(StatusCodes.Status200OK);
         group.MapPost("/recommendations/refresh", RefreshRecommendationsAsync).RequireAuthorization();
 
-        group.MapPost("/recommendations/radio", StartRadioAsync).RequireAuthorization();
-        group.MapPost("/recommendations/radio/extend", ExtendRadioAsync).RequireAuthorization();
+        group.MapPost("/recommendations/radio", StartRadioAsync).RequireAuthorization()
+            .Produces<RadioQueueVM>(StatusCodes.Status200OK);
+        group.MapPost("/recommendations/radio/extend", ExtendRadioAsync).RequireAuthorization()
+            .Produces<RadioQueueVM>(StatusCodes.Status200OK);
 
-        group.MapGet("/stations", GetStationsAsync).RequireAuthorization();
-        group.MapPost("/stations", CreateStationAsync).RequireAuthorization();
+        group.MapGet("/stations", GetStationsAsync).RequireAuthorization()
+            .Produces<IEnumerable<StationVM>>(StatusCodes.Status200OK);
+        group.MapPost("/stations", CreateStationAsync).RequireAuthorization()
+            .Produces<StationVM>(StatusCodes.Status200OK);
         group.MapDelete("/stations/{stationId:guid}", DeleteStationAsync).RequireAuthorization();
         group.MapPost("/stations/{stationId:guid}/play", TouchStationAsync).RequireAuthorization();
 
@@ -164,8 +183,10 @@ public static class MusicEndpoints
             .WithName("ListYearsWithHistory")
             .Produces<IEnumerable<int>>(StatusCodes.Status200OK);
 
-        group.MapGet("/artists/{artistId:guid}/similar", GetSimilarArtistsAsync).RequireAuthorization();
-        group.MapGet("/artists/{artistId:guid}/also-played", GetCoPlayedArtistsAsync).RequireAuthorization();
+        group.MapGet("/artists/{artistId:guid}/similar", GetSimilarArtistsAsync).RequireAuthorization()
+            .Produces<IEnumerable<ArtistVM>>(StatusCodes.Status200OK);
+        group.MapGet("/artists/{artistId:guid}/also-played", GetCoPlayedArtistsAsync).RequireAuthorization()
+            .Produces<IEnumerable<ArtistVM>>(StatusCodes.Status200OK);
 
         group.MapGet("/genres", GetGenresAsync)
             .RequireAuthorization()
@@ -179,11 +200,14 @@ public static class MusicEndpoints
 
         group.MapPost("/playback/heartbeat", HeartbeatAsync).RequireAuthorization();
         group.MapPost("/playback/stop", StopPlaybackAsync).RequireAuthorization();
-        group.MapGet("/playback/active", GetActivePlaybackAsync).RequireAuthorization();
+        group.MapGet("/playback/active", GetActivePlaybackAsync).RequireAuthorization()
+            .Produces<IEnumerable<ServerPlaybackSessionVM>>(StatusCodes.Status200OK);
 
         var adminGroup = routes.MapGroup("/api/admin/music").WithTags("AdminMusic").RequireAuthorization("AdminOnly");
-        adminGroup.MapGet("/history", GetAdminMusicHistoryAsync);
-        adminGroup.MapGet("/summary", GetAdminMusicSummaryAsync);
+        adminGroup.MapGet("/history", GetAdminMusicHistoryAsync)
+            .Produces<AdminMusicHistoryVM>(StatusCodes.Status200OK);
+        adminGroup.MapGet("/summary", GetAdminMusicSummaryAsync)
+            .Produces<AdminMusicSummaryVM>(StatusCodes.Status200OK);
 
         return routes;
     }
@@ -234,14 +258,14 @@ public static class MusicEndpoints
     {
         if (!user.IsAdmin()) return Results.Forbid();
         var url = await manager.RefreshArtistArtworkFromProvidersAsync(artistId, force ?? true, cancellationToken);
-        return Results.Ok(new { updated = url != null, artworkUrl = url });
+        return Results.Ok(new ArtworkRefreshResponse { Updated = url != null, ArtworkUrl = url });
     }
 
     private static async Task<IResult> RefreshAlbumArtworkAsync(Guid albumId, [FromQuery] bool? force, ClaimsPrincipal user, IMusicManager manager, CancellationToken cancellationToken)
     {
         if (!user.IsAdmin()) return Results.Forbid();
         var url = await manager.RefreshAlbumArtworkFromProvidersAsync(albumId, force ?? true, cancellationToken);
-        return Results.Ok(new { updated = url != null, artworkUrl = url });
+        return Results.Ok(new ArtworkRefreshResponse { Updated = url != null, ArtworkUrl = url });
     }
 
     private static async Task<IResult> UpdateArtistAsync(Guid artistId, [FromBody] UpdateArtistRequest request, ClaimsPrincipal user, IMusicManager manager)
@@ -273,7 +297,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveArtistArtworkAsync(artistId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new { url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadAlbumArtworkAsync(Guid albumId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -284,7 +308,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveAlbumArtworkAsync(albumId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new { url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadArtistBackgroundAsync(Guid artistId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -295,7 +319,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveArtistBackgroundAsync(artistId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new { url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadAlbumBackgroundAsync(Guid albumId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -306,7 +330,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveAlbumBackgroundAsync(albumId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new { url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadArtistBannerAsync(Guid artistId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -317,7 +341,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveArtistBannerAsync(artistId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new { url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadArtistClearLogoAsync(Guid artistId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -328,7 +352,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveArtistClearLogoAsync(artistId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new { url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadAlbumDiscArtAsync(Guid albumId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -339,7 +363,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveAlbumDiscArtAsync(albumId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new { url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> GetAlbumArtworkSuggestionsAsync(Guid albumId, ClaimsPrincipal user, IMusicManager manager, CancellationToken cancellationToken)
@@ -514,7 +538,7 @@ public static class MusicEndpoints
         if (string.IsNullOrWhiteSpace(request.Token)) return Results.BadRequest();
         var username = await manager.CompleteLastFmAuthAsync(profileId.Value, request.Token, cancellationToken);
         if (username == null) return Results.BadRequest(new { error = "Authorization failed. Make sure you clicked Allow on Last.fm before completing." });
-        return Results.Ok(new { username });
+        return Results.Ok(new LastFmAuthCompleteResponse { Username = username });
     }
 
     private static async Task<IResult> DisconnectLastFmAsync(ClaimsPrincipal user, IMusicManager manager)

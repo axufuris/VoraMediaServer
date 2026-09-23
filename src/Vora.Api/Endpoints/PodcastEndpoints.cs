@@ -52,7 +52,8 @@ public static class PodcastEndpoints
         group.MapGet("/catalog", GetCatalogAsync)
             .WithName("GetPodcastCatalog")
             .Produces<IEnumerable<CatalogPodcastVM>>(StatusCodes.Status200OK);
-        group.MapPost("/admin/catalog", AddCatalogPodcastAsync);
+        group.MapPost("/admin/catalog", AddCatalogPodcastAsync)
+            .Produces<CatalogPodcastVM>(StatusCodes.Status200OK);
         group.MapDelete("/admin/catalog/{showId:guid}", RemoveCatalogPodcastAsync);
 
         return routes;

@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.Auth;
@@ -52,7 +52,8 @@ public static class UserEndpoints
 
         group.MapPut("/{userId:guid}", UpdateUserAsync)
             .WithName("UpdateUserAccount")
-            .Produces(StatusCodes.Status204NoContent);
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces<UpdateUserResponse>(StatusCodes.Status200OK);
     }
 
     private static void MapAdminEndpoints(IEndpointRouteBuilder routes)
@@ -137,7 +138,7 @@ public static class UserEndpoints
             return Results.Forbid();
         }
 
-        return Results.Ok(new { EmailVerificationSent = emailResult == EmailChangeRequestResult.VerificationSent });
+        return Results.Ok(new UpdateUserResponse { EmailVerificationSent = emailResult == EmailChangeRequestResult.VerificationSent });
     }
 
     private static async Task<IResult> UpdateUserAccessAsync(Guid userId, [FromBody] UpdateUserAccessDto request, IUserManager manager)

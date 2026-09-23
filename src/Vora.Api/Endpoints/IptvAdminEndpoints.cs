@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Vora.Application.Iptv;
 using Vora.Domain.Enums;
+using Vora.Application.Iptv.ViewModels;
 
 namespace Vora.Api.Endpoints;
 
@@ -53,18 +54,25 @@ public static class IptvAdminEndpoints
     {
         var group = routes.MapGroup("/api/iptv/admin").WithTags("IPTV (Admin)").RequireAuthorization("AdminOnly");
 
-        group.MapGet("/playlists", GetAllPlaylistsAsync);
-        group.MapPost("/playlists", AddPlaylistAsync);
-        group.MapPut("/playlists/{id:guid}", UpdatePlaylistAsync);
+        group.MapGet("/playlists", GetAllPlaylistsAsync)
+            .Produces<IEnumerable<IptvPlaylistVM>>(StatusCodes.Status200OK);
+        group.MapPost("/playlists", AddPlaylistAsync)
+            .Produces<IptvPlaylistVM>(StatusCodes.Status200OK);
+        group.MapPut("/playlists/{id:guid}", UpdatePlaylistAsync)
+            .Produces<IptvPlaylistVM>(StatusCodes.Status200OK);
         group.MapPost("/playlists/{id:guid}/refresh", RefreshPlaylistAsync);
         group.MapDelete("/playlists/{id:guid}", DeletePlaylistAsync);
 
-        group.MapGet("/epg-sources", GetAllEpgSourcesAsync);
-        group.MapPost("/epg-sources", AddEpgSourceAsync);
-        group.MapPut("/epg-sources/{id:guid}", UpdateEpgSourceAsync);
+        group.MapGet("/epg-sources", GetAllEpgSourcesAsync)
+            .Produces<IEnumerable<IptvEpgSourceVM>>(StatusCodes.Status200OK);
+        group.MapPost("/epg-sources", AddEpgSourceAsync)
+            .Produces<IptvEpgSourceVM>(StatusCodes.Status200OK);
+        group.MapPut("/epg-sources/{id:guid}", UpdateEpgSourceAsync)
+            .Produces<IptvEpgSourceVM>(StatusCodes.Status200OK);
         group.MapPost("/epg-sources/{id:guid}/refresh", RefreshEpgSourceAsync);
         group.MapDelete("/epg-sources/{id:guid}", DeleteEpgSourceAsync);
-        group.MapGet("/epg-diagnostics", GetEpgDiagnosticsAsync);
+        group.MapGet("/epg-diagnostics", GetEpgDiagnosticsAsync)
+            .Produces<IptvEpgDiagnosticsVM>(StatusCodes.Status200OK);
 
         group.MapPut("/channels/{id:guid}/toggle-visibility", ToggleChannelVisibilityAsync);
         group.MapPut("/channels/{id:guid}/kind", SetChannelKindAsync);

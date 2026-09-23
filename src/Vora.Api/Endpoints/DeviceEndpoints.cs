@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Vora.Application.Devices;
 using Vora.Application.Devices.Dtos;
+using Vora.Application.Devices.ViewModels;
 
 namespace Vora.Api.Endpoints;
 
@@ -17,7 +18,8 @@ public static class DeviceEndpoints
     {
         var group = routes.MapGroup("/api/admin/devices").WithTags("Devices (Admin)").RequireAuthorization("AdminOnly");
 
-        group.MapGet("/", GetAllDevicesAsync);
+        group.MapGet("/", GetAllDevicesAsync)
+            .Produces<IEnumerable<ClientDeviceVM>>(StatusCodes.Status200OK);
         group.MapPut("/{id:guid}/block", BlockDeviceAsync);
         group.MapPut("/{id:guid}/unblock", UnblockDeviceAsync);
         group.MapDelete("/{id:guid}", DeleteDeviceAsync);

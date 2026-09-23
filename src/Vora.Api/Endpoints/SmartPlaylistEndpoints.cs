@@ -22,8 +22,10 @@ public static class SmartPlaylistEndpoints
             .WithName("GetSmartPlaylist")
             .Produces<SmartPlaylistDetailVM>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
-        group.MapPost("/", CreateAsync).RequireAuthorization();
-        group.MapPut("/{id:guid}", UpdateAsync).RequireAuthorization();
+        group.MapPost("/", CreateAsync).RequireAuthorization()
+            .Produces<SmartPlaylistSummaryVM>(StatusCodes.Status200OK);
+        group.MapPut("/{id:guid}", UpdateAsync).RequireAuthorization()
+            .Produces<SmartPlaylistSummaryVM>(StatusCodes.Status200OK);
         group.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization();
         group.MapGet("/{id:guid}/items", GetTracksAsync)
             .RequireAuthorization()
