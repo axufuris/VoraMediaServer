@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { libraryAdminService, type CreateLibraryRequest } from '../../../api/Media/libraryAdminService';
+import { libraryTypeToName } from '../../../utils/libraryTypes';
 import { pluginAdminService, type PluginOptionVM } from '../../../api/System/pluginAdminService';
 import { useDialog } from '../../../dialogs';
 import IconSelect, { type IconSelectOption } from '../../../components/Common/IconSelect';
@@ -70,17 +71,21 @@ export default function CreateLibrary() {
         enableIntroDetection: false,
     });
 
+    // Refetched when the type changes rather than filtered in place, so the one
+    // rule that decides which plugins apply to a kind stays on the server.
+    const libraryTypeName = libraryTypeToName(library.type);
+
     useEffect(() => {
         Promise.all([
-            pluginAdminService.getMetadataProviders(serverId),
-            pluginAdminService.getRatingsProviders(serverId),
-            pluginAdminService.getArtworkProviders(serverId),
+            pluginAdminService.getMetadataProviders(serverId, libraryTypeName),
+            pluginAdminService.getRatingsProviders(serverId, libraryTypeName),
+            pluginAdminService.getArtworkProviders(serverId, libraryTypeName),
         ]).then(([meta, ratings, artwork]) => {
             setProviders(meta);
             setRatingProviders(ratings);
             setArtworkProviders(artwork);
         }).catch(console.error);
-    }, [serverId]);
+    }, [serverId, libraryTypeName]);
 
     const handleChange = <K extends keyof CreateLibraryRequest>(field: K, value: CreateLibraryRequest[K]) => {
         setLibrary({ ...library, [field]: value });
@@ -142,17 +147,11 @@ export default function CreateLibrary() {
         }
     };
 
-    const getLibraryTypeString = (type: number) => {
-        if (type === 2) return 'TvShow';
-        if (type === 3) return 'Music';
-        if (type === 4) return 'HomeVideo';
-        return 'Movie';
-    };
-
-    const currentTypeStr = getLibraryTypeString(library.type);
-    const availableMetadataProviders = providers.filter(p => !p.supportedLibraryTypes || p.supportedLibraryTypes.includes(currentTypeStr));
-    const availableRatingProviders = ratingProviders.filter(p => !p.supportedLibraryTypes || p.supportedLibraryTypes.includes(currentTypeStr));
-    const availableArtworkProviders = artworkProviders.filter(p => !p.supportedLibraryTypes || p.supportedLibraryTypes.includes(currentTypeStr));
+    // The lists are already narrowed to this library type by the server, so there
+    // is nothing left to filter here.
+    const availableMetadataProviders = providers;
+    const availableRatingProviders = ratingProviders;
+    const availableArtworkProviders = artworkProviders;
 
     const isTvShow = library.type === 2;
     const showVideoOptions = library.type === 1 || library.type === 2;
