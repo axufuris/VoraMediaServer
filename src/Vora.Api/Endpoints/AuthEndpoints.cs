@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using Vora.Api.Extensions;
 using Vora.Application.Auth;
@@ -112,10 +112,12 @@ public static class AuthEndpoints
 
         group.MapGet("/invitations", ListInvitationsAsync)
             .WithName("ListInvitations")
-            .RequireAuthorization("AdminOnly");
+            .RequireAuthorization("AdminOnly")
+            .Produces<IEnumerable<InvitationVM>>(StatusCodes.Status200OK);
         group.MapPost("/invitations", CreateInvitationAsync)
             .WithName("CreateInvitation")
-            .RequireAuthorization("AdminOnly");
+            .RequireAuthorization("AdminOnly")
+            .Produces<CreateInvitationResponse>(StatusCodes.Status200OK);
         group.MapDelete("/invitations/{id:guid}", RevokeInvitationAsync)
             .WithName("RevokeInvitation")
             .RequireAuthorization("AdminOnly");

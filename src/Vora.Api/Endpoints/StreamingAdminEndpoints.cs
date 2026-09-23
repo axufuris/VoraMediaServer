@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Vora.Api.Hubs;
 using Vora.Application.Analysis;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
+using Vora.Application.Streaming.Dtos;
+using Vora.Application.Streaming.ViewModels;
 
 namespace Vora.Api.Endpoints;
 
@@ -15,10 +17,13 @@ public static class StreamingAdminEndpoints
     {
         var group = routes.MapGroup("/api/streaming/admin").WithTags("Streaming (Admin)").RequireAuthorization("AdminOnly");
 
-        group.MapGet("/now-playing", GetNowPlayingAsync);
+        group.MapGet("/now-playing", GetNowPlayingAsync)
+            .Produces<IEnumerable<NowPlayingSessionDto>>(StatusCodes.Status200OK);
         group.MapGet("/history", GetHistoryAsync)
-            .Produces(StatusCodes.Status200OK);
-        group.MapGet("/system-stats", GetSystemStatsAsync);
+            .Produces(StatusCodes.Status200OK)
+            .Produces<StreamHistoryPageVM>(StatusCodes.Status200OK);
+        group.MapGet("/system-stats", GetSystemStatsAsync)
+            .Produces<SystemStatsVM>(StatusCodes.Status200OK);
         group.MapPost("/sessions/{sessionId:guid}/command", SendSessionCommandAsync);
 
         return group;
@@ -37,7 +42,7 @@ public static class StreamingAdminEndpoints
         IStreamManager streamManager)
     {
         var result = await streamManager.GetGroupedHistoryAsync(page, pageSize, search ?? string.Empty);
-        return Results.Ok(new { result.Data, result.Total });
+        return Results.Ok(new StreamHistoryPageVM { Data = result.Data, Total = result.Total });
     }
 
     private static async Task<IResult> GetSystemStatsAsync(IStreamManager streamManager, ISystemMetricRepository metricRepo)

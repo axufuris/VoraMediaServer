@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Vora.Application.Collections;
 using Vora.Application.FileSystem;
 using Vora.Domain.Enums;
+using Vora.Application.Artwork;
 
 namespace Vora.Api.Endpoints;
 
@@ -12,11 +13,13 @@ public static class CollectionArtworkEndpoints
         var group = routes.MapGroup("/api/collections").WithTags("Collection Artwork").RequireAuthorization();
 
         group.MapGet("/{id:guid}/artwork", GetArtworkAsync)
-            .Produces(StatusCodes.Status200OK);
+            .Produces(StatusCodes.Status200OK)
+            .Produces<IEnumerable<CollectionArtworkVM>>(StatusCodes.Status200OK);
 
         group.MapPost("/{id:guid}/artwork/upload", UploadArtworkAsync)
             .RequireAuthorization("AdminOnly")
-            .DisableAntiforgery();
+            .DisableAntiforgery()
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
 
         group.MapPost("/{id:guid}/artwork/url", AddArtworkUrlAsync).RequireAuthorization("AdminOnly");
 
@@ -37,7 +40,7 @@ public static class CollectionArtworkEndpoints
     {
         await using var stream = file.OpenReadStream();
         var url = await service.UploadAsync(id, new UploadedFile(stream, file.FileName, file.ContentType), kind);
-        return Results.Ok(new { Url = url });
+        return Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> AddArtworkUrlAsync(Guid id, [FromBody] string url, [FromQuery] ArtworkKind kind, ICollectionArtworkService service)

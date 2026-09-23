@@ -13,25 +13,32 @@ namespace Vora.Api.Tests;
 // clients to check — without an annotation, and the client author had to write
 // the model by hand to get at it.
 //
-// Scoped to the music endpoints because that is the surface the native clients
-// are being generated from today. The same check over every endpoint file finds
-// 26 more routes in 13 files; widening it is the follow-up, and it needs those
-// fixed first rather than an exemption list that would outlive them.
-public class MusicEndpointResponseSchemaTests
+// Covers every endpoint file, with no exemption list. It was scoped to music
+// first, while the other 26 routes across 13 files were still undeclared; an
+// allow-list that long outlives its entries, which is the failure this kind of
+// test exists to prevent, so the routes were fixed instead.
+public class EndpointResponseSchemaTests
 {
-    private static string EndpointSource()
+    private static IReadOnlyList<FileInfo> EndpointFiles()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir != null && dir.GetDirectories("src").Length == 0) dir = dir.Parent;
         dir.Should().NotBeNull("the test has to be able to find the source tree");
 
-        var path = Path.Combine(dir!.FullName, "src", "Vora.Api", "Endpoints", "MusicEndpoints.cs");
-        File.Exists(path).Should().BeTrue($"expected the music endpoints at {path}");
-        return File.ReadAllText(path);
+        var endpoints = new DirectoryInfo(Path.Combine(dir!.FullName, "src", "Vora.Api", "Endpoints"));
+        endpoints.Exists.Should().BeTrue($"expected the endpoints at {endpoints.FullName}");
+
+        var files = endpoints.GetFiles("*Endpoints.cs", SearchOption.AllDirectories);
+        files.Should().NotBeEmpty();
+        return files;
     }
 
+    // Any receiver, not just one called `group`. Several files register on a
+    // sub-group — `var authGroup = group.MapGroup("").RequireAuthorization();` —
+    // and matching only `group.Map` made every route on those invisible, which is
+    // how ArtworkEndpoints hid an anonymous response from an earlier pass.
     private static readonly Regex Route = new(
-        @"group\.Map(?:Get|Post|Put|Delete|Patch)\(""(?<route>[^""]+)"",\s*(?<handler>\w+)\)(?<chain>[^;]*);",
+        @"\w+\.Map(?:Get|Post|Put|Delete|Patch)\(""(?<route>[^""]+)"",\s*(?<handler>\w+)\)(?<chain>[^;]*);",
         RegexOptions.Compiled);
 
     // Task<IResult> and bare IResult both: a synchronous handler is still a
@@ -61,16 +68,20 @@ public class MusicEndpointResponseSchemaTests
     }
 
     [Fact]
-    public void Every_music_route_that_returns_a_body_declares_its_schema()
+    public void Every_route_that_returns_a_body_declares_its_schema()
     {
-        var source = EndpointSource();
-        var withBody = HandlersReturningABody(source);
+        var undeclared = new List<string>();
 
-        var undeclared = Route.Matches(source)
-            .Where(m => withBody.Contains(m.Groups["handler"].Value))
-            .Where(m => !m.Groups["chain"].Value.Contains(".Produces<", StringComparison.Ordinal))
-            .Select(m => $"{m.Groups["route"].Value} -> {m.Groups["handler"].Value}")
-            .ToList();
+        foreach (var file in EndpointFiles())
+        {
+            var source = File.ReadAllText(file.FullName);
+            var withBody = HandlersReturningABody(source);
+
+            undeclared.AddRange(Route.Matches(source)
+                .Where(m => withBody.Contains(m.Groups["handler"].Value))
+                .Where(m => !m.Groups["chain"].Value.Contains(".Produces<", StringComparison.Ordinal))
+                .Select(m => $"{file.Name}: {m.Groups["route"].Value} -> {m.Groups["handler"].Value}"));
+        }
 
         undeclared.Should().BeEmpty(
             "a route with no Produces<> is a 200 with no schema in the OpenAPI document, so the generated "
@@ -81,9 +92,14 @@ public class MusicEndpointResponseSchemaTests
     // failure wearing an annotation. The golden rule already says responses use a
     // VM or a Response class; this is what enforces it on the routes that matter.
     [Fact]
-    public void No_music_route_answers_with_an_anonymous_type()
+    public void No_route_answers_with_an_anonymous_type()
     {
-        EndpointSource().Should().NotContain("Results.Ok(new {",
+        var offenders = EndpointFiles()
+            .Where(f => File.ReadAllText(f.FullName).Contains("Results.Ok(new {", StringComparison.Ordinal))
+            .Select(f => f.Name)
+            .ToList();
+
+        offenders.Should().BeEmpty(
             "an anonymous type serializes fine and describes nothing — give it a named response class");
     }
 
@@ -92,10 +108,13 @@ public class MusicEndpointResponseSchemaTests
     [Fact]
     public void The_scanner_still_finds_the_routes_and_the_handlers()
     {
-        var source = EndpointSource();
+        var files = EndpointFiles();
+        files.Should().HaveCountGreaterThan(15, "the api registers many endpoint groups");
 
-        Route.Matches(source).Should().HaveCountGreaterThan(40, "the music group registers many routes");
-        HandlersReturningABody(source).Should().Contain("RecordTrackPlayAsync");
-        HandlersReturningABody(source).Should().NotContain("UpdateNowPlayingAsync", "it returns an empty 200");
+        var music = File.ReadAllText(files.Single(f => f.Name == "MusicEndpoints.cs").FullName);
+
+        Route.Matches(music).Should().HaveCountGreaterThan(40, "the music group registers many routes");
+        HandlersReturningABody(music).Should().Contain("RecordTrackPlayAsync");
+        HandlersReturningABody(music).Should().NotContain("UpdateNowPlayingAsync", "it returns an empty 200");
     }
 }

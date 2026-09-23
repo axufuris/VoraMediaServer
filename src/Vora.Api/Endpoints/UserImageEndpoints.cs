@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Vora.Application.FileSystem;
 using Vora.Application.Users;
+using Vora.Application.Artwork;
 
 namespace Vora.Api.Endpoints;
 
@@ -15,7 +16,8 @@ public static partial class UserImageEndpoints
 
         group.MapPost("/upload", UploadAsync)
             .DisableAntiforgery()
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
 
         group.MapGet("/custom/{fileName}", ServeCustomImage)
             .AllowAnonymous();
@@ -40,7 +42,7 @@ public static partial class UserImageEndpoints
         await using var stream = file.OpenReadStream();
         var url = await imgService.UploadAsync(new UploadedFile(stream, file.FileName, file.ContentType), oldUrl);
 
-        return Results.Ok(new { Url = url });
+        return Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static IResult ServeCustomImage(string fileName, IUserProfileImageService imgService, HttpContext httpContext)

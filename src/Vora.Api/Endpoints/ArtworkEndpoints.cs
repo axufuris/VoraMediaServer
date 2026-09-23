@@ -25,9 +25,11 @@ public static partial class ArtworkEndpoints
 
         var authGroup = group.MapGroup("").RequireAuthorization();
 
-        authGroup.MapGet("/media/{id:guid}/artwork", GetMediaArtworkAsync);
+        authGroup.MapGet("/media/{id:guid}/artwork", GetMediaArtworkAsync)
+            .Produces<IEnumerable<MediaArtworkVM>>(StatusCodes.Status200OK);
         authGroup.MapPost("/media/{id:guid}/artwork/fetch", RefreshMediaArtworkAsync).RequireAuthorization("AdminOnly");
-        authGroup.MapPost("/media/{id:guid}/artwork/upload", UploadMediaArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery();
+        authGroup.MapPost("/media/{id:guid}/artwork/upload", UploadMediaArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
         authGroup.MapPost("/media/{id:guid}/artwork/url", AddMediaArtworkUrlAsync).RequireAuthorization("AdminOnly");
         authGroup.MapDelete("/media/artwork/{artworkId:guid}", DeleteMediaArtworkAsync).RequireAuthorization("AdminOnly");
 
@@ -126,7 +128,7 @@ public static partial class ArtworkEndpoints
     {
         await using var stream = file.OpenReadStream();
         var url = await service.UploadAsync(id, new UploadedFile(stream, file.FileName, file.ContentType), kind);
-        return Results.Ok(new { Url = url });
+        return Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> AddMediaArtworkUrlAsync(Guid id, [FromBody] string url, [FromQuery] ArtworkKind kind, IArtworkService service)

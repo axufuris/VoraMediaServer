@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Vora.Application.FileSystem;
 using Vora.Application.Plugins;
 using Vora.Application.Plugins.ViewModels;
@@ -19,11 +19,13 @@ public static class PluginEndpoints
 
         group.MapPost("/upload", UploadPluginAsync)
             .DisableAntiforgery()
-            .Produces(StatusCodes.Status200OK);
+            .Produces(StatusCodes.Status200OK)
+            .Produces<PluginActionResponse>(StatusCodes.Status200OK);
 
         group.MapDelete("/{id}", UninstallPluginAsync)
             .Produces(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces<PluginActionResponse>(StatusCodes.Status200OK);
 
         return group;
     }
@@ -43,7 +45,7 @@ public static class PluginEndpoints
         {
             await using var stream = file.OpenReadStream();
             await manager.UploadPluginAsync(new UploadedFile(stream, file.FileName, file.ContentType));
-            return Results.Ok(new { Message = "Plugin uploaded successfully. Restart the server to load it." });
+            return Results.Ok(new PluginActionResponse { Message = "Plugin uploaded successfully. Restart the server to load it." });
         }
         catch (InvalidOperationException ex)
         {
@@ -57,7 +59,7 @@ public static class PluginEndpoints
         {
             var success = manager.UninstallPlugin(id);
             return success
-                ? Results.Ok(new { Message = "Plugin uninstalled. Restart the server to apply changes." })
+                ? Results.Ok(new PluginActionResponse { Message = "Plugin uninstalled. Restart the server to apply changes." })
                 : Results.NotFound();
         }
         catch (InvalidOperationException ex)

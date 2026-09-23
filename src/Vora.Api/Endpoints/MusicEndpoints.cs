@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Vora.Api.Extensions;
 using Vora.Application.Analysis;
+using Vora.Application.Artwork;
 using Vora.Application.Media;
 using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
@@ -48,19 +49,19 @@ public static class MusicEndpoints
         group.MapPut("/tracks/{trackId:guid}", UpdateTrackAsync).RequireAuthorization();
 
         group.MapPost("/artists/{artistId:guid}/artwork/upload", UploadArtistArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
-            .Produces<ArtworkUploadResponse>(StatusCodes.Status200OK);
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
         group.MapPost("/albums/{albumId:guid}/artwork/upload", UploadAlbumArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
-            .Produces<ArtworkUploadResponse>(StatusCodes.Status200OK);
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
         group.MapPost("/artists/{artistId:guid}/background/upload", UploadArtistBackgroundAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
-            .Produces<ArtworkUploadResponse>(StatusCodes.Status200OK);
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
         group.MapPost("/albums/{albumId:guid}/background/upload", UploadAlbumBackgroundAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
-            .Produces<ArtworkUploadResponse>(StatusCodes.Status200OK);
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
         group.MapPost("/artists/{artistId:guid}/banner/upload", UploadArtistBannerAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
-            .Produces<ArtworkUploadResponse>(StatusCodes.Status200OK);
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
         group.MapPost("/artists/{artistId:guid}/clearlogo/upload", UploadArtistClearLogoAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
-            .Produces<ArtworkUploadResponse>(StatusCodes.Status200OK);
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
         group.MapPost("/albums/{albumId:guid}/discart/upload", UploadAlbumDiscArtAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
-            .Produces<ArtworkUploadResponse>(StatusCodes.Status200OK);
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
 
         group.MapGet("/artists/{artistId:guid}/artwork/suggestions", GetArtistArtworkSuggestionsAsync).RequireAuthorization()
             .Produces<IEnumerable<MusicArtworkResult>>(StatusCodes.Status200OK);
@@ -203,8 +204,10 @@ public static class MusicEndpoints
             .Produces<IEnumerable<ServerPlaybackSessionVM>>(StatusCodes.Status200OK);
 
         var adminGroup = routes.MapGroup("/api/admin/music").WithTags("AdminMusic").RequireAuthorization("AdminOnly");
-        adminGroup.MapGet("/history", GetAdminMusicHistoryAsync);
-        adminGroup.MapGet("/summary", GetAdminMusicSummaryAsync);
+        adminGroup.MapGet("/history", GetAdminMusicHistoryAsync)
+            .Produces<AdminMusicHistoryVM>(StatusCodes.Status200OK);
+        adminGroup.MapGet("/summary", GetAdminMusicSummaryAsync)
+            .Produces<AdminMusicSummaryVM>(StatusCodes.Status200OK);
 
         return routes;
     }
@@ -294,7 +297,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveArtistArtworkAsync(artistId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new ArtworkUploadResponse { Url = url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadAlbumArtworkAsync(Guid albumId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -305,7 +308,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveAlbumArtworkAsync(albumId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new ArtworkUploadResponse { Url = url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadArtistBackgroundAsync(Guid artistId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -316,7 +319,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveArtistBackgroundAsync(artistId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new ArtworkUploadResponse { Url = url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadAlbumBackgroundAsync(Guid albumId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -327,7 +330,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveAlbumBackgroundAsync(albumId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new ArtworkUploadResponse { Url = url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadArtistBannerAsync(Guid artistId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -338,7 +341,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveArtistBannerAsync(artistId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new ArtworkUploadResponse { Url = url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadArtistClearLogoAsync(Guid artistId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -349,7 +352,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveArtistClearLogoAsync(artistId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new ArtworkUploadResponse { Url = url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> UploadAlbumDiscArtAsync(Guid albumId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
@@ -360,7 +363,7 @@ public static class MusicEndpoints
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var url = await manager.SaveAlbumDiscArtAsync(albumId, ms.ToArray(), file.FileName);
-        return url == null ? Results.NotFound() : Results.Ok(new ArtworkUploadResponse { Url = url });
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
     }
 
     private static async Task<IResult> GetAlbumArtworkSuggestionsAsync(Guid albumId, ClaimsPrincipal user, IMusicManager manager, CancellationToken cancellationToken)

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Vora.Application.Settings;
 using Vora.Application.Settings.ViewModels;
 
@@ -10,8 +10,10 @@ public static class RemoteAccessEndpoints
     {
         var group = routes.MapGroup("/api/remote-access").WithTags("Remote Access").RequireAuthorization("AdminOnly");
 
-        group.MapGet("/", GetStatusAsync);
-        group.MapPut("/", ApplySettingsAsync);
+        group.MapGet("/", GetStatusAsync)
+            .Produces<RemoteAccessStatusVM>(StatusCodes.Status200OK);
+        group.MapPut("/", ApplySettingsAsync)
+            .Produces<RemoteAccessStatusVM>(StatusCodes.Status200OK);
 
         return group;
     }
