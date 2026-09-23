@@ -46,6 +46,17 @@ export interface AlbumPageVM {
     limit: number;
 }
 
+// The server decides what counts as a play and silently discards what does not,
+// so the response says which happened. The web player gates locally before
+// posting and should always see Recorded — a native client that posts at its own
+// threshold is the case this exists for.
+export type RecordPlayOutcome = 'Recorded' | 'BelowThreshold' | 'UnknownTrack';
+
+export interface RecordPlayResponse {
+    recorded: boolean;
+    outcome: RecordPlayOutcome;
+}
+
 export interface TrackVM {
     id: string;
     title: string;
@@ -566,8 +577,9 @@ export const musicService = {
         }
     },
 
-    recordPlay: async (trackId: string, durationListenedSeconds: number, completed: boolean, serverId?: string): Promise<void> => {
-        await apiClient.post(`/music/tracks/${trackId}/played`, { durationListenedSeconds, completed }, { serverId });
+    recordPlay: async (trackId: string, durationListenedSeconds: number, completed: boolean, serverId?: string): Promise<RecordPlayResponse> => {
+        const response = await apiClient.post<RecordPlayResponse>(`/music/tracks/${trackId}/played`, { durationListenedSeconds, completed }, { serverId });
+        return response.data;
     },
 
     getRecentlyPlayed: async (limit?: number, serverId?: string): Promise<ArtistTrackVM[]> => {

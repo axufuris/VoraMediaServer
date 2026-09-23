@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
+using Vora.Application.Media.ViewModels;
 using Vora.Application.Settings;
 using Vora.Application.Users;
 using Vora.Domain.Entities.Media;
@@ -41,7 +42,7 @@ public class RecordTrackPlayGateTests
         _repository.GetTrackByIdAsync(_trackId, Arg.Any<MusicAccessFilter>())
             .Returns(new Track { Id = _trackId, Title = "Liar", Artist = "Britney Spears", DurationSeconds = seconds });
 
-    private Task Play(int secondsListened, bool completed = false) =>
+    private Task<RecordPlayOutcome> Play(int secondsListened, bool completed = false) =>
         _manager.RecordTrackPlayAsync(_profileId, _trackId, secondsListened, completed);
 
     // The case that started this: thirty seconds of a two-minute song used to be
@@ -51,8 +52,9 @@ public class RecordTrackPlayGateTests
     {
         GivenTrackOfLength(120);
 
-        await Play(30);
+        var outcome = await Play(30);
 
+        outcome.Should().Be(RecordPlayOutcome.BelowThreshold);
         await _repository.DidNotReceive().RecordPlayAsync(
             Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<bool>());
     }
@@ -62,8 +64,9 @@ public class RecordTrackPlayGateTests
     {
         GivenTrackOfLength(120);
 
-        await Play(60);
+        var outcome = await Play(60);
 
+        outcome.Should().Be(RecordPlayOutcome.Recorded);
         await _repository.Received(1).RecordPlayAsync(_profileId, _trackId, 60, false);
     }
 
@@ -123,8 +126,12 @@ public class RecordTrackPlayGateTests
     {
         _repository.GetTrackByIdAsync(_trackId, Arg.Any<MusicAccessFilter>()).Returns((Track?)null);
 
-        await Play(30);
+        var outcome = await Play(30);
 
+        // Distinct from BelowThreshold on purpose: a client told only "not
+        // recorded" would go looking in its own threshold logic for a problem
+        // that is actually a bad track id.
+        outcome.Should().Be(RecordPlayOutcome.UnknownTrack);
         await _repository.DidNotReceive().RecordPlayAsync(
             Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<bool>());
     }

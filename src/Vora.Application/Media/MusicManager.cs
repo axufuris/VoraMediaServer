@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -52,7 +52,7 @@ public interface IMusicManager
 
     Task<LyricsResult?> GetTrackLyricsAsync(Guid trackId, MusicAccessFilter access, CancellationToken cancellationToken);
 
-    Task RecordTrackPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed);
+    Task<RecordPlayOutcome> RecordTrackPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed);
     Task UpdateNowPlayingAsync(Guid profileId, Guid trackId, CancellationToken cancellationToken);
     Task<List<ArtistTrackVM>> GetRecentlyPlayedAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<ArtistTrackVM>> GetTopPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit);
@@ -620,7 +620,7 @@ public class MusicManager : IMusicManager
         }).ToList();
     }
 
-    public async Task RecordTrackPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed)
+    public async Task<RecordPlayOutcome> RecordTrackPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed)
     {
         // Looked up rather than taken from the scrobble info, which also comes
         // back null for a track that exists but carries no artist tag. Only a
@@ -629,7 +629,7 @@ public class MusicManager : IMusicManager
         if (track == null)
         {
             _logger.LogDebug("Not recording a play of track {Track}, which no longer exists.", trackId);
-            return;
+            return RecordPlayOutcome.UnknownTrack;
         }
 
         // The gate lives here rather than in the player, because the player is
@@ -641,10 +641,19 @@ public class MusicManager : IMusicManager
             _logger.LogDebug(
                 "Not recording a play of track {Track}: {Seconds}s of {Duration}s is below the threshold.",
                 trackId, durationListenedSeconds, track.DurationSeconds);
-            return;
+            return RecordPlayOutcome.BelowThreshold;
         }
 
         await _repository.RecordPlayAsync(profileId, trackId, durationListenedSeconds, completed);
+
+        // The play is stored either way. Scrobbling is a side effect that must
+        // not change what the caller is told about its own request.
+        await ScrobbleAsync(profileId, trackId);
+        return RecordPlayOutcome.Recorded;
+    }
+
+    private async Task ScrobbleAsync(Guid profileId, Guid trackId)
+    {
         if (!_listeningProviders.Any()) return;
 
         try

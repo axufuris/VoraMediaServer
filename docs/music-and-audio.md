@@ -80,13 +80,15 @@ No persistence — restart wipes it.
 
 `POST /api/music/tracks/{trackId}/played` with `{ durationListenedSeconds, completed }`. **Every client posts here** — web, TV, phone — so the rules below are the contract, not the web player's implementation.
 
+Returns `200 { recorded, outcome }`, where `outcome` is `Recorded`, `BelowThreshold` or `UnknownTrack`. A post that does not qualify is discarded on purpose, which is a correct result rather than a client error, so it is not a 4xx — but it is reported, because otherwise a client posting at the wrong moment sees success and no history and has nothing on either side to connect the two. `UnknownTrack` is kept distinct so a bad track id is not mistaken for a threshold bug.
+
 - **Post once, when the listen ENDS**: the track finished, the queue moved on, or the app is closing. Not when a threshold is crossed. The web player held a `recordedPlayTrackIdRef` set at the threshold and checked the same ref in `onEnded`, so `onEnded` never fired and every row stored "~30 seconds, not completed" regardless of what was heard.
 - **`durationListenedSeconds` is the FURTHEST position reached**, not the latest. Seeking back to replay a passage must not reduce it.
 - **`completed`** means the track played out. It is trusted over the position, because players stop reporting position slightly before the end.
 
 ### What counts as a play
 
-`PlayQualification` in `Vora.Domain` is authoritative and `MusicManager.RecordTrackPlayAsync` enforces it — a post below the bar is **silently discarded** (204 either way, logged at Debug). A client that posts at its own threshold loses those plays without being told.
+`PlayQualification` in `Vora.Domain` is authoritative and `MusicManager.RecordTrackPlayAsync` enforces it — a post below the bar is **discarded, not stored** (logged at Debug, and reported as `BelowThreshold`). A client that posts at its own threshold loses those plays; check `recorded` while building one.
 
 ```
 qualifies = listened >= 240s  OR  listened / trackDuration >= 0.5

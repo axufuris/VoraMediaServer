@@ -476,8 +476,18 @@ public static class MusicEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        await manager.RecordTrackPlayAsync(profileId.Value, trackId, request.DurationListenedSeconds, request.Completed);
-        return Results.NoContent();
+
+        // 200 with the outcome rather than 204. A listen below the threshold is
+        // discarded on purpose, which is a correct result and not a client error,
+        // so it cannot be a 4xx — but saying nothing meant a client posting at the
+        // wrong moment saw success and no history, with nothing on either side to
+        // connect the two.
+        var outcome = await manager.RecordTrackPlayAsync(profileId.Value, trackId, request.DurationListenedSeconds, request.Completed);
+        return Results.Ok(new RecordPlayResponse
+        {
+            Recorded = outcome == RecordPlayOutcome.Recorded,
+            Outcome = outcome
+        });
     }
 
     private static async Task<IResult> UpdateNowPlayingAsync(Guid trackId, ClaimsPrincipal user, IMusicManager manager, CancellationToken cancellationToken)
