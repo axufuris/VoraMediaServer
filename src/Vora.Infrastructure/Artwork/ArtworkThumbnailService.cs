@@ -40,11 +40,21 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
     private const string JpegExtension = ".jpg";
     private const string PngExtension = ".png";
 
+    // Every host an installed artwork provider can hand back a URL on. A host
+    // missing here is not a broken image — it is a BLANK one: the thumbnail
+    // route 404s, MediaCard falls back to its placeholder, and only pages that
+    // render the raw url in an <img> still show the artwork. That is how music
+    // artists ended up with placeholder circles in the grid while their own
+    // detail page showed the picture: Fanart's host was listed and TheAudioDB's
+    // was not, so whichever provider answered decided whether the image appeared.
     private static readonly HashSet<string> AllowedRemoteHosts = new(StringComparer.OrdinalIgnoreCase)
     {
         "image.tmdb.org",
         "artworks.thetvdb.com",
         "assets.fanart.tv",
+        "www.theaudiodb.com",
+        "r2.theaudiodb.com",
+        "coverartarchive.org",
     };
 
     private static int _writeCount;
@@ -252,10 +262,20 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
         }
 
         if (Uri.TryCreate(src, UriKind.Absolute, out var uri)
-            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
-            && AllowedRemoteHosts.Contains(uri.Host))
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
         {
-            return await _downloader.DownloadAsync(src, cancellationToken);
+            if (AllowedRemoteHosts.Contains(uri.Host))
+            {
+                return await _downloader.DownloadAsync(src, cancellationToken);
+            }
+
+            // Rejection is otherwise indistinguishable from "this item has no
+            // artwork" — the card just shows its placeholder. Say which host was
+            // refused, so adding a provider whose CDN is not listed is a line in
+            // the log rather than a blank tile nobody can account for.
+            _logger.LogWarning(
+                "Not serving a thumbnail for {Source}: host '{Host}' is not an allowed artwork source, so the image will render as a placeholder.",
+                src, uri.Host);
         }
 
         return null;
