@@ -1,5 +1,6 @@
 import { type ArtistVM, type AlbumVM, type ArtistTrackVM, type RadioSeed } from '../../../../api/Music/musicService';
 import MusicTrackRow from './MusicTrackRow';
+import { formatCompactCount } from '../../../../utils/compactCount';
 import StarRating from '../../../../components/Client/Primitives/StarRating';
 import RatedBadge from '../../../../components/Client/Primitives/RatedBadge';
 import { type MusicNavState } from './musicNavState';
@@ -111,6 +112,15 @@ export default function MusicArtistView({
                                     )}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                    {/* The world's figure, not this server's — labelled with
+                                        where it comes from so it is not read as how much
+                                        this household plays them. Absent until the first
+                                        popularity refresh has reached this artist. */}
+                                    {formatCompactCount(currentArtist.globalListeners) && (
+                                        <span className="text-xs text-[var(--vora-text-secondary)]" title="Unique listeners on Last.fm">
+                                            <span className="font-semibold text-[var(--vora-text-primary)]">{formatCompactCount(currentArtist.globalListeners)}</span> listeners on Last.fm
+                                        </span>
+                                    )}
                                     <div className="flex items-center gap-2">
                                         <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-secondary)]">Your rating</span>
                                         <StarRating

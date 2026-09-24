@@ -392,8 +392,15 @@ public class MusicRepository : IMusicRepository
             })
             .OrderByDescending(x => x.Plays)
             .ThenByDescending(x => x.LastPlayed)
-            // The remaining keys are today's ordering, so an artist nobody has
-            // played renders exactly what the clients already show.
+            // Then the world's opinion. This is what an artist nobody here has
+            // played is ordered by: their actual hits rather than the first
+            // tracks of their oldest album, which is the slice this section was
+            // introduced to replace. HasValue first so tracks with no figure sink
+            // rather than Postgres putting NULLs first in a descending sort.
+            .ThenByDescending(x => x.Track.GlobalListeners.HasValue)
+            .ThenByDescending(x => x.Track.GlobalListeners)
+            // And only then album order, for tracks nobody anywhere has an
+            // opinion on.
             .ThenBy(x => x.Track.Album == null ? null : x.Track.Album.Year)
             .ThenBy(x => x.Track.DiscNumber)
             .ThenBy(x => x.Track.TrackNumber)
@@ -401,6 +408,31 @@ public class MusicRepository : IMusicRepository
 
         return await query.Take(Math.Clamp(limit, 1, MaxTopTracks)).ToListAsync();
     }
+    // Never-refreshed artists first, then the stalest. Ordered so that a batch
+    // cut short by its limit or by the provider going away still spends itself on
+    // the artists with the least data, not on ones refreshed last month.
+    public Task<List<PopularityRefreshTarget>> GetArtistsDueForPopularityRefreshAsync(DateTime staleBefore, int limit) =>
+        _context.Artists
+            .AsNoTracking()
+            .Where(a => a.PopularityRefreshedAt == null || a.PopularityRefreshedAt < staleBefore)
+            .OrderBy(a => a.PopularityRefreshedAt.HasValue)
+            .ThenBy(a => a.PopularityRefreshedAt)
+            .ThenBy(a => a.Name)
+            .Take(Math.Max(1, limit))
+            .Select(a => new PopularityRefreshTarget(a.Id, a.Name))
+            .ToListAsync();
+
+    // Tracked, with every album and every track, because a refresh rewrites the
+    // artist's whole catalogue as one snapshot.
+    public Task<Artist?> GetArtistCatalogForUpdateAsync(Guid artistId) =>
+        _context.Artists
+            .Include(a => a.Albums)
+            .ThenInclude(al => al.Tracks)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(a => a.Id == artistId);
+
+    public Task SaveMusicChangesAsync(CancellationToken cancellationToken) =>
+        _context.SaveChangesAsync(cancellationToken);
 
     public async Task<List<Album>> GetRecentlyAddedAlbumsAsync(MusicAccessFilter access, int limit)
     {
@@ -462,12 +494,23 @@ public class MusicRepository : IMusicRepository
         // title — the album name sits underneath in smaller text next to the year.
         // Ordering by album title made an A-Z grid look unsorted: the big labels
         // ran in no discernible order.
-        var ordered = sort == AlbumSortOrder.Alphabetical
-            ? query
+        var ordered = sort switch
+        {
+            AlbumSortOrder.Alphabetical => query
                 .OrderBy(a => a.Artist!.SortName ?? a.Artist!.Name)
                 .ThenBy(a => a.SortTitle ?? a.Title)
-                .ThenBy(a => a.Id)
-            : query.OrderByDescending(a => a.AddedAt).ThenBy(a => a.Id);
+                .ThenBy(a => a.Id),
+
+            // HasValue first so albums with no figure sink to the end instead of
+            // Postgres putting NULLs first in a descending sort.
+            AlbumSortOrder.Popular => query
+                .OrderByDescending(a => a.GlobalPlays.HasValue)
+                .ThenByDescending(a => a.GlobalPlays)
+                .ThenBy(a => a.Artist!.SortName ?? a.Artist!.Name)
+                .ThenBy(a => a.Id),
+
+            _ => query.OrderByDescending(a => a.AddedAt).ThenBy(a => a.Id),
+        };
 
         var albums = await ordered
             .Skip(offset)

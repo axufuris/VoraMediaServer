@@ -10,6 +10,7 @@ const ALBUM_PAGE_SIZE = 60;
 const SORTS: { key: AlbumSortOrder; label: string }[] = [
     { key: 'Alphabetical', label: 'A–Z' },
     { key: 'RecentlyAdded', label: 'Recently added' },
+    { key: 'Popular', label: 'Popular' },
 ];
 
 interface MusicAlbumsViewProps {

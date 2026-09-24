@@ -48,6 +48,9 @@ public interface IMusicRepository
     Task<string?> GetTrackFilePathAsync(Guid trackId, MusicAccessFilter access);
 
     Task<Artist?> GetArtistForUpdateAsync(Guid artistId);
+    Task<List<PopularityRefreshTarget>> GetArtistsDueForPopularityRefreshAsync(DateTime staleBefore, int limit);
+    Task<Artist?> GetArtistCatalogForUpdateAsync(Guid artistId);
+    Task SaveMusicChangesAsync(CancellationToken cancellationToken);
     Task<Album?> GetAlbumForUpdateAsync(Guid albumId);
     Task<Track?> GetTrackForUpdateAsync(Guid trackId);
     Task UpdateTrackAsync(Track track);
@@ -134,3 +137,5 @@ public class MusicAccessFilter
 
     public static MusicAccessFilter Unrestricted => new();
 }
+
+public sealed record PopularityRefreshTarget(Guid ArtistId, string ArtistName);

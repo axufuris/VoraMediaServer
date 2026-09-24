@@ -1,4 +1,4 @@
-﻿using Vora.Domain.Entities.Common;
+using Vora.Domain.Entities.Common;
 using Vora.Domain.Entities.Library;
 
 namespace Vora.Domain.Entities.Media;
@@ -23,6 +23,14 @@ public class Album : LockableEntity
     public bool IsCompilation { get; set; }
 
     public decimal? ServerAdminRating { get; set; }
+
+    // How popular this is in the WORLD, from Last.fm's aggregate over its own
+    // users. Named Global so it cannot be mistaken for this server's plays, which
+    // live in TrackPlayHistory and drive the Popular section - two different
+    // questions that are easy to conflate and wrong to mix.
+    // Plays only: Last.fm's artist.getTopAlbums returns a playcount per album and
+    // no listener count, so a listeners column here would never be filled.
+    public long? GlobalPlays { get; set; }
 
     public Guid ArtistId { get; set; }
     public virtual Artist Artist { get; set; } = null!;
