@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Media.ViewModels;
 using Vora.Application.Settings;
@@ -487,7 +487,6 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         {
             HasAllLibraryAccess = profile.HasAllLibraryAccess,
             AllowedLibraryIds = profile.AllowedLibraryIds ?? new List<Guid>(),
-            HasAllRatings = musicRatings.Count == 0,
             AllowedRatings = musicRatings,
             BlockUnratedContent = profile.BlockUnratedContent
         };

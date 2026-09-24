@@ -37,7 +37,7 @@ public class SmartPlaylistEvaluatorTvTests
         _fx.AddEpisode(f1, "The Emperor's Peace", 1);
 
         var results = await _fx.Evaluator.EvaluateAsync(
-            Definition(AllOf()), PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+            Definition(AllOf()), PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().HaveCount(3);
     }
@@ -52,7 +52,7 @@ public class SmartPlaylistEvaluatorTvTests
         _fx.AddEpisode(season, "In Perpetuity", 3);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.Title, SmartPlaylistOperator.Contains, "good")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().ContainSingle();
         results[0].Title.Should().Be("Good News About Hell");
@@ -71,7 +71,7 @@ public class SmartPlaylistEvaluatorTvTests
         _fx.AddEpisode(f1, "Ep1", 1);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.ShowTitle, SmartPlaylistOperator.Equals, "Severance")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().HaveCount(2);
     }
@@ -85,7 +85,7 @@ public class SmartPlaylistEvaluatorTvTests
         _fx.AddEpisode(_fx.AddSeason(fnd, 1), "Ep1", 1);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.ShowTitle, SmartPlaylistOperator.Contains, "found")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().ContainSingle();
     }
@@ -100,7 +100,7 @@ public class SmartPlaylistEvaluatorTvTests
         _fx.AddEpisode(s2, "S2E2", 2);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.SeasonNumber, SmartPlaylistOperator.Equals, "2")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().HaveCount(2);
         results.All(r => r.Title.StartsWith("S2")).Should().BeTrue();
@@ -115,7 +115,7 @@ public class SmartPlaylistEvaluatorTvTests
         _fx.AddEpisode(_fx.AddSeason(sev, 3), "S3E1", 1);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.SeasonNumber, SmartPlaylistOperator.GreaterThan, "1")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().HaveCount(2);
         results.Should().NotContain(r => r.Title == "S1E1");
@@ -133,7 +133,7 @@ public class SmartPlaylistEvaluatorTvTests
         _fx.AddEpisode(s2, "S2E2", 2);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.EpisodeNumber, SmartPlaylistOperator.Equals, "1")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().HaveCount(2);
     }
@@ -149,7 +149,7 @@ public class SmartPlaylistEvaluatorTvTests
             Rule(SmartPlaylistField.ShowTitle, SmartPlaylistOperator.Equals, "Severance"),
             Rule(SmartPlaylistField.SeasonNumber, SmartPlaylistOperator.Equals, "2"),
             Rule(SmartPlaylistField.EpisodeNumber, SmartPlaylistOperator.Equals, "5")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().ContainSingle();
         results[0].Title.Should().Be("S2E5");
@@ -164,7 +164,7 @@ public class SmartPlaylistEvaluatorTvTests
         _fx.AddEpisode(season, "New", 2, releaseYear: 2026);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.Year, SmartPlaylistOperator.Equals, "2026")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().ContainSingle();
         results[0].Title.Should().Be("New");
@@ -179,7 +179,7 @@ public class SmartPlaylistEvaluatorTvTests
         _fx.AddEpisode(season, "MA", 2, contentRating: "TV-MA");
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.ContentRating, SmartPlaylistOperator.Equals, "TV-MA")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().ContainSingle();
         results[0].Title.Should().Be("MA");
@@ -195,7 +195,7 @@ public class SmartPlaylistEvaluatorTvTests
         _fx.AddEpisode(_fx.AddSeason(comedy, 1), "Brooklyn Ep1", 1);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.Genre, SmartPlaylistOperator.Equals, "sci-fi")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().ContainSingle();
         results[0].Title.Should().Be("Severance Ep1");
@@ -213,7 +213,7 @@ public class SmartPlaylistEvaluatorTvTests
         var def = Definition(AnyOf(
             Rule(SmartPlaylistField.Year, SmartPlaylistOperator.Equals, "2023"),
             Rule(SmartPlaylistField.SeasonNumber, SmartPlaylistOperator.Equals, "99")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Shows, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().HaveCount(2);
         results.Select(r => r.Title).Should().BeEquivalentTo(new[] { "S1E2", "S99" });

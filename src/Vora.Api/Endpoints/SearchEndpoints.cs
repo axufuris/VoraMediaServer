@@ -30,7 +30,6 @@ public static class SearchEndpoints
             q.Trim(),
             user.HasAllLibraryAccess(),
             user.GetAllowedLibraryIds(),
-            user.HasAllContentRatings(),
             user.GetAllowedMovieRatings(),
             user.GetAllowedTvRatings(),
             user.GetAllowedMusicRatings(),

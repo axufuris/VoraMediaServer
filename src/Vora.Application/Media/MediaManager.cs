@@ -13,8 +13,8 @@ namespace Vora.Application.Media;
 
 public interface IMediaManager
 {
-    Task<MediaDetailsVM?> GetMediaItemAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, bool hasAllRatings, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated);
-    Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, bool hasAllRatings, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated);
+    Task<MediaDetailsVM?> GetMediaItemAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated);
+    Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated);
     Task<MediaDetailsVM?> GetMediaItemAsync(Guid id);
     Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId);
     Task<SeasonDetailsVM?> GetSeasonDetailsAsync(Guid seasonId);
@@ -78,9 +78,9 @@ public class MediaManager : IMediaManager
         _logger = logger;
     }
 
-    public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, bool hasAllRatings, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
+    public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
     {
-        var vm = await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection, hasAllAccess, allowedLibs, hasAllRatings, allowedMovieRatings, allowedTvRatings, blockUnrated);
+        var vm = await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
 
         if (vm == null || !profileId.HasValue) return vm;
 
@@ -88,9 +88,9 @@ public class MediaManager : IMediaManager
         return vm;
     }
 
-    public async Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, bool hasAllRatings, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
+    public async Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
     {
-        var items = await _repository.GetAllProjectedAsync(LibraryItemVM.Projection, libraryId, null, hasAllAccess, allowedLibs, hasAllRatings, allowedMovieRatings, allowedTvRatings, blockUnrated);
+        var items = await _repository.GetAllProjectedAsync(LibraryItemVM.Projection, libraryId, null, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
         var groupedItems = items.GroupBy(e => $"{e.Title.ToLower().Trim()}_{e.ReleaseDate?.Year}").Select(g => g.First()).ToList();
 
         if (profileId.HasValue) await _stateRepository.AttachLibraryItemUserStatesAsync(groupedItems, profileId.Value);

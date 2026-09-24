@@ -131,8 +131,21 @@ public class MusicAccessFilter
 {
     public bool HasAllLibraryAccess { get; init; } = true;
     public List<Guid> AllowedLibraryIds { get; init; } = new();
-    public bool HasAllRatings { get; init; } = true;
+
+    // The music ratings this profile may hear — "Clean", "Explicit". Empty means
+    // no music restriction, the same meaning an empty allowlist has for movies
+    // and TV.
     public List<string> AllowedRatings { get; init; } = new();
+
+    // Derived, never set. It used to be set from the profile's single
+    // hasAllRatings claim, which is true only when movies, TV AND music are all
+    // unrestricted. So a parent who restricted a child's movies and left music
+    // open got HasAllRatings=false with an empty music allowlist — and the
+    // filter then hid every track tagged Clean or Explicit, leaving only the
+    // untagged ones. Music's restriction has to come from music's allowlist, and
+    // making this computed is what stops a construction site getting it wrong.
+    public bool HasAllRatings => AllowedRatings.Count == 0;
+
     public bool BlockUnratedContent { get; init; }
 
     public static MusicAccessFilter Unrestricted => new();

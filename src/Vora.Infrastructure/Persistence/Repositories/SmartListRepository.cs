@@ -22,13 +22,12 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         Guid? collectionId = null,
         bool hasAllAccess = true,
         List<Guid>? allowedLibs = null,
-        bool hasAllRatings = true,
         List<string>? allowedMovieRatings = null,
         List<string>? allowedTvRatings = null,
         bool blockUnrated = false)
     {
         var query = context.MediaItems.AsNoTracking().AsQueryable();
-        query = query.ApplyAccessFilters(hasAllAccess, allowedLibs ?? new List<Guid>(), hasAllRatings, allowedMovieRatings ?? new List<string>(), allowedTvRatings ?? new List<string>(), blockUnrated);
+        query = query.ApplyAccessFilters(hasAllAccess, allowedLibs ?? new List<Guid>(), allowedMovieRatings ?? new List<string>(), allowedTvRatings ?? new List<string>(), blockUnrated);
 
         if (!hasAllAccess && allowedLibs != null)
         {

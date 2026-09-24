@@ -26,7 +26,7 @@ public sealed class SmartPlaylistManager : ISmartPlaylistManager
         _musicRepo = musicRepo;
     }
 
-    public async Task<List<SmartPlaylistSummaryVM>> ListAsync(Guid profileId, MusicAccessFilter access)
+    public async Task<List<SmartPlaylistSummaryVM>> ListAsync(Guid profileId, PlaylistAccessFilter access)
     {
         var rows = await _repo.GetForProfileAsync(profileId);
         var summaries = new List<SmartPlaylistSummaryVM>(rows.Count);
@@ -51,7 +51,7 @@ public sealed class SmartPlaylistManager : ISmartPlaylistManager
         return summaries;
     }
 
-    public async Task<SmartPlaylistDetailVM?> GetAsync(Guid id, Guid profileId, MusicAccessFilter access)
+    public async Task<SmartPlaylistDetailVM?> GetAsync(Guid id, Guid profileId, PlaylistAccessFilter access)
     {
         var row = await _repo.GetByIdAsync(id, profileId);
         if (row == null) return null;
@@ -125,10 +125,10 @@ public sealed class SmartPlaylistManager : ISmartPlaylistManager
 
     public Task DeleteAsync(Guid id, Guid profileId) => _repo.DeleteAsync(id, profileId);
 
-    public Task<int> PreviewCountAsync(Guid profileId, MusicAccessFilter access, PlaylistMediaType mediaType, SmartPlaylistDefinition definition) =>
+    public Task<int> PreviewCountAsync(Guid profileId, PlaylistAccessFilter access, PlaylistMediaType mediaType, SmartPlaylistDefinition definition) =>
         _evaluator.CountAsync(definition, mediaType, profileId, access);
 
-    public async Task<SmartPlaylistItemsVM> GetItemsAsync(Guid id, Guid profileId, MusicAccessFilter access)
+    public async Task<SmartPlaylistItemsVM> GetItemsAsync(Guid id, Guid profileId, PlaylistAccessFilter access)
     {
         var row = await _repo.GetByIdAsync(id, profileId);
         if (row == null) return new SmartPlaylistItemsVM { MediaType = PlaylistMediaType.Music };

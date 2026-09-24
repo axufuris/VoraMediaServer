@@ -1,4 +1,6 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
+using Vora.Application.Media;
+using Vora.Application.Media.SmartPlaylists;
 
 namespace Vora.Api.Extensions;
 
@@ -57,12 +59,6 @@ public static class AuthExtensions
             .ToList();
     }
 
-    public static bool HasAllContentRatings(this ClaimsPrincipal user)
-    {
-        var claim = user.FindFirst("hasAllRatings");
-        return claim != null && bool.TryParse(claim.Value, out var value) && value;
-    }
-
     public static List<string> GetAllowedMovieRatings(this ClaimsPrincipal user)
     {
         return user.FindAll("allowedMovieRating").Select(c => c.Value).ToList();
@@ -83,6 +79,30 @@ public static class AuthExtensions
         var claim = user.FindFirst("blockUnrated");
         return claim != null && bool.TryParse(claim.Value, out var value) && value;
     }
+
+    // The one place a request's music access is decided. The music and smart
+    // playlist endpoints each built their own copy of this, and both passed the
+    // profile's cross-media hasAllRatings through — so restricting a child's
+    // movies silently restricted their music to untagged tracks only. Whether
+    // music is restricted now follows from the music allowlist alone, which
+    // MusicAccessFilter computes rather than accepting.
+    public static MusicAccessFilter GetMusicAccessFilter(this ClaimsPrincipal user) => new()
+    {
+        HasAllLibraryAccess = user.HasAllLibraryAccess(),
+        AllowedLibraryIds = user.GetAllowedLibraryIds(),
+        AllowedRatings = user.GetAllowedMusicRatings(),
+        BlockUnratedContent = user.BlockUnratedContent()
+    };
+
+    public static PlaylistAccessFilter GetPlaylistAccessFilter(this ClaimsPrincipal user) => new()
+    {
+        HasAllLibraryAccess = user.HasAllLibraryAccess(),
+        AllowedLibraryIds = user.GetAllowedLibraryIds(),
+        AllowedMovieRatings = user.GetAllowedMovieRatings(),
+        AllowedTvRatings = user.GetAllowedTvRatings(),
+        AllowedMusicRatings = user.GetAllowedMusicRatings(),
+        BlockUnratedContent = user.BlockUnratedContent()
+    };
 
     public static bool CanTimeshiftIptv(this ClaimsPrincipal user)
     {

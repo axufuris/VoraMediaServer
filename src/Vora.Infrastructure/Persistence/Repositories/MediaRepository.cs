@@ -564,20 +564,20 @@ public partial class MediaRepository : IMediaRepository
             .ToListAsync();
     }
 
-    public async Task<T?> GetProjectedAsync<T>(Guid id, Expression<Func<MediaItem, T>> projection, bool hasAllAccess = true, List<Guid>? allowedLibs = null, bool hasAllRatings = true, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false)
+    public async Task<T?> GetProjectedAsync<T>(Guid id, Expression<Func<MediaItem, T>> projection, bool hasAllAccess = true, List<Guid>? allowedLibs = null, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false)
     {
         var query = _context.MediaItems.AsNoTracking().AsSplitQuery().Where(m => m.Id == id);
-        query = query.ApplyAccessFilters(hasAllAccess, allowedLibs ?? new List<Guid>(), hasAllRatings, allowedMovieRatings ?? new List<string>(), allowedTvRatings ?? new List<string>(), blockUnrated);
+        query = query.ApplyAccessFilters(hasAllAccess, allowedLibs ?? new List<Guid>(), allowedMovieRatings ?? new List<string>(), allowedTvRatings ?? new List<string>(), blockUnrated);
 
         if (!hasAllAccess && allowedLibs != null) query = query.Where(m => allowedLibs.Contains(m.LibraryId));
 
         return await query.Select(projection).FirstOrDefaultAsync();
     }
 
-    public async Task<IEnumerable<T>> GetAllProjectedAsync<T>(Expression<Func<MediaItem, T>> projection, Guid? libraryId = null, string? libraryType = null, bool hasAllAccess = true, List<Guid>? allowedLibs = null, bool hasAllRatings = true, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false)
+    public async Task<IEnumerable<T>> GetAllProjectedAsync<T>(Expression<Func<MediaItem, T>> projection, Guid? libraryId = null, string? libraryType = null, bool hasAllAccess = true, List<Guid>? allowedLibs = null, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false)
     {
         var query = _context.MediaItems.AsNoTracking().AsSplitQuery();
-        query = query.ApplyAccessFilters(hasAllAccess, allowedLibs ?? new List<Guid>(), hasAllRatings, allowedMovieRatings ?? new List<string>(), allowedTvRatings ?? new List<string>(), blockUnrated);
+        query = query.ApplyAccessFilters(hasAllAccess, allowedLibs ?? new List<Guid>(), allowedMovieRatings ?? new List<string>(), allowedTvRatings ?? new List<string>(), blockUnrated);
 
         if (!hasAllAccess && allowedLibs != null) query = query.Where(m => allowedLibs.Contains(m.LibraryId));
 

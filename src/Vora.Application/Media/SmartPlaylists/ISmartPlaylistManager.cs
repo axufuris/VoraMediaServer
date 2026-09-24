@@ -4,13 +4,13 @@ namespace Vora.Application.Media.SmartPlaylists;
 
 public interface ISmartPlaylistManager
 {
-    Task<List<SmartPlaylistSummaryVM>> ListAsync(Guid profileId, MusicAccessFilter access);
-    Task<SmartPlaylistDetailVM?> GetAsync(Guid id, Guid profileId, MusicAccessFilter access);
+    Task<List<SmartPlaylistSummaryVM>> ListAsync(Guid profileId, PlaylistAccessFilter access);
+    Task<SmartPlaylistDetailVM?> GetAsync(Guid id, Guid profileId, PlaylistAccessFilter access);
     Task<SmartPlaylistSummaryVM> CreateAsync(Guid profileId, SmartPlaylistSaveRequest request);
     Task<SmartPlaylistSummaryVM?> UpdateAsync(Guid id, Guid profileId, SmartPlaylistSaveRequest request);
     Task DeleteAsync(Guid id, Guid profileId);
-    Task<int> PreviewCountAsync(Guid profileId, MusicAccessFilter access, PlaylistMediaType mediaType, SmartPlaylistDefinition definition);
-    Task<SmartPlaylistItemsVM> GetItemsAsync(Guid id, Guid profileId, MusicAccessFilter access);
+    Task<int> PreviewCountAsync(Guid profileId, PlaylistAccessFilter access, PlaylistMediaType mediaType, SmartPlaylistDefinition definition);
+    Task<SmartPlaylistItemsVM> GetItemsAsync(Guid id, Guid profileId, PlaylistAccessFilter access);
 }
 
 public sealed class SmartPlaylistSaveRequest

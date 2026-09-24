@@ -155,7 +155,7 @@ public class MusicRepositoryAlbumPageTests
         shelf.Album("Explicit", 2, rating: "Explicit");
         shelf.Album("Empty", 3, withTrack: false);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
-        var access = new MusicAccessFilter { HasAllRatings = false, AllowedRatings = new List<string> { "Clean" } };
+        var access = new MusicAccessFilter { AllowedRatings = new List<string> { "Clean" } };
 
         var (albums, total) = await new MusicRepository(db).GetAlbumsPageAsync(null, access, AlbumSortOrder.RecentlyAdded, 0, 10);
 

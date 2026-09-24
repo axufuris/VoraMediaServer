@@ -441,6 +441,9 @@ function ProfileEditor({ profile, user, libraries, iptvPlaylists, serverId, onCl
 
                             {!editAllowAllRatings && (
                                 <div className="space-y-4">
+                                    <p className="text-xs text-[var(--vora-text-disabled)]">
+                                        Movies, TV and music are limited separately. Leave a section with nothing selected to allow everything in it.
+                                    </p>
                                     <div>
                                         <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-disabled)] mb-2">Movies</label>
                                         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 bg-[var(--vora-bg-canvas)] p-3 rounded-md border border-[var(--vora-border-subtle)]">

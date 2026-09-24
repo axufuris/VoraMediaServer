@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 using Vora.Plugins.Dtos;
@@ -1163,9 +1163,13 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
             {
                 foreach (var frame in id3v2.GetFrames<TagLib.Id3v2.UserTextInformationFrame>())
                 {
+                    // Not "RATING WMP": that is Windows Media Player's STAR rating,
+                    // stored as 1 / 25 / 50 / 75 / 99. Reading it as an advisory
+                    // turned a one-star song into "Explicit" — value "1" is the
+                    // iTunes code for explicit — and hid it from every restricted
+                    // profile for a reason that had nothing to do with its content.
                     if (string.Equals(frame.Description, "ITUNESADVISORY", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(frame.Description, "PARENTAL_ADVISORY", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(frame.Description, "RATING WMP", StringComparison.OrdinalIgnoreCase))
+                        || string.Equals(frame.Description, "PARENTAL_ADVISORY", StringComparison.OrdinalIgnoreCase))
                     {
                         var value = frame.Text.FirstOrDefault();
                         if (string.IsNullOrEmpty(value)) continue;

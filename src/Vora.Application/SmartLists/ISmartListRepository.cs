@@ -17,7 +17,6 @@ public interface ISmartListRepository
         Guid? collectionId = null,
         bool hasAllAccess = true,
         List<Guid>? allowedLibs = null,
-        bool hasAllRatings = true,
         List<string>? allowedMovieRatings = null,
         List<string>? allowedTvRatings = null,
         bool blockUnrated = false);
