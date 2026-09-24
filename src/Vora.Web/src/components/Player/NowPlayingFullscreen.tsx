@@ -9,7 +9,6 @@ import { NowPlayingShell } from './NowPlaying/NowPlayingShell';
 import { NowPlayingArtwork } from './NowPlaying/NowPlayingArtwork';
 import { NowPlayingControlRow, NowPlayingIconButton, NowPlayingPill, NowPlayingPlayButton, NowPlayingSeekBar, NowPlayingVolume } from './NowPlaying/NowPlayingControls';
 import { lyricsScrollTop } from '../../utils/lyricsScroll';
-import { plainLyricsScrollTop } from '../../utils/plainLyricsScroll';
 import AddToPlaylistModal from '../Collections/AddToPlaylistModal';
 
 export default function NowPlayingFullscreen() {
@@ -84,8 +83,12 @@ export default function NowPlayingFullscreen() {
     // without clearing the preference for the one after.
     const lyricsOpen = lyricsWanted && (hasLyrics || lyricsLoading);
     const showLyricsToggle = hasLyrics || lyricsOpen;
-    // Plain lyrics carry no timings, so the panel travels with the song's
-    // progress instead. It is not something the viewer scrolls or tabs into.
+    // Plain lyrics carry no timings, so they are shown as what they are: a block
+    // of text the listener scrolls themselves. The panel used to scroll them in
+    // proportion to the song's progress and lock manual scrolling, which read as
+    // broken sync — a proportional position lands mid-verse whenever the text
+    // has repeated choruses or section headers, and the listener could not
+    // scroll back to where the singer actually was.
     const plainLyricsOpen = lyricsOpen && !!lyrics && !(lyrics.isSynced && parsedLrc.length > 0);
 
     useEffect(() => {
@@ -114,13 +117,13 @@ export default function NowPlayingFullscreen() {
 
     const currentTrackId = currentMedia?.id;
 
+    // A new track starts at the top of its own text rather than wherever the
+    // listener had scrolled the previous one to.
     useEffect(() => {
         if (!plainLyricsOpen) return;
         const container = lyricsScrollRef.current;
-        if (!container) return;
-
-        container.scrollTop = plainLyricsScrollTop(currentTime, duration, container.scrollHeight, container.clientHeight);
-    }, [plainLyricsOpen, currentTime, duration, lyrics?.plainLyrics]);
+        if (container) container.scrollTop = 0;
+    }, [plainLyricsOpen, currentTrackId]);
 
     useEffect(() => {
         if (!lyricsOpen) {
@@ -411,7 +414,8 @@ export default function NowPlayingFullscreen() {
                         ref={lyricsScrollRef}
                         data-testid="lyrics-panel"
                         aria-label="Lyrics"
-                        className={`mt-6 min-h-0 w-full max-w-[640px] flex-1 px-4 ${plainLyricsOpen ? 'overflow-hidden' : 'overflow-y-auto'}`}
+                        tabIndex={plainLyricsOpen ? 0 : undefined}
+                        className="mt-6 min-h-0 w-full max-w-[640px] flex-1 overflow-y-auto px-4"
                     >
                         {lyricsLoading ? (
                             <div className="py-16 text-center text-sm" style={{ color: 'var(--vora-text-muted)' }}>Loading lyrics…</div>
@@ -435,7 +439,15 @@ export default function NowPlayingFullscreen() {
                                 })}
                             </div>
                         ) : (
-                            <pre className="whitespace-pre-wrap py-6 text-center font-sans text-base leading-relaxed" style={{ color: 'var(--vora-text-secondary)' }}>{lyrics.plainLyrics || ''}</pre>
+                            <>
+                                {/* Said once, quietly, so the absence of a moving
+                                    highlight reads as a kind of lyrics rather than
+                                    as sync that has stopped working. */}
+                                <div className="pt-4 text-center text-[11px] uppercase tracking-widest" style={{ color: 'var(--vora-text-disabled)' }}>
+                                    Not synced to this recording
+                                </div>
+                                <pre className="whitespace-pre-wrap py-4 text-center font-sans text-base leading-relaxed" style={{ color: 'var(--vora-text-secondary)' }}>{lyrics.plainLyrics || ''}</pre>
+                            </>
                         )}
                         {lyrics?.providerName && (
                             <div className="pb-4 text-center text-[10px]" style={{ color: 'var(--vora-text-disabled)' }}>Lyrics via {lyrics.providerName}</div>

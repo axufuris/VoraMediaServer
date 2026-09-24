@@ -184,18 +184,41 @@ describe('music now playing', () => {
         expect(screen.queryByRole('button', { name: 'Playlist' })).toBeNull();
     });
 
-    it('lets plain lyrics ride along with the song instead of being scrolled', async () => {
-        getTrackLyrics.mockResolvedValue({ plainLyrics: `Line one
-Line two
-Line three`, syncedLyrics: null, isSynced: false, providerName: 'LRClib', sourceUrl: null });
+    // Plain lyrics have no timings. Scrolling them in proportion to the song
+    // read as broken sync and locked out manual scrolling, so they are a plain
+    // block of text the listener moves through themselves.
+    it('shows plain lyrics as text the listener scrolls, not as fake sync', async () => {
+        getTrackLyrics.mockResolvedValue({ plainLyrics: `[Chorus]
+Line one
+Line two`, syncedLyrics: null, isSynced: false, providerName: 'Genius', sourceUrl: null });
         renderScreen(player());
 
         fireEvent.click(await screen.findByRole('button', { name: 'Lyrics' }));
 
         const panel = await screen.findByTestId('lyrics-panel');
-        expect(panel.className).toContain('overflow-hidden');
-        expect(panel.className).not.toContain('overflow-y-auto');
-        expect(panel).not.toHaveAttribute('tabindex');
+        expect(panel.className).toContain('overflow-y-auto');
+        expect(panel.className).not.toContain('overflow-hidden');
+        // Scrollable by keyboard as well as by pointer.
+        expect(panel).toHaveAttribute('tabindex', '0');
+    });
+
+    it('says plainly when lyrics are not synced', async () => {
+        getTrackLyrics.mockResolvedValue({ plainLyrics: 'Line one', syncedLyrics: null, isSynced: false, providerName: 'Genius', sourceUrl: null });
+        renderScreen(player());
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Lyrics' }));
+
+        expect(await screen.findByText('Not synced to this recording')).toBeInTheDocument();
+    });
+
+    it('does not label synced lyrics as unsynced', async () => {
+        getTrackLyrics.mockResolvedValue({ plainLyrics: null, syncedLyrics: `[00:10.00]Line one`, isSynced: true, providerName: 'LRClib', sourceUrl: null });
+        renderScreen(player());
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Lyrics' }));
+
+        await screen.findByText('Line one');
+        expect(screen.queryByText('Not synced to this recording')).toBeNull();
     });
 
     it('keeps synced lyrics scrollable so a line can be clicked', async () => {
