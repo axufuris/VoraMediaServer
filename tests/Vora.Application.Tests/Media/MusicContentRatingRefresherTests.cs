@@ -14,6 +14,7 @@ public class MusicContentRatingRefresherTests
     private readonly IMusicRepository _repository = Substitute.For<IMusicRepository>();
     private readonly IMusicContentRatingProvider _provider = Substitute.For<IMusicContentRatingProvider>();
     private readonly ISystemSettingsRepository _settings = Substitute.For<ISystemSettingsRepository>();
+    private readonly ITaskProgressReporter _progress = Substitute.For<ITaskProgressReporter>();
 
     public MusicContentRatingRefresherTests()
     {
@@ -26,7 +27,7 @@ public class MusicContentRatingRefresherTests
     }
 
     private MusicContentRatingRefresher Refresher() => new(
-        _repository, new[] { _provider }, _settings,
+        _repository, new[] { _provider }, _settings, _progress,
         NullLogger<MusicContentRatingRefresher>.Instance, (_, _) => Task.CompletedTask);
 
     private List<Track> GivenAlbum(string artist, string album, params Track[] tracks)
@@ -158,5 +159,24 @@ public class MusicContentRatingRefresherTests
         await Refresher().RateDueAlbumsAsync(TestContext.Current.CancellationToken);
 
         await _repository.DidNotReceive().GetAlbumsDueForContentRatingAsync(Arg.Any<DateTime>(), Arg.Any<int>());
+    }
+
+    // The task row shows how far through the run it is and which album it is on.
+    [Fact]
+    public async Task Progress_names_each_album_with_its_place_in_the_run()
+    {
+        var first = new ContentRatingTarget(Guid.NewGuid(), "Eminem", "The Eminem Show");
+        var second = new ContentRatingTarget(Guid.NewGuid(), "Luke Bryan", "Crash My Party");
+        _repository.GetAlbumsDueForContentRatingAsync(Arg.Any<DateTime>(), Arg.Any<int>()).Returns(new List<ContentRatingTarget> { first, second });
+        _repository.GetAlbumTracksForUpdateAsync(Arg.Any<Guid>()).Returns(new List<Track>());
+
+        await Refresher().RateDueAlbumsAsync(TestContext.Current.CancellationToken);
+
+        Received.InOrder(() =>
+        {
+            _progress.Report("Checking Clean / Explicit 1/2: Eminem - The Eminem Show");
+            _progress.Report("Checking Clean / Explicit 2/2: Luke Bryan - Crash My Party");
+            _progress.Report(null);
+        });
     }
 }
