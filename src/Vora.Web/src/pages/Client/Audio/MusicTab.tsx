@@ -73,6 +73,7 @@ export default function MusicTab() {
     const [currentArtist, setCurrentArtist] = useState<ArtistVM | null>(null);
     const [albums, setAlbums] = useState<AlbumVM[]>([]);
     const [currentAlbum, setCurrentAlbum] = useState<AlbumVM | null>(null);
+    const [albumArtistBackgroundUrl, setAlbumArtistBackgroundUrl] = useState<string | null>(null);
     const [tracks, setTracks] = useState<TrackVM[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -476,6 +477,7 @@ export default function MusicTab() {
             .then(detail => {
                 setCurrentAlbum(detail.album);
                 setTracks(detail.tracks);
+                setAlbumArtistBackgroundUrl(detail.artistBackgroundUrl);
             })
             .catch(err => {
                 console.error('Failed to load album detail', err);
@@ -715,8 +717,14 @@ export default function MusicTab() {
         }
     };
 
+    // Resolved once and passed down, rather than coalesced at each use. Most
+    // albums have no background of their own — fanart's album coverage is thin
+    // and an embedded cover never carries one — so without this the album page
+    // is flat black while the artist page one tap away is fully dressed.
+    const albumBackdrop = currentAlbum?.backgroundUrl ?? albumArtistBackgroundUrl;
+
     const activeBackgroundUrl = searchActive ? null
-        : nav.view === 'album' ? currentAlbum?.backgroundUrl
+        : nav.view === 'album' ? albumBackdrop
         : null;
 
     return (
@@ -854,6 +862,7 @@ export default function MusicTab() {
                 <MusicAlbumView
                     isLoading={isLoading}
                     currentAlbum={currentAlbum}
+                    albumBackdrop={albumBackdrop}
                     tracks={tracks}
                     isServerAdmin={isServerAdmin}
                     playFromIndex={playFromIndex}

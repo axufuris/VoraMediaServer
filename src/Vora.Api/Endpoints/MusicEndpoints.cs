@@ -404,9 +404,14 @@ public static class MusicEndpoints
 
     private static async Task<IResult> GetAlbumDetailAsync(Guid albumId, ClaimsPrincipal user, IMusicManager manager)
     {
-        var (album, tracks) = await manager.GetAlbumDetailAsync(albumId, user.GetProfileId(), BuildFilter(user));
+        var (album, tracks, artistBackgroundUrl) = await manager.GetAlbumDetailAsync(albumId, user.GetProfileId(), BuildFilter(user));
         if (album == null) return Results.NotFound();
-        return Results.Ok(new Vora.Application.Media.ViewModels.AlbumDetailVM { Album = album, Tracks = tracks });
+        return Results.Ok(new AlbumDetailVM
+        {
+            Album = album,
+            Tracks = tracks,
+            ArtistBackgroundUrl = artistBackgroundUrl
+        });
     }
 
     private static async Task<IResult> GetArtistTracksAsync(Guid artistId, ClaimsPrincipal user, IMusicManager manager)
