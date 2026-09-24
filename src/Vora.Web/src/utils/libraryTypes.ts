@@ -19,3 +19,16 @@ export const LIBRARY_TYPE_NAMES: Record<number, string> = {
 export function libraryTypeToName(type: number): string | undefined {
     return LIBRARY_TYPE_NAMES[type];
 }
+
+// Mirrors LibraryCapabilities.HasVideoContent in Vora.Domain. Frames, embedded
+// subtitle tracks, scrub-bar sprites and chapter markers all mean nothing
+// without a video stream, so the admin sections for them are hidden rather than
+// shown reporting zero.
+//
+// The API sends the type as its enum NAME, so this compares case-insensitively
+// on that rather than on the numeric form the create page works in.
+const VIDEO_BEARING_TYPES = ['movie', 'tvshow', 'homevideo'];
+
+export function libraryHasVideoContent(typeName: string | undefined): boolean {
+    return !!typeName && VIDEO_BEARING_TYPES.includes(typeName.toLowerCase());
+}
