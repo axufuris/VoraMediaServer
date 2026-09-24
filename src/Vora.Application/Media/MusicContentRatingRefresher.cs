@@ -43,6 +43,7 @@ public class MusicContentRatingRefresher : IMusicContentRatingRefresher
     private readonly IMusicRepository _repository;
     private readonly IEnumerable<IMusicContentRatingProvider> _providers;
     private readonly ISystemSettingsRepository _settings;
+    private readonly ITaskProgressReporter _progress;
     private readonly ILogger<MusicContentRatingRefresher> _logger;
     private readonly Func<TimeSpan, CancellationToken, Task> _pause;
 
@@ -50,8 +51,9 @@ public class MusicContentRatingRefresher : IMusicContentRatingRefresher
         IMusicRepository repository,
         IEnumerable<IMusicContentRatingProvider> providers,
         ISystemSettingsRepository settings,
+        ITaskProgressReporter progress,
         ILogger<MusicContentRatingRefresher> logger)
-        : this(repository, providers, settings, logger, Task.Delay)
+        : this(repository, providers, settings, progress, logger, Task.Delay)
     {
     }
 
@@ -59,12 +61,14 @@ public class MusicContentRatingRefresher : IMusicContentRatingRefresher
         IMusicRepository repository,
         IEnumerable<IMusicContentRatingProvider> providers,
         ISystemSettingsRepository settings,
+        ITaskProgressReporter progress,
         ILogger<MusicContentRatingRefresher> logger,
         Func<TimeSpan, CancellationToken, Task> pause)
     {
         _repository = repository;
         _providers = providers;
         _settings = settings;
+        _progress = progress;
         _logger = logger;
         _pause = pause;
     }
@@ -77,9 +81,14 @@ public class MusicContentRatingRefresher : IMusicContentRatingRefresher
         var due = await _repository.GetAlbumsDueForContentRatingAsync(DateTime.UtcNow - RecheckAfter, MaxAlbumsPerRun);
         var rated = 0;
 
-        foreach (var album in due)
+        for (var i = 0; i < due.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var album = due[i];
+
+            // The count comes first so a narrow task row that truncates the
+            // album name still shows how far through the run it is.
+            _progress.Report($"Checking Clean / Explicit {i + 1}/{due.Count}: {album.ArtistName} - {album.AlbumTitle}");
 
             var tracks = (await _repository.GetAlbumTracksForUpdateAsync(album.AlbumId))
                 .Where(t => t.ContentRating == null && !t.IsLocked(nameof(Track.ContentRating)))
@@ -98,6 +107,8 @@ public class MusicContentRatingRefresher : IMusicContentRatingRefresher
                 break;
             }
         }
+
+        _progress.Report(null);
 
         if (rated > 0)
         {
