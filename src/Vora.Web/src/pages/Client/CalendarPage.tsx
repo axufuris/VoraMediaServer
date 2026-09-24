@@ -22,7 +22,7 @@ const VIEW_LABELS: Record<CalendarViewMode, string> = {
 
 const readSavedViewMode = (): CalendarViewMode => {
     const saved = localStorage.getItem(StorageKeys.calendarViewMode);
-    return isCalendarViewMode(saved) ? saved : 'month';
+    return isCalendarViewMode(saved) ? saved : 'week';
 };
 
 interface EventTheme {

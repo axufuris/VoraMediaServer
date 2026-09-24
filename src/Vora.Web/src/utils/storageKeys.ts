@@ -8,7 +8,7 @@ export const StorageKeys = {
     isProfileAdmin: 'is_profile_admin',
     autoLoginProfileId: 'auto_login_profile_id',
     iptvPrefs: (profileId: string, deviceId: string) => `iptv_prefs_${profileId}_${deviceId}`,
-    calendarViewMode: 'calendar_view_mode',
+    calendarViewMode: 'calendar_view_mode_v2',
     musicSubTab: 'music_sub_tab',
 } as const;
 
