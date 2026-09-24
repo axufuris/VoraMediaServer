@@ -11,6 +11,10 @@ export interface AlbumTrackContextMenuPayload {
 interface MusicAlbumViewProps {
     isLoading: boolean;
     currentAlbum: AlbumVM | null;
+    // The album's own background, or the artist's when it has none. Display only
+    // — the edit modal still reads currentAlbum.backgroundUrl, so an admin saving
+    // the form cannot stamp the artist's url onto the album row.
+    albumBackdrop: string | null;
     tracks: TrackVM[];
     isServerAdmin: boolean;
     playFromIndex: (startIndex: number) => void;
@@ -28,6 +32,7 @@ interface MusicAlbumViewProps {
 export default function MusicAlbumView({
     isLoading,
     currentAlbum,
+    albumBackdrop,
     tracks,
     isServerAdmin,
     playFromIndex,
@@ -62,13 +67,13 @@ export default function MusicAlbumView({
     return (
         <>
             <div className="relative mb-8 pb-6 border-b border-[var(--vora-border-subtle)] overflow-hidden rounded-lg">
-                {/* The server fills backgroundUrl for albums, and until now nothing
-                    rendered it. Behind the header at low opacity it gives the page
-                    the album's own colour without competing with the cover. */}
-                {currentAlbum.backgroundUrl && (
+                {/* Behind the header at low opacity, giving the page its colour
+                    without competing with the cover. Falls back to the artist's
+                    background, since most albums have none of their own. */}
+                {albumBackdrop && (
                     <>
                         <img
-                            src={currentAlbum.backgroundUrl}
+                            src={albumBackdrop}
                             alt=""
                             aria-hidden="true"
                             className="absolute inset-0 w-full h-full object-cover opacity-30"
@@ -76,7 +81,7 @@ export default function MusicAlbumView({
                         <div className="absolute inset-0 bg-gradient-to-t from-[var(--vora-bg-canvas)] via-[var(--vora-bg-canvas)]/75 to-[var(--vora-bg-canvas)]/45" />
                     </>
                 )}
-                <div className={`relative flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 text-center sm:text-left ${currentAlbum.backgroundUrl ? 'p-5 sm:p-6' : ''}`}>
+                <div className={`relative flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 text-center sm:text-left ${albumBackdrop ? 'p-5 sm:p-6' : ''}`}>
                 <div className="relative shrink-0" style={{ width: currentAlbum.discArtUrl ? '14rem' : '10rem', height: '10rem' }}>
                     {currentAlbum.discArtUrl && (
                         <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-black border border-[var(--vora-border-subtle)] overflow-hidden shadow-lg hidden sm:block">

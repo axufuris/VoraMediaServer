@@ -299,6 +299,10 @@ export interface ArtistDetail {
 export interface AlbumDetail {
     album: AlbumVM;
     tracks: TrackVM[];
+    // The ARTIST's background, sent only when the album has none of its own, for
+    // dressing the page. Never written back — album.backgroundUrl stays the
+    // album's own value, including null, which is what the edit modal reads.
+    artistBackgroundUrl: string | null;
 }
 
 export interface AdminMusicHistoryQuery {

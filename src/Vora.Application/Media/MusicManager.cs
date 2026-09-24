@@ -19,7 +19,7 @@ public interface IMusicManager
 {
     Task<List<ArtistVM>> GetArtistsAsync(Guid? libraryId, MusicAccessFilter access, int? limit = null);
     Task<(ArtistVM? Artist, List<AlbumVM> Albums)> GetArtistDetailAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
-    Task<(AlbumVM? Album, List<TrackVM> Tracks)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access);
+    Task<(AlbumVM? Album, List<TrackVM> Tracks, string? ArtistBackgroundUrl)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access);
     Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
     Task<string?> GetTrackFilePathAsync(Guid trackId, MusicAccessFilter access);
 
@@ -173,10 +173,10 @@ public class MusicManager : IMusicManager
         return result;
     }
 
-    public async Task<(AlbumVM? Album, List<TrackVM> Tracks)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access)
+    public async Task<(AlbumVM? Album, List<TrackVM> Tracks, string? ArtistBackgroundUrl)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access)
     {
         var album = await _repository.GetAlbumByIdAsync(albumId, access);
-        if (album == null) return (null, new List<TrackVM>());
+        if (album == null) return (null, new List<TrackVM>(), null);
 
         var tracks = await _repository.GetTracksForAlbumAsync(albumId, access);
         var likedIds = profileId.HasValue
@@ -202,7 +202,17 @@ public class MusicManager : IMusicManager
             if (ratings.TryGetValue(albumId, out var rating)) albumVm.MyRating = rating;
         }
 
-        return (albumVm, trackVms);
+        // Only when the album has nothing of its own, so the common path costs
+        // no extra query. Through the access filter, so a profile that cannot see
+        // the artist gets null rather than a leaked url.
+        string? artistBackgroundUrl = null;
+        if (string.IsNullOrWhiteSpace(album.BackgroundUrl) && album.ArtistId != Guid.Empty)
+        {
+            var artist = await _repository.GetArtistByIdAsync(album.ArtistId, access);
+            artistBackgroundUrl = artist?.BackgroundUrl;
+        }
+
+        return (albumVm, trackVms, artistBackgroundUrl);
     }
 
     public async Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
