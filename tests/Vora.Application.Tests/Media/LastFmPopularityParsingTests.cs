@@ -7,11 +7,12 @@ using Vora.Plugins.Providers.LastFm;
 
 namespace Vora.Application.Tests.Media;
 
-// Pinned against payloads shaped like Last.fm's documented responses. These
-// could not be checked against the live API when this was written — no key was
-// configured locally — so the shapes are asserted here, and the first real
-// refresh is the thing to watch. A misspelled field is a silent no-op: the value
-// simply never arrives, and looks exactly like an artist nobody listens to.
+// Pinned against payloads captured from the live Last.fm API. A misspelled field
+// is a silent no-op — the value never arrives, and looks exactly like an artist
+// nobody listens to — so the shapes are asserted rather than trusted. Checked
+// live: artist.getInfo and artist.getTopTracks quote their counts,
+// artist.getTopAlbums does not and carries no listener count at all, an unknown
+// artist is HTTP 200 with error 6, and a bad key is HTTP 403 with error 10.
 public class LastFmPopularityParsingTests
 {
     // Routes by the method= query parameter, so one provider can answer all three
@@ -136,6 +137,21 @@ public class LastFmPopularityParsingTests
     public async Task A_service_problem_is_unavailable_not_not_found(HttpStatusCode status, string body)
     {
         var (provider, _) = Provider(new() { ["artist.getInfo"] = (status, body) });
+
+        var result = await provider.GetArtistPopularityAsync("Luke Bryan", 50, 50, TestContext.Current.CancellationToken);
+
+        result.Outcome.Should().Be(PopularityLookupOutcome.Unavailable);
+    }
+
+    // A mistyped key must stop the run, not stamp every artist as "refreshed,
+    // nothing found" and hide the misconfiguration for thirty days.
+    [Fact]
+    public async Task A_rejected_key_is_unavailable_not_not_found()
+    {
+        var (provider, _) = Provider(new()
+        {
+            ["artist.getInfo"] = (HttpStatusCode.Forbidden, """{"message":"Invalid API key - You must be granted a valid key by last.fm","error":10}"""),
+        });
 
         var result = await provider.GetArtistPopularityAsync("Luke Bryan", 50, 50, TestContext.Current.CancellationToken);
 

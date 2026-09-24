@@ -100,6 +100,58 @@ public class ArtistTopTracksTests
         tracks.Select(t => t.Title).Should().Equal("I Want You Back", "Tearin' Up My Heart", "Bye Bye Bye");
     }
 
+    // An artist nobody here has played shows their actual hits, not the first
+    // tracks of their oldest album — the slice this section replaced.
+    [Fact]
+    public async Task An_unplayed_artist_is_ordered_by_world_wide_popularity()
+    {
+        using var db = NewContext();
+        var debut = AddAlbum(db, "*NSYNC", 1998);
+        var later = AddAlbum(db, "No Strings Attached", 2000);
+        var deepCut = AddTrack(db, debut, "Deep Cut", 1);
+        var hit = AddTrack(db, later, "Bye Bye Bye", 1);
+        deepCut.GlobalListeners = 20_000;
+        hit.GlobalListeners = 1_500_000;
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+
+        tracks.Select(t => t.Title).Should().Equal("Bye Bye Bye", "Deep Cut");
+    }
+
+    // This server's own listening outranks the world's: the section is about what
+    // gets played here first, and falls back to global figures only after that.
+    [Fact]
+    public async Task Plays_here_outrank_popularity_elsewhere()
+    {
+        using var db = NewContext();
+        var album = AddAlbum(db, "No Strings Attached", 2000);
+        var globalHit = AddTrack(db, album, "Global Hit", 1);
+        var localFavourite = AddTrack(db, album, "Local Favourite", 2);
+        globalHit.GlobalListeners = 5_000_000;
+        AddPlays(db, localFavourite, 1);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+
+        tracks.Select(t => t.Title).Should().Equal("Local Favourite", "Global Hit");
+    }
+
+    [Fact]
+    public async Task Tracks_with_no_figure_sink_below_those_with_one()
+    {
+        using var db = NewContext();
+        var album = AddAlbum(db, "Celebrity", 2001);
+        AddTrack(db, album, "Unknown To Last.fm", 1);
+        var known = AddTrack(db, album, "Known", 2);
+        known.GlobalListeners = 10;
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+
+        tracks.Select(t => t.Title).Should().Equal("Known", "Unknown To Last.fm");
+    }
+
     [Fact]
     public async Task Played_tracks_lead_in_descending_play_count()
     {

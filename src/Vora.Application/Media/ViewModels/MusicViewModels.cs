@@ -169,5 +169,7 @@ public class ArtistTrackVM
     public string? AlbumArtworkUrl { get; set; }
     public bool IsLiked { get; set; }
     public decimal? ServerAdminRating { get; set; }
+    public long? GlobalListeners { get; set; }
+    public long? GlobalPlays { get; set; }
     public decimal? MyRating { get; set; }
 }

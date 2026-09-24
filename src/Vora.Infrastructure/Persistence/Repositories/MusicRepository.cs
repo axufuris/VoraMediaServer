@@ -392,8 +392,15 @@ public class MusicRepository : IMusicRepository
             })
             .OrderByDescending(x => x.Plays)
             .ThenByDescending(x => x.LastPlayed)
-            // The remaining keys are today's ordering, so an artist nobody has
-            // played renders exactly what the clients already show.
+            // Then the world's opinion. This is what an artist nobody here has
+            // played is ordered by: their actual hits rather than the first
+            // tracks of their oldest album, which is the slice this section was
+            // introduced to replace. HasValue first so tracks with no figure sink
+            // rather than Postgres putting NULLs first in a descending sort.
+            .ThenByDescending(x => x.Track.GlobalListeners.HasValue)
+            .ThenByDescending(x => x.Track.GlobalListeners)
+            // And only then album order, for tracks nobody anywhere has an
+            // opinion on.
             .ThenBy(x => x.Track.Album == null ? null : x.Track.Album.Year)
             .ThenBy(x => x.Track.DiscNumber)
             .ThenBy(x => x.Track.TrackNumber)

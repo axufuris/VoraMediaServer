@@ -245,6 +245,8 @@ public class MusicManager : IMusicManager
             AlbumArtworkUrl = t.Album?.ArtworkUrl,
             IsLiked = likedIds.Contains(t.Id),
             ServerAdminRating = t.ServerAdminRating,
+            GlobalListeners = t.GlobalListeners,
+            GlobalPlays = t.GlobalPlays,
             MyRating = ratings.TryGetValue(t.Id, out var r) ? r : (decimal?)null
         }).ToList();
     }
