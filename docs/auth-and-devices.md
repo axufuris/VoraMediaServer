@@ -101,7 +101,7 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 | `playback_prefs_<profileId>_<deviceId>` | Per-profile/device bandwidth + max resolution + max audio channels JSON. Mirrored server-side via `profileDeviceSettingsService`. | `SettingsPage` (Playback tab) |
 | `iptv_prefs_<profileId>_<deviceId>` | Per-profile/device IPTV provider selection + timeshift prefs JSON. Mirrored server-side via `profileDeviceSettingsService`. | `SettingsPage` (Providers tab) |
 | `music_sub_tab` | Music page sub-tab — `forYou`, `artists`, `albums`, or `playlists`. Device-local display preference; an unrecognised value falls back to `forYou`. | `MusicTab` (`pages/Client/Audio/Music/musicSubTab.ts`) |
-| `calendar_view_mode` | Release Calendar layout — `month`, `week`, or `day`. Device-local, not mirrored: it is a display preference, not a profile setting. An unrecognised value falls back to `month`. | `CalendarPage` |
+| `calendar_view_mode_v2` | Release Calendar layout — `month`, `week`, or `day`. Device-local, not mirrored: it is a display preference, not a profile setting. Nothing saved, or an unrecognised value, opens on `week`. Renamed from `calendar_view_mode` when the default changed from Month, so a Month saved under the old default doesn't pin existing browsers there; the old key is simply ignored. | `CalendarPage` |
 | `vora_library_migration_job_id` | Active library-migration job id. Lets the admin reload `/admin/library-migration` and re-attach to the running job. Cleared on "Run again" / "Start over" or when the backend returns 404 (job evicted on server restart). | `LibraryMigrationPage` |
 | Server vault keys | Managed by `utils/serverVault.ts` (`VAULT_KEY`, `ACTIVE_SERVER_KEY`) | `serverVault` |
 
