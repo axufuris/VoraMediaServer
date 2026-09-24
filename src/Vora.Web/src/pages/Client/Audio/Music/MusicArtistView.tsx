@@ -37,35 +37,48 @@ export default function MusicArtistView({
     return (
         <>
             {currentArtist && (() => {
-                // Each image gets the slot its SHAPE suits.
+                // The header is a ~12:1 strip and no artwork is drawn that shape,
+                // so nothing can fill it edge to edge without being wrecked.
+                // object-cover scales an image to cover the WIDTH: a 1000x185
+                // banner becomes 1820x337 inside a 208px-tall box, which crops
+                // away two fifths of it and magnifies what is left by nearly
+                // double. That is the giant faces.
                 //
-                //   banner     (5:1)   -> the backdrop, which is a wide strip
-                //   background (16:9)  -> the backdrop only if there is no banner
-                //   clear logo (wide)  -> the title, drawn whole
-                //   artwork    (square)-> the round avatar
+                // So the strip is built from two layers instead of one image
+                // stretched across it.
                 //
-                // The banner leads because the header is a ~12:1 strip and the
-                // banner is the only artwork drawn to be one. Filling that strip
-                // with a 16:9 background scales it to the strip's width and crops
-                // away everything but a horizontal sliver of the middle — at this
-                // width a shirt and half a logo, which is not recognisable as the
-                // picture it came from. A 5:1 banner loses a fraction of that.
-                //
-                // The background is kept as the fallback rather than dropped: a
-                // badly cropped image still reads better than the flat gradient,
-                // and some artists have one and no banner.
-                const heroBackdrop = currentArtist.bannerUrl || currentArtist.backgroundUrl;
+                //   ambient  - blurred and dimmed, fills the width. Cropping and
+                //              magnifying are fine here because no detail is
+                //              meant to survive; it is colour, not a picture.
+                //   feature  - the banner at its natural aspect, height-fitted
+                //              and anchored right, so it is never cropped and
+                //              never enlarged past the height of the strip. It
+                //              fades out to the left, where the content sits.
+                const banner = currentArtist.bannerUrl;
+                const ambient = currentArtist.backgroundUrl || currentArtist.bannerUrl;
                 const titleImage = currentArtist.clearLogoUrl;
                 const hasArtwork = !!currentArtist.artworkUrl;
                 return (
                     <div className="relative w-full rounded-lg overflow-hidden mb-6 border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)]" style={{ minHeight: '13rem' }}>
-                        {heroBackdrop ? (
-                            <img src={heroBackdrop} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                        {ambient ? (
+                            <img src={ambient} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-40" />
                         ) : (
                             <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800" />
                         )}
+                        {banner && (
+                            <img
+                                src={banner}
+                                alt=""
+                                aria-hidden="true"
+                                className="absolute inset-y-0 right-0 h-full w-auto max-w-full object-contain object-right"
+                                style={{
+                                    maskImage: 'linear-gradient(to right, transparent, black 35%)',
+                                    WebkitMaskImage: 'linear-gradient(to right, transparent, black 35%)',
+                                }}
+                            />
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/55 to-gray-950/20" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-gray-950/40 via-transparent to-gray-950/40" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-950/75 via-gray-950/25 to-transparent" />
 
                         <div className="relative flex flex-col sm:flex-row items-stretch sm:items-end gap-4 p-5 sm:p-6 min-h-[13rem]">
                             {hasArtwork && (
