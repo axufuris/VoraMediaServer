@@ -18,6 +18,8 @@ namespace Vora.Api.Endpoints;
 
 public static class MusicEndpoints
 {
+    private const int DefaultTopTracks = 10;
+
     private const string StreamTokenScope = "music";
     private static readonly TimeSpan StreamTokenTtl = TimeSpan.FromHours(6);
 
@@ -37,6 +39,17 @@ public static class MusicEndpoints
         group.MapGet("/artists/{artistId:guid}/tracks", GetArtistTracksAsync)
             .RequireAuthorization()
             .WithName("ListArtistTracks")
+            .Produces<IEnumerable<ArtistTrackVM>>(StatusCodes.Status200OK);
+        // The flat, immediately playable list at the top of an artist page.
+        // Separate from /tracks, which stays the whole discography in album order
+        // because Play Artist and Shuffle Artist need exactly that.
+        //
+        // limit defaults to 10 and is CLAMPED to 50. Saying so here because the
+        // clamp is otherwise invisible: asking for 500 returns 50 with nothing in
+        // the response to explain the difference.
+        group.MapGet("/artists/{artistId:guid}/top-tracks", GetArtistTopTracksAsync)
+            .RequireAuthorization()
+            .WithName("ListArtistTopTracks")
             .Produces<IEnumerable<ArtistTrackVM>>(StatusCodes.Status200OK);
         group.MapGet("/albums/{albumId:guid}", GetAlbumDetailAsync)
             .RequireAuthorization()
@@ -417,6 +430,12 @@ public static class MusicEndpoints
     private static async Task<IResult> GetArtistTracksAsync(Guid artistId, ClaimsPrincipal user, IMusicManager manager)
     {
         var tracks = await manager.GetTracksForArtistAsync(artistId, user.GetProfileId(), BuildFilter(user));
+        return Results.Ok(tracks);
+    }
+
+    private static async Task<IResult> GetArtistTopTracksAsync(Guid artistId, [FromQuery] int? limit, ClaimsPrincipal user, IMusicManager manager)
+    {
+        var tracks = await manager.GetTopTracksForArtistAsync(artistId, user.GetProfileId(), BuildFilter(user), limit ?? DefaultTopTracks);
         return Results.Ok(tracks);
     }
 

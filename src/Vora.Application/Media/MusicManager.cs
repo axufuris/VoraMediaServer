@@ -21,6 +21,7 @@ public interface IMusicManager
     Task<(ArtistVM? Artist, List<AlbumVM> Albums)> GetArtistDetailAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
     Task<(AlbumVM? Album, List<TrackVM> Tracks, string? ArtistBackgroundUrl)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access);
     Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
+    Task<List<ArtistTrackVM>> GetTopTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access, int limit);
     Task<string?> GetTrackFilePathAsync(Guid trackId, MusicAccessFilter access);
 
     Task<bool> UpdateArtistAsync(Guid artistId, UpdateArtistRequest request);
@@ -218,6 +219,11 @@ public class MusicManager : IMusicManager
     public async Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
     {
         var tracks = await _repository.GetTracksForArtistAsync(artistId, access);
+        return await HydrateArtistTracksAsync(tracks, profileId);
+    }
+
+    private async Task<List<ArtistTrackVM>> HydrateArtistTracksAsync(List<Domain.Entities.Media.Track> tracks, Guid? profileId)
+    {
         var likedIds = profileId.HasValue
             ? await _repository.GetLikedTrackIdsAsync(profileId.Value, tracks.Select(t => t.Id))
             : new HashSet<Guid>();
@@ -241,6 +247,12 @@ public class MusicManager : IMusicManager
             ServerAdminRating = t.ServerAdminRating,
             MyRating = ratings.TryGetValue(t.Id, out var r) ? r : (decimal?)null
         }).ToList();
+    }
+
+    public async Task<List<ArtistTrackVM>> GetTopTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access, int limit)
+    {
+        var tracks = await _repository.GetTopTracksForArtistAsync(artistId, access, limit);
+        return await HydrateArtistTracksAsync(tracks, profileId);
     }
 
     public Task<string?> GetTrackFilePathAsync(Guid trackId, MusicAccessFilter access) =>

@@ -1,4 +1,5 @@
-import { type ArtistVM, type AlbumVM, type RadioSeed } from '../../../../api/Music/musicService';
+import { type ArtistVM, type AlbumVM, type ArtistTrackVM, type RadioSeed } from '../../../../api/Music/musicService';
+import MusicTrackRow from './MusicTrackRow';
 import StarRating from '../../../../components/Client/Primitives/StarRating';
 import RatedBadge from '../../../../components/Client/Primitives/RatedBadge';
 import { type MusicNavState } from './musicNavState';
@@ -7,6 +8,9 @@ interface MusicArtistViewProps {
     isLoading: boolean;
     currentArtist: ArtistVM | null;
     albums: AlbumVM[];
+    topTracks: ArtistTrackVM[];
+    playArtistTrackList: (tracks: ArtistTrackVM[], startIndex: number) => void;
+    formatDuration: (seconds?: number) => string;
     similarArtists: ArtistVM[];
     coPlayedArtists: ArtistVM[];
     isServerAdmin: boolean;
@@ -23,6 +27,9 @@ export default function MusicArtistView({
     isLoading,
     currentArtist,
     albums,
+    topTracks,
+    playArtistTrackList,
+    formatDuration,
     similarArtists,
     coPlayedArtists,
     isServerAdmin,
@@ -167,6 +174,27 @@ export default function MusicArtistView({
                     </div>
                 );
             })()}
+
+            {/* A flat, immediately playable list is the most useful thing on an
+                artist page, and every music app puts one here. Hidden entirely
+                when empty rather than showing a placeholder — an artist with no
+                tracks the profile may see has nothing to say about them. */}
+            {topTracks.length > 0 && (
+                <div className="mb-8">
+                    <h3 className="text-lg font-bold text-[var(--vora-text-primary)] mb-3">Popular</h3>
+                    <div className="space-y-1">
+                        {topTracks.map((t, idx) => (
+                            <MusicTrackRow
+                                key={t.id}
+                                track={t}
+                                position={idx + 1}
+                                onPlay={() => playArtistTrackList(topTracks, idx)}
+                                formatDuration={formatDuration}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {isLoading ? (
                 <div className="text-[var(--vora-text-muted)] py-12 text-center">Loading albums...</div>

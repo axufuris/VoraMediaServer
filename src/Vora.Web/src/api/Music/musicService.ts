@@ -392,8 +392,20 @@ export const musicService = {
         return response.data;
     },
 
+    // The whole discography in album order — what Play Artist and Shuffle Artist
+    // queue. For the short list at the top of the page use getArtistTopTracks.
     getArtistTracks: async (artistId: string, serverId?: string): Promise<ArtistTrackVM[]> => {
         const response = await apiClient.get<ArtistTrackVM[]>(`/music/artists/${artistId}/tracks`, { serverId });
+        return response.data;
+    },
+
+    // Ordered by what actually gets played on this server, falling back to album
+    // order for an artist nobody has played. limit is clamped to 50 server-side.
+    getArtistTopTracks: async (artistId: string, limit?: number, serverId?: string): Promise<ArtistTrackVM[]> => {
+        const response = await apiClient.get<ArtistTrackVM[]>(`/music/artists/${artistId}/top-tracks`, {
+            params: limit ? { limit } : undefined,
+            serverId,
+        });
         return response.data;
     },
 
