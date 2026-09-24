@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
+using Vora.Application.Media.SmartPlaylists;
 using Vora.Application.Playlists.ViewModels;
 using Vora.Domain.Entities.Playlists;
 
@@ -8,8 +9,11 @@ namespace Vora.Application.Playlists;
 
 public interface IPlaylistRepository
 {
-    Task<List<PlaylistSummaryVM>> GetPlaylistsAsync(Guid profileId);
-    Task<PlaylistDetailsVM?> GetPlaylistDetailsAsync(Guid id, Guid profileId);
+    Task<List<PlaylistSummaryVM>> GetPlaylistsAsync(Guid profileId, PlaylistAccessFilter access);
+    Task<PlaylistDetailsVM?> GetPlaylistDetailsAsync(Guid id, Guid viewerProfileId, PlaylistAccessFilter access);
+    Task<List<PlaylistSummaryVM>> GetSharedByOthersAsync(Guid viewerProfileId, PlaylistAccessFilter access);
+    Task<bool> SetSharedAsync(Guid id, Guid ownerProfileId, bool isShared);
+    Task<Guid?> CopyPlaylistAsync(Guid sourceId, Guid viewerProfileId, PlaylistAccessFilter access);
     Task<Guid> CreatePlaylistAsync(Playlist playlist);
 
     Task<bool> IsPlaylistOwnerAsync(Guid playlistId, Guid profileId);

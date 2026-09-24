@@ -53,6 +53,13 @@ export interface SmartPlaylistSummaryVM {
     trackCount: number;
     createdAt: string;
     updatedAt: string;
+
+    // Visible, read-only, to every profile on the server once shared. isOwner is
+    // false for someone else's shared playlist: hide the edit controls, because
+    // every edit endpoint answers 404 to anyone but the owner.
+    isShared: boolean;
+    isOwner: boolean;
+    ownerName: string;
 }
 
 export interface SmartPlaylistDetailVM {
@@ -64,6 +71,13 @@ export interface SmartPlaylistDetailVM {
     definition: SmartPlaylistDefinition;
     createdAt: string;
     updatedAt: string;
+
+    // Visible, read-only, to every profile on the server once shared. isOwner is
+    // false for someone else's shared playlist: hide the edit controls, because
+    // every edit endpoint answers 404 to anyone but the owner.
+    isShared: boolean;
+    isOwner: boolean;
+    ownerName: string;
 }
 
 export interface SmartPlaylistSaveRequest {
@@ -160,6 +174,15 @@ export const smartPlaylistService = {
         return response.data;
     },
 
+    setShared: async (id: string, isShared: boolean, serverId?: string): Promise<void> => {
+        await apiClient.put(`/smart-playlists/${id}/sharing`, { isShared }, { serverId });
+    },
+    // Copies the rules. The copy is the viewer's, runs on their own plays and
+    // ratings from then on, and starts unshared.
+    copy: async (id: string, serverId?: string): Promise<{ id: string }> => {
+        const response = await apiClient.post<{ id: string }>(`/smart-playlists/${id}/copy`, null, { serverId });
+        return response.data;
+    },
     preview: async (mediaType: PlaylistMediaType, definition: SmartPlaylistDefinition, serverId?: string): Promise<number> => {
         const response = await apiClient.post<{ count: number }>('/smart-playlists/preview', { mediaType, definition }, { serverId });
         return response.data.count;

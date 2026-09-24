@@ -1,3 +1,4 @@
+using Vora.Application.Playlists.ViewModels;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
@@ -27,6 +28,14 @@ public static class SmartPlaylistEndpoints
         group.MapPut("/{id:guid}", UpdateAsync).RequireAuthorization()
             .Produces<SmartPlaylistSummaryVM>(StatusCodes.Status200OK);
         group.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization();
+        group.MapPut("/{id:guid}/sharing", SetSharingAsync).RequireAuthorization()
+            .WithName("SetSmartPlaylistSharing")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapPost("/{id:guid}/copy", CopyAsync).RequireAuthorization()
+            .WithName("CopySmartPlaylist")
+            .Produces<CreatePlaylistResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
         group.MapGet("/{id:guid}/items", GetTracksAsync)
             .RequireAuthorization()
             .WithName("ListSmartPlaylistItems")
@@ -37,6 +46,21 @@ public static class SmartPlaylistEndpoints
         return routes;
     }
 
+
+    private static async Task<IResult> SetSharingAsync(Guid id, [FromBody] SetPlaylistSharingRequest request, ClaimsPrincipal user, ISmartPlaylistManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        return await manager.SetSharedAsync(id, profileId.Value, request.IsShared) ? Results.NoContent() : Results.NotFound();
+    }
+
+    private static async Task<IResult> CopyAsync(Guid id, ClaimsPrincipal user, ISmartPlaylistManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        var copyId = await manager.CopyAsync(id, profileId.Value);
+        return copyId.HasValue ? Results.Ok(new CreatePlaylistResponse { Id = copyId.Value }) : Results.NotFound();
+    }
 
     private static async Task<IResult> ListAsync(ClaimsPrincipal user, ISmartPlaylistManager manager)
     {

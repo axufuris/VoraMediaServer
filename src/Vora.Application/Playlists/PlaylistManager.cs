@@ -1,12 +1,16 @@
-﻿using Vora.Application.Playlists.ViewModels;
+using Vora.Application.Media.SmartPlaylists;
+using Vora.Application.Playlists.ViewModels;
 using Vora.Domain.Entities.Playlists;
 
 namespace Vora.Application.Playlists;
 
 public interface IPlaylistManager
 {
-    Task<List<PlaylistSummaryVM>> GetPlaylistsAsync(Guid profileId);
-    Task<PlaylistDetailsVM?> GetPlaylistDetailsAsync(Guid id, Guid profileId);
+    Task<List<PlaylistSummaryVM>> GetPlaylistsAsync(Guid profileId, PlaylistAccessFilter access);
+    Task<PlaylistDetailsVM?> GetPlaylistDetailsAsync(Guid id, Guid viewerProfileId, PlaylistAccessFilter access);
+    Task<List<PlaylistSummaryVM>> GetSharedByOthersAsync(Guid viewerProfileId, PlaylistAccessFilter access);
+    Task<bool> SetSharedAsync(Guid id, Guid ownerProfileId, bool isShared);
+    Task<Guid?> CopyPlaylistAsync(Guid sourceId, Guid viewerProfileId, PlaylistAccessFilter access);
     Task<Guid> CreatePlaylistAsync(Guid profileId, string name, string? description, PlaylistMediaType mediaType);
     Task AddToPlaylistAsync(Guid playlistId, Guid profileId, Guid mediaItemId);
     Task RemoveFromPlaylistAsync(Guid playlistId, Guid profileId, Guid playlistItemId);
@@ -27,15 +31,20 @@ public class PlaylistManager : IPlaylistManager
         _repository = repository;
     }
 
-    public async Task<List<PlaylistSummaryVM>> GetPlaylistsAsync(Guid profileId)
-    {
-        return await _repository.GetPlaylistsAsync(profileId);
-    }
+    public Task<List<PlaylistSummaryVM>> GetPlaylistsAsync(Guid profileId, PlaylistAccessFilter access) =>
+        _repository.GetPlaylistsAsync(profileId, access);
 
-    public async Task<PlaylistDetailsVM?> GetPlaylistDetailsAsync(Guid id, Guid profileId)
-    {
-        return await _repository.GetPlaylistDetailsAsync(id, profileId);
-    }
+    public Task<PlaylistDetailsVM?> GetPlaylistDetailsAsync(Guid id, Guid viewerProfileId, PlaylistAccessFilter access) =>
+        _repository.GetPlaylistDetailsAsync(id, viewerProfileId, access);
+
+    public Task<List<PlaylistSummaryVM>> GetSharedByOthersAsync(Guid viewerProfileId, PlaylistAccessFilter access) =>
+        _repository.GetSharedByOthersAsync(viewerProfileId, access);
+
+    public Task<bool> SetSharedAsync(Guid id, Guid ownerProfileId, bool isShared) =>
+        _repository.SetSharedAsync(id, ownerProfileId, isShared);
+
+    public Task<Guid?> CopyPlaylistAsync(Guid sourceId, Guid viewerProfileId, PlaylistAccessFilter access) =>
+        _repository.CopyPlaylistAsync(sourceId, viewerProfileId, access);
 
     public async Task<Guid> CreatePlaylistAsync(Guid profileId, string name, string? description, PlaylistMediaType mediaType)
     {

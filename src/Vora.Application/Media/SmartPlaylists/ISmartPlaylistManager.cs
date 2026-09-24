@@ -11,6 +11,9 @@ public interface ISmartPlaylistManager
     Task DeleteAsync(Guid id, Guid profileId);
     Task<int> PreviewCountAsync(Guid profileId, PlaylistAccessFilter access, PlaylistMediaType mediaType, SmartPlaylistDefinition definition);
     Task<SmartPlaylistItemsVM> GetItemsAsync(Guid id, Guid profileId, PlaylistAccessFilter access);
+    Task<List<SmartPlaylistSummaryVM>> GetSharedByOthersAsync(Guid viewerProfileId, PlaylistAccessFilter access);
+    Task<bool> SetSharedAsync(Guid id, Guid ownerProfileId, bool isShared);
+    Task<Guid?> CopyAsync(Guid sourceId, Guid viewerProfileId);
 }
 
 public sealed class SmartPlaylistSaveRequest
@@ -32,6 +35,10 @@ public sealed class SmartPlaylistSummaryVM
     public int TrackCount { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    public bool IsShared { get; set; }
+    public bool IsOwner { get; set; }
+    public string OwnerName { get; set; } = string.Empty;
 }
 
 public sealed class SmartPlaylistDetailVM
@@ -44,6 +51,10 @@ public sealed class SmartPlaylistDetailVM
     public SmartPlaylistDefinition Definition { get; set; } = new();
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    public bool IsShared { get; set; }
+    public bool IsOwner { get; set; }
+    public string OwnerName { get; set; } = string.Empty;
 }
 
 public sealed class SmartPlaylistItemsVM

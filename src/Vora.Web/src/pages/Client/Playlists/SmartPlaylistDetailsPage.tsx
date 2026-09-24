@@ -12,6 +12,7 @@ import { serverVault } from '../../../utils/serverVault';
 import { audioQualityStore } from '../../../utils/audioQuality';
 import { useDialog } from '../../../dialogs';
 import SmartPlaylistEditorModal from './SmartPlaylistEditorModal';
+import { PlaylistSharingControls, PlaylistUnavailable, SavedCopyBanner, type SavedCopyState } from './PlaylistSharing';
 
 export default function SmartPlaylistDetailsPage() {
     const { serverId, id } = useParams<{ serverId?: string; id: string }>();
@@ -42,6 +43,29 @@ export default function SmartPlaylistDetailsPage() {
     }, [id, serverId]);
 
     useEffect(() => { load(); }, [load]);
+
+    const handleToggleShared = async (next: boolean) => {
+        if (!detail) return;
+        try {
+            await smartPlaylistService.setShared(detail.id, next, serverId);
+            setDetail(prev => prev ? { ...prev, isShared: next } : prev);
+        } catch {
+            await dialog.alert(next ? 'Could not share this playlist.' : 'Could not stop sharing this playlist.');
+        }
+    };
+
+    // Copies the rules. The copy is the viewer's own, runs on their plays and
+    // ratings from then on, and starts unshared.
+    const handleSaveCopy = async () => {
+        if (!detail) return;
+        try {
+            const { id: copyId } = await smartPlaylistService.copy(detail.id, serverId);
+            const state: SavedCopyState = { savedCopy: true };
+            navigate(serverId ? `/server/${serverId}/smart-playlist/${copyId}` : `/smart-playlist/${copyId}`, { state });
+        } catch {
+            await dialog.alert('Could not save a copy. The playlist may no longer be shared.');
+        }
+    };
 
     const buildMusicQueue = (list: ArtistTrackVM[]): PlayableMedia[] => {
         const server = serverId ? serverVault.getServer(serverId) : serverVault.getActiveServer();
@@ -103,9 +127,14 @@ export default function SmartPlaylistDetailsPage() {
     if (loading) {
         return <div className="p-12 text-center text-[var(--vora-text-muted)] mt-16">Loading…</div>;
     }
+    // The service turns a 404 into null: deleted, unshared or never existed.
     if (!detail || !items) {
-        return <div className="p-12 text-center text-[var(--vora-text-muted)] mt-16">Smart playlist not found.</div>;
+        return <PlaylistUnavailable backTo={serverId ? `/server/${serverId}/playlists` : '/playlists'} />;
     }
+
+    // Someone else's shared smart playlist is read-only here; the server refuses
+    // an edit from anyone but the owner regardless.
+    const canEdit = detail.isOwner;
 
     const itemCount = items.mediaType === 'Music'
         ? items.tracks?.length ?? 0
@@ -127,6 +156,7 @@ export default function SmartPlaylistDetailsPage() {
     return (
         <div className="min-h-full pb-16">
             <div className="mx-auto w-full max-w-6xl px-8 pt-12">
+                <SavedCopyBanner />
                 <div className="mb-8 flex items-end gap-6 pb-6" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>
                     <div className={`w-48 h-48 rounded shadow-2xl flex items-center justify-center bg-gradient-to-br ${heroGradient} flex-shrink-0 relative overflow-hidden`}>
                         {detail.artworkUrl
@@ -144,8 +174,19 @@ export default function SmartPlaylistDetailsPage() {
                             {showShuffleBtn && (
                                 <button onClick={handleShuffle} disabled={itemCount === 0} className="px-4 py-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] font-bold rounded cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">🔀 Shuffle</button>
                             )}
-                            <button onClick={() => setEditing(true)} className="px-4 py-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] font-bold rounded cursor-pointer">Edit Rules</button>
-                            <button onClick={handleDelete} className="px-4 py-2 bg-rose-900 hover:bg-rose-700 text-[var(--vora-text-primary)] font-bold rounded cursor-pointer">Delete</button>
+                            {canEdit && (<>
+                                <button onClick={() => setEditing(true)} className="px-4 py-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] font-bold rounded cursor-pointer">Edit Rules</button>
+                                <button onClick={handleDelete} className="px-4 py-2 bg-rose-900 hover:bg-rose-700 text-[var(--vora-text-primary)] font-bold rounded cursor-pointer">Delete</button>
+                            </>)}
+                            <div className="self-center">
+                                <PlaylistSharingControls
+                                    isOwner={detail.isOwner}
+                                    isShared={detail.isShared}
+                                    ownerName={detail.ownerName}
+                                    onToggleShared={handleToggleShared}
+                                    onSaveCopy={handleSaveCopy}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -155,7 +196,9 @@ export default function SmartPlaylistDetailsPage() {
                         className="mt-12 rounded-xl p-8 text-center text-sm"
                         style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-muted)' }}
                     >
-                        No {itemLabel} match the current rules. Try loosening them in Edit Rules.
+                        {canEdit
+                            ? <>No {itemLabel} match the current rules. Try loosening them in Edit Rules.</>
+                            : <>Nothing in this playlist is available to you right now.</>}
                     </div>
                 ) : items.mediaType === 'Music' && items.tracks ? (
                     <MusicTable tracks={items.tracks} onPlay={handlePlay} formatDuration={formatDuration} />
