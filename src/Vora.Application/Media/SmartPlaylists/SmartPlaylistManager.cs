@@ -45,15 +45,20 @@ public sealed class SmartPlaylistManager : ISmartPlaylistManager
                 MediaType = r.MediaType,
                 TrackCount = count,
                 CreatedAt = r.CreatedAt,
-                UpdatedAt = r.UpdatedAt
+                UpdatedAt = r.UpdatedAt,
+                IsShared = r.IsShared,
+                IsOwner = true
             });
         }
         return summaries;
     }
 
+    // Readable by the owner or, once shared, by anyone. The rules themselves are
+    // part of what is shared, so a viewer sees the definition — but only the
+    // owner can change it, because updates still load through GetByIdAsync.
     public async Task<SmartPlaylistDetailVM?> GetAsync(Guid id, Guid profileId, PlaylistAccessFilter access)
     {
-        var row = await _repo.GetByIdAsync(id, profileId);
+        var row = await _repo.GetVisibleAsync(id, profileId);
         if (row == null) return null;
         var def = ParseDefinition(row);
         return new SmartPlaylistDetailVM
@@ -65,7 +70,10 @@ public sealed class SmartPlaylistManager : ISmartPlaylistManager
             MediaType = row.MediaType,
             Definition = def,
             CreatedAt = row.CreatedAt,
-            UpdatedAt = row.UpdatedAt
+            UpdatedAt = row.UpdatedAt,
+            IsShared = row.IsShared,
+            IsOwner = row.ProfileId == profileId,
+            OwnerName = row.Profile?.Name ?? string.Empty
         };
     }
 
@@ -125,15 +133,89 @@ public sealed class SmartPlaylistManager : ISmartPlaylistManager
 
     public Task DeleteAsync(Guid id, Guid profileId) => _repo.DeleteAsync(id, profileId);
 
+    // Other people's shared smart playlists. Counted the same way they are shown
+    // — the owner's taste, the viewer's visibility — and one that would show the
+    // viewer nothing is left out rather than listed as empty, for the same
+    // reason as manual playlists: its title alone can be what a parent's
+    // controls are there to keep from a child.
+    public async Task<List<SmartPlaylistSummaryVM>> GetSharedByOthersAsync(Guid viewerProfileId, PlaylistAccessFilter access)
+    {
+        var rows = await _repo.GetSharedByOthersAsync(viewerProfileId);
+        var shared = new List<SmartPlaylistSummaryVM>(rows.Count);
+
+        foreach (var r in rows)
+        {
+            int count;
+            try { count = await _evaluator.CountAsync(ParseDefinition(r), r.MediaType, r.ProfileId, access); }
+            catch { count = 0; }
+            if (count == 0) continue;
+
+            shared.Add(new SmartPlaylistSummaryVM
+            {
+                Id = r.Id,
+                Name = r.Name,
+                Description = r.Description,
+                ArtworkUrl = r.ArtworkUrl,
+                MediaType = r.MediaType,
+                TrackCount = count,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt,
+                IsShared = true,
+                IsOwner = false,
+                OwnerName = r.Profile?.Name ?? string.Empty
+            });
+        }
+
+        return shared;
+    }
+
+    public Task<bool> SetSharedAsync(Guid id, Guid ownerProfileId, bool isShared) =>
+        _repo.SetSharedAsync(id, ownerProfileId, isShared);
+
+    // Copies the RULES, not the results. The copy is the viewer's playlist, so
+    // from then on it is evaluated entirely on the viewer's own plays, ratings
+    // and parental controls — a copy of "Most Played" becomes the viewer's most
+    // played. It starts unshared, so saving someone's playlist does not add a
+    // duplicate to everyone's Shared tab.
+    public async Task<Guid?> CopyAsync(Guid sourceId, Guid viewerProfileId)
+    {
+        var source = await _repo.GetVisibleAsync(sourceId, viewerProfileId);
+        if (source == null) return null;
+
+        var copy = new SmartPlaylist
+        {
+            ProfileId = viewerProfileId,
+            Name = source.Name,
+            Description = source.Description,
+            ArtworkUrl = source.ArtworkUrl,
+            MediaType = source.MediaType,
+            RulesJson = source.RulesJson,
+            Limit = source.Limit,
+            SortBy = source.SortBy,
+            SortDirection = source.SortDirection,
+            IsShared = false
+        };
+
+        await _repo.AddAsync(copy);
+        return copy.Id;
+    }
+
     public Task<int> PreviewCountAsync(Guid profileId, PlaylistAccessFilter access, PlaylistMediaType mediaType, SmartPlaylistDefinition definition) =>
         _evaluator.CountAsync(definition, mediaType, profileId, access);
 
+    // The profile a smart playlist is evaluated FOR does two jobs, and sharing
+    // splits them. Rules such as "tracks I've played ten times" or "films I've
+    // rated four stars" describe the OWNER's taste, so they read the owner's
+    // plays and ratings — otherwise opening Andy's "Most Played" would show the
+    // viewer their own most played under Andy's name. What may be SHOWN is the
+    // viewer's business, so visibility comes from the viewer's parental
+    // controls. The hearts on each row stay the viewer's own likes.
     public async Task<SmartPlaylistItemsVM> GetItemsAsync(Guid id, Guid profileId, PlaylistAccessFilter access)
     {
-        var row = await _repo.GetByIdAsync(id, profileId);
+        var row = await _repo.GetVisibleAsync(id, profileId);
         if (row == null) return new SmartPlaylistItemsVM { MediaType = PlaylistMediaType.Music };
         var def = ParseDefinition(row);
-        var items = await _evaluator.EvaluateAsync(def, row.MediaType, profileId, access);
+        var items = await _evaluator.EvaluateAsync(def, row.MediaType, row.ProfileId, access);
 
         var vm = new SmartPlaylistItemsVM { MediaType = row.MediaType };
 

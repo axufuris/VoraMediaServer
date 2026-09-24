@@ -7,7 +7,7 @@
 //   Episode  {Show}             /  {Episode}              /  S{season} · E{number}
 //   Music    {Artist}           /  {Year} · {Album}      /  {Song}
 //   Collection {Title}          /  {N items}
-//   Playlist {Name}             /  {N items} · {MediaType}
+//   Playlist {Name}             /  {N items} · {MediaType}   [/ by {Owner}]
 //
 // The first entry is the bold primary line; the rest are muted sub-lines.
 
@@ -29,6 +29,11 @@ export interface PosterCaptionItem {
     // Collections and playlists
     itemCount?: number | null;
     mediaTypeLabel?: string | null;
+    // Set only for someone else's shared playlist, so the Shared tab says whose
+    // each one is. A playlist of your own never names you.
+    ownerName?: string | null;
+    // One of your own that everyone else can currently see.
+    sharedByYou?: boolean;
 }
 
 export interface PosterCaption {
@@ -97,7 +102,13 @@ export function posterCaption(item: PosterCaptionItem): PosterCaption {
         case 'Collection':
             return { title: item.title, lines: [itemCountLabel(item.itemCount)].filter((l): l is string => !!l) };
         case 'Playlist':
-            return { title: item.title, lines: [dotJoin([itemCountLabel(item.itemCount), item.mediaTypeLabel])].filter((l): l is string => !!l) };
+            return {
+                title: item.title,
+                lines: [
+                    dotJoin([itemCountLabel(item.itemCount), item.mediaTypeLabel, item.sharedByYou ? 'Shared' : null]),
+                    item.ownerName ? `by ${item.ownerName}` : null,
+                ].filter((l): l is string => !!l),
+            };
         case 'Artist':
             return { title: item.title, lines: [] };
         // The album name gets the line to itself. Prefixing it with the year left

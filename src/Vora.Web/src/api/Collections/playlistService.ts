@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { PlaylistMediaType } from '../Music/smartPlaylistService';
+import type { PlaylistMediaType, SmartPlaylistSummaryVM } from '../Music/smartPlaylistService';
 
 export interface PlaylistSummaryVM {
     id: string;
@@ -9,6 +9,13 @@ export interface PlaylistSummaryVM {
     itemCount: number;
     posterUrls: string[];
     backdropUrls: string[];
+
+    // Visible, read-only, to every profile on the server once shared. isOwner is
+    // false for someone else's shared playlist: hide the edit controls, because
+    // every edit endpoint answers 404 to anyone but the owner.
+    isShared: boolean;
+    isOwner: boolean;
+    ownerName: string;
 }
 
 export interface PlaylistItemVM {
@@ -38,6 +45,13 @@ export interface PlaylistItemVM {
 
 export interface PlaylistDetailsVM extends PlaylistSummaryVM {
     items: PlaylistItemVM[];
+}
+
+// What other profiles have shared, both kinds in one response so the Shared tab
+// can lay them out the way the owner's own list does.
+export interface SharedPlaylistsVM {
+    manual: PlaylistSummaryVM[];
+    smart: SmartPlaylistSummaryVM[];
 }
 
 export const playlistService = {
@@ -77,5 +91,17 @@ export const playlistService = {
     },
     updatePlaylist: async (playlistId: string, name: string, description?: string, serverId?: string) => {
         await apiClient.put(`/playlists/${playlistId}`, { name, description }, { serverId });
+    },
+    getShared: async (serverId?: string): Promise<SharedPlaylistsVM> => {
+        const response = await apiClient.get<SharedPlaylistsVM>('/playlists/shared', { serverId });
+        return response.data;
+    },
+    setShared: async (playlistId: string, isShared: boolean, serverId?: string): Promise<void> => {
+        await apiClient.put(`/playlists/${playlistId}/sharing`, { isShared }, { serverId });
+    },
+    // Returns the new playlist, which the viewer owns and which starts unshared.
+    copy: async (playlistId: string, serverId?: string): Promise<{ id: string }> => {
+        const response = await apiClient.post<{ id: string }>(`/playlists/${playlistId}/copy`, null, { serverId });
+        return response.data;
     }
 };

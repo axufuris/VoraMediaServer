@@ -21,6 +21,17 @@ public class SmartPlaylist
     public string SortBy { get; set; } = "Random";
     public string SortDirection { get; set; } = "Asc";
 
+    // Shared playlists are visible, read-only, to every profile on the server.
+    // Anyone can play one or save a copy they own; only the owner can change it.
+    // A copy starts unshared, so saving someone's playlist does not put a second
+    // copy of it in everyone's Shared tab.
+    public bool IsShared { get; set; }
+
+    // When it was last shared, so the Shared tab can list the newest first.
+    // Cleared on unsharing rather than kept, because a playlist that was shared
+    // last year and is shared again today is new to everyone looking at it.
+    public DateTime? SharedAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

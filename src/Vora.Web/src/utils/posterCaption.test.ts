@@ -45,4 +45,19 @@ describe('posterCaption', () => {
         const cap = posterCaption({ type: 'Movie', title: 'Untitled' });
         expect(cap.lines).toEqual([]);
     });
+
+    it('names the owner of someone else\'s shared playlist on its own line', () => {
+        const caption = posterCaption({ type: 'Playlist', title: 'Road Trip', itemCount: 12, mediaTypeLabel: 'Music', ownerName: 'Andy' });
+        expect(caption.lines).toEqual(['12 items · Music', 'by Andy']);
+    });
+
+    it('never names the owner of your own playlist', () => {
+        const caption = posterCaption({ type: 'Playlist', title: 'Road Trip', itemCount: 12, mediaTypeLabel: 'Music' });
+        expect(caption.lines).toEqual(['12 items · Music']);
+    });
+
+    it('marks a playlist of your own that you have shared', () => {
+        const caption = posterCaption({ type: 'Playlist', title: 'Road Trip', itemCount: 12, mediaTypeLabel: 'Music', sharedByYou: true });
+        expect(caption.lines).toEqual(['12 items · Music · Shared']);
+    });
 });

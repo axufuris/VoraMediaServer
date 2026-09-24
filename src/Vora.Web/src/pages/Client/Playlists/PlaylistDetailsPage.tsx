@@ -10,6 +10,8 @@ import { useDialog } from '../../../dialogs';
 import { audioQualityStore } from '../../../utils/audioQuality';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
 import { StorageKeys } from '../../../utils/storageKeys';
+import { isAxiosError } from 'axios';
+import { PlaylistSharingControls, PlaylistUnavailable, SavedCopyBanner, type SavedCopyState } from './PlaylistSharing';
 
 export default function PlaylistDetailsPage() {
     const dialog = useDialog();
@@ -28,6 +30,7 @@ export default function PlaylistDetailsPage() {
     const [selectedItem, setSelectedItem] = useState<PlaylistItemVM | null>(null);
     const [loading, setLoading] = useState(true);
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    const [unavailable, setUnavailable] = useState(false);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editName, setEditName] = useState('');
@@ -52,11 +55,36 @@ export default function PlaylistDetailsPage() {
                 setSelectedItem(null);
             }
         } catch (e) {
-            console.error(e);
+            // 404 is deleted, unshared or never existed — all the same to a viewer.
+            if (isAxiosError(e) && e.response?.status === 404) setUnavailable(true);
+            else console.error(e);
         } finally {
             setLoading(false);
         }
     }, [id, serverId]);
+
+    const handleToggleShared = async (next: boolean) => {
+        if (!playlist) return;
+        try {
+            await playlistService.setShared(playlist.id, next, serverId);
+            setPlaylist(prev => prev ? { ...prev, isShared: next } : prev);
+        } catch {
+            await dialog.alert(next ? 'Could not share this playlist.' : 'Could not stop sharing this playlist.');
+        }
+    };
+
+    // The copy is the viewer's own and starts unshared. Opened straight away,
+    // with state that shows a confirmation there rather than a toast here.
+    const handleSaveCopy = async () => {
+        if (!playlist) return;
+        try {
+            const { id: copyId } = await playlistService.copy(playlist.id, serverId);
+            const state: SavedCopyState = { savedCopy: true };
+            navigate(serverId ? `/server/${serverId}/playlist/${copyId}` : `/playlist/${copyId}`, { state });
+        } catch {
+            await dialog.alert('Could not save a copy. The playlist may no longer be shared.');
+        }
+    };
 
     useEffect(() => { loadPlaylist(); }, [loadPlaylist]);
 
@@ -188,7 +216,12 @@ export default function PlaylistDetailsPage() {
     };
 
     if (loading) return <div className="p-12 text-center text-[var(--vora-text-muted)] mt-16">Loading playlist...</div>;
-    if (!playlist) return <div className="p-12 text-center text-[var(--vora-danger-500)] mt-16">Playlist not found.</div>;
+    if (unavailable || !playlist) return <PlaylistUnavailable backTo={serverId ? `/server/${serverId}/playlists` : '/playlists'} />;
+
+    // Someone else's shared playlist is read-only here. The server enforces it —
+    // every edit answers 404 to anyone but the owner — so this only stops the
+    // page offering controls that would fail.
+    const canEdit = playlist.isOwner;
 
     const inProgress = selectedItem && selectedItem.resumePositionSeconds > 0 && !selectedItem.isPlayed;
 
@@ -233,6 +266,7 @@ export default function PlaylistDetailsPage() {
             </div>
 
             <div className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-12 pt-8">
+                <SavedCopyBanner />
 
                 <div className="flex flex-col md:flex-row gap-10 mb-16">
                     <div className="w-64 shrink-0 relative">
@@ -265,13 +299,22 @@ export default function PlaylistDetailsPage() {
                                 </span>
                             </h2>
 
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
+                                <PlaylistSharingControls
+                                    isOwner={playlist.isOwner}
+                                    isShared={playlist.isShared}
+                                    ownerName={playlist.ownerName}
+                                    onToggleShared={handleToggleShared}
+                                    onSaveCopy={handleSaveCopy}
+                                />
+                                {canEdit && (<>
                                 <button onClick={handleOpenEdit} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)] transition-colors" title="Edit Playlist">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                 </button>
                                 <button onClick={handleDeletePlaylist} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] hover:bg-[var(--vora-bg-sunken)] transition-colors" title="Delete Playlist">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 </button>
+                                </>)}
                             </div>
                         </div>
 
@@ -346,16 +389,18 @@ export default function PlaylistDetailsPage() {
                         {playlist.items.map((item, index) => (
                             <div
                                 key={item.id}
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, index)}
-                                onDragOver={handleDragOver}
-                                onDrop={(e) => handleDrop(e, index)}
+                                draggable={canEdit}
+                                onDragStart={canEdit ? (e) => handleDragStart(e, index) : undefined}
+                                onDragOver={canEdit ? handleDragOver : undefined}
+                                onDrop={canEdit ? (e) => handleDrop(e, index) : undefined}
                                 onClick={() => setSelectedItem(item)}
                                 className={`flex items-center gap-4 p-3 rounded-lg border transition-all cursor-pointer ${draggedIndex === index ? 'opacity-50' : 'opacity-100'} ${item.isPlayed ? 'opacity-60 grayscale-[40%]' : ''} ${selectedItem?.id === item.id ? 'bg-[var(--vora-bg-sunken)] border-[var(--vora-accent-500)]' : 'bg-[var(--vora-bg-raised)]/50 border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-subtle)]'}`}
                             >
-                                <div className="text-[var(--vora-text-muted)] px-2 cursor-grab" title="Drag to reorder">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
-                                </div>
+                                {canEdit && (
+                                    <div className="text-[var(--vora-text-muted)] px-2 cursor-grab" title="Drag to reorder">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                                    </div>
+                                )}
                                 {item.type === 'Track' ? (
                                     <div className="w-16 h-16 shrink-0 bg-[var(--vora-bg-sunken)] rounded overflow-hidden relative">
                                         {item.albumArtworkUrl
@@ -424,15 +469,17 @@ export default function PlaylistDetailsPage() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                     </button>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id); }}
-                                        className="p-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] transition-colors cursor-pointer"
-                                        title="Remove from Playlist"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
+                                    {canEdit && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id); }}
+                                            className="p-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] transition-colors cursor-pointer"
+                                            title="Remove from Playlist"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}

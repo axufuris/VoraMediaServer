@@ -20,10 +20,43 @@ public sealed class SmartPlaylistRepository : ISmartPlaylistRepository
             .OrderBy(p => p.Name)
             .ToListAsync();
 
+    // Owner only, and deliberately left that way: the update path loads through
+    // this before saving, so widening it to shared playlists would let anyone
+    // rewrite someone else's rules. Reads that should see shared playlists go
+    // through GetVisibleAsync instead.
     public Task<SmartPlaylist?> GetByIdAsync(Guid id, Guid profileId) =>
         _context.SmartPlaylists
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == id && p.ProfileId == profileId);
+
+    public Task<SmartPlaylist?> GetVisibleAsync(Guid id, Guid viewerProfileId) =>
+        _context.SmartPlaylists
+            .AsNoTracking()
+            .Include(p => p.Profile)
+            .FirstOrDefaultAsync(p => p.Id == id && (p.ProfileId == viewerProfileId || p.IsShared));
+
+    public Task<List<SmartPlaylist>> GetSharedByOthersAsync(Guid viewerProfileId) =>
+        _context.SmartPlaylists
+            .AsNoTracking()
+            .Include(p => p.Profile)
+            .Where(p => p.IsShared && p.ProfileId != viewerProfileId)
+            .OrderByDescending(p => p.SharedAt)
+            .ToListAsync();
+
+    public async Task<bool> SetSharedAsync(Guid id, Guid ownerProfileId, bool isShared)
+    {
+        var entity = await _context.SmartPlaylists.FirstOrDefaultAsync(p => p.Id == id && p.ProfileId == ownerProfileId);
+        if (entity == null) return false;
+
+        if (entity.IsShared != isShared)
+        {
+            entity.IsShared = isShared;
+            entity.SharedAt = isShared ? DateTime.UtcNow : null;
+            await _context.SaveChangesAsync();
+        }
+
+        return true;
+    }
 
     public async Task AddAsync(SmartPlaylist playlist)
     {

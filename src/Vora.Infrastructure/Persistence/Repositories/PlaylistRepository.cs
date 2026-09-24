@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Vora.Application.Media.SmartPlaylists;
 using Vora.Application.Playlists;
 using Vora.Application.Playlists.ViewModels;
 using Vora.Domain.Entities.Playlists;
@@ -14,74 +15,163 @@ public class PlaylistRepository : IPlaylistRepository
         _context = context;
     }
 
-    public async Task<List<PlaylistSummaryVM>> GetPlaylistsAsync(Guid profileId)
+    // One projection for every list of playlists, so the owner's own list, the
+    // Shared tab and the detail header can never disagree about what a playlist
+    // holds. Counts and poster mosaics only ever draw on items the viewer may
+    // see - a mosaic built from every item would put a restricted film's poster
+    // in the header while the film itself was hidden.
+    private static IQueryable<PlaylistSummaryVM> Summaries(IQueryable<Playlist> playlists, IQueryable<Guid> visible, Guid viewerProfileId) =>
+        playlists.Select(p => new PlaylistSummaryVM
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Description = p.Description,
+            MediaType = p.MediaType,
+            IsShared = p.IsShared,
+            IsOwner = p.ProfileId == viewerProfileId,
+            OwnerName = p.Profile.Name,
+            ItemCount = p.Items.Count(i => visible.Contains(i.MediaItemId)),
+            PosterUrls = p.Items
+                .Where(i => visible.Contains(i.MediaItemId))
+                .OrderBy(i => i.Order)
+                .Select(i => i.MediaItem.PosterUrl
+                    ?? (i.MediaItem is Vora.Domain.Entities.Media.Track
+                        ? ((Vora.Domain.Entities.Media.Track)i.MediaItem).Album!.ArtworkUrl
+                        : null))
+                .Where(u => u != null)
+                .Select(u => u!)
+                .Take(4)
+                .ToList(),
+            BackdropUrls = p.Items
+                .Where(i => visible.Contains(i.MediaItemId))
+                .OrderBy(i => i.Order)
+                .Select(i => i.MediaItem.BackgroundUrl)
+                .Where(u => u != null)
+                .Select(u => u!)
+                .Take(4)
+                .ToList()
+        });
+
+    public async Task<List<PlaylistSummaryVM>> GetPlaylistsAsync(Guid profileId, PlaylistAccessFilter access)
     {
-        return await _context.Playlists
-            .AsNoTracking()
-            .Where(p => p.ProfileId == profileId)
-            .OrderBy(p => p.Name)
-            .Select(p => new PlaylistSummaryVM
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Description = p.Description,
-                MediaType = p.MediaType,
-                ItemCount = p.Items.Count,
-                PosterUrls = p.Items.OrderBy(i => i.Order)
-                                    .Select(i => i.MediaItem.PosterUrl
-                                        ?? (i.MediaItem is Vora.Domain.Entities.Media.Track
-                                            ? ((Vora.Domain.Entities.Media.Track)i.MediaItem).Album!.ArtworkUrl
-                                            : null))
-                                    .Where(u => u != null)
-                                    .Select(u => u!)
-                                    .Take(4)
-                                    .ToList(),
-                BackdropUrls = p.Items.OrderBy(i => i.Order)
-                                    .Select(i => i.MediaItem.BackgroundUrl)
-                                    .Where(u => u != null)
-                                    .Select(u => u!)
-                                    .Take(4)
-                                    .ToList()
-            })
+        var visible = PlaylistVisibility.VisibleMediaIds(_context, access);
+        return await Summaries(
+                _context.Playlists.AsNoTracking().Where(p => p.ProfileId == profileId).OrderBy(p => p.Name),
+                visible,
+                profileId)
             .ToListAsync();
     }
 
-    public async Task<PlaylistDetailsVM?> GetPlaylistDetailsAsync(Guid id, Guid profileId)
+    // Other people's shared playlists, newest share first. One the viewer can see
+    // nothing in is left out entirely rather than listed as empty: a child has no
+    // use for an adult's "Horror Marathon", and listing it would show them the
+    // title of something their controls exist to keep from them.
+    public async Task<List<PlaylistSummaryVM>> GetSharedByOthersAsync(Guid viewerProfileId, PlaylistAccessFilter access)
     {
-        var playlist = await _context.Playlists
+        var visible = PlaylistVisibility.VisibleMediaIds(_context, access);
+        var shared = await Summaries(
+                _context.Playlists
+                    .AsNoTracking()
+                    .Where(p => p.IsShared && p.ProfileId != viewerProfileId)
+                    .OrderByDescending(p => p.SharedAt),
+                visible,
+                viewerProfileId)
+            .ToListAsync();
+
+        return shared.Where(p => p.ItemCount > 0).ToList();
+    }
+
+    // Owner only. Unsharing clears SharedAt, so re-sharing later puts it back at
+    // the top of everyone's list, where something newly shared belongs.
+    public async Task<bool> SetSharedAsync(Guid id, Guid ownerProfileId, bool isShared)
+    {
+        var playlist = await _context.Playlists.FirstOrDefaultAsync(p => p.Id == id && p.ProfileId == ownerProfileId);
+        if (playlist == null) return false;
+
+        if (playlist.IsShared != isShared)
+        {
+            playlist.IsShared = isShared;
+            playlist.SharedAt = isShared ? DateTime.UtcNow : null;
+            await _context.SaveChangesAsync();
+        }
+
+        return true;
+    }
+
+    // A fork the viewer owns outright. It starts UNSHARED, so saving someone's
+    // playlist does not put a second copy of it into everyone's Shared tab, and
+    // it holds only the items the viewer may see - copying the rest would slip a
+    // restricted title into a restricted profile's own playlist, where it would
+    // then sit in their library as if they had chosen it.
+    public async Task<Guid?> CopyPlaylistAsync(Guid sourceId, Guid viewerProfileId, PlaylistAccessFilter access)
+    {
+        var source = await _context.Playlists
             .AsNoTracking()
-            .Where(p => p.Id == id && p.ProfileId == profileId)
-            .Select(p => new PlaylistDetailsVM
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Description = p.Description,
-                ItemCount = p.Items.Count,
-                PosterUrls = p.Items.OrderBy(i => i.Order)
-                                    .Select(i => i.MediaItem.PosterUrl
-                                        ?? (i.MediaItem is Vora.Domain.Entities.Media.Track
-                                            ? ((Vora.Domain.Entities.Media.Track)i.MediaItem).Album!.ArtworkUrl
-                                            : null))
-                                    .Where(u => u != null)
-                                    .Select(u => u!)
-                                    .Take(4)
-                                    .ToList(),
-                BackdropUrls = p.Items.OrderBy(i => i.Order)
-                                    .Select(i => i.MediaItem.BackgroundUrl)
-                                    .Where(u => u != null)
-                                    .Select(u => u!)
-                                    .Take(4)
-                                    .ToList()
-            })
+            .Where(p => p.Id == sourceId && (p.ProfileId == viewerProfileId || p.IsShared))
+            .Select(p => new { p.Name, p.Description, p.MediaType })
             .FirstOrDefaultAsync();
 
-        if (playlist == null) return null;
+        if (source == null) return null;
+
+        var visible = PlaylistVisibility.VisibleMediaIds(_context, access);
+        var mediaIds = await _context.PlaylistItems
+            .AsNoTracking()
+            .Where(i => i.PlaylistId == sourceId && visible.Contains(i.MediaItemId))
+            .OrderBy(i => i.Order)
+            .Select(i => i.MediaItemId)
+            .ToListAsync();
+
+        var copy = new Playlist
+        {
+            ProfileId = viewerProfileId,
+            Name = source.Name,
+            Description = source.Description,
+            MediaType = source.MediaType,
+            IsShared = false,
+            Items = mediaIds.Select((mediaId, index) => new PlaylistItem { MediaItemId = mediaId, Order = index + 1 }).ToList()
+        };
+
+        _context.Playlists.Add(copy);
+        await _context.SaveChangesAsync();
+        return copy.Id;
+    }
+
+    // Readable by the owner, or by anyone once it is shared - and by nobody once
+    // it has been deleted or unshared, which is what a viewer who had it open
+    // sees as "no longer available". Writes are not affected: every write path
+    // still matches on the owner alone.
+    public async Task<PlaylistDetailsVM?> GetPlaylistDetailsAsync(Guid id, Guid viewerProfileId, PlaylistAccessFilter access)
+    {
+        var profileId = viewerProfileId;
+        var visible = PlaylistVisibility.VisibleMediaIds(_context, access);
+
+        var summary = await Summaries(
+                _context.Playlists.AsNoTracking().Where(p => p.Id == id && (p.ProfileId == viewerProfileId || p.IsShared)),
+                visible,
+                viewerProfileId)
+            .FirstOrDefaultAsync();
+
+        if (summary == null) return null;
+
+        var playlist = new PlaylistDetailsVM
+        {
+            Id = summary.Id,
+            Name = summary.Name,
+            Description = summary.Description,
+            MediaType = summary.MediaType,
+            ItemCount = summary.ItemCount,
+            PosterUrls = summary.PosterUrls,
+            BackdropUrls = summary.BackdropUrls,
+            IsShared = summary.IsShared,
+            IsOwner = summary.IsOwner,
+            OwnerName = summary.OwnerName
+        };
 
         var rawItems = await _context.PlaylistItems
             .AsNoTracking()
             .Include(i => i.MediaItem)
                 .ThenInclude(m => m.Analysis)
-            .Where(i => i.PlaylistId == id)
+            .Where(i => i.PlaylistId == id && visible.Contains(i.MediaItemId))
             .OrderBy(i => i.Order)
             .ToListAsync();
 
