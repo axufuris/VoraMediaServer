@@ -29,6 +29,7 @@ public class ScheduledJobWorker : BackgroundService
     private DateTime _lastIptvHealthCheckDate = DateTime.MinValue.Date;
     private DateTime _lastVideoThumbnailDate = DateTime.MinValue.Date;
     private DateTime _lastTrashPurgeDate = DateTime.MinValue.Date;
+    private DateTime _lastMusicPopularityDate = DateTime.MinValue.Date;
 
     private bool _startupCatchUpDone = false;
 
@@ -115,6 +116,7 @@ public class ScheduledJobWorker : BackgroundService
             if (timeOfDay >= settings.IptvHealthCheckTime) _lastIptvHealthCheckDate = today;
             if (timeOfDay >= settings.VideoThumbnailScheduleTime) _lastVideoThumbnailDate = today;
             if (timeOfDay >= settings.NightlyScanTime) _lastTrashPurgeDate = today;
+            if (timeOfDay >= settings.NightlyScanTime) _lastMusicPopularityDate = today;
         }
 
         if (settings.EnableNightlyScan && timeOfDay >= settings.NightlyScanTime && _lastNightlyScanDate < today)
@@ -145,6 +147,17 @@ public class ScheduledJobWorker : BackgroundService
             }
 
             _lastTrashPurgeDate = today;
+        }
+
+        // Daily, but cheap on any day but the first: the refresher only asks about
+        // artists never refreshed or not refreshed in thirty days. Deliberately not
+        // tied to EnableNightlyScan — popularity has nothing to do with whether
+        // the library is rescanned, and the refresher is a no-op when no listening
+        // provider is configured.
+        if (timeOfDay >= settings.NightlyScanTime && _lastMusicPopularityDate < today)
+        {
+            taskQueue.QueueRefreshMusicPopularity();
+            _lastMusicPopularityDate = today;
         }
 
         // Queued before analysis on purpose: the two share the library-maint

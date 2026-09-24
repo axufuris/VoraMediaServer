@@ -15,6 +15,8 @@ export interface ArtistVM {
     clearLogoUrl?: string;
     libraryId: string;
     serverAdminRating?: number;
+    globalListeners?: number | null;
+    globalPlays?: number | null;
     myRating?: number;
     lockedFields: string[];
 }
@@ -33,11 +35,12 @@ export interface AlbumVM {
     artistId: string;
     artistName: string;
     serverAdminRating?: number;
+    globalPlays?: number | null;
     myRating?: number;
     lockedFields: string[];
 }
 
-export type AlbumSortOrder = 'RecentlyAdded' | 'Alphabetical';
+export type AlbumSortOrder = 'RecentlyAdded' | 'Alphabetical' | 'Popular';
 
 export interface AlbumPageVM {
     items: AlbumVM[];
@@ -69,6 +72,8 @@ export interface TrackVM {
     albumId?: string;
     isLiked: boolean;
     serverAdminRating?: number;
+    globalListeners?: number | null;
+    globalPlays?: number | null;
     myRating?: number;
     lockedFields: string[];
 }

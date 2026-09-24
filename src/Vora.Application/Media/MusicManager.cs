@@ -1029,6 +1029,8 @@ public class MusicManager : IMusicManager
         ClearLogoUrl = a.ClearLogoUrl,
         LibraryId = a.LibraryId,
         ServerAdminRating = a.ServerAdminRating,
+        GlobalListeners = a.GlobalListeners,
+        GlobalPlays = a.GlobalPlays,
         LockedFields = a.LockedFields ?? new List<string>()
     };
 
@@ -1047,6 +1049,7 @@ public class MusicManager : IMusicManager
         ArtistId = a.ArtistId,
         ArtistName = artistName,
         ServerAdminRating = a.ServerAdminRating,
+        GlobalPlays = a.GlobalPlays,
         LockedFields = a.LockedFields ?? new List<string>()
     };
 
@@ -1062,6 +1065,8 @@ public class MusicManager : IMusicManager
         ContentRating = t.ContentRating,
         AlbumId = t.AlbumId,
         ServerAdminRating = t.ServerAdminRating,
+        GlobalListeners = t.GlobalListeners,
+        GlobalPlays = t.GlobalPlays,
         LockedFields = t.LockedFields ?? new List<string>()
     };
 }

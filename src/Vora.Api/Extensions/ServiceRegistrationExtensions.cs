@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
@@ -406,6 +406,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMediaDedupeManager, MediaDedupeManager>();
         services.AddScoped<IMediaManager, MediaManager>();
         services.AddScoped<IMusicManager, MusicManager>();
+        services.AddScoped<IMusicPopularityRefresher, MusicPopularityRefresher>();
         services.AddScoped<IMusicRecommendationManager, MusicRecommendationManager>();
         services.AddSingleton<IServerPlaybackTracker, ServerPlaybackTracker>();
         services.AddScoped<IMetadataManager, MetadataManager>();

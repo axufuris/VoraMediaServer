@@ -320,4 +320,135 @@ public class LastFmListeningDataProvider : IListeningDataProvider, IPluginConnec
             return Array.Empty<ArtistTagResult>();
         }
     }
+
+    // Last.fm answers an unknown artist with HTTP 200 and an error body rather
+    // than a 404, so the status code alone cannot tell "not found" from "found".
+    private const int LastFmErrorInvalidParameters = 6;
+
+    public async Task<ArtistPopularity> GetArtistPopularityAsync(string artistName, int trackLimit, int albumLimit, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(artistName)) return ArtistPopularity.NotFound;
+
+        var (apiKey, _) = await GetCredentialsAsync();
+        if (apiKey == null) return ArtistPopularity.Unavailable;
+
+        // autocorrect=1 lets Last.fm resolve "bon jovi" or "Bon Jovi" to the
+        // canonical artist, which turns what would be a NotFound into data.
+        var info = await GetPopularityJsonAsync("artist.getInfo", artistName, apiKey, null, cancellationToken);
+        if (info.Outcome != PopularityLookupOutcome.Found || info.Document == null)
+        {
+            return info.Outcome == PopularityLookupOutcome.NotFound ? ArtistPopularity.NotFound : ArtistPopularity.Unavailable;
+        }
+
+        long? listeners = null;
+        long? plays = null;
+        using (info.Document)
+        {
+            if (info.Document.RootElement.TryGetProperty("artist", out var artist)
+                && artist.TryGetProperty("stats", out var stats))
+            {
+                listeners = ReadCount(stats, "listeners");
+                plays = ReadCount(stats, "playcount");
+            }
+        }
+
+        // The artist was found, so a failure on either list below is not a
+        // reason to discard what is already in hand. Each comes back empty
+        // instead, and the artist's own figures are still stored.
+        var tracks = await ReadNamedListAsync("artist.getTopTracks", artistName, apiKey, trackLimit, "toptracks", "track", cancellationToken);
+        var albums = await ReadNamedListAsync("artist.getTopAlbums", artistName, apiKey, albumLimit, "topalbums", "album", cancellationToken);
+
+        return new ArtistPopularity
+        {
+            Outcome = PopularityLookupOutcome.Found,
+            Listeners = listeners,
+            Plays = plays,
+            TopTracks = tracks,
+            TopAlbums = albums,
+        };
+    }
+
+    private async Task<IReadOnlyList<NamedPopularity>> ReadNamedListAsync(
+        string method, string artistName, string apiKey, int limit, string containerName, string itemName, CancellationToken cancellationToken)
+    {
+        var result = await GetPopularityJsonAsync(method, artistName, apiKey, limit, cancellationToken);
+        if (result.Outcome != PopularityLookupOutcome.Found || result.Document == null) return Array.Empty<NamedPopularity>();
+
+        using (result.Document)
+        {
+            if (!result.Document.RootElement.TryGetProperty(containerName, out var container)) return Array.Empty<NamedPopularity>();
+            if (!container.TryGetProperty(itemName, out var items) || items.ValueKind != JsonValueKind.Array) return Array.Empty<NamedPopularity>();
+
+            var list = new List<NamedPopularity>();
+            foreach (var item in items.EnumerateArray())
+            {
+                var name = item.TryGetProperty("name", out var n) ? n.GetString() : null;
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                list.Add(new NamedPopularity
+                {
+                    Name = name,
+                    Listeners = ReadCount(item, "listeners"),
+                    Plays = ReadCount(item, "playcount"),
+                });
+            }
+            return list;
+        }
+    }
+
+    private async Task<(PopularityLookupOutcome Outcome, JsonDocument? Document)> GetPopularityJsonAsync(
+        string method, string artistName, string apiKey, int? limit, CancellationToken cancellationToken)
+    {
+        var url = $"{BaseUrl}?method={method}&artist={Uri.EscapeDataString(artistName)}&autocorrect=1"
+            + (limit.HasValue ? $"&limit={limit.Value}" : string.Empty)
+            + $"&api_key={Uri.EscapeDataString(apiKey)}&format=json";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient(HttpClientName);
+            using var response = await client.GetAsync(url, cancellationToken);
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            JsonDocument doc;
+            try { doc = JsonDocument.Parse(json); }
+            catch (JsonException) { return (PopularityLookupOutcome.Unavailable, null); }
+
+            if (doc.RootElement.TryGetProperty("error", out var error))
+            {
+                var code = error.ValueKind == JsonValueKind.Number ? error.GetInt32() : 0;
+                doc.Dispose();
+                return (code == LastFmErrorInvalidParameters ? PopularityLookupOutcome.NotFound : PopularityLookupOutcome.Unavailable, null);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                doc.Dispose();
+                return (PopularityLookupOutcome.Unavailable, null);
+            }
+
+            return (PopularityLookupOutcome.Found, doc);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Last.fm {Method} failed for {Artist}", method, artistName);
+            return (PopularityLookupOutcome.Unavailable, null);
+        }
+    }
+
+    // Last.fm sends counts as strings in some methods and numbers in others —
+    // artist.getInfo quotes them, artist.getTopAlbums does not — so accept both
+    // rather than trusting whichever one the method happened to be tested with.
+    internal static long? ReadCount(JsonElement element, string property)
+    {
+        if (!element.TryGetProperty(property, out var value)) return null;
+        return value.ValueKind switch
+        {
+            JsonValueKind.Number when value.TryGetInt64(out var n) => n,
+            JsonValueKind.String when long.TryParse(value.GetString(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n) => n,
+            _ => null,
+        };
+    }
 }

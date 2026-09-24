@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -71,6 +71,7 @@ public interface ITaskQueueManager
     void QueuePreExtractMediaItemSubtitles(Guid mediaItemId, string? mediaItemName = null);
     void QueuePreExtractLibrarySubtitles(Guid libraryId, string? libraryName = null);
     void QueueSubtitleBackfill();
+    void QueueRefreshMusicPopularity();
 }
 
 public class TaskQueueManager : ITaskQueueManager
@@ -765,6 +766,18 @@ public class TaskQueueManager : ITaskQueueManager
             var manager = sp.GetRequiredService<Vora.Application.Subtitles.ISubtitlePreExtractionManager>();
             await manager.PreExtractForLibraryAsync(libraryId, ct);
         }, resourceKey: SubtitleExtractionKey, dedupeKey: $"pre-extract-subs:library:{libraryId}");
+    }
+
+    // Deduplicated because it is queued by a daily schedule and could otherwise
+    // stack behind a slow previous run. Network-bound rather than disk-bound, so
+    // it takes no library key and does not wait on a scan.
+    public void QueueRefreshMusicPopularity()
+    {
+        EnqueueTask("Refresh Music Popularity", async (ct, sp) =>
+        {
+            var refresher = sp.GetRequiredService<IMusicPopularityRefresher>();
+            await refresher.RefreshDueArtistsAsync(ct);
+        }, dedupeKey: "music-popularity-refresh");
     }
 
     public void QueueSubtitleBackfill()
