@@ -351,7 +351,7 @@ public class MediaIngestionService : IMediaIngestionService
         return new AlbumHandle(album.Id);
     }
 
-    public async Task<MediaItemHandle> EnsureTrackAsync(LibraryHandle library, AlbumHandle album, string title, int trackNumber, int? discNumber, int? durationSeconds, string? audioCodec, int? sampleRate, int? bitrate, string? contentRating, string? trackArtist = null)
+    public async Task<MediaItemHandle> EnsureTrackAsync(LibraryHandle library, AlbumHandle album, string title, int trackNumber, int? discNumber, int? durationSeconds, string? audioCodec, int? sampleRate, int? bitrate, string? contentRating, string? trackArtist = null, string? isrc = null)
     {
         var libraryId = library.Value;
         var albumId = album.Value;
@@ -359,11 +359,28 @@ public class MediaIngestionService : IMediaIngestionService
         if (existing != null)
         {
             bool changed = false;
+            // The file's own advisory tag describes this file, so it replaces a
+            // provider's answer, which only describes a recording it matched.
             if (!existing.IsLocked(nameof(existing.ContentRating))
-                && existing.ContentRating == null
-                && !string.IsNullOrWhiteSpace(contentRating))
+                && !string.IsNullOrWhiteSpace(contentRating)
+                && (existing.ContentRating != contentRating || existing.ContentRatingProvider != null))
             {
                 existing.ContentRating = contentRating;
+                existing.ContentRatingProvider = null;
+                changed = true;
+            }
+            // A different ISRC is a different recording, so whatever a provider
+            // said about the old one no longer applies.
+            var normalizedIsrc = NormalizeIsrc(isrc);
+            if (normalizedIsrc != null && normalizedIsrc != existing.Isrc)
+            {
+                existing.Isrc = normalizedIsrc;
+                existing.ContentRatingCheckedAt = null;
+                if (existing.ContentRatingProvider != null && !existing.IsLocked(nameof(existing.ContentRating)))
+                {
+                    existing.ContentRating = null;
+                    existing.ContentRatingProvider = null;
+                }
                 changed = true;
             }
             if (string.IsNullOrEmpty(existing.Artist) && !string.IsNullOrWhiteSpace(trackArtist) && !existing.IsLocked(nameof(existing.Artist)))
@@ -392,10 +409,21 @@ public class MediaIngestionService : IMediaIngestionService
             AudioCodec = audioCodec,
             SampleRate = sampleRate,
             Bitrate = bitrate,
-            ContentRating = contentRating
+            ContentRating = contentRating,
+            Isrc = NormalizeIsrc(isrc)
         };
         await _repository.AddMediaItemAsync(track);
         return new MediaItemHandle(track.Id);
+    }
+
+    // Twelve letters and digits. Taggers write it with hyphens or spaces, in
+    // either case; anything else in the field is not an ISRC and is dropped
+    // rather than stored and sent to a provider.
+    internal static string? NormalizeIsrc(string? isrc)
+    {
+        if (string.IsNullOrWhiteSpace(isrc)) return null;
+        var compact = new string(isrc.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
+        return compact.Length == 12 ? compact : null;
     }
 
     public Task ReleaseTrackedEntitiesAsync() => _repository.ReleaseTrackedEntitiesAsync();

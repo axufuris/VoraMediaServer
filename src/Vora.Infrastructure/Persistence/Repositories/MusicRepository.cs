@@ -431,6 +431,29 @@ public class MusicRepository : IMusicRepository
             .AsSplitQuery()
             .FirstOrDefaultAsync(a => a.Id == artistId);
 
+    // Albums holding a track with no rating that a provider has not been asked
+    // about, or was asked long enough ago to be worth asking again. Never-asked
+    // first, so a run cut short still spends itself on the unrated.
+    public Task<List<ContentRatingTarget>> GetAlbumsDueForContentRatingAsync(DateTime recheckBefore, int limit)
+    {
+        var awaiting = _context.Tracks.AwaitingProviderRating(recheckBefore);
+        return _context.Albums
+            .AsNoTracking()
+            .Where(al => awaiting.Any(t => t.AlbumId == al.Id))
+            .OrderBy(al => awaiting.Any(t => t.AlbumId == al.Id && t.ContentRatingCheckedAt != null))
+            .ThenBy(al => al.Title)
+            .Take(Math.Max(1, limit))
+            .Select(al => new ContentRatingTarget(al.Id, al.AlbumArtist ?? al.Artist.Name, al.Title))
+            .ToListAsync();
+    }
+
+    public Task<List<Track>> GetAlbumTracksForUpdateAsync(Guid albumId) =>
+        _context.Tracks
+            .Where(t => t.AlbumId == albumId)
+            .OrderBy(t => t.DiscNumber)
+            .ThenBy(t => t.TrackNumber)
+            .ToListAsync();
+
     public Task SaveMusicChangesAsync(CancellationToken cancellationToken) =>
         _context.SaveChangesAsync(cancellationToken);
 

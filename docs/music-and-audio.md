@@ -19,9 +19,17 @@ Music libraries are filtered out of the left nav (they're surfaced via the Music
 `MusicAccessFilter` (in `Vora.Application.Media`) carries:
 
 - `HasAllLibraryAccess` + `AllowedLibraryIds` (per-profile library scope)
-- `HasAllRatings` + `AllowedRatings` + `BlockUnratedContent` (music content-rating filter, separate from movie/TV ratings)
+- `AllowedRatings` + `BlockUnratedContent` (music content-rating filter, independent of movie/TV ratings; `HasAllRatings` is derived — empty allowlist = open)
 
-Endpoints build it via `MusicEndpoints.BuildFilter(user)` using `AuthExtensions`. Every music repo query that returns tracks/albums/artists must apply this filter — it's the music equivalent of `ApplyAccessFilters` for `MediaItem`.
+Endpoints build it via `AuthExtensions.GetMusicAccessFilter()`. Every music query applies it through `MusicAccessQuery.ApplyMusicAccess` / `ApplyMusicRatings` — the only place the rule is written (`MusicAccessRuleIsWrittenOnceTests` enforces it).
+
+## Where a track's Clean / Explicit comes from
+
+1. **The file's tags** (scanner `DetectAdvisory`): MP4 `rtng`; ID3 `TXXX` and Vorbis `ITUNESADVISORY` / `PARENTAL_ADVISORY` / `EXPLICIT`; `[Explicit]` in the title. A tag **always wins** — on rescan it replaces a provider's answer (`Track.ContentRatingProvider` goes back to null). A `LockedFields["ContentRating"]` lock beats both.
+2. **An `IMusicContentRatingProvider`** fills only what the tags left blank. Built in: `DeezerContentRatingProvider` (no key). `MusicContentRatingRefresher` runs nightly and after every music scan:
+   - A track with an **ISRC** (`Track.Isrc`, read from the file) is looked up exactly — explicit and clean edits have different ISRCs.
+   - Otherwise, every edition of the album is fetched and `MusicEditionMatcher` takes the **strictest** answer: Clean only if every matching edition says Clean. Deezer carries both editions of e.g. *The Eminem Show* with near-identical durations, so an untagged file can't be told apart — erring to Explicit is the safe direction.
+   - Every asked track is stamped `ContentRatingCheckedAt`; an unanswered one is asked again after 90 days. A provider that stops answering ends the run.
 
 ## Recommendation engine
 
@@ -171,6 +179,7 @@ Podcasts (`/podcasts`) and Radio (`/radio`) are separate pages. Music libraries 
 - `MusicBrainzArtworkProvider`, `FanartTvMusicArtworkProvider`, `TheAudioDbMusicArtworkProvider` — implement `IMusicArtworkProvider`. Surface in the metadata edit modal's image picker.
 - `LrcLibLyricsProvider`, `GeniusLyricsProvider` — implement `ILyricsProvider`.
 - `LastFmClientPlugin` — implements `ILastFmClient` and `IListeningDataProvider`.
+- `DeezerContentRatingProvider` — implements `IMusicContentRatingProvider` (Clean / Explicit for untagged files).
 - `ItunesPodcastDiscoveryProvider` — implements `IPodcastDiscoveryProvider`.
 
 See `docs/plugins.md` for the plugin loader contract.

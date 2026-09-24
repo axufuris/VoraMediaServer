@@ -72,6 +72,7 @@ public interface ITaskQueueManager
     void QueuePreExtractLibrarySubtitles(Guid libraryId, string? libraryName = null);
     void QueueSubtitleBackfill();
     void QueueRefreshMusicPopularity();
+    void QueueRateMusicContent();
 }
 
 public class TaskQueueManager : ITaskQueueManager
@@ -780,6 +781,17 @@ public class TaskQueueManager : ITaskQueueManager
         }, dedupeKey: "music-popularity-refresh");
     }
 
+    // Deduplicated for the same reason as the popularity refresh, and likewise
+    // network-bound, so it holds no library key.
+    public void QueueRateMusicContent()
+    {
+        EnqueueTask("Rate Music Clean / Explicit", async (ct, sp) =>
+        {
+            var refresher = sp.GetRequiredService<IMusicContentRatingRefresher>();
+            await refresher.RateDueAlbumsAsync(ct);
+        }, dedupeKey: "music-content-rating");
+    }
+
     public void QueueSubtitleBackfill()
     {
         EnqueueTask("Pre-extract Subtitles: whole library backfill", async (ct, sp) =>
@@ -919,6 +931,13 @@ public class TaskQueueManager : ITaskQueueManager
         // an already-enriched item; force stays off here so a force rescan the
         // units already handled isn't re-run).
         await RunStepAsync("Fetching details…", () => metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false, cancellationToken: ct));
+
+        // Straight after the scan rather than waiting for the night, so a newly
+        // added explicit album is labelled before a restricted profile finds it.
+        if (libraryVm?.Type == nameof(LibraryType.Music))
+        {
+            await RunStepAsync("Checking Clean / Explicit…", () => sp.GetRequiredService<IMusicContentRatingRefresher>().RateDueAlbumsAsync(ct));
+        }
 
         // A show scanned across two resolution folders (e.g. .../TV/1080p/Show
         // and .../TV/4K/Show) lands as two show rows until enrichment stamps the

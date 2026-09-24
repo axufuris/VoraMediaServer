@@ -51,6 +51,8 @@ public interface IMusicRepository
     Task<List<PopularityRefreshTarget>> GetArtistsDueForPopularityRefreshAsync(DateTime staleBefore, int limit);
     Task<Artist?> GetArtistCatalogForUpdateAsync(Guid artistId);
     Task SaveMusicChangesAsync(CancellationToken cancellationToken);
+    Task<List<ContentRatingTarget>> GetAlbumsDueForContentRatingAsync(DateTime recheckBefore, int limit);
+    Task<List<Track>> GetAlbumTracksForUpdateAsync(Guid albumId);
     Task<Album?> GetAlbumForUpdateAsync(Guid albumId);
     Task<Track?> GetTrackForUpdateAsync(Guid trackId);
     Task UpdateTrackAsync(Track track);
@@ -152,3 +154,5 @@ public class MusicAccessFilter
 }
 
 public sealed record PopularityRefreshTarget(Guid ArtistId, string ArtistName);
+
+public sealed record ContentRatingTarget(Guid AlbumId, string ArtistName, string AlbumTitle);

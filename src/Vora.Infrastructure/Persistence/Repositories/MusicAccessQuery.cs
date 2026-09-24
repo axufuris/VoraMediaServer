@@ -44,4 +44,10 @@ internal static class MusicAccessQuery
 
         return query.ApplyMusicRatings(access);
     }
+
+    // Not an access rule: the tracks a rating provider still has to be asked
+    // about. It lives here so every test of a track's rating is in one file.
+    public static IQueryable<Track> AwaitingProviderRating(this IQueryable<Track> query, DateTime recheckBefore) =>
+        query.Where(t => t.ContentRating == null
+            && (t.ContentRatingCheckedAt == null || t.ContentRatingCheckedAt < recheckBefore));
 }

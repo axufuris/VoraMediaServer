@@ -26,6 +26,7 @@ public static class PluginLoaderExtensions
         typeof(IPodcastDiscoveryProvider),
         typeof(ILyricsProvider),
         typeof(IListeningDataProvider),
+        typeof(IMusicContentRatingProvider),
         typeof(ILibrarySyncProvider),
         typeof(ISubtitleSearchProvider)
     };

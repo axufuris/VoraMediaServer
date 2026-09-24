@@ -191,4 +191,73 @@ public class MediaIngestionServiceTests : IDisposable
             s.LibraryId == library.Value));
     }
 
+    private Track GivenExistingTrack(string? rating, string? provider = null, string? isrc = null)
+    {
+        var track = new Track { Id = Guid.NewGuid(), Title = "White America", TrackNumber = 2, ContentRating = rating, ContentRatingProvider = provider, Isrc = isrc };
+        _musicRepo.GetTrackByAlbumAndNumberAsync(Arg.Any<Guid>(), 2, Arg.Any<int?>()).Returns(track);
+        return track;
+    }
+
+    private Task RescanAsync(string? rating, string? isrc = null) => _service.EnsureTrackAsync(
+        LibraryHandle.FromGuid(Guid.NewGuid()), new AlbumHandle(Guid.NewGuid()), "White America", 2, null, 324,
+        "flac", 44100, 900, rating, isrc: isrc);
+
+    // The tag describes this file; a provider only described a recording it matched.
+    [Fact]
+    public async Task A_file_advisory_tag_replaces_a_provider_rating()
+    {
+        var track = GivenExistingTrack("Clean", provider: "deezer_content_ratings");
+
+        await RescanAsync("Explicit");
+
+        track.ContentRating.Should().Be("Explicit");
+        track.ContentRatingProvider.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_file_with_no_advisory_tag_keeps_the_provider_rating()
+    {
+        var track = GivenExistingTrack("Explicit", provider: "deezer_content_ratings");
+
+        await RescanAsync(null);
+
+        track.ContentRating.Should().Be("Explicit");
+        track.ContentRatingProvider.Should().Be("deezer_content_ratings");
+    }
+
+    [Fact]
+    public async Task A_locked_rating_survives_a_file_tag()
+    {
+        var track = GivenExistingTrack("Clean");
+        track.LockField(nameof(Track.ContentRating));
+
+        await RescanAsync("Explicit");
+
+        track.ContentRating.Should().Be("Clean");
+    }
+
+    // A new ISRC is a different recording — the file was replaced with another
+    // edition — so the provider's answer about the old one is dropped and asked again.
+    [Fact]
+    public async Task A_changed_isrc_drops_the_provider_rating_and_asks_again()
+    {
+        var track = GivenExistingTrack("Explicit", provider: "deezer_content_ratings", isrc: "USIR10211052");
+        track.ContentRatingCheckedAt = DateTime.UtcNow;
+
+        await RescanAsync(null, isrc: "USIR10211126");
+
+        track.Isrc.Should().Be("USIR10211126");
+        track.ContentRating.Should().BeNull();
+        track.ContentRatingCheckedAt.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("us-ir1-02-11052", "USIR10211052")]
+    [InlineData(" USIR10211052 ", "USIR10211052")]
+    [InlineData("not an isrc", null)]
+    [InlineData("", null)]
+    public void Isrcs_are_stored_in_one_form_or_not_at_all(string raw, string? expected)
+    {
+        MediaIngestionService.NormalizeIsrc(raw).Should().Be(expected);
+    }
 }
