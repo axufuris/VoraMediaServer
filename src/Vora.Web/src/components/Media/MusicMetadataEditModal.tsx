@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type MusicArtworkResultVM, type MusicArtworkKind } from '../../api/Music/musicService';
 import { Modal, ModalHeader } from '../Common/Modal';
@@ -432,6 +432,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                             isLocked={isLocked('ArtworkUrl')}
                             onLockToggle={() => toggleLock('ArtworkUrl')}
                             inputClassName={inputClass('ArtworkUrl')}
+                            suggestionsKey={providerFilter}
                             onLoadSuggestions={suggestionsFor(['Thumb', 'Unknown'])}
                             onRefreshFromProviders={artist ? async () => {
                                 const result = await musicService.refreshArtistArtwork(artist.id, true, serverId);
@@ -455,6 +456,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                             isLocked={isLocked('BackgroundUrl')}
                             onLockToggle={() => toggleLock('BackgroundUrl')}
                             inputClassName={inputClass('BackgroundUrl')}
+                            suggestionsKey={providerFilter}
                             onLoadSuggestions={suggestionsFor(['Background'])}
                         />
                     )}
@@ -470,6 +472,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                             isLocked={isLocked('BannerUrl')}
                             onLockToggle={() => toggleLock('BannerUrl')}
                             inputClassName={inputClass('BannerUrl')}
+                            suggestionsKey={providerFilter}
                             onLoadSuggestions={suggestionsFor(['Banner'])}
                         />
                     )}
@@ -485,6 +488,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                             isLocked={isLocked('ClearLogoUrl')}
                             onLockToggle={() => toggleLock('ClearLogoUrl')}
                             inputClassName={inputClass('ClearLogoUrl')}
+                            suggestionsKey={providerFilter}
                             onLoadSuggestions={suggestionsFor(['Logo'])}
                         />
                     )}
@@ -523,6 +527,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                             isLocked={isLocked('ArtworkUrl')}
                             onLockToggle={() => toggleLock('ArtworkUrl')}
                             inputClassName={inputClass('ArtworkUrl')}
+                            suggestionsKey={providerFilter}
                             onLoadSuggestions={suggestionsFor(['Cover', 'Unknown'])}
                             onRefreshFromProviders={album ? async () => {
                                 const result = await musicService.refreshAlbumArtwork(album.id, true, serverId);
@@ -553,6 +558,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                             isLocked={isLocked('BackgroundUrl')}
                             onLockToggle={() => toggleLock('BackgroundUrl')}
                             inputClassName={inputClass('BackgroundUrl')}
+                            suggestionsKey={providerFilter}
                             onLoadSuggestions={suggestionsFor(['Background'])}
                         />
                     )}
@@ -568,6 +574,7 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                             isLocked={isLocked('DiscArtUrl')}
                             onLockToggle={() => toggleLock('DiscArtUrl')}
                             inputClassName={inputClass('DiscArtUrl')}
+                            suggestionsKey={providerFilter}
                             onLoadSuggestions={suggestionsFor(['Logo'])}
                         />
                     )}
@@ -649,10 +656,15 @@ interface ArtworkSectionProps {
     onLockToggle: () => void;
     inputClassName: string;
     onLoadSuggestions: () => Promise<MusicArtworkResultVM[]>;
+    // Which provider the results were fetched under. The list is cached after the
+    // first browse, so without this a provider change left the old results on
+    // screen with no way to refresh them: re-clicking only closed and reopened
+    // the same cached list, and the button still read "Hide alternatives".
+    suggestionsKey: string;
     onRefreshFromProviders?: () => Promise<boolean>;
 }
 
-function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, uploading, isLocked, onLockToggle, inputClassName, onLoadSuggestions, onRefreshFromProviders }: ArtworkSectionProps) {
+function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, uploading, isLocked, onLockToggle, inputClassName, onLoadSuggestions, suggestionsKey, onRefreshFromProviders }: ArtworkSectionProps) {
     const dialog = useDialog();
     const shapeClass = shape === 'circle' ? 'rounded-full' : 'rounded';
     const containerClass = shape === 'banner'
@@ -683,16 +695,17 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
         }
     };
 
-    const handleBrowse = async () => {
-        const wasOpen = suggestionsOpen;
-        setSuggestionsOpen(!wasOpen);
-        if (wasOpen) return;
-        if (suggestions !== null) return; // already loaded
+    // onLoadSuggestions closes over the current provider, so its identity changes
+    // every render and it cannot go in a dependency array without looping. The
+    // ref keeps the effect below on the latest one while depending only on the key.
+    const loadSuggestionsRef = useRef(onLoadSuggestions);
+    loadSuggestionsRef.current = onLoadSuggestions;
+
+    const loadSuggestions = useCallback(async () => {
         setSuggestionsLoading(true);
         setSuggestionsError(null);
         try {
-            const results = await onLoadSuggestions();
-            setSuggestions(results);
+            setSuggestions(await loadSuggestionsRef.current());
         } catch (err) {
             console.error('Failed to load artwork suggestions', err);
             setSuggestionsError('Failed to load suggestions.');
@@ -700,6 +713,25 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
         } finally {
             setSuggestionsLoading(false);
         }
+    }, []);
+
+    // Changing the provider invalidates what is on screen. Refetch while the
+    // panel is open so the change is visible where it was made, and drop the
+    // cache while it is closed so the next browse asks again.
+    const firstKey = useRef(suggestionsKey);
+    useEffect(() => {
+        if (firstKey.current === suggestionsKey) return;
+        firstKey.current = suggestionsKey;
+        setSuggestions(null);
+        if (suggestionsOpen) void loadSuggestions();
+    }, [suggestionsKey, suggestionsOpen, loadSuggestions]);
+
+    const handleBrowse = async () => {
+        const wasOpen = suggestionsOpen;
+        setSuggestionsOpen(!wasOpen);
+        if (wasOpen) return;
+        if (suggestions !== null) return; // already loaded for this provider
+        await loadSuggestions();
     };
 
     return (
