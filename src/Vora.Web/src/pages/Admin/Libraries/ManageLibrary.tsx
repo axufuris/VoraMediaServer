@@ -6,6 +6,7 @@ import { pluginAdminService, type PluginOptionVM } from '../../../api/System/plu
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import FolderPathInput from '../../../components/Admin/FolderBrowser/FolderPathInput';
 import { useDialog } from '../../../dialogs';
+import { libraryHasVideoContent } from '../../../utils/libraryTypes';
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
     return <h2 className="text-base font-semibold text-[var(--vora-text-primary)] pb-2 border-b border-[var(--vora-border-subtle)]">{children}</h2>;
@@ -29,7 +30,7 @@ function Checkbox({ checked, onChange, label }: { checked: boolean, onChange: (v
     );
 }
 
-function MarkerCoverageCard({ libraryId, serverId }: { libraryId: string, serverId?: string }) {
+function MarkerCoverageCard({ libraryId, libraryType, serverId }: { libraryId: string, libraryType: string, serverId?: string }) {
     const [coverage, setCoverage] = useState<MarkerCoverageVM | null>(null);
     const [loading, setLoading] = useState(false);
     const dialog = useDialog();
@@ -57,7 +58,14 @@ function MarkerCoverageCard({ libraryId, serverId }: { libraryId: string, server
         }
     };
 
+    // Markers are intros, recaps and credits — a music library has none of
+    // those, so the card was asking for coverage it could only ever report as
+    // "no movies or episodes yet". The thumbnail card next door already skipped
+    // non-video libraries; this one did not.
+    const isVideoType = libraryHasVideoContent(libraryType);
+
     const load = async () => {
+        if (!isVideoType) return;
         setLoading(true);
         try {
             const data = await libraryAdminService.getLibraryMarkerCoverage(libraryId, serverId);
@@ -76,8 +84,9 @@ function MarkerCoverageCard({ libraryId, serverId }: { libraryId: string, server
 
     useEffect(() => {
         void loadRef.current();
-    }, [libraryId, serverId]);
+    }, [libraryId, serverId, isVideoType]);
 
+    if (!isVideoType) return null;
     if (!coverage && !loading) return null;
 
     const pct = (n: number) => coverage && coverage.totalItems > 0
@@ -98,7 +107,7 @@ function MarkerCoverageCard({ libraryId, serverId }: { libraryId: string, server
                         {loading ? 'Refreshing…' : 'Refresh'}
                     </button>
                     <button type="button" onClick={() => analyze(false)} className="vora-button-secondary text-xs">Analyze library</button>
-                    <button type="button" onClick={() => analyze(true)} className="vora-button-secondary text-xs">Re-analyze all</button>
+                    <button type="button" onClick={() => analyze(true)} className="px-4 py-2 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer bg-[var(--vora-warning-soft)] text-[var(--vora-warning-text)] hover:bg-[var(--vora-warning-500)] hover:text-[var(--vora-bg-canvas)]">Re-analyze all</button>
                 </div>
             </div>
             {coverage && coverage.totalItems === 0 ? (
@@ -130,7 +139,7 @@ function ThumbnailCoverageCard({ libraryId, libraryType, enabled, serverId }: { 
     const [regenerating, setRegenerating] = useState(false);
     const dialog = useDialog();
 
-    const isVideoType = ['movie', 'tvshow', 'homevideo'].includes(libraryType.toLowerCase());
+    const isVideoType = libraryHasVideoContent(libraryType);
 
     const load = async () => {
         if (!isVideoType) return;
@@ -188,7 +197,7 @@ function ThumbnailCoverageCard({ libraryId, libraryType, enabled, serverId }: { 
                     <button type="button" onClick={() => regenerate(false)} disabled={regenerating || !enabled} className="vora-button-secondary text-xs disabled:opacity-50" title={enabled ? '' : 'Enable the checkbox in library settings first'}>
                         {regenerating ? 'Queued…' : 'Regenerate missing'}
                     </button>
-                    <button type="button" onClick={() => regenerate(true)} disabled={regenerating || !enabled} className="vora-button-secondary text-xs disabled:opacity-50" title={enabled ? 'Redo every item, including ones that already have thumbnails' : 'Enable the checkbox in library settings first'}>
+                    <button type="button" onClick={() => regenerate(true)} disabled={regenerating || !enabled} className="px-4 py-2 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer bg-[var(--vora-warning-soft)] text-[var(--vora-warning-text)] hover:bg-[var(--vora-warning-500)] hover:text-[var(--vora-bg-canvas)] disabled:opacity-50" title={enabled ? 'Redo every item, including ones that already have thumbnails' : 'Enable the checkbox in library settings first'}>
                         {regenerating ? 'Queued…' : 'Regenerate all'}
                     </button>
                 </div>
@@ -361,63 +370,63 @@ export default function ManageLibrary() {
                 <div className="vora-card p-5 flex flex-wrap gap-2">
                     <button
                         type="button"
-                        onClick={async () => {
-                            try {
-                                await libraryAdminService.triggerScan(library.id, serverId);
-                                showAlert('Scan started', 'Scan triggered. Check the server console.');
-                            } catch (err) {
-                                console.error(err);
-                                showAlert('Error', 'Failed to trigger scan.');
-                            }
-                        }}
-                        className="vora-button-secondary text-xs"
+                        onClick={handleToggleWatch}
+                        className={`px-4 py-2 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer ${library.isBeingWatched
+                            ? 'bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)] hover:bg-[var(--vora-danger-500)] hover:text-white'
+                            : 'bg-[var(--vora-success-soft)] text-[var(--vora-success-text)] hover:bg-[var(--vora-success-500)] hover:text-white'}`}
                     >
-                        Run scan
+                        {library.isBeingWatched ? 'Stop watching' : 'Start watching'}
                     </button>
-                    <button
-                        type="button"
-                        onClick={async () => {
-                            try {
-                                await libraryAdminService.refreshRatings(library.id, true, serverId);
-                                showAlert('Refresh started', 'Ratings refresh triggered.');
-                            } catch (err) {
-                                console.error(err);
-                                showAlert('Error', 'Failed to trigger ratings refresh.');
-                            }
-                        }}
-                        className="vora-button-secondary text-xs"
-                    >
-                        Refresh ratings
-                    </button>
-                    <button
-                        type="button"
-                        onClick={async () => {
-                            try {
-                                await libraryAdminService.refreshMetadata(library.id, true, serverId);
-                                showAlert('Refresh started', 'Metadata refresh triggered.');
-                            } catch (err) {
-                                console.error(err);
-                                showAlert('Error', 'Failed to trigger metadata refresh.');
-                            }
-                        }}
-                        className="vora-button-secondary text-xs"
-                    >
-                        Refresh metadata
-                    </button>
-                    <div className="ml-auto">
+                    <div className="ml-auto flex flex-wrap gap-2">
                         <button
                             type="button"
-                            onClick={handleToggleWatch}
-                            className={`px-4 py-2 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer ${library.isBeingWatched
-                                ? 'bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)] hover:bg-[var(--vora-danger-500)] hover:text-white'
-                                : 'bg-[var(--vora-success-soft)] text-[var(--vora-success-text)] hover:bg-[var(--vora-success-500)] hover:text-white'}`}
+                            onClick={async () => {
+                                try {
+                                    await libraryAdminService.triggerScan(library.id, serverId);
+                                    showAlert('Scan started', 'Scan triggered. Check the server console.');
+                                } catch (err) {
+                                    console.error(err);
+                                    showAlert('Error', 'Failed to trigger scan.');
+                                }
+                            }}
+                            className="vora-button-secondary text-xs"
                         >
-                            {library.isBeingWatched ? 'Stop watching' : 'Start watching'}
+                            Run scan
+                        </button>
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    await libraryAdminService.refreshRatings(library.id, true, serverId);
+                                    showAlert('Refresh started', 'Ratings refresh triggered.');
+                                } catch (err) {
+                                    console.error(err);
+                                    showAlert('Error', 'Failed to trigger ratings refresh.');
+                                }
+                            }}
+                            className="vora-button-secondary text-xs"
+                        >
+                            Refresh ratings
+                        </button>
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    await libraryAdminService.refreshMetadata(library.id, true, serverId);
+                                    showAlert('Refresh started', 'Metadata refresh triggered.');
+                                } catch (err) {
+                                    console.error(err);
+                                    showAlert('Error', 'Failed to trigger metadata refresh.');
+                                }
+                            }}
+                            className="vora-button-secondary text-xs"
+                        >
+                            Refresh metadata
                         </button>
                     </div>
                 </div>
 
-                <MarkerCoverageCard libraryId={library.id} serverId={serverId} />
+                <MarkerCoverageCard libraryId={library.id} libraryType={library.type} serverId={serverId} />
 
                 <ThumbnailCoverageCard libraryId={library.id} libraryType={library.type} enabled={library.enableVideoPreviewThumbnails} serverId={serverId} />
 
