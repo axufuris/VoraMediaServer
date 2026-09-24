@@ -15,7 +15,7 @@ public interface IPlaylistManager
     Task AddToPlaylistAsync(Guid playlistId, Guid profileId, Guid mediaItemId);
     Task RemoveFromPlaylistAsync(Guid playlistId, Guid profileId, Guid playlistItemId);
     Task ReorderPlaylistAsync(Guid playlistId, Guid profileId, List<Guid> itemIds);
-    Task MarkAllUnplayedAsync(Guid playlistId, Guid profileId);
+    Task<bool> MarkAllUnplayedAsync(Guid playlistId, Guid profileId, PlaylistAccessFilter access);
     Task DeletePlaylistAsync(Guid playlistId, Guid profileId);
     Task<List<Guid>> GetPlaylistsContainingItemAsync(Guid profileId, Guid mediaItemId);
     Task RemoveMediaFromPlaylistAsync(Guid playlistId, Guid profileId, Guid mediaItemId);
@@ -85,11 +85,15 @@ public class PlaylistManager : IPlaylistManager
         await _repository.UpdatePlaylistAsync(playlist);
     }
 
-    public async Task MarkAllUnplayedAsync(Guid playlistId, Guid profileId)
+    // A read of the playlist and a write to the caller's own watch state, so a
+    // viewer of a shared playlist may do it too. False when the playlist is
+    // neither theirs nor shared.
+    public async Task<bool> MarkAllUnplayedAsync(Guid playlistId, Guid profileId, PlaylistAccessFilter access)
     {
-        var mediaIds = await _repository.GetPlaylistMediaIdsAsync(playlistId, profileId);
-        if (!mediaIds.Any()) return;
-        await _repository.MarkItemsUnplayedAsync(profileId, mediaIds);
+        var mediaIds = await _repository.GetVisiblePlaylistMediaIdsAsync(playlistId, profileId, access);
+        if (mediaIds == null) return false;
+        if (mediaIds.Count > 0) await _repository.MarkItemsUnplayedAsync(profileId, mediaIds);
+        return true;
     }
 
     public async Task DeletePlaylistAsync(Guid playlistId, Guid profileId)

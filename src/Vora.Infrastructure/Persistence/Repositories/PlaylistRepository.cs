@@ -346,13 +346,40 @@ public class PlaylistRepository : IPlaylistRepository
             .ToListAsync();
     }
 
+    // Owner or shared, like GetPlaylistDetailsAsync, and only the items the
+    // viewer's parental controls allow. Null when the playlist is not visible
+    // to them at all, so the caller can tell that apart from an empty one.
+    public async Task<List<Guid>?> GetVisiblePlaylistMediaIdsAsync(Guid playlistId, Guid viewerProfileId, PlaylistAccessFilter access)
+    {
+        var visiblePlaylist = await _context.Playlists
+            .AsNoTracking()
+            .AnyAsync(p => p.Id == playlistId && (p.ProfileId == viewerProfileId || p.IsShared));
+        if (!visiblePlaylist) return null;
+
+        var visible = PlaylistVisibility.VisibleMediaIds(_context, access);
+        return await _context.PlaylistItems
+            .AsNoTracking()
+            .Where(i => i.PlaylistId == playlistId && visible.Contains(i.MediaItemId))
+            .Select(i => i.MediaItemId)
+            .Distinct()
+            .ToListAsync();
+    }
+
+    // Only this profile's rows, so a viewer clearing a shared playlist never
+    // touches its owner's watch state.
     public async Task MarkItemsUnplayedAsync(Guid profileId, List<Guid> mediaIds)
     {
-        await _context.UserMediaStates
+        var states = await _context.UserMediaStates
             .Where(s => s.ProfileId == profileId && mediaIds.Contains(s.MediaItemId))
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(x => x.IsPlayed, false)
-                .SetProperty(x => x.ResumePositionSeconds, 0));
+            .ToListAsync();
+        if (states.Count == 0) return;
+
+        foreach (var state in states)
+        {
+            state.IsPlayed = false;
+            state.ResumePositionSeconds = 0;
+        }
+        await _context.SaveChangesAsync();
     }
 
     public async Task DeletePlaylistAsync(Guid playlistId, Guid profileId)

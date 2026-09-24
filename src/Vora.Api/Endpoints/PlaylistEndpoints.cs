@@ -35,7 +35,12 @@ public static class PlaylistEndpoints
             .WithName("AddPlaylistItem")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
-        group.MapPost("/{id:guid}/unwatch-all", MarkAllUnplayedAsync);
+        // Your own, or anyone's shared one: it only changes your own watch
+        // state. 404 when the playlist is neither, as GET gives.
+        group.MapPost("/{id:guid}/unwatch-all", MarkAllUnplayedAsync)
+            .WithName("MarkPlaylistUnwatched")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
 
         // Owner only. 404 for anyone else, the same answer as a playlist that
         // does not exist, so the endpoint does not confirm what is there.
@@ -111,8 +116,8 @@ public static class PlaylistEndpoints
 
     private static async Task<IResult> MarkAllUnplayedAsync(Guid id, ClaimsPrincipal user, IPlaylistManager manager)
     {
-        await manager.MarkAllUnplayedAsync(id, RequireProfileId(user));
-        return Results.NoContent();
+        var found = await manager.MarkAllUnplayedAsync(id, RequireProfileId(user), user.GetPlaylistAccessFilter());
+        return found ? Results.NoContent() : Results.NotFound();
     }
 
     private static async Task<IResult> UpdatePlaylistAsync(Guid id, [FromBody] UpdatePlaylistRequest req, ClaimsPrincipal user, IPlaylistManager manager)

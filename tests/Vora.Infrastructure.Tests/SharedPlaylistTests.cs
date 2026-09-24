@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.Media.SmartPlaylists;
+using Vora.Application.Playlists;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Playlists;
@@ -226,5 +227,88 @@ public class SharedPlaylistTests
 
         await repository.SetSharedAsync(playlist.Id, _owner, false);
         (await db.Playlists.AsNoTracking().SingleAsync(p => p.Id == playlist.Id, TestContext.Current.CancellationToken)).SharedAt.Should().BeNull();
+    }
+
+    // Unwatch All reads the playlist and writes only the caller's own watch
+    // state, so a viewer of a shared playlist may do it too.
+
+    private UserMediaState Watched(VoraDbContext db, Guid profileId, Track track)
+    {
+        var state = new UserMediaState { ProfileId = profileId, MediaItemId = track.Id, IsPlayed = true, ResumePositionSeconds = 120 };
+        db.UserMediaStates.Add(state);
+        db.SaveChanges();
+        return state;
+    }
+
+    private static PlaylistManager Manager(VoraDbContext db) => new(new PlaylistRepository(db));
+
+    [Fact]
+    public async Task A_viewer_can_unwatch_all_of_a_shared_playlist_for_themselves()
+    {
+        using var db = NewContext();
+        var playlist = AddPlaylist(db, "Road Trip", shared: true, _clean);
+        var viewers = Watched(db, _viewer, _clean);
+
+        var found = await Manager(db).MarkAllUnplayedAsync(playlist.Id, _viewer, Anyone);
+
+        found.Should().BeTrue();
+        viewers.IsPlayed.Should().BeFalse();
+        viewers.ResumePositionSeconds.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_viewers_unwatch_all_leaves_the_owners_state_alone()
+    {
+        using var db = NewContext();
+        var playlist = AddPlaylist(db, "Road Trip", shared: true, _clean);
+        var owners = Watched(db, _owner, _clean);
+        Watched(db, _viewer, _clean);
+
+        await Manager(db).MarkAllUnplayedAsync(playlist.Id, _viewer, Anyone);
+
+        owners.IsPlayed.Should().BeTrue();
+        owners.ResumePositionSeconds.Should().Be(120);
+    }
+
+    // What their parental controls hide, Unwatch All doesn't reach either.
+    [Fact]
+    public async Task A_viewers_unwatch_all_skips_items_their_controls_hide()
+    {
+        using var db = NewContext();
+        var playlist = AddPlaylist(db, "Mixed", shared: true, _explicit, _clean);
+        var hidden = Watched(db, _viewer, _explicit);
+        var visible = Watched(db, _viewer, _clean);
+
+        await Manager(db).MarkAllUnplayedAsync(playlist.Id, _viewer, CleanOnly);
+
+        hidden.IsPlayed.Should().BeTrue();
+        visible.IsPlayed.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Unwatch_all_on_an_unshared_or_missing_playlist_is_not_found()
+    {
+        using var db = NewContext();
+        var playlist = AddPlaylist(db, "Private", shared: false, _clean);
+        var viewers = Watched(db, _viewer, _clean);
+        var manager = Manager(db);
+
+        (await manager.MarkAllUnplayedAsync(playlist.Id, _viewer, Anyone)).Should().BeFalse();
+        (await manager.MarkAllUnplayedAsync(Guid.NewGuid(), _viewer, Anyone)).Should().BeFalse();
+        viewers.IsPlayed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task An_owners_unwatch_all_still_clears_their_own_playlist()
+    {
+        using var db = NewContext();
+        var playlist = AddPlaylist(db, "Private", shared: false, _explicit, _clean);
+        var first = Watched(db, _owner, _explicit);
+        var second = Watched(db, _owner, _clean);
+
+        (await Manager(db).MarkAllUnplayedAsync(playlist.Id, _owner, Anyone)).Should().BeTrue();
+
+        first.IsPlayed.Should().BeFalse();
+        second.IsPlayed.Should().BeFalse();
     }
 }

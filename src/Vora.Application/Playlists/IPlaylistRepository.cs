@@ -30,6 +30,7 @@ public interface IPlaylistRepository
     Task RemoveMediaFromPlaylistAsync(Guid playlistId, Guid profileId, Guid mediaItemId);
 
     Task<List<Guid>> GetPlaylistMediaIdsAsync(Guid playlistId, Guid profileId);
+    Task<List<Guid>?> GetVisiblePlaylistMediaIdsAsync(Guid playlistId, Guid viewerProfileId, PlaylistAccessFilter access);
     Task MarkItemsUnplayedAsync(Guid profileId, List<Guid> mediaIds);
     Task<List<Guid>> GetPlaylistsContainingItemAsync(Guid profileId, Guid mediaItemId);
 }
