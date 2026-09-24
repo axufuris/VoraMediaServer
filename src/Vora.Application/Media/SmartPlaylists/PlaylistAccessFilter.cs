@@ -12,13 +12,9 @@ public class PlaylistAccessFilter
     public bool HasAllLibraryAccess { get; init; } = true;
     public List<Guid> AllowedLibraryIds { get; init; } = new();
 
-    // Films and episodes are filtered exactly the way browsing filters them —
-    // the same flag and the same allowlists — so a smart playlist shows a child
-    // precisely what their library shows them and nothing more. Deliberately the
-    // profile's single cross-media flag, because that is what video browsing
-    // uses today; changing what it means belongs to video browsing as a whole,
-    // not to one screen that reads it.
-    public bool VideoHasAllRatings { get; init; } = true;
+    // Films and episodes are filtered exactly the way browsing filters them, so a
+    // smart playlist shows a child precisely what their library shows them. Each
+    // kind follows its own allowlist, and an empty one leaves that kind open.
     public List<string> AllowedMovieRatings { get; init; } = new();
     public List<string> AllowedTvRatings { get; init; } = new();
 

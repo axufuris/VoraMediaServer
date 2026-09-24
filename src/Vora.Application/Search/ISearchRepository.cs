@@ -10,7 +10,6 @@ public interface ISearchRepository
         int limit,
         bool hasAllAccess,
         List<Guid> allowedLibs,
-        bool hasAllRatings,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
         bool blockUnrated);

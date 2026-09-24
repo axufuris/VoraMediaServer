@@ -12,7 +12,7 @@ namespace Vora.Application.SmartLists;
 public interface ISmartListManager
 {
     Task<List<SmartListClientVM>> GetActiveSmartListsAsync(Guid userId, bool isAdmin);
-    Task<IEnumerable<LibraryItemVM>> GetSmartListItemsAsync(Guid listId, Guid? profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, bool hasAllRatings, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated);
+    Task<IEnumerable<LibraryItemVM>> GetSmartListItemsAsync(Guid listId, Guid? profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated);
     Task<List<SmartListAdminVM>> GetAllAdminListsAsync();
     Task<Guid> CreateListAsync(SmartListSaveRequest request);
     Task<bool> UpdateListAsync(Guid id, SmartListSaveRequest request);
@@ -39,7 +39,6 @@ public class SmartListManager(
         Guid? libraryId,
         bool hasAllAccess,
         List<Guid> allowedLibs,
-        bool hasAllRatings,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
         bool blockUnrated)
@@ -60,7 +59,6 @@ public class SmartListManager(
             list.CollectionId,
             hasAllAccess,
             allowedLibs,
-            hasAllRatings,
             allowedMovieRatings,
             allowedTvRatings,
             blockUnrated);

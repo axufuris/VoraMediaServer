@@ -14,13 +14,12 @@ public class SearchRepository(VoraDbContext context) : ISearchRepository
         int limit,
         bool hasAllAccess,
         List<Guid> allowedLibs,
-        bool hasAllRatings,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
         bool blockUnrated)
     {
         var dbQuery = context.MediaItems.AsNoTracking().AsQueryable();
-        dbQuery = dbQuery.ApplyAccessFilters(hasAllAccess, allowedLibs, hasAllRatings, allowedMovieRatings, allowedTvRatings, blockUnrated);
+        dbQuery = dbQuery.ApplyAccessFilters(hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
 
         if (!hasAllAccess)
         {

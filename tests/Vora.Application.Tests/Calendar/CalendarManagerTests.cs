@@ -62,7 +62,7 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = await Build(p1, p2).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false,
+            start, end, true, new List<Guid>(), All(), All(), false,
             TestContext.Current.CancellationToken);
 
         result.Should().HaveCount(2);
@@ -79,7 +79,7 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = await Build(enabled, disabled).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false,
+            start, end, true, new List<Guid>(), All(), All(), false,
             TestContext.Current.CancellationToken);
 
         result.Should().ContainSingle();
@@ -94,7 +94,7 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = await Build(p).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false,
+            start, end, true, new List<Guid>(), All(), All(), false,
             TestContext.Current.CancellationToken);
 
         result.Should().ContainSingle();
@@ -111,7 +111,7 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = await Build(failing, good).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false,
+            start, end, true, new List<Guid>(), All(), All(), false,
             TestContext.Current.CancellationToken);
 
         result.Should().ContainSingle();
@@ -132,7 +132,6 @@ public class CalendarManagerTests
         var result = (await Build(p).GetCalendarEventsAsync(
             start, end,
             hasAllAccess: true, allowedLibs: new List<Guid>(),
-            hasAllRatings: false,
             allowedMovieRatings: new List<string> { "G", "PG" },
             allowedTvRatings: new List<string>(),
             blockUnrated: false,
@@ -155,7 +154,6 @@ public class CalendarManagerTests
         var result = (await Build(p).GetCalendarEventsAsync(
             start, end,
             hasAllAccess: true, allowedLibs: new List<Guid>(),
-            hasAllRatings: false,
             allowedMovieRatings: new List<string>(),
             allowedTvRatings: new List<string> { "TV-Y", "TV-PG" },
             blockUnrated: false,
@@ -176,7 +174,6 @@ public class CalendarManagerTests
 
         var result = await Build(p).GetCalendarEventsAsync(
             start, end, true, new List<Guid>(),
-            hasAllRatings: false,
             allowedMovieRatings: new List<string> { "G" },
             allowedTvRatings: new List<string>(),
             blockUnrated: false,
@@ -196,7 +193,6 @@ public class CalendarManagerTests
 
         var result = await Build(p).GetCalendarEventsAsync(
             start, end, true, new List<Guid>(),
-            hasAllRatings: false,
             allowedMovieRatings: new List<string> { "G" },
             allowedTvRatings: new List<string>(),
             blockUnrated: true,
@@ -206,23 +202,43 @@ public class CalendarManagerTests
     }
 
     [Fact]
-    public async Task GetCalendarEventsAsync_all_ratings_short_circuits_to_pass()
+    public async Task GetCalendarEventsAsync_empty_allowlist_leaves_that_kind_open()
     {
         var p = MakeProvider("p", new[]
         {
-            Event("e1", "Adult", new DateTime(2026, 5, 10), mediaType: "Movie", contentRating: "NC-17")
+            Event("e1", "Adult", new DateTime(2026, 5, 10), mediaType: "Movie", contentRating: "NC-17"),
+            Event("e2", "Adult Show", new DateTime(2026, 5, 11), mediaType: "TvShow", contentRating: "TV-MA")
         });
         var (start, end) = Window();
 
         var result = await Build(p).GetCalendarEventsAsync(
             start, end, true, new List<Guid>(),
-            hasAllRatings: true,
+            allowedMovieRatings: new List<string>(),
+            allowedTvRatings: new List<string> { "TV-Y" },
+            blockUnrated: false,
+            TestContext.Current.CancellationToken);
+
+        result.Select(e => e.Title).Should().Equal("Adult");
+    }
+
+    [Fact]
+    public async Task GetCalendarEventsAsync_blocks_unrated_even_with_no_allowlist()
+    {
+        var p = MakeProvider("p", new[]
+        {
+            Event("e1", "Unknown rating", new DateTime(2026, 5, 10), mediaType: "Movie", contentRating: "Unrated"),
+            Event("e2", "Adult", new DateTime(2026, 5, 11), mediaType: "Movie", contentRating: "NC-17")
+        });
+        var (start, end) = Window();
+
+        var result = await Build(p).GetCalendarEventsAsync(
+            start, end, true, new List<Guid>(),
             allowedMovieRatings: new List<string>(),
             allowedTvRatings: new List<string>(),
             blockUnrated: true,
             TestContext.Current.CancellationToken);
 
-        result.Should().ContainSingle();
+        result.Select(e => e.Title).Should().Equal("Adult");
     }
 
     // ---------- Library access gate ----------
@@ -243,7 +259,7 @@ public class CalendarManagerTests
             start, end,
             hasAllAccess: false,
             allowedLibs: new List<Guid> { allowedLib },
-            true, All(), All(), false,
+            All(), All(), false,
             TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
@@ -267,7 +283,7 @@ public class CalendarManagerTests
             start, end,
             hasAllAccess: false,
             allowedLibs: new List<Guid> { libraryId },
-            true, All(), All(), false,
+            All(), All(), false,
             TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
@@ -293,7 +309,7 @@ public class CalendarManagerTests
             start, end,
             hasAllAccess: false,
             allowedLibs: new List<Guid> { otherLib },
-            true, All(), All(), false,
+            All(), All(), false,
             TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
@@ -317,7 +333,7 @@ public class CalendarManagerTests
             start, end,
             hasAllAccess: false,
             allowedLibs: new List<Guid> { Guid.NewGuid() },
-            true, All(), All(), false,
+            All(), All(), false,
             TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
@@ -340,7 +356,7 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p1, p2).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false,
+            start, end, true, new List<Guid>(), All(), All(), false,
             TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
@@ -359,7 +375,7 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p1).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false,
+            start, end, true, new List<Guid>(), All(), All(), false,
             TestContext.Current.CancellationToken)).ToList();
 
         result.Should().HaveCount(2);
@@ -378,7 +394,7 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false,
+            start, end, true, new List<Guid>(), All(), All(), false,
             TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
@@ -398,7 +414,7 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false,
+            start, end, true, new List<Guid>(), All(), All(), false,
             TestContext.Current.CancellationToken)).ToList();
 
         result.Should().HaveCount(2);
@@ -414,7 +430,7 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false,
+            start, end, true, new List<Guid>(), All(), All(), false,
             TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
@@ -433,7 +449,7 @@ public class CalendarManagerTests
         var (start, end) = Window();
 
         var result = (await Build(p).GetCalendarEventsAsync(
-            start, end, true, new List<Guid>(), true, All(), All(), false,
+            start, end, true, new List<Guid>(), All(), All(), false,
             TestContext.Current.CancellationToken)).ToList();
 
         result.Select(r => r.Title).Should().Equal("First", "Second", "Third");

@@ -154,7 +154,6 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
             .ApplyAccessFilters(
                 access.HasAllLibraryAccess,
                 access.AllowedLibraryIds,
-                access.VideoHasAllRatings,
                 access.AllowedMovieRatings,
                 access.AllowedTvRatings,
                 access.BlockUnratedContent);

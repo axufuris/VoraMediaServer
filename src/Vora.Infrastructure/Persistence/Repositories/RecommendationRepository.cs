@@ -14,14 +14,13 @@ public class RecommendationRepository(VoraDbContext context) : IRecommendationRe
         Guid? libraryId,
         bool hasAllAccess,
         List<Guid> allowedLibs,
-        bool hasAllRatings,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
         bool blockUnrated)
     {
         var query = context.MediaItems
             .AsNoTracking()
-            .ApplyAccessFilters(hasAllAccess, allowedLibs, hasAllRatings, allowedMovieRatings, allowedTvRatings, blockUnrated);
+            .ApplyAccessFilters(hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
 
         if (libraryId.HasValue)
         {

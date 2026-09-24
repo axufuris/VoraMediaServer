@@ -7,7 +7,7 @@ namespace Vora.Application.Recommendations;
 
 public interface IRecommendationManager
 {
-    Task<List<RecommendationListVM>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, bool hasAllRatings, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated, string? targetProviderId = null);
+    Task<List<RecommendationListVM>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated, string? targetProviderId = null);
     Task<List<string>> GetActiveProviderIdsAsync();
 }
 
@@ -26,7 +26,7 @@ public class RecommendationManager : IRecommendationManager
         _recommendationRepo = recommendationRepo;
     }
 
-    public async Task<List<RecommendationListVM>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, bool hasAllRatings, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated, string? targetProviderId = null)
+    public async Task<List<RecommendationListVM>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated, string? targetProviderId = null)
     {
         var activeProviders = new List<IRecommendationProvider>();
 
@@ -49,7 +49,7 @@ public class RecommendationManager : IRecommendationManager
                 foreach (var list in providerLists)
                 {
                     var matchedItems = await _recommendationRepo.GetHydratedMediaItemsAsync(
-                        list.LocalItemIds, list.ExternalTmdbIds, libraryId, hasAllAccess, allowedLibs, hasAllRatings, allowedMovieRatings, allowedTvRatings, blockUnrated);
+                        list.LocalItemIds, list.ExternalTmdbIds, libraryId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
 
                     if (matchedItems.Any())
                     {

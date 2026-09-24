@@ -10,7 +10,6 @@ public interface IRecommendationRepository
         Guid? libraryId,
         bool hasAllAccess,
         List<Guid> allowedLibs,
-        bool hasAllRatings,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
         bool blockUnrated);

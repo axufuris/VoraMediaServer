@@ -24,7 +24,6 @@ public class SmartPlaylistParentalControlTests
     // that would have regressed.
     private static PlaylistAccessFilter FamilyFilmsOnly => new()
     {
-        VideoHasAllRatings = false,
         AllowedMovieRatings = new List<string> { "G", "PG" },
     };
 
@@ -70,11 +69,36 @@ public class SmartPlaylistParentalControlTests
         _fx.AddEpisode(_fx.AddSeason(kids, 1), "Episode One", 1, contentRating: null);
         _fx.Db.SaveChanges();
 
-        var tvYOnly = new PlaylistAccessFilter { VideoHasAllRatings = false, AllowedTvRatings = new List<string> { "TV-Y" } };
+        var tvYOnly = new PlaylistAccessFilter { AllowedTvRatings = new List<string> { "TV-Y" } };
 
         var results = await _fx.Evaluator.EvaluateAsync(Everything(), PlaylistMediaType.Shows, _fx.ProfileId, tvYOnly);
 
         results.Select(e => e.Title).Should().Equal("Episode One");
+    }
+
+    [Fact]
+    public async Task A_film_restriction_does_not_filter_tv()
+    {
+        var mature = _fx.AddShow("Mature Show");
+        mature.ContentRating = "TV-MA";
+        _fx.AddEpisode(_fx.AddSeason(mature, 1), "Pilot", 1, contentRating: null);
+        _fx.Db.SaveChanges();
+
+        var results = await _fx.Evaluator.EvaluateAsync(Everything(), PlaylistMediaType.Shows, _fx.ProfileId, FamilyFilmsOnly);
+
+        results.Select(e => e.Title).Should().Equal("Pilot");
+    }
+
+    [Fact]
+    public async Task Blocking_unrated_applies_to_films_with_no_allowlist()
+    {
+        _fx.AddMovie("Alien", 1979, rating: "R");
+        _fx.AddMovie("Home Video", 2020, rating: null);
+        var blockUnratedOnly = new PlaylistAccessFilter { BlockUnratedContent = true };
+
+        var results = await _fx.Evaluator.EvaluateAsync(Everything(), PlaylistMediaType.Movies, _fx.ProfileId, blockUnratedOnly);
+
+        results.Select(m => m.Title).Should().Equal("Alien");
     }
 
     [Fact]

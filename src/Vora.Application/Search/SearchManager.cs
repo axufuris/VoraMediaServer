@@ -9,7 +9,6 @@ public interface ISearchManager
         string query,
         bool hasAllAccess,
         List<Guid> allowedLibs,
-        bool hasAllRatings,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
         List<string> allowedMusicRatings,
@@ -26,7 +25,6 @@ public class SearchManager(ISearchRepository repository, IMusicManager musicMana
         string query,
         bool hasAllAccess,
         List<Guid> allowedLibs,
-        bool hasAllRatings,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
         List<string> allowedMusicRatings,
@@ -39,9 +37,9 @@ public class SearchManager(ISearchRepository repository, IMusicManager musicMana
             return new GlobalSearchVM { Query = query };
         }
 
-        var movies = await repository.SearchMediaAsync("Movie", query, limitPerCategory, hasAllAccess, allowedLibs, hasAllRatings, allowedMovieRatings, allowedTvRatings, blockUnrated);
+        var movies = await repository.SearchMediaAsync("Movie", query, limitPerCategory, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
         cancellationToken.ThrowIfCancellationRequested();
-        var tvShows = await repository.SearchMediaAsync("TvShow", query, limitPerCategory, hasAllAccess, allowedLibs, hasAllRatings, allowedMovieRatings, allowedTvRatings, blockUnrated);
+        var tvShows = await repository.SearchMediaAsync("TvShow", query, limitPerCategory, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
         cancellationToken.ThrowIfCancellationRequested();
         var actors = await repository.SearchActorsAsync(query, limitPerCategory);
         cancellationToken.ThrowIfCancellationRequested();

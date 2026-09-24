@@ -71,7 +71,6 @@ public static class SmartListEndpoints
             null,
             user.HasAllLibraryAccess(),
             user.GetAllowedLibraryIds(),
-            user.HasAllContentRatings(),
             user.GetAllowedMovieRatings(),
             user.GetAllowedTvRatings(),
             user.BlockUnratedContent());

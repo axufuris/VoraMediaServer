@@ -59,12 +59,6 @@ public static class AuthExtensions
             .ToList();
     }
 
-    public static bool HasAllContentRatings(this ClaimsPrincipal user)
-    {
-        var claim = user.FindFirst("hasAllRatings");
-        return claim != null && bool.TryParse(claim.Value, out var value) && value;
-    }
-
     public static List<string> GetAllowedMovieRatings(this ClaimsPrincipal user)
     {
         return user.FindAll("allowedMovieRating").Select(c => c.Value).ToList();
@@ -104,7 +98,6 @@ public static class AuthExtensions
     {
         HasAllLibraryAccess = user.HasAllLibraryAccess(),
         AllowedLibraryIds = user.GetAllowedLibraryIds(),
-        VideoHasAllRatings = user.HasAllContentRatings(),
         AllowedMovieRatings = user.GetAllowedMovieRatings(),
         AllowedTvRatings = user.GetAllowedTvRatings(),
         AllowedMusicRatings = user.GetAllowedMusicRatings(),

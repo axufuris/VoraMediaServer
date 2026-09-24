@@ -30,7 +30,6 @@ public static class CalendarEndpoints
             endDate.AsUtc(),
             user.HasAllLibraryAccess(),
             user.GetAllowedLibraryIds(),
-            user.HasAllContentRatings(),
             user.GetAllowedMovieRatings(),
             user.GetAllowedTvRatings(),
             user.BlockUnratedContent());

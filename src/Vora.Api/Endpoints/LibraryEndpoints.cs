@@ -87,7 +87,6 @@ public static class LibraryEndpoints
             user.GetProfileId(),
             user.HasAllLibraryAccess(),
             user.GetAllowedLibraryIds(),
-            user.HasAllContentRatings(),
             user.GetAllowedMovieRatings(),
             user.GetAllowedTvRatings(),
             user.BlockUnratedContent());

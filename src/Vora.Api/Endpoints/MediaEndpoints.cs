@@ -159,7 +159,6 @@ public static class MediaEndpoints
             user.GetProfileId(),
             user.HasAllLibraryAccess(),
             user.GetAllowedLibraryIds(),
-            user.HasAllContentRatings(),
             user.GetAllowedMovieRatings(),
             user.GetAllowedTvRatings(),
             user.BlockUnratedContent());

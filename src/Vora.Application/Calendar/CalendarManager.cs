@@ -12,7 +12,6 @@ public interface ICalendarManager
         DateTime endDate,
         bool hasAllAccess,
         List<Guid> allowedLibs,
-        bool hasAllRatings,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
         bool blockUnrated,
@@ -36,7 +35,6 @@ public class CalendarManager(
         DateTime endDate,
         bool hasAllAccess,
         List<Guid> allowedLibs,
-        bool hasAllRatings,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
         bool blockUnrated,
@@ -51,7 +49,7 @@ public class CalendarManager(
         }
 
         var filtered = allEvents
-            .Where(ev => PassesContentRating(ev, hasAllRatings, allowedMovieRatings, allowedTvRatings, blockUnrated))
+            .Where(ev => PassesContentRating(ev, allowedMovieRatings, allowedTvRatings, blockUnrated))
             .Where(ev => PassesLibraryAccess(ev, hasAllAccess, allowedLibs))
             .ToList();
 
@@ -123,24 +121,19 @@ public class CalendarManager(
         return await mediaRepository.GetLibraryMatchesByTmdbIdsAsync(externalTmdbIds);
     }
 
-    private static bool PassesContentRating(CalendarEventDto ev, bool hasAllRatings, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
+    private static bool PassesContentRating(CalendarEventDto ev, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
     {
-        if (hasAllRatings)
-        {
-            return true;
-        }
-
         var isUnrated = ev.ContentRating.Equals(UnratedRating, StringComparison.OrdinalIgnoreCase);
-        if (blockUnrated && isUnrated)
+        if (isUnrated)
         {
-            return false;
+            return !blockUnrated;
         }
 
         var listToCheck = ev.MediaType.Equals("Movie", StringComparison.OrdinalIgnoreCase)
             ? allowedMovieRatings
             : allowedTvRatings;
 
-        return isUnrated || listToCheck.Contains(ev.ContentRating, StringComparer.OrdinalIgnoreCase);
+        return listToCheck.Count == 0 || listToCheck.Contains(ev.ContentRating, StringComparer.OrdinalIgnoreCase);
     }
 
     // Pure check now that linking happens first: an event in a library the
