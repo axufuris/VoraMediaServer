@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -12,9 +13,11 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    partial class VoraDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260924184536_AddTrackIsrcAndRatingSource")]
+    partial class AddTrackIsrcAndRatingSource
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2303,9 +2306,6 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
-                    b.Property<bool>("IsShared")
-                        .HasColumnType("boolean");
-
                     b.Property<int>("MediaType")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -2318,9 +2318,6 @@ namespace Vora.Infrastructure.Migrations
 
                     b.Property<Guid>("ProfileId")
                         .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("SharedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2376,9 +2373,6 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
 
-                    b.Property<bool>("IsShared")
-                        .HasColumnType("boolean");
-
                     b.Property<int?>("Limit")
                         .HasColumnType("integer");
 
@@ -2400,9 +2394,6 @@ namespace Vora.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
                         .HasDefaultValue("{}");
-
-                    b.Property<DateTime?>("SharedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("SortBy")
                         .IsRequired()

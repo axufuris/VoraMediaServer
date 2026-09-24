@@ -718,7 +718,8 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                     Bitrate = tagFile.Properties?.AudioBitrate,
                     ArtworkBytes = artworkBytes,
                     ArtworkMimeType = artworkMime,
-                    ContentRating = contentRating
+                    ContentRating = contentRating,
+                    Isrc = tag.ISRC
                 });
             }
             catch (Exception ex)
@@ -916,7 +917,8 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                                 track.SampleRate,
                                 track.Bitrate,
                                 track.ContentRating,
-                                trackArtist: track.TrackArtist);
+                                trackArtist: track.TrackArtist,
+                                isrc: track.Isrc);
 
                             await _ingestionService.AddMediaPartAsync(trackId, track.FilePath, resolution: null, syncEdition: false);
                             lastTrackId = trackId.Value;
@@ -1087,6 +1089,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         public byte[]? ArtworkBytes { get; init; }
         public string? ArtworkMimeType { get; init; }
         public string? ContentRating { get; init; }
+        public string? Isrc { get; init; }
     }
 
     private static bool IsCompilationTag(TagLib.File tagFile, TagLib.Tag tag)
@@ -1136,6 +1139,24 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         return false;
     }
 
+    private static readonly string[] AdvisoryFields = { "ITUNESADVISORY", "PARENTAL_ADVISORY", "EXPLICIT" };
+
+    // iTunes codes: 1 and 4 explicit, 2 clean, 0 none. A 0 is left unrated: it
+    // is also what a tagger writes when nobody said anything, so it is not a
+    // statement that the song is clean.
+    internal static string? ReadAdvisoryValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        value = value.Trim();
+        if (value == "1" || value == "4"
+            || value.Equals("true", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("Explicit", StringComparison.OrdinalIgnoreCase))
+            return "Explicit";
+        if (value == "2" || value.Contains("Clean", StringComparison.OrdinalIgnoreCase))
+            return "Clean";
+        return null;
+    }
+
     private static string? DetectAdvisory(TagLib.File tagFile, TagLib.Tag tag)
     {
         try
@@ -1168,16 +1189,23 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                     // turned a one-star song into "Explicit" — value "1" is the
                     // iTunes code for explicit — and hid it from every restricted
                     // profile for a reason that had nothing to do with its content.
-                    if (string.Equals(frame.Description, "ITUNESADVISORY", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(frame.Description, "PARENTAL_ADVISORY", StringComparison.OrdinalIgnoreCase))
+                    if (AdvisoryFields.Contains(frame.Description, StringComparer.OrdinalIgnoreCase))
                     {
-                        var value = frame.Text.FirstOrDefault();
-                        if (string.IsNullOrEmpty(value)) continue;
-                        if (value == "1" || value == "4" || value.Contains("Explicit", StringComparison.OrdinalIgnoreCase))
-                            return "Explicit";
-                        if (value == "2" || value.Contains("Clean", StringComparison.OrdinalIgnoreCase))
-                            return "Clean";
+                        var advisory = ReadAdvisoryValue(frame.Text.FirstOrDefault());
+                        if (advisory != null) return advisory;
                     }
+                }
+            }
+
+            // FLAC and Ogg carry Vorbis comments, where downloaders and taggers
+            // write the same advisory under the same names as the ID3 frames.
+            var xiph = tagFile.GetTag(TagLib.TagTypes.Xiph, false) as TagLib.Ogg.XiphComment;
+            if (xiph != null)
+            {
+                foreach (var field in AdvisoryFields)
+                {
+                    var advisory = ReadAdvisoryValue(xiph.GetFirstField(field));
+                    if (advisory != null) return advisory;
                 }
             }
         }

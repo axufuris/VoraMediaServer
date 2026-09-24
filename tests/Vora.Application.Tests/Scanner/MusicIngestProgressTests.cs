@@ -64,7 +64,7 @@ public class MusicIngestProgressTests : IDisposable
         _ingestion.EnsureTrackAsync(
                 Arg.Any<LibraryHandle>(), Arg.Any<AlbumHandle>(), Arg.Any<string>(), Arg.Any<int>(),
                 Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<int?>(), Arg.Any<int?>(),
-                Arg.Any<string?>(), Arg.Any<string?>())
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>())
             .Returns(_ => new MediaItemHandle(Guid.NewGuid()));
     }
 

@@ -157,6 +157,7 @@ public class ScheduledJobWorker : BackgroundService
         if (timeOfDay >= settings.NightlyScanTime && _lastMusicPopularityDate < today)
         {
             taskQueue.QueueRefreshMusicPopularity();
+            taskQueue.QueueRateMusicContent();
             _lastMusicPopularityDate = today;
         }
 

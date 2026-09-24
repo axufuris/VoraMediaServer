@@ -24,6 +24,23 @@ public class Track : MediaItem
     public long? GlobalListeners { get; set; }
     public long? GlobalPlays { get; set; }
 
+    // The recording's International Standard Recording Code, read from the file.
+    // It identifies one recording exactly, so the explicit and the clean edit of
+    // a song carry different codes, which is what lets a provider's explicit flag
+    // be matched to this file rather than to whichever edition a title search
+    // happens to return.
+    public string? Isrc { get; set; }
+
+    // Where ContentRating came from: null when it was read from the file's own
+    // tags, otherwise the id of the provider plugin that supplied it. A file tag
+    // always replaces a provider's answer, because the tag describes this file
+    // and the provider only describes a recording it matched.
+    public string? ContentRatingProvider { get; set; }
+
+    // When a provider was last asked about this track's rating, answer or not, so
+    // a track no provider knows is not asked about again every night.
+    public DateTime? ContentRatingCheckedAt { get; set; }
+
     public bool HasEmbeddedLyrics { get; set; }
     public string? ExternalLyricsPath { get; set; }
 }

@@ -259,6 +259,8 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.AudioCodec).HasMaxLength(32);
             entity.Property(e => e.ExternalLyricsPath).HasMaxLength(1024);
             entity.Property(e => e.Artist).HasMaxLength(500);
+            entity.Property(e => e.Isrc).HasMaxLength(12);
+            entity.Property(e => e.ContentRatingProvider).HasMaxLength(64);
 
             entity.HasOne(e => e.Album)
                   .WithMany(a => a.Tracks)

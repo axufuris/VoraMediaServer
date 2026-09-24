@@ -407,6 +407,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMediaManager, MediaManager>();
         services.AddScoped<IMusicManager, MusicManager>();
         services.AddScoped<IMusicPopularityRefresher, MusicPopularityRefresher>();
+        services.AddScoped<IMusicContentRatingRefresher, MusicContentRatingRefresher>();
         services.AddScoped<IMusicRecommendationManager, MusicRecommendationManager>();
         services.AddSingleton<IServerPlaybackTracker, ServerPlaybackTracker>();
         services.AddScoped<IMetadataManager, MetadataManager>();
@@ -580,6 +581,12 @@ public static class ServiceRegistrationExtensions
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Last.fm Scrobbler)");
+        }).AddVoraResilience(totalTimeoutSeconds: 30);
+        services.AddHttpClient(Vora.Plugins.Providers.Deezer.DeezerContentRatingProvider.HttpClientName, client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+            client.DefaultRequestHeaders.Add("User-Agent", "Vora-MusicMetadata/1.0 (https://github.com/zenith/vora)");
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
         }).AddVoraResilience(totalTimeoutSeconds: 30);
         services.AddHttpClient(GeniusLyricsProvider.HttpClientName, client =>
         {
