@@ -103,6 +103,7 @@ export default function MusicTab() {
     const [availableYears, setAvailableYears] = useState<number[]>([]);
     const [hasAnyHistory, setHasAnyHistory] = useState(false);
     const [similarArtists, setSimilarArtists] = useState<ArtistVM[]>([]);
+    const [artistTopTracks, setArtistTopTracks] = useState<ArtistTrackVM[]>([]);
     const [coPlayedArtists, setCoPlayedArtists] = useState<ArtistVM[]>([]);
     const [genres, setGenres] = useState<GenreSummaryVM[]>([]);
     const [currentGenre, setCurrentGenre] = useState<GenreContentVM | null>(null);
@@ -452,6 +453,11 @@ export default function MusicTab() {
             setSimilarArtists([]);
             setCoPlayedArtists([]);
         });
+        setArtistTopTracks([]);
+        musicService.getArtistTopTracks(nav.artistId, 10, serverId)
+            .then(setArtistTopTracks)
+            .catch(err => console.error('Failed to load artist top tracks', err));
+
         musicService.getArtistDetail(nav.artistId, serverId)
             .then(detail => {
                 setCurrentArtist(detail.artist);
@@ -845,6 +851,9 @@ export default function MusicTab() {
                     isLoading={isLoading}
                     currentArtist={currentArtist}
                     albums={albums}
+                    topTracks={artistTopTracks}
+                    playArtistTrackList={playArtistTrackList}
+                    formatDuration={formatDuration}
                     similarArtists={similarArtists}
                     coPlayedArtists={coPlayedArtists}
                     isServerAdmin={isServerAdmin}

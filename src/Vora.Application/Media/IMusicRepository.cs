@@ -43,6 +43,7 @@ public interface IMusicRepository
     Task<Album?> GetAlbumByIdAsync(Guid albumId, MusicAccessFilter access);
     Task<List<Track>> GetTracksForAlbumAsync(Guid albumId, MusicAccessFilter access);
     Task<List<Track>> GetTracksForArtistAsync(Guid artistId, MusicAccessFilter access);
+    Task<List<Track>> GetTopTracksForArtistAsync(Guid artistId, MusicAccessFilter access, int limit);
     Task<Track?> GetTrackByIdAsync(Guid trackId, MusicAccessFilter access);
     Task<string?> GetTrackFilePathAsync(Guid trackId, MusicAccessFilter access);
 

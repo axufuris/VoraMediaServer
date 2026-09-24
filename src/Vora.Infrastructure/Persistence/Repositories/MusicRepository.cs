@@ -13,6 +13,13 @@ public class MusicRepository : IMusicRepository
     // undone by a server configured otherwise.
     private const string LikeEscapeCharacter = "\\";
 
+    // Clamped rather than trusted, and named rather than inlined: GetAlbumsAsync
+    // silently clamping to MaxAlbumPageSize has already cost a debugging session,
+    // where a caller asked for the whole library and got 200 rows with nothing
+    // saying so. The clamp is right; the silence is what hurt, so the cap is
+    // documented on the endpoint.
+    private const int MaxTopTracks = 50;
+
     private readonly VoraDbContext _context;
 
     public MusicRepository(VoraDbContext context)
@@ -330,6 +337,69 @@ public class MusicRepository : IMusicRepository
                     select track;
 
         return await query.Take(Math.Max(1, limit)).ToListAsync();
+    }
+
+    // What this artist actually gets played, for the flat list at the top of an
+    // artist page. The clients built that section as the first ten of
+    // GetTracksForArtistAsync, which orders by album year — so "Tracks" was
+    // tracks 1-10 of the artist's oldest album, sitting directly above an Albums
+    // rail whose first card was that same album.
+    //
+    // LEFT join, unlike GetTopPlayedTracksAsync next door. That one inner-joins
+    // because it answers "what have I played most", where a track with no plays
+    // has no place. Here an inner join would empty the section on any artist
+    // nobody has played yet — every artist on a new install — so unplayed tracks
+    // still come back, behind the played ones, in the order the clients show
+    // today. The change degrades to the status quo rather than to an empty box.
+    //
+    // Play counts are server-wide on purpose, with no profile filter. This is a
+    // household server and the page already carries "Also Played Here", which is
+    // explicitly about everyone. An artist page that looked different to every
+    // member of the house would be surprising for no stated benefit. Access
+    // filtering is untouched and still per-profile.
+    public async Task<List<Track>> GetTopTracksForArtistAsync(Guid artistId, MusicAccessFilter access, int limit)
+    {
+        var albumIds = await _context.Albums
+            .AsNoTracking()
+            .Where(a => a.ArtistId == artistId)
+            .Select(a => a.Id)
+            .ToListAsync();
+
+        if (albumIds.Count == 0) return new List<Track>();
+
+        IQueryable<Track> tracks = _context.Tracks
+            .AsNoTracking()
+            .Include(t => t.Album)
+            .Where(t => t.AlbumId != null && albumIds.Contains(t.AlbumId.Value));
+        tracks = ApplyLibraryFilter(tracks, access);
+        tracks = ApplyRatingFilterToTracks(tracks, access);
+
+        // Counted per track rather than group-joined. A group join plus
+        // DefaultIfEmpty needs a null check on every sort key, and those ternaries
+        // are what the in-memory provider chokes on while sorting. Count returns 0
+        // for a track nobody has played and Max over nothing returns null once the
+        // cast makes it nullable, so the left join falls out and no key can be
+        // null-unwrapped. It is a correlated subquery per row, over one artist's
+        // tracks, capped at fifty.
+        var query = tracks
+            .Select(t => new
+            {
+                Track = t,
+                Plays = _context.TrackPlayHistory.Count(h => h.TrackId == t.Id),
+                LastPlayed = _context.TrackPlayHistory
+                    .Where(h => h.TrackId == t.Id)
+                    .Max(h => (DateTime?)h.PlayedAt)
+            })
+            .OrderByDescending(x => x.Plays)
+            .ThenByDescending(x => x.LastPlayed)
+            // The remaining keys are today's ordering, so an artist nobody has
+            // played renders exactly what the clients already show.
+            .ThenBy(x => x.Track.Album == null ? null : x.Track.Album.Year)
+            .ThenBy(x => x.Track.DiscNumber)
+            .ThenBy(x => x.Track.TrackNumber)
+            .Select(x => x.Track);
+
+        return await query.Take(Math.Clamp(limit, 1, MaxTopTracks)).ToListAsync();
     }
 
     public async Task<List<Album>> GetRecentlyAddedAlbumsAsync(MusicAccessFilter access, int limit)

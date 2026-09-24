@@ -260,6 +260,7 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
 
             {chooserOpen && (
                 <PlaylistTypeChooser
+                    presetType={lockedType === 'music' ? 'Music' : undefined}
                     onCancel={() => setChooserOpen(false)}
                     onPickManual={(t) => { setChooserOpen(false); setManualCreatorType(t); setNewName(''); setNewDescription(''); }}
                     onPickSmart={(t) => { setChooserOpen(false); setSmartEditorType(t); }}
@@ -320,13 +321,17 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
 }
 
 interface ChooserProps {
+    // Set when the page is embedded somewhere that already fixes the kind — the
+    // Music tab, where asking "what kind of playlist?" and offering Movies is a
+    // question the user has already answered by being there.
+    presetType?: PlaylistMediaType;
     onCancel: () => void;
     onPickManual: (type: PlaylistMediaType) => void;
     onPickSmart: (type: PlaylistMediaType) => void;
 }
 
-function PlaylistTypeChooser({ onCancel, onPickManual, onPickSmart }: ChooserProps) {
-    const [pickedType, setPickedType] = useState<PlaylistMediaType | null>(null);
+function PlaylistTypeChooser({ presetType, onCancel, onPickManual, onPickSmart }: ChooserProps) {
+    const [pickedType, setPickedType] = useState<PlaylistMediaType | null>(presetType ?? null);
 
     if (!pickedType) {
         return (

@@ -1,4 +1,5 @@
 import { type ArtistTrackVM } from '../../../../api/Music/musicService';
+import MusicTrackRow from './MusicTrackRow';
 
 interface MusicTopViewProps {
     topTracks: ArtistTrackVM[];
@@ -62,23 +63,13 @@ export default function MusicTopView({
             ) : (
                 <div className="space-y-1">
                     {topTracks.map((t, idx) => (
-                        <div
+                        <MusicTrackRow
                             key={t.id}
-                            onClick={() => playArtistTrackList(topTracks, idx)}
-                            className="w-full text-left flex items-center gap-3 p-2 vora-row-interactive border border-transparent rounded transition-all cursor-pointer group"
-                        >
-                            <div className="w-8 text-right text-sm text-[var(--vora-text-muted)] group-hover:text-[var(--vora-accent-text)] tabular-nums">{idx + 1}</div>
-                            <div className="w-10 h-10 rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
-                                {t.albumArtworkUrl
-                                    ? <img src={t.albumArtworkUrl} alt="" className="w-full h-full object-cover" />
-                                    : <svg className="w-5 h-5 text-[var(--vora-text-disabled)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="text-sm text-[var(--vora-text-primary)] group-hover:text-[var(--vora-text-primary)] truncate">{t.title}</div>
-                                <div className="text-xs text-[var(--vora-text-muted)] truncate">{t.albumTitle ?? ''}</div>
-                            </div>
-                            <div className="text-xs text-[var(--vora-text-muted)] w-12 text-right">{formatDuration(t.durationSeconds)}</div>
-                        </div>
+                            track={t}
+                            position={idx + 1}
+                            onPlay={() => playArtistTrackList(topTracks, idx)}
+                            formatDuration={formatDuration}
+                        />
                     ))}
                 </div>
             )}
