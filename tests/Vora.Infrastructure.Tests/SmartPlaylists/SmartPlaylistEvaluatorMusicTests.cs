@@ -30,7 +30,7 @@ public class SmartPlaylistEvaluatorMusicTests
         _fx.AddTrack(album, "Track 2", 2);
 
         var def = Definition(AllOf());
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(t => t.Title).Should().BeEquivalentTo(new[] { "Track 1", "Track 2" });
     }
@@ -45,7 +45,7 @@ public class SmartPlaylistEvaluatorMusicTests
         _fx.AddTrack(albumB, "From B", 1);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.AlbumTitle, SmartPlaylistOperator.Equals, "Album A")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(t => t.Title).Should().BeEquivalentTo(new[] { "From A" });
     }
@@ -60,7 +60,7 @@ public class SmartPlaylistEvaluatorMusicTests
         _fx.AddTrack(newAlbum, "New Track", 1);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.Year, SmartPlaylistOperator.GreaterThan, "2000")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(t => t.Title).Should().BeEquivalentTo(new[] { "New Track" });
     }
@@ -75,7 +75,7 @@ public class SmartPlaylistEvaluatorMusicTests
         _fx.AddTrack(album, "Unrated Track", 3);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.ContentRating, SmartPlaylistOperator.Equals, "Clean")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(t => t.Title).Should().BeEquivalentTo(new[] { "Clean Track" });
     }
@@ -90,7 +90,7 @@ public class SmartPlaylistEvaluatorMusicTests
         _fx.AddTrack(comp, "Compilation Track", 1);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.IsCompilation, SmartPlaylistOperator.Equals, "true")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(t => t.Title).Should().BeEquivalentTo(new[] { "Compilation Track" });
     }
@@ -103,7 +103,7 @@ public class SmartPlaylistEvaluatorMusicTests
         for (int i = 1; i <= 5; i++) _fx.AddTrack(album, $"Track {i}", i);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.TrackNumber, SmartPlaylistOperator.LessThan, "3")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(t => t.Title).Should().BeEquivalentTo(new[] { "Track 1", "Track 2" });
     }
@@ -118,7 +118,7 @@ public class SmartPlaylistEvaluatorMusicTests
         _fx.AddTrack(album, "Long", 3, durationSeconds: 500);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.DurationSeconds, SmartPlaylistOperator.Between, "100", "300")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(t => t.Title).Should().BeEquivalentTo(new[] { "Medium" });
     }
@@ -131,7 +131,7 @@ public class SmartPlaylistEvaluatorMusicTests
         var album = _fx.AddAlbum(artist, "X");
         _fx.AddTrack(album, "Track", 1);
 
-        var restricted = new MusicAccessFilter
+        var restricted = new PlaylistAccessFilter
         {
             HasAllLibraryAccess = false,
             AllowedLibraryIds = new List<Guid> { Guid.NewGuid() }  // Different from _fx.LibraryId
@@ -158,7 +158,7 @@ public class SmartPlaylistEvaluatorMusicTests
             Limit = 4
         };
 
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Music, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().HaveCount(4);
     }

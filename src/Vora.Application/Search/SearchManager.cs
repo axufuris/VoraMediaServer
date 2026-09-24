@@ -52,7 +52,6 @@ public class SearchManager(ISearchRepository repository, IMusicManager musicMana
         {
             HasAllLibraryAccess = hasAllAccess,
             AllowedLibraryIds = allowedLibs,
-            HasAllRatings = hasAllRatings,
             AllowedRatings = allowedMusicRatings,
             BlockUnratedContent = blockUnrated
         };

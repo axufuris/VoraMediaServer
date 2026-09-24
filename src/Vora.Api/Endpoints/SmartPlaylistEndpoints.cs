@@ -37,20 +37,12 @@ public static class SmartPlaylistEndpoints
         return routes;
     }
 
-    private static MusicAccessFilter BuildFilter(ClaimsPrincipal user) => new()
-    {
-        HasAllLibraryAccess = user.HasAllLibraryAccess(),
-        AllowedLibraryIds = user.GetAllowedLibraryIds(),
-        HasAllRatings = user.HasAllContentRatings(),
-        AllowedRatings = user.GetAllowedMusicRatings(),
-        BlockUnratedContent = user.BlockUnratedContent()
-    };
 
     private static async Task<IResult> ListAsync(ClaimsPrincipal user, ISmartPlaylistManager manager)
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var list = await manager.ListAsync(profileId.Value, BuildFilter(user));
+        var list = await manager.ListAsync(profileId.Value, user.GetPlaylistAccessFilter());
         return Results.Ok(list);
     }
 
@@ -58,7 +50,7 @@ public static class SmartPlaylistEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var detail = await manager.GetAsync(id, profileId.Value, BuildFilter(user));
+        var detail = await manager.GetAsync(id, profileId.Value, user.GetPlaylistAccessFilter());
         if (detail == null) return Results.NotFound();
         return Results.Ok(detail);
     }
@@ -94,7 +86,7 @@ public static class SmartPlaylistEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var items = await manager.GetItemsAsync(id, profileId.Value, BuildFilter(user));
+        var items = await manager.GetItemsAsync(id, profileId.Value, user.GetPlaylistAccessFilter());
         return Results.Ok(items);
     }
 
@@ -102,7 +94,7 @@ public static class SmartPlaylistEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var count = await manager.PreviewCountAsync(profileId.Value, BuildFilter(user), request.MediaType, request.Definition ?? new SmartPlaylistDefinition());
+        var count = await manager.PreviewCountAsync(profileId.Value, user.GetPlaylistAccessFilter(), request.MediaType, request.Definition ?? new SmartPlaylistDefinition());
         return Results.Ok(new SmartPlaylistPreviewResultVM { Count = count });
     }
 

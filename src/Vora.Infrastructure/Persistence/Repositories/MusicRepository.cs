@@ -106,7 +106,7 @@ public class MusicRepository : IMusicRepository
         query = ApplyLibraryFilter(query, access);
 
         var allowedTracks = _context.Tracks.AsNoTracking();
-        allowedTracks = ApplyRatingFilterToTracks(allowedTracks, access);
+        allowedTracks = allowedTracks.ApplyMusicRatings(access);
         var anyTracksByArtist = allowedTracks
             .Where(t => t.AlbumId != null)
             .Join(_context.Albums.AsNoTracking(), t => t.AlbumId, a => (Guid?)a.Id, (t, a) => a.ArtistId);
@@ -126,7 +126,7 @@ public class MusicRepository : IMusicRepository
         var query = _context.Albums.AsNoTracking().Where(a => a.ArtistId == artistId);
         query = ApplyLibraryFilter(query, access);
 
-        var allowedTracks = ApplyRatingFilterToTracks(_context.Tracks.AsNoTracking(), access)
+        var allowedTracks = _context.Tracks.AsNoTracking().ApplyMusicRatings(access)
             .Where(t => t.AlbumId != null)
             .Select(t => t.AlbumId!.Value);
 
@@ -156,7 +156,7 @@ public class MusicRepository : IMusicRepository
     {
         var query = _context.Tracks.AsNoTracking().Where(t => t.AlbumId == albumId);
         query = ApplyLibraryFilter(query, access);
-        query = ApplyRatingFilterToTracks(query, access);
+        query = query.ApplyMusicRatings(access);
 
         return await query
             .OrderBy(t => t.DiscNumber)
@@ -179,7 +179,7 @@ public class MusicRepository : IMusicRepository
             .Include(t => t.Album)
             .Where(t => t.AlbumId != null && albumIds.Contains(t.AlbumId.Value));
         query = ApplyLibraryFilter(query, access);
-        query = ApplyRatingFilterToTracks(query, access);
+        query = query.ApplyMusicRatings(access);
 
         return await query
             .OrderBy(t => t.Album!.Year)
@@ -193,7 +193,7 @@ public class MusicRepository : IMusicRepository
     {
         var query = _context.Tracks.AsNoTracking().Where(t => t.Id == trackId);
         query = ApplyLibraryFilter(query, access);
-        query = ApplyRatingFilterToTracks(query, access);
+        query = query.ApplyMusicRatings(access);
         return await query.FirstOrDefaultAsync();
     }
 
@@ -201,7 +201,7 @@ public class MusicRepository : IMusicRepository
     {
         var trackQuery = _context.Tracks.AsNoTracking().Where(t => t.Id == trackId);
         trackQuery = ApplyLibraryFilter(trackQuery, access);
-        trackQuery = ApplyRatingFilterToTracks(trackQuery, access);
+        trackQuery = trackQuery.ApplyMusicRatings(access);
 
         var allowed = await trackQuery.Select(t => t.Id).FirstOrDefaultAsync();
         if (allowed == Guid.Empty) return null;
@@ -269,7 +269,7 @@ public class MusicRepository : IMusicRepository
             .Include(t => t.Album)
             .ThenInclude(a => a!.Artist);
         query = ApplyLibraryFilter(query, access);
-        query = ApplyRatingFilterToTracks(query, access);
+        query = query.ApplyMusicRatings(access);
 
         var ordered = from track in query
                       join like in likedJoin on track.Id equals like.TrackId
@@ -306,7 +306,7 @@ public class MusicRepository : IMusicRepository
             .Include(t => t.Album)
             .ThenInclude(a => a!.Artist);
         tracks = ApplyLibraryFilter(tracks, access);
-        tracks = ApplyRatingFilterToTracks(tracks, access);
+        tracks = tracks.ApplyMusicRatings(access);
 
         var query = from track in tracks
                     join recent in perTrackLatest on track.Id equals recent.TrackId
@@ -329,7 +329,7 @@ public class MusicRepository : IMusicRepository
             .Include(t => t.Album)
             .ThenInclude(a => a!.Artist);
         tracks = ApplyLibraryFilter(tracks, access);
-        tracks = ApplyRatingFilterToTracks(tracks, access);
+        tracks = tracks.ApplyMusicRatings(access);
 
         var query = from track in tracks
                     join stat in perTrackCount on track.Id equals stat.TrackId
@@ -372,7 +372,7 @@ public class MusicRepository : IMusicRepository
             .Include(t => t.Album)
             .Where(t => t.AlbumId != null && albumIds.Contains(t.AlbumId.Value));
         tracks = ApplyLibraryFilter(tracks, access);
-        tracks = ApplyRatingFilterToTracks(tracks, access);
+        tracks = tracks.ApplyMusicRatings(access);
 
         // Counted per track rather than group-joined. A group join plus
         // DefaultIfEmpty needs a null check on every sort key, and those ternaries
@@ -439,7 +439,7 @@ public class MusicRepository : IMusicRepository
         IQueryable<Album> query = _context.Albums.AsNoTracking().Include(a => a.Artist);
         query = ApplyLibraryFilter(query, access);
 
-        var allowedTracks = ApplyRatingFilterToTracks(_context.Tracks.AsNoTracking(), access)
+        var allowedTracks = _context.Tracks.AsNoTracking().ApplyMusicRatings(access)
             .Where(t => t.AlbumId != null)
             .Select(t => t.AlbumId!.Value);
 
@@ -467,7 +467,7 @@ public class MusicRepository : IMusicRepository
         }
         query = ApplyLibraryFilter(query, access);
 
-        var playableAlbumIds = ApplyRatingFilterToTracks(_context.Tracks.AsNoTracking(), access)
+        var playableAlbumIds = _context.Tracks.AsNoTracking().ApplyMusicRatings(access)
             .Where(t => t.AlbumId != null)
             .Select(t => t.AlbumId);
 
@@ -633,7 +633,7 @@ public class MusicRepository : IMusicRepository
 
         var tracksQuery = _context.Tracks.AsNoTracking().Include(t => t.Album).ThenInclude(a => a!.Artist).AsQueryable();
         tracksQuery = ApplyLibraryFilter(tracksQuery, access);
-        tracksQuery = ApplyRatingFilterToTracks(tracksQuery, access);
+        tracksQuery = tracksQuery.ApplyMusicRatings(access);
         tracksQuery = tracksQuery.Where(t => EF.Functions.ILike(t.Title, searchPattern));
 
         var trackResults = await tracksQuery
@@ -671,7 +671,7 @@ public class MusicRepository : IMusicRepository
 
         var trackQuery = _context.Tracks.AsNoTracking().Include(t => t.Album).Where(t => t.Album != null && t.Album.Genre != null && t.Album.Genre != string.Empty);
         trackQuery = ApplyLibraryFilter(trackQuery, access);
-        trackQuery = ApplyRatingFilterToTracks(trackQuery, access);
+        trackQuery = trackQuery.ApplyMusicRatings(access);
 
         var trackCounts = await trackQuery
             .GroupBy(t => t.Album!.Genre)
@@ -857,7 +857,7 @@ public class MusicRepository : IMusicRepository
         var trackQuery = _context.Tracks.AsNoTracking().Include(t => t.Album)
             .Where(t => t.Album != null && t.Album.Genre != null && EF.Functions.ILike(t.Album.Genre, genre));
         trackQuery = ApplyLibraryFilter(trackQuery, access);
-        trackQuery = ApplyRatingFilterToTracks(trackQuery, access);
+        trackQuery = trackQuery.ApplyMusicRatings(access);
         var tracks = await trackQuery.Take(50).ToListAsync();
 
         return new GenreContent
@@ -890,21 +890,6 @@ public class MusicRepository : IMusicRepository
         return query.Where(t => allowed.Contains(t.LibraryId));
     }
 
-    private static IQueryable<Track> ApplyRatingFilterToTracks(IQueryable<Track> query, MusicAccessFilter access)
-    {
-        if (access.BlockUnratedContent)
-        {
-            query = query.Where(t => t.ContentRating != null);
-        }
-
-        if (!access.HasAllRatings)
-        {
-            var allowed = access.AllowedRatings;
-            query = query.Where(t => t.ContentRating == null || allowed.Contains(t.ContentRating));
-        }
-
-        return query;
-    }
 
     public async Task<Dictionary<Guid, decimal>> GetAlbumRatingsAsync(Guid profileId, IEnumerable<Guid> albumIds)
     {

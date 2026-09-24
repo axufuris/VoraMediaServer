@@ -263,7 +263,7 @@ public static class MusicEndpoints
         {
             return Results.Ok(Array.Empty<object>());
         }
-        var results = await manager.SearchAsync(q.Trim(), BuildFilter(user), limit ?? 30);
+        var results = await manager.SearchAsync(q.Trim(), user.GetMusicAccessFilter(), limit ?? 30);
         return Results.Ok(results);
     }
 
@@ -393,31 +393,23 @@ public static class MusicEndpoints
         return Results.Ok(results);
     }
 
-    private static MusicAccessFilter BuildFilter(ClaimsPrincipal user) => new()
-    {
-        HasAllLibraryAccess = user.HasAllLibraryAccess(),
-        AllowedLibraryIds = user.GetAllowedLibraryIds(),
-        HasAllRatings = user.HasAllContentRatings(),
-        AllowedRatings = user.GetAllowedMusicRatings(),
-        BlockUnratedContent = user.BlockUnratedContent()
-    };
 
     private static async Task<IResult> GetArtistsAsync([FromQuery] Guid? libraryId, [FromQuery] int? limit, ClaimsPrincipal user, IMusicManager manager)
     {
-        var artists = await manager.GetArtistsAsync(libraryId, BuildFilter(user), limit);
+        var artists = await manager.GetArtistsAsync(libraryId, user.GetMusicAccessFilter(), limit);
         return Results.Ok(artists);
     }
 
     private static async Task<IResult> GetArtistDetailAsync(Guid artistId, ClaimsPrincipal user, IMusicManager manager)
     {
-        var (artist, albums) = await manager.GetArtistDetailAsync(artistId, user.GetProfileId(), BuildFilter(user));
+        var (artist, albums) = await manager.GetArtistDetailAsync(artistId, user.GetProfileId(), user.GetMusicAccessFilter());
         if (artist == null) return Results.NotFound();
         return Results.Ok(new ArtistDetailVM { Artist = artist, Albums = albums });
     }
 
     private static async Task<IResult> GetAlbumDetailAsync(Guid albumId, ClaimsPrincipal user, IMusicManager manager)
     {
-        var (album, tracks, artistBackgroundUrl) = await manager.GetAlbumDetailAsync(albumId, user.GetProfileId(), BuildFilter(user));
+        var (album, tracks, artistBackgroundUrl) = await manager.GetAlbumDetailAsync(albumId, user.GetProfileId(), user.GetMusicAccessFilter());
         if (album == null) return Results.NotFound();
         return Results.Ok(new AlbumDetailVM
         {
@@ -429,13 +421,13 @@ public static class MusicEndpoints
 
     private static async Task<IResult> GetArtistTracksAsync(Guid artistId, ClaimsPrincipal user, IMusicManager manager)
     {
-        var tracks = await manager.GetTracksForArtistAsync(artistId, user.GetProfileId(), BuildFilter(user));
+        var tracks = await manager.GetTracksForArtistAsync(artistId, user.GetProfileId(), user.GetMusicAccessFilter());
         return Results.Ok(tracks);
     }
 
     private static async Task<IResult> GetArtistTopTracksAsync(Guid artistId, [FromQuery] int? limit, ClaimsPrincipal user, IMusicManager manager)
     {
-        var tracks = await manager.GetTopTracksForArtistAsync(artistId, user.GetProfileId(), BuildFilter(user), limit ?? DefaultTopTracks);
+        var tracks = await manager.GetTopTracksForArtistAsync(artistId, user.GetProfileId(), user.GetMusicAccessFilter(), limit ?? DefaultTopTracks);
         return Results.Ok(tracks);
     }
 
@@ -459,7 +451,7 @@ public static class MusicEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var tracks = await manager.GetLikedTracksAsync(profileId.Value, BuildFilter(user));
+        var tracks = await manager.GetLikedTracksAsync(profileId.Value, user.GetMusicAccessFilter());
         return Results.Ok(new LikedTracksVM { Count = tracks.Count, Tracks = tracks });
     }
 
@@ -502,7 +494,7 @@ public static class MusicEndpoints
 
     private static async Task<IResult> GetTrackLyricsAsync(Guid trackId, ClaimsPrincipal user, IMusicManager manager, CancellationToken cancellationToken)
     {
-        var lyrics = await manager.GetTrackLyricsAsync(trackId, BuildFilter(user), cancellationToken);
+        var lyrics = await manager.GetTrackLyricsAsync(trackId, user.GetMusicAccessFilter(), cancellationToken);
         if (lyrics == null) return Results.NotFound();
         return Results.Ok(new TrackLyricsVM
         {
@@ -581,7 +573,7 @@ public static class MusicEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var tracks = await manager.GetRecentlyPlayedAsync(profileId.Value, BuildFilter(user), limit ?? 20);
+        var tracks = await manager.GetRecentlyPlayedAsync(profileId.Value, user.GetMusicAccessFilter(), limit ?? 20);
         return Results.Ok(tracks);
     }
 
@@ -589,7 +581,7 @@ public static class MusicEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var tracks = await manager.GetTopPlayedTracksAsync(profileId.Value, BuildFilter(user), limit ?? 50);
+        var tracks = await manager.GetTopPlayedTracksAsync(profileId.Value, user.GetMusicAccessFilter(), limit ?? 50);
         return Results.Ok(tracks);
     }
 
@@ -597,7 +589,7 @@ public static class MusicEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var artists = await manager.GetTopPlayedArtistsAsync(profileId.Value, BuildFilter(user), limit ?? 12);
+        var artists = await manager.GetTopPlayedArtistsAsync(profileId.Value, user.GetMusicAccessFilter(), limit ?? 12);
         return Results.Ok(artists);
     }
 
@@ -605,13 +597,13 @@ public static class MusicEndpoints
     // q and a second convention for the same idea is one the caller has to learn.
     private static async Task<IResult> GetAlbumsAsync([FromQuery] Guid? libraryId, [FromQuery] AlbumSortOrder? sort, [FromQuery] int? offset, [FromQuery] int? limit, [FromQuery] string? q, ClaimsPrincipal user, IMusicManager manager)
     {
-        var page = await manager.GetAlbumsAsync(libraryId, BuildFilter(user), sort ?? AlbumSortOrder.RecentlyAdded, offset ?? 0, limit ?? MusicManager.DefaultAlbumPageSize, q);
+        var page = await manager.GetAlbumsAsync(libraryId, user.GetMusicAccessFilter(), sort ?? AlbumSortOrder.RecentlyAdded, offset ?? 0, limit ?? MusicManager.DefaultAlbumPageSize, q);
         return Results.Ok(page);
     }
 
     private static async Task<IResult> GetRecentlyAddedAlbumsAsync([FromQuery] int? limit, ClaimsPrincipal user, IMusicManager manager)
     {
-        var albums = await manager.GetRecentlyAddedAlbumsAsync(BuildFilter(user), limit ?? 12);
+        var albums = await manager.GetRecentlyAddedAlbumsAsync(user.GetMusicAccessFilter(), limit ?? 12);
         return Results.Ok(albums);
     }
 
@@ -619,7 +611,7 @@ public static class MusicEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var mixes = await manager.GetMixesForProfileAsync(profileId.Value, BuildFilter(user));
+        var mixes = await manager.GetMixesForProfileAsync(profileId.Value, user.GetMusicAccessFilter());
         return Results.Ok(mixes);
     }
 
@@ -627,7 +619,7 @@ public static class MusicEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var detail = await manager.GetMixDetailAsync(mixId, profileId.Value, BuildFilter(user));
+        var detail = await manager.GetMixDetailAsync(mixId, profileId.Value, user.GetMusicAccessFilter());
         if (detail == null) return Results.NotFound();
         return Results.Ok(detail);
     }
@@ -636,7 +628,7 @@ public static class MusicEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var rows = await manager.GetBecauseYouPlayedRowsAsync(profileId.Value, BuildFilter(user));
+        var rows = await manager.GetBecauseYouPlayedRowsAsync(profileId.Value, user.GetMusicAccessFilter());
         return Results.Ok(rows);
     }
 
@@ -670,7 +662,7 @@ public static class MusicEndpoints
         if (profileId == null) return Results.Forbid();
         var seed = ParseSeed(request);
         if (seed == null) return Results.BadRequest(new { error = "Invalid radio seed." });
-        var queue = await manager.StartRadioAsync(profileId.Value, BuildFilter(user), seed, request.Size ?? 50);
+        var queue = await manager.StartRadioAsync(profileId.Value, user.GetMusicAccessFilter(), seed, request.Size ?? 50);
         return Results.Ok(queue);
     }
 
@@ -681,7 +673,7 @@ public static class MusicEndpoints
         var seed = ParseSeed(request);
         if (seed == null) return Results.BadRequest(new { error = "Invalid radio seed." });
         var excludeIds = request.ExcludeTrackIds ?? new List<Guid>();
-        var queue = await manager.ExtendRadioAsync(profileId.Value, BuildFilter(user), seed, excludeIds, request.Size ?? 25);
+        var queue = await manager.ExtendRadioAsync(profileId.Value, user.GetMusicAccessFilter(), seed, excludeIds, request.Size ?? 25);
         return Results.Ok(queue);
     }
 
@@ -699,7 +691,7 @@ public static class MusicEndpoints
         if (profileId == null) return Results.Forbid();
         var seed = ParseSeed(request);
         if (seed == null) return Results.BadRequest(new { error = "Invalid station seed." });
-        var station = await manager.SaveStationAsync(profileId.Value, BuildFilter(user), request.Name ?? string.Empty, seed);
+        var station = await manager.SaveStationAsync(profileId.Value, user.GetMusicAccessFilter(), request.Name ?? string.Empty, seed);
         if (station == null) return Results.BadRequest(new { error = "Could not save station." });
         return Results.Ok(station);
     }
@@ -725,7 +717,7 @@ public static class MusicEndpoints
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
         var targetYear = year ?? DateTime.UtcNow.Year;
-        var recap = await manager.GetYearRecapAsync(profileId.Value, BuildFilter(user), targetYear);
+        var recap = await manager.GetYearRecapAsync(profileId.Value, user.GetMusicAccessFilter(), targetYear);
         return Results.Ok(recap);
     }
 
@@ -741,7 +733,7 @@ public static class MusicEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var artists = await manager.GetSimilarArtistsAsync(artistId, BuildFilter(user), cancellationToken);
+        var artists = await manager.GetSimilarArtistsAsync(artistId, user.GetMusicAccessFilter(), cancellationToken);
         return Results.Ok(artists);
     }
 
@@ -749,19 +741,19 @@ public static class MusicEndpoints
     {
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
-        var artists = await manager.GetCoPlayedArtistsAsync(artistId, BuildFilter(user));
+        var artists = await manager.GetCoPlayedArtistsAsync(artistId, user.GetMusicAccessFilter());
         return Results.Ok(artists);
     }
 
     private static async Task<IResult> GetGenresAsync(ClaimsPrincipal user, IMusicManager manager)
     {
-        var genres = await manager.GetGenresAsync(BuildFilter(user));
+        var genres = await manager.GetGenresAsync(user.GetMusicAccessFilter());
         return Results.Ok(genres);
     }
 
     private static async Task<IResult> GetGenreContentAsync(string genre, ClaimsPrincipal user, IMusicManager manager)
     {
-        var content = await manager.GetGenreContentAsync(Uri.UnescapeDataString(genre), BuildFilter(user));
+        var content = await manager.GetGenreContentAsync(Uri.UnescapeDataString(genre), user.GetMusicAccessFilter());
         if (content == null) return Results.NotFound();
         return Results.Ok(content);
     }
@@ -877,7 +869,7 @@ public static class MusicEndpoints
 
     private static async Task<IResult> GetMusicStreamUrlAsync(Guid trackId, [FromQuery] string? quality, ClaimsPrincipal user, IMusicManager manager, IStreamingTokenSigner signer, IAudioTranscodeService audioTranscodeService)
     {
-        var path = await manager.GetTrackFilePathAsync(trackId, BuildFilter(user));
+        var path = await manager.GetTrackFilePathAsync(trackId, user.GetMusicAccessFilter());
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return Results.NotFound();
 
         var token = signer.Sign(StreamTokenScope, trackId.ToString(), StreamTokenTtl);

@@ -31,7 +31,7 @@ public class SmartPlaylistEvaluatorMovieTests
         _fx.AddMovie("The Matrix", 1999);
 
         var def = Definition(AllOf());
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(m => m.Title).Should().BeEquivalentTo(new[] { "Inception", "The Matrix" });
     }
@@ -43,7 +43,7 @@ public class SmartPlaylistEvaluatorMovieTests
         _fx.AddMovie("The Matrix", 1999);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.Title, SmartPlaylistOperator.Equals, "Inception")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().HaveCount(1);
         results[0].Title.Should().Be("Inception");
@@ -57,7 +57,7 @@ public class SmartPlaylistEvaluatorMovieTests
         _fx.AddMovie("The Matrix", 1999);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.Title, SmartPlaylistOperator.Contains, "inter")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(m => m.Title).Should().BeEquivalentTo(new[] { "Interstellar" });
     }
@@ -70,7 +70,7 @@ public class SmartPlaylistEvaluatorMovieTests
         _fx.AddMovie("Recent", 2023);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.ReleaseYear, SmartPlaylistOperator.GreaterThan, "2000")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(m => m.Title).Should().BeEquivalentTo(new[] { "Newish", "Recent" });
     }
@@ -84,7 +84,7 @@ public class SmartPlaylistEvaluatorMovieTests
         _fx.AddMovie("Too New", 2023);
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.ReleaseYear, SmartPlaylistOperator.Between, "2000", "2015")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(m => m.Title).Should().BeEquivalentTo(new[] { "In Range A", "In Range B" });
     }
@@ -96,7 +96,7 @@ public class SmartPlaylistEvaluatorMovieTests
         _fx.AddMovie("Mature", 2015, rating: "R");
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.ContentRating, SmartPlaylistOperator.Equals, "PG")));
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(m => m.Title).Should().BeEquivalentTo(new[] { "Family" });
     }
@@ -112,7 +112,7 @@ public class SmartPlaylistEvaluatorMovieTests
             Rule(SmartPlaylistField.Title, SmartPlaylistOperator.Contains, "Inception"),
             Rule(SmartPlaylistField.ContentRating, SmartPlaylistOperator.Equals, "PG-13")));
 
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(m => m.Title).Should().BeEquivalentTo(new[]
         {
@@ -131,7 +131,7 @@ public class SmartPlaylistEvaluatorMovieTests
             Rule(SmartPlaylistField.ContentRating, SmartPlaylistOperator.Equals, "PG"),
             Rule(SmartPlaylistField.ContentRating, SmartPlaylistOperator.Equals, "G")));
 
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(m => m.Title).Should().BeEquivalentTo(new[] { "PG Movie", "G Movie" });
     }
@@ -149,7 +149,7 @@ public class SmartPlaylistEvaluatorMovieTests
             Limit = 3
         };
 
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Should().HaveCount(3);
     }
@@ -168,7 +168,7 @@ public class SmartPlaylistEvaluatorMovieTests
             SortDirection = SmartPlaylistSortDirection.Desc
         };
 
-        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var results = await _fx.Evaluator.EvaluateAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         results.Select(m => m.Title).Should().ContainInOrder("C", "B", "A");
     }
@@ -182,7 +182,7 @@ public class SmartPlaylistEvaluatorMovieTests
 
         var def = Definition(AllOf(Rule(SmartPlaylistField.ContentRating, SmartPlaylistOperator.Equals, "PG")));
 
-        var count = await _fx.Evaluator.CountAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, MusicAccessFilter.Unrestricted);
+        var count = await _fx.Evaluator.CountAsync(def, PlaylistMediaType.Movies, _fx.ProfileId, PlaylistAccessFilter.Unrestricted);
 
         count.Should().Be(2);
     }

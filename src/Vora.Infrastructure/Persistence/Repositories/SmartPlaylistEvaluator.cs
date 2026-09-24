@@ -4,6 +4,7 @@ using Vora.Application.Media;
 using Vora.Application.Media.SmartPlaylists;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Playlists;
+using Vora.Infrastructure.Persistence.Extensions;
 
 namespace Vora.Infrastructure.Persistence.Repositories;
 
@@ -16,7 +17,7 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
         _context = context;
     }
 
-    public async Task<List<MediaItem>> EvaluateAsync(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, MusicAccessFilter access)
+    public async Task<List<MediaItem>> EvaluateAsync(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, PlaylistAccessFilter access)
     {
         var ids = await BuildIdQuery(definition, mediaType, profileId, access).ToListAsync();
         if (ids.Count == 0) return new List<MediaItem>();
@@ -50,10 +51,10 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
         return ids.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
     }
 
-    public Task<List<Guid>> EvaluateIdsAsync(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, MusicAccessFilter access) =>
+    public Task<List<Guid>> EvaluateIdsAsync(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, PlaylistAccessFilter access) =>
         BuildIdQuery(definition, mediaType, profileId, access).ToListAsync();
 
-    public Task<int> CountAsync(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, MusicAccessFilter access) =>
+    public Task<int> CountAsync(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, PlaylistAccessFilter access) =>
         mediaType switch
         {
             PlaylistMediaType.Music => BuildMusicRowQuery(definition, profileId, access).CountAsync(),
@@ -62,7 +63,7 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
             _ => Task.FromResult(0)
         };
 
-    private IQueryable<Guid> BuildIdQuery(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, MusicAccessFilter access)
+    private IQueryable<Guid> BuildIdQuery(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, PlaylistAccessFilter access)
     {
         int limit = definition.Limit.HasValue && definition.Limit.Value > 0 ? definition.Limit.Value : 2000;
         switch (mediaType)
@@ -90,7 +91,7 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
         }
     }
 
-    private IQueryable<MusicRow> BuildMusicRowQuery(SmartPlaylistDefinition definition, Guid profileId, MusicAccessFilter access)
+    private IQueryable<MusicRow> BuildMusicRowQuery(SmartPlaylistDefinition definition, Guid profileId, PlaylistAccessFilter access)
     {
         var baseQuery = _context.Tracks
             .AsNoTracking()
@@ -103,18 +104,10 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
             baseQuery = baseQuery.Where(t => t.Album != null && allowed.Contains(t.Album.LibraryId));
         }
 
-        if (!access.HasAllRatings)
-        {
-            var allowedRatings = access.AllowedRatings;
-            if (access.BlockUnratedContent)
-            {
-                baseQuery = baseQuery.Where(t => t.ContentRating != null && allowedRatings.Contains(t.ContentRating));
-            }
-            else
-            {
-                baseQuery = baseQuery.Where(t => t.ContentRating == null || allowedRatings.Contains(t.ContentRating));
-            }
-        }
+        // The same rule every other music surface uses, rather than a fourth copy
+        // of it — this one applied "block unrated" only when the allowlist was
+        // also restricted.
+        baseQuery = baseQuery.ApplyMusicRatings(access.Music);
 
         var playStats = _context.TrackPlayHistory
             .Where(p => p.ProfileId == profileId)
@@ -155,24 +148,23 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
         return rowQuery;
     }
 
-    private IQueryable<VideoRow> BuildMovieRowQuery(SmartPlaylistDefinition definition, Guid profileId, MusicAccessFilter access)
+    private IQueryable<MediaItem> VideoVisibleTo(PlaylistAccessFilter access) =>
+        _context.MediaItems
+            .AsNoTracking()
+            .ApplyAccessFilters(
+                access.HasAllLibraryAccess,
+                access.AllowedLibraryIds,
+                access.VideoHasAllRatings,
+                access.AllowedMovieRatings,
+                access.AllowedTvRatings,
+                access.BlockUnratedContent);
+
+    private IQueryable<VideoRow> BuildMovieRowQuery(SmartPlaylistDefinition definition, Guid profileId, PlaylistAccessFilter access)
     {
-        var baseQuery = _context.Movies.AsNoTracking().Where(m => m.MissingSince == null);
-
-        if (!access.HasAllLibraryAccess)
-        {
-            var allowed = access.AllowedLibraryIds;
-            baseQuery = baseQuery.Where(m => allowed.Contains(m.LibraryId));
-        }
-
-        if (!access.HasAllRatings)
-        {
-            var allowedRatings = access.AllowedRatings;
-            if (access.BlockUnratedContent)
-                baseQuery = baseQuery.Where(m => m.ContentRating != null && allowedRatings.Contains(m.ContentRating));
-            else
-                baseQuery = baseQuery.Where(m => m.ContentRating == null || allowedRatings.Contains(m.ContentRating));
-        }
+        // Exactly what browsing a film library applies, so a smart playlist shows a
+        // child the same films their library does. It used to test films against
+        // the MUSIC allowlist, which only failed safe by accident.
+        var baseQuery = VideoVisibleTo(access).OfType<Movie>();
 
         var rowQuery = baseQuery.Select(m => new VideoRow
         {
@@ -205,27 +197,15 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
         return rowQuery;
     }
 
-    private IQueryable<VideoRow> BuildEpisodeRowQuery(SmartPlaylistDefinition definition, Guid profileId, MusicAccessFilter access)
+    private IQueryable<VideoRow> BuildEpisodeRowQuery(SmartPlaylistDefinition definition, Guid profileId, PlaylistAccessFilter access)
     {
-        var baseQuery = _context.Episodes
-            .AsNoTracking()
-            .Where(e => e.MissingSince == null)
+        // The video-browse rule, which — unlike the check this replaces — falls
+        // back to the season's and then the show's rating when an episode has
+        // none of its own. Most episodes carry no rating of their own, so the old
+        // check waved through every episode of a TV-MA show.
+        var baseQuery = VideoVisibleTo(access)
+            .OfType<Episode>()
             .Where(e => e.Season != null && e.Season.TvShow != null);
-
-        if (!access.HasAllLibraryAccess)
-        {
-            var allowed = access.AllowedLibraryIds;
-            baseQuery = baseQuery.Where(e => allowed.Contains(e.LibraryId));
-        }
-
-        if (!access.HasAllRatings)
-        {
-            var allowedRatings = access.AllowedRatings;
-            if (access.BlockUnratedContent)
-                baseQuery = baseQuery.Where(e => e.ContentRating != null && allowedRatings.Contains(e.ContentRating));
-            else
-                baseQuery = baseQuery.Where(e => e.ContentRating == null || allowedRatings.Contains(e.ContentRating));
-        }
 
         var rowQuery = baseQuery.Select(e => new VideoRow
         {

@@ -156,15 +156,7 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
             .Include(t => t.Album)
             .Where(t => t.AlbumId != null && t.Album!.ArtistId == artistId);
 
-        if (!access.HasAllLibraryAccess)
-        {
-            var allowed = access.AllowedLibraryIds;
-            query = query.Where(t => allowed.Contains(t.LibraryId));
-        }
-        if (access.BlockUnratedContent)
-        {
-            query = query.Where(t => t.ContentRating != null);
-        }
+        query = query.ApplyMusicAccess(access);
 
         var tracks = await query.ToListAsync();
         if (tracks.Count == 0) return tracks;
@@ -262,15 +254,7 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
             .Include(t => t.Album)
             .Where(t => ids.Contains(t.Id));
 
-        if (!access.HasAllLibraryAccess)
-        {
-            var allowed = access.AllowedLibraryIds;
-            query = query.Where(t => allowed.Contains(t.LibraryId));
-        }
-        if (access.BlockUnratedContent)
-        {
-            query = query.Where(t => t.ContentRating != null);
-        }
+        query = query.ApplyMusicAccess(access);
 
         var fetched = await query.ToListAsync();
         var byId = fetched.ToDictionary(t => t.Id);
@@ -289,15 +273,7 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
             .Include(t => t.Album)
             .Where(t => t.AlbumId != null && ids.Contains(t.Album!.ArtistId));
 
-        if (!access.HasAllLibraryAccess)
-        {
-            var allowed = access.AllowedLibraryIds;
-            query = query.Where(t => allowed.Contains(t.LibraryId));
-        }
-        if (access.BlockUnratedContent)
-        {
-            query = query.Where(t => t.ContentRating != null);
-        }
+        query = query.ApplyMusicAccess(access);
 
         return await query.Take(limit).ToListAsync();
     }
@@ -314,15 +290,7 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
             .Include(t => t.Album)
             .Where(t => t.Album != null && t.Album.Genre != null && genreList.Contains(t.Album.Genre));
 
-        if (!access.HasAllLibraryAccess)
-        {
-            var allowed = access.AllowedLibraryIds;
-            query = query.Where(t => allowed.Contains(t.LibraryId));
-        }
-        if (access.BlockUnratedContent)
-        {
-            query = query.Where(t => t.ContentRating != null);
-        }
+        query = query.ApplyMusicAccess(access);
 
         return await query.Take(limit).ToListAsync();
     }
@@ -365,15 +333,7 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
             query = query.Where(t => t.Album!.ArtistId != exId);
         }
 
-        if (!access.HasAllLibraryAccess)
-        {
-            var allowed = access.AllowedLibraryIds;
-            query = query.Where(t => allowed.Contains(t.LibraryId));
-        }
-        if (access.BlockUnratedContent)
-        {
-            query = query.Where(t => t.ContentRating != null);
-        }
+        query = query.ApplyMusicAccess(access);
 
         var fetched = await query.Take(limit * 3).ToListAsync();
         return fetched
@@ -393,15 +353,7 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
             .Include(t => t.Album)
             .Where(t => t.Album != null && t.Album.Genre == genre);
 
-        if (!access.HasAllLibraryAccess)
-        {
-            var allowed = access.AllowedLibraryIds;
-            query = query.Where(t => allowed.Contains(t.LibraryId));
-        }
-        if (access.BlockUnratedContent)
-        {
-            query = query.Where(t => t.ContentRating != null);
-        }
+        query = query.ApplyMusicAccess(access);
 
         var fetched = await query.Take(limit * 3).ToListAsync();
         return fetched
@@ -462,17 +414,7 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
         var query = _context.TrackPlayHistory
             .AsNoTracking()
             .Where(p => p.ProfileId == profileId && p.PlayedAt >= start && p.PlayedAt < end)
-            .Join(_context.Tracks, p => p.TrackId, t => t.Id, (p, t) => new { Play = p, Track = t });
-
-        if (!access.HasAllLibraryAccess)
-        {
-            var allowed = access.AllowedLibraryIds;
-            query = query.Where(x => allowed.Contains(x.Track.LibraryId));
-        }
-        if (access.BlockUnratedContent)
-        {
-            query = query.Where(x => x.Track.ContentRating != null);
-        }
+            .Join(_context.Tracks.ApplyMusicAccess(access), p => p.TrackId, t => t.Id, (p, t) => new { Play = p, Track = t });
 
         var withAlbum = query
             .GroupJoin(_context.Albums, x => x.Track.AlbumId, a => (Guid?)a.Id, (x, albums) => new { x.Play, x.Track, Albums = albums })
@@ -597,18 +539,7 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
             query = query.Where(t => t.Album != null && allowed.Contains(t.Album.LibraryId));
         }
 
-        if (!access.HasAllRatings)
-        {
-            var allowedRatings = access.AllowedRatings;
-            if (access.BlockUnratedContent)
-            {
-                query = query.Where(t => t.ContentRating != null && allowedRatings.Contains(t.ContentRating));
-            }
-            else
-            {
-                query = query.Where(t => t.ContentRating == null || allowedRatings.Contains(t.ContentRating));
-            }
-        }
+        query = query.ApplyMusicRatings(access);
 
         return await query
             .OrderByDescending(t => t.AddedAt)
