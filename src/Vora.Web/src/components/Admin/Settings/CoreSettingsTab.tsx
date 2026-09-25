@@ -578,7 +578,7 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
             <SettingsCard title="New User Registration">
                 <FieldLabel>Registration Mode</FieldLabel>
                 <select
-                    value={serverSettings.registrationMode || 1}
+                    value={serverSettings.registrationMode ?? 1}
                     onChange={e => setServerSettings({ ...serverSettings, registrationMode: Number(e.target.value) })}
                     className="vora-input max-w-md cursor-pointer"
                 >

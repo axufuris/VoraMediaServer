@@ -63,7 +63,25 @@ public static class UserEndpoints
         group.MapGet("/", GetAllUsersAsync)
             .Produces<List<UserVM>>(StatusCodes.Status200OK);
 
+        // An admin adding an account directly, whatever the registration mode.
+        group.MapPost("/", CreateUserAsync)
+            .WithName("AdminCreateUser")
+            .Produces<AdminCreateUserResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapPut("/{userId:guid}/access", UpdateUserAccessAsync);
+    }
+
+    private static async Task<IResult> CreateUserAsync([FromBody] AdminCreateUserRequest request, IAuthManager authManager)
+    {
+        var result = await authManager.CreateUserAsAdminAsync(request.Email, request.Password, request.DisplayName);
+        return result.Outcome switch
+        {
+            AdminCreateUserOutcome.Created when result.UserId is Guid id => Results.Ok(new AdminCreateUserResponse { Id = id }),
+            AdminCreateUserOutcome.EmailInUse => Results.Problem(detail: result.Error, statusCode: StatusCodes.Status409Conflict),
+            _ => Results.Problem(detail: result.Error, statusCode: StatusCodes.Status400BadRequest),
+        };
     }
 
     private static async Task<IResult> GetAllUsersAsync(IUserManager manager)

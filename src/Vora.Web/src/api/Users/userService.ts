@@ -45,6 +45,12 @@ export const userService = {
         const response = await apiClient.get<UserVM[]>('/users', { serverId });
         return response.data;
     },
+    // Admin only. Adds an account directly, whatever the registration mode; the
+    // account gets a first profile named after it. 409 when the email is taken.
+    createUser: async (email: string, displayName: string, password: string, serverId?: string): Promise<{ id: string }> => {
+        const response = await apiClient.post<{ id: string }>('/users', { email, displayName, password }, { serverId });
+        return response.data;
+    },
 
     getUserAccount: async (userId: string, serverId?: string): Promise<UserVM> => {
         const response = await apiClient.get<UserVM>(`/users/${userId}`, { serverId });
