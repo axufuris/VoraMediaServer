@@ -57,6 +57,9 @@
     --vora-info-soft: #e0f2fe;
     --vora-info-text: #075985;
 
+    /* A third party's mark keeps its owner's colour in every template. */
+    --vora-lastfm-red: #d51007;
+
     /* === Typography === */
     --vora-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --vora-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;

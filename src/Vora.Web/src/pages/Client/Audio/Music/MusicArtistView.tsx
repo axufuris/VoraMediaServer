@@ -1,4 +1,5 @@
 import { type ArtistVM, type AlbumVM, type ArtistTrackVM, type RadioSeed } from '../../../../api/Music/musicService';
+import LastFmMark from '../../../../components/Media/LastFmMark';
 import MusicTrackRow from './MusicTrackRow';
 import { formatCompactCount } from '../../../../utils/compactCount';
 import StarRating from '../../../../components/Client/Primitives/StarRating';
@@ -117,8 +118,13 @@ export default function MusicArtistView({
                                         this household plays them. Absent until the first
                                         popularity refresh has reached this artist. */}
                                     {formatCompactCount(currentArtist.globalListeners) && (
-                                        <span className="text-xs text-[var(--vora-text-secondary)]" title="Unique listeners on Last.fm">
-                                            <span className="font-semibold text-[var(--vora-text-primary)]">{formatCompactCount(currentArtist.globalListeners)}</span> listeners on Last.fm
+                                        <span
+                                            className="inline-flex items-center gap-1.5 text-xs"
+                                            title={`${(currentArtist.globalListeners ?? 0).toLocaleString()} listeners on Last.fm`}
+                                        >
+                                            <LastFmMark />
+                                            <span className="font-semibold text-[var(--vora-text-primary)]">{formatCompactCount(currentArtist.globalListeners)}</span>
+                                            <span className="sr-only">listeners</span>
                                         </span>
                                     )}
                                     <div className="flex items-center gap-2">
