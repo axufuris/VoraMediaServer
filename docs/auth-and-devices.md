@@ -79,6 +79,8 @@ There are two parallel invitation systems and they coexist:
 - **Legacy `RegistrationTicket`** (3-word shared codes). Used when `RegistrationMode == SecretWord`. Anyone with the code can register; codes are consumed on use. `AuthManager.GenerateInviteCodeAsync` creates them; surfaced on the **Users & Access** admin page.
 - **Per-email `InvitationTicket`** (Phase 4 email invitations). Independent of `RegistrationMode` — works regardless of the mode setting, including `Disabled`. Each invite is tied to one email address, requires the recipient's email to match at registration, and is consumed on use. Surfaced on the **Email Invitations** admin page. See `docs/email.md`.
 
+- **Admin-created accounts**: `POST /api/users` (AdminOnly, `AuthManager.CreateUserAsAdminAsync`) adds an account with a starting password, regardless of `RegistrationMode` — the mode only governs self sign-up. Same defaults and first profile as a registration; 409 for an email in use, 400 with a `detail` for bad input. Surfaced as **Add user** on **Users & Access**, which also shows the mode selector and the action that fits it (open → sign-up link, PIN → generate, invitation → send email).
+
 `AuthManager.RegisterAsync` checks `inviteToken` first; if present, it takes the invitation path. Otherwise it falls through to the legacy `RegistrationMode`-based flow.
 
 ## localStorage keys

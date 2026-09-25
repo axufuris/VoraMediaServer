@@ -46,6 +46,7 @@ public interface IAuthManager
     Task<AuthResponseDto?> LoginAsync(string email, string password);
     Task<ProfileTokenResult> GenerateProfileTokenAsync(Guid accountId, Guid profileId, string? pin = null);
     Task<AuthResponseDto> RegisterAsync(string email, string password, string displayName, string? secretCode, string? inviteToken = null);
+    Task<AdminCreateUserResult> CreateUserAsAdminAsync(string email, string password, string displayName);
     Task<string> IssueRefreshTokenAsync(Guid accountId, string? deviceId);
     Task<AuthResponseDto?> RefreshAsync(string refreshToken, Guid? profileId, string? deviceId);
     Task RevokeRefreshTokenAsync(string refreshToken);
@@ -197,6 +198,32 @@ public class AuthManager(
         }
 
         return BuildAuthResponse(user);
+    }
+
+    // An admin adding someone directly: no invite, and not subject to the
+    // registration mode, which governs who may sign THEMSELVES up. The account
+    // gets the same defaults and first profile a self-registered one does.
+    public async Task<AdminCreateUserResult> CreateUserAsAdminAsync(string email, string password, string displayName)
+    {
+        var normalizedEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
+        var name = (displayName ?? string.Empty).Trim();
+
+        if (normalizedEmail.Length == 0 || !normalizedEmail.Contains('@')) return AdminCreateUserResult.Invalid("Enter a valid email address.");
+        if (name.Length == 0) return AdminCreateUserResult.Invalid("Enter a name.");
+        if (string.IsNullOrWhiteSpace(password) || password.Length < MinPasswordLength)
+        {
+            return AdminCreateUserResult.Invalid($"The password must be at least {MinPasswordLength} characters.");
+        }
+
+        if (await repository.GetUserWithProfilesByEmailAsync(normalizedEmail) != null)
+        {
+            return AdminCreateUserResult.EmailInUse;
+        }
+
+        var user = BuildUser(normalizedEmail, password, name, isAdmin: false);
+        await repository.AddUserAsync(user);
+        logger.LogInformation("Admin created account {Email}", normalizedEmail);
+        return AdminCreateUserResult.Created(user.Id);
     }
 
     public async Task<AuthResponseDto> ClaimServerAsync(string email, string password, string displayName)

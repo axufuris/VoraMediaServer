@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { libraryService, type LibrarySummary } from '../../api/Media/libraryService';
-import { authService } from '../../api/Auth/authService';
 import { iptvAdminService, type IptvPlaylistVM } from '../../api/Iptv/iptvAdminService';
 import UserAccessModal from '../../components/Admin/UserAccessModal';
 import { useDialog } from '../../dialogs';
@@ -9,6 +8,8 @@ import { type UserVM, userService } from '../../api/Users/userService';
 import { profileService, type UserProfileVM } from '../../api/Users/profileService';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
+import AddUserModal from '../../components/Admin/Users/AddUserModal';
+import SignUpCard from '../../components/Admin/Users/SignUpCard';
 
 export default function UserManagementPage() {
     const dialog = useDialog();
@@ -16,7 +17,7 @@ export default function UserManagementPage() {
     const [users, setUsers] = useState<UserVM[]>([]);
     const [libraries, setLibraries] = useState<LibrarySummary[]>([]);
     const [iptvPlaylists, setIptvPlaylists] = useState<IptvPlaylistVM[]>([]);
-    const [inviteCode, setInviteCode] = useState<string | null>(null);
+    const [addingUser, setAddingUser] = useState(false);
     const [loading, setLoading] = useState(true);
 
     const [editingUser, setEditingUser] = useState<UserVM | null>(null);
@@ -42,15 +43,6 @@ export default function UserManagementPage() {
     useEffect(() => {
         loadData();
     }, [loadData]);
-
-    const handleGenerateInvite = async () => {
-        try {
-            const code = await authService.generateInviteCode(serverId);
-            setInviteCode(code);
-        } catch {
-            await dialog.alert('Failed to generate invite code.');
-        }
-    };
 
     const handleAccessSave = async (hasAllLibs: boolean, allowedLibs: string[], canRequest: boolean, autoApprove: boolean, enableAi: boolean, hasAllIptv: boolean, allowedIptv: string[], canRecordLiveTv: boolean, dvrQuotaBytes: number, canTimeshiftIptv: boolean, canAddCustomPodcastFeeds: boolean) => {
         if (!editingUser) return;
@@ -79,41 +71,16 @@ export default function UserManagementPage() {
         <div data-vora-page="">
             <PageHeader
                 title="Users & Access"
-                description="Manage accounts, profiles, library permissions, and server invites."
+                description="Manage accounts, profiles, library permissions, and how new people sign up."
+                actions={
+                    <button type="button" onClick={() => setAddingUser(true)} className="vora-button-primary">
+                        Add user
+                    </button>
+                }
             />
 
             <div className="p-8 max-w-6xl mx-auto space-y-10">
-                <section className="vora-card p-6">
-                    <div className="flex items-start justify-between gap-6 mb-1">
-                        <div>
-                            <h2 className="text-base font-semibold text-[var(--vora-text-primary)]">Server Invites</h2>
-                            <p className="text-sm text-[var(--vora-text-muted)] mt-0.5">
-                                Generate a temporary 4-digit PIN so a friend or family member can register an account on this server.
-                            </p>
-                        </div>
-                        {!inviteCode && (
-                            <button type="button" onClick={handleGenerateInvite} className="vora-button-secondary shrink-0">
-                                Generate code
-                            </button>
-                        )}
-                    </div>
-
-                    {inviteCode && (
-                        <div className="mt-5 p-5 border-2 border-dashed border-[var(--vora-accent-500)] bg-[var(--vora-accent-soft)] rounded-[var(--vora-radius-lg)] text-center max-w-md">
-                            <p className="text-xs uppercase tracking-widest font-semibold text-[var(--vora-accent-text)] mb-2">
-                                Expires in 30 minutes
-                            </p>
-                            <p className="text-5xl font-bold tracking-[0.4em] text-[var(--vora-accent-active)] mb-3 font-mono">{inviteCode}</p>
-                            <button
-                                type="button"
-                                onClick={() => setInviteCode(null)}
-                                className="text-xs font-semibold text-[var(--vora-accent-text)] hover:text-[var(--vora-accent-active)] cursor-pointer"
-                            >
-                                Clear
-                            </button>
-                        </div>
-                    )}
-                </section>
+                <SignUpCard serverId={serverId} invitationsPath={serverId ? `/admin/server/${serverId}/invitations` : '/admin/invitations'} />
 
                 <section className="space-y-4">
                     <div className="flex items-end justify-between">
@@ -222,6 +189,9 @@ export default function UserManagementPage() {
                     onClose={() => setEditingShowtimes(null)}
                     onSaved={async () => { setEditingShowtimes(null); await loadData(); }}
                 />
+            )}
+            {addingUser && (
+                <AddUserModal serverId={serverId} onClose={() => setAddingUser(false)} onCreated={() => { void loadData(); }} />
             )}
         </div>
     );
