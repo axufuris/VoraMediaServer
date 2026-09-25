@@ -137,7 +137,7 @@ public class FolderWatcherService : IFolderWatcherService
         // Honor the library's exclude filters here so excluded files (e.g. a
         // *.TDARR copy still transcoding) don't even queue a scan task — the
         // scanner would reject them anyway, but this keeps them off the task list.
-        if (MatchesExcludeFilter(Path.GetFileName(filePath), library.ExcludeFilters))
+        if (LibraryFileFilter.IsExcluded(filePath, library.ExcludeFilters))
         {
             _logger.LogInformation("Skipping excluded file {FilePath}.", filePath);
             return;
@@ -166,7 +166,7 @@ public class FolderWatcherService : IFolderWatcherService
 
         // Excluded files (e.g. *.TDARR temp copies) were never ingested, so a
         // deletion must not queue an orphan-cleanup task for them.
-        if (MatchesExcludeFilter(Path.GetFileName(filePath), library.ExcludeFilters)) return;
+        if (LibraryFileFilter.IsExcluded(filePath, library.ExcludeFilters)) return;
 
         var taskQueue = scope.ServiceProvider.GetRequiredService<ITaskQueueManager>();
         taskQueue.QueueRemoveOrphanedMedia(filePath);
@@ -200,19 +200,24 @@ public class FolderWatcherService : IFolderWatcherService
             var uningested = FindUningestedFiles(filesOnDisk, ingested, target.ExcludeFilters, target.Type);
             if (uningested.Count == 0) return;
 
+            // Named, so an admin can see from the log which files keep coming
+            // back. A file the scanner can't add - an unreadable tag, a folder
+            // only one side ignores - reappears here on every start.
+            var sample = string.Join(", ", uningested.Take(ReconcileLogSampleSize));
+
             if (ShouldQueueFullScan(ingested.Count, uningested.Count))
             {
                 _logger.LogInformation(
-                    "Watcher reconciliation for library {LibraryName} found {Count} un-ingested file(s); queueing one library scan rather than a task per file.",
-                    target.Name, uningested.Count);
+                    "Watcher reconciliation for library {LibraryName} found {Count} un-ingested file(s); queueing one library scan rather than a task per file. First {SampleSize}: {Sample}",
+                    target.Name, uningested.Count, Math.Min(uningested.Count, ReconcileLogSampleSize), sample);
 
                 taskQueue.QueueScanLibrary(libraryId, target.Name);
                 return;
             }
 
             _logger.LogInformation(
-                "Watcher reconciliation for library {LibraryName} found {Count} file(s) on disk that were never ingested; queueing them.",
-                target.Name, uningested.Count);
+                "Watcher reconciliation for library {LibraryName} found {Count} file(s) on disk that were never ingested; queueing them. First {SampleSize}: {Sample}",
+                target.Name, uningested.Count, Math.Min(uningested.Count, ReconcileLogSampleSize), sample);
 
             foreach (var filePath in uningested)
             {
@@ -248,6 +253,8 @@ public class FolderWatcherService : IFolderWatcherService
     // so is any backlog past the fan-out limit.
     internal const int ReconcileFanOutLimit = 50;
 
+    private const int ReconcileLogSampleSize = 10;
+
     internal static bool ShouldQueueFullScan(int ingestedCount, int uningestedCount) =>
         ingestedCount == 0 || uningestedCount > ReconcileFanOutLimit;
 
@@ -259,7 +266,7 @@ public class FolderWatcherService : IFolderWatcherService
         {
             if (!supported.Contains(Path.GetExtension(file).ToLowerInvariant())) continue;
             if (ingestedPaths.Contains(file)) continue;
-            if (MatchesExcludeFilter(Path.GetFileName(file), excludeFilters)) continue;
+            if (LibraryFileFilter.IsExcluded(file, excludeFilters)) continue;
             result.Add(file);
         }
         return result;
@@ -276,16 +283,16 @@ public class FolderWatcherService : IFolderWatcherService
 
     private sealed record WatchTarget(string Name, LibraryType Type, List<string> ExcludeFilters);
 
+    // The same filters the scanner applies, server-wide ignored folders
+    // included. Leaving those out is what made files in .recycle look new here
+    // on every start while the scanner kept skipping them.
     private static async Task<WatchTarget?> GetWatchTargetAsync(IServiceScope scope, Guid libraryId)
     {
         var libraryRepo = scope.ServiceProvider.GetRequiredService<ILibraryRepository>();
         var projected = await libraryRepo.GetProjectedByIdAsync(libraryId, l => new { l.Name, l.Type, l.ExcludeFilters });
-        return projected == null ? null : new WatchTarget(projected.Name, projected.Type, projected.ExcludeFilters);
-    }
+        if (projected == null) return null;
 
-    private static bool MatchesExcludeFilter(string fileName, IReadOnlyList<string>? excludeFilters)
-    {
-        return excludeFilters != null
-            && excludeFilters.Any(f => !string.IsNullOrWhiteSpace(f) && fileName.Contains(f.Trim(), StringComparison.OrdinalIgnoreCase));
+        var settings = await scope.ServiceProvider.GetRequiredService<ISystemSettingsRepository>().GetSettingsAsync();
+        return new WatchTarget(projected.Name, projected.Type, LibraryFileFilter.Combine(projected.ExcludeFilters, settings.ScanIgnoredFolders));
     }
 }

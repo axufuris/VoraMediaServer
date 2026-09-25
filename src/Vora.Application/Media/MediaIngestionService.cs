@@ -9,6 +9,7 @@ using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Enums;
+using Vora.Plugins;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -68,17 +69,8 @@ public class MediaIngestionService : IMediaIngestionService
         var row = await _libraryRepository.GetProjectedByIdAsync(libraryId, l => new { l.FolderPaths, l.ScannerRegex, l.ExcludeFilters });
         if (row == null) throw new InvalidOperationException($"Library {libraryId} not found.");
 
-        var excludeFilters = row.ExcludeFilters ?? new List<string>();
         var settings = await _settingsRepo.GetSettingsAsync();
-        var ignoredFolders = settings.ScanIgnoredFolders;
-        if (ignoredFolders.Count > 0)
-        {
-            excludeFilters = excludeFilters
-                .Concat(ignoredFolders)
-                .Where(f => !string.IsNullOrWhiteSpace(f))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
+        var excludeFilters = LibraryFileFilter.Combine(row.ExcludeFilters, settings.ScanIgnoredFolders);
 
         return (row.FolderPaths, row.ScannerRegex, excludeFilters);
     }
