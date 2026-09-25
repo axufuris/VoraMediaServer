@@ -60,4 +60,9 @@ describe('posterCaption', () => {
         const caption = posterCaption({ type: 'Playlist', title: 'Road Trip', itemCount: 12, mediaTypeLabel: 'Music', sharedByYou: true });
         expect(caption.lines).toEqual(['12 items · Music · Shared']);
     });
+
+    it('leads a song tile with the song, then the artist, then the album', () => {
+        expect(posterCaption({ type: 'Track', title: 'Feel So Close', artistName: 'Calvin Harris', albumTitle: '18 Months', releaseDate: '2012-10-26' }))
+            .toEqual({ title: 'Feel So Close', lines: ['Calvin Harris', '18 Months · 2012'] });
+    });
 });
