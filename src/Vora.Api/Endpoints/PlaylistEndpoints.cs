@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.Playlists;
 using Vora.Application.Playlists.ViewModels;
+using Vora.Application.Artwork;
 
 namespace Vora.Api.Endpoints;
 
@@ -53,6 +54,19 @@ public static class PlaylistEndpoints
         group.MapPost("/{id:guid}/copy", CopyAsync)
             .WithName("CopyPlaylist")
             .Produces<CreatePlaylistResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        // Owner only. A PNG, JPEG or WebP image up to 10 MB; removing it goes
+        // back to the mosaic built from the playlist's items.
+        group.MapPost("/{id:guid}/image", UploadImageAsync)
+            .WithName("UploadPlaylistImage")
+            .DisableAntiforgery()
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK)
+            .ProducesValidationProblem()
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapDelete("/{id:guid}/image", RemoveImageAsync)
+            .WithName("RemovePlaylistImage")
+            .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPut("/{id:guid}", UpdatePlaylistAsync);
@@ -131,6 +145,32 @@ public static class PlaylistEndpoints
         await manager.ReorderPlaylistAsync(id, RequireProfileId(user), req.PlaylistItemIds);
         return Results.NoContent();
     }
+
+    private const long MaxPlaylistImageBytes = 10 * 1024 * 1024;
+
+    private static async Task<IResult> UploadImageAsync(Guid id, IFormFile file, ClaimsPrincipal user, IPlaylistManager manager)
+    {
+        if (file == null || file.Length == 0) return InvalidImage("Choose an image to upload.");
+        if (file.Length > MaxPlaylistImageBytes) return InvalidImage("The image is larger than 10 MB.");
+
+        using var buffer = new MemoryStream();
+        await file.CopyToAsync(buffer);
+        var bytes = buffer.ToArray();
+
+        var ext = Vora.Application.FileSystem.ImageContentValidator.DetectImageExtension(bytes);
+        if (ext == null || ext.Equals(".gif", StringComparison.OrdinalIgnoreCase)) return InvalidImage("Use a PNG, JPEG or WebP image.");
+
+        var url = await manager.SetImageAsync(id, RequireProfileId(user), bytes);
+        return url == null ? Results.NotFound() : Results.Ok(new UploadedImageResponse { Url = url });
+    }
+
+    private static async Task<IResult> RemoveImageAsync(Guid id, ClaimsPrincipal user, IPlaylistManager manager) =>
+        await manager.RemoveImageAsync(id, RequireProfileId(user)) ? Results.NoContent() : Results.NotFound();
+
+    private static IResult InvalidImage(string message) => Results.ValidationProblem(new Dictionary<string, string[]>
+    {
+        ["file"] = new[] { message }
+    });
 
     private static async Task<IResult> DeletePlaylistAsync(Guid id, ClaimsPrincipal user, IPlaylistManager manager)
     {

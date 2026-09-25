@@ -413,6 +413,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMetadataManager, MetadataManager>();
         services.AddScoped<IMediaMatchManager, MediaMatchManager>();
         services.AddScoped<IPlaylistManager, PlaylistManager>();
+        services.AddSingleton<IPlaylistImageStore, PlaylistImageStore>();
         services.AddScoped<ISmartPlaylistManager, SmartPlaylistManager>();
         services.AddScoped<IPodcastManager, PodcastManager>();
         services.AddScoped<IPluginManager, PluginManager>();

@@ -350,6 +350,7 @@ export default function NowPlayingFullscreen() {
                             isOpen={true}
                             onClose={() => setAddToPlaylistOpen(false)}
                             mediaId={currentMedia.id}
+                            kind="music"
                             serverId={currentMedia.serverId ?? serverId}
                         />
                     )}

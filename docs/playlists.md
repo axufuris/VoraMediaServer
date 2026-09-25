@@ -22,6 +22,12 @@ User-curated, ordered list of `MediaItem`s via `PlaylistItem` rows (`PlaylistIte
 - Manager: `IPlaylistManager` — `CreatePlaylistAsync` takes a `PlaylistMediaType`.
 - Endpoint: `/api/playlists`.
 
+### Cover and page layout
+
+- **Cover**: `Playlist.ImageUrl`, uploaded by the owner via `POST /api/playlists/{id}/image` (PNG/JPEG/WebP ≤ 10 MB, saved by `PlaylistImageStore` beside the other custom artwork) and cleared by `DELETE /api/playlists/{id}/image`. Null means a mosaic: `PlaylistSummaryVM.PosterUrls` is up to four **different** item images in playlist order (the setter drops repeats). A copy shares its source's file, so a file is only deleted once no playlist points at it.
+- **Layout**: a playlist that is `Music`, or holds only tracks, renders `MusicPlaylistView` — square cover, the playlist's name as the title, Play / Shuffle, a numbered list that plays from the clicked song. No watched checkmarks, Unwatch All or View Details. Everything else keeps the film layout built around a selected item (View Details removed there too).
+- **Adding songs**: `AddToPlaylistButton` on every track row opens `AddToPlaylistModal` with `kind` (`music` → Music/Mixed playlists; `video` → Movies/Shows/Mixed), which can also create a new playlist with the item already in it.
+
 ## Smart playlist (`SmartPlaylist`)
 
 Rule-driven, evaluated live on view. No `PlaylistItem` rows — items are computed each time `/api/smart-playlists/{id}/items` is called.

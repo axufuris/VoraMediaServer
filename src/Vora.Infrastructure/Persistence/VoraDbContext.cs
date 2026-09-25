@@ -988,6 +988,7 @@ public class VoraDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.ImageUrl).HasMaxLength(1024);
             entity.Property(e => e.MediaType).HasConversion<int>().HasDefaultValue(PlaylistMediaType.Mixed).HasSentinel(PlaylistMediaType.Mixed);
 
             entity.HasOne(e => e.Profile)

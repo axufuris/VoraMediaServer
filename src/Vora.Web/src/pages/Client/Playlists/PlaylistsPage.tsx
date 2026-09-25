@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { playlistTileArt } from '../../../utils/playlistArt';
 import { useNavigate, useParams } from 'react-router-dom';
 import { playlistService, type PlaylistSummaryVM, type SharedPlaylistsVM } from '../../../api/Collections/playlistService';
 import { musicService, type GeneratedMixSummaryVM } from '../../../api/Music/musicService';
@@ -266,15 +267,7 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
                                     key={p.id}
                                     item={{ type: 'Playlist', title: p.name, itemCount: p.itemCount, mediaTypeLabel: p.mediaType !== 'Mixed' ? p.mediaType : null, sharedByYou: p.isShared }}
                                     shape="square"
-                                    // Prefer backdrops for the cinematic mosaic. Falls back to
-                                    // posters for playlists where items have no backdrop art
-                                    // (e.g. music tracks — albums never carry backgrounds).
-                                    mosaicUrls={p.backdropUrls && p.backdropUrls.length > 0 ? p.backdropUrls : p.posterUrls}
-                                    imageUrl={
-                                        p.backdropUrls && p.backdropUrls.length > 0
-                                            ? p.backdropUrls[0]
-                                            : (p.posterUrls && p.posterUrls.length > 0 ? p.posterUrls[0] : undefined)
-                                    }
+                                    {...playlistTileArt(p)}
                                     onClick={() => navigate(serverId ? `/server/${serverId}/playlist/${p.id}` : `/playlist/${p.id}`)}
                                     onDelete={(e) => handleDelete(e, p.id, p.name)}
                                     fill
@@ -426,12 +419,7 @@ function SharedPlaylists({ manual, smart, openManual, openSmart }: SharedPlaylis
                                 key={p.id}
                                 item={{ type: 'Playlist', title: p.name, itemCount: p.itemCount, mediaTypeLabel: p.mediaType !== 'Mixed' ? p.mediaType : null, ownerName: p.ownerName }}
                                 shape="square"
-                                mosaicUrls={p.backdropUrls && p.backdropUrls.length > 0 ? p.backdropUrls : p.posterUrls}
-                                imageUrl={
-                                    p.backdropUrls && p.backdropUrls.length > 0
-                                        ? p.backdropUrls[0]
-                                        : (p.posterUrls && p.posterUrls.length > 0 ? p.posterUrls[0] : undefined)
-                                }
+                                {...playlistTileArt(p)}
                                 onClick={() => openManual(p.id)}
                                 fill
                             />

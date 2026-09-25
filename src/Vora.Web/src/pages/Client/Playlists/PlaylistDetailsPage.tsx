@@ -13,12 +13,14 @@ import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBa
 import { StorageKeys } from '../../../utils/storageKeys';
 import { isAxiosError } from 'axios';
 import { PlaylistSharingControls, PlaylistUnavailable, SavedCopyBanner, type SavedCopyState } from './PlaylistSharing';
+import MusicPlaylistView from './MusicPlaylistView';
+import PlaylistCover from '../../../components/Collections/PlaylistCover';
 
 export default function PlaylistDetailsPage() {
     const dialog = useDialog();
     const { serverId, id } = useParams<{ serverId?: string, id: string }>();
     const navigate = useNavigate();
-    const { playMedia, playQueue } = usePlayer();
+    const { playMedia, playQueue, isShuffled, toggleShuffle } = usePlayer();
 
     const formatTrackDuration = (s?: number): string => {
         if (!s || s <= 0) return '';
@@ -36,6 +38,7 @@ export default function PlaylistDetailsPage() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editName, setEditName] = useState('');
     const [editDescription, setEditDescription] = useState('');
+    const [coverBusy, setCoverBusy] = useState(false);
 
     const loadPlaylist = useCallback(async () => {
         if (!id) return;
@@ -142,30 +145,35 @@ export default function PlaylistDetailsPage() {
         }
     };
 
-    const handleGoToDetails = (e: React.MouseEvent, mediaId: string) => {
-        e.stopPropagation();
-        navigate(serverId ? `/server/${serverId}/media/${mediaId}` : `/media/${mediaId}`);
+    // Plays the playlist's songs from one of them. Shuffle is the player's own
+    // mode, switched to match the button pressed so Play after Shuffle plays in
+    // order again.
+    const playTracks = (startIndex: number, shuffle: boolean) => {
+        if (!playlist) return;
+        const server = serverId ? serverVault.getServer(serverId) : serverVault.getActiveServer();
+        const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
+        const trackItems = playlist.items.filter(i => i.type === 'Track');
+        if (trackItems.length === 0) return;
+        const queue = trackItems.map(t => ({
+            id: t.mediaItemId,
+            title: t.title,
+            subtitle: t.artistName && t.albumTitle ? `${t.artistName} — ${t.albumTitle}` : (t.albumTitle ?? playlist.name),
+            posterUrl: t.albumArtworkUrl,
+            streamUrl: musicService.getTrackStreamUrl(t.mediaItemId, baseUrl, audioQualityStore.get()),
+            serverId: server?.id,
+            container: 'audio' as const,
+            playbackContextType: 'Music' as const
+        }));
+        if (shuffle !== isShuffled) toggleShuffle();
+        playQueue(queue, Math.max(0, Math.min(startIndex, queue.length - 1)));
     };
 
     const handlePlay = async () => {
         if (!selectedItem) return;
 
         if (selectedItem.type === 'Track' && playlist) {
-            const server = serverId ? serverVault.getServer(serverId) : serverVault.getActiveServer();
-            const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
             const trackItems = playlist.items.filter(i => i.type === 'Track');
-            const startIndex = Math.max(0, trackItems.findIndex(i => i.id === selectedItem.id));
-            const queue = trackItems.map(t => ({
-                id: t.mediaItemId,
-                title: t.title,
-                subtitle: t.artistName && t.albumTitle ? `${t.artistName} — ${t.albumTitle}` : (t.albumTitle ?? playlist.name),
-                posterUrl: t.albumArtworkUrl,
-                streamUrl: musicService.getTrackStreamUrl(t.mediaItemId, baseUrl, audioQualityStore.get()),
-                serverId: server?.id,
-                container: 'audio' as const,
-                playbackContextType: 'Music' as const
-            }));
-            playQueue(queue, startIndex);
+            playTracks(Math.max(0, trackItems.findIndex(i => i.id === selectedItem.id)), false);
             return;
         }
 
@@ -246,6 +254,34 @@ export default function PlaylistDetailsPage() {
         setIsEditModalOpen(true);
     };
 
+    const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || !playlist) return;
+        setCoverBusy(true);
+        try {
+            const url = await playlistService.uploadImage(playlist.id, file, serverId);
+            setPlaylist(prev => prev ? { ...prev, imageUrl: url } : prev);
+        } catch {
+            await dialog.alert('Could not use that image. Choose a PNG, JPEG or WebP image up to 10 MB.');
+        } finally {
+            setCoverBusy(false);
+        }
+    };
+
+    const handleCoverRemove = async () => {
+        if (!playlist) return;
+        setCoverBusy(true);
+        try {
+            await playlistService.removeImage(playlist.id, serverId);
+            setPlaylist(prev => prev ? { ...prev, imageUrl: null } : prev);
+        } catch {
+            await dialog.alert('Could not remove the cover.');
+        } finally {
+            setCoverBusy(false);
+        }
+    };
+
     const handleSaveEdit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!playlist || !editName.trim()) return;
@@ -258,6 +294,124 @@ export default function PlaylistDetailsPage() {
             await dialog.alert("Failed to update playlist.");
         }
     };
+
+    const headerActions = (
+        <div className="flex items-center gap-2">
+                                <PlaylistSharingControls
+                                    isOwner={playlist.isOwner}
+                                    isShared={playlist.isShared}
+                                    ownerName={playlist.ownerName}
+                                    onToggleShared={handleToggleShared}
+                                    onSaveCopy={handleSaveCopy}
+                                />
+                                {canEdit && (<>
+                                <button onClick={handleOpenEdit} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)] transition-colors" title="Edit Playlist">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                                <button onClick={handleDeletePlaylist} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] hover:bg-[var(--vora-bg-sunken)] transition-colors" title="Delete Playlist">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                                </>)}
+        </div>
+    );
+
+    // A playlist of songs gets the album-style layout. Mixed playlists that
+    // hold only songs count too; anything with a film or episode in it keeps
+    // the film layout, which is built around one selected item.
+    const isMusic = playlist.mediaType === 'Music'
+        || (playlist.items.length > 0 && playlist.items.every(i => i.type === 'Track'));
+
+    const editModal = isEditModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-2xl max-w-md w-full p-6">
+                <h2 className="text-2xl font-bold text-[var(--vora-text-primary)] mb-6">Edit Playlist</h2>
+
+                <div className="mb-5 flex items-center gap-4">
+                    <div className="w-24 shrink-0">
+                        <PlaylistCover imageUrl={playlist.imageUrl} posterUrls={playlist.posterUrls} shape={isMusic ? 'square' : 'poster'} className="shadow-none" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-2">
+                        <div className="text-sm font-bold text-[var(--vora-text-muted)]">Cover</div>
+                        <p className="text-xs text-[var(--vora-text-muted)]">
+                            {playlist.imageUrl ? 'Your own image.' : 'Made from the artwork of the first items.'}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            <label className={`vora-pill cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold ${coverBusy ? 'pointer-events-none opacity-60' : ''}`}>
+                                {coverBusy ? 'Saving…' : 'Upload image'}
+                                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleCoverUpload} disabled={coverBusy} />
+                            </label>
+                            {playlist.imageUrl && (
+                                <button type="button" onClick={handleCoverRemove} disabled={coverBusy} className="vora-pill cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-60">
+                                    Use the playlist's artwork
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <form onSubmit={handleSaveEdit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-bold text-[var(--vora-text-muted)] mb-2">Name</label>
+                        <input
+                            autoFocus
+                            required
+                            type="text"
+                            value={editName}
+                            onChange={e => setEditName(e.target.value)}
+                            className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-3 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)]"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-[var(--vora-text-muted)] mb-2">Description</label>
+                        <textarea
+                            value={editDescription}
+                            onChange={e => setEditDescription(e.target.value)}
+                            className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-3 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)] min-h-[100px] resize-none"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-[var(--vora-border-subtle)]">
+                        <button
+                            type="button"
+                            onClick={() => setIsEditModalOpen(false)}
+                            className="px-4 py-2 rounded text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-raised)] transition-colors cursor-pointer"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors cursor-pointer"
+                        >
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+
+    if (isMusic) {
+        return (
+            <div className="relative min-h-full pb-16">
+                <div className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 pt-8 sm:px-12">
+                    <SavedCopyBanner />
+                    <MusicPlaylistView
+                        playlist={playlist}
+                        canEdit={canEdit}
+                        headerActions={headerActions}
+                        onPlay={playTracks}
+                        onRemove={handleRemoveItem}
+                        draggedIndex={draggedIndex}
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                    />
+                </div>
+                {editModal}
+            </div>
+        );
+    }
 
     return (
         <div className="relative min-h-full pb-16">
@@ -300,23 +454,7 @@ export default function PlaylistDetailsPage() {
                                 </span>
                             </h2>
 
-                            <div className="flex items-center gap-2">
-                                <PlaylistSharingControls
-                                    isOwner={playlist.isOwner}
-                                    isShared={playlist.isShared}
-                                    ownerName={playlist.ownerName}
-                                    onToggleShared={handleToggleShared}
-                                    onSaveCopy={handleSaveCopy}
-                                />
-                                {canEdit && (<>
-                                <button onClick={handleOpenEdit} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)] transition-colors" title="Edit Playlist">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                </button>
-                                <button onClick={handleDeletePlaylist} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] hover:bg-[var(--vora-bg-sunken)] transition-colors" title="Delete Playlist">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
-                                </>)}
-                            </div>
+                            {headerActions}
                         </div>
 
                         {playlist.description && (
@@ -367,13 +505,6 @@ export default function PlaylistDetailsPage() {
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={selectedItem.isPlayed ? 3 : 2} d="M5 13l4 4L19 7" opacity={selectedItem.isPlayed ? 1 : 0.4} />
                                     </svg>
-                                </button>
-                                <button
-                                    onClick={(e) => handleGoToDetails(e, selectedItem.mediaItemId)}
-                                    className="p-2.5 rounded-full text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)] hover:text-[var(--vora-text-primary)] transition-colors border border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-subtle)] cursor-pointer shrink-0"
-                                    title="View Details"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 </button>
                                 <button
                                     onClick={handleMarkAllUnwatched}
@@ -464,15 +595,6 @@ export default function PlaylistDetailsPage() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={item.isPlayed ? 3 : 2} d="M5 13l4 4L19 7" />
                                         </svg>
                                     </button>
-                                    <button
-                                        onClick={(e) => handleGoToDetails(e, item.mediaItemId)}
-                                        className="p-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer"
-                                        title="View Details"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </button>
                                     {canEdit && (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id); }}
@@ -491,52 +613,7 @@ export default function PlaylistDetailsPage() {
                 </div>
             </div>
 
-            {isEditModalOpen && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-2xl max-w-md w-full p-6">
-                        <h2 className="text-2xl font-bold text-[var(--vora-text-primary)] mb-6">Edit Playlist</h2>
-
-                        <form onSubmit={handleSaveEdit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-[var(--vora-text-muted)] mb-2">Name</label>
-                                <input
-                                    autoFocus
-                                    required
-                                    type="text"
-                                    value={editName}
-                                    onChange={e => setEditName(e.target.value)}
-                                    className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-3 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)]"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-[var(--vora-text-muted)] mb-2">Description</label>
-                                <textarea
-                                    value={editDescription}
-                                    onChange={e => setEditDescription(e.target.value)}
-                                    className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-3 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)] min-h-[100px] resize-none"
-                                />
-                            </div>
-
-                            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-[var(--vora-border-subtle)]">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEditModalOpen(false)}
-                                    className="px-4 py-2 rounded text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-raised)] transition-colors cursor-pointer"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors cursor-pointer"
-                                >
-                                    Save Changes
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            {editModal}
         </div>
     );
 }

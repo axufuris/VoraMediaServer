@@ -1,4 +1,5 @@
 import { type AlbumVM, type TrackVM, type RadioSeed } from '../../../../api/Music/musicService';
+import AddToPlaylistButton from '../../../../components/Collections/AddToPlaylistButton';
 import LastFmMark from '../../../../components/Media/LastFmMark';
 import ContentRatingBadge from '../../../../components/Media/ContentRatingBadge';
 import { hasExplicitTrack } from '../../../../utils/musicContentRating';
@@ -255,6 +256,7 @@ export default function MusicAlbumView({
                                                 </>
                                             )}
                                         </div>
+                                        <AddToPlaylistButton mediaId={track.id} title={track.title} />
                                         <div className="text-xs text-[var(--vora-text-muted)] shrink-0 tabular-nums">{formatDuration(track.durationSeconds)}</div>
                                         {isServerAdmin && (
                                             <button

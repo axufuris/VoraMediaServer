@@ -26,11 +26,23 @@ public interface IPlaylistRepository
     Task UpdatePlaylistDetailsAsync(Guid id, Guid profileId, string name, string? description);
 
     Task RemovePlaylistItemAsync(Guid playlistId, Guid profileId, Guid playlistItemId);
-    Task DeletePlaylistAsync(Guid playlistId, Guid profileId);
+    Task<PlaylistDeletion> DeletePlaylistAsync(Guid playlistId, Guid profileId);
+    Task<PlaylistImageChange> SetImageAsync(Guid playlistId, Guid ownerProfileId, string? imageUrl);
+    Task<bool> IsImageInUseAsync(string imageUrl);
     Task RemoveMediaFromPlaylistAsync(Guid playlistId, Guid profileId, Guid mediaItemId);
 
     Task<List<Guid>> GetPlaylistMediaIdsAsync(Guid playlistId, Guid profileId);
     Task<List<Guid>?> GetVisiblePlaylistMediaIdsAsync(Guid playlistId, Guid viewerProfileId, PlaylistAccessFilter access);
     Task MarkItemsUnplayedAsync(Guid profileId, List<Guid> mediaIds);
     Task<List<Guid>> GetPlaylistsContainingItemAsync(Guid profileId, Guid mediaItemId);
+}
+
+public sealed record PlaylistDeletion(bool Found, string? ImageUrl)
+{
+    public static PlaylistDeletion NotFound { get; } = new(false, null);
+}
+
+public sealed record PlaylistImageChange(bool Found, string? PreviousImageUrl)
+{
+    public static PlaylistImageChange NotFound { get; } = new(false, null);
 }
