@@ -119,10 +119,13 @@ export function posterCaption(item: PosterCaptionItem): PosterCaption {
                 title: item.artistName || item.title,
                 lines: [item.albumTitle || item.title, year].filter((l): l is string => !!l),
             };
+        // The song leads. It used to be the artist, with the song last in the
+        // faintest line, so a row of one artist's songs read as the same name
+        // over and over, and three songs from one album looked identical.
         case 'Track':
             return {
-                title: item.artistName || item.title,
-                lines: [dotJoin([year, item.albumTitle]), item.title].filter((l): l is string => !!l),
+                title: item.title,
+                lines: [item.artistName, dotJoin([item.albumTitle, year])].filter((l): l is string => !!l),
             };
         default:
             return { title: item.title, lines: [year].filter((l): l is string => !!l) };
