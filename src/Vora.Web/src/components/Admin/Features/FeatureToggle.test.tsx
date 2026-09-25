@@ -41,6 +41,14 @@ const renderToggle = (props: Partial<React.ComponentProps<typeof FeatureToggle>>
     />,
 );
 
+// The switch is disabled until the flags arrive, and the defaults already
+// read as on — so waiting for "on" alone passes before loading finishes, and
+// a click then lands on a disabled button and saves nothing.
+const loaded = async () => {
+    await waitFor(() => expect(screen.getByRole('button')).toBeEnabled());
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true');
+};
+
 describe('FeatureToggle', () => {
     beforeEach(() => {
         mocks.getFeatureFlags.mockReset();
@@ -56,7 +64,7 @@ describe('FeatureToggle', () => {
 
         renderToggle();
 
-        await waitFor(() => expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true'));
+        await loaded();
     });
 
     it('says why an enabled feature still will not reach clients', async () => {
@@ -72,7 +80,7 @@ describe('FeatureToggle', () => {
 
         renderToggle();
 
-        await waitFor(() => expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true'));
+        await loaded();
         expect(screen.queryByText('No Live TV source configured')).toBeNull();
     });
 
@@ -81,7 +89,7 @@ describe('FeatureToggle', () => {
 
         renderToggle({ featureKey: 'podcasts', unavailableHint: undefined });
 
-        await waitFor(() => expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true'));
+        await loaded();
     });
 
     // The save sends the whole flag set back. If it sent the derived value, an
@@ -91,7 +99,7 @@ describe('FeatureToggle', () => {
         mocks.getFeatureFlags.mockResolvedValue(onButUnconfigured);
 
         renderToggle();
-        await waitFor(() => expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true'));
+        await loaded();
         fireEvent.click(screen.getByRole('button'));
 
         await waitFor(() => expect(mocks.updateFeatureFlags).toHaveBeenCalled());
@@ -104,7 +112,7 @@ describe('FeatureToggle', () => {
         mocks.getFeatureFlags.mockResolvedValue(onButUnconfigured);
 
         renderToggle({ featureKey: 'internetRadio', unavailableHint: 'No radio source configured' });
-        await waitFor(() => expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true'));
+        await loaded();
         fireEvent.click(screen.getByRole('button'));
 
         await waitFor(() => expect(mocks.updateFeatureFlags).toHaveBeenCalled());
