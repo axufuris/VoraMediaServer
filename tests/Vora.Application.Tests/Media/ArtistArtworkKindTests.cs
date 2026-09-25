@@ -19,6 +19,7 @@ public class ArtistArtworkKindTests : IDisposable
     private readonly string _artworkDir;
     private readonly IMusicRepository _repository = Substitute.For<IMusicRepository>();
     private readonly IMusicArtworkProvider _provider = Substitute.For<IMusicArtworkProvider>();
+    private readonly IClientNotifier _notifier = Substitute.For<IClientNotifier>();
     private readonly MusicManager _manager;
 
     public ArtistArtworkKindTests()
@@ -32,7 +33,7 @@ public class ArtistArtworkKindTests : IDisposable
             new[] { _provider },
             Array.Empty<ILyricsProvider>(),
             Array.Empty<IListeningDataProvider>(),
-            Substitute.For<IClientNotifier>(),
+            _notifier,
             Options.Create(new StoragePathsOptions { CustomArtwork = _artworkDir }),
             new NullTaskProgressReporter(),
             NullLogger<MusicManager>.Instance);
@@ -147,14 +148,20 @@ public class ArtistArtworkKindTests : IDisposable
         await _repository.Received(1).UpdateArtistAsync(artist);
     }
 
+    // Nothing matched, so no image changes and clients aren't told to refetch.
+    // The artist is still saved, to stamp that the providers were asked, or the
+    // next scan would ask about it again.
     [Fact]
-    public async Task Does_not_save_when_nothing_matched()
+    public async Task Changes_no_artwork_when_nothing_matched_but_records_the_check()
     {
         var artist = GivenArtist(NewArtist(), Art("bg.jpg", MusicArtworkKind.Background));
         artist.BackgroundUrl = "already.jpg";
 
         await _manager.RefreshArtistArtworkFromProvidersAsync(artist.Id, force: false, CancellationToken.None);
 
-        await _repository.DidNotReceive().UpdateArtistAsync(Arg.Any<Artist>());
+        artist.BackgroundUrl.Should().Be("already.jpg");
+        artist.BannerUrl.Should().BeNull();
+        artist.ArtworkCheckedAt.Should().NotBeNull();
+        await _notifier.DidNotReceive().NotifyMusicArtistUpdatedAsync(Arg.Any<Guid>());
     }
 }

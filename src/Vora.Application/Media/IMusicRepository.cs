@@ -36,8 +36,8 @@ public interface IMusicRepository
     Task UpdateAlbumAsync(Album album);
 
     Task<List<Artist>> GetArtistsAsync(Guid? libraryId, MusicAccessFilter access, int? limit = null);
-    Task<List<Guid>> GetArtistIdsForArtworkRefreshAsync(Guid libraryId, bool force);
-    Task<List<Guid>> GetAlbumIdsForArtworkRefreshAsync(Guid libraryId, bool force);
+    Task<List<Guid>> GetArtistIdsForArtworkRefreshAsync(Guid libraryId, bool force, DateTime checkedBefore);
+    Task<List<Guid>> GetAlbumIdsForArtworkRefreshAsync(Guid libraryId, bool force, DateTime checkedBefore);
     Task<List<Album>> GetAlbumsForArtistAsync(Guid artistId, MusicAccessFilter access);
     Task<Artist?> GetArtistByIdAsync(Guid artistId, MusicAccessFilter access);
     Task<Album?> GetAlbumByIdAsync(Guid albumId, MusicAccessFilter access);

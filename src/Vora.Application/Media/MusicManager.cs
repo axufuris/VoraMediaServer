@@ -86,6 +86,11 @@ public class MusicManager : IMusicManager
 
     private const string MusicArtworkUrlPrefix = "/api/artwork/custom/";
 
+    // How long before the providers are asked again about artwork they didn't
+    // have. New artists and albums have never been asked, so they are looked up
+    // on the scan that adds them.
+    public static readonly TimeSpan ArtworkRetryAfter = TimeSpan.FromDays(30);
+
     private readonly IMusicRepository _repository;
     private readonly IUserRepository _userRepository;
     private readonly IUserMediaStateRepository _userMediaStateRepository;
@@ -507,8 +512,9 @@ public class MusicManager : IMusicManager
     // filled ArtworkUrl never asked a provider for a background, banner or logo.
     public async Task RefreshLibraryArtworkFromProvidersAsync(Guid libraryId, bool force, CancellationToken cancellationToken)
     {
-        var artistIds = await _repository.GetArtistIdsForArtworkRefreshAsync(libraryId, force);
-        var albumIds = await _repository.GetAlbumIdsForArtworkRefreshAsync(libraryId, force);
+        var checkedBefore = DateTime.UtcNow - ArtworkRetryAfter;
+        var artistIds = await _repository.GetArtistIdsForArtworkRefreshAsync(libraryId, force, checkedBefore);
+        var albumIds = await _repository.GetAlbumIdsForArtworkRefreshAsync(libraryId, force, checkedBefore);
 
         var total = artistIds.Count + albumIds.Count;
         if (total == 0) return;
@@ -574,14 +580,17 @@ public class MusicManager : IMusicManager
             .Where(slot => force || string.IsNullOrEmpty(slot.Get()))
             .ToList();
 
-        if (fillable.Count == 0) return artist.ArtworkUrl;
+        // Stamped whatever the outcome, so an artist the providers have nothing
+        // more for isn't asked again until ArtworkRetryAfter has passed.
+        artist.ArtworkCheckedAt = DateTime.UtcNow;
+
+        if (fillable.Count == 0)
+        {
+            await _repository.UpdateArtistAsync(artist);
+            return artist.ArtworkUrl;
+        }
 
         var suggestions = await GetArtistArtworkSuggestionsAsync(artistId, cancellationToken);
-        if (suggestions.Count == 0)
-        {
-            _logger.LogInformation("No artwork suggestions available for artist {Artist}", artist.Name);
-            return null;
-        }
 
         var applied = 0;
         foreach (var slot in fillable)
@@ -592,9 +601,14 @@ public class MusicManager : IMusicManager
             applied++;
         }
 
-        if (applied == 0) return null;
-
         await _repository.UpdateArtistAsync(artist);
+
+        if (applied == 0)
+        {
+            if (suggestions.Count == 0) _logger.LogInformation("No artwork suggestions available for artist {Artist}", artist.Name);
+            return null;
+        }
+
         await _notifier.NotifyMusicArtistUpdatedAsync(artistId);
         _logger.LogInformation("Applied {Count} artwork image(s) for artist {Artist}", applied, artist.Name);
         return artist.ArtworkUrl;
@@ -617,14 +631,15 @@ public class MusicManager : IMusicManager
             .Where(slot => force || string.IsNullOrEmpty(slot.Get()))
             .ToList();
 
-        if (fillable.Count == 0) return album.ArtworkUrl;
+        album.ArtworkCheckedAt = DateTime.UtcNow;
+
+        if (fillable.Count == 0)
+        {
+            await _repository.UpdateAlbumAsync(album);
+            return album.ArtworkUrl;
+        }
 
         var suggestions = await GetAlbumArtworkSuggestionsAsync(albumId, cancellationToken);
-        if (suggestions.Count == 0)
-        {
-            _logger.LogInformation("No artwork suggestions available for album {Album}", album.Title);
-            return null;
-        }
 
         var applied = 0;
         foreach (var slot in fillable)
@@ -635,9 +650,14 @@ public class MusicManager : IMusicManager
             applied++;
         }
 
-        if (applied == 0) return null;
-
         await _repository.UpdateAlbumAsync(album);
+
+        if (applied == 0)
+        {
+            if (suggestions.Count == 0) _logger.LogInformation("No artwork suggestions available for album {Album}", album.Title);
+            return null;
+        }
+
         await _notifier.NotifyMusicAlbumUpdatedAsync(albumId);
         _logger.LogInformation("Applied {Count} artwork image(s) for album {Album}", applied, album.Title);
         return album.ArtworkUrl;
