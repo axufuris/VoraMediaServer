@@ -322,6 +322,8 @@ export default function CreateLibrary() {
                         {showVideoOptions && <Checkbox checked={library.findExtras} onChange={v => handleChange('findExtras', v)} label="Find extras" />}
                         {showVideoOptions && <Checkbox checked={library.onlyShowTrailers} onChange={v => handleChange('onlyShowTrailers', v)} label="Only show trailers" />}
                         {showVideoPreviewThumbnails && <Checkbox checked={library.enableVideoPreviewThumbnails} onChange={v => handleChange('enableVideoPreviewThumbnails', v)} label="Enable video preview thumbnails" />}
+                        {isTvShow && <Checkbox checked={library.useSeasonTitles} onChange={v => handleChange('useSeasonTitles', v)} label="Use season titles" />}
+                        {isTvShow && <Checkbox checked={library.enableIntroDetection} onChange={v => handleChange('enableIntroDetection', v)} label="Enable intro detection" />}
                         {showVideoOptions && <Checkbox checked={library.enableCreditsDetection} onChange={v => handleChange('enableCreditsDetection', v)} label="Enable credits detection" />}
                         {isTvShow && <Checkbox checked={library.enablePreviewDetection} onChange={v => handleChange('enablePreviewDetection', v)} label="Enable next-episode preview skips" />}
                     </div>
@@ -383,11 +385,6 @@ export default function CreateLibrary() {
                                         <option value={2}>Hide</option>
                                     </select>
                                 </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <Checkbox checked={library.useSeasonTitles} onChange={v => handleChange('useSeasonTitles', v)} label="Use season titles" />
-                                <Checkbox checked={library.enableIntroDetection} onChange={v => handleChange('enableIntroDetection', v)} label="Enable intro detection" />
                             </div>
                         </>
                     )}
