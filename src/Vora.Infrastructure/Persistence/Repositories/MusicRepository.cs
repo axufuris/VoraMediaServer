@@ -66,30 +66,36 @@ public class MusicRepository : IMusicRepository
     // Pre-filter so a non-forced refresh does not pay a provider round trip for
     // an artist whose slots are all filled. The per-slot lock and force rules
     // still live in MusicManager; this only avoids loading the hopeless cases.
-    public async Task<List<Guid>> GetArtistIdsForArtworkRefreshAsync(Guid libraryId, bool force)
+    // Missing something AND not asked recently. Missing alone matched nearly
+    // every artist on every scan, since most have no banner or logo anywhere.
+    public async Task<List<Guid>> GetArtistIdsForArtworkRefreshAsync(Guid libraryId, bool force, DateTime checkedBefore)
     {
         var query = _context.Set<Artist>().AsNoTracking().Where(a => a.LibraryId == libraryId);
 
         if (!force)
         {
-            query = query.Where(a => a.ArtworkUrl == null
-                || a.BackgroundUrl == null
-                || a.BannerUrl == null
-                || a.ClearLogoUrl == null);
+            query = query.Where(a => (a.ArtworkUrl == null
+                    || a.BackgroundUrl == null
+                    || a.BannerUrl == null
+                    || a.ClearLogoUrl == null)
+                && (a.ArtworkCheckedAt == null || a.ArtworkCheckedAt < checkedBefore));
         }
 
         return await query.OrderBy(a => a.Name).Select(a => a.Id).ToListAsync();
     }
 
-    public async Task<List<Guid>> GetAlbumIdsForArtworkRefreshAsync(Guid libraryId, bool force)
+    // As for artists. No provider has album backgrounds, so "missing" alone
+    // matched every album on every scan.
+    public async Task<List<Guid>> GetAlbumIdsForArtworkRefreshAsync(Guid libraryId, bool force, DateTime checkedBefore)
     {
         var query = _context.Set<Album>().AsNoTracking().Where(a => a.LibraryId == libraryId);
 
         if (!force)
         {
-            query = query.Where(a => a.ArtworkUrl == null
-                || a.BackgroundUrl == null
-                || a.DiscArtUrl == null);
+            query = query.Where(a => (a.ArtworkUrl == null
+                    || a.BackgroundUrl == null
+                    || a.DiscArtUrl == null)
+                && (a.ArtworkCheckedAt == null || a.ArtworkCheckedAt < checkedBefore));
         }
 
         return await query.OrderBy(a => a.Title).Select(a => a.Id).ToListAsync();

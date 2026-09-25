@@ -39,8 +39,8 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
             new NullTaskProgressReporter(),
             NullLogger<MusicManager>.Instance);
 
-        _repository.GetArtistIdsForArtworkRefreshAsync(Arg.Any<Guid>(), Arg.Any<bool>()).Returns(new List<Guid>());
-        _repository.GetAlbumIdsForArtworkRefreshAsync(Arg.Any<Guid>(), Arg.Any<bool>()).Returns(new List<Guid>());
+        _repository.GetArtistIdsForArtworkRefreshAsync(Arg.Any<Guid>(), Arg.Any<bool>(), Arg.Any<DateTime>()).Returns(new List<Guid>());
+        _repository.GetAlbumIdsForArtworkRefreshAsync(Arg.Any<Guid>(), Arg.Any<bool>(), Arg.Any<DateTime>()).Returns(new List<Guid>());
     }
 
     public void Dispose()
@@ -51,7 +51,7 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
     private Artist GivenArtist(params MusicArtworkResult[] results)
     {
         var artist = new Artist { Id = Guid.NewGuid(), Name = "311", ArtworkUrl = "existing.jpg" };
-        _repository.GetArtistIdsForArtworkRefreshAsync(_libraryId, Arg.Any<bool>()).Returns(new List<Guid> { artist.Id });
+        _repository.GetArtistIdsForArtworkRefreshAsync(_libraryId, Arg.Any<bool>(), Arg.Any<DateTime>()).Returns(new List<Guid> { artist.Id });
         _repository.GetArtistForUpdateAsync(artist.Id).Returns(artist);
         _repository.GetArtistByIdAsync(artist.Id, Arg.Any<MusicAccessFilter>()).Returns(artist);
         _provider.SearchArtistArtworkAsync(artist.Name, Arg.Any<CancellationToken>()).Returns(results);
@@ -81,8 +81,45 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
     {
         await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, TestContext.Current.CancellationToken);
 
-        await _repository.Received(1).GetArtistIdsForArtworkRefreshAsync(_libraryId, false);
-        await _repository.Received(1).GetAlbumIdsForArtworkRefreshAsync(_libraryId, false);
+        await _repository.Received(1).GetArtistIdsForArtworkRefreshAsync(_libraryId, false, Arg.Any<DateTime>());
+        await _repository.Received(1).GetAlbumIdsForArtworkRefreshAsync(_libraryId, false, Arg.Any<DateTime>());
+    }
+
+    // Some artwork never exists - no provider has album backgrounds, and most
+    // artists have no banner. Without a stamp, every scan asked again.
+    [Fact]
+    public async Task Only_items_not_asked_in_the_last_thirty_days_are_asked_again()
+    {
+        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, TestContext.Current.CancellationToken);
+
+        var expected = DateTime.UtcNow - MusicManager.ArtworkRetryAfter;
+        await _repository.Received(1).GetArtistIdsForArtworkRefreshAsync(_libraryId, false,
+            Arg.Is<DateTime>(d => (d - expected).Duration() < TimeSpan.FromMinutes(1)));
+        MusicManager.ArtworkRetryAfter.Should().Be(TimeSpan.FromDays(30));
+    }
+
+    [Fact]
+    public async Task An_artist_the_providers_have_nothing_for_is_still_stamped_as_asked()
+    {
+        var artist = GivenArtist();
+
+        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, TestContext.Current.CancellationToken);
+
+        artist.ArtworkCheckedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        await _repository.Received().UpdateArtistAsync(artist);
+    }
+
+    [Fact]
+    public async Task An_album_the_providers_have_nothing_for_is_still_stamped_as_asked()
+    {
+        var album = new Album { Id = Guid.NewGuid(), Title = "Grassroots", ArtworkUrl = "cover.jpg", Artist = new Artist { Name = "311" } };
+        _repository.GetAlbumIdsForArtworkRefreshAsync(_libraryId, Arg.Any<bool>(), Arg.Any<DateTime>()).Returns(new List<Guid> { album.Id });
+        _repository.GetAlbumForUpdateAsync(album.Id).Returns(album);
+
+        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, TestContext.Current.CancellationToken);
+
+        album.ArtworkCheckedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        await _repository.Received().UpdateAlbumAsync(album);
     }
 
     [Fact]
@@ -90,8 +127,8 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
     {
         await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: true, TestContext.Current.CancellationToken);
 
-        await _repository.Received(1).GetArtistIdsForArtworkRefreshAsync(_libraryId, true);
-        await _repository.Received(1).GetAlbumIdsForArtworkRefreshAsync(_libraryId, true);
+        await _repository.Received(1).GetArtistIdsForArtworkRefreshAsync(_libraryId, true, Arg.Any<DateTime>());
+        await _repository.Received(1).GetAlbumIdsForArtworkRefreshAsync(_libraryId, true, Arg.Any<DateTime>());
     }
 
     // One artist whose provider lookup throws must not cost the library the rest.
@@ -101,7 +138,7 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
         var failing = new Artist { Id = Guid.NewGuid(), Name = "Broken" };
         var ok = new Artist { Id = Guid.NewGuid(), Name = "Fine" };
 
-        _repository.GetArtistIdsForArtworkRefreshAsync(_libraryId, Arg.Any<bool>())
+        _repository.GetArtistIdsForArtworkRefreshAsync(_libraryId, Arg.Any<bool>(), Arg.Any<DateTime>())
             .Returns(new List<Guid> { failing.Id, ok.Id });
         _repository.GetArtistForUpdateAsync(failing.Id).Returns<Artist?>(_ => throw new InvalidOperationException("boom"));
         _repository.GetArtistForUpdateAsync(ok.Id).Returns(ok);

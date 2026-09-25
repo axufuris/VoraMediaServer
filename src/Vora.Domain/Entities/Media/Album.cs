@@ -32,6 +32,12 @@ public class Album : LockableEntity
     // no listener count, so a listeners column here would never be filled.
     public long? GlobalPlays { get; set; }
 
+    // When the artwork providers were last asked about this, whether or not they
+    // had anything. Some artwork is missing for good - no provider has album
+    // backgrounds, and most artists have no banner or logo - so without this
+    // every scan asked again about nearly the whole library.
+    public DateTime? ArtworkCheckedAt { get; set; }
+
     public Guid ArtistId { get; set; }
     public virtual Artist Artist { get; set; } = null!;
 

@@ -166,7 +166,7 @@ Each `MediaPart` carries its own `Edition` (Director's Cut, IMAX, …), parsed f
 
 ### Artwork refresh only fetches what's missing
 
-A **non-force** library artwork refresh (`MetadataManager.TriggerLibraryArtworkRefreshAsync`) now fetches only items missing a poster (`GetMediaIdsMissingArtworkAsync`, `PosterUrl == null`) instead of re-hitting every item. Force still refetches everything.
+A **non-force** library artwork refresh (`MetadataManager.TriggerLibraryArtworkRefreshAsync`) now fetches only items missing a poster (`GetMediaIdsMissingArtworkAsync`, `PosterUrl == null`) instead of re-hitting every item. Force still refetches everything. **Music** (`MusicManager.RefreshLibraryArtworkFromProvidersAsync`, run after every music scan) asks about an artist or album only when it is missing a slot **and** `ArtworkCheckedAt` is null or older than `MusicManager.ArtworkRetryAfter` (30 days). The stamp is written after every attempt, found or not, because some slots are never fillable: no provider has album backgrounds, and most artists have no banner or logo. Without it, every scan re-asked about nearly the whole library. New items have no stamp, so they're looked up on the scan that adds them; force ignores the window.
 
 ## Soft-delete & Media Trash
 
