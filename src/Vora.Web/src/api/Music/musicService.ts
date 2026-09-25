@@ -60,6 +60,10 @@ export interface RecordPlayResponse {
     outcome: RecordPlayOutcome;
 }
 
+// Where a track's Clean / Explicit came from. Manual means set by an admin and
+// locked, so rescans and the provider lookup leave it alone.
+export type MusicContentRatingSource = 'None' | 'FileTag' | 'Provider' | 'Manual';
+
 export interface TrackVM {
     id: string;
     title: string;
@@ -69,6 +73,7 @@ export interface TrackVM {
     discNumber?: number;
     durationSeconds?: number;
     contentRating?: string;
+    contentRatingSource?: MusicContentRatingSource;
     albumId?: string;
     isLiked: boolean;
     serverAdminRating?: number;
@@ -438,6 +443,11 @@ export const musicService = {
 
     updateTrack: async (trackId: string, request: UpdateTrackRequest, serverId?: string): Promise<void> => {
         await apiClient.put(`/music/tracks/${trackId}`, request, { serverId });
+    },
+
+    // Sets and locks the rating on every track of the album. null for none.
+    setAlbumContentRating: async (albumId: string, contentRating: 'Explicit' | 'Clean' | null, serverId?: string): Promise<void> => {
+        await apiClient.put(`/music/albums/${albumId}/content-rating`, { contentRating }, { serverId });
     },
 
     uploadArtistArtwork: async (artistId: string, file: File, serverId?: string): Promise<string> => {

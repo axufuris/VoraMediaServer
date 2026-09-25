@@ -27,6 +27,7 @@ public interface IMusicManager
     Task<bool> UpdateArtistAsync(Guid artistId, UpdateArtistRequest request);
     Task<bool> UpdateAlbumAsync(Guid albumId, UpdateAlbumRequest request);
     Task<bool> UpdateTrackAsync(Guid trackId, UpdateTrackRequest request);
+    Task<bool> SetAlbumContentRatingAsync(Guid albumId, string? rating);
 
     Task<string?> SaveArtistArtworkAsync(Guid artistId, byte[] bytes, string? fileName);
     Task<string?> SaveAlbumArtworkAsync(Guid albumId, byte[] bytes, string? fileName);
@@ -305,10 +306,36 @@ public class MusicManager : IMusicManager
         if (!track.IsLocked(nameof(track.SortTitle))) track.SortTitle = request.SortTitle;
         if (!track.IsLocked(nameof(track.TrackNumber))) track.TrackNumber = request.TrackNumber;
         if (!track.IsLocked(nameof(track.DiscNumber))) track.DiscNumber = request.DiscNumber;
-        if (!track.IsLocked(nameof(track.ContentRating))) track.ContentRating = string.IsNullOrWhiteSpace(request.ContentRating) ? null : request.ContentRating.Trim();
+        // Not gated on the lock like the fields above: the lock keeps the scanner
+        // and the provider off a hand-set rating, and this IS a hand edit. An
+        // admin choosing a different rating means it; one who only unlocks it
+        // hands it back to the file tag and the provider.
+        string? rating = null;
+        var ratingChanged = MusicContentRating.TryNormalize(request.ContentRating, out rating)
+            && rating != track.ContentRating;
 
         track.LockedFields = request.LockedFields ?? new List<string>();
+        if (ratingChanged)
+        {
+            MusicContentRating.SetByHand(track, rating);
+        }
+
         await _repository.UpdateTrackAsync(track);
+        return true;
+    }
+
+    // Every track on the album at once, each locked like a single hand edit.
+    public async Task<bool> SetAlbumContentRatingAsync(Guid albumId, string? rating)
+    {
+        var tracks = await _repository.GetAlbumTracksForUpdateAsync(albumId);
+        if (tracks.Count == 0) return false;
+
+        foreach (var track in tracks)
+        {
+            MusicContentRating.SetByHand(track, rating);
+        }
+
+        await _repository.SaveMusicChangesAsync(CancellationToken.None);
         return true;
     }
 
@@ -1065,6 +1092,7 @@ public class MusicManager : IMusicManager
         DiscNumber = t.DiscNumber,
         DurationSeconds = t.DurationSeconds,
         ContentRating = t.ContentRating,
+        ContentRatingSource = MusicContentRating.SourceOf(t),
         AlbumId = t.AlbumId,
         ServerAdminRating = t.ServerAdminRating,
         GlobalListeners = t.GlobalListeners,

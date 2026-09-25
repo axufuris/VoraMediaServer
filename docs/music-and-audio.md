@@ -30,6 +30,8 @@ Endpoints build it via `AuthExtensions.GetMusicAccessFilter()`. Every music quer
    - A track with an **ISRC** (`Track.Isrc`, read from the file) is looked up exactly — explicit and clean edits have different ISRCs.
    - Otherwise, every edition of the album is fetched and `MusicEditionMatcher` takes the **strictest** answer: Clean only if every matching edition says Clean. Deezer carries both editions of e.g. *The Eminem Show* with near-identical durations, so an untagged file can't be told apart — erring to Explicit is the safe direction.
    - Every asked track is stamped `ContentRatingCheckedAt`; an unanswered one is asked again after 90 days. A provider that stops answering ends the run.
+3. **By hand** (admin): the track edit modal offers Explicit / Clean / None only (`MusicContentRating.TryNormalize`; anything else is a 400, since the music allowlist knows no other value). A changed rating is **locked**, including a change to None, so neither a rescan nor the provider undoes it. The lock doesn't block the admin's own next edit. Unlocking without changing the value hands it back to tags and the provider. `PUT /api/music/albums/{id}/content-rating` sets and locks every track of an album.
+   - `TrackVM.contentRatingSource` is `None | FileTag | Provider | Manual`, and the edit modal says which. Clients show `ContentRatingBadge` ("E" / "C") in every track list and an "E" on the album header when any track is explicit.
 
 ## Recommendation engine
 
