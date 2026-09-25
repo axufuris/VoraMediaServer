@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type MusicArtworkResultVM, type MusicArtworkKind } from '../../api/Music/musicService';
+import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type MusicArtworkResultVM, type MusicArtworkKind, type MusicContentRatingSource } from '../../api/Music/musicService';
 import { Modal, ModalHeader } from '../Common/Modal';
 import { pluginAdminService, type PluginOptionVM } from '../../api/System/pluginAdminService';
 import { useDialog } from '../../dialogs';
@@ -21,7 +21,54 @@ interface MusicMetadataEditModalProps {
     track?: TrackVM | null;
 }
 
-const RATING_QUICK_PICKS = ['Explicit', 'Clean'];
+// The only ratings the music filter understands: a profile's music allowlist
+// is Clean and/or Explicit. '' is none.
+type MusicRatingChoice = 'Explicit' | 'Clean' | '';
+const RATING_CHOICES: { value: MusicRatingChoice; label: string }[] = [
+    { value: 'Explicit', label: 'Explicit' },
+    { value: 'Clean', label: 'Clean' },
+    { value: '', label: 'None' },
+];
+
+const toRatingChoice = (rating?: string | null): MusicRatingChoice =>
+    rating === 'Explicit' || rating === 'Clean' ? rating : '';
+
+const RATING_SOURCE_HINT: Record<MusicContentRatingSource, string> = {
+    FileTag: "From the file's own tags.",
+    Provider: 'Looked up online because the file carries no rating.',
+    Manual: "Set by hand and locked, so rescans and online lookups won't change it. Unlock to hand it back to the file's tags.",
+    None: "No rating in the file and none found online. Profiles that block unrated content won't hear it.",
+};
+
+function RatingChoiceGroup<T extends string>({ label, options, value, onChange }: {
+    label: string;
+    options: { value: T; label: string }[];
+    value: T;
+    onChange: (value: T) => void;
+}) {
+    return (
+        <div role="group" aria-label={label} className="flex flex-wrap gap-2">
+            {options.map(option => (
+                <button
+                    key={option.label}
+                    type="button"
+                    onClick={() => onChange(option.value)}
+                    aria-pressed={value === option.value}
+                    data-active={value === option.value}
+                    className="vora-pill cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold"
+                >
+                    {option.label}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+type AlbumRatingChoice = 'keep' | MusicRatingChoice;
+const ALBUM_RATING_CHOICES: { value: AlbumRatingChoice; label: string }[] = [
+    { value: 'keep', label: 'Leave each track as it is' },
+    ...RATING_CHOICES,
+];
 
 export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind, artist, album, track }: MusicMetadataEditModalProps) {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -60,7 +107,8 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
 
     const [trackNumber, setTrackNumber] = useState<string>('');
     const [discNumber, setDiscNumber] = useState<string>('');
-    const [contentRating, setContentRating] = useState('');
+    const [contentRating, setContentRating] = useState<MusicRatingChoice>('');
+    const [albumRating, setAlbumRating] = useState<AlbumRatingChoice>('keep');
 
     const [uploading, setUploading] = useState(false);
     const [uploadingBackground, setUploadingBackground] = useState(false);
@@ -93,13 +141,14 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
             setArtworkUrl(album.artworkUrl || '');
             setBackgroundUrl(album.backgroundUrl || '');
             setDiscArtUrl(album.discArtUrl || '');
+            setAlbumRating('keep');
             setLockedFields([...(album.lockedFields || [])]);
         } else if (kind === 'track' && track) {
             setTitle(track.title);
             setSortTitle(track.sortTitle || '');
             setTrackNumber(track.trackNumber.toString());
             setDiscNumber(track.discNumber != null ? track.discNumber.toString() : '');
-            setContentRating(track.contentRating || '');
+            setContentRating(toRatingChoice(track.contentRating));
             setLockedFields([...(track.lockedFields || [])]);
         }
     }, [isOpen, kind, artist, album, track]);
@@ -250,13 +299,16 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                     discArtUrl: discArtUrl.trim() || null,
                     lockedFields
                 }, serverId);
+                if (albumRating !== 'keep') {
+                    await musicService.setAlbumContentRating(album.id, albumRating || null, serverId);
+                }
             } else if (kind === 'track' && track) {
                 await musicService.updateTrack(track.id, {
                     title,
                     sortTitle: sortTitle.trim() || null,
                     trackNumber: parseInt(trackNumber, 10) || 0,
                     discNumber: discNumber.trim() ? parseInt(discNumber, 10) : null,
-                    contentRating: contentRating.trim() || null,
+                    contentRating: contentRating || null,
                     lockedFields
                 }, serverId);
             }
@@ -513,6 +565,15 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                                     <input type="text" value={genre} onChange={e => setGenre(e.target.value)} className={inputClass('Genre')} />
                                 </div>
                             </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-[var(--vora-text-muted)]">Content rating for every track</label>
+                                <RatingChoiceGroup label="Content rating for every track" options={ALBUM_RATING_CHOICES} value={albumRating} onChange={setAlbumRating} />
+                                <p className="mt-2 text-xs text-[var(--vora-text-muted)]">
+                                    {albumRating === 'keep'
+                                        ? 'Each track keeps its own rating. Change one on its own with the pencil beside it.'
+                                        : "Saving sets and locks this rating on every track of the album, so rescans and online lookups won't change them."}
+                                </p>
+                            </div>
                         </>
                     )}
 
@@ -601,32 +662,12 @@ export default function MusicMetadataEditModal({ isOpen, onClose, onSaved, kind,
                             </div>
                             <div>
                                 <FieldLabel field="ContentRating" label="Content Rating" />
-                                <input
-                                    type="text"
-                                    value={contentRating}
-                                    onChange={e => setContentRating(e.target.value)}
-                                    placeholder="e.g. Explicit, Clean, G, PG, PG-13, R, or leave empty"
-                                    className={inputClass('ContentRating')}
-                                />
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {RATING_QUICK_PICKS.map(r => (
-                                        <button
-                                            key={r}
-                                            type="button"
-                                            onClick={() => setContentRating(r)}
-                                            className={`text-xs px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${contentRating === r ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-raised)]'}`}
-                                        >
-                                            {r}
-                                        </button>
-                                    ))}
-                                    <button
-                                        type="button"
-                                        onClick={() => setContentRating('')}
-                                        className="text-xs px-2.5 py-1 rounded font-bold bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] hover:bg-[var(--vora-bg-raised)] transition-colors cursor-pointer"
-                                    >
-                                        Clear
-                                    </button>
-                                </div>
+                                <RatingChoiceGroup label="Content rating" options={RATING_CHOICES} value={contentRating} onChange={setContentRating} />
+                                <p className="mt-2 text-xs text-[var(--vora-text-muted)]">
+                                    {contentRating !== toRatingChoice(track?.contentRating)
+                                        ? "Saving locks this rating, so rescans and online lookups won't change it."
+                                        : RATING_SOURCE_HINT[track?.contentRatingSource ?? 'None']}
+                                </p>
                             </div>
                         </>
                     )}

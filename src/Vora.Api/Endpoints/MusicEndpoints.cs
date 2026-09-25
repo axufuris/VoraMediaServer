@@ -61,6 +61,16 @@ public static class MusicEndpoints
         group.MapPut("/albums/{albumId:guid}", UpdateAlbumAsync).RequireAuthorization();
         group.MapPut("/tracks/{trackId:guid}", UpdateTrackAsync).RequireAuthorization();
 
+        // Sets every track on the album and locks each, as a hand edit of one
+        // track does. Explicit, Clean, or none; anything else is refused.
+        group.MapPut("/albums/{albumId:guid}/content-rating", SetAlbumContentRatingAsync)
+            .RequireAuthorization()
+            .WithName("SetAlbumContentRating")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesValidationProblem()
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapPost("/artists/{artistId:guid}/artwork/upload", UploadArtistArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
             .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
         group.MapPost("/albums/{albumId:guid}/artwork/upload", UploadAlbumArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
@@ -298,9 +308,23 @@ public static class MusicEndpoints
     private static async Task<IResult> UpdateTrackAsync(Guid trackId, [FromBody] UpdateTrackRequest request, ClaimsPrincipal user, IMusicManager manager)
     {
         if (!user.IsAdmin()) return Results.Forbid();
+        if (!MusicContentRating.TryNormalize(request.ContentRating, out _)) return InvalidMusicRating();
         var ok = await manager.UpdateTrackAsync(trackId, request);
         return ok ? Results.NoContent() : Results.NotFound();
     }
+
+    private static async Task<IResult> SetAlbumContentRatingAsync(Guid albumId, [FromBody] SetAlbumContentRatingRequest request, ClaimsPrincipal user, IMusicManager manager)
+    {
+        if (!user.IsAdmin()) return Results.Forbid();
+        if (!MusicContentRating.TryNormalize(request.ContentRating, out var rating)) return InvalidMusicRating();
+        var ok = await manager.SetAlbumContentRatingAsync(albumId, rating);
+        return ok ? Results.NoContent() : Results.NotFound();
+    }
+
+    private static IResult InvalidMusicRating() => Results.ValidationProblem(new Dictionary<string, string[]>
+    {
+        ["contentRating"] = new[] { "A music rating is Explicit, Clean, or empty for none." }
+    });
 
     private static async Task<IResult> UploadArtistArtworkAsync(Guid artistId, IFormFile file, ClaimsPrincipal user, IMusicManager manager)
     {

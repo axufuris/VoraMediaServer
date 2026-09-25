@@ -1,3 +1,5 @@
+using Vora.Application.Media;
+
 namespace Vora.Application.Media.ViewModels;
 
 public class MusicStreamUrlResponse
@@ -72,6 +74,7 @@ public class TrackVM
     public int? DiscNumber { get; set; }
     public int? DurationSeconds { get; set; }
     public string? ContentRating { get; set; }
+    public MusicContentRatingSource ContentRatingSource { get; set; }
     public Guid? AlbumId { get; set; }
     public bool IsLiked { get; set; }
     public decimal? ServerAdminRating { get; set; }

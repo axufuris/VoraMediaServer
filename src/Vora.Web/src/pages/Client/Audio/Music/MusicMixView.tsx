@@ -1,4 +1,5 @@
 import { type GeneratedMixDetailVM } from '../../../../api/Music/musicService';
+import ContentRatingBadge from '../../../../components/Media/ContentRatingBadge';
 
 interface MusicMixViewProps {
     isLoading: boolean;
@@ -86,9 +87,7 @@ export default function MusicMixView({
                             <div className="flex-1 min-w-0">
                                 <div className="text-sm text-[var(--vora-text-primary)] group-hover:text-[var(--vora-text-primary)] truncate flex items-center gap-2">
                                     <span className="truncate">{t.title}</span>
-                                    {t.contentRating && (
-                                        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] shrink-0">{t.contentRating}</span>
-                                    )}
+                                    <ContentRatingBadge rating={t.contentRating} />
                                 </div>
                                 {t.artist && <div className="text-xs text-[var(--vora-text-muted)] truncate">{t.artist}</div>}
                             </div>

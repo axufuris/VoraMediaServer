@@ -21,9 +21,6 @@ public interface IMusicContentRatingRefresher
 // most once per album, and only if some track needs it.
 public class MusicContentRatingRefresher : IMusicContentRatingRefresher
 {
-    public const string ExplicitRating = "Explicit";
-    public const string CleanRating = "Clean";
-
     // A provider that knew nothing about a track may have learned it since —
     // labels deliver catalogue late — so an unanswered track is asked again, but
     // rarely.
@@ -161,8 +158,8 @@ public class MusicContentRatingRefresher : IMusicContentRatingRefresher
 
         var rating = advisory switch
         {
-            ProviderAdvisory.Explicit => ExplicitRating,
-            ProviderAdvisory.Clean => CleanRating,
+            ProviderAdvisory.Explicit => MusicContentRating.Explicit,
+            ProviderAdvisory.Clean => MusicContentRating.Clean,
             _ => null
         };
         if (rating == null) return false;

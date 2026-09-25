@@ -1,4 +1,6 @@
 import { type AlbumVM, type TrackVM, type RadioSeed } from '../../../../api/Music/musicService';
+import ContentRatingBadge from '../../../../components/Media/ContentRatingBadge';
+import { hasExplicitTrack } from '../../../../utils/musicContentRating';
 import { formatCompactCount } from '../../../../utils/compactCount';
 import StarRating from '../../../../components/Client/Primitives/StarRating';
 
@@ -103,7 +105,10 @@ export default function MusicAlbumView({
                             )}
                             <h2 className="text-2xl sm:text-3xl font-bold text-[var(--vora-text-primary)] truncate">{currentAlbum.title}</h2>
                             <p className="text-base sm:text-lg text-[var(--vora-text-secondary)] truncate">{displayArtist}</p>
-                            <p className="text-xs sm:text-sm text-[var(--vora-text-muted)] mt-1">{currentAlbum.year || ''}{currentAlbum.genre ? ` • ${currentAlbum.genre}` : ''}{tracks.length > 0 ? ` • ${tracks.length} tracks` : ''}</p>
+                            <p className="text-xs sm:text-sm text-[var(--vora-text-muted)] mt-1 flex flex-wrap items-center gap-x-1.5 justify-center sm:justify-start">
+                                {hasExplicitTrack(tracks) && <ContentRatingBadge rating="Explicit" />}
+                                <span>{currentAlbum.year || ''}{currentAlbum.genre ? ` • ${currentAlbum.genre}` : ''}{tracks.length > 0 ? ` • ${tracks.length} tracks` : ''}</span>
+                            </p>
                             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 justify-center sm:justify-start">
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">Your rating</span>
@@ -192,9 +197,7 @@ export default function MusicAlbumView({
                                         <div className="flex-1 min-w-0">
                                             <div className="text-sm text-[var(--vora-text-primary)] group-hover:text-[var(--vora-text-primary)] truncate flex items-center gap-2">
                                                 <span className="truncate">{track.title}</span>
-                                                {track.contentRating && (
-                                                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] shrink-0">{track.contentRating}</span>
-                                                )}
+                                                <ContentRatingBadge rating={track.contentRating} />
                                             </div>
                                             {showTrackArtist && track.artist && (
                                                 <div className="text-xs text-[var(--vora-text-muted)] truncate">{track.artist}</div>

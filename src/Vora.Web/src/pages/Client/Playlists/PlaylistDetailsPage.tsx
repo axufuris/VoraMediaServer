@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import ContentRatingBadge from '../../../components/Media/ContentRatingBadge';
 import { useParams, useNavigate } from 'react-router-dom';
 import { playlistService, type PlaylistDetailsVM, type PlaylistItemVM } from '../../../api/Collections/playlistService';
 import { mediaService } from '../../../api/Media/mediaService';
@@ -346,7 +347,9 @@ export default function PlaylistDetailsPage() {
                             ) : selectedItem?.durationMinutes ? (
                                 <span>{selectedItem.durationMinutes} min</span>
                             ) : null}
-                            {selectedItem?.contentRating && <span>{selectedItem.contentRating}</span>}
+                            {selectedItem?.type === 'Track'
+                                ? <ContentRatingBadge rating={selectedItem.contentRating} />
+                                : selectedItem?.contentRating && <span>{selectedItem.contentRating}</span>}
                         </div>
 
                         {selectedItem && (
@@ -423,8 +426,9 @@ export default function PlaylistDetailsPage() {
                                     </div>
                                 )}
                                 <div className="flex-1 flex flex-col justify-center">
-                                    <h4 className={`font-bold text-lg ${selectedItem?.id === item.id ? 'text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-secondary)]'}`}>
+                                    <h4 className={`flex items-center gap-2 font-bold text-lg ${selectedItem?.id === item.id ? 'text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-secondary)]'}`}>
                                         {item.type === 'Episode' ? `${item.episodeNumber}. ${item.title}` : item.title}
+                                        {item.type === 'Track' && <ContentRatingBadge rating={item.contentRating} />}
                                     </h4>
                                     <div className="flex items-center gap-3 text-sm text-[var(--vora-text-muted)] font-medium">
                                         {item.type === 'Track' ? (

@@ -1,4 +1,5 @@
 import { type ArtistTrackVM } from '../../../../api/Music/musicService';
+import ContentRatingBadge from '../../../../components/Media/ContentRatingBadge';
 
 // The numbered, immediately playable track row. Written out twice already — in
 // the Top Tracks view and the Mix view — and the artist page's Popular section
@@ -24,7 +25,10 @@ export default function MusicTrackRow({ track, position, onPlay, formatDuration 
                     : <svg className="w-5 h-5 text-[var(--vora-text-disabled)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>}
             </div>
             <div className="flex-1 min-w-0">
-                <div className="text-sm text-[var(--vora-text-primary)] truncate">{track.title}</div>
+                <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--vora-text-primary)]">
+                    <span className="truncate">{track.title}</span>
+                    <ContentRatingBadge rating={track.contentRating} />
+                </div>
                 <div className="text-xs text-[var(--vora-text-muted)] truncate">{track.albumTitle ?? ''}</div>
             </div>
             <div className="text-xs text-[var(--vora-text-muted)] w-12 text-right">{formatDuration(track.durationSeconds)}</div>
