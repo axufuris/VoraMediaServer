@@ -7,6 +7,9 @@ export interface PlaylistSummaryVM {
     description?: string;
     mediaType: PlaylistMediaType;
     itemCount: number;
+    // The owner's uploaded cover. Null means build one from posterUrls, which
+    // holds up to four different images in playlist order.
+    imageUrl?: string | null;
     posterUrls: string[];
     backdropUrls: string[];
 
@@ -88,6 +91,20 @@ export const playlistService = {
     },
     removeMediaFromPlaylist: async (playlistId: string, mediaId: string, serverId?: string) => {
         await apiClient.delete(`/playlists/${playlistId}/media/${mediaId}`, { serverId });
+    },
+    // Owner only. PNG, JPEG or WebP up to 10 MB. Returns the new cover's url.
+    uploadImage: async (playlistId: string, file: File, serverId?: string): Promise<string> => {
+        const data = new FormData();
+        data.append('file', file);
+        const response = await apiClient.post<{ url: string }>(`/playlists/${playlistId}/image`, data, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            serverId
+        });
+        return response.data.url;
+    },
+    // Back to the mosaic built from the playlist's items.
+    removeImage: async (playlistId: string, serverId?: string): Promise<void> => {
+        await apiClient.delete(`/playlists/${playlistId}/image`, { serverId });
     },
     updatePlaylist: async (playlistId: string, name: string, description?: string, serverId?: string) => {
         await apiClient.put(`/playlists/${playlistId}`, { name, description }, { serverId });

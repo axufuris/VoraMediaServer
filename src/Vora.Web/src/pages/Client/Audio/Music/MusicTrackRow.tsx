@@ -1,4 +1,5 @@
 import { type ArtistTrackVM } from '../../../../api/Music/musicService';
+import AddToPlaylistButton from '../../../../components/Collections/AddToPlaylistButton';
 import ContentRatingBadge from '../../../../components/Media/ContentRatingBadge';
 
 // The numbered, immediately playable track row. Written out twice already — in
@@ -31,6 +32,7 @@ export default function MusicTrackRow({ track, position, onPlay, formatDuration 
                 </div>
                 <div className="text-xs text-[var(--vora-text-muted)] truncate">{track.albumTitle ?? ''}</div>
             </div>
+            <AddToPlaylistButton mediaId={track.id} title={track.title} />
             <div className="text-xs text-[var(--vora-text-muted)] w-12 text-right">{formatDuration(track.durationSeconds)}</div>
         </div>
     );

@@ -27,6 +27,7 @@ public class PlaylistRepository : IPlaylistRepository
             Name = p.Name,
             Description = p.Description,
             MediaType = p.MediaType,
+            ImageUrl = p.ImageUrl,
             IsShared = p.IsShared,
             IsOwner = p.ProfileId == viewerProfileId,
             OwnerName = p.Profile.Name,
@@ -40,7 +41,7 @@ public class PlaylistRepository : IPlaylistRepository
                         : null))
                 .Where(u => u != null)
                 .Select(u => u!)
-                .Take(4)
+                .Take(PlaylistSummaryVM.MosaicCandidates)
                 .ToList(),
             BackdropUrls = p.Items
                 .Where(i => visible.Contains(i.MediaItemId))
@@ -108,7 +109,7 @@ public class PlaylistRepository : IPlaylistRepository
         var source = await _context.Playlists
             .AsNoTracking()
             .Where(p => p.Id == sourceId && (p.ProfileId == viewerProfileId || p.IsShared))
-            .Select(p => new { p.Name, p.Description, p.MediaType })
+            .Select(p => new { p.Name, p.Description, p.MediaType, p.ImageUrl })
             .FirstOrDefaultAsync();
 
         if (source == null) return null;
@@ -127,6 +128,7 @@ public class PlaylistRepository : IPlaylistRepository
             Name = source.Name,
             Description = source.Description,
             MediaType = source.MediaType,
+            ImageUrl = source.ImageUrl,
             IsShared = false,
             Items = mediaIds.Select((mediaId, index) => new PlaylistItem { MediaItemId = mediaId, Order = index + 1 }).ToList()
         };
@@ -382,12 +384,36 @@ public class PlaylistRepository : IPlaylistRepository
         await _context.SaveChangesAsync();
     }
 
-    public async Task DeletePlaylistAsync(Guid playlistId, Guid profileId)
+    public async Task<PlaylistDeletion> DeletePlaylistAsync(Guid playlistId, Guid profileId)
     {
-        await _context.Playlists
-            .Where(p => p.Id == playlistId && p.ProfileId == profileId)
-            .ExecuteDeleteAsync();
+        var playlist = await _context.Playlists
+            .Include(p => p.Items)
+            .FirstOrDefaultAsync(p => p.Id == playlistId && p.ProfileId == profileId);
+        if (playlist == null) return PlaylistDeletion.NotFound;
+
+        _context.Playlists.Remove(playlist);
+        await _context.SaveChangesAsync();
+        return new PlaylistDeletion(true, playlist.ImageUrl);
     }
+
+    // Owner only. Returns the image it replaced, so the caller can remove the
+    // old file once nothing else uses it.
+    public async Task<PlaylistImageChange> SetImageAsync(Guid playlistId, Guid ownerProfileId, string? imageUrl)
+    {
+        var playlist = await _context.Playlists.FirstOrDefaultAsync(p => p.Id == playlistId && p.ProfileId == ownerProfileId);
+        if (playlist == null) return PlaylistImageChange.NotFound;
+
+        var previous = playlist.ImageUrl;
+        playlist.ImageUrl = imageUrl;
+        playlist.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return new PlaylistImageChange(true, previous);
+    }
+
+    // A copy shares its source's cover file, so a file is only removed once no
+    // playlist points at it.
+    public Task<bool> IsImageInUseAsync(string imageUrl) =>
+        _context.Playlists.AnyAsync(p => p.ImageUrl == imageUrl);
 
     public async Task<List<Guid>> GetPlaylistsContainingItemAsync(Guid profileId, Guid mediaItemId)
     {

@@ -975,6 +975,7 @@ export default function MusicTab() {
                     isOpen={true}
                     onClose={() => setAddToPlaylistTrackId(null)}
                     mediaId={addToPlaylistTrackId}
+                    kind="music"
                 />
             )}
             {trackContextMenu && currentAlbum && (

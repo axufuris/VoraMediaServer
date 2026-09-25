@@ -17,6 +17,8 @@ public interface IPlaylistManager
     Task ReorderPlaylistAsync(Guid playlistId, Guid profileId, List<Guid> itemIds);
     Task<bool> MarkAllUnplayedAsync(Guid playlistId, Guid profileId, PlaylistAccessFilter access);
     Task DeletePlaylistAsync(Guid playlistId, Guid profileId);
+    Task<string?> SetImageAsync(Guid playlistId, Guid ownerProfileId, byte[] bytes);
+    Task<bool> RemoveImageAsync(Guid playlistId, Guid ownerProfileId);
     Task<List<Guid>> GetPlaylistsContainingItemAsync(Guid profileId, Guid mediaItemId);
     Task RemoveMediaFromPlaylistAsync(Guid playlistId, Guid profileId, Guid mediaItemId);
     Task UpdatePlaylistDetailsAsync(Guid id, Guid profileId, string name, string? description);
@@ -25,10 +27,12 @@ public interface IPlaylistManager
 public class PlaylistManager : IPlaylistManager
 {
     private readonly IPlaylistRepository _repository;
+    private readonly IPlaylistImageStore _images;
 
-    public PlaylistManager(IPlaylistRepository repository)
+    public PlaylistManager(IPlaylistRepository repository, IPlaylistImageStore images)
     {
         _repository = repository;
+        _images = images;
     }
 
     public Task<List<PlaylistSummaryVM>> GetPlaylistsAsync(Guid profileId, PlaylistAccessFilter access) =>
@@ -98,7 +102,45 @@ public class PlaylistManager : IPlaylistManager
 
     public async Task DeletePlaylistAsync(Guid playlistId, Guid profileId)
     {
-        await _repository.DeletePlaylistAsync(playlistId, profileId);
+        var deletion = await _repository.DeletePlaylistAsync(playlistId, profileId);
+        if (deletion.Found) await ReleaseImageAsync(deletion.ImageUrl);
+    }
+
+    // Null when the bytes aren't an image the artwork route can serve, or the
+    // playlist isn't the caller's; the endpoint has already told the two apart.
+    public async Task<string?> SetImageAsync(Guid playlistId, Guid ownerProfileId, byte[] bytes)
+    {
+        if (!await _repository.IsPlaylistOwnerAsync(playlistId, ownerProfileId)) return null;
+
+        var url = await _images.SaveAsync(playlistId, bytes);
+        if (url == null) return null;
+
+        var change = await _repository.SetImageAsync(playlistId, ownerProfileId, url);
+        if (!change.Found)
+        {
+            _images.Delete(url);
+            return null;
+        }
+
+        await ReleaseImageAsync(change.PreviousImageUrl);
+        return url;
+    }
+
+    // Back to the mosaic built from the playlist's items.
+    public async Task<bool> RemoveImageAsync(Guid playlistId, Guid ownerProfileId)
+    {
+        var change = await _repository.SetImageAsync(playlistId, ownerProfileId, null);
+        if (!change.Found) return false;
+
+        await ReleaseImageAsync(change.PreviousImageUrl);
+        return true;
+    }
+
+    private async Task ReleaseImageAsync(string? imageUrl)
+    {
+        if (string.IsNullOrEmpty(imageUrl)) return;
+        if (await _repository.IsImageInUseAsync(imageUrl)) return;
+        _images.Delete(imageUrl);
     }
 
     public async Task<List<Guid>> GetPlaylistsContainingItemAsync(Guid profileId, Guid mediaItemId)

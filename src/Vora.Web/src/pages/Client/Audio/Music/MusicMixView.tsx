@@ -1,4 +1,5 @@
 import { type GeneratedMixDetailVM } from '../../../../api/Music/musicService';
+import AddToPlaylistButton from '../../../../components/Collections/AddToPlaylistButton';
 import ContentRatingBadge from '../../../../components/Media/ContentRatingBadge';
 
 interface MusicMixViewProps {
@@ -91,6 +92,7 @@ export default function MusicMixView({
                                 </div>
                                 {t.artist && <div className="text-xs text-[var(--vora-text-muted)] truncate">{t.artist}</div>}
                             </div>
+                            <AddToPlaylistButton mediaId={t.id} title={t.title} />
                             <div className="text-xs text-[var(--vora-text-muted)] shrink-0 tabular-nums">{formatDuration(t.durationSeconds)}</div>
                         </div>
                     ))}

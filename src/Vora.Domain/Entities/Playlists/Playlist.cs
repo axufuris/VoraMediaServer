@@ -16,6 +16,10 @@ public class Playlist
 
     public PlaylistMediaType MediaType { get; set; } = PlaylistMediaType.Mixed;
 
+    // A cover the owner uploaded. Null means the clients build one from the
+    // artwork of the playlist's first items.
+    public string? ImageUrl { get; set; }
+
     // Shared playlists are visible, read-only, to every profile on the server.
     // Anyone can play one or save a copy they own; only the owner can change it.
     // A copy starts unshared, so saving someone's playlist does not put a second

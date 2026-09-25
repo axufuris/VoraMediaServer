@@ -240,7 +240,7 @@ public class SharedPlaylistTests
         return state;
     }
 
-    private static PlaylistManager Manager(VoraDbContext db) => new(new PlaylistRepository(db));
+    private static PlaylistManager Manager(VoraDbContext db) => new(new PlaylistRepository(db), Substitute.For<IPlaylistImageStore>());
 
     [Fact]
     public async Task A_viewer_can_unwatch_all_of_a_shared_playlist_for_themselves()

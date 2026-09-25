@@ -765,7 +765,7 @@ export default function MediaDetailsPage() {
             )}
             <EditMetadataModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSaved={reloadMedia} itemId={media.id} type="media" libraryType={media.type === 'Movie' ? 'Movie' : 'TvShow'} initialData={{ ...media, lockedFields: media.lockedFields ?? [] }} />
             <AddToCollectionModal isOpen={isCollectionModalOpen} onClose={() => setIsCollectionModalOpen(false)} mediaId={media.id} libraryId={media.libraryId} mediaType={media.type} initialCollectionIds={media.collectionIds || []} onSaved={reloadMedia} />
-            <AddToPlaylistModal isOpen={isPlaylistModalOpen} onClose={() => setIsPlaylistModalOpen(false)} mediaId={media.id} />
+            <AddToPlaylistModal isOpen={isPlaylistModalOpen} onClose={() => setIsPlaylistModalOpen(false)} mediaId={media.id} kind="video" />
             <TrailerOverlay trailer={playingTrailer} onClose={() => setPlayingTrailer(null)} />
             <MarkerEditorModal isOpen={isMarkerEditorOpen} onClose={() => setIsMarkerEditorOpen(false)} mediaItemId={media.id} mediaItemTitle={media.title} durationSeconds={media.durationMinutes ? media.durationMinutes * 60 : undefined} serverId={serverId} onSaved={reloadMedia} />
 
