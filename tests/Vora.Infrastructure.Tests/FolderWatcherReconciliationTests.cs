@@ -50,6 +50,34 @@ public class FolderWatcherReconciliationTests
         result.Should().BeEquivalentTo(new[] { "/media/shows/Real.mkv" });
     }
 
+    // The scanner skips a file when any folder on its path is excluded; the
+    // watcher used to check only the file name. Every song in .recycle was
+    // skipped by the scan and looked new to the watcher on every restart, and
+    // past fifty of them each restart queued a full library scan.
+    [Fact]
+    public void FindUningestedFiles_skips_files_inside_an_excluded_folder()
+    {
+        var disk = new[] { "/media/music/Artist/Album/01.mp3", "/media/music/.recycle/Artist/Album/02.mp3" };
+        var ingested = new HashSet<string>();
+
+        var result = FolderWatcherService.FindUningestedFiles(disk, ingested, new List<string> { ".recycle" }, LibraryType.Music);
+
+        result.Should().BeEquivalentTo(new[] { "/media/music/Artist/Album/01.mp3" });
+    }
+
+    // Finder's "._Song.mp3" stubs carry an audio extension, so the music
+    // scanner's tag read fails on each one - and each came back every restart.
+    [Fact]
+    public void FindUningestedFiles_skips_macOS_resource_forks()
+    {
+        var disk = new[] { "/media/music/Artist/Album/01 Song.mp3", "/media/music/Artist/Album/._01 Song.mp3" };
+        var ingested = new HashSet<string> { "/media/music/Artist/Album/01 Song.mp3" };
+
+        var result = FolderWatcherService.FindUningestedFiles(disk, ingested, new List<string>(), LibraryType.Music);
+
+        result.Should().BeEmpty();
+    }
+
     [Fact]
     public void FindUningestedFiles_flags_a_second_same_episode_file_the_watcher_would_orphan()
     {
