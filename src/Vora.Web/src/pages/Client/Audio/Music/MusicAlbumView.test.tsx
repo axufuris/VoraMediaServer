@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import MusicAlbumView from './MusicAlbumView';
 import type { AlbumVM, TrackVM } from '../../../../api/Music/musicService';
 
@@ -32,21 +32,27 @@ const renderAlbum = (currentAlbum: AlbumVM, tracks: TrackVM[]) => render(
 );
 
 describe('MusicAlbumView popularity', () => {
-    it("shows the album's plays on Last.fm, labelled with the source", () => {
+    it("shows the album's plays beside the Last.fm mark, with the full figure on hover", () => {
         renderAlbum(album({ globalPlays: 4_100_000 }), [track()]);
 
-        expect(screen.getByTitle('Plays on Last.fm')).toHaveTextContent('4.1M plays on Last.fm');
+        const figure = screen.getByTitle('4,100,000 plays on Last.fm');
+        expect(figure).toHaveTextContent('4.1M');
+        expect(within(figure).getByRole('img', { name: 'Last.fm' })).toBeInTheDocument();
     });
 
     it('says nothing before popularity has been fetched', () => {
         renderAlbum(album({ globalPlays: null }), [track()]);
 
-        expect(screen.queryByTitle('Plays on Last.fm')).toBeNull();
+        expect(screen.queryByRole('img', { name: 'Last.fm' })).toBeNull();
     });
 
     it("shows each track's listeners where Last.fm has them", () => {
         renderAlbum(album(), [track({ globalListeners: 700_000 }), track({ id: 't2', title: 'Deep Cut', trackNumber: 2 })]);
 
-        expect(screen.getByTitle('700,000 listeners on Last.fm')).toHaveTextContent('700K');
+        const figure = screen.getByTitle('700,000 listeners on Last.fm');
+        expect(figure).toHaveTextContent('700K');
+        expect(within(figure).getByRole('img', { name: 'Last.fm' })).toBeInTheDocument();
+        // The track Last.fm doesn't know gets no mark: one mark in the whole list.
+        expect(screen.getAllByRole('img', { name: 'Last.fm' })).toHaveLength(1);
     });
 });

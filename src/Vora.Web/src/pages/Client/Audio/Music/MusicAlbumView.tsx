@@ -1,4 +1,5 @@
 import { type AlbumVM, type TrackVM, type RadioSeed } from '../../../../api/Music/musicService';
+import LastFmMark from '../../../../components/Media/LastFmMark';
 import ContentRatingBadge from '../../../../components/Media/ContentRatingBadge';
 import { hasExplicitTrack } from '../../../../utils/musicContentRating';
 import { formatCompactCount } from '../../../../utils/compactCount';
@@ -114,8 +115,13 @@ export default function MusicAlbumView({
                                     read as this household's plays. Last.fm gives albums a play
                                     count and no listener count. */}
                                 {formatCompactCount(currentAlbum.globalPlays) && (
-                                    <span className="text-xs text-[var(--vora-text-secondary)]" title="Plays on Last.fm">
-                                        <span className="font-semibold text-[var(--vora-text-primary)]">{formatCompactCount(currentAlbum.globalPlays)}</span> plays on Last.fm
+                                    <span
+                                        className="inline-flex items-center gap-1.5 text-xs"
+                                        title={`${(currentAlbum.globalPlays ?? 0).toLocaleString()} plays on Last.fm`}
+                                    >
+                                        <LastFmMark />
+                                        <span className="font-semibold text-[var(--vora-text-primary)]">{formatCompactCount(currentAlbum.globalPlays)}</span>
+                                        <span className="sr-only">plays</span>
                                     </span>
                                 )}
                                 <div className="flex items-center gap-2">
@@ -238,10 +244,16 @@ export default function MusicAlbumView({
                                             that order would look like it was sorted wrong. Hidden
                                             below sm, where the row has no room to spare. */}
                                         <div
-                                            className="hidden sm:block w-14 text-right text-xs text-[var(--vora-text-disabled)] shrink-0 tabular-nums"
+                                            className="hidden sm:flex w-20 items-center justify-end gap-1 text-xs text-[var(--vora-text-disabled)] shrink-0 tabular-nums"
                                             title={track.globalListeners != null ? `${track.globalListeners.toLocaleString()} listeners on Last.fm` : undefined}
                                         >
-                                            {formatCompactCount(track.globalListeners) ?? ''}
+                                            {track.globalListeners != null && (
+                                                <>
+                                                    <LastFmMark className="h-3 w-3" />
+                                                    <span>{formatCompactCount(track.globalListeners)}</span>
+                                                    <span className="sr-only">listeners</span>
+                                                </>
+                                            )}
                                         </div>
                                         <div className="text-xs text-[var(--vora-text-muted)] shrink-0 tabular-nums">{formatDuration(track.durationSeconds)}</div>
                                         {isServerAdmin && (
