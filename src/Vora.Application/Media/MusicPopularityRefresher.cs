@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Vora.Application.Settings;
 using Vora.Domain.Entities.Media;
 using Vora.Plugins.Interfaces;
 
@@ -35,43 +36,59 @@ public class MusicPopularityRefresher : IMusicPopularityRefresher
     // the average comfortably under that.
     private static readonly TimeSpan PauseBetweenArtists = TimeSpan.FromMilliseconds(750);
 
+    private const string EnabledSettingKey = "is_enabled";
+    private const string DisabledValue = "false";
+
     private readonly IMusicRepository _repository;
     private readonly IEnumerable<IListeningDataProvider> _providers;
+    private readonly ISystemSettingsRepository _settings;
+    private readonly ITaskProgressReporter _progress;
     private readonly ILogger<MusicPopularityRefresher> _logger;
     private readonly Func<TimeSpan, CancellationToken, Task> _pause;
 
     public MusicPopularityRefresher(
         IMusicRepository repository,
         IEnumerable<IListeningDataProvider> providers,
+        ISystemSettingsRepository settings,
+        ITaskProgressReporter progress,
         ILogger<MusicPopularityRefresher> logger)
-        : this(repository, providers, logger, Task.Delay)
+        : this(repository, providers, settings, progress, logger, Task.Delay)
     {
     }
 
     internal MusicPopularityRefresher(
         IMusicRepository repository,
         IEnumerable<IListeningDataProvider> providers,
+        ISystemSettingsRepository settings,
+        ITaskProgressReporter progress,
         ILogger<MusicPopularityRefresher> logger,
         Func<TimeSpan, CancellationToken, Task> pause)
     {
         _repository = repository;
         _providers = providers;
+        _settings = settings;
+        _progress = progress;
         _logger = logger;
         _pause = pause;
     }
 
     public async Task<int> RefreshDueArtistsAsync(CancellationToken cancellationToken)
     {
-        var provider = _providers.FirstOrDefault();
+        var provider = await FirstEnabledProviderAsync();
         if (provider == null) return 0;
 
         var due = await _repository.GetArtistsDueForPopularityRefreshAsync(DateTime.UtcNow - StaleAfter, MaxArtistsPerRun);
         if (due.Count == 0) return 0;
 
         var refreshed = 0;
-        foreach (var target in due)
+        for (var i = 0; i < due.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var target = due[i];
+
+            // Count first, so a task row that truncates a long name still shows
+            // how far through the run it is.
+            _progress.Report($"Fetching popularity {i + 1}/{due.Count}: {target.ArtistName}");
 
             var popularity = await provider.GetArtistPopularityAsync(target.ArtistName, TopTracksPerArtist, TopAlbumsPerArtist, cancellationToken);
 
@@ -82,8 +99,10 @@ public class MusicPopularityRefresher : IMusicPopularityRefresher
             // next run.
             if (popularity.Outcome == PopularityLookupOutcome.Unavailable)
             {
-                _logger.LogInformation(
-                    "Stopping the music popularity refresh after {Refreshed} of {Due} artists: {Provider} is not answering.",
+                // Warning, not information: this is also what a missing API key
+                // looks like, and nothing else says so.
+                _logger.LogWarning(
+                    "Stopping the music popularity refresh after {Refreshed} of {Due} artists: {Provider} is not answering. Check that it has an API key on the Plugins page.",
                     refreshed, due.Count, provider.ProviderName);
                 break;
             }
@@ -98,6 +117,8 @@ public class MusicPopularityRefresher : IMusicPopularityRefresher
             await _pause(PauseBetweenArtists, cancellationToken);
         }
 
+        _progress.Report(null);
+
         // No client notification. Popularity is not something anyone watches
         // change, and one event per artist would have every open client refetch
         // a hundred times in a row; the numbers are simply there on next load.
@@ -107,6 +128,16 @@ public class MusicPopularityRefresher : IMusicPopularityRefresher
         }
 
         return refreshed;
+    }
+
+    private async Task<IListeningDataProvider?> FirstEnabledProviderAsync()
+    {
+        foreach (var provider in _providers)
+        {
+            var enabled = await _settings.GetPluginSettingAsync(provider.Id, EnabledSettingKey);
+            if (enabled != DisabledValue) return provider;
+        }
+        return null;
     }
 
     // Written as one snapshot of the whole catalogue. Values from the previous
