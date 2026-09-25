@@ -937,6 +937,11 @@ public class TaskQueueManager : ITaskQueueManager
         if (libraryVm?.Type == nameof(LibraryType.Music))
         {
             await RunStepAsync("Checking Clean / Explicit…", () => sp.GetRequiredService<IMusicContentRatingRefresher>().RateDueAlbumsAsync(ct));
+
+            // Only artists never fetched or older than a month, so after the
+            // first run this is the scan's new artists. Without it, a new artist
+            // had no numbers until the next night.
+            await RunStepAsync("Fetching popularity…", () => sp.GetRequiredService<IMusicPopularityRefresher>().RefreshDueArtistsAsync(ct));
         }
 
         // A show scanned across two resolution folders (e.g. .../TV/1080p/Show

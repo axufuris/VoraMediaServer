@@ -110,6 +110,14 @@ export default function MusicAlbumView({
                                 <span>{currentAlbum.year || ''}{currentAlbum.genre ? ` • ${currentAlbum.genre}` : ''}{tracks.length > 0 ? ` • ${tracks.length} tracks` : ''}</span>
                             </p>
                             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 justify-center sm:justify-start">
+                                {/* The world's figure, labelled with its source so it is not
+                                    read as this household's plays. Last.fm gives albums a play
+                                    count and no listener count. */}
+                                {formatCompactCount(currentAlbum.globalPlays) && (
+                                    <span className="text-xs text-[var(--vora-text-secondary)]" title="Plays on Last.fm">
+                                        <span className="font-semibold text-[var(--vora-text-primary)]">{formatCompactCount(currentAlbum.globalPlays)}</span> plays on Last.fm
+                                    </span>
+                                )}
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">Your rating</span>
                                     <StarRating

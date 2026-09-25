@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Media;
+using Vora.Application.Settings;
 using Vora.Domain.Entities.Media;
 using Vora.Plugins.Interfaces;
 
@@ -13,10 +14,14 @@ public class MusicPopularityRefresherTests
 {
     private readonly IMusicRepository _repository = Substitute.For<IMusicRepository>();
     private readonly IListeningDataProvider _provider = Substitute.For<IListeningDataProvider>();
+    private readonly ISystemSettingsRepository _settings = Substitute.For<ISystemSettingsRepository>();
+    private readonly ITaskProgressReporter _progress = Substitute.For<ITaskProgressReporter>();
 
     private MusicPopularityRefresher Refresher(bool withProvider = true) => new(
         _repository,
         withProvider ? new[] { _provider } : Array.Empty<IListeningDataProvider>(),
+        _settings,
+        _progress,
         NullLogger<MusicPopularityRefresher>.Instance,
         (_, _) => Task.CompletedTask);
 
@@ -157,5 +162,36 @@ public class MusicPopularityRefresherTests
         var tracks = artist.Albums.Single().Tracks.ToList();
         tracks.Single(t => t.Title.StartsWith("Kansas")).GlobalListeners.Should().BeNull();
         tracks.Single(t => t.Title.StartsWith("Can")).GlobalListeners.Should().Be(12_000);
+    }
+
+    [Fact]
+    public async Task A_listening_plugin_switched_off_is_not_asked()
+    {
+        _provider.Id.Returns("lastfm_listening");
+        _settings.GetPluginSettingAsync("lastfm_listening", "is_enabled").Returns("false");
+
+        await Refresher().RefreshDueArtistsAsync(TestContext.Current.CancellationToken);
+
+        await _repository.DidNotReceive().GetArtistsDueForPopularityRefreshAsync(Arg.Any<DateTime>(), Arg.Any<int>());
+    }
+
+    // The task row shows how far through the run it is and which artist it's on.
+    [Fact]
+    public async Task Progress_names_each_artist_with_its_place_in_the_run()
+    {
+        var first = GivenDue("Luke Bryan");
+        var second = GivenDue("311");
+        Due(first, second);
+        Answers("Luke Bryan", ArtistPopularity.NotFound);
+        Answers("311", ArtistPopularity.NotFound);
+
+        await Refresher().RefreshDueArtistsAsync(TestContext.Current.CancellationToken);
+
+        Received.InOrder(() =>
+        {
+            _progress.Report("Fetching popularity 1/2: Luke Bryan");
+            _progress.Report("Fetching popularity 2/2: 311");
+            _progress.Report(null);
+        });
     }
 }
