@@ -135,4 +135,22 @@ public class PlaylistCoverTests
 
         summary.PosterUrls.Should().Equal("a", "b", "c", "d");
     }
+
+    // A generated mix saved to keep: the profile's own playlist, in the mix's
+    // order, starting unshared.
+    [Fact]
+    public async Task A_mix_saved_as_a_playlist_keeps_its_order_and_is_the_owners()
+    {
+        using var db = NewContext();
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+
+        var id = await Manager(db).CreatePlaylistFromMediaAsync(_owner, "Daily Mix 1", null, PlaylistMediaType.Music, new[] { b, a, b });
+
+        var playlist = db.Playlists.Include(p => p.Items).Single(p => p.Id == id);
+        playlist.ProfileId.Should().Be(_owner);
+        playlist.IsShared.Should().BeFalse();
+        playlist.MediaType.Should().Be(PlaylistMediaType.Music);
+        playlist.Items.OrderBy(i => i.Order).Select(i => i.MediaItemId).Should().Equal(b, a);
+    }
 }

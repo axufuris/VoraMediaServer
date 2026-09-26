@@ -25,6 +25,8 @@ export interface UserProfileVM {
     canAddCustomPodcastFeeds: boolean;
     lastFmUsername?: string;
     showtimesLocation?: string | null;
+    // The profile's own opt-out from AI playlists; true unless switched off.
+    aiMusicPlaylistsEnabled?: boolean;
 }
 
 export interface ShowtimesLocationDto {
@@ -38,6 +40,11 @@ export interface PlaybackPreferencesVM {
 }
 
 export const profileService = {
+    // Account owner only. Off means nothing about this profile's listening is
+    // sent to OpenAI, and no one can Blend with it.
+    setAiPlaylistsEnabled: async (profileId: string, enabled: boolean, serverId?: string): Promise<void> => {
+        await apiClient.put(`/users/profiles/${profileId}/ai-playlists`, { enabled }, { serverId });
+    },
     createProfile: async (userId: string, name: string, profileImageUrl?: string, pin?: string, allowedMovieRatings: string[] = [], allowedTvRatings: string[] = [], allowedMusicRatings: string[] = [], hasAllLibraryAccess = true, blockUnrated = false, allowedLibs: string[] = [], hasAllIptv = true, allowedIptv: string[] = [], schedules: ProfileScheduleVM[] = [], canRecordLiveTv = false, canAddCustomPodcastFeeds = true, serverId?: string, showtimesLocation: string | null = null): Promise<void> => {
         await apiClient.post(`/users/${userId}/profiles`, {
             name, profileImageUrl, pin,

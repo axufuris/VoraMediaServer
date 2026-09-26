@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { systemSettingsAdminService, type ServerSettings } from '../../../api/System/systemSettingsAdminService';
 import { musicService } from '../../../api/Music/musicService';
 import FeatureToggle from '../../../components/Admin/Features/FeatureToggle';
+import AiPlaylistsSettings from '../../../components/Admin/Features/AiPlaylistsSettings';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import { useDialog } from '../../../dialogs';
 
@@ -197,6 +198,8 @@ export default function ForYouPage() {
                                         </span>
                                     )}
                                 </section>
+
+                                <AiPlaylistsSettings serverSettings={serverSettings} onChange={setServerSettings} serverId={serverId} />
 
                                 <button type="submit" disabled={isSaving} className="vora-button-primary">
                                     {isSaving ? 'Saving…' : 'Save recommendation settings'}

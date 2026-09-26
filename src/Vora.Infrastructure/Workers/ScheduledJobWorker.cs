@@ -251,6 +251,13 @@ public class ScheduledJobWorker : BackgroundService
                 taskQueue.QueueGenerateAiEmbeddings();
             }
 
+            // Its own switch, not the recommendations plugin's: AI playlists only
+            // need the OpenAI key that plugin holds.
+            if (settings.EnableAiMusicPlaylists)
+            {
+                taskQueue.QueueEmbedMusicForAi();
+            }
+
             _lastAiEmbedDate = today;
         }
 

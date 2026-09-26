@@ -37,6 +37,7 @@ public interface IUserManager
 
     Task<string?> GetShowtimesLocationAsync(Guid profileId);
     Task SaveShowtimesLocationAsync(Guid profileId, string? location);
+    Task SetAiMusicPlaylistsEnabledAsync(Guid profileId, bool enabled);
 
     Task<PlaybackPreferencesVM> GetPlaybackPreferencesAsync(Guid profileId);
     Task<PlaybackPreferencesVM> SavePlaybackPreferencesAsync(Guid profileId, PlaybackPreferencesVM prefs);
@@ -374,6 +375,14 @@ public class UserManager(
         var profile = await repository.GetProfileByIdAsync(profileId)
             ?? throw new InvalidOperationException("Profile not found.");
         profile.ShowtimesLocation = string.IsNullOrWhiteSpace(location) ? null : location.Trim();
+        await repository.UpdateProfileAsync(profile);
+    }
+
+    public async Task SetAiMusicPlaylistsEnabledAsync(Guid profileId, bool enabled)
+    {
+        var profile = await repository.GetProfileByIdAsync(profileId)
+            ?? throw new InvalidOperationException("Profile not found.");
+        profile.AiMusicPlaylistsEnabled = enabled;
         await repository.UpdateProfileAsync(profile);
     }
 

@@ -159,6 +159,14 @@ public class ServerSetting
     public DateTime? DailyMixLastRefreshedAt { get; set; }
 
     public bool EnableWeeklyMixes { get; set; } = true;
+
+    // AI playlists for music. Off until an admin turns it on: it sends each
+    // profile's listening summary to OpenAI. Requests is the "Make me a
+    // playlist for..." box, which an admin can switch off on its own; the daily
+    // limit caps what one profile can spend on it.
+    public bool EnableAiMusicPlaylists { get; set; }
+    public bool EnableAiPlaylistRequests { get; set; } = true;
+    public int AiPlaylistRequestsPerDay { get; set; } = 10;
     public DateTime? WeeklyMixLastRefreshedAt { get; set; }
 
     public bool EnableDiscover { get; set; } = true;

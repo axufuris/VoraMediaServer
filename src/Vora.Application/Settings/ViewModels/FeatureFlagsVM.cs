@@ -31,6 +31,12 @@ public class FeatureFlagsVM
     // Not in UpdateFeatureFlagsRequest — it follows the plugin, so an admin sets
     // it by entering an API key rather than by flipping a switch.
     public bool SubtitleSearch { get; set; }
+
+    // Read-only and derived: the admin's AI playlists toggle, For You, and an
+    // OpenAI key. Requests additionally needs its own toggle. A profile can
+    // still have switched AI playlists off for itself - see UserProfileVM.
+    public bool AiPlaylists { get; set; }
+    public bool AiPlaylistRequests { get; set; }
 }
 
 public class UpdateFeatureFlagsRequest
