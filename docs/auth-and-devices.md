@@ -167,7 +167,7 @@ Every authenticated request goes through `Vora.Api/Middleware/DeviceTrackingMidd
    - `X-Vora-Device` → `DeviceName` (≤128)
    - `X-Vora-Device-Type` → `DeviceType` (≤32)
    - `X-Vora-OS` → `OperatingSystem` (≤64). The frontend sends a parsed short name (`Windows 10/11`, `macOS`, `iOS`, …) via `detectOs()` in `client.ts` — **never** the raw `navigator.userAgent` (overflows the column).
-4. Updates `LastConnectedAt`, `LastIpAddress`, `LastUserId`, `LastProfileId`. Geo-looks-up the IP via the named HttpClient `DeviceTrackingMiddleware.GeoLookupHttpClientName` only when the IP changes.
+4. Updates `LastConnectedAt`, `LastIpAddress`, `LastUserId`, `LastProfileId`. Geo-looks-up the IP (`ClientAddress`, ipwho.is over HTTPS, no key) via the named HttpClient `DeviceTrackingMiddleware.GeoLookupHttpClientName` when the IP changes or the device still has no location. Private and reserved addresses (incl. Docker's 172.16.0.0/12 and Tailscale's 100.64.0.0/10) are "Local Network" and never sent out. Behind Docker's port mapping every client can arrive as the bridge gateway (e.g. 172.20.0.1); a reverse proxy plus the `ForwardedHeaders` settings restores real addresses.
 5. Caches the device for 5 minutes to avoid re-upserting on every request.
 
 `DeviceEndpoints.UpdateCapabilitiesAsync` (`PUT /api/devices/capabilities`) reads the same `X-Vora-Device-Id` header to attach codec/container/audio-channel capabilities to the device row. `StreamingEndpoints` start-session does the same.

@@ -1,7 +1,7 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Vora.Api.Extensions;
+using Vora.Application.Devices;
 using Vora.Domain.Entities.Users;
 using Vora.Infrastructure.Persistence;
 
@@ -116,7 +116,10 @@ public class DeviceTrackingMiddleware
 
             var (device, ipChanged) = UpsertDevice(dbContext, existingDevice, context.Request, deviceId, ip, accountId, profileId);
 
-            if (ipChanged)
+            // Also retried while a device has no location yet, so devices saved
+            // while every lookup was failing get one without waiting for their
+            // address to change.
+            if (ipChanged || ClientAddress.NeedsLookup(device.Location))
             {
                 device.Location = await ResolveLocationAsync(httpClientFactory, ip, device.Location);
             }
@@ -196,32 +199,21 @@ public class DeviceTrackingMiddleware
 
     private static async Task<string> ResolveLocationAsync(IHttpClientFactory httpClientFactory, string ip, string? fallback)
     {
-        if (IsLocalIp(ip))
+        if (ClientAddress.IsLocal(ip))
         {
-            return "Local Network";
+            return ClientAddress.LocalNetwork;
         }
 
         try
         {
             var client = httpClientFactory.CreateClient(GeoLookupHttpClientName);
-            var response = await client.GetStringAsync($"https://ip-api.com/json/{Uri.EscapeDataString(ip)}");
-            using var doc = JsonDocument.Parse(response);
-
-            if (doc.RootElement.TryGetProperty("status", out var status) && status.GetString() == "success")
-            {
-                var city = doc.RootElement.GetProperty("city").GetString();
-                var region = doc.RootElement.GetProperty("region").GetString();
-                var country = doc.RootElement.GetProperty("countryCode").GetString();
-                return $"{city}, {region}, {country}";
-            }
+            var location = ClientAddress.ParseLocation(await client.GetStringAsync(ClientAddress.LookupUrl(ip)));
+            if (location != null) return location;
         }
-        catch
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
         }
 
-        return string.IsNullOrEmpty(fallback) ? "Unknown Location" : fallback;
+        return fallback is { } kept && !ClientAddress.NeedsLookup(kept) ? kept : ClientAddress.UnknownLocation;
     }
-
-    private static bool IsLocalIp(string ip) =>
-        ip.StartsWith("192.168.") || ip.StartsWith("10.") || ip.StartsWith("127.") || ip == "::1";
 }
