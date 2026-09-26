@@ -187,6 +187,9 @@ public class MusicRecommendationManager : IMusicRecommendationManager
             Slot = mix.Slot,
             Name = mix.Name,
             DescriptionTag = mix.DescriptionTag,
+            Kind = mix.Kind.ToString(),
+            Description = mix.Description,
+            Prompt = mix.Prompt,
             ArtworkUrl = mix.ArtworkUrl,
             GeneratedAt = mix.GeneratedAt,
             LastDriftAt = mix.LastDriftAt,
@@ -1331,6 +1334,12 @@ public class GeneratedMixDetailVM
     public int Slot { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? DescriptionTag { get; set; }
+    // DailyMix, DiscoverMix, MoodMix, ReleaseRadar - or, for an AI playlist,
+    // AiPlaylist, Bridge, Blend or Requested, with why it was made and the
+    // request's words.
+    public string Kind { get; set; } = "DailyMix";
+    public string? Description { get; set; }
+    public string? Prompt { get; set; }
     public string? ArtworkUrl { get; set; }
     public DateTime GeneratedAt { get; set; }
     public DateTime? LastDriftAt { get; set; }

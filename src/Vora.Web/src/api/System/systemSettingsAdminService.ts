@@ -64,6 +64,11 @@ export interface ServerSettings {
     dailyMixMinPlays: number;
     dailyMixLastRefreshedAt?: string;
     enableWeeklyMixes: boolean;
+    // AI playlists: off until an admin turns them on. Requests is the "Make me a
+    // playlist for..." box, with its own switch and a per-profile daily limit.
+    enableAiMusicPlaylists: boolean;
+    enableAiPlaylistRequests: boolean;
+    aiPlaylistRequestsPerDay: number;
     weeklyMixLastRefreshedAt?: string;
     dvrStoragePath?: string | null;
     dvrMaxStorageGb: number;

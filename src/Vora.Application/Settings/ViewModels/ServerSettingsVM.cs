@@ -68,6 +68,9 @@ public class ServerSettingsVM
     public int DailyMixMinPlays { get; set; } = 50;
     public DateTime? DailyMixLastRefreshedAt { get; set; }
     public bool EnableWeeklyMixes { get; set; } = true;
+    public bool EnableAiMusicPlaylists { get; set; }
+    public bool EnableAiPlaylistRequests { get; set; } = true;
+    public int AiPlaylistRequestsPerDay { get; set; } = 10;
     public DateTime? WeeklyMixLastRefreshedAt { get; set; }
 
     public string? DvrStoragePath { get; set; }
@@ -147,6 +150,9 @@ public class ServerSettingsVM
             DailyMixMinPlays = s.DailyMixMinPlays,
             DailyMixLastRefreshedAt = s.DailyMixLastRefreshedAt,
             EnableWeeklyMixes = s.EnableWeeklyMixes,
+            EnableAiMusicPlaylists = s.EnableAiMusicPlaylists,
+            EnableAiPlaylistRequests = s.EnableAiPlaylistRequests,
+            AiPlaylistRequestsPerDay = s.AiPlaylistRequestsPerDay,
             WeeklyMixLastRefreshedAt = s.WeeklyMixLastRefreshedAt,
             DvrStoragePath = s.DvrStoragePath,
             DvrMaxStorageGb = s.DvrMaxStorageGb,

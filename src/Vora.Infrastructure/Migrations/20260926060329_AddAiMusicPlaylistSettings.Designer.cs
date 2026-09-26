@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -12,9 +13,11 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    partial class VoraDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926060329_AddAiMusicPlaylistSettings")]
+    partial class AddAiMusicPlaylistSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1196,10 +1199,6 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
                     b.Property<string>("DescriptionTag")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -1218,15 +1217,8 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<Guid?>("PartnerProfileId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("ProfileId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("Prompt")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
 
                     b.Property<int>("Slot")
                         .HasColumnType("integer");

@@ -103,6 +103,75 @@ public class OpenAiClient(
         return data.Choices[0].Message?.Content;
     }
 
+    public const string EmbeddingModel = "text-embedding-3-small";
+
+    public async Task<IReadOnlyList<float[]?>?> EmbedAsync(string pluginId, IReadOnlyList<string> inputs, CancellationToken cancellationToken = default)
+    {
+        if (inputs.Count == 0) return Array.Empty<float[]?>();
+
+        var apiKey = await settings.GetPluginSettingAsync(KeyPluginId, "api_key");
+        if (string.IsNullOrWhiteSpace(apiKey)) return null;
+
+        var limitStr = await settings.GetPluginSettingAsync(KeyPluginId, "monthly_token_limit");
+        if (long.TryParse(limitStr, out var limit) && limit > 0)
+        {
+            var used = await usage.GetMonthlyTokenUsageAsync();
+            if (used >= limit)
+            {
+                throw new InvalidOperationException($"AI monthly token limit reached ({used:N0} / {limit:N0} tokens). Raise 'Monthly Token Limit' in the OpenAI plugin settings or wait until next month.");
+            }
+        }
+
+        var client = httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromMinutes(2);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/embeddings");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        request.Content = JsonContent.Create(new { model = EmbeddingModel, input = inputs });
+
+        var response = await client.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            logger.LogWarning("OpenAI embedding failed ({Status}) for plugin {PluginId}: {Body}", (int)response.StatusCode, pluginId, body);
+            throw new InvalidOperationException($"OpenAI request failed ({(int)response.StatusCode}). Check the API key and account billing.");
+        }
+
+        var data = await response.Content.ReadFromJsonAsync<EmbeddingResponse>(cancellationToken: cancellationToken);
+        var vectors = new float[]?[inputs.Count];
+
+        // By the index OpenAI returns, not by position: the order of the list is
+        // not part of the API's contract.
+        foreach (var entry in data?.Data ?? new List<EmbeddingEntry>())
+        {
+            if (entry.Index >= 0 && entry.Index < vectors.Length && entry.Embedding.Length > 0)
+            {
+                vectors[entry.Index] = entry.Embedding;
+            }
+        }
+
+        await usage.LogAiUsageAsync(new AiUsageLog
+        {
+            PluginId = pluginId,
+            ModelUsed = EmbeddingModel,
+            PromptTokens = data?.Usage?.PromptTokens ?? 0,
+            TotalTokens = data?.Usage?.TotalTokens ?? 0
+        });
+
+        return vectors;
+    }
+
+    private class EmbeddingResponse
+    {
+        public List<EmbeddingEntry> Data { get; set; } = new();
+        public UsageInfo? Usage { get; set; }
+    }
+
+    private class EmbeddingEntry
+    {
+        public float[] Embedding { get; set; } = Array.Empty<float>();
+        public int Index { get; set; }
+    }
+
     private static bool IsReasoningModel(string model)
         => model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase)
         || model.StartsWith("o1", StringComparison.OrdinalIgnoreCase)

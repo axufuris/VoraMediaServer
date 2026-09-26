@@ -73,6 +73,7 @@ public interface ITaskQueueManager
     void QueueSubtitleBackfill();
     void QueueRefreshMusicPopularity();
     void QueueRateMusicContent();
+    void QueueGenerateAiPlaylists(bool force = false);
 }
 
 public class TaskQueueManager : ITaskQueueManager
@@ -781,6 +782,18 @@ public class TaskQueueManager : ITaskQueueManager
         }, dedupeKey: "music-popularity-refresh");
     }
 
+    // Embeds any new songs first, since a playlist can only be made from songs
+    // that have vectors, then makes the weekly set for profiles that are due -
+    // or for every eligible profile when an admin forces it.
+    public void QueueGenerateAiPlaylists(bool force = false)
+    {
+        EnqueueTask("Make AI Playlists", async (ct, sp) =>
+        {
+            await sp.GetRequiredService<Vora.Application.Media.Ai.IMusicEmbeddingService>().EmbedMissingTracksAsync(ct);
+            await sp.GetRequiredService<Vora.Application.Media.Ai.IAiPlaylistService>().GenerateWeeklyForDueProfilesAsync(force, ct);
+        }, dedupeKey: "music-ai-playlists");
+    }
+
     // Deduplicated for the same reason as the popularity refresh, and likewise
     // network-bound, so it holds no library key.
     public void QueueRateMusicContent()
@@ -942,6 +955,13 @@ public class TaskQueueManager : ITaskQueueManager
             // first run this is the scan's new artists. Without it, a new artist
             // had no numbers until the next night.
             await RunStepAsync("Fetching popularity…", () => sp.GetRequiredService<IMusicPopularityRefresher>().RefreshDueArtistsAsync(ct));
+
+            // Only the scan's new songs, and only while AI playlists are on - the
+            // step isn't shown at all otherwise.
+            if ((await sp.GetRequiredService<Vora.Application.Settings.ISystemSettingsRepository>().GetSettingsAsync()).EnableAiMusicPlaylists)
+            {
+                await RunStepAsync("Preparing music for AI playlists…", () => sp.GetRequiredService<Vora.Application.Media.Ai.IMusicEmbeddingService>().EmbedMissingTracksAsync(ct));
+            }
         }
 
         // A show scanned across two resolution folders (e.g. .../TV/1080p/Show

@@ -121,6 +121,7 @@ public static class WebApplicationExtensions
         app.MapLogEndpoints();
         app.MapMediaEndpoints();
         app.MapMusicEndpoints();
+        app.MapAiPlaylistEndpoints();
         app.MapOverlayTemplateEndpoints();
         app.MapPlaylistEndpoints();
         app.MapPluginEndpoints();

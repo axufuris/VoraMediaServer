@@ -121,6 +121,12 @@ export interface GeneratedMixDetailVM {
     slot: number;
     name: string;
     descriptionTag?: string;
+    // DailyMix, DiscoverMix, MoodMix, ReleaseRadar - or for an AI playlist
+    // AiPlaylist, Bridge, Blend or Requested, with why it was made and the
+    // request's words.
+    kind?: string;
+    description?: string | null;
+    prompt?: string | null;
     artworkUrl?: string;
     generatedAt: string;
     lastDriftAt?: string;
@@ -443,6 +449,12 @@ export const musicService = {
 
     updateTrack: async (trackId: string, request: UpdateTrackRequest, serverId?: string): Promise<void> => {
         await apiClient.put(`/music/tracks/${trackId}`, request, { serverId });
+    },
+
+    // Keeps a generated mix as the profile's own playlist, in the mix's order.
+    saveMixAsPlaylist: async (mixId: string, serverId?: string): Promise<{ id: string }> => {
+        const response = await apiClient.post<{ id: string }>(`/music/recommendations/mixes/${mixId}/save`, null, { serverId });
+        return response.data;
     },
 
     // Sets and locks the rating on every track of the album. null for none.

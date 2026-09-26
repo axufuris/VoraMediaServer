@@ -52,6 +52,9 @@ public interface IMusicRepository
     Task<Artist?> GetArtistCatalogForUpdateAsync(Guid artistId);
     Task SaveMusicChangesAsync(CancellationToken cancellationToken);
     Task<List<ContentRatingTarget>> GetAlbumsDueForContentRatingAsync(DateTime recheckBefore, int limit);
+    Task<List<TrackForEmbedding>> GetTracksMissingEmbeddingsAsync(int limit);
+    Task<int> CountTracksMissingEmbeddingsAsync();
+    Task SaveTrackEmbeddingsAsync(IReadOnlyList<(Guid TrackId, float[] Vector)> embeddings);
     Task<List<Track>> GetAlbumTracksForUpdateAsync(Guid albumId);
     Task<Album?> GetAlbumForUpdateAsync(Guid albumId);
     Task<Track?> GetTrackForUpdateAsync(Guid trackId);
@@ -156,3 +159,5 @@ public class MusicAccessFilter
 public sealed record PopularityRefreshTarget(Guid ArtistId, string ArtistName);
 
 public sealed record ContentRatingTarget(Guid AlbumId, string ArtistName, string AlbumTitle);
+
+public sealed record TrackForEmbedding(Guid TrackId, string Title, string? Artist, string? AlbumTitle, int? Year, string? Genre);

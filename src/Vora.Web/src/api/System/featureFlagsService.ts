@@ -20,6 +20,10 @@ export interface FeatureFlagsVM {
     // Derived from the installed plugins rather than an admin toggle: true only
     // when a subtitle-search provider is installed AND configured.
     subtitleSearch: boolean;
+    // Derived: the admin's toggle, For You, and an OpenAI key. A profile can
+    // still have opted out - see UserProfileVM.aiMusicPlaylistsEnabled.
+    aiPlaylists: boolean;
+    aiPlaylistRequests: boolean;
 }
 
 export const DEFAULT_FEATURE_FLAGS: FeatureFlagsVM = {
@@ -35,7 +39,9 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlagsVM = {
     discoverEnabled: true,
     // Off by default: the feature needs an API key, so assuming it works would
     // show a Find Subtitles button that can only fail.
-    subtitleSearch: false
+    subtitleSearch: false,
+    aiPlaylists: false,
+    aiPlaylistRequests: false
 };
 
 export interface UpdateFeatureFlagsRequest {

@@ -29,6 +29,11 @@ public class UserProfile
 
     public string? ShowtimesLocation { get; set; }
 
+    // A profile's own opt-out from AI playlists. When off, nothing about its
+    // listening is sent to OpenAI, it gets no AI playlists or requests, and no
+    // one can Blend with it.
+    public bool AiMusicPlaylistsEnabled { get; set; } = true;
+
     public string? RadioPrefsJson { get; set; }
 
     public bool AutoSkipIntro { get; set; }

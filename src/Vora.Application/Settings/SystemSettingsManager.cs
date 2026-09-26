@@ -158,6 +158,10 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.DailyMixDriftPercent = Math.Clamp(request.DailyMixDriftPercent, 0, 100);
         settings.DailyMixMinPlays = Math.Max(0, request.DailyMixMinPlays);
         settings.EnableWeeklyMixes = request.EnableWeeklyMixes;
+        var aiPlaylistsTurnedOn = request.EnableAiMusicPlaylists && !settings.EnableAiMusicPlaylists;
+        settings.EnableAiMusicPlaylists = request.EnableAiMusicPlaylists;
+        settings.EnableAiPlaylistRequests = request.EnableAiPlaylistRequests;
+        settings.AiPlaylistRequestsPerDay = Math.Clamp(request.AiPlaylistRequestsPerDay, 1, 100);
 
         settings.DvrStoragePath = string.IsNullOrWhiteSpace(request.DvrStoragePath) ? null : request.DvrStoragePath;
         settings.DvrMaxStorageGb = Math.Max(0, request.DvrMaxStorageGb);
@@ -176,6 +180,13 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.TimeshiftMaxSessionHours = Math.Clamp(request.TimeshiftMaxSessionHours, 1, 48);
 
         await _settingsRepo.SaveChangesAsync();
+
+        // Start preparing the library now rather than at the next night's run,
+        // so the feature works the day it is switched on.
+        if (aiPlaylistsTurnedOn)
+        {
+            _serviceProvider.GetRequiredService<Vora.Application.Tasks.ITaskQueueManager>().QueueGenerateAiPlaylists();
+        }
 
         if (watcherChanged)
         {
@@ -197,6 +208,12 @@ public class SystemSettingsManager : ISystemSettingsManager
         var settings = await _settingsRepo.GetSettingsAsync();
         var iptv = await GetIptvSourceAvailabilityAsync();
 
+        // Switched on AND usable: the admin's toggle, the For You page they live
+        // on, and an OpenAI key to make them with.
+        var aiPlaylists = settings.EnableAiMusicPlaylists
+            && settings.EnableForYou
+            && !string.IsNullOrWhiteSpace(await _settingsRepo.GetPluginSettingAsync("openai_recommendations", "api_key"));
+
         return new FeatureFlagsVM
         {
             ForYou = settings.EnableForYou,
@@ -214,7 +231,9 @@ public class SystemSettingsManager : ISystemSettingsManager
             DiscoverEnabled = settings.EnableDiscover,
             LiveTvEnabled = settings.EnableLiveTv,
             InternetRadioEnabled = settings.EnableInternetRadio,
-            SubtitleSearch = await IsSubtitleSearchAvailableAsync()
+            SubtitleSearch = await IsSubtitleSearchAvailableAsync(),
+            AiPlaylists = aiPlaylists,
+            AiPlaylistRequests = aiPlaylists && settings.EnableAiPlaylistRequests
         };
     }
 

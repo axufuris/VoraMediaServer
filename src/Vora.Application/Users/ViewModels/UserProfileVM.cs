@@ -23,6 +23,7 @@ public class UserProfileVM
     public bool CanAddCustomPodcastFeeds { get; set; }
     public string? LastFmUsername { get; set; }
     public string? ShowtimesLocation { get; set; }
+    public bool AiMusicPlaylistsEnabled { get; set; } = true;
     public bool AutoSkipIntro { get; set; }
     public bool AutoSkipCredits { get; set; }
     public int MinimumCreditsSceneSeconds { get; set; }
@@ -47,6 +48,7 @@ public class UserProfileVM
             CanAddCustomPodcastFeeds = p.CanAddCustomPodcastFeeds,
             LastFmUsername = p.LastFmUsername,
             ShowtimesLocation = p.ShowtimesLocation,
+            AiMusicPlaylistsEnabled = p.AiMusicPlaylistsEnabled,
             AutoSkipIntro = p.AutoSkipIntro,
             AutoSkipCredits = p.AutoSkipCredits,
             MinimumCreditsSceneSeconds = p.MinimumCreditsSceneSeconds,

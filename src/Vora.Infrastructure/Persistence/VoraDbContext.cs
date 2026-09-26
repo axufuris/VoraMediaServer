@@ -343,6 +343,8 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
             entity.Property(e => e.DescriptionTag).HasMaxLength(100);
             entity.Property(e => e.ArtworkUrl).HasMaxLength(2048);
+            entity.Property(e => e.Description).HasMaxLength(300);
+            entity.Property(e => e.Prompt).HasMaxLength(300);
             entity.Property(e => e.Kind).HasConversion<int>();
             entity.Property(e => e.TrackOrder)
                   .HasConversion(converters.GuidList)
