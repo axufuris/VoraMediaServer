@@ -185,7 +185,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         // so the feature works the day it is switched on.
         if (aiPlaylistsTurnedOn)
         {
-            _serviceProvider.GetRequiredService<Vora.Application.Tasks.ITaskQueueManager>().QueueEmbedMusicForAi();
+            _serviceProvider.GetRequiredService<Vora.Application.Tasks.ITaskQueueManager>().QueueGenerateAiPlaylists();
         }
 
         if (watcherChanged)

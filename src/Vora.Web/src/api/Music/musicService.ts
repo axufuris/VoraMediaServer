@@ -121,6 +121,12 @@ export interface GeneratedMixDetailVM {
     slot: number;
     name: string;
     descriptionTag?: string;
+    // DailyMix, DiscoverMix, MoodMix, ReleaseRadar - or for an AI playlist
+    // AiPlaylist, Bridge, Blend or Requested, with why it was made and the
+    // request's words.
+    kind?: string;
+    description?: string | null;
+    prompt?: string | null;
     artworkUrl?: string;
     generatedAt: string;
     lastDriftAt?: string;

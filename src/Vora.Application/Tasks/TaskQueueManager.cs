@@ -73,7 +73,7 @@ public interface ITaskQueueManager
     void QueueSubtitleBackfill();
     void QueueRefreshMusicPopularity();
     void QueueRateMusicContent();
-    void QueueEmbedMusicForAi();
+    void QueueGenerateAiPlaylists(bool force = false);
 }
 
 public class TaskQueueManager : ITaskQueueManager
@@ -782,14 +782,16 @@ public class TaskQueueManager : ITaskQueueManager
         }, dedupeKey: "music-popularity-refresh");
     }
 
-    // A no-op unless AI playlists are switched on, so it is safe to queue from
-    // the nightly schedule on every server.
-    public void QueueEmbedMusicForAi()
+    // Embeds any new songs first, since a playlist can only be made from songs
+    // that have vectors, then makes the weekly set for profiles that are due -
+    // or for every eligible profile when an admin forces it.
+    public void QueueGenerateAiPlaylists(bool force = false)
     {
-        EnqueueTask("Prepare Music for AI Playlists", async (ct, sp) =>
+        EnqueueTask("Make AI Playlists", async (ct, sp) =>
         {
             await sp.GetRequiredService<Vora.Application.Media.Ai.IMusicEmbeddingService>().EmbedMissingTracksAsync(ct);
-        }, dedupeKey: "music-ai-embeddings");
+            await sp.GetRequiredService<Vora.Application.Media.Ai.IAiPlaylistService>().GenerateWeeklyForDueProfilesAsync(force, ct);
+        }, dedupeKey: "music-ai-playlists");
     }
 
     // Deduplicated for the same reason as the popularity refresh, and likewise

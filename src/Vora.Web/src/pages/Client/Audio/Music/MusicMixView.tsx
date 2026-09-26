@@ -3,6 +3,18 @@ import SaveMixButton from '../../../../components/Collections/SaveMixButton';
 import AddToPlaylistButton from '../../../../components/Collections/AddToPlaylistButton';
 import ContentRatingBadge from '../../../../components/Media/ContentRatingBadge';
 
+// What kind of mix the page is showing. AI playlists say so, so nobody
+// mistakes one for the ordinary Daily Mixes.
+const mixKicker = (kind?: string): string => {
+    switch (kind) {
+        case 'AiPlaylist': return 'Made for you by AI';
+        case 'Bridge': return 'Bridge · made by AI';
+        case 'Blend': return 'Blend';
+        case 'Requested': return 'Your request · made by AI';
+        default: return 'Made for You';
+    }
+};
+
 interface MusicMixViewProps {
     isLoading: boolean;
     currentMix: GeneratedMixDetailVM | null;
@@ -40,8 +52,10 @@ export default function MusicMixView({
                     </div>
                 </div>
                 <div className="flex-1 min-w-0">
-                    <div className="text-xs uppercase tracking-widest text-[var(--vora-text-secondary)] font-bold mb-1">Made for You</div>
+                    <div className="text-xs uppercase tracking-widest text-[var(--vora-text-secondary)] font-bold mb-1">{mixKicker(currentMix.kind)}</div>
                     <h2 className="text-3xl sm:text-4xl font-bold text-[var(--vora-text-primary)] truncate">{currentMix.name}</h2>
+                    {currentMix.prompt && <p className="text-sm text-[var(--vora-text-secondary)] mt-2">You asked for “{currentMix.prompt}”</p>}
+                    {currentMix.description && <p className="text-sm text-[var(--vora-text-secondary)] mt-2">{currentMix.description}</p>}
                     <p className="text-sm text-[var(--vora-text-secondary)] mt-2">{currentMix.tracks.length} tracks{currentMix.lastDriftAt ? ` • Updated ${new Date(currentMix.lastDriftAt).toLocaleDateString()}` : ''}</p>
                     {currentMix.tracks.length > 0 && (
                         <div className="flex flex-wrap items-center gap-2 mt-4 justify-center sm:justify-start">

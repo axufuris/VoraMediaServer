@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ServerSettings } from '../../../api/System/systemSettingsAdminService';
 import { featureFlagsService } from '../../../api/System/featureFlagsService';
+import { aiPlaylistService } from '../../../api/Music/aiPlaylistService';
 
 // AI playlists on the admin For You page, saved with the page's other mix
 // settings. Off until an admin turns it on, because it sends each profile's
@@ -22,7 +23,19 @@ export default function AiPlaylistsSettings({ serverSettings, onChange, serverId
             .catch(() => setActive(null));
     }, [serverId]);
 
+    const [queued, setQueued] = useState(false);
     const enabled = serverSettings.enableAiMusicPlaylists;
+
+    // Makes this week's set for every eligible profile now, rather than waiting
+    // for the nightly run. One small request per profile.
+    const generateNow = async () => {
+        try {
+            await aiPlaylistService.generateNow(serverId);
+            setQueued(true);
+        } catch {
+            setQueued(false);
+        }
+    };
 
     return (
         <section className="vora-card p-6" aria-labelledby="ai-playlists-heading">
@@ -41,6 +54,15 @@ export default function AiPlaylistsSettings({ serverSettings, onChange, serverId
                 Songs always come from your own library and each profile's parental controls. Uses the OpenAI key from the OpenAI plugin;
                 each profile's listening summary is sent to OpenAI, and any profile can opt out in its own settings.
             </p>
+
+            {enabled && active && (
+                <div className="mt-3 pl-6 flex flex-wrap items-center gap-3">
+                    <button type="button" onClick={generateNow} disabled={queued} className="vora-button-secondary text-xs disabled:opacity-60">
+                        {queued ? 'Started — see Background Tasks' : 'Make AI playlists now'}
+                    </button>
+                    <span className="text-xs text-[var(--vora-text-muted)]">Otherwise they're made weekly, overnight.</span>
+                </div>
+            )}
 
             {enabled && active === false && (
                 <p role="status" className="mt-3 pl-6 text-sm text-[var(--vora-warning-text)]">

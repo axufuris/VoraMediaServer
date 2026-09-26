@@ -255,7 +255,7 @@ public class ScheduledJobWorker : BackgroundService
             // need the OpenAI key that plugin holds.
             if (settings.EnableAiMusicPlaylists)
             {
-                taskQueue.QueueEmbedMusicForAi();
+                taskQueue.QueueGenerateAiPlaylists();
             }
 
             _lastAiEmbedDate = today;

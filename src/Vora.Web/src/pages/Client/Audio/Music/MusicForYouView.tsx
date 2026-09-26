@@ -11,6 +11,7 @@ import {
 import { useDialog } from '../../../../dialogs';
 import MediaCard from '../../../../components/Client/Primitives/MediaCard';
 import MediaRow, { MediaRowItem } from '../../../../components/Client/Primitives/MediaRow';
+import AiPlaylistsSection from './AiPlaylistsSection';
 import EmptyState from '../../../../components/Client/Primitives/EmptyState';
 import { type MusicNavState } from './musicNavState';
 import { albumCaption, trackCaption } from './musicCaptions';
@@ -181,6 +182,8 @@ export default function MusicForYouView({
                     )}
                 </div>
             </section>
+
+            <AiPlaylistsSection updateNav={updateNav} />
 
             {mixRow('Made for You', madeForYou, mix => mix.kind === 'DiscoverMix' ? 'Discover' : `Daily Mix ${mix.slot}`)}
 
