@@ -453,6 +453,38 @@ public class MusicRepository : IMusicRepository
             .ToListAsync();
     }
 
+    public Task<List<TrackForEmbedding>> GetTracksMissingEmbeddingsAsync(int limit) =>
+        _context.Tracks
+            .AsNoTracking()
+            .Where(t => !_context.MediaItemEmbeddings.Any(e => e.MediaItemId == t.Id))
+            .OrderBy(t => t.Id)
+            .Take(Math.Max(1, limit))
+            .Select(t => new TrackForEmbedding(
+                t.Id,
+                t.Title,
+                t.Artist ?? (t.Album != null ? t.Album.Artist.Name : null),
+                t.Album != null ? t.Album.Title : null,
+                t.Album != null ? t.Album.Year : null,
+                t.Album != null ? t.Album.Genre : null))
+            .ToListAsync();
+
+    public Task<int> CountTracksMissingEmbeddingsAsync() =>
+        _context.Tracks.CountAsync(t => !_context.MediaItemEmbeddings.Any(e => e.MediaItemId == t.Id));
+
+    public async Task SaveTrackEmbeddingsAsync(IReadOnlyList<(Guid TrackId, float[] Vector)> embeddings)
+    {
+        foreach (var (trackId, vector) in embeddings)
+        {
+            _context.MediaItemEmbeddings.Add(new Vora.Domain.Entities.Ai.MediaItemEmbedding
+            {
+                MediaItemId = trackId,
+                Embedding = new Pgvector.Vector(vector),
+                LastUpdatedAt = DateTime.UtcNow
+            });
+        }
+        await _context.SaveChangesAsync();
+    }
+
     public Task<List<Track>> GetAlbumTracksForUpdateAsync(Guid albumId) =>
         _context.Tracks
             .Where(t => t.AlbumId == albumId)

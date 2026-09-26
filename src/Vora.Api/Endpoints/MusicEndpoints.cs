@@ -179,6 +179,13 @@ public static class MusicEndpoints
             .WithName("GetMixDetail")
             .Produces<GeneratedMixDetailVM>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
+        // Keep a mix: a new playlist of its songs, in order, that the profile owns
+        // and that no refresh will change. Only songs the profile may hear.
+        group.MapPost("/recommendations/mixes/{mixId:guid}/save", SaveMixAsPlaylistAsync)
+            .RequireAuthorization()
+            .WithName("SaveMixAsPlaylist")
+            .Produces<Vora.Application.Playlists.ViewModels.CreatePlaylistResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
         group.MapGet("/recommendations/because-you-played", GetBecauseYouPlayedAsync)
             .RequireAuthorization()
             .WithName("ListBecauseYouPlayed")
@@ -637,6 +644,18 @@ public static class MusicEndpoints
         if (profileId == null) return Results.Forbid();
         var mixes = await manager.GetMixesForProfileAsync(profileId.Value, user.GetMusicAccessFilter());
         return Results.Ok(mixes);
+    }
+
+    private static async Task<IResult> SaveMixAsPlaylistAsync(Guid mixId, ClaimsPrincipal user, IMusicRecommendationManager manager, Vora.Application.Playlists.IPlaylistManager playlists)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        var detail = await manager.GetMixDetailAsync(mixId, profileId.Value, user.GetMusicAccessFilter());
+        if (detail == null) return Results.NotFound();
+
+        var id = await playlists.CreatePlaylistFromMediaAsync(
+            profileId.Value, detail.Name, null, Vora.Domain.Entities.Playlists.PlaylistMediaType.Music, detail.Tracks.Select(t => t.Id).ToList());
+        return Results.Ok(new Vora.Application.Playlists.ViewModels.CreatePlaylistResponse { Id = id });
     }
 
     private static async Task<IResult> GetMixDetailAsync(Guid mixId, ClaimsPrincipal user, IMusicRecommendationManager manager)

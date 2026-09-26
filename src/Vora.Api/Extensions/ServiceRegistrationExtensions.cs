@@ -407,6 +407,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMediaManager, MediaManager>();
         services.AddScoped<IMusicManager, MusicManager>();
         services.AddScoped<IMusicPopularityRefresher, MusicPopularityRefresher>();
+        services.AddScoped<Vora.Application.Media.Ai.IMusicEmbeddingService, Vora.Application.Media.Ai.MusicEmbeddingService>();
         services.AddScoped<IMusicContentRatingRefresher, MusicContentRatingRefresher>();
         services.AddScoped<IMusicRecommendationManager, MusicRecommendationManager>();
         services.AddSingleton<IServerPlaybackTracker, ServerPlaybackTracker>();

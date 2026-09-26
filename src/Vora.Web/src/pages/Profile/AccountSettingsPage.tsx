@@ -294,6 +294,23 @@ function ProfileEditor({ profile, user, libraries, iptvPlaylists, serverId, onCl
     const [editAllowedIptv, setEditAllowedIptv] = useState([...(profile.allowedIptvPlaylistIds || [])]);
     const [editCanRecordLiveTv, setEditCanRecordLiveTv] = useState(profile.canRecordLiveTv || false); // <-- NEW
     const [editCanAddCustomPodcastFeeds, setEditCanAddCustomPodcastFeeds] = useState(profile.canAddCustomPodcastFeeds ?? true);
+    const [aiPlaylists, setAiPlaylists] = useState(profile.aiMusicPlaylistsEnabled ?? true);
+    const [savingAiPlaylists, setSavingAiPlaylists] = useState(false);
+
+    // Saved straight away, like a switch: it has nothing to do with the form's
+    // other fields, and a new profile gets it on by default.
+    const handleAiPlaylistsChange = async (enabled: boolean) => {
+        setAiPlaylists(enabled);
+        setSavingAiPlaylists(true);
+        try {
+            await profileService.setAiPlaylistsEnabled(profile.id, enabled, serverId);
+        } catch {
+            setAiPlaylists(!enabled);
+            await dialog.alert('Could not change the AI playlists setting.');
+        } finally {
+            setSavingAiPlaylists(false);
+        }
+    };
     const [editSchedules, setEditSchedules] = useState([...profile.accessSchedules]);
     const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -416,6 +433,24 @@ function ProfileEditor({ profile, user, libraries, iptvPlaylists, serverId, onCl
                             </label>
                         </div>
                     </div>
+
+                    {profile.id !== 'NEW' && (
+                        <label className="flex items-start gap-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={aiPlaylists}
+                                disabled={savingAiPlaylists}
+                                onChange={e => handleAiPlaylistsChange(e.target.checked)}
+                                className="mt-0.5 w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer"
+                            />
+                            <span>
+                                <span className="block text-sm font-medium text-[var(--vora-text-secondary)]">AI playlists</span>
+                                <span className="block text-xs text-[var(--vora-text-muted)]">
+                                    Playlists made from this profile's listening, when the server has them on. Off means nothing about its listening is sent to OpenAI, and no one can Blend with it.
+                                </span>
+                            </span>
+                        </label>
+                    )}
                 </>
             )}
 

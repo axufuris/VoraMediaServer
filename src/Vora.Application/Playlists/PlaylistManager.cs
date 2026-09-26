@@ -12,6 +12,7 @@ public interface IPlaylistManager
     Task<bool> SetSharedAsync(Guid id, Guid ownerProfileId, bool isShared);
     Task<Guid?> CopyPlaylistAsync(Guid sourceId, Guid viewerProfileId, PlaylistAccessFilter access);
     Task<Guid> CreatePlaylistAsync(Guid profileId, string name, string? description, PlaylistMediaType mediaType);
+    Task<Guid> CreatePlaylistFromMediaAsync(Guid profileId, string name, string? description, PlaylistMediaType mediaType, IReadOnlyList<Guid> mediaIds);
     Task AddToPlaylistAsync(Guid playlistId, Guid profileId, Guid mediaItemId);
     Task RemoveFromPlaylistAsync(Guid playlistId, Guid profileId, Guid playlistItemId);
     Task ReorderPlaylistAsync(Guid playlistId, Guid profileId, List<Guid> itemIds);
@@ -53,6 +54,21 @@ public class PlaylistManager : IPlaylistManager
     public async Task<Guid> CreatePlaylistAsync(Guid profileId, string name, string? description, PlaylistMediaType mediaType)
     {
         var playlist = new Playlist { ProfileId = profileId, Name = name, Description = description, MediaType = mediaType };
+        return await _repository.CreatePlaylistAsync(playlist);
+    }
+
+    // A new playlist holding these items in this order: a generated mix saved to
+    // keep, or an AI playlist the listener wants to hold on to. Starts unshared.
+    public async Task<Guid> CreatePlaylistFromMediaAsync(Guid profileId, string name, string? description, PlaylistMediaType mediaType, IReadOnlyList<Guid> mediaIds)
+    {
+        var playlist = new Playlist
+        {
+            ProfileId = profileId,
+            Name = name,
+            Description = description,
+            MediaType = mediaType,
+            Items = mediaIds.Distinct().Select((id, i) => new PlaylistItem { MediaItemId = id, Order = i + 1 }).ToList()
+        };
         return await _repository.CreatePlaylistAsync(playlist);
     }
 

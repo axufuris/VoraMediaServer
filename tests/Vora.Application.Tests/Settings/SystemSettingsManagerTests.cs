@@ -591,4 +591,44 @@ public class SystemSettingsManagerTests
         vm.LiveTvEnabled.Should().BeTrue();
         vm.LiveTv.Should().BeFalse();
     }
+
+    // AI playlists are off until an admin turns them on, and then usable only
+    // with For You on and an OpenAI key to make them with.
+    [Theory]
+    [InlineData(true, true, "sk-key", true, true)]
+    [InlineData(false, true, "sk-key", true, false)]
+    [InlineData(true, false, "sk-key", true, false)]
+    [InlineData(true, true, null, true, false)]
+    public async Task AI_playlists_need_the_toggle_For_You_and_a_key(bool toggle, bool forYou, string? key, bool requests, bool expected)
+    {
+        _repo.GetSettingsAsync().Returns(new ServerSetting { EnableAiMusicPlaylists = toggle, EnableForYou = forYou, EnableAiPlaylistRequests = requests });
+        _repo.GetPluginSettingAsync("openai_recommendations", "api_key").Returns(key);
+
+        var vm = await Build().GetFeatureFlagsAsync();
+
+        vm.AiPlaylists.Should().Be(expected);
+        vm.AiPlaylistRequests.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task The_make_me_a_playlist_box_has_its_own_off_switch()
+    {
+        _repo.GetSettingsAsync().Returns(new ServerSetting { EnableAiMusicPlaylists = true, EnableForYou = true, EnableAiPlaylistRequests = false });
+        _repo.GetPluginSettingAsync("openai_recommendations", "api_key").Returns("sk-key");
+
+        var vm = await Build().GetFeatureFlagsAsync();
+
+        vm.AiPlaylists.Should().BeTrue();
+        vm.AiPlaylistRequests.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AI_playlists_start_off_and_requests_start_on_behind_them()
+    {
+        var fresh = new ServerSetting();
+
+        fresh.EnableAiMusicPlaylists.Should().BeFalse();
+        fresh.EnableAiPlaylistRequests.Should().BeTrue();
+        fresh.AiPlaylistRequestsPerDay.Should().Be(10);
+    }
 }

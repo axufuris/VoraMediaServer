@@ -10,4 +10,9 @@ public interface IOpenAiClient
     // configured. Throws InvalidOperationException when the configured monthly
     // token limit has been reached. Usage is logged against the calling plugin.
     Task<string?> CompleteJsonAsync(string pluginId, string prompt, CancellationToken cancellationToken = default, double? temperature = null, string? modelSettingKey = null);
+
+    // text-embedding-3-small vectors for the inputs, in input order; an entry
+    // the response didn't cover is null. Null overall when no key is
+    // configured. Same monthly limit and usage logging as chat.
+    Task<IReadOnlyList<float[]?>?> EmbedAsync(string pluginId, IReadOnlyList<string> inputs, CancellationToken cancellationToken = default);
 }

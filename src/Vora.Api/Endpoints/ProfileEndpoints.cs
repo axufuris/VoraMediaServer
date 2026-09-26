@@ -158,6 +158,13 @@ public static class ProfileEndpoints
             .RequireAuthorization("AdminOnly")
             .Produces<ShowtimesLocationDto>(StatusCodes.Status200OK);
 
+        // The account that owns the profile (AccountOwnershipFilter), so a parent
+        // can switch it off for a child's profile.
+        group.MapPut("/profiles/{profileId:guid}/ai-playlists", SetAiPlaylistsAsync)
+            .WithName("SetProfileAiPlaylists")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/profiles/me/playback-preferences", GetMyPlaybackPreferencesAsync)
             .WithName("GetMyPlaybackPreferences")
             .Produces<PlaybackPreferencesVM>(StatusCodes.Status200OK);
@@ -308,6 +315,19 @@ public static class ProfileEndpoints
         catch (InvalidOperationException ex)
         {
             return Results.BadRequest(new { Message = ex.Message });
+        }
+    }
+
+    private static async Task<IResult> SetAiPlaylistsAsync(Guid profileId, [FromBody] AiPlaylistsSettingRequest request, IUserManager manager)
+    {
+        try
+        {
+            await manager.SetAiMusicPlaylistsEnabledAsync(profileId, request.Enabled);
+            return Results.NoContent();
+        }
+        catch (InvalidOperationException)
+        {
+            return Results.NotFound();
         }
     }
 
