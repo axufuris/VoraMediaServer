@@ -23,6 +23,7 @@ import { isImageSubtitleCodec, isNoSubtitle, NoSubtitle } from '../../utils/subt
 import { placeCues } from '../../utils/subtitleCuePlacement';
 import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { ScrubThumbnail } from './VideoScrubThumbnails';
+import { seasonEpisodeLabel } from '../../utils/seasonLabel';
 
 type VideoTrackType = NonNullable<MediaPart['videoTracks']>[number];
 type AudioTrackType = NonNullable<MediaPart['audioTracks']>[number];
@@ -509,7 +510,7 @@ export default function GlobalVideoPlayer() {
             playMedia({
                 id: item.id,
                 title: item.title,
-                subtitle: item.type === 'Episode' ? `S${item.seasonNumber} E${item.episodeNumber} - ${item.tvShowTitle}` : '',
+                subtitle: item.type === 'Episode' && item.seasonNumber != null && item.episodeNumber != null ? `${seasonEpisodeLabel(item.seasonNumber, item.episodeNumber)} - ${item.tvShowTitle}` : '',
                 posterUrl: item.posterUrl,
                 backgroundUrl: item.backgroundUrl,
                 ...sessionInfo,

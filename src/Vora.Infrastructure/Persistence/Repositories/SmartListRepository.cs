@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Vora.Application.Media;
+using Microsoft.EntityFrameworkCore;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.SmartLists;
 using Vora.Application.SmartLists.Dtos;
@@ -45,9 +46,11 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
 
         // A show should appear at most once in a list row. When the list surfaces
         // episodes, collapse each show to a single episode — the first unwatched
-        // one (by season/episode), or its earliest if all are watched. Only the
-        // top of the sorted pool is inspected so this stays cheap on large TV
-        // libraries; non-episode items pass through untouched.
+        // one (by season/episode), or its earliest if all are watched. Specials
+        // (season 0) only count when they are all the show has in the pool;
+        // ordered by number they always came first. Only the top of the sorted
+        // pool is inspected so this stays cheap on large TV libraries;
+        // non-episode items pass through untouched.
         if (rules?.MediaTypes != null && rules.MediaTypes.Contains("Episode"))
         {
             var poolSize = Math.Max(maxItems * 10, 100);
@@ -67,8 +70,9 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
 
             var keptEpisodeIds = episodePool
                 .GroupBy(e => e.ShowId)
-                .Select(g => (g.Where(e => !e.Played).OrderBy(e => e.Season).ThenBy(e => e.Episode).FirstOrDefault()
-                              ?? g.OrderBy(e => e.Season).ThenBy(e => e.Episode).First()).Id)
+                .Select(g => EpisodeSequence.PreferRegular(g, e => e.Season))
+                .Select(pool => (pool.Where(e => !e.Played).OrderBy(e => e.Season).ThenBy(e => e.Episode).FirstOrDefault()
+                                 ?? pool.OrderBy(e => e.Season).ThenBy(e => e.Episode).First()).Id)
                 .ToHashSet();
 
             query = query.Where(m => !(m is Episode) || keptEpisodeIds.Contains(m.Id));

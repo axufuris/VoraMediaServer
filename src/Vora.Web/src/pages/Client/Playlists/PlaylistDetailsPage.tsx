@@ -15,6 +15,7 @@ import { isAxiosError } from 'axios';
 import { PlaylistSharingControls, PlaylistUnavailable, SavedCopyBanner, type SavedCopyState } from './PlaylistSharing';
 import MusicPlaylistView from './MusicPlaylistView';
 import PlaylistCover from '../../../components/Collections/PlaylistCover';
+import { seasonEpisodeLabel } from '../../../utils/seasonLabel';
 
 export default function PlaylistDetailsPage() {
     const dialog = useDialog();
@@ -182,7 +183,9 @@ export default function PlaylistDetailsPage() {
         let targetMediaId = selectedItem.mediaItemId;
         let startPos = selectedItem.resumePositionSeconds || 0;
         let playTitle = selectedItem.title;
-        let playSubtitle = selectedItem.type === 'Episode' ? `S${selectedItem.seasonNumber} E${selectedItem.episodeNumber} - ${selectedItem.tvShowTitle}` : playlist?.name;
+        let playSubtitle = selectedItem.type === 'Episode' && selectedItem.seasonNumber != null && selectedItem.episodeNumber != null
+            ? `${seasonEpisodeLabel(selectedItem.seasonNumber, selectedItem.episodeNumber)} - ${selectedItem.tvShowTitle}`
+            : playlist?.name;
 
         if (selectedItem.type === 'Season') {
             try {
@@ -197,7 +200,7 @@ export default function PlaylistDetailsPage() {
                 targetMediaId = firstUnwatched.id;
                 startPos = firstUnwatched.resumePositionSeconds || 0;
                 playTitle = firstUnwatched.title;
-                playSubtitle = `S${seasonData.seasonNumber} E${firstUnwatched.episodeNumber} - ${seasonData.tvShowTitle}`;
+                playSubtitle = `${seasonEpisodeLabel(seasonData.seasonNumber, firstUnwatched.episodeNumber)} - ${seasonData.tvShowTitle}`;
             } catch (error) {
                 console.error("Failed to load season episodes", error);
                 await dialog.alert("Failed to resolve episodes for this season.");

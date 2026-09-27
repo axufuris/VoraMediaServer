@@ -35,6 +35,7 @@ import MediaInfoDialog from '../../../components/Media/MediaInfoDialog';
 import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
 import { audioChipLabel, heroFactsLine, pickChipAudioTrack, resolutionChipLabel, subtitleChipLabel } from '../../../utils/heroQualityChips';
 import { formatDate, serverTimeMs, yearOf } from '../../../utils/serverTime';
+import { seasonEpisodeLabel } from '../../../utils/seasonLabel';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -253,11 +254,8 @@ export default function MediaDetailsPage() {
         if (!media) return;
 
         let subtitle = '';
-        if (media.type === 'Episode') {
-            const epLabel = media.endEpisodeNumber && media.endEpisodeNumber > (media.episodeNumber ?? 0)
-                ? `E${media.episodeNumber}-E${media.endEpisodeNumber}`
-                : `E${media.episodeNumber}`;
-            subtitle = `S${media.seasonNumber} ${epLabel} - ${media.tvShowTitle}`;
+        if (media.type === 'Episode' && media.seasonNumber != null && media.episodeNumber != null) {
+            subtitle = `${seasonEpisodeLabel(media.seasonNumber, media.episodeNumber, { endEpisodeNumber: media.endEpisodeNumber })} - ${media.tvShowTitle}`;
         }
         else if (media.releaseDate) subtitle = String(yearOf(media.releaseDate) ?? '');
 
@@ -794,10 +792,8 @@ export default function MediaDetailsPage() {
                 posterShape={isEpisode ? 'still' : 'poster'}
                 title={heroTitle}
                 logoUrl={media.logoUrl}
-                titleSuffix={isEpisode
-                    ? (media.endEpisodeNumber && media.endEpisodeNumber > (media.episodeNumber ?? 0)
-                        ? `S${media.seasonNumber} E${media.episodeNumber}-E${media.endEpisodeNumber}`
-                        : `S${media.seasonNumber} E${media.episodeNumber}`)
+                titleSuffix={isEpisode && media.seasonNumber != null && media.episodeNumber != null
+                    ? seasonEpisodeLabel(media.seasonNumber, media.episodeNumber, { endEpisodeNumber: media.endEpisodeNumber })
                     : undefined}
                 subtitle={heroSubtitle}
                 chips={heroChips}
