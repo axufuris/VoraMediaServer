@@ -1047,10 +1047,6 @@ public class TaskQueueManager : ITaskQueueManager
     // concurrently up to the global cap.
     private static string LibraryKey(Guid libraryId) => $"library:{libraryId}";
 
-    // A library's full ingest and its plain scans share this, so a scan asked for
-    // while one is already queued or running is dropped. Adding a library starts
-    // its folder watcher, whose first reconcile finds nothing ingested yet and
-    // queued a second full scan behind the ingest that was covering those files.
     private static string LibraryScanKey(Guid libraryId) => $"library-scan:{libraryId}";
 
     // The long maintenance jobs (Analyze, Thumbnails) get a separate key from the

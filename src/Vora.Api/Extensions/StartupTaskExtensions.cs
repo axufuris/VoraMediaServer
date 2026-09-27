@@ -26,9 +26,6 @@ public static class StartupTaskExtensions
         await PreloadIptvEpgCacheAsync(app);
     }
 
-    // The settings row is created from ServerSetting's own defaults the first
-    // time it is read. Doing that here, once, means two early requests never
-    // race to insert it.
     private static async Task EnsureServerSettingsAsync(WebApplication app)
     {
         using var scope = app.Services.CreateScope();
