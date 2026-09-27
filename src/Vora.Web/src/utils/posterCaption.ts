@@ -1,3 +1,4 @@
+import { seasonEpisodeLabel } from './seasonLabel';
 // The structured caption shown under a poster/card, consistent everywhere we
 // render a list of posters. The shape varies by media type:
 //
@@ -92,7 +93,7 @@ export function posterCaption(item: PosterCaptionItem): PosterCaption {
             // faster than "S1 · E5" does. Falls back to the named-season label
             // ("Specials · E3") when there's no numeric season.
             const seasonEp = item.seasonNumber != null && item.episodeNumber != null
-                ? `S${item.seasonNumber} · E${item.episodeNumber}`
+                ? seasonEpisodeLabel(item.seasonNumber, item.episodeNumber, { separator: ' · ' })
                 : dotJoin([seasonLabel(item), item.episodeNumber != null ? `E${item.episodeNumber}` : null]);
             return {
                 title: item.tvShowTitle || item.title,

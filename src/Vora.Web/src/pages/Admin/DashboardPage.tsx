@@ -13,6 +13,7 @@ import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
 import StatusDot from '../../components/Admin/Primitives/StatusDot';
 import EmptyState from '../../components/Admin/Primitives/EmptyState';
 import { Modal } from '../../components/Common/Modal';
+import { seasonEpisodeLabel } from '../../utils/seasonLabel';
 
 function formatRelative(iso: string): string {
     const diffMs = Date.now() - new Date(iso).getTime();
@@ -88,8 +89,8 @@ function NowPlayingRow({ session, onPlay, onPause, onStop }: { session: NowPlayi
     const fullTitle = session.tvShowTitle
         ? `${session.tvShowTitle} — ${session.title}`
         : session.title;
-    const subtitle = session.tvShowTitle && session.seasonNumber && session.episodeNumber
-        ? `S${session.seasonNumber} · E${session.episodeNumber}`
+    const subtitle = session.tvShowTitle && session.seasonNumber != null && session.episodeNumber != null
+        ? seasonEpisodeLabel(session.seasonNumber, session.episodeNumber, { separator: ' · ' })
         : null;
 
     return (

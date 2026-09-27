@@ -97,11 +97,13 @@ public class UserMediaStateRepository : IUserMediaStateRepository
 
             if (seasonInfo != null)
             {
+                var inSpecials = EpisodeSequence.IsSpecial(seasonInfo.SeasonNumber);
+
                 result.NextItem = await _context.Set<Episode>()
                     .AsNoTracking()
                     .Where(e => e.Season.TvShowId == seasonInfo.TvShowId && e.MissingSince == null &&
                                ((e.Season.SeasonNumber == seasonInfo.SeasonNumber && e.EpisodeNumber > currentMedia.EpisodeNumber) ||
-                                 e.Season.SeasonNumber > seasonInfo.SeasonNumber))
+                                 (!inSpecials && e.Season.SeasonNumber > seasonInfo.SeasonNumber)))
                     .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
                     .Select(e => new UpNextItemVM
                     {
@@ -121,7 +123,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                     .AsNoTracking()
                     .Where(e => e.Season.TvShowId == seasonInfo.TvShowId &&
                                ((e.Season.SeasonNumber == seasonInfo.SeasonNumber && e.EpisodeNumber < currentMedia.EpisodeNumber) ||
-                                 e.Season.SeasonNumber < seasonInfo.SeasonNumber))
+                                 (e.Season.SeasonNumber < seasonInfo.SeasonNumber && e.Season.SeasonNumber != EpisodeSequence.SpecialsSeason)))
                     .OrderByDescending(e => e.Season.SeasonNumber).ThenByDescending(e => e.EpisodeNumber)
                     .Select(e => new UpNextItemVM
                     {
@@ -142,11 +144,15 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         {
             UpNextItemVM? nextEpisode = null;
 
+            var hasRegularEpisodes = await _context.Set<Episode>()
+                .AnyAsync(e => e.Season.TvShowId == mediaId && e.MissingSince == null && e.Season.SeasonNumber != EpisodeSequence.SpecialsSeason);
+
             if (profileId.HasValue)
             {
                 nextEpisode = await _context.Set<Episode>()
                     .AsNoTracking()
                     .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
+                    .Where(e => !hasRegularEpisodes || e.Season.SeasonNumber != EpisodeSequence.SpecialsSeason)
                     .Where(e => !_context.UserMediaStates.Any(s => s.ProfileId == profileId.Value && s.MediaItemId == e.Id && s.IsPlayed))
                     .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
                     .Select(e => new UpNextItemVM
@@ -167,6 +173,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
             nextEpisode ??= await _context.Set<Episode>()
                 .AsNoTracking()
                 .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
+                .Where(e => !hasRegularEpisodes || e.Season.SeasonNumber != EpisodeSequence.SpecialsSeason)
                 .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
                 .Select(e => new UpNextItemVM
                 {
@@ -293,12 +300,27 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                 .Where(e => candidateShowIds.Contains(e.Season.TvShowId))
                 .Where(e => e.MissingSince == null)
                 .Where(e => !_context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == e.Id && (s.IsPlayed || s.IsHiddenFromContinueWatching)))
-                .Select(e => new { e.Id, TvShowId = e.Season.TvShowId, SeasonNumber = e.Season.SeasonNumber, e.EpisodeNumber })
+                .Select(e => new
+                {
+                    e.Id,
+                    TvShowId = e.Season.TvShowId,
+                    SeasonNumber = e.Season.SeasonNumber,
+                    e.EpisodeNumber,
+                    InProgress = _context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == e.Id && s.ResumePositionSeconds > 0)
+                })
                 .ToListAsync();
+
+            var showsWithRegularEpisodes = (await _context.Set<Episode>()
+                .AsNoTracking()
+                .Where(e => candidateShowIds.Contains(e.Season.TvShowId) && e.MissingSince == null && e.Season.SeasonNumber != EpisodeSequence.SpecialsSeason)
+                .Select(e => e.Season.TvShowId)
+                .Distinct()
+                .ToListAsync()).ToHashSet();
 
             var nextEpisodeIds = unplayedKeys
                 .GroupBy(e => e.TvShowId)
-                .Select(g => g.OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).First().Id)
+                .Select(g => EpisodeSequence.PickNextUp(g, e => e.SeasonNumber, e => e.EpisodeNumber, e => e.InProgress, showsWithRegularEpisodes.Contains(g.Key))?.Id)
+                .OfType<Guid>()
                 .ToList();
 
             var candidateEpisodes = await _context.Set<Episode>()
