@@ -16,12 +16,12 @@ public class ServerSetting
     // meant their own 2am.
     public string ScheduleTimeZone { get; set; } = string.Empty;
 
-    public bool EnableNightlyScan { get; set; } = true;
+    public bool EnableNightlyScan { get; set; }
     public TimeSpan NightlyScanTime { get; set; } = new(2, 0, 0);
 
     public List<string> ScanIgnoredFolders { get; set; } = new() { ".recycle" };
 
-    public DetectionTrigger RunDetections { get; set; } = DetectionTrigger.OnSchedule;
+    public DetectionTrigger RunDetections { get; set; } = DetectionTrigger.Never;
     public TimeSpan DetectionScheduleTime { get; set; } = new(3, 0, 0);
 
     public int SilenceThresholdOffsetDb { get; set; } = -12;
@@ -43,7 +43,7 @@ public class ServerSetting
     // When thumbnail generation runs automatically. Mirrors RunDetections for
     // analysis: OnSchedule (default) keeps the nightly pass, OnAddition generates
     // right after a scan adds files, Never disables both (manual Regenerate only).
-    public DetectionTrigger VideoThumbnailGeneration { get; set; } = DetectionTrigger.OnSchedule;
+    public DetectionTrigger VideoThumbnailGeneration { get; set; } = DetectionTrigger.Never;
 
     public TimeSpan VideoThumbnailScheduleTime { get; set; } = new(4, 0, 0);
     public int VideoThumbnailIntervalSeconds { get; set; } = 10;
@@ -80,7 +80,7 @@ public class ServerSetting
     public bool EnableTrashAutoPurge { get; set; } = true;
     public int MissingMediaRetentionDays { get; set; } = 30;
 
-    public bool ResolveMovieTvdbIds { get; set; }
+    public bool ResolveMovieTvdbIds { get; set; } = true;
 
     public string MetadataLanguage { get; set; } = "eng";
 
@@ -101,7 +101,7 @@ public class ServerSetting
     public int InternetUploadSpeedMbps { get; set; } = 1000;
     public int MaxRemoteStreamBitrateMbps { get; set; }
 
-    public StreamingProfile StreamingProfile { get; set; } = StreamingProfile.ClientPreference;
+    public StreamingProfile StreamingProfile { get; set; } = StreamingProfile.DirectStreamPreference;
 
     public bool DisableVideoTranscoding { get; set; }
     public bool UseHardwareAcceleration { get; set; } = true;

@@ -19,6 +19,10 @@ public static class SettingsEndpoints
         group.MapPut("/server", UpdateServerSettingsAsync)
             .Produces(StatusCodes.Status204NoContent);
 
+        group.MapPut("/registration-mode", UpdateRegistrationModeAsync)
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
         group.MapGet("/plugins/{pluginId}", GetPluginSettingsAsync)
             .Produces<List<PluginSettingFieldVM>>(StatusCodes.Status200OK);
 
@@ -46,6 +50,16 @@ public static class SettingsEndpoints
     {
         var settings = await manager.GetServerSettingsAsync();
         return Results.Ok(settings);
+    }
+
+    private static async Task<IResult> UpdateRegistrationModeAsync([FromBody] UpdateRegistrationModeRequest request, ISystemSettingsManager manager)
+    {
+        if (!Enum.IsDefined(request.Mode))
+        {
+            return Results.Problem("Unknown registration mode.", statusCode: StatusCodes.Status400BadRequest);
+        }
+        await manager.UpdateRegistrationModeAsync(request.Mode);
+        return Results.NoContent();
     }
 
     private static async Task<IResult> UpdateServerSettingsAsync([FromBody] ServerSettingsVM request, ISystemSettingsManager manager)

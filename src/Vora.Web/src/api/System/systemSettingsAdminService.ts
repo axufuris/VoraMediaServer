@@ -94,6 +94,9 @@ export interface PluginSettingField {
     options: string[];
 }
 
+// The server's RegistrationMode names, by the number the settings page uses.
+const REGISTRATION_MODES: Record<number, string> = { 0: 'Disabled', 1: 'Simple', 2: 'SecretWord', 3: 'Invitation' };
+
 export const systemSettingsAdminService = {
     getServerSettings: async (serverId?: string): Promise<ServerSettings> => {
         const response = await apiClient.get<ServerSettings>('/settings/server', { serverId });
@@ -105,6 +108,11 @@ export const systemSettingsAdminService = {
     },
     updateServerSettings: async (settings: ServerSettings, serverId?: string): Promise<void> => {
         await apiClient.put('/settings/server', settings, { serverId });
+    },
+    // Its own call: the full settings save leaves the registration mode alone,
+    // so System Settings can never undo a change made on Users & Access.
+    updateRegistrationMode: async (mode: number, serverId?: string): Promise<void> => {
+        await apiClient.put('/settings/registration-mode', { mode: REGISTRATION_MODES[mode] ?? 'SecretWord' }, { serverId });
     },
     queueSubtitleBackfill: async (serverId?: string): Promise<void> => {
         await apiClient.post('/metadata/subtitles/backfill', {}, { serverId });

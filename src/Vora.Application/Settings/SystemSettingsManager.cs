@@ -11,6 +11,7 @@ public interface ISystemSettingsManager
 {
     Task<ServerSettingsVM> GetServerSettingsAsync();
     Task UpdateServerSettingsAsync(ServerSettingsVM request);
+    Task UpdateRegistrationModeAsync(RegistrationMode mode);
     Task<List<PluginSettingFieldVM>> GetPluginSettingsAsync(string pluginId);
     Task UpdatePluginSettingsAsync(string pluginId, Dictionary<string, string> settings);
     Task<FeatureFlagsVM> GetFeatureFlagsAsync();
@@ -75,6 +76,13 @@ public class SystemSettingsManager : ISystemSettingsManager
         return result;
     }
 
+    public async Task UpdateRegistrationModeAsync(RegistrationMode mode)
+    {
+        var settings = await _settingsRepo.GetSettingsForUpdateAsync();
+        settings.RegistrationMode = mode;
+        await _settingsRepo.SaveChangesAsync();
+    }
+
     public async Task UpdateServerSettingsAsync(ServerSettingsVM request)
     {
         var settings = await _settingsRepo.GetSettingsForUpdateAsync();
@@ -131,7 +139,6 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.ResolveMovieTvdbIds = request.ResolveMovieTvdbIds;
         settings.MetadataLanguage = string.IsNullOrWhiteSpace(request.MetadataLanguage) ? "eng" : request.MetadataLanguage;
         settings.AutoEnableSubtitlesForForeignAudio = request.AutoEnableSubtitlesForForeignAudio;
-        settings.RegistrationMode = (RegistrationMode)request.RegistrationMode;
         settings.InternetUploadSpeedMbps = request.InternetUploadSpeedMbps;
         settings.MaxRemoteStreamBitrateMbps = request.MaxRemoteStreamBitrateMbps;
         settings.StreamingProfile = (StreamingProfile)request.StreamingProfile;

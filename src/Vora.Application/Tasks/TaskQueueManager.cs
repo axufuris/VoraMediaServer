@@ -107,7 +107,8 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Auto-Ingest Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
             RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, ct),
             libraryName == null ? LibraryLabel(libraryId, "Auto-Ingest Library: {0}") : null,
-            resourceKey: LibraryKey(libraryId));
+            resourceKey: LibraryKey(libraryId),
+            dedupeKey: LibraryScanKey(libraryId));
     }
 
     public void QueueLibraryUpdated(Guid libraryId, string? libraryName = null, bool forceOverride = false)
@@ -123,6 +124,7 @@ public class TaskQueueManager : ITaskQueueManager
         EnqueueTask($"Scan Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
             RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, ct),
             libraryName == null ? LibraryLabel(libraryId, "Scan Library: {0}") : null,
+            dedupeKey: forceOverride ? null : LibraryScanKey(libraryId),
             resourceKey: LibraryKey(libraryId));
     }
 
@@ -1044,6 +1046,12 @@ public class TaskQueueManager : ITaskQueueManager
     // and race on its rows); different libraries get different keys and can run
     // concurrently up to the global cap.
     private static string LibraryKey(Guid libraryId) => $"library:{libraryId}";
+
+    // A library's full ingest and its plain scans share this, so a scan asked for
+    // while one is already queued or running is dropped. Adding a library starts
+    // its folder watcher, whose first reconcile finds nothing ingested yet and
+    // queued a second full scan behind the ingest that was covering those files.
+    private static string LibraryScanKey(Guid libraryId) => $"library-scan:{libraryId}";
 
     // The long maintenance jobs (Analyze, Thumbnails) get a separate key from the
     // LibraryKey ingestion work, so a multi-day analyze no longer blocks new-file

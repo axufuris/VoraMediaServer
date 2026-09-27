@@ -68,9 +68,9 @@ export const authService = {
         return response.data;
     },
 
-    setupServerAt: async (baseUrl: string, email: string, password: string, displayName: string): Promise<AuthResponse> => {
+    setupServerAt: async (baseUrl: string, email: string, password: string, displayName: string, serverName?: string): Promise<AuthResponse> => {
         const client = createDirectClient(baseUrl);
-        const response = await client.post<AuthResponse>('/auth/setup', { email, password, displayName });
+        const response = await client.post<AuthResponse>('/auth/setup', { email, password, displayName, serverName: serverName?.trim() || undefined });
         return response.data;
     },
 
