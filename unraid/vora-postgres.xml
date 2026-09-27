@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>vora-postgres</Name>
+  <Repository>pgvector/pgvector:pg16</Repository>
+  <Registry>https://hub.docker.com/r/pgvector/pgvector</Registry>
+  <Network>vora</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/axufuris/VoraMediaServer/issues</Support>
+  <Project>https://github.com/pgvector/pgvector</Project>
+  <Overview>PostgreSQL with the pgvector extension - the database backend required by the Vora media server. Put this on the same user-defined Docker network as the Vora container (e.g. "vora") so Vora can reach it by name (vora-postgres). No port is published, keeping the database off your LAN.</Overview>
+  <Category>Tools: Other:</Category>
+  <WebUI/>
+  <TemplateURL/>
+  <Icon>https://getvora.net/vora-icon-512.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <DateInstalled/>
+  <Config Name="Data" Target="/var/lib/postgresql/data" Default="/mnt/user/appdata/vora-postgres" Mode="rw" Description="PostgreSQL data directory" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/vora-postgres</Config>
+  <Config Name="POSTGRES_DB" Target="POSTGRES_DB" Default="vora" Mode="" Description="Database name (match the Vora connection string)" Type="Variable" Display="always" Required="true" Mask="false">vora</Config>
+  <Config Name="POSTGRES_USER" Target="POSTGRES_USER" Default="vora" Mode="" Description="Database user (match the Vora connection string)" Type="Variable" Display="always" Required="true" Mask="false">vora</Config>
+  <Config Name="POSTGRES_PASSWORD" Target="POSTGRES_PASSWORD" Default="" Mode="" Description="Database password (use a strong value; match the Vora connection string)" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+</Container>

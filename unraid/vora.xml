@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Vora</Name>
+  <Repository>ghcr.io/axufuris/vora-media-server:latest</Repository>
+  <Registry>https://ghcr.io/axufuris/vora-media-server</Registry>
+  <Network>vora</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/axufuris/VoraMediaServer/issues</Support>
+  <Project>https://getvora.net</Project>
+  <Overview>Vora is a self-hosted media server for movies, TV, music, and IPTV with DVR, with cinematic clients for Android, Android TV, Fire TV, Roku, and the web.&#13;&#13;REQUIREMENTS: Vora needs a PostgreSQL database with the pgvector extension. Install the companion "vora-postgres" template (pgvector/pgvector:pg16) FIRST, and put BOTH containers on the same user-defined Docker network (create one under Settings &gt; Docker &gt; Add network, e.g. "vora") so Vora can reach Postgres by container name.&#13;&#13;After both are running, browse to http://[SERVER-IP]:8080 and claim the server: the account you create there is the server admin.&#13;&#13;GPU (optional): for NVIDIA hardware transcoding, install the Nvidia-Driver plugin and set Extra Parameters to --runtime=nvidia.</Overview>
+  <Category>MediaServer:Video MediaApp:Video</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <TemplateURL/>
+  <Icon>https://getvora.net/vora-icon-512.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>Requires a PostgreSQL server with the pgvector extension (see the vora-postgres template) on the same custom Docker network.</Requires>
+  <Config Name="WebUI Port" Target="8080" Default="8080" Mode="tcp" Description="Web UI / API port" Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+  <Config Name="App Data" Target="/app/data" Default="/mnt/user/appdata/vora" Mode="rw" Description="Persistent data: config, artwork, plugins, logs, backups" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/vora</Config>
+  <Config Name="Transcode" Target="/transcode" Default="/mnt/user/appdata/vora-transcode" Mode="rw" Description="Transcoder scratch (HLS segments, IPTV timeshift); a fast local disk or cache pool is recommended" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/vora-transcode</Config>
+  <Config Name="Movies" Target="/media/movies" Default="/mnt/user/media/movies" Mode="ro" Description="Movies library (read-only)" Type="Path" Display="always" Required="false" Mask="false">/mnt/user/media/movies</Config>
+  <Config Name="Shows" Target="/media/shows" Default="/mnt/user/media/shows" Mode="ro" Description="TV shows library (read-only)" Type="Path" Display="always" Required="false" Mask="false">/mnt/user/media/shows</Config>
+  <Config Name="Music" Target="/media/music" Default="/mnt/user/media/music" Mode="ro" Description="Music library (read-only)" Type="Path" Display="always" Required="false" Mask="false">/mnt/user/media/music</Config>
+  <Config Name="Database Connection" Target="ConnectionStrings__DefaultConnection" Default="Host=vora-postgres;Port=5432;Database=vora;Username=vora;Password=CHANGEME" Mode="" Description="Npgsql connection string. Host = the Postgres container name on your custom network. Match the DB/user/password to the vora-postgres template." Type="Variable" Display="always" Required="true" Mask="false">Host=vora-postgres;Port=5432;Database=vora;Username=vora;Password=CHANGEME</Config>
+  <Config Name="JWT Secret Key" Target="Jwt__SecretKey" Default="" Mode="" Description="Long random string used to sign auth tokens. Generate once (e.g. openssl rand -base64 64) and keep it stable; changing it logs everyone out." Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User id the container runs as (Unraid 'nobody' = 99)" Type="Variable" Display="always" Required="true" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group id the container runs as (Unraid 'users' = 100)" Type="Variable" Display="always" Required="true" Mask="false">100</Config>
+  <Config Name="Timezone" Target="TZ" Default="America/Chicago" Mode="" Description="Container timezone (e.g. America/Chicago). Affects scheduled scans and tasks." Type="Variable" Display="always" Required="false" Mask="false">America/Chicago</Config>
+  <Config Name="Internal HTTP Port" Target="ASPNETCORE_HTTP_PORTS" Default="8080" Mode="" Description="Internal listen port; leave at 8080" Type="Variable" Display="advanced-hide" Required="true" Mask="false">8080</Config>
+  <Config Name="UMASK" Target="UMASK" Default="022" Mode="" Description="Permissions mask for files the app creates" Type="Variable" Display="advanced" Required="false" Mask="false">022</Config>
+  <Config Name="Path: Custom Artwork" Target="StoragePaths__CustomArtwork" Default="/app/data/custom_artwork" Mode="" Description="Internal path; keep under /app/data" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/custom_artwork</Config>
+  <Config Name="Path: Artwork Cache" Target="StoragePaths__OriginalArtworkCache" Default="/app/data/original_artwork_cache" Mode="" Description="Internal path; keep under /app/data" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/original_artwork_cache</Config>
+  <Config Name="Path: EPG Cache" Target="StoragePaths__EpgCache" Default="/app/data/iptv/epg_cache" Mode="" Description="Internal path; keep under /app/data" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/iptv/epg_cache</Config>
+  <Config Name="Path: IPTV DVR" Target="StoragePaths__IptvDvr" Default="/app/data/iptv/dvr" Mode="" Description="Internal path; keep under /app/data" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/iptv/dvr</Config>
+  <Config Name="Path: User Images" Target="StoragePaths__UserImages" Default="/app/data/users" Mode="" Description="Internal path; keep under /app/data" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/users</Config>
+  <Config Name="Path: Plugins" Target="StoragePaths__Plugins" Default="/app/data/plugins" Mode="" Description="Internal path; keep under /app/data" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/plugins</Config>
+  <Config Name="Path: Subtitles" Target="StoragePaths__Subtitles" Default="/app/data/subtitles" Mode="" Description="Internal path; keep under /app/data" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/subtitles</Config>
+  <Config Name="Path: Logs" Target="StoragePaths__Logs" Default="/app/data/logs" Mode="" Description="Internal path; keep under /app/data so it persists across container updates" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/logs</Config>
+  <Config Name="Path: Backups" Target="StoragePaths__Backups" Default="/app/data/backups" Mode="" Description="Internal path; keep under /app/data so it persists across container updates" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/backups</Config>
+  <Config Name="Path: Data Protection Keys" Target="StoragePaths__DataProtection" Default="/app/data/dp-keys" Mode="" Description="Internal path; keep under /app/data so it persists across container updates" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/dp-keys</Config>
+  <Config Name="Path: Video Thumbnails" Target="StoragePaths__VideoThumbnails" Default="/app/data/video-thumbnails" Mode="" Description="Internal path; keep under /app/data so it persists across container updates" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/video-thumbnails</Config>
+  <Config Name="Path: Metadata" Target="StoragePaths__Metadata" Default="/app/data/metadata" Mode="" Description="Internal path; keep under /app/data so it persists across container updates" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/metadata</Config>
+  <Config Name="Path: Audio Fingerprints" Target="StoragePaths__AudioFingerprints" Default="/app/data/audio-fingerprints" Mode="" Description="Internal path; keep under /app/data so it persists across container updates" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/app/data/audio-fingerprints</Config>
+</Container>
