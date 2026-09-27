@@ -574,22 +574,6 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
             )}
             </>)}
 
-            {subTab === 'general' && (<>
-            <SettingsCard title="New User Registration">
-                <FieldLabel>Registration Mode</FieldLabel>
-                <select
-                    value={serverSettings.registrationMode ?? 1}
-                    onChange={e => setServerSettings({ ...serverSettings, registrationMode: Number(e.target.value) })}
-                    className="vora-input max-w-md cursor-pointer"
-                >
-                    <option value={0}>Disabled (no new users allowed)</option>
-                    <option value={1}>Simple (open registration)</option>
-                    <option value={2}>Invite PIN (requires 4-digit code from admin)</option>
-                    <option value={3}>Invitation only (admin must send an email invite from /admin/invitations)</option>
-                </select>
-                <FieldHint>Control how new users can create accounts on this server.</FieldHint>
-            </SettingsCard>
-            </>)}
 
             {subTab === 'analysis' && (<>
             <SettingsCard title="Intro & Credit Detection">

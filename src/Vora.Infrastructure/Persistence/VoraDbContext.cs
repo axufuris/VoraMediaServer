@@ -209,7 +209,6 @@ public class VoraDbContext : DbContext
         ConfigureDiscovery(modelBuilder);
 
         SeedReferenceData(modelBuilder);
-        SeedSystemDefaults(modelBuilder);
     }
 
     private static void ConfigureMediaHierarchy(ModelBuilder modelBuilder, ListValueConverters converters)
@@ -1572,15 +1571,6 @@ public class VoraDbContext : DbContext
                 FilterRulesJson = "{\"mediaTypes\":[\"TvShow\"]}"
             }
         );
-    }
-
-    private static void SeedSystemDefaults(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<ServerSetting>().HasData(
-            new ServerSetting { EnableNightlyScan = false, RunDetections = DetectionTrigger.Never }
-        );
-
-        
     }
 
     private sealed class ListValueConverters

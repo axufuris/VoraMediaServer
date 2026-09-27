@@ -32,6 +32,38 @@ public class TaskQueueManagerTests
     }
 
     [Fact]
+    public void A_scan_asked_for_while_the_library_is_being_ingested_is_dropped()
+    {
+        var libraryId = Guid.NewGuid();
+
+        _queue.QueueLibraryAdded(libraryId, "Music");
+        _queue.QueueScanLibrary(libraryId, "Music");
+        _queue.QueueScanLibrary(libraryId, "Music");
+
+        _queue.GetAllTasks().Select(t => t.Name).Should().Equal("Auto-Ingest Library: Music");
+    }
+
+    [Fact]
+    public void A_forced_scan_still_queues_behind_a_running_one()
+    {
+        var libraryId = Guid.NewGuid();
+
+        _queue.QueueScanLibrary(libraryId, "Movies");
+        _queue.QueueScanLibrary(libraryId, "Movies", forceOverride: true);
+
+        _queue.GetAllTasks().Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Scans_of_different_libraries_both_queue()
+    {
+        _queue.QueueScanLibrary(Guid.NewGuid(), "Movies");
+        _queue.QueueScanLibrary(Guid.NewGuid(), "Music");
+
+        _queue.GetAllTasks().Should().HaveCount(2);
+    }
+
+    [Fact]
     public void EnqueueTask_with_same_dedupe_key_does_not_create_a_second_task()
     {
         var first = _queue.EnqueueTask("gen", (ct, sp) => Task.CompletedTask, dedupeKey: "gen-thumbs:lib1:False");

@@ -42,7 +42,7 @@ public enum EmailChangeConfirmResult
 public interface IAuthManager
 {
     Task<(bool IsClaimed, RegistrationMode Mode)> GetSetupStatusAsync();
-    Task<AuthResponseDto> ClaimServerAsync(string email, string password, string displayName);
+    Task<AuthResponseDto> ClaimServerAsync(string email, string password, string displayName, string? serverName = null);
     Task<AuthResponseDto?> LoginAsync(string email, string password);
     Task<ProfileTokenResult> GenerateProfileTokenAsync(Guid accountId, Guid profileId, string? pin = null);
     Task<AuthResponseDto> RegisterAsync(string email, string password, string displayName, string? secretCode, string? inviteToken = null);
@@ -67,6 +67,7 @@ public class AuthManager(
     ILogger<AuthManager> logger) : IAuthManager
 {
     private const int AccountTokenLifetimeHours = 2;
+    private const int MaxServerNameLength = 100;
     private const int ProfileTokenLifetimeDays = 7;
     private const int RefreshTokenLifetimeDays = 90;
     private const int InviteCodeLifetimeMinutes = 30;
@@ -226,7 +227,7 @@ public class AuthManager(
         return AdminCreateUserResult.Created(user.Id);
     }
 
-    public async Task<AuthResponseDto> ClaimServerAsync(string email, string password, string displayName)
+    public async Task<AuthResponseDto> ClaimServerAsync(string email, string password, string displayName, string? serverName = null)
     {
         EnsurePasswordMeetsPolicy(password);
         var status = await GetSetupStatusAsync();
@@ -244,6 +245,14 @@ public class AuthManager(
         {
             logger.LogError(ex, "Failed to claim server with admin email {Email}", email);
             throw;
+        }
+
+        var trimmedName = serverName?.Trim();
+        if (!string.IsNullOrEmpty(trimmedName))
+        {
+            var settings = await settingsRepo.GetSettingsForUpdateAsync();
+            settings.ServerName = trimmedName.Length > MaxServerNameLength ? trimmedName[..MaxServerNameLength] : trimmedName;
+            await settingsRepo.SaveChangesAsync();
         }
 
         return BuildAuthResponse(admin);

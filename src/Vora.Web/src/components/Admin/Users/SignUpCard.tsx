@@ -55,7 +55,7 @@ export default function SignUpCard({ serverId, invitationsPath }: SignUpCardProp
         setPin(null);
         setInviteStatus(null);
         try {
-            await systemSettingsAdminService.updateServerSettings(next, serverId);
+            await systemSettingsAdminService.updateRegistrationMode(mode, serverId);
         } catch (err) {
             setSettings(previous);
             setError(resolveReason(err) ?? 'Could not change how people sign up.');

@@ -10,6 +10,7 @@ export default function SetupPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [displayName, setDisplayName] = useState('');
+    const [serverName, setServerName] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -39,7 +40,7 @@ export default function SetupPage() {
         setIsSubmitting(true);
         try {
             const targetUrl = getTargetUrl();
-            const auth = await authService.setupServerAt(targetUrl, email, password, displayName);
+            const auth = await authService.setupServerAt(targetUrl, email, password, displayName, serverName);
 
             sessionStorage.setItem(SessionKeys.pendingServerUrl, targetUrl);
             sessionStorage.setItem(SessionKeys.pendingUserToken, auth.accessToken);
@@ -77,8 +78,13 @@ export default function SetupPage() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                    <label className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Display Name</label>
-                    <input autoFocus required type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="vora-input w-full" placeholder="e.g. Andy" />
+                    <label htmlFor="setup-server-name" className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Server Name</label>
+                    <input id="setup-server-name" autoFocus type="text" maxLength={100} value={serverName} onChange={e => setServerName(e.target.value)} className="vora-input w-full" placeholder="Vora Server" />
+                    <p className="mt-1 text-xs" style={{ color: 'var(--vora-text-muted)' }}>What this server is called in apps and emails. You can change it later in System Settings.</p>
+                </div>
+                <div>
+                    <label htmlFor="setup-display-name" className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Your Name</label>
+                    <input id="setup-display-name" required type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="vora-input w-full" placeholder="e.g. Andy" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Email</label>

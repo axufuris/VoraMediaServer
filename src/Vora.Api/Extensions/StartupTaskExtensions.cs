@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Vora.Application.Iptv;
 using Vora.Application.Libraries;
 using Vora.Application.Plugins;
+using Vora.Application.Settings;
 using Vora.Application.Watchers;
 using Vora.Infrastructure.FileSystem;
 using Vora.Infrastructure.Persistence;
@@ -20,8 +21,15 @@ public static class StartupTaskExtensions
         }
 
         await MigrateDatabaseAsync(app);
+        await EnsureServerSettingsAsync(app);
         await SeedPluginSettingsFromEnvironmentAsync(app);
         await PreloadIptvEpgCacheAsync(app);
+    }
+
+    private static async Task EnsureServerSettingsAsync(WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<ISystemSettingsRepository>().GetSettingsForUpdateAsync();
     }
 
     private static async Task SeedPluginSettingsFromEnvironmentAsync(WebApplication app)

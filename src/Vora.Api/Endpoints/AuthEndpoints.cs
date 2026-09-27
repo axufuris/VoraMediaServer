@@ -14,6 +14,11 @@ public class SetupRequestDto
     public required string DisplayName { get; set; }
 }
 
+public class ClaimServerRequestDto : SetupRequestDto
+{
+    public string? ServerName { get; set; }
+}
+
 public class RegisterRequestDto : SetupRequestDto
 {
     public string? SecretCode { get; set; }
@@ -139,11 +144,11 @@ public static class AuthEndpoints
         });
     }
 
-    private static async Task<IResult> ClaimServerAsync([FromBody] SetupRequestDto request, IAuthManager manager, HttpContext httpContext)
+    private static async Task<IResult> ClaimServerAsync([FromBody] ClaimServerRequestDto request, IAuthManager manager, HttpContext httpContext)
     {
         try
         {
-            var result = await manager.ClaimServerAsync(request.Email, request.Password, request.DisplayName);
+            var result = await manager.ClaimServerAsync(request.Email, request.Password, request.DisplayName, request.ServerName);
             result.RefreshToken = await manager.IssueRefreshTokenAsync(result.UserId, ReadDeviceId(httpContext));
             return Results.Ok(result);
         }

@@ -8,14 +8,14 @@ import SignUpCard from './SignUpCard';
 const mocks = vi.hoisted(() => ({
     createUser: vi.fn(),
     getServerSettings: vi.fn(),
-    updateServerSettings: vi.fn(),
+    updateRegistrationMode: vi.fn(),
     generateInviteCode: vi.fn(),
     createInvitation: vi.fn(),
 }));
 
 vi.mock('../../../api/Users/userService', () => ({ userService: { createUser: mocks.createUser } }));
 vi.mock('../../../api/System/systemSettingsAdminService', () => ({
-    systemSettingsAdminService: { getServerSettings: mocks.getServerSettings, updateServerSettings: mocks.updateServerSettings },
+    systemSettingsAdminService: { getServerSettings: mocks.getServerSettings, updateRegistrationMode: mocks.updateRegistrationMode },
 }));
 vi.mock('../../../api/Auth/authService', () => ({ authService: { generateInviteCode: mocks.generateInviteCode } }));
 vi.mock('../../../api/Auth/invitationsAdminService', () => ({ invitationsAdminService: { create: mocks.createInvitation } }));
@@ -68,7 +68,7 @@ describe('AddUserModal', () => {
 describe('SignUpCard', () => {
     beforeEach(() => {
         Object.values(mocks).forEach(m => m.mockReset());
-        mocks.updateServerSettings.mockResolvedValue(undefined);
+        mocks.updateRegistrationMode.mockResolvedValue(undefined);
     });
 
     // Disabled is 0. The settings page used `mode || 1`, so it always showed Open.
@@ -110,14 +110,13 @@ describe('SignUpCard', () => {
         expect(mocks.createInvitation).toHaveBeenCalledWith('sam@example.com', null, undefined);
     });
 
-    it('saves a new mode straight away, keeping the rest of the settings', async () => {
+    it('saves a new mode straight away, and only the mode', async () => {
         withMode(1);
         renderCard();
 
         fireEvent.change(await screen.findByRole('combobox', { name: 'How people sign up' }), { target: { value: '3' } });
 
-        await waitFor(() => expect(mocks.updateServerSettings).toHaveBeenCalledWith(
-            { registrationMode: 3, nightlyScanTime: '03:00:00' }, undefined));
+        await waitFor(() => expect(mocks.updateRegistrationMode).toHaveBeenCalledWith(3, undefined));
         expect(await screen.findByRole('button', { name: 'Send invitation' })).toBeInTheDocument();
     });
 });
