@@ -1,0 +1,119 @@
+# Architecture
+
+Vora follows a layered/clean-architecture-style design. Domain at the core, Application around it, Infrastructure and Api on the outside, with a separate React frontend and a runtime plugin system.
+
+## Solution layout
+
+All source lives under `/src`. The solution is `Vora.slnx` at the repo root.
+
+### Backend projects
+
+- **`/src/Vora.Api`** — Entry point. Minimal API endpoints. Stays thin: parse requests, call into Managers/Services, return responses. See `docs/backend-conventions.md` for the endpoint pattern.
+
+- **`/src/Vora.Application`** — Business logic layer:
+  - **Managers** and **Services** (the actual logic)
+  - **Repository interfaces** (defined here so other projects depend on abstractions)
+  - **View Models** consumed by the frontend (`*VM`)
+  - **DTOs** crossing layers (`*Dto`)
+  - **Requests** (inbound API bodies, `*Request`) and **Responses** (`*Response`)
+
+- **`/src/Vora.Domain`** — Pure domain library:
+  - Database **entities**
+  - **Enums**
+  - No dependencies on other projects in the solution.
+
+- **`/src/Vora.Infrastructure`** — Database and external-system code:
+  - **Repository implementations** (fulfill interfaces from `Vora.Application`)
+  - **EF Core DbContext** (split into partials and Configure* helpers)
+  - **FFmpeg analyzer**, filesystem analyzers
+  - **Workers** (background hosted services)
+  - **Migrations** in `/Migrations`
+
+### Plugin system
+
+- **`/src/Vora.Plugins`** — Single project containing the provider interfaces, the DTOs that cross the plugin boundary, and the built-in provider implementations under `Providers/<Source>/`. External (third-party) plugins are separate `*.dll`s loaded at runtime from `<install>/Plugins/`. See `docs/plugins.md`.
+
+### Frontend
+
+- **`/src/Vora.Web`** — React + TypeScript SPA. Consumes the API exposed by `Vora.Api`. View Model shapes come from `Vora.Application`. See `docs/frontend-conventions.md`.
+
+### Native clients
+
+Each ecosystem gets its own native client rather than a cross-platform renderer: **Swift / SwiftUI** for iOS and tvOS, **Kotlin / Compose (+ Compose for TV)** for Android and Android TV, **BrightScript / SceneGraph** for Roku later. They live in their own repositories and share no source with `Vora.Web` — only contracts: the API surface via OpenAPI codegen (`docs/clients/openapi-codegen.md`) and the visual language via emitted design tokens (`docs/clients/design-tokens.md`), with the primitive behaviour contract in `docs/clients/primitive-specs.md`.
+
+The deciding constraint is TV. React Native's tvOS support is a community fork and MAUI has no tvOS target at all, so a shared renderer would have meant fighting the framework exactly where the experience matters most; SwiftUI focus handling and Compose for TV are first-class on their platforms. The cost is accepted deliberately: a feature ships to one client, is validated, then ported. `Vora.Web` stays the only surface with an admin UI.
+
+Two consequences bind the backend. The OpenAPI document is load-bearing for every client, so operation ids, the ProblemDetails shape and enum-as-string serialization have to be defended at the API layer. And `ThemeManifest` is effectively a cross-language schema — a new token slot means updating the Swift and Kotlin emitters too.
+
+### Infrastructure / orchestration
+
+- **`/docker-compose.dcproj`** — Visual Studio Docker Compose project (startup project).
+- **`/docker-compose.yml`** — services, images, networks, volumes.
+- **`/Dockerfile`** — API image (includes FFmpeg).
+
+## Dependency rules
+
+| Project | Depends on |
+| --- | --- |
+| `Vora.Domain` | nothing in the solution |
+| `Vora.Application` | `Vora.Domain` |
+| `Vora.Infrastructure` | `Vora.Application`, `Vora.Domain` |
+| `Vora.Api` | `Vora.Application` (+ `Vora.Infrastructure` for DI wire-up) |
+| `Vora.Plugins` | nothing concrete (only `Vora.Domain` if entities are needed) |
+| external plugin DLLs | `Vora.Plugins` (+ `Vora.Domain` if needed) |
+| `Vora.Web` | independent — talks to `Vora.Api` over HTTP only |
+
+If you ever feel like adding a reference that breaks this graph, stop and restructure.
+
+## Where to put new code
+
+| Kind of change | Where it goes | Register it in |
+| --- | --- | --- |
+| New API endpoint | `Vora.Api/Endpoints/` | `WebApplicationExtensions.MapVoraEndpoints` |
+| New Manager or Service | `Vora.Application` (interface at top of file with impl) | `ServiceRegistrationExtensions.AddVoraManagers` / `AddVoraApplicationServices` |
+| New entity or enum | `Vora.Domain` | — |
+| New repository | interface in `Vora.Application`, impl in `Vora.Infrastructure` | `ServiceRegistrationExtensions.AddVoraRepositories` |
+| New view model for the UI | `Vora.Application` | — |
+| New DTO crossing layers | `Vora.Application` | — |
+| New Request / Response shape | `Vora.Application` | — |
+| New background worker | `Vora.Infrastructure` | `ServiceRegistrationExtensions.AddVoraWorkers` |
+| New media or filesystem analyzer | `Vora.Infrastructure` | — |
+| New plugin contract | `Vora.Plugins/Interfaces/` (and supporting DTOs in `Vora.Plugins/Dtos/`) | also add to `PluginLoaderExtensions.PluginProviderInterfaces` |
+| New built-in provider | `Vora.Plugins/Providers/<Source>/` | — (the loader discovers it automatically) |
+| New external plugin | separate assembly built into `<install>/Plugins/`, references `Vora.Plugins` | — |
+| New React component / page / hook | `Vora.Web` (see `docs/frontend-conventions.md` for folder picking) | — |
+| New client page that lists media | reuse `MediaCard` + `MediaRow` (rail) or `MediaGrid` (wrapping grid) from `components/Client/Primitives/`. Don't author a new tile or scroller — there is exactly one of each. Per-type caption text goes in `utils/posterCaption.ts`, keyed on the item's `type` | — |
+| New client detail page | reuse `DetailHero` (+ `HeroChip`, `HeroCredits`) from `components/Client/Primitives/`. Pass the slots you have data for and omit the rest | — |
+| New file produced by a stream session | write it into `TranscoderTempDirectory` named `{transcodeKey}…` (`session.ExtraId ?? session.MediaItemId`), and give it an extension the HLS route allows. The route authorizes by signed filename prefix, so any other name is unreachable; a name ending `_<integer>` is read as an HLS segment. See `docs/streaming.md` | — |
+| New subtitle source (a provider, a sidecar format, a new codec) | `Vora.Plugins/Interfaces/ISubtitleSearchProvider` for an online source; `Vora.Application/Subtitles/` for discovery and orchestration; `Vora.Infrastructure/Transcoding/FFmpegSubtitleExtractionService` for anything that shells out. A new **image** codec must be added to `BestPathDecisionManager.IsImageSubtitleCodec` **and** `Vora.Web/src/utils/subtitleKind.ts` — `SubtitleCodecParityTests` enforces it. See `docs/streaming.md` | — |
+| New SignalR notification | method on `IClientNotifier` in `Vora.Application.Analysis`, then implement in `SignalRClientNotifier` (`Vora.Api/Hubs/`) | — |
+| New feature toggle | add a `bool EnableX` to `ServerSetting`, mirror in `FeatureFlagsVM` + `UpdateFeatureFlagsRequest`, add to `FeatureGate` enum and `RequireFeatureFilter`, mirror in `FeatureFlagsVM` on the frontend, then gate the relevant endpoints with `.RequireFeature(FeatureGate.X)` and the nav with `isNavItemEnabled` in `MainLayout.tsx`. If the feature can be switched on but unusable, derive the flag as `toggle && configured` (see `SubtitleSearch`, `LiveTv`, `InternetRadio`) and expose the raw toggle separately for the admin switch | run `add-migration AddXFeatureToggle` |
+| New email template | add an enum value to `Vora.Domain.Enums.EmailTemplateKey`; add three files under `Vora.Application/Email/Templates/` (`<Key>.subject.txt`, `.html`, `.txt`); mark each as `<EmbeddedResource>` in `Vora.Application.csproj`; add a variable list to `EmailTemplateVariables.Catalog`; add display name + description to `EmailTemplateManager.Metadata`. Send via `IEmailService.SendAsync(new EmailMessage { ... })`. See `docs/email.md`. | — |
+| New email transport (e.g. SendGrid plugin) | implement `Vora.Application.Email.IEmailTransport`. The default impl is `SmtpEmailTransport` in `Vora.Infrastructure/Email/`. | replace registration in `AddVoraEmail` inside `ServiceRegistrationExtensions` |
+| New admin feature page | `pages/Admin/Features/<Name>Page.tsx` — use `FeatureToggle` + `FeaturePluginList` from `components/Admin/Features/`. Add the route in `App.tsx` (mirror under `/server/:serverId/admin/...`) and **one entry** in `components/Admin/Shell/adminNavData.tsx` (the sidebar AND the Cmd-K palette both consume that list) | — |
+| New admin sidebar / palette entry | `components/Admin/Shell/adminNavData.tsx` — single source of truth for both `SidebarV2` and `SearchPalette`. Set `section`, `icon`, optional `keywords` for palette fuzzy-match, optional `requires: 'ai'` runtime gate | — |
+| New built-in admin theme | `Vora.Web/src/theme/themes/<id>.ts` (frontend manifest) **and** add a `ThemeMetaVM` entry in `Vora.Application/Themes/IThemeRegistry.cs` so the backend picker knows about it. Register the manifest in `BUILT_IN_THEMES` in `theme/ThemeProvider.tsx` and add a swatch row in `AppearancePage`'s `INACTIVE_SWATCHES`. Plugin-shipped themes don't need any of this — they go in `<install>/Themes/<id>/` and are scanned on startup (see `docs/admin-theme-bundles.md`) | — |
+
+## Type naming and folder rules in `Vora.Application`
+
+These four kinds of types each live in their own folder and are never mixed:
+
+| Suffix | Purpose | Example |
+| --- | --- | --- |
+| `*VM` | View Model returned from API endpoints | `UserVM`, `VideoLibraryVM` |
+| `*Dto` | Moving data between layers internally | `UserDto` |
+| `*Request` | Inbound API request body | `CreateUserRequest` |
+| `*Response` | Outbound API response when a VM alone isn't the right shape | `CreateUserResponse` |
+
+Don't reuse one as another — e.g. never return a `*Dto` from an endpoint, return a `*VM` or a `*Response`.
+
+## Build & run
+
+This solution is run from Visual Studio 2026 — there is no CLI build to invoke from outside.
+
+1. If `Vora.Web` isn't already running, open a terminal in `/src/Vora.Web` and run `npm run dev`.
+2. In Visual Studio, set `docker-compose.dcproj` as the startup project and run it.
+
+The API **always** runs in Docker (FFmpeg lives inside the container). Don't try to run `Vora.Api` natively.
+
+Ports are baked into the project configs — don't override them.

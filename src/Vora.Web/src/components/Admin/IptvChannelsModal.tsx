@@ -1,0 +1,101 @@
+import { useState, useMemo } from 'react';
+import { iptvAdminService, type IptvChannelVM } from '../../api/Iptv/iptvAdminService';
+import { Modal, ModalHeader } from '../Common/Modal';
+
+interface Props {
+    isOpen: boolean;
+    onClose: () => void;
+    playlistName: string;
+    channels: IptvChannelVM[];
+    serverId?: string;
+    onChannelToggled: () => void;
+}
+
+export default function IptvChannelsModal({ isOpen, onClose, playlistName, channels, serverId, onChannelToggled }: Props) {
+    const [search, setSearch] = useState('');
+    const [localChannels, setLocalChannels] = useState<IptvChannelVM[]>(channels);
+
+    const filteredChannels = useMemo(() => {
+        return localChannels
+            .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || (c.groupTitle || '').toLowerCase().includes(search.toLowerCase()))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [localChannels, search]);
+
+    const handleToggle = async (channelId: string, currentState: boolean) => {
+        try {
+            setLocalChannels(prev => prev.map(c => c.id === channelId ? { ...c, isHiddenByAdmin: !currentState } : c));
+            await iptvAdminService.toggleChannelVisibility(channelId, serverId);
+            onChannelToggled();
+        } catch (error) {
+            console.error('Failed to toggle channel', error);
+            setLocalChannels(prev => prev.map(c => c.id === channelId ? { ...c, isHiddenByAdmin: currentState } : c));
+        }
+    };
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            size="3xl"
+            zIndex="z-[200]"
+            surface="light"
+            closeOnBackdropClick
+            overlayPadding="p-6"
+            cardClassName="p-6 flex flex-col max-h-[90vh] h-full"
+        >
+            <ModalHeader
+                title="Manage Channels"
+                subtitle={<span className="text-[var(--vora-accent-text)] text-sm font-semibold">{playlistName} ({localChannels.length} channels)</span>}
+                onClose={onClose}
+                bordered={false}
+                surface="light"
+            />
+            <div className="border-b border-[var(--vora-border-subtle)] mb-4" />
+
+            <div className="flex gap-3 mb-4 shrink-0">
+                <input
+                    type="text"
+                    placeholder="Search channels by name or group…"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="vora-input flex-1"
+                />
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+                {filteredChannels.map(c => (
+                    <div key={c.id} className={`flex items-center justify-between p-3 rounded-[var(--vora-radius-md)] border transition-colors ${c.isHiddenByAdmin ? 'bg-[var(--vora-danger-soft)]/40 border-[var(--vora-danger-500)]/30' : 'bg-[var(--vora-bg-surface)] border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-strong)]'}`}>
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-8 bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded flex items-center justify-center shrink-0 overflow-hidden">
+                                {c.logoUrl ? <img src={c.logoUrl} alt="" className="max-w-full max-h-full object-contain" /> : <span className="text-[8px] text-[var(--vora-text-disabled)]">No logo</span>}
+                            </div>
+                            <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-sm font-semibold ${c.isHiddenByAdmin ? 'text-[var(--vora-text-disabled)] line-through' : 'text-[var(--vora-text-primary)]'}`}>{c.name}</span>
+                                    {c.isHealthy === false && (
+                                        <span
+                                            className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)] border border-[var(--vora-danger-500)]/30"
+                                            title={c.lastHealthCheckAt ? `Last checked ${new Date(c.lastHealthCheckAt).toLocaleString()}` : 'Stream did not respond'}
+                                        >
+                                            Unreachable
+                                        </span>
+                                    )}
+                                </div>
+                                <span className="text-[10px] text-[var(--vora-text-muted)]">{c.groupTitle || 'No group'}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => handleToggle(c.id, c.isHiddenByAdmin)}
+                                className={`px-4 py-1.5 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer ${c.isHiddenByAdmin ? 'bg-[var(--vora-bg-sunken)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-border-strong)]' : 'bg-[var(--vora-accent-soft)] text-[var(--vora-accent-text)] border border-[var(--vora-accent-500)]/30 hover:bg-[var(--vora-accent-500)] hover:text-[var(--vora-text-primary)] hover:border-[var(--vora-accent-500)]'}`}
+                            >
+                                {c.isHiddenByAdmin ? 'Hidden (click to show)' : 'Visible (click to hide)'}
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </Modal>
+    );
+}

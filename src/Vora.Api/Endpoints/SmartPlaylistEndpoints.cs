@@ -1,0 +1,135 @@
+using Vora.Application.Playlists.ViewModels;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
+using Vora.Api.Extensions;
+using Vora.Application.Media;
+using Vora.Application.Media.SmartPlaylists;
+using Vora.Domain.Entities.Playlists;
+
+namespace Vora.Api.Endpoints;
+
+public static class SmartPlaylistEndpoints
+{
+    public static IEndpointRouteBuilder MapSmartPlaylistEndpoints(this IEndpointRouteBuilder routes)
+    {
+        var group = routes.MapGroup("/api/smart-playlists").WithTags("SmartPlaylists");
+
+        group.MapGet("/", ListAsync)
+            .RequireAuthorization()
+            .WithName("ListSmartPlaylists")
+            .Produces<IEnumerable<SmartPlaylistSummaryVM>>(StatusCodes.Status200OK);
+        group.MapGet("/{id:guid}", GetAsync)
+            .RequireAuthorization()
+            .WithName("GetSmartPlaylist")
+            .Produces<SmartPlaylistDetailVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapPost("/", CreateAsync).RequireAuthorization()
+            .Produces<SmartPlaylistSummaryVM>(StatusCodes.Status200OK);
+        group.MapPut("/{id:guid}", UpdateAsync).RequireAuthorization()
+            .Produces<SmartPlaylistSummaryVM>(StatusCodes.Status200OK);
+        group.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization();
+        group.MapPut("/{id:guid}/sharing", SetSharingAsync).RequireAuthorization()
+            .WithName("SetSmartPlaylistSharing")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapPost("/{id:guid}/copy", CopyAsync).RequireAuthorization()
+            .WithName("CopySmartPlaylist")
+            .Produces<CreatePlaylistResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapGet("/{id:guid}/items", GetTracksAsync)
+            .RequireAuthorization()
+            .WithName("ListSmartPlaylistItems")
+            .Produces<SmartPlaylistItemsVM>(StatusCodes.Status200OK);
+        group.MapPost("/preview", PreviewAsync).RequireAuthorization()
+            .Produces<SmartPlaylistPreviewResultVM>(StatusCodes.Status200OK);
+
+        return routes;
+    }
+
+
+    private static async Task<IResult> SetSharingAsync(Guid id, [FromBody] SetPlaylistSharingRequest request, ClaimsPrincipal user, ISmartPlaylistManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        return await manager.SetSharedAsync(id, profileId.Value, request.IsShared) ? Results.NoContent() : Results.NotFound();
+    }
+
+    private static async Task<IResult> CopyAsync(Guid id, ClaimsPrincipal user, ISmartPlaylistManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        var copyId = await manager.CopyAsync(id, profileId.Value);
+        return copyId.HasValue ? Results.Ok(new CreatePlaylistResponse { Id = copyId.Value }) : Results.NotFound();
+    }
+
+    private static async Task<IResult> ListAsync(ClaimsPrincipal user, ISmartPlaylistManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        var list = await manager.ListAsync(profileId.Value, user.GetPlaylistAccessFilter());
+        return Results.Ok(list);
+    }
+
+    private static async Task<IResult> GetAsync(Guid id, ClaimsPrincipal user, ISmartPlaylistManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        var detail = await manager.GetAsync(id, profileId.Value, user.GetPlaylistAccessFilter());
+        if (detail == null) return Results.NotFound();
+        return Results.Ok(detail);
+    }
+
+    private static async Task<IResult> CreateAsync([FromBody] SmartPlaylistSaveRequest request, ClaimsPrincipal user, ISmartPlaylistManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        if (string.IsNullOrWhiteSpace(request.Name)) return Results.BadRequest(new { error = "Name is required." });
+        var summary = await manager.CreateAsync(profileId.Value, request);
+        return Results.Ok(summary);
+    }
+
+    private static async Task<IResult> UpdateAsync(Guid id, [FromBody] SmartPlaylistSaveRequest request, ClaimsPrincipal user, ISmartPlaylistManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        if (string.IsNullOrWhiteSpace(request.Name)) return Results.BadRequest(new { error = "Name is required." });
+        var summary = await manager.UpdateAsync(id, profileId.Value, request);
+        if (summary == null) return Results.NotFound();
+        return Results.Ok(summary);
+    }
+
+    private static async Task<IResult> DeleteAsync(Guid id, ClaimsPrincipal user, ISmartPlaylistManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        await manager.DeleteAsync(id, profileId.Value);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> GetTracksAsync(Guid id, ClaimsPrincipal user, ISmartPlaylistManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        var items = await manager.GetItemsAsync(id, profileId.Value, user.GetPlaylistAccessFilter());
+        return Results.Ok(items);
+    }
+
+    private static async Task<IResult> PreviewAsync([FromBody] SmartPlaylistPreviewRequest request, ClaimsPrincipal user, ISmartPlaylistManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        var count = await manager.PreviewCountAsync(profileId.Value, user.GetPlaylistAccessFilter(), request.MediaType, request.Definition ?? new SmartPlaylistDefinition());
+        return Results.Ok(new SmartPlaylistPreviewResultVM { Count = count });
+    }
+
+    public sealed class SmartPlaylistPreviewResultVM
+    {
+        public int Count { get; set; }
+    }
+
+    public sealed class SmartPlaylistPreviewRequest
+    {
+        public PlaylistMediaType MediaType { get; set; } = PlaylistMediaType.Music;
+        public SmartPlaylistDefinition? Definition { get; set; }
+    }
+}

@@ -1,0 +1,316 @@
+﻿using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using Vora.Application.Artwork;
+using Vora.Application.FileSystem;
+using Vora.Application.Net;
+using Vora.Application.Settings;
+
+namespace Vora.Infrastructure.Artwork;
+
+public class ArtworkThumbnailService : IArtworkThumbnailService
+{
+    private const string CustomArtworkPrefix = "/api/artwork/custom/";
+    private const long MaxCacheBytes = 512L * 1024 * 1024;
+    private const int PruneEveryWrites = 250;
+    private const string DefaultKindFolder = "posters";
+
+    private static readonly int[] WidthBuckets = { 200, 360, 500, 780, 1280, 1920 };
+
+    private static readonly IReadOnlyDictionary<string, string> KindFolders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["poster"] = "posters",
+        ["still"] = "stills",
+        ["backdrop"] = "backdrops",
+        ["logo"] = "logos",
+    };
+
+    // A clear logo is a wordmark on a transparent background; every other kind
+    // is photographic, where JPEG is correct and far smaller. JPEG has no alpha
+    // channel, and a transparent pixel stored as RGB(0,0,0) turns opaque black
+    // when the alpha is dropped — a black rectangle with the title inside it,
+    // served as a perfectly healthy 200.
+    private const string LogoKind = "logo";
+    private const string JpegExtension = ".jpg";
+    private const string PngExtension = ".png";
+
+    // Every host an installed artwork provider can hand back a URL on. A host
+    // missing here is not a broken image — it is a BLANK one: the thumbnail
+    // route 404s, MediaCard falls back to its placeholder, and only pages that
+    // render the raw url in an <img> still show the artwork. That is how music
+    // artists ended up with placeholder circles in the grid while their own
+    // detail page showed the picture: Fanart's host was listed and TheAudioDB's
+    // was not, so whichever provider answered decided whether the image appeared.
+    private static readonly HashSet<string> AllowedRemoteHosts = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image.tmdb.org",
+        "artworks.thetvdb.com",
+        "assets.fanart.tv",
+        "www.theaudiodb.com",
+        "r2.theaudiodb.com",
+        "coverartarchive.org",
+    };
+
+    private static int _writeCount;
+
+    private readonly ISafeImageDownloader _downloader;
+    private readonly ILogger<ArtworkThumbnailService> _logger;
+    private readonly string _customArtworkPath;
+    private readonly string _cacheRoot;
+
+    public ArtworkThumbnailService(
+        ISafeImageDownloader downloader,
+        IOptions<StoragePathsOptions> storagePaths,
+        ILogger<ArtworkThumbnailService> logger)
+    {
+        _downloader = downloader;
+        _logger = logger;
+
+        var configured = storagePaths.Value.CustomArtwork;
+        _customArtworkPath = !string.IsNullOrWhiteSpace(configured)
+            ? configured
+            : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
+
+        _cacheRoot = Path.Combine(_customArtworkPath, "imagecache");
+        foreach (var folder in KindFolders.Values.Distinct())
+        {
+            Directory.CreateDirectory(Path.Combine(_cacheRoot, folder));
+        }
+    }
+
+    public async Task<string?> GetOrCreateThumbnailAsync(string src, int width, string kind, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(src)) return null;
+
+        var kindDir = Path.Combine(_cacheRoot, ResolveKindFolder(kind));
+        var keepAlpha = IsTransparentKind(kind);
+        var cacheFile = Path.Combine(kindDir, CacheKey(src, width) + CacheExtension(kind));
+        if (File.Exists(cacheFile)) return cacheFile;
+
+        byte[]? sourceBytes;
+        try
+        {
+            sourceBytes = await LoadSourceAsync(ResolveDownloadSource(src, width), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Thumbnail source fetch failed for {Src}.", src);
+            return null;
+        }
+
+        if (sourceBytes == null || sourceBytes.Length == 0) return null;
+
+        try
+        {
+            using var image = Image.Load<Rgba32>(sourceBytes);
+            if (image.Width > width)
+            {
+                image.Mutate(x => x.Resize(new ResizeOptions
+                {
+                    Size = new Size(width, 0),
+                    Mode = ResizeMode.Max,
+                    Sampler = KnownResamplers.Lanczos3
+                }));
+            }
+
+            Directory.CreateDirectory(kindDir);
+            var tempFile = cacheFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
+
+            if (keepAlpha)
+            {
+                // The image is already Rgba32, so the default encoder keeps the
+                // alpha channel. A JPEG encoder here would flatten it.
+                await image.SaveAsPngAsync(tempFile, cancellationToken);
+            }
+            else
+            {
+                await image.SaveAsJpegAsync(tempFile, new JpegEncoder { Quality = 82 }, cancellationToken);
+            }
+
+            File.Move(tempFile, cacheFile, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Thumbnail resize failed for {Src}.", src);
+            return null;
+        }
+
+        if (Interlocked.Increment(ref _writeCount) % PruneEveryWrites == 0)
+        {
+            _ = Task.Run(PruneCache);
+        }
+
+        return File.Exists(cacheFile) ? cacheFile : null;
+    }
+
+    // Removing one source costs 4 kind folders x 6 width buckets x 2 extensions
+    // = 48 File.Exists calls, nearly all of them misses. Done per source while
+    // sweeping a library that is thousands of items, those stats dominate — and
+    // on a container bind-mount each one is a round trip, not a memory lookup.
+    //
+    // Listing each kind folder ONCE and testing membership turns that into four
+    // directory reads plus hash lookups, whatever the number of sources.
+    public void RemoveThumbnailsForSources(IEnumerable<string?> sources, CancellationToken cancellationToken = default)
+    {
+        var distinct = sources
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (distinct.Count == 0) return;
+
+        foreach (var folder in KindFolders.Values.Distinct())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var kindDir = Path.Combine(_cacheRoot, folder);
+
+            HashSet<string> present;
+            try
+            {
+                if (!Directory.Exists(kindDir)) continue;
+                present = new HashSet<string>(
+                    Directory.EnumerateFiles(kindDir).Select(Path.GetFileName)!,
+                    StringComparer.Ordinal);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not list cached thumbnails in {Directory}; leaving them in place.", kindDir);
+                continue;
+            }
+
+            if (present.Count == 0) continue;
+
+            foreach (var src in distinct)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                foreach (var width in WidthBuckets)
+                {
+                    foreach (var extension in new[] { JpegExtension, PngExtension })
+                    {
+                        var fileName = CacheKey(src!, width) + extension;
+                        if (!present.Contains(fileName)) continue;
+
+                        try { File.Delete(Path.Combine(kindDir, fileName)); }
+                        catch (Exception ex) { _logger.LogWarning(ex, "Failed to remove cached thumbnail {Path}.", Path.Combine(kindDir, fileName)); }
+                    }
+                }
+            }
+        }
+    }
+
+    public void RemoveThumbnailsForSource(string? src)
+    {
+        if (string.IsNullOrWhiteSpace(src)) return;
+
+        foreach (var folder in KindFolders.Values.Distinct())
+        {
+            var kindDir = Path.Combine(_cacheRoot, folder);
+            foreach (var width in WidthBuckets)
+            {
+                foreach (var extension in new[] { JpegExtension, PngExtension })
+                {
+                    var cacheFile = Path.Combine(kindDir, CacheKey(src, width) + extension);
+                    if (!File.Exists(cacheFile)) continue;
+                    try { File.Delete(cacheFile); }
+                    catch (Exception ex) { _logger.LogWarning(ex, "Failed to remove cached thumbnail {Path}.", cacheFile); }
+                }
+            }
+        }
+    }
+
+    private static bool IsTransparentKind(string? kind) =>
+        string.Equals(kind, LogoKind, StringComparison.OrdinalIgnoreCase);
+
+    private static string CacheExtension(string? kind) =>
+        IsTransparentKind(kind) ? PngExtension : JpegExtension;
+
+    private static string ResolveKindFolder(string? kind)
+    {
+        if (!string.IsNullOrWhiteSpace(kind) && KindFolders.TryGetValue(kind, out var folder)) return folder;
+        return DefaultKindFolder;
+    }
+
+    private static readonly Regex TmdbSizeSegment = new(@"(https?://image\.tmdb\.org/t/p/)[wh]\d+(/)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // For the large (hero) bucket, pull TMDB's full-resolution "original" backdrop
+    // rather than the stored w1280, so the downscale to the bucket stays sharp on
+    // wide screens. Smaller buckets keep the stored size to avoid oversized
+    // downloads; the cache key still uses the requested `src`, so nothing else
+    // needs to know about the upgrade.
+    private static string ResolveDownloadSource(string src, int width)
+    {
+        if (width <= 1280) return src;
+        return TmdbSizeSegment.Replace(src, "$1original$2");
+    }
+
+    private async Task<byte[]?> LoadSourceAsync(string src, CancellationToken cancellationToken)
+    {
+        if (src.StartsWith(CustomArtworkPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var fileName = src.Substring(CustomArtworkPrefix.Length);
+            var localPath = SafePathResolver.ResolveContainedFilePath(_customArtworkPath, fileName);
+            if (localPath == null || !File.Exists(localPath)) return null;
+            return await File.ReadAllBytesAsync(localPath, cancellationToken);
+        }
+
+        if (Uri.TryCreate(src, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+        {
+            if (AllowedRemoteHosts.Contains(uri.Host))
+            {
+                return await _downloader.DownloadAsync(src, cancellationToken);
+            }
+
+            // Rejection is otherwise indistinguishable from "this item has no
+            // artwork" — the card just shows its placeholder. Say which host was
+            // refused, so adding a provider whose CDN is not listed is a line in
+            // the log rather than a blank tile nobody can account for.
+            _logger.LogWarning(
+                "Not serving a thumbnail for {Source}: host '{Host}' is not an allowed artwork source, so the image will render as a placeholder.",
+                src, uri.Host);
+        }
+
+        return null;
+    }
+
+    internal static string CacheKey(string src, int width)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{src}|{width}"));
+        return Convert.ToHexString(bytes);
+    }
+
+    private void PruneCache()
+    {
+        try
+        {
+            var root = new DirectoryInfo(_cacheRoot);
+            if (!root.Exists) return;
+
+            var files = root.GetFiles("*.jpg", SearchOption.AllDirectories)
+                .Concat(root.GetFiles("*.png", SearchOption.AllDirectories))
+                .ToArray();
+            long total = files.Sum(f => f.Length);
+            if (total <= MaxCacheBytes) return;
+
+            var target = (long)(MaxCacheBytes * 0.8);
+            foreach (var file in files.OrderBy(f => f.LastWriteTimeUtc))
+            {
+                if (total <= target) break;
+                try { total -= file.Length; file.Delete(); }
+                catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Thumbnail cache prune failed.");
+        }
+    }
+}
