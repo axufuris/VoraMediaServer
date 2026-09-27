@@ -1,8 +1,14 @@
+import { useState } from 'react';
 import { type GeneratedMixDetailVM } from '../../../../api/Music/musicService';
 import SaveMixButton from '../../../../components/Collections/SaveMixButton';
 import AddToPlaylistButton from '../../../../components/Collections/AddToPlaylistButton';
 import ContentRatingBadge from '../../../../components/Media/ContentRatingBadge';
 import TrackListeners from '../../../../components/Media/TrackListeners';
+import { MakePlaylistDialog } from './AiPlaylistsSection';
+import { aiPlaylistService } from '../../../../api/Music/aiPlaylistService';
+import { RestartIcon, ShuffleIcon, TrashIcon } from '../../../../components/Client/Primitives/ActionIcons';
+import { useDialog } from '../../../../dialogs';
+import { resolveReason } from '../../../../utils/apiError';
 
 // What kind of mix the page is showing. AI playlists say so, so nobody
 // mistakes one for the ordinary Daily Mixes.
@@ -29,6 +35,9 @@ const mixKicker = (kind?: string): string => {
 };
 
 interface MusicMixViewProps {
+    serverId?: string;
+    onRegenerated: () => void;
+    onDeleted: () => void;
     isLoading: boolean;
     currentMix: GeneratedMixDetailVM | null;
     isShuffled: boolean;
@@ -38,6 +47,9 @@ interface MusicMixViewProps {
 }
 
 export default function MusicMixView({
+    serverId,
+    onRegenerated,
+    onDeleted,
     isLoading,
     currentMix,
     isShuffled,
@@ -45,6 +57,9 @@ export default function MusicMixView({
     playMixFromIndex,
     formatDuration,
 }: MusicMixViewProps) {
+    const dialog = useDialog();
+    const [regenerateOpen, setRegenerateOpen] = useState(false);
+
     if (isLoading) {
         return <div className="text-[var(--vora-text-muted)] py-12 text-center">Loading mix...</div>;
     }
@@ -53,6 +68,24 @@ export default function MusicMixView({
     }
 
     const coverLabel = mixCoverLabel(currentMix.kind, currentMix.slot, !!currentMix.artworkUrl);
+    const canRegenerate = currentMix.kind === 'Requested' && !!currentMix.prompt;
+    const canDelete = currentMix.kind === 'Requested' || currentMix.kind === 'Blend';
+
+    const deleteMix = async () => {
+        const confirmed = await dialog.confirm({
+            title: 'Delete this playlist?',
+            message: `"${currentMix.name}" will be removed. A copy you saved to your playlists stays.`,
+            confirmText: 'Delete',
+            tone: 'danger',
+        });
+        if (!confirmed) return;
+        try {
+            await aiPlaylistService.remove(currentMix.id, serverId);
+            onDeleted();
+        } catch (err) {
+            await dialog.alert({ title: 'Could not delete it', message: resolveReason(err) ?? 'Try again in a moment.', tone: 'danger' });
+        }
+    };
 
     return (
         <>
@@ -98,10 +131,32 @@ export default function MusicMixView({
                                 }}
                                 className="text-sm px-4 py-2 bg-[var(--vora-bg-surface)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] hover:text-[var(--vora-text-primary)] rounded transition-colors cursor-pointer flex items-center gap-2"
                             >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4l5 5m0 0V5m0 4H5m11-4l5 5m0 0V5m0 4h-4m-2 7l7 7m-7-7l-7 7m14 0v-4m0 4h-4" /></svg>
+                                <ShuffleIcon size={16} />
                                 Shuffle
                             </button>
                             <SaveMixButton mixId={currentMix.id} />
+                            {canRegenerate && (
+                                <button
+                                    type="button"
+                                    onClick={() => setRegenerateOpen(true)}
+                                    className="vora-pill flex cursor-pointer items-center gap-2 rounded px-4 py-2 text-sm font-semibold"
+                                >
+                                    <RestartIcon size={16} />
+                                    Regenerate
+                                </button>
+                            )}
+                            {canDelete && (
+                                <button
+                                    type="button"
+                                    onClick={deleteMix}
+                                    aria-label="Delete playlist"
+                                    title="Delete playlist"
+                                    className="vora-pill flex cursor-pointer items-center rounded px-3 py-2 text-sm font-semibold"
+                                    style={{ color: 'var(--vora-danger-text)' }}
+                                >
+                                    <TrashIcon />
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -134,6 +189,14 @@ export default function MusicMixView({
                         </div>
                     ))}
                 </div>
+            )}
+            {regenerateOpen && currentMix.prompt && (
+                <MakePlaylistDialog
+                    serverId={serverId}
+                    regenerate={{ mixId: currentMix.id, prompt: currentMix.prompt, trackCount: currentMix.tracks.length }}
+                    onClose={() => setRegenerateOpen(false)}
+                    onMade={() => { setRegenerateOpen(false); onRegenerated(); }}
+                />
             )}
         </>
     );

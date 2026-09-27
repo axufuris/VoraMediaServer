@@ -6,6 +6,7 @@ import StarRating from '../../../../components/Client/Primitives/StarRating';
 import RatedBadge from '../../../../components/Client/Primitives/RatedBadge';
 import { type MusicNavState } from './musicNavState';
 import { albumCover } from '../../../../utils/albumCover';
+import { ShuffleIcon } from '../../../../components/Client/Primitives/ActionIcons';
 
 interface MusicArtistViewProps {
     isLoading: boolean;
@@ -161,7 +162,7 @@ export default function MusicArtistView({
                                                 className="text-sm px-4 py-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-primary)] hover:text-[var(--vora-text-primary)] rounded transition-colors cursor-pointer flex items-center gap-2 backdrop-blur-sm border border-[var(--vora-border-subtle)]/60"
                                                 title="Shuffle every track from every album"
                                             >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4l5 5m0 0V5m0 4H5m11-4l5 5m0 0V5m0 4h-4m-2 7l7 7m-7-7l-7 7m14 0v-4m0 4h-4" /></svg>
+                                                <ShuffleIcon size={16} />
                                                 Shuffle Artist
                                             </button>
                                             <button

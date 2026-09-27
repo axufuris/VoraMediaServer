@@ -940,6 +940,15 @@ export default function MusicTab() {
 
             {nav.view === 'mix' && (
                 <MusicMixView
+                    serverId={serverId}
+                    onRegenerated={() => {
+                        aiPlaylists.reload();
+                        setRefreshSeq(n => n + 1);
+                    }}
+                    onDeleted={() => {
+                        aiPlaylists.reload();
+                        updateNav({ view: 'root' });
+                    }}
                     isLoading={isLoading}
                     currentMix={currentMix}
                     isShuffled={isShuffled}

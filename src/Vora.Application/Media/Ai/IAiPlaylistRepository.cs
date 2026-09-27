@@ -16,11 +16,14 @@ public interface IAiPlaylistRepository
     Task<List<Guid>> GetProfilesDueForWeeklyAsync(DateTime generatedBefore, int minPlays, int withinDays);
     Task<List<BlendPartner>> GetBlendPartnersAsync(Guid profileId);
     Task<int> CountRequestsSinceAsync(Guid profileId, DateTime since);
+    Task<GeneratedMix?> GetAiMixAsync(Guid profileId, Guid mixId);
     Task<List<GeneratedMix>> GetAiMixesAsync(Guid profileId);
 
     Task ReplaceWeeklyAsync(Guid profileId, IReadOnlyList<GeneratedMix> mixes);
     Task ReplaceBlendAsync(GeneratedMix blend);
     Task AddRequestAsync(GeneratedMix request, int keep);
+    Task RebuildRequestAsync(Guid mixId, GeneratedMix rebuilt);
+    Task<bool> DeleteAiMixAsync(Guid profileId, Guid mixId, IReadOnlyCollection<GeneratedMixKind> kinds);
 }
 
 public sealed record PlayedVector(float[] Vector, int Plays);

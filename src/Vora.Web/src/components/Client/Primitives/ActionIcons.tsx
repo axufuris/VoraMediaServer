@@ -74,6 +74,30 @@ export function StarIcon({ size = 18, filled = false }: { size?: number; filled?
     );
 }
 
+export function TrashIcon({ size = 16 }: { size?: number }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} aria-hidden="true">
+            <path d="M3 6h18" />
+            <path d="M8 6V4h8v2" />
+            <path d="M19 6l-1 14H6L5 6" />
+            <path d="M10 11v6M14 11v6" />
+        </svg>
+    );
+}
+
+// Two crossing arrows, the shuffle glyph players use everywhere.
+export function ShuffleIcon({ size = 18 }: { size?: number }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} aria-hidden="true">
+            <path d="M16 3h5v5" />
+            <path d="M4 20 21 3" />
+            <path d="M21 16v5h-5" />
+            <path d="m15 15 6 6" />
+            <path d="M4 4l5 5" />
+        </svg>
+    );
+}
+
 // Outlined bookmark, matching the watchlist affordance viewers know from Plex.
 export function BookmarkIcon({ size = 18, filled = false }: { size?: number; filled?: boolean }) {
     return (

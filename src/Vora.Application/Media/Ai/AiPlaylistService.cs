@@ -14,6 +14,8 @@ public interface IAiPlaylistService
     Task<AiPlaylistsVM> GetForProfileAsync(Guid profileId);
     Task<int> GenerateWeeklyForDueProfilesAsync(bool force, CancellationToken cancellationToken);
     Task<AiResult> CreateFromRequestAsync(Guid profileId, string prompt, int? songs, MusicAccessFilter access, CancellationToken cancellationToken);
+    Task<AiResult> RegenerateRequestAsync(Guid profileId, Guid mixId, string? prompt, int? songs, MusicAccessFilter access, CancellationToken cancellationToken);
+    Task<bool> DeleteAsync(Guid profileId, Guid mixId);
     Task<AiResult> CreateBlendAsync(Guid profileId, Guid partnerProfileId, MusicAccessFilter access, CancellationToken cancellationToken);
     Task<List<BlendPartner>> GetBlendPartnersAsync(Guid profileId);
 }
@@ -194,33 +196,60 @@ public class AiPlaylistService : IAiPlaylistService
 
     // ---------- Requests ----------
 
+    public static readonly IReadOnlyCollection<GeneratedMixKind> DeletableKinds = new[] { GeneratedMixKind.Requested, GeneratedMixKind.Blend };
+
     public async Task<AiResult> CreateFromRequestAsync(Guid profileId, string prompt, int? songs, MusicAccessFilter access, CancellationToken cancellationToken)
     {
+        var (result, mix) = await BuildRequestAsync(profileId, prompt, songs, access, cancellationToken);
+        if (mix == null) return result;
+
+        await _repository.AddRequestAsync(mix, KeepRequests);
+        return AiResult.Made(mix.Id);
+    }
+
+    public async Task<AiResult> RegenerateRequestAsync(Guid profileId, Guid mixId, string? prompt, int? songs, MusicAccessFilter access, CancellationToken cancellationToken)
+    {
+        var existing = await _repository.GetAiMixAsync(profileId, mixId);
+        if (existing == null || existing.Kind != GeneratedMixKind.Requested) return AiResult.NothingFound;
+
+        var words = string.IsNullOrWhiteSpace(prompt) ? existing.Prompt ?? string.Empty : prompt;
+        var (result, mix) = await BuildRequestAsync(profileId, words, songs, access, cancellationToken);
+        if (mix == null) return result;
+
+        await _repository.RebuildRequestAsync(existing.Id, mix);
+        return AiResult.Made(existing.Id);
+    }
+
+    public Task<bool> DeleteAsync(Guid profileId, Guid mixId) =>
+        _repository.DeleteAiMixAsync(profileId, mixId, DeletableKinds);
+
+    private async Task<(AiResult Result, GeneratedMix? Mix)> BuildRequestAsync(Guid profileId, string prompt, int? songs, MusicAccessFilter access, CancellationToken cancellationToken)
+    {
         var request = (prompt ?? string.Empty).Trim();
-        if (request.Length == 0) return AiResult.Invalid("Say what the playlist is for.");
-        if (songs is < MinRequestSongs or > MaxRequestSongs) return AiResult.Invalid($"Choose between {MinRequestSongs} and {MaxRequestSongs} songs.");
+        if (request.Length == 0) return (AiResult.Invalid("Say what the playlist is for."), null);
+        if (songs is < MinRequestSongs or > MaxRequestSongs) return (AiResult.Invalid($"Choose between {MinRequestSongs} and {MaxRequestSongs} songs."), null);
         if (request.Length > MaxRequestLength) request = request[..MaxRequestLength];
 
         var server = await _settings.GetSettingsAsync();
         var profile = await _users.GetProfileByIdAsync(profileId);
         if (!server.EnableAiPlaylistRequests || profile == null || !profile.AiMusicPlaylistsEnabled || !await IsServerEnabledAsync())
         {
-            return AiResult.Unavailable;
+            return (AiResult.Unavailable, null);
         }
 
         var sinceDayAgo = await _repository.CountRequestsSinceAsync(profileId, DateTime.UtcNow.AddDays(-1));
         if (sinceDayAgo >= server.AiPlaylistRequestsPerDay)
         {
-            return AiResult.LimitReached(server.AiPlaylistRequestsPerDay);
+            return (AiResult.LimitReached(server.AiPlaylistRequestsPerDay), null);
         }
 
-        var parsed = ParseRequest(await _openAi.CompleteJsonAsync(PluginId, RequestPrompt(request, songs), cancellationToken, 0.4, ModelSettingKey));
-        if (parsed == null) return AiResult.Failed;
+        var parsed = ParseRequest(await _openAi.CompleteJsonAsync(PluginId, RequestPrompt(request, songs), cancellationToken, 0.4, ModelSettingKey, profileId));
+        if (parsed == null) return (AiResult.Failed, null);
 
         var inputs = new List<string> { parsed.Search };
         if (!string.IsNullOrWhiteSpace(parsed.Avoid)) inputs.Add(parsed.Avoid);
         var vectors = await _openAi.EmbedAsync(PluginId, inputs, cancellationToken);
-        if (vectors == null || vectors[0] is not float[] search) return AiResult.Failed;
+        if (vectors == null || vectors[0] is not float[] search) return (AiResult.Failed, null);
 
         // What was asked for leads; the listener's own taste only nudges it, and
         // anything asked to be avoided pushes the search away from it.
@@ -229,12 +258,11 @@ public class AiPlaylistService : IAiPlaylistService
         if (vectors.Count > 1 && vectors[1] is float[] avoid) query = Blend(query, 1f, avoid, -0.35f);
 
         var tracks = await PickAsync(query, access, songs ?? Math.Clamp(parsed.Songs, MinRequestSongs, MaxRequestSongs), new HashSet<Guid>(), new AiTrackFilter(parsed.YearFrom, parsed.YearTo));
-        if (tracks.Count == 0) return AiResult.NothingFound;
+        if (tracks.Count == 0) return (AiResult.NothingFound, null);
 
         var mix = NewMix(profileId, GeneratedMixKind.Requested, 1, parsed.Title, parsed.Why, tracks);
         mix.Prompt = request;
-        await _repository.AddRequestAsync(mix, KeepRequests);
-        return AiResult.Made(mix.Id);
+        return (AiResult.Made(mix.Id), mix);
     }
 
     // ---------- Blends ----------

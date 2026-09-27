@@ -96,7 +96,37 @@ public class AiPlaylistRepository : IAiPlaylistRepository
             .ToListAsync();
 
     public Task<int> CountRequestsSinceAsync(Guid profileId, DateTime since) =>
-        _context.GeneratedMixes.CountAsync(m => m.ProfileId == profileId && m.Kind == GeneratedMixKind.Requested && m.GeneratedAt >= since);
+        _context.AiUsageLogs.CountAsync(l => l.ProfileId == profileId && l.PluginId == AiPlaylistService.PluginId && l.Timestamp >= since);
+
+    public Task<GeneratedMix?> GetAiMixAsync(Guid profileId, Guid mixId) =>
+        _context.GeneratedMixes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.Id == mixId && m.ProfileId == profileId && AiKinds.Contains(m.Kind));
+
+    public async Task RebuildRequestAsync(Guid mixId, GeneratedMix rebuilt)
+    {
+        var mix = await _context.GeneratedMixes.FirstOrDefaultAsync(m => m.Id == mixId);
+        if (mix == null) return;
+
+        mix.Name = rebuilt.Name;
+        mix.Description = rebuilt.Description;
+        mix.DescriptionTag = rebuilt.DescriptionTag;
+        mix.Prompt = rebuilt.Prompt;
+        mix.ArtworkUrl = rebuilt.ArtworkUrl;
+        mix.TrackOrder = rebuilt.TrackOrder;
+        mix.GeneratedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<bool> DeleteAiMixAsync(Guid profileId, Guid mixId, IReadOnlyCollection<GeneratedMixKind> kinds)
+    {
+        var mix = await _context.GeneratedMixes.FirstOrDefaultAsync(m => m.Id == mixId && m.ProfileId == profileId && kinds.Contains(m.Kind));
+        if (mix == null) return false;
+
+        _context.GeneratedMixes.Remove(mix);
+        await _context.SaveChangesAsync();
+        return true;
+    }
 
     public Task<List<GeneratedMix>> GetAiMixesAsync(Guid profileId) =>
         _context.GeneratedMixes

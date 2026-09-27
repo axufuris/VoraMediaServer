@@ -9,6 +9,12 @@ public class MakeAiPlaylistRequest
     public int? Songs { get; set; }
 }
 
+public class RegenerateAiPlaylistRequest
+{
+    public string? Prompt { get; set; }
+    public int? Songs { get; set; }
+}
+
 public class CreateBlendRequest
 {
     public Guid PartnerProfileId { get; set; }

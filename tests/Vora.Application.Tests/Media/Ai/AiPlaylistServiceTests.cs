@@ -52,7 +52,7 @@ public class AiPlaylistServiceTests
     [Fact]
     public async Task A_request_becomes_a_playlist_from_the_library_through_the_viewers_controls()
     {
-        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>()).Returns(RequestJson);
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>()).Returns(RequestJson);
 
         var result = await Service().CreateFromRequestAsync(_me.Id, "cooking dinner, 90s hip hop, nothing sad", null, CleanOnly, TestContext.Current.CancellationToken);
 
@@ -67,7 +67,7 @@ public class AiPlaylistServiceTests
     [Fact]
     public async Task No_more_than_two_songs_by_one_artist()
     {
-        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>()).Returns(RequestJson);
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>()).Returns(RequestJson);
         GeneratedMix? saved = null;
         await _repo.AddRequestAsync(Arg.Do<GeneratedMix>(m => saved = m), Arg.Any<int>());
 
@@ -85,7 +85,7 @@ public class AiPlaylistServiceTests
         var result = await Service().CreateFromRequestAsync(_me.Id, "road trip", null, CleanOnly, TestContext.Current.CancellationToken);
 
         result.Outcome.Should().Be(AiOutcome.LimitReached);
-        await _openAi.DidNotReceive().CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>());
+        await _openAi.DidNotReceive().CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
     }
 
     [Theory]
@@ -100,7 +100,7 @@ public class AiPlaylistServiceTests
         var result = await Service().CreateFromRequestAsync(_me.Id, "road trip", null, CleanOnly, TestContext.Current.CancellationToken);
 
         result.Outcome.Should().Be(AiOutcome.Unavailable);
-        await _openAi.DidNotReceive().CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>());
+        await _openAi.DidNotReceive().CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -112,25 +112,25 @@ public class AiPlaylistServiceTests
     [Fact]
     public async Task A_chosen_length_is_used_whatever_the_model_says()
     {
-        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>()).Returns(RequestJson);
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>()).Returns(RequestJson);
         GeneratedMix? saved = null;
         await _repo.AddRequestAsync(Arg.Do<GeneratedMix>(m => saved = m), Arg.Any<int>());
 
         await Service().CreateFromRequestAsync(_me.Id, "road trip", 12, CleanOnly, TestContext.Current.CancellationToken);
 
         saved!.TrackOrder.Should().HaveCount(12);
-        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Is<string>(p => p.Contains("They want 12 songs.")), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>());
+        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Is<string>(p => p.Contains("They want 12 songs.")), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
     }
 
     [Fact]
     public async Task With_no_length_chosen_the_model_picks_one_between_the_limits()
     {
-        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>())
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>())
             .Returns("""{"title":"Road Trip","search":"driving rock","songs":400}""");
 
         await Service().CreateFromRequestAsync(_me.Id, "road trip", null, CleanOnly, TestContext.Current.CancellationToken);
 
-        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Is<string>(p => p.Contains("from 10 to 60")), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>());
+        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Is<string>(p => p.Contains("from 10 to 60")), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
         await _repo.Received().FindNearestTracksAsync(Arg.Any<float[]>(), CleanOnly, Arg.Any<AiTrackFilter>(), AiPlaylistService.MaxRequestSongs * 4);
     }
 
@@ -142,7 +142,82 @@ public class AiPlaylistServiceTests
         var result = await Service().CreateFromRequestAsync(_me.Id, "road trip", songs, CleanOnly, TestContext.Current.CancellationToken);
 
         result.Outcome.Should().Be(AiOutcome.Invalid);
-        await _openAi.DidNotReceive().CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>());
+        await _openAi.DidNotReceive().CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task A_request_is_charged_to_the_profile_that_made_it()
+    {
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>()).Returns(RequestJson);
+
+        await Service().CreateFromRequestAsync(_me.Id, "road trip", null, CleanOnly, TestContext.Current.CancellationToken);
+
+        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), _me.Id);
+    }
+
+    [Fact]
+    public async Task Regenerating_rebuilds_the_same_playlist_from_its_words_at_the_new_length()
+    {
+        var mixId = Guid.NewGuid();
+        _repo.GetAiMixAsync(_me.Id, mixId).Returns(new GeneratedMix { Id = mixId, ProfileId = _me.Id, Kind = GeneratedMixKind.Requested, Name = "Cruisin' Vibes", Prompt = "Cruising in the car, upbeat fun music." });
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>()).Returns(RequestJson);
+
+        var result = await Service().RegenerateRequestAsync(_me.Id, mixId, null, 12, CleanOnly, TestContext.Current.CancellationToken);
+
+        result.Outcome.Should().Be(AiOutcome.Made);
+        result.MixId.Should().Be(mixId);
+        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Is<string>(p => p.Contains("Cruising in the car") && p.Contains("They want 12 songs.")), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), _me.Id);
+        await _repo.Received(1).RebuildRequestAsync(mixId, Arg.Is<GeneratedMix>(m => m.TrackOrder.Count == 12 && m.Prompt == "Cruising in the car, upbeat fun music."));
+        await _repo.DidNotReceive().AddRequestAsync(Arg.Any<GeneratedMix>(), Arg.Any<int>());
+    }
+
+    [Fact]
+    public async Task Regenerating_uses_new_words_when_given()
+    {
+        var mixId = Guid.NewGuid();
+        _repo.GetAiMixAsync(_me.Id, mixId).Returns(new GeneratedMix { Id = mixId, ProfileId = _me.Id, Kind = GeneratedMixKind.Requested, Name = "Old", Prompt = "old words" });
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>()).Returns(RequestJson);
+
+        await Service().RegenerateRequestAsync(_me.Id, mixId, "rainy sunday", null, CleanOnly, TestContext.Current.CancellationToken);
+
+        await _repo.Received(1).RebuildRequestAsync(mixId, Arg.Is<GeneratedMix>(m => m.Prompt == "rainy sunday"));
+    }
+
+    [Fact]
+    public async Task Only_a_request_can_be_regenerated()
+    {
+        var mixId = Guid.NewGuid();
+        _repo.GetAiMixAsync(_me.Id, mixId).Returns(new GeneratedMix { Id = mixId, ProfileId = _me.Id, Kind = GeneratedMixKind.Blend, Name = "Andy + Sam" });
+
+        var result = await Service().RegenerateRequestAsync(_me.Id, mixId, null, null, CleanOnly, TestContext.Current.CancellationToken);
+
+        result.Outcome.Should().Be(AiOutcome.NothingFound);
+        await _openAi.DidNotReceive().CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task Regenerating_counts_against_the_daily_limit()
+    {
+        var mixId = Guid.NewGuid();
+        Server(perDay: 2);
+        _repo.CountRequestsSinceAsync(_me.Id, Arg.Any<DateTime>()).Returns(2);
+        _repo.GetAiMixAsync(_me.Id, mixId).Returns(new GeneratedMix { Id = mixId, ProfileId = _me.Id, Kind = GeneratedMixKind.Requested, Name = "x", Prompt = "x" });
+
+        var result = await Service().RegenerateRequestAsync(_me.Id, mixId, null, 30, CleanOnly, TestContext.Current.CancellationToken);
+
+        result.Outcome.Should().Be(AiOutcome.LimitReached);
+    }
+
+    [Fact]
+    public async Task Only_requests_and_blends_can_be_deleted()
+    {
+        var mixId = Guid.NewGuid();
+        _repo.DeleteAiMixAsync(_me.Id, mixId, Arg.Any<IReadOnlyCollection<GeneratedMixKind>>()).Returns(true);
+
+        (await Service().DeleteAsync(_me.Id, mixId)).Should().BeTrue();
+
+        await _repo.Received(1).DeleteAiMixAsync(_me.Id, mixId, Arg.Is<IReadOnlyCollection<GeneratedMixKind>>(k =>
+            k.Count == 2 && k.Contains(GeneratedMixKind.Requested) && k.Contains(GeneratedMixKind.Blend)));
     }
 
     // ---------- Weekly ----------
@@ -163,7 +238,7 @@ public class AiPlaylistServiceTests
         _recs.GetTopArtistsForProfileAsync(_me.Id, Arg.Any<MusicAccessFilter>(), Arg.Any<int>(), Arg.Any<int>())
             .Returns(new List<ArtistPlayScore> { new() { ArtistId = Guid.NewGuid(), ArtistName = "blink-182", Score = 10 } });
         _recs.GetGenresForArtistsAsync(Arg.Any<IEnumerable<Guid>>()).Returns(new Dictionary<Guid, List<string>>());
-        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>()).Returns(WeeklyJson);
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>()).Returns(WeeklyJson);
         IReadOnlyList<GeneratedMix>? saved = null;
         await _repo.ReplaceWeeklyAsync(_me.Id, Arg.Do<IReadOnlyList<GeneratedMix>>(m => saved = m));
 
@@ -172,7 +247,7 @@ public class AiPlaylistServiceTests
         saved!.Count(m => m.Kind == GeneratedMixKind.AiPlaylist).Should().Be(4);
         saved!.Should().ContainSingle(m => m.Kind == GeneratedMixKind.Bridge && m.Name == "Punk to Country");
         saved!.First().Description.Should().Be("Moodier stuff.");
-        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>());
+        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
         await _openAi.Received(1).EmbedAsync(Arg.Any<string>(), Arg.Is<IReadOnlyList<string>>(l => l.Count == 6), Arg.Any<CancellationToken>());
     }
 
@@ -185,7 +260,7 @@ public class AiPlaylistServiceTests
         _recs.GetTopArtistsForProfileAsync(_me.Id, Arg.Any<MusicAccessFilter>(), Arg.Any<int>(), Arg.Any<int>())
             .Returns(new List<ArtistPlayScore> { new() { ArtistId = Guid.NewGuid(), ArtistName = "blink-182", Score = 10 } });
         _recs.GetGenresForArtistsAsync(Arg.Any<IEnumerable<Guid>>()).Returns(new Dictionary<Guid, List<string>>());
-        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>()).Returns(WeeklyJson);
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>()).Returns(WeeklyJson);
 
         await Service().GenerateWeeklyForDueProfilesAsync(false, TestContext.Current.CancellationToken);
 
@@ -218,7 +293,7 @@ public class AiPlaylistServiceTests
         result.Outcome.Should().Be(AiOutcome.Made);
         await _repo.Received(1).ReplaceBlendAsync(Arg.Is<GeneratedMix>(m => m.Kind == GeneratedMixKind.Blend && m.Name == "Andy + Sam" && m.PartnerProfileId == _sam.Id));
         await _repo.Received().FindNearestTracksAsync(Arg.Any<float[]>(), CleanOnly, Arg.Any<AiTrackFilter>(), Arg.Any<int>());
-        await _openAi.DidNotReceive().CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>());
+        await _openAi.DidNotReceive().CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
     }
 
     // Someone who switched AI playlists off can't be blended with.
