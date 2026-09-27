@@ -31,6 +31,7 @@ public interface ITaskQueueManager
     void QueueAnalyzeLibraryMediaContent(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false);
     void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueScanNewFile(Guid libraryId, string filePath);
+    void QueueLibraryPostScan(Guid libraryId, string? libraryName = null, bool forceOverride = false);
     void QueueScanNewMusicFile(Guid libraryId, string filePath);
     void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueRefreshMatchedMediaItem(Guid mediaItemId, Guid libraryId, bool isTvShow);
@@ -166,6 +167,14 @@ public class TaskQueueManager : ITaskQueueManager
 
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
         }, resourceKey: LibraryKey(libraryId));
+    }
+
+    public void QueueLibraryPostScan(Guid libraryId, string? libraryName = null, bool forceOverride = false)
+    {
+        EnqueueTask($"Analyze Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
+            RunLibraryPostScanAsync(sp, libraryId, libraryName, forceOverride, ct),
+            libraryName == null ? LibraryLabel(libraryId, "Analyze Library: {0}") : null,
+            resourceKey: LibraryMaintenanceKey(libraryId));
     }
 
     public void QueueAnalyzeLibraryMediaContent(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false)
@@ -819,10 +828,7 @@ public class TaskQueueManager : ITaskQueueManager
     private static async Task RunFullLibraryWorkflowAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, CancellationToken ct = default)
     {
         var metadataManager = sp.GetRequiredService<IMetadataManager>();
-        var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
         var libraryManager = sp.GetRequiredService<ILibraryManager>();
-        var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
-        var thumbnailManager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
         var dedupeManager = sp.GetRequiredService<Vora.Application.Media.IMediaDedupeManager>();
         var progress = sp.GetRequiredService<ITaskProgressReporter>();
         var logger = sp.GetService<ILogger<TaskQueueManager>>();
@@ -921,26 +927,7 @@ public class TaskQueueManager : ITaskQueueManager
         // try/catch so one failing pass can't starve the ones after it — a
         // library must never end up with, say, no analysis just because overlay
         // generation threw. Cancellation still stops the whole workflow.
-        async Task RunStepAsync(string label, Func<Task> step)
-        {
-            ct.ThrowIfCancellationRequested();
-            progress.Report(label);
-            var stepStopwatch = Stopwatch.StartNew();
-            try
-            {
-                await step();
-            }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                logger?.LogError(ex, "Library workflow step '{Step}' failed for {LibraryId}; continuing with the remaining steps.", label, libraryId);
-            }
-            finally
-            {
-                stepStopwatch.Stop();
-                logger?.LogInformation("Library workflow phase '{Step}' took {Wall:n1}s for {LibraryId}.", label.TrimEnd('…', '.', ' '), stepStopwatch.Elapsed.TotalSeconds, libraryId);
-            }
-        }
+        Task RunStepAsync(string label, Func<Task> step) => RunWorkflowStepAsync(progress, logger, libraryId, label, step, ct);
 
         // Safety net for anything the per-unit path missed (never double-fetches
         // an already-enriched item; force stays off here so a force rescan the
@@ -978,6 +965,23 @@ public class TaskQueueManager : ITaskQueueManager
         }
 
         await RunStepAsync("Refreshing actor metadata…", () => metadataManager.TriggerActorMetadataRefreshAsync(ct));
+
+        sp.GetRequiredService<ITaskQueueManager>().QueueLibraryPostScan(libraryId, libraryName, forceOverride);
+
+        workflowStopwatch.Stop();
+        logger?.LogInformation("Full library workflow for {LibraryId} completed in {Wall:n1}s.", libraryId, workflowStopwatch.Elapsed.TotalSeconds);
+        progress.Report(null);
+    }
+
+    private static async Task RunLibraryPostScanAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, CancellationToken ct = default)
+    {
+        var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
+        var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
+        var thumbnailManager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
+        var progress = sp.GetRequiredService<ITaskProgressReporter>();
+        var logger = sp.GetService<ILogger<TaskQueueManager>>();
+
+        Task RunStepAsync(string label, Func<Task> step) => RunWorkflowStepAsync(progress, logger, libraryId, label, step, ct);
 
         // Analysis populates each part's audio/video tracks (codec, HDR). The
         // overlay badges read that data, so analysis MUST run before overlays —
@@ -1033,16 +1037,35 @@ public class TaskQueueManager : ITaskQueueManager
             sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractLibrarySubtitles(libraryId, libraryName);
         }
 
-        workflowStopwatch.Stop();
-        logger?.LogInformation("Full library workflow for {LibraryId} completed in {Wall:n1}s.", libraryId, workflowStopwatch.Elapsed.TotalSeconds);
         progress.Report(null);
+    }
+
+    private static async Task RunWorkflowStepAsync(ITaskProgressReporter progress, ILogger<TaskQueueManager>? logger, Guid libraryId, string label, Func<Task> step, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        progress.Report(label);
+        var stepStopwatch = Stopwatch.StartNew();
+        try
+        {
+            await step();
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "Library workflow step '{Step}' failed for {LibraryId}; continuing with the remaining steps.", label, libraryId);
+        }
+        finally
+        {
+            stepStopwatch.Stop();
+            logger?.LogInformation("Library workflow phase '{Step}' took {Wall:n1}s for {LibraryId}.", label.TrimEnd('…', '.', ' '), stepStopwatch.Elapsed.TotalSeconds, libraryId);
+        }
     }
 
     private static string ResolveDisplayName(Guid id, string? name) =>
         string.IsNullOrEmpty(name) ? id.ToString() : name;
 
-    // All heavy jobs on one library share this key so they serialize (a scan,
-    // refresh, analyze, or watcher file-ingest of the same library never overlap
+    // All ingest jobs on one library share this key so they serialize (a scan,
+    // refresh, or watcher file-ingest of the same library never overlap
     // and race on its rows); different libraries get different keys and can run
     // concurrently up to the global cap.
     private static string LibraryKey(Guid libraryId) => $"library:{libraryId}";

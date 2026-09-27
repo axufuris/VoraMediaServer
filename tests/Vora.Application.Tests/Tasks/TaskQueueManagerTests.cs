@@ -252,4 +252,24 @@ public class TaskQueueManagerTests
         // Second remove no-ops (token already disposed and removed).
         _queue.RemoveTask(id);
     }
+
+    [Fact]
+    public async Task A_new_file_scan_does_not_wait_behind_a_libraries_analysis()
+    {
+        var libraryId = Guid.NewGuid();
+        _queue.QueueLibraryAdded(libraryId, "Movies");
+        _queue.QueueLibraryPostScan(libraryId, "Movies");
+        _queue.QueueScanNewFile(libraryId, "/movies/Runner (2026)/Runner.mkv");
+
+        var keys = new Dictionary<string, string>();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        await foreach (var task in _queue.DequeueAsync(cts.Token))
+        {
+            keys[task.Name.Split(':')[0]] = task.ResourceKey;
+            if (keys.Count == 3) break;
+        }
+
+        keys["Analyze Library"].Should().NotBe(keys["Scan File"]);
+        keys["Auto-Ingest Library"].Should().Be(keys["Scan File"]);
+    }
 }
