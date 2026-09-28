@@ -50,7 +50,7 @@ public interface ITaskQueueManager
     void QueueGeneratePosterOverlays(Guid mediaItemId);
     void QueueFullCollectionSync(Guid collectionId, string title, bool hasContentSync, bool hasChronologySort);
     void QueueReevaluateCollectionOrder(Guid collectionId);
-    Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null, string? dedupeKey = null);
+    Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null, string? dedupeKey = null, bool rerunIfRunning = false);
     bool CancelTask(Guid taskId);
     int CancelTasksForLibrary(Guid libraryId);
     CancellationToken? GetTaskCancellationToken(Guid taskId);
@@ -97,6 +97,7 @@ public class TaskQueueManager : ITaskQueueManager
     // the other finished and nulled it, froze the survivor's label entirely.
     private static readonly AsyncLocal<Guid?> _currentTaskId = new();
     private DateTime _lastProgressNotifyUtc = DateTime.MinValue;
+    private readonly ConcurrentDictionary<Guid, LibraryAnalysisReason> _analysisReasons = new();
 
     public TaskQueueManager(IClientNotifier notifier)
     {
@@ -169,26 +170,28 @@ public class TaskQueueManager : ITaskQueueManager
         }, resourceKey: LibraryKey(libraryId));
     }
 
-    public void QueueLibraryPostScan(Guid libraryId, string? libraryName = null, bool forceOverride = false)
+    public void QueueLibraryPostScan(Guid libraryId, string? libraryName = null, bool forceOverride = false) =>
+        QueueLibraryAnalysis(libraryId, libraryName, forceOverride ? LibraryAnalysisReason.Addition | LibraryAnalysisReason.Force : LibraryAnalysisReason.Addition);
+
+    public void QueueLibraryAnalysis(Guid libraryId, string? libraryName, LibraryAnalysisReason reason)
     {
+        _analysisReasons.AddOrUpdate(libraryId, reason, (_, existing) => existing | reason);
         EnqueueTask($"Analyze Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunLibraryPostScanAsync(sp, libraryId, libraryName, forceOverride, ct),
+            RunLibraryAnalysisAsync(sp, libraryId, libraryName, TakeAnalysisReasons(libraryId), ct),
             libraryName == null ? LibraryLabel(libraryId, "Analyze Library: {0}") : null,
-            resourceKey: LibraryMaintenanceKey(libraryId));
+            resourceKey: LibraryMaintenanceKey(libraryId),
+            dedupeKey: LibraryAnalyzeKey(libraryId),
+            rerunIfRunning: true);
     }
 
-    public void QueueAnalyzeLibraryMediaContent(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false)
-    {
-        EnqueueTask($"Analyze Library Media: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
-        {
-            var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
-            await analyzerManager.TriggerLibraryFileAnalysisAsync(libraryId, libraryName, ct);
-            await analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, forceOverride: forceOverride, isScheduleTrigger: isScheduleTrigger, cancellationToken: ct);
-        },
-        libraryName == null ? LibraryLabel(libraryId, "Analyze Library Media: {0}") : null,
-        resourceKey: LibraryMaintenanceKey(libraryId),
-        dedupeKey: $"analyze-lib:{libraryId}:{forceOverride}");
-    }
+    public LibraryAnalysisReason TakeAnalysisReasons(Guid libraryId) =>
+        _analysisReasons.TryRemove(libraryId, out var reasons) ? reasons : LibraryAnalysisReason.None;
+
+    public void QueueAnalyzeLibraryMediaContent(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false) =>
+        QueueLibraryAnalysis(libraryId, libraryName,
+            forceOverride ? LibraryAnalysisReason.Force
+            : isScheduleTrigger ? LibraryAnalysisReason.Schedule
+            : LibraryAnalysisReason.Manual);
 
     public void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
     {
@@ -482,19 +485,23 @@ public class TaskQueueManager : ITaskQueueManager
         }, resourceKey: CollectionKey(collectionId));
     }
 
-    public Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null, string? dedupeKey = null)
+    public Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null, string? dedupeKey = null, bool rerunIfRunning = false)
     {
         // Don't enqueue a duplicate of an operation that's already queued or
         // running (e.g. the daily thumbnail schedule firing over a manual run).
         // Best-effort: the states dict holds only active tasks, and a schedule vs.
         // manual trigger are far enough apart that a tight race isn't a concern.
+        var task = new QueuedTaskDto { Name = name, WorkItem = workItem, NameResolver = nameResolver, ResourceKey = resourceKey ?? Guid.NewGuid().ToString(), DedupeKey = dedupeKey };
+
         if (dedupeKey != null)
         {
-            var existing = _taskStates.Values.FirstOrDefault(t => t.DedupeKey == dedupeKey);
-            if (existing != null) return existing.Id;
+            var existing = _taskStates.Values.FirstOrDefault(t => t.DedupeKey == dedupeKey && t.Status != CancellingStatus);
+            if (existing != null)
+            {
+                if (rerunIfRunning && existing.Status == RunningStatus) existing.FollowUp = task;
+                return existing.Id;
+            }
         }
-
-        var task = new QueuedTaskDto { Name = name, WorkItem = workItem, NameResolver = nameResolver, ResourceKey = resourceKey ?? Guid.NewGuid().ToString(), DedupeKey = dedupeKey };
         var cts = new CancellationTokenSource();
 
         _taskTokens.TryAdd(task.Id, cts);
@@ -622,9 +629,18 @@ public class TaskQueueManager : ITaskQueueManager
     {
         // No _runningTaskId to clear — _currentTaskId is AsyncLocal and lives only
         // on the finished task's own async flow, so it goes away with it.
-        if (_taskTokens.TryRemove(taskId, out var cts)) cts.Dispose();
-        if (_taskStates.TryRemove(taskId, out _))
+        var cancelled = false;
+        if (_taskTokens.TryRemove(taskId, out var cts))
         {
+            cancelled = cts.IsCancellationRequested;
+            cts.Dispose();
+        }
+        if (_taskStates.TryRemove(taskId, out var removed))
+        {
+            if (removed.FollowUp is { } followUp && !cancelled && removed.Status != CancellingStatus)
+            {
+                EnqueueTask(followUp.Name, followUp.WorkItem, followUp.NameResolver, followUp.ResourceKey, followUp.DedupeKey, rerunIfRunning: true);
+            }
             _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
         }
     }
@@ -979,8 +995,11 @@ public class TaskQueueManager : ITaskQueueManager
         progress.Report(null);
     }
 
-    private static async Task RunLibraryPostScanAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, CancellationToken ct = default)
+    private static async Task RunLibraryAnalysisAsync(IServiceProvider sp, Guid libraryId, string? libraryName, LibraryAnalysisReason reasons, CancellationToken ct = default)
     {
+        if (reasons == LibraryAnalysisReason.None) return;
+        var afterScan = reasons.HasFlag(LibraryAnalysisReason.Addition);
+
         var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
         var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
         var thumbnailManager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
@@ -1000,7 +1019,27 @@ public class TaskQueueManager : ITaskQueueManager
         // as an addition trigger — it is gated by RunDetections and stays off
         // entirely when detection is set to Never or Schedule-only. Only the
         // explicit Analyze action (forceOverride) detects regardless of setting.
-        await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: forceOverride, isAdditionTrigger: true, cancellationToken: ct));
+        if (reasons.HasFlag(LibraryAnalysisReason.Force) || reasons.HasFlag(LibraryAnalysisReason.Manual))
+        {
+            await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, forceOverride: reasons.HasFlag(LibraryAnalysisReason.Force), cancellationToken: ct));
+        }
+        else
+        {
+            if (afterScan)
+            {
+                await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, isAdditionTrigger: true, cancellationToken: ct));
+            }
+            if (reasons.HasFlag(LibraryAnalysisReason.Schedule))
+            {
+                await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, isScheduleTrigger: true, cancellationToken: ct));
+            }
+        }
+
+        if (!afterScan)
+        {
+            progress.Report(null);
+            return;
+        }
 
         // Overlays LAST: now the posters get every badge — resolution (scan),
         // content rating (enrich), audio/video codec + HDR (analysis), and
@@ -1084,6 +1123,8 @@ public class TaskQueueManager : ITaskQueueManager
     // concurrency slot. Analyze and Thumbnails still share THIS key so the two
     // heavy FFmpeg/GPU jobs on one library don't run at once and double the load.
     private static string LibraryMaintenanceKey(Guid libraryId) => $"library-maint:{libraryId}";
+
+    private static string LibraryAnalyzeKey(Guid libraryId) => $"library-analyze:{libraryId}";
 
     // All of a collection's sync/order tasks share one key so they serialize:
     // a content sync (which itself queues a reorder), the chronology sort, and a

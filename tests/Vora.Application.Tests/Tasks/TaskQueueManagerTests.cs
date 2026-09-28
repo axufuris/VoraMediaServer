@@ -272,4 +272,75 @@ public class TaskQueueManagerTests
         keys["Analyze Library"].Should().NotBe(keys["Scan File"]);
         keys["Auto-Ingest Library"].Should().Be(keys["Scan File"]);
     }
+
+    [Fact]
+    public void A_scans_analysis_the_schedule_and_a_click_on_one_library_are_one_task()
+    {
+        var libraryId = Guid.NewGuid();
+
+        _queue.QueueLibraryPostScan(libraryId, "Shows");
+        _queue.QueueAnalyzeLibraryMediaContent(libraryId, "Shows", isScheduleTrigger: true);
+        _queue.QueueAnalyzeLibraryMediaContent(libraryId, "Shows");
+
+        _queue.GetAllTasks().Select(t => t.Name).Should().Equal("Analyze Library: Shows");
+        _queue.TakeAnalysisReasons(libraryId).Should().Be(LibraryAnalysisReason.Addition | LibraryAnalysisReason.Schedule | LibraryAnalysisReason.Manual);
+    }
+
+    [Fact]
+    public void A_request_while_the_analysis_runs_waits_and_runs_once_after()
+    {
+        var libraryId = Guid.NewGuid();
+        var running = _queue.EnqueueTaskForAnalysis(libraryId);
+        _queue.MarkTaskAsRunning(running);
+        _queue.TakeAnalysisReasons(libraryId);
+
+        _queue.QueueAnalyzeLibraryMediaContent(libraryId, "Movies", isScheduleTrigger: true);
+        _queue.QueueAnalyzeLibraryMediaContent(libraryId, "Movies", isScheduleTrigger: true);
+
+        _queue.GetAllTasks().Should().ContainSingle();
+
+        _queue.RemoveTask(running);
+
+        var followUp = _queue.GetAllTasks().Should().ContainSingle().Subject;
+        followUp.Id.Should().NotBe(running);
+        followUp.Status.Should().Be("Pending");
+        _queue.TakeAnalysisReasons(libraryId).Should().Be(LibraryAnalysisReason.Schedule);
+    }
+
+    [Fact]
+    public void Cancelling_a_running_analysis_does_not_queue_its_follow_up()
+    {
+        var libraryId = Guid.NewGuid();
+        var running = _queue.EnqueueTaskForAnalysis(libraryId);
+        _queue.MarkTaskAsRunning(running);
+        _queue.QueueAnalyzeLibraryMediaContent(libraryId, "Movies");
+
+        _queue.CancelTask(running);
+        _queue.RemoveTask(running);
+
+        _queue.GetAllTasks().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_scan_asked_for_while_the_ingest_runs_is_still_dropped_outright()
+    {
+        var libraryId = Guid.NewGuid();
+        _queue.QueueLibraryAdded(libraryId, "Music");
+        var id = _queue.GetAllTasks().Single().Id;
+        _queue.MarkTaskAsRunning(id);
+
+        _queue.QueueScanLibrary(libraryId, "Music");
+        _queue.RemoveTask(id);
+
+        _queue.GetAllTasks().Should().BeEmpty();
+    }
+}
+
+internal static class AnalysisQueueTestExtensions
+{
+    public static Guid EnqueueTaskForAnalysis(this TaskQueueManager queue, Guid libraryId)
+    {
+        queue.QueueAnalyzeLibraryMediaContent(libraryId, "Movies");
+        return queue.GetAllTasks().Single().Id;
+    }
 }
