@@ -21,7 +21,7 @@ export default function PlaylistDetailsPage() {
     const dialog = useDialog();
     const { serverId, id } = useParams<{ serverId?: string, id: string }>();
     const navigate = useNavigate();
-    const { playMedia, playQueue, isShuffled, toggleShuffle } = usePlayer();
+    const { playMedia, playQueue, isShuffled, toggleShuffle, playNext, addToQueue } = usePlayer();
 
     const formatTrackDuration = (s?: number): string => {
         if (!s || s <= 0) return '';
@@ -47,7 +47,9 @@ export default function PlaylistDetailsPage() {
             const data = await playlistService.getPlaylist(id, serverId);
             setPlaylist(data);
             if (data.items.length > 0) {
-                const firstUnwatched = data.items.find(i => !i.isPlayed) || data.items[0];
+                const firstUnwatched = data.mediaType === 'Music'
+                    ? data.items[0]
+                    : data.items.find(i => !i.isPlayed) || data.items[0];
 
                 setSelectedItem(prev => {
                     if (prev) {
@@ -149,13 +151,11 @@ export default function PlaylistDetailsPage() {
     // Plays the playlist's songs from one of them. Shuffle is the player's own
     // mode, switched to match the button pressed so Play after Shuffle plays in
     // order again.
-    const playTracks = (startIndex: number, shuffle: boolean) => {
-        if (!playlist) return;
+    const trackPlayables = () => {
+        if (!playlist) return [];
         const server = serverId ? serverVault.getServer(serverId) : serverVault.getActiveServer();
         const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
-        const trackItems = playlist.items.filter(i => i.type === 'Track');
-        if (trackItems.length === 0) return;
-        const queue = trackItems.map(t => ({
+        return playlist.items.filter(i => i.type === 'Track').map(t => ({
             id: t.mediaItemId,
             title: t.title,
             subtitle: t.artistName && t.albumTitle ? `${t.artistName} — ${t.albumTitle}` : (t.albumTitle ?? playlist.name),
@@ -165,6 +165,19 @@ export default function PlaylistDetailsPage() {
             container: 'audio' as const,
             playbackContextType: 'Music' as const
         }));
+    };
+
+    const queueTracks = (index: number | null, next: boolean) => {
+        const all = trackPlayables();
+        const items = index === null ? all : all.slice(index, index + 1);
+        if (items.length === 0) return;
+        if (next) playNext(items);
+        else addToQueue(items);
+    };
+
+    const playTracks = (startIndex: number, shuffle: boolean) => {
+        const queue = trackPlayables();
+        if (queue.length === 0) return;
         if (shuffle !== isShuffled) toggleShuffle();
         playQueue(queue, Math.max(0, Math.min(startIndex, queue.length - 1)));
     };
@@ -404,6 +417,7 @@ export default function PlaylistDetailsPage() {
                         canEdit={canEdit}
                         headerActions={headerActions}
                         onPlay={playTracks}
+                        onQueue={queueTracks}
                         onRemove={handleRemoveItem}
                         draggedIndex={draggedIndex}
                         onDragStart={handleDragStart}

@@ -71,6 +71,12 @@ export const playlistService = {
         const response = await apiClient.post<{ id: string }>('/playlists', { name, description, mediaType }, { serverId });
         return response.data;
     },
+    // The player's queue kept as a music playlist, songs in queue order. Ids
+    // the server doesn't know are dropped rather than failing the save.
+    createPlaylistFromQueue: async (name: string, mediaIds: string[], serverId?: string): Promise<{ id: string }> => {
+        const response = await apiClient.post<{ id: string }>('/playlists', { name, mediaType: 'Music', mediaItemIds: mediaIds }, { serverId });
+        return response.data;
+    },
     addToPlaylist: async (playlistId: string, mediaId: string, serverId?: string) => {
         await apiClient.post(`/playlists/${playlistId}/items/${mediaId}`, null, { serverId });
     },

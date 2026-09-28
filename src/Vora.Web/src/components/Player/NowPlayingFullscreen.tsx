@@ -10,6 +10,8 @@ import { NowPlayingArtwork } from './NowPlaying/NowPlayingArtwork';
 import { NowPlayingControlRow, NowPlayingIconButton, NowPlayingPill, NowPlayingPlayButton, NowPlayingSeekBar, NowPlayingVolume } from './NowPlaying/NowPlayingControls';
 import { lyricsScrollTop } from '../../utils/lyricsScroll';
 import AddToPlaylistModal from '../Collections/AddToPlaylistModal';
+import { useDialog } from '../../dialogs';
+import { playlistService } from '../../api/Collections/playlistService';
 
 export default function NowPlayingFullscreen() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -27,6 +29,24 @@ export default function NowPlayingFullscreen() {
 
     const [lyricsWanted, setLyricsWanted] = useState(false);
     const [queueOpen, setQueueOpen] = useState(false);
+    const dialog = useDialog();
+    const queuedSongIds = useMemo(() => queue.filter(item => item.playbackContextType === 'Music').map(item => item.id), [queue]);
+
+    const saveQueue = async () => {
+        const name = await dialog.prompt({
+            title: 'Save queue as playlist',
+            message: 'The songs are saved in the order they are queued.',
+            defaultValue: `Queue ${new Date().toLocaleDateString()}`,
+            confirmText: 'Save',
+        });
+        if (!name?.trim()) return;
+        try {
+            await playlistService.createPlaylistFromQueue(name.trim(), queuedSongIds, queue[0]?.serverId ?? serverId);
+            await dialog.alert({ title: 'Saved', message: `"${name.trim()}" is in your playlists.`, tone: 'success' });
+        } catch {
+            await dialog.alert({ title: 'Could not save the queue', message: 'Try again in a moment.', tone: 'danger' });
+        }
+    };
     const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
     const [audioQuality, setAudioQualityState] = useState<AudioQuality>(audioQualityStore.get());
     const [crossfadeSec, setCrossfadeSec] = useState<number>(crossfadeStore.get());
@@ -462,8 +482,13 @@ export default function NowPlayingFullscreen() {
                     className="flex w-[340px] shrink-0 flex-col"
                     style={{ background: 'color-mix(in srgb, var(--vora-bg-surface) 80%, transparent)', borderLeft: '1px solid var(--vora-border-subtle)' }}
                 >
-                    <div className="shrink-0 px-5 py-4 text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--vora-text-muted)', borderBottom: '1px solid var(--vora-border-subtle)' }}>
-                        Queue · {queue.length}
+                    <div className="flex shrink-0 items-center justify-between gap-2 px-5 py-3" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>
+                        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--vora-text-muted)' }}>Queue · {queue.length}</span>
+                        {queuedSongIds.length > 0 && (
+                            <button type="button" onClick={saveQueue} className="vora-pill cursor-pointer rounded-full px-3 py-1 text-xs font-semibold">
+                                Save as playlist
+                            </button>
+                        )}
                     </div>
                     <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
                         {queue.length === 0 ? (

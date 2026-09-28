@@ -4,6 +4,7 @@ import PlaylistCover from '../../../components/Collections/PlaylistCover';
 import AddToPlaylistButton from '../../../components/Collections/AddToPlaylistButton';
 import ContentRatingBadge from '../../../components/Media/ContentRatingBadge';
 import TrackListeners from '../../../components/Media/TrackListeners';
+import { useState } from 'react';
 
 // A music playlist laid out like an album: its own cover, name and length at
 // the top, and a numbered list where clicking a song plays from there.
@@ -17,6 +18,9 @@ interface MusicPlaylistViewProps {
     canEdit: boolean;
     headerActions: ReactNode;
     onPlay: (startIndex: number, shuffle: boolean) => void;
+    // Into the player's queue without replacing it: one song (its index) or the
+    // whole playlist (null), straight after the current song or at the end.
+    onQueue: (index: number | null, next: boolean) => void;
     onRemove: (itemId: string) => void;
     draggedIndex: number | null;
     onDragStart: (e: React.DragEvent, index: number) => void;
@@ -36,8 +40,9 @@ const formatTotal = (seconds: number): string => {
 };
 
 export default function MusicPlaylistView({
-    playlist, canEdit, headerActions, onPlay, onRemove, draggedIndex, onDragStart, onDragOver, onDrop,
+    playlist, canEdit, headerActions, onPlay, onQueue, onRemove, draggedIndex, onDragStart, onDragOver, onDrop,
 }: MusicPlaylistViewProps) {
+    const [menuFor, setMenuFor] = useState<number | null>(null);
     const tracks = playlist.items;
     const totalSeconds = tracks.reduce((sum, t) => sum + (t.durationSeconds ?? 0), 0);
     const summary = [
@@ -76,6 +81,12 @@ export default function MusicPlaylistView({
                                 >
                                     <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>
                                     Shuffle
+                                </button>
+                                <button type="button" onClick={() => onQueue(null, true)} className="vora-pill cursor-pointer rounded px-4 py-2 text-sm font-semibold">
+                                    Play next
+                                </button>
+                                <button type="button" onClick={() => onQueue(null, false)} className="vora-pill cursor-pointer rounded px-4 py-2 text-sm font-semibold">
+                                    Add to queue
                                 </button>
                             </>
                         )}
@@ -119,6 +130,31 @@ export default function MusicPlaylistView({
                             </div>
                             <TrackListeners listeners={track.globalListeners} />
                             <AddToPlaylistButton mediaId={track.mediaItemId} title={track.title} />
+                            <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
+                                <button
+                                    type="button"
+                                    onClick={() => setMenuFor(menuFor === index ? null : index)}
+                                    aria-label={`Queue options for ${track.title}`}
+                                    aria-haspopup="menu"
+                                    aria-expanded={menuFor === index}
+                                    className="vora-icon-button cursor-pointer rounded-full p-1.5 text-[var(--vora-text-muted)]"
+                                >
+                                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+                                </button>
+                                {menuFor === index && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setMenuFor(null)} />
+                                        <div
+                                            role="menu"
+                                            className="absolute right-0 z-50 mt-1 w-40 overflow-hidden rounded-lg"
+                                            style={{ background: 'var(--vora-bg-raised)', border: '1px solid var(--vora-border-strong)', boxShadow: 'var(--vora-shadow-lg)' }}
+                                        >
+                                            <button type="button" role="menuitem" onClick={() => { onQueue(index, true); setMenuFor(null); }} className="vora-row-interactive block w-full cursor-pointer px-3 py-2 text-left text-sm text-[var(--vora-text-primary)]">Play next</button>
+                                            <button type="button" role="menuitem" onClick={() => { onQueue(index, false); setMenuFor(null); }} className="vora-row-interactive block w-full cursor-pointer px-3 py-2 text-left text-sm text-[var(--vora-text-primary)]">Add to queue</button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                             <div className="w-12 shrink-0 text-right text-xs tabular-nums text-[var(--vora-text-muted)]">{formatDuration(track.durationSeconds)}</div>
                             {canEdit && (
                                 <button
