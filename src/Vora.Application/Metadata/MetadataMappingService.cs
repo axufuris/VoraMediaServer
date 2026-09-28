@@ -609,9 +609,10 @@ public class MetadataMappingService : IMetadataMappingService
 
                 if (!season.IsLocked(nameof(season.TmdbId)) || forceOverride) season.TmdbId = tmdbId ?? season.TmdbId;
                 if (!season.IsLocked(nameof(season.TvdbId)) || forceOverride) season.TvdbId = tvdbId ?? season.TvdbId;
-                if (!season.IsLocked(nameof(season.Title)) || forceOverride) season.Title = parsedSeason.Name ?? $"Season {parsedSeason.SeasonNumber}";
-                if (!season.IsLocked(nameof(season.OriginalTitle)) || forceOverride) season.OriginalTitle = parsedSeason.Name ?? $"Season {parsedSeason.SeasonNumber}";
-                if (!season.IsLocked(nameof(season.SortTitle)) || forceOverride) season.SortTitle = parsedSeason.Name ?? $"Season {parsedSeason.SeasonNumber}";
+                var seasonName = SeasonNames.Resolve(parsedSeason.SeasonNumber, parsedSeason.Name);
+                if (!season.IsLocked(nameof(season.Title)) || forceOverride) season.Title = seasonName;
+                if (!season.IsLocked(nameof(season.OriginalTitle)) || forceOverride) season.OriginalTitle = seasonName;
+                if (!season.IsLocked(nameof(season.SortTitle)) || forceOverride) season.SortTitle = seasonName;
                 if (!season.IsLocked(nameof(season.Overview)) || forceOverride) season.Overview = parsedSeason.Overview;
                 if (!season.IsLocked(nameof(season.PosterUrl)) || forceOverride) season.PosterUrl = parsedSeason.PosterUrl;
                 if (!season.IsLocked(nameof(season.ReleaseDate)) || forceOverride) season.ReleaseDate = parsedSeason.AirDate;

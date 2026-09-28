@@ -248,7 +248,7 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
             SmartPlaylistSortBy.AlbumTitle => desc ? query.OrderByDescending(r => r.AlbumTitle ?? "") : query.OrderBy(r => r.AlbumTitle ?? ""),
             SmartPlaylistSortBy.Year => desc ? query.OrderByDescending(r => r.AlbumYear) : query.OrderBy(r => r.AlbumYear),
             SmartPlaylistSortBy.DateAdded => desc ? query.OrderByDescending(r => r.AddedAt) : query.OrderBy(r => r.AddedAt),
-            SmartPlaylistSortBy.LastPlayedAt => desc ? query.OrderByDescending(r => r.LastPlayedAt) : query.OrderBy(r => r.LastPlayedAt),
+            SmartPlaylistSortBy.LastPlayedAt => desc ? query.OrderByDescending(r => r.LastPlayedAt.HasValue).ThenByDescending(r => r.LastPlayedAt) : query.OrderBy(r => r.LastPlayedAt),
             SmartPlaylistSortBy.PlayCount => desc ? query.OrderByDescending(r => r.PlayCount) : query.OrderBy(r => r.PlayCount),
             SmartPlaylistSortBy.DurationSeconds => desc ? query.OrderByDescending(r => r.DurationSeconds) : query.OrderBy(r => r.DurationSeconds),
             _ => query.OrderBy(r => r.Title)
@@ -264,7 +264,7 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
             SmartPlaylistSortBy.Title => desc ? query.OrderByDescending(r => r.Title) : query.OrderBy(r => r.Title),
             SmartPlaylistSortBy.Year => desc ? query.OrderByDescending(r => r.ReleaseYear) : query.OrderBy(r => r.ReleaseYear),
             SmartPlaylistSortBy.DateAdded => desc ? query.OrderByDescending(r => r.AddedAt) : query.OrderBy(r => r.AddedAt),
-            SmartPlaylistSortBy.LastPlayedAt => desc ? query.OrderByDescending(r => r.LastPlayedAt) : query.OrderBy(r => r.LastPlayedAt),
+            SmartPlaylistSortBy.LastPlayedAt => desc ? query.OrderByDescending(r => r.LastPlayedAt.HasValue).ThenByDescending(r => r.LastPlayedAt) : query.OrderBy(r => r.LastPlayedAt),
             SmartPlaylistSortBy.DurationSeconds => desc ? query.OrderByDescending(r => r.DurationSeconds) : query.OrderBy(r => r.DurationSeconds),
             _ => query.OrderBy(r => r.Title)
         };

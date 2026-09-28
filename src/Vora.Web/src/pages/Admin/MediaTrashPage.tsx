@@ -5,6 +5,7 @@ import { thumbUrl } from '../../utils/thumbnails';
 import { useDialog } from '../../dialogs';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import EmptyState from '../../components/Admin/Primitives/EmptyState';
+import { seasonName } from '../../utils/seasonLabel';
 
 const TYPE_LABELS: Record<string, string> = {
     Movie: 'Movie',
@@ -18,7 +19,7 @@ function seasonEpisodeLabel(item: TrashMediaItem): string | null {
         return `S${String(item.seasonNumber).padStart(2, '0')}E${String(item.episodeNumber).padStart(2, '0')}`;
     }
     if (item.type === 'Season' && item.seasonNumber != null) {
-        return `Season ${item.seasonNumber}`;
+        return seasonName(item.seasonNumber);
     }
     return null;
 }

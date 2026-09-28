@@ -35,7 +35,7 @@ import MediaInfoDialog from '../../../components/Media/MediaInfoDialog';
 import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
 import { audioChipLabel, heroFactsLine, pickChipAudioTrack, resolutionChipLabel, subtitleChipLabel } from '../../../utils/heroQualityChips';
 import { formatDate, serverTimeMs, yearOf } from '../../../utils/serverTime';
-import { seasonEpisodeLabel } from '../../../utils/seasonLabel';
+import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -562,7 +562,7 @@ export default function MediaDetailsPage() {
         });
     };
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
-    const heroSubtitle = (isSeason || isEpisode) ? media.title : undefined;
+    const heroSubtitle = isSeason ? seasonName(media.seasonNumber, media.title) : isEpisode ? media.title : undefined;
     const showQualityButton = (media.type === 'Movie' || isEpisode || media.type === 'TvShow') && (versionOptions.length > 1 || sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
     const playLabel = media.type === 'TvShow' ? 'Play next' : inProgress ? 'Resume' : 'Play';
     const playRuntime = formatRuntime(media.durationMinutes);
@@ -811,7 +811,7 @@ export default function MediaDetailsPage() {
                             <MediaRowItem key={season.id}>
                                 <MediaCard
                                     imageUrl={season.posterUrl || media.posterUrl}
-                                    title={season.title || `Season ${season.seasonNumber}`}
+                                    title={seasonName(season.seasonNumber, season.title)}
                                     captionLines={[`${season.episodeCount || 0} episode${season.episodeCount === 1 ? '' : 's'}`]}
                                     unplayedCount={season.unplayedItemCount}
                                     onClick={() => navigate(serverId ? `/server/${serverId}/media/${season.id}` : `/media/${season.id}`)}

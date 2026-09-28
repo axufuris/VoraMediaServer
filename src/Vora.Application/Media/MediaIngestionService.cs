@@ -187,9 +187,9 @@ public class MediaIngestionService : IMediaIngestionService
 
             var season = new Season
             {
-                Title = $"Season {seasonNumber}",
-                SortTitle = $"Season {seasonNumber}",
-                OriginalTitle = $"Season {seasonNumber}",
+                Title = SeasonNames.Default(seasonNumber),
+                SortTitle = SeasonNames.Default(seasonNumber),
+                OriginalTitle = SeasonNames.Default(seasonNumber),
                 SeasonNumber = seasonNumber,
                 TvShowId = tvShowId,
                 LibraryId = libraryId

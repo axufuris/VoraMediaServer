@@ -21,3 +21,12 @@ export function seasonEpisodeLabel(
         : `E${episodeNumber}`;
     return `${seasonShortLabel(seasonNumber)}${separator}${episode}`;
 }
+
+// A season's display name. Season 0 is "Specials" unless it carries a real
+// name of its own; any other season keeps its name, or "Season N" without one.
+export function seasonName(seasonNumber?: number | null, title?: string | null): string {
+    const name = title?.trim();
+    if (isSpecialsSeason(seasonNumber) && (!name || /^season\s*0+$/i.test(name))) return 'Specials';
+    if (name) return name;
+    return seasonNumber != null ? `Season ${seasonNumber}` : '';
+}

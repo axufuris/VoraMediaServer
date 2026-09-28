@@ -263,11 +263,11 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         switch (sortBy)
         {
             case SmartListSortBy.ReleaseDateDesc:
-                return query.OrderByDescending(m => m.ReleaseDate);
+                return query.OrderByDescending(m => m.ReleaseDate.HasValue).ThenByDescending(m => m.ReleaseDate);
             case SmartListSortBy.ReleaseDateAsc:
-                return query.OrderBy(m => m.ReleaseDate);
+                return query.OrderByDescending(m => m.ReleaseDate.HasValue).ThenBy(m => m.ReleaseDate);
             case SmartListSortBy.TopRated:
-                return query.OrderByDescending(m => m.ThirdPartyRating1);
+                return query.OrderByDescending(m => m.ThirdPartyRating1.HasValue).ThenByDescending(m => m.ThirdPartyRating1);
             case SmartListSortBy.Random:
                 return query.OrderBy(m => EF.Functions.Random());
             case SmartListSortBy.MostWatched:
