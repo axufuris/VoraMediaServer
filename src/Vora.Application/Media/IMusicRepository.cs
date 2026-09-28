@@ -124,6 +124,7 @@ public sealed class GenreContent
     public List<Artist> Artists { get; set; } = new();
     public List<Album> Albums { get; set; } = new();
     public int AlbumCount { get; set; }
+    public string? SampleArtworkUrl { get; set; }
     public List<Track> Tracks { get; set; } = new();
 }
 

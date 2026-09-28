@@ -155,6 +155,8 @@ export interface GenreContentVM {
     // Every album in the genre; `albums` is only a sample. Page through them
     // with getAlbums({ genre }).
     albumCount: number;
+    // The same cover the genre's tile shows on the Genres screen.
+    sampleArtworkUrl?: string | null;
     tracks: TrackVM[];
 }
 

@@ -7,6 +7,10 @@ import RatedBadge from '../../../../components/Client/Primitives/RatedBadge';
 import { type MusicNavState } from './musicNavState';
 import { albumCover } from '../../../../utils/albumCover';
 import { ShuffleIcon } from '../../../../components/Client/Primitives/ActionIcons';
+import MediaGrid from '../../../../components/Client/Primitives/MediaGrid';
+import MediaCard from '../../../../components/Client/Primitives/MediaCard';
+import LastFmCount from '../../../../components/Media/LastFmCount';
+import { albumCaption } from './musicCaptions';
 
 interface MusicArtistViewProps {
     isLoading: boolean;
@@ -220,41 +224,41 @@ export default function MusicArtistView({
                 <div className="text-[var(--vora-text-muted)] py-12 text-center">No albums for this artist.</div>
             ) : (
                 <>
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
-                        {albums.map(album => (
-                            <div
-                                key={album.id}
-                                onClick={() => updateNav({ view: 'album', artistId: currentArtistId, albumId: album.id })}
-                                className="relative flex flex-col bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] hover:border-[var(--vora-accent-500)] rounded-lg p-3 transition-all cursor-pointer text-left"
-                            >
-                                {isServerAdmin && (
-                                    <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); onEditAlbum(album); }}
-                                        className="absolute top-2 right-2 p-1.5 rounded bg-[var(--vora-bg-canvas)]/80 text-[var(--vora-text-muted)] hover:text-[var(--vora-accent-text)] transition-colors cursor-pointer z-10"
-                                        title="Edit album"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                    </button>
-                                )}
-                                <div className="relative aspect-square rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden mb-3">
-                                    {albumCover(album)
-                                        ? <img src={albumCover(album)} alt={album.title} className="max-w-full max-h-full object-cover" />
-                                        : <svg className="w-10 h-10 text-[var(--vora-text-disabled)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>}
-                                    {(album.myRating ?? album.serverAdminRating) != null && (
-                                        <div className="absolute left-2 bottom-2">
-                                            <RatedBadge
-                                                value={(album.myRating ?? album.serverAdminRating)!}
-                                                title={album.myRating != null ? `Your rating: ${Math.round(album.myRating)} of 10` : `Server admin rating: ${Math.round(album.serverAdminRating!)} of 10`}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="font-bold text-sm text-[var(--vora-text-primary)] truncate" title={album.title}>{album.title}</div>
-                                <div className="text-xs text-[var(--vora-text-muted)]">{album.year || ''}</div>
-                            </div>
-                        ))}
-                    </div>
+                    <MediaGrid size="xs">
+                        {albums.map(album => {
+                            const rating = album.myRating ?? album.serverAdminRating;
+                            return (
+                                <MediaCard
+                                    key={album.id}
+                                    item={albumCaption(album)}
+                                    captionExtra={<LastFmCount value={album.globalPlays} unit="plays" />}
+                                    imageUrl={albumCover(album)}
+                                    shape="square"
+                                    size="xs"
+                                    fill
+                                    onClick={() => updateNav({ view: 'album', artistId: currentArtistId, albumId: album.id })}
+                                    bottomLeftBadge={rating != null ? (
+                                        <RatedBadge
+                                            value={rating}
+                                            title={album.myRating != null ? `Your rating: ${Math.round(album.myRating)} of 10` : `Server admin rating: ${Math.round(rating)} of 10`}
+                                        />
+                                    ) : undefined}
+                                    hoverBadge={isServerAdmin ? (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); onEditAlbum(album); }}
+                                            className="vora-icon-button cursor-pointer rounded p-1.5"
+                                            style={{ background: 'var(--vora-bg-overlay)', color: 'var(--vora-text-secondary)' }}
+                                            title="Edit album"
+                                            aria-label={`Edit ${album.title}`}
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                        </button>
+                                    ) : undefined}
+                                />
+                            );
+                        })}
+                    </MediaGrid>
                     {similarArtists.length > 0 && (
                         <div className="mt-10">
                             <h3 className="text-lg font-bold text-[var(--vora-text-primary)] mb-3">Fans Also Listen To</h3>

@@ -167,4 +167,22 @@ describe('MusicAlbumsView', () => {
 
         expect(await screen.findByText('No albums yet')).toBeInTheDocument();
     });
+
+    it("shows the album's Last.fm plays beside it, and nothing when Last.fm has none", async () => {
+        getAlbums.mockResolvedValueOnce({
+            items: [
+                { id: 'a1', title: 'Enema of the State', artistId: 'x', artistName: 'blink-182', year: 1999, isCompilation: false, lockedFields: [], globalPlays: 41_000_000 },
+                { id: 'a2', title: 'Unknown Demo', artistId: 'x', artistName: 'blink-182', isCompilation: false, lockedFields: [] },
+            ],
+            total: 2,
+            offset: 0,
+            limit: 60,
+        });
+
+        render(<MusicAlbumsView refreshKey={0} onOpenAlbum={vi.fn()} />);
+
+        const figure = await screen.findByTitle('41,000,000 plays on Last.fm');
+        expect(figure).toHaveTextContent('41M');
+        expect(screen.getAllByRole('img', { name: 'Last.fm' })).toHaveLength(1);
+    });
 });

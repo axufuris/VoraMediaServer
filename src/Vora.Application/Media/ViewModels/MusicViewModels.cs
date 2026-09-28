@@ -100,6 +100,7 @@ public class GenreContentVM
     public List<ArtistVM> Artists { get; set; } = new();
     public List<AlbumVM> Albums { get; set; } = new();
     public int AlbumCount { get; set; }
+    public string? SampleArtworkUrl { get; set; }
     public List<TrackVM> Tracks { get; set; } = new();
 }
 

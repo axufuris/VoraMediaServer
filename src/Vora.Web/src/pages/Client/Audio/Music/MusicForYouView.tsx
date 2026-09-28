@@ -17,6 +17,7 @@ import EmptyState from '../../../../components/Client/Primitives/EmptyState';
 import { type MusicNavState } from './musicNavState';
 import { albumCaption, trackCaption } from './musicCaptions';
 import { albumCover } from '../../../../utils/albumCover';
+import LastFmCount from '../../../../components/Media/LastFmCount';
 
 type DialogApi = ReturnType<typeof useDialog>;
 
@@ -262,6 +263,7 @@ export default function MusicForYouView({
                     <MediaRowItem key={album.id}>
                         <MediaCard
                             item={albumCaption(album)}
+                            captionExtra={<LastFmCount value={album.globalPlays} unit="plays" />}
                             imageUrl={albumCover(album)}
                             shape="square"
                             size="xs"

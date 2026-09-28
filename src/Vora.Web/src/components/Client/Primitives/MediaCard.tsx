@@ -12,6 +12,8 @@ export interface MediaCardProps {
     item?: PosterCaptionItem;
     title?: string;
     captionLines?: string[];
+    // One more caption line that isn't plain text, e.g. a Last.fm figure.
+    captionExtra?: ReactNode;
     imageUrl?: string | null;
     mosaicUrls?: string[];
     shape?: MediaCardShape;
@@ -84,7 +86,7 @@ function Mosaic({ urls }: { urls: string[] }) {
 // caption is decided by posterCaption() from the item's type — pass `item` and
 // the card captions itself, or pass title/captionLines for non-media tiles.
 export default function MediaCard({
-    item, title, captionLines, imageUrl, mosaicUrls,
+    item, title, captionLines, captionExtra, imageUrl, mosaicUrls,
     shape = 'poster', size = 'md', fill, onClick,
     isPlayed, unplayedCount, progressPercent, inWatchlist,
     badge, hoverBadge, bottomLeftBadge, onRemove, onDelete, className,
@@ -229,6 +231,11 @@ export default function MediaCard({
                             {line}
                         </div>
                     ))}
+                    {captionExtra && (
+                        <div className="mt-0.5 truncate" style={{ color: 'var(--vora-text-muted)', fontSize: 'var(--vora-card-caption-size)' }}>
+                            {captionExtra}
+                        </div>
+                    )}
                 </div>
             )}
         </div>
