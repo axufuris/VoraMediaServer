@@ -1,0 +1,69 @@
+name: Bug report
+description: Something in Vora isn't working the way it should.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. For questions or setup help, please use [Q&A in Discussions](https://github.com/axufuris/VoraMediaServer/discussions/categories/q-a) instead, and for a security issue use [private vulnerability reporting](https://github.com/axufuris/VoraMediaServer/security/advisories/new).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected to see instead.
+      placeholder: The Recently Released row shows a special from 2000 at the front.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to Home
+        2. Look at Recently Released Movies & Episodes
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Vora version
+      description: Shown at the bottom of the admin sidebar, e.g. v0.1.0-beta.2.
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How is the server installed?
+      options:
+        - Unraid (Community Applications)
+        - Docker Compose
+        - Docker (other)
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: Which client shows the problem?
+      multiple: true
+      options:
+        - Web
+        - Android phone or tablet
+        - Android TV / Google TV
+        - Amazon Fire TV
+        - Roku
+        - Server only (admin, scans, tasks)
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server logs
+      description: From Admin → Server Logs, or /app/data/logs/vora-<date>.log in the container. Remove anything private (API keys, passwords, addresses) before posting.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, your reverse proxy, the media file involved, anything that might help.

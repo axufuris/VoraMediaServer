@@ -7,7 +7,7 @@
   <MyIP/>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/axufuris/VoraMediaServer/issues</Support>
+  <Support>https://github.com/axufuris/VoraMediaServer/discussions/categories/q-a</Support>
   <Project>https://getvora.net</Project>
   <Overview>Vora is a self-hosted media server for movies, TV, music, and IPTV with DVR, with cinematic clients for Android, Android TV, Fire TV, Roku, and the web.&#13;&#13;REQUIREMENTS: Vora needs a PostgreSQL database with the pgvector extension. Install the companion "vora-postgres" template (pgvector/pgvector:pg16) FIRST, and put BOTH containers on the same user-defined Docker network (create one under Settings &gt; Docker &gt; Add network, e.g. "vora") so Vora can reach Postgres by container name.&#13;&#13;After both are running, browse to http://[SERVER-IP]:8080 and claim the server: the account you create there is the server admin.&#13;&#13;GPU (optional): for NVIDIA hardware transcoding, install the Nvidia-Driver plugin and set Extra Parameters to --runtime=nvidia.</Overview>
   <Category>MediaServer:Video MediaApp:Video</Category>

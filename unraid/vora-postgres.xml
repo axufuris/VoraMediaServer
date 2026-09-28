@@ -7,7 +7,7 @@
   <MyIP/>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/axufuris/VoraMediaServer/issues</Support>
+  <Support>https://github.com/axufuris/VoraMediaServer/discussions/categories/q-a</Support>
   <Project>https://github.com/pgvector/pgvector</Project>
   <Overview>PostgreSQL with the pgvector extension - the database backend required by the Vora media server. Put this on the same user-defined Docker network as the Vora container (e.g. "vora") so Vora can reach it by name (vora-postgres). No port is published, keeping the database off your LAN.</Overview>
   <Category>Tools: Other:</Category>
