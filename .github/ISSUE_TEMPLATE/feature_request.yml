@@ -1,0 +1,41 @@
+name: Feature request
+description: A specific change you'd like, ready to be worked on.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Still shaping the idea, or want to see if others want it too? Start in [Ideas in Discussions](https://github.com/axufuris/VoraMediaServer/discussions/categories/ideas), where people can upvote it.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The problem or situation, not the solution yet.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like Vora to do?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Movies & shows
+        - Music
+        - Live TV / DVR
+        - Podcasts & radio
+        - Collections & playlists
+        - Admin & server
+        - Clients (Android, Fire TV, Roku)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How do you handle it today?

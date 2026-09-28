@@ -16,4 +16,4 @@ first, and put both containers on the same user-defined Docker network (create o
 2. Push these files to the public repo.
 3. Submit the repo URL at https://ca.unraid.net/submit/new (sign in → add repo → review → submit).
 
-Support is handled via GitHub Issues on this repository.
+Support questions go to [Q&A in Discussions](https://github.com/axufuris/VoraMediaServer/discussions/categories/q-a); bugs to [Issues](https://github.com/axufuris/VoraMediaServer/issues/new/choose).

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question or get setup help
+    url: https://github.com/axufuris/VoraMediaServer/discussions/categories/q-a
+    about: Installing, configuring, reverse proxies, clients — ask in Q&A.
+  - name: Suggest or vote on an idea
+    url: https://github.com/axufuris/VoraMediaServer/discussions/categories/ideas
+    about: Early ideas go in Ideas, where others can upvote them.
+  - name: Report a security vulnerability
+    url: https://github.com/axufuris/VoraMediaServer/security/advisories/new
+    about: Please report security issues privately, not as a public issue.
