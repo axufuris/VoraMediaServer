@@ -23,7 +23,7 @@ public interface IMusicRepository
     Task<List<Artist>> GetTopPlayedArtistsAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<Artist>> GetCoPlayedArtistsAsync(Guid artistId, MusicAccessFilter access, int limit);
     Task<List<Album>> GetRecentlyAddedAlbumsAsync(MusicAccessFilter access, int limit);
-    Task<(List<Album> Albums, int Total)> GetAlbumsPageAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit, string? search = null);
+    Task<(List<Album> Albums, int Total)> GetAlbumsPageAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit, string? search = null, string? genre = null);
 
     Task<Artist?> GetArtistByNameAsync(Guid libraryId, string name);
     Task<Artist?> FindArtistByNameAsync(string name);
@@ -123,6 +123,7 @@ public sealed class GenreContent
     public required string Name { get; init; }
     public List<Artist> Artists { get; set; } = new();
     public List<Album> Albums { get; set; } = new();
+    public int AlbumCount { get; set; }
     public List<Track> Tracks { get; set; } = new();
 }
 

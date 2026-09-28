@@ -60,7 +60,7 @@ public interface IMusicManager
     Task<List<ArtistTrackVM>> GetTopPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<ArtistVM>> GetTopPlayedArtistsAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<AlbumVM>> GetRecentlyAddedAlbumsAsync(MusicAccessFilter access, int limit);
-    Task<AlbumPageVM> GetAlbumsAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit, string? search = null);
+    Task<AlbumPageVM> GetAlbumsAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit, string? search = null, string? genre = null);
 
     Task<List<GenreSummaryVM>> GetGenresAsync(MusicAccessFilter access);
     Task<GenreContentVM?> GetGenreContentAsync(string genre, MusicAccessFilter access);
@@ -860,7 +860,7 @@ public class MusicManager : IMusicManager
         return albums.Select(a => MapAlbum(a, a.Artist?.Name ?? string.Empty, a.Artist?.ArtworkUrl)).ToList();
     }
 
-    public async Task<AlbumPageVM> GetAlbumsAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit, string? search = null)
+    public async Task<AlbumPageVM> GetAlbumsAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit, string? search = null, string? genre = null)
     {
         var pageOffset = Math.Max(0, offset);
         var pageLimit = Math.Clamp(limit, 1, MaxAlbumPageSize);
@@ -870,7 +870,8 @@ public class MusicManager : IMusicManager
         // the query as absent so that "no search" is one state and not two.
         var term = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
 
-        var (albums, total) = await _repository.GetAlbumsPageAsync(libraryId, access, sort, pageOffset, pageLimit, term);
+        var genreName = string.IsNullOrWhiteSpace(genre) ? null : genre.Trim();
+        var (albums, total) = await _repository.GetAlbumsPageAsync(libraryId, access, sort, pageOffset, pageLimit, term, genreName);
 
         return new AlbumPageVM
         {
@@ -905,6 +906,7 @@ public class MusicManager : IMusicManager
             Name = content.Name,
             Artists = content.Artists.Select(MapArtist).ToList(),
             Albums = content.Albums.Select(a => MapAlbum(a, a.Artist?.Name ?? string.Empty, a.Artist?.ArtworkUrl)).ToList(),
+            AlbumCount = content.AlbumCount,
             Tracks = content.Tracks.Select(MapTrack).ToList()
         };
     }

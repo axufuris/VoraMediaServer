@@ -979,6 +979,8 @@ export default function MusicTab() {
                 <MusicGenreView
                     isLoading={isLoading}
                     currentGenre={currentGenre}
+                    serverId={serverId}
+                    refreshKey={libraryVersion}
                     updateNav={updateNav}
                 />
             )}

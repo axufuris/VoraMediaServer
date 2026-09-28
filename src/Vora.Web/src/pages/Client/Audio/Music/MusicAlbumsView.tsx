@@ -11,6 +11,7 @@ const ALBUM_PAGE_SIZE = 60;
 const SORTS: { key: AlbumSortOrder; label: string }[] = [
     { key: 'Alphabetical', label: 'A–Z' },
     { key: 'RecentlyAdded', label: 'Recently added' },
+    { key: 'Newest', label: 'Newest' },
     { key: 'Popular', label: 'Popular' },
 ];
 
@@ -20,10 +21,24 @@ interface MusicAlbumsViewProps {
     onOpenAlbum: (album: AlbumVM) => void;
 }
 
+interface AlbumBrowserProps extends MusicAlbumsViewProps {
+    title: string;
+    // Only this genre's albums; the whole library when absent.
+    genre?: string;
+    // False inside a view that already has the page gutter.
+    padded?: boolean;
+}
+
 // The sort pills stay put while the grid underneath is keyed on everything that
 // invalidates the loaded pages, so a new sort or a library change starts from a
 // fresh first page instead of resetting state inside an effect.
-export default function MusicAlbumsView({ serverId, refreshKey, onOpenAlbum }: MusicAlbumsViewProps) {
+export default function MusicAlbumsView(props: MusicAlbumsViewProps) {
+    return <AlbumBrowser {...props} title="All Albums" />;
+}
+
+// The one way albums are listed: the Albums tab and a genre's page both use it,
+// so both page through every album and offer the same orders.
+export function AlbumBrowser({ serverId, refreshKey, onOpenAlbum, title, genre, padded = true }: AlbumBrowserProps) {
     const [sort, setSort] = useState<AlbumSortOrder>('Alphabetical');
 
     const sortPills = (
@@ -46,9 +61,12 @@ export default function MusicAlbumsView({ serverId, refreshKey, onOpenAlbum }: M
 
     return (
         <AlbumPages
-            key={`${sort}|${serverId ?? ''}|${refreshKey}`}
+            key={`${sort}|${serverId ?? ''}|${refreshKey}|${genre ?? ''}`}
             sort={sort}
             serverId={serverId}
+            genre={genre}
+            title={title}
+            padded={padded}
             sortControl={sortPills}
             onOpenAlbum={onOpenAlbum}
         />
@@ -58,11 +76,14 @@ export default function MusicAlbumsView({ serverId, refreshKey, onOpenAlbum }: M
 interface AlbumPagesProps {
     sort: AlbumSortOrder;
     serverId?: string;
+    genre?: string;
+    title: string;
+    padded: boolean;
     sortControl: ReactNode;
     onOpenAlbum: (album: AlbumVM) => void;
 }
 
-function AlbumPages({ sort, serverId, sortControl, onOpenAlbum }: AlbumPagesProps) {
+function AlbumPages({ sort, serverId, genre, title, padded, sortControl, onOpenAlbum }: AlbumPagesProps) {
     const [albums, setAlbums] = useState<AlbumVM[]>([]);
     const [total, setTotal] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -72,7 +93,7 @@ function AlbumPages({ sort, serverId, sortControl, onOpenAlbum }: AlbumPagesProp
 
     const fetchPage = useCallback(async (offset: number) => {
         try {
-            const page = await musicService.getAlbums({ offset, limit: ALBUM_PAGE_SIZE, sort }, serverId);
+            const page = await musicService.getAlbums({ offset, limit: ALBUM_PAGE_SIZE, sort, genre }, serverId);
             setAlbums(prev => {
                 const seen = new Set(prev.map(a => a.id));
                 return [...prev, ...page.items.filter(a => !seen.has(a.id))];
@@ -86,7 +107,7 @@ function AlbumPages({ sort, serverId, sortControl, onOpenAlbum }: AlbumPagesProp
             inFlight.current = false;
             setIsLoading(false);
         }
-    }, [sort, serverId]);
+    }, [sort, serverId, genre]);
 
     useEffect(() => {
         inFlight.current = true;
@@ -122,7 +143,7 @@ function AlbumPages({ sort, serverId, sortControl, onOpenAlbum }: AlbumPagesProp
 
     if (!isLoading && !failed && total === 0) {
         return (
-            <div className="px-8">
+            <div className={padded ? 'px-8' : undefined}>
                 <div className="flex justify-end">{sortControl}</div>
                 <EmptyState
                     title="No albums yet"
@@ -133,10 +154,10 @@ function AlbumPages({ sort, serverId, sortControl, onOpenAlbum }: AlbumPagesProp
     }
 
     return (
-        <div className="px-8">
+        <div className={padded ? 'px-8' : undefined}>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                 <div>
-                    <h2 className="text-2xl font-bold" style={{ color: 'var(--vora-text-primary)' }}>All Albums</h2>
+                    <h2 className="text-2xl font-bold" style={{ color: 'var(--vora-text-primary)' }}>{title}</h2>
                     {total !== null && (
                         <p className="text-sm" style={{ color: 'var(--vora-text-muted)' }}>
                             {total} {total === 1 ? 'album' : 'albums'}

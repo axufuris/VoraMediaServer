@@ -626,9 +626,9 @@ public static class MusicEndpoints
 
     // q, not "search" or "query", because GET /api/music/search already calls it
     // q and a second convention for the same idea is one the caller has to learn.
-    private static async Task<IResult> GetAlbumsAsync([FromQuery] Guid? libraryId, [FromQuery] AlbumSortOrder? sort, [FromQuery] int? offset, [FromQuery] int? limit, [FromQuery] string? q, ClaimsPrincipal user, IMusicManager manager)
+    private static async Task<IResult> GetAlbumsAsync([FromQuery] Guid? libraryId, [FromQuery] AlbumSortOrder? sort, [FromQuery] int? offset, [FromQuery] int? limit, [FromQuery] string? q, [FromQuery] string? genre, ClaimsPrincipal user, IMusicManager manager)
     {
-        var page = await manager.GetAlbumsAsync(libraryId, user.GetMusicAccessFilter(), sort ?? AlbumSortOrder.RecentlyAdded, offset ?? 0, limit ?? MusicManager.DefaultAlbumPageSize, q);
+        var page = await manager.GetAlbumsAsync(libraryId, user.GetMusicAccessFilter(), sort ?? AlbumSortOrder.RecentlyAdded, offset ?? 0, limit ?? MusicManager.DefaultAlbumPageSize, q, genre);
         return Results.Ok(page);
     }
 

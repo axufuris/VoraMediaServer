@@ -162,4 +162,21 @@ public class MusicRepositoryAlbumPageTests
         total.Should().Be(1);
         albums.Select(a => a.Title).Should().Equal("Clean");
     }
+
+    [Fact]
+    public async Task Newest_orders_by_release_year_with_undated_albums_last()
+    {
+        await using var db = NewContext();
+        var shelf = NewShelf(db);
+        shelf.Album("Enema of the State", 1).Year = 1999;
+        shelf.Album("Undated", 2);
+        shelf.Album("One More Time", 3).Year = 2024;
+        shelf.Album("Neighborhoods", 4).Year = 2011;
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var (albums, total) = await new MusicRepository(db).GetAlbumsPageAsync(null, MusicAccessFilter.Unrestricted, AlbumSortOrder.Newest, 0, 10);
+
+        total.Should().Be(4);
+        albums.Select(a => a.Title).Should().Equal("One More Time", "Neighborhoods", "Enema of the State", "Undated");
+    }
 }

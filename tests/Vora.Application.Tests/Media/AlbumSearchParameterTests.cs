@@ -26,7 +26,7 @@ public class AlbumSearchParameterTests
     {
         _repository
             .GetAlbumsPageAsync(Arg.Any<Guid?>(), Arg.Any<MusicAccessFilter>(), Arg.Any<AlbumSortOrder>(),
-                Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string?>())
+                Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<string?>())
             .Returns((new List<Album>(), 0));
 
         _manager = new MusicManager(
@@ -108,5 +108,19 @@ public class AlbumSearchParameterTests
 
         page.Offset.Should().Be(0);
         page.Limit.Should().Be(MusicManager.MaxAlbumPageSize);
+    }
+
+    [Fact]
+    public async Task A_genre_reaches_the_query_trimmed_and_a_blank_one_as_absent()
+    {
+        await _manager.GetAlbumsAsync(null, MusicAccessFilter.Unrestricted, AlbumSortOrder.Newest, 0, 60, null, "  Alternative Rock ");
+        await _manager.GetAlbumsAsync(null, MusicAccessFilter.Unrestricted, AlbumSortOrder.Newest, 0, 60, null, "   ");
+
+        await _repository.Received(1).GetAlbumsPageAsync(
+            Arg.Any<Guid?>(), Arg.Any<MusicAccessFilter>(), AlbumSortOrder.Newest,
+            Arg.Any<int>(), Arg.Any<int>(), null, "Alternative Rock");
+        await _repository.Received(1).GetAlbumsPageAsync(
+            Arg.Any<Guid?>(), Arg.Any<MusicAccessFilter>(), AlbumSortOrder.Newest,
+            Arg.Any<int>(), Arg.Any<int>(), null, null);
     }
 }
