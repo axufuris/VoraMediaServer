@@ -7,6 +7,7 @@ import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import FolderPathInput from '../../../components/Admin/FolderBrowser/FolderPathInput';
 import { useDialog } from '../../../dialogs';
 import { libraryHasVideoContent } from '../../../utils/libraryTypes';
+import MinimumCollectionSizeField from '../../../components/Admin/Libraries/MinimumCollectionSizeField';
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
     return <h2 className="text-base font-semibold text-[var(--vora-text-primary)] pb-2 border-b border-[var(--vora-border-subtle)]">{children}</h2>;
@@ -581,19 +582,7 @@ export default function ManageLibrary() {
 
                     {showVideoOptions && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <FieldLabel>Minimum Collection Size</FieldLabel>
-                                <select
-                                    value={library.minimumCollectionSize || 1}
-                                    onChange={e => handleChange('minimumCollectionSize', Number(e.target.value))}
-                                    className="vora-input cursor-pointer"
-                                >
-                                    {Array.from({ length: 25 }, (_, i) => i + 1).map(num => (
-                                        <option key={num} value={num}>{num}</option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-[var(--vora-text-muted)] mt-1.5">Collections with fewer items than this will be hidden from the library.</p>
-                            </div>
+                            <MinimumCollectionSizeField value={library.minimumCollectionSize ?? 3} onChange={v => handleChange('minimumCollectionSize', v)} />
                         </div>
                     )}
 

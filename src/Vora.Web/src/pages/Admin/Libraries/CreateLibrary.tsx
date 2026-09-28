@@ -8,6 +8,7 @@ import IconSelect, { type IconSelectOption } from '../../../components/Common/Ic
 import { renderNavIcon } from '../../../layouts/parts/navIcons';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import FolderPathInput from '../../../components/Admin/FolderBrowser/FolderPathInput';
+import MinimumCollectionSizeField from '../../../components/Admin/Libraries/MinimumCollectionSizeField';
 
 const MEDIA_TYPE_OPTIONS: IconSelectOption<number>[] = [
     { value: 1, label: 'Movies', icon: renderNavIcon('Movie', 'w-5 h-5') },
@@ -63,7 +64,7 @@ export default function CreateLibrary() {
         enableVideoPreviewThumbnails: false,
         enableCreditsDetection: false,
         enablePreviewDetection: false,
-        minimumCollectionSize: 1,
+        minimumCollectionSize: 3,
         episodeSorting: 0,
         episodeOrder: 0,
         useSeasonTitles: true,
@@ -330,19 +331,7 @@ export default function CreateLibrary() {
 
                     {showVideoOptions && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <FieldLabel>Minimum Collection Size</FieldLabel>
-                                <select
-                                    value={library.minimumCollectionSize}
-                                    onChange={e => handleChange('minimumCollectionSize', Number(e.target.value))}
-                                    className="vora-input cursor-pointer"
-                                >
-                                    {Array.from({ length: 25 }, (_, i) => i + 1).map(num => (
-                                        <option key={num} value={num}>{num}</option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-[var(--vora-text-muted)] mt-1.5">Collections with fewer items than this will be hidden.</p>
-                            </div>
+                            <MinimumCollectionSizeField value={library.minimumCollectionSize} onChange={v => handleChange('minimumCollectionSize', v)} />
                         </div>
                     )}
 

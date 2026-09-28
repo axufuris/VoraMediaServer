@@ -127,6 +127,20 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
                 .SetProperty(c => c.ContentSyncCacheJson, cacheJson)
                 .SetProperty(c => c.ContentSyncedAt, DateTime.UtcNow));
 
+    public async Task<List<CollectionDescriptionTarget>> GetCollectionsAwaitingDescriptionAsync(Guid libraryId)
+    {
+        var rows = await context.Collections
+            .AsNoTracking()
+            .Where(c => c.LibraryId == libraryId && c.TmdbId != null && c.Description == null)
+            .Select(c => new { c.Id, c.TmdbId, c.LockedFields })
+            .ToListAsync();
+
+        return rows
+            .Where(r => r.TmdbId.HasValue && !r.LockedFields.Contains(nameof(Collection.Description), StringComparer.OrdinalIgnoreCase))
+            .Select(r => new CollectionDescriptionTarget(r.Id, r.TmdbId ?? 0))
+            .ToList();
+    }
+
     public Task UpdateDescriptionAsync(Guid collectionId, string description) =>
         context.Collections
             .Where(c => c.Id == collectionId)
@@ -187,7 +201,7 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
     public async Task<int> GetLibraryMinimumCollectionSizeAsync(Guid libraryId)
     {
         var library = await context.MediaLibraries.FindAsync(libraryId);
-        return library?.MinimumCollectionSize ?? 1;
+        return library?.MinimumCollectionSize ?? CollectionVisibility.DefaultMinimum;
     }
 
     public Task<Dictionary<Guid, int>> GetAllLibraryMinimumSizesAsync() =>

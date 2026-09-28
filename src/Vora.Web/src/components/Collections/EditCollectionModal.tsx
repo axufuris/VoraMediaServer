@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { collectionAdminService } from '../../api/Collections/collectionAdminService';
-import type { CollectionDetails, CollectionSortOrder } from '../../api/Collections/collectionService';
+import { collectionService, type CollectionDetails, type CollectionSortOrder } from '../../api/Collections/collectionService';
 import type { ArtworkKind, ArtworkResult } from '../../api/Media/artworkService';
 import { Modal } from '../Common/Modal';
 import ArtworkPicker from '../Common/ArtworkPicker';
@@ -40,12 +40,26 @@ export default function EditCollectionModal({
     isOpen, onClose, onSaved, onDeleted, collection }: EditCollectionModalProps) {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
+
+    const fetchDescription = async () => {
+        setFetchingDescription(true);
+        try {
+            const fetched = await collectionService.refreshDescription(collection.id, serverId);
+            if (fetched) setDescription(fetched);
+            else await dialog.alert({ title: 'No description on TMDB', message: 'TMDB has no description for this collection. You can write one here.' });
+        } catch {
+            await dialog.alert({ title: 'Could not reach TMDB', message: 'Check the TMDB API key in Plugins, then try again.', tone: 'danger' });
+        } finally {
+            setFetchingDescription(false);
+        }
+    };
     const [activeTab, setActiveTab] = useState<'general' | 'poster' | 'backdrop'>('general');
     const [loadingArt, setLoadingArt] = useState(false);
     const [artwork, setArtwork] = useState<ArtworkResult[]>([]);
 
     const [title, setTitle] = useState(collection.title);
     const [description, setDescription] = useState(collection.description || '');
+    const [fetchingDescription, setFetchingDescription] = useState(false);
     const [posterUrl, setPosterUrl] = useState(collection.posterUrl || '');
     const [backdropUrl, setBackdropUrl] = useState(collection.backdropUrl || '');
     const [defaultSort, setDefaultSort] = useState(collection.defaultSort);
@@ -241,7 +255,14 @@ export default function EditCollectionModal({
                                 <input required type="text" value={title} onChange={e => setTitle(e.target.value)} disabled={collection.systemGenerated} className={`w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none ${collection.systemGenerated ? 'opacity-50' : ''}`} />
                             </div>
                             <div>
-                                <label className="flex items-center text-sm font-medium text-[var(--vora-text-muted)] mb-1">Description <LockIcon field="Description" /></label>
+                                <div className="mb-1 flex items-center justify-between gap-3">
+                                    <label className="flex items-center text-sm font-medium text-[var(--vora-text-muted)]">Description <LockIcon field="Description" /></label>
+                                    {collection.tmdbId != null && (
+                                        <button type="button" onClick={fetchDescription} disabled={fetchingDescription} className="vora-pill cursor-pointer rounded-full px-3 py-1 text-xs font-medium disabled:opacity-60">
+                                            {fetchingDescription ? 'Fetching…' : 'Fetch from TMDB'}
+                                        </button>
+                                    )}
+                                </div>
                                 <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
                             </div>
                             <div>

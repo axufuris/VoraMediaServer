@@ -69,7 +69,7 @@ public class LibraryManager : ILibraryManager
             EnableVideoPreviewThumbnails = request.EnableVideoPreviewThumbnails && request.Type.HasVideoContent(),
             EnableCreditsDetection = request.EnableCreditsDetection,
             EnablePreviewDetection = request.EnablePreviewDetection,
-            MinimumCollectionSize = request.MinimumCollectionSize,
+            MinimumCollectionSize = Vora.Application.Collections.CollectionVisibility.Clamp(request.MinimumCollectionSize, Vora.Application.Collections.CollectionVisibility.DefaultMinimum),
             EnableRealTimeWatching = request.EnableRealTimeWatching,
 
             EpisodeSorting = (Domain.Enums.EpisodeSortOrder)request.EpisodeSorting,
@@ -145,7 +145,7 @@ public class LibraryManager : ILibraryManager
         library.EnableVideoPreviewThumbnails = requestedThumbnails;
         library.EnableCreditsDetection = request.EnableCreditsDetection;
         library.EnablePreviewDetection = request.EnablePreviewDetection;
-        library.MinimumCollectionSize = request.MinimumCollectionSize;
+        library.MinimumCollectionSize = Vora.Application.Collections.CollectionVisibility.Clamp(request.MinimumCollectionSize, library.MinimumCollectionSize);
 
         library.EpisodeSorting = (Domain.Enums.EpisodeSortOrder)request.EpisodeSorting;
         library.EpisodeOrder = (Domain.Enums.EpisodeOrdering)request.EpisodeOrder;

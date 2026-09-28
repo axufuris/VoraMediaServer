@@ -26,7 +26,7 @@ public class MediaLibrary
     public bool OnlyShowTrailers { get; set; }
     public bool EnableVideoPreviewThumbnails { get; set; }
 
-    public int MinimumCollectionSize { get; set; } = 1;
+    public int MinimumCollectionSize { get; set; } = 3;
 
     public bool EnableCreditsDetection { get; set; }
     public bool EnablePreviewDetection { get; set; }
