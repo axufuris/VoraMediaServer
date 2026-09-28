@@ -220,7 +220,8 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                 var genreMovies = await _context.MediaItems
                     .AsNoTracking()
                     .Where(m => m.Id != mediaId && m is Movie && m.Genres.Any(g => currentMedia.GenreIds.Contains(g.Id)))
-                    .OrderByDescending(m => m.ReleaseDate)
+                    .OrderByDescending(m => m.ReleaseDate.HasValue)
+                    .ThenByDescending(m => m.ReleaseDate)
                     .Select(m => new UpNextItemVM
                     {
                         Id = m.Id,

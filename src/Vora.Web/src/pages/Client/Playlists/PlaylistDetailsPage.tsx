@@ -15,7 +15,7 @@ import { isAxiosError } from 'axios';
 import { PlaylistSharingControls, PlaylistUnavailable, SavedCopyBanner, type SavedCopyState } from './PlaylistSharing';
 import MusicPlaylistView from './MusicPlaylistView';
 import PlaylistCover from '../../../components/Collections/PlaylistCover';
-import { seasonEpisodeLabel } from '../../../utils/seasonLabel';
+import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
 
 export default function PlaylistDetailsPage() {
     const dialog = useDialog();
@@ -585,7 +585,7 @@ export default function PlaylistDetailsPage() {
                                             </span>
                                         ) : (
                                             <span>
-                                                {item.type === 'Episode' || item.type === 'Season' ? `${item.tvShowTitle} - Season ${item.seasonNumber}` : item.type}
+                                                {item.type === 'Episode' || item.type === 'Season' ? `${item.tvShowTitle} - ${seasonName(item.seasonNumber)}` : item.type}
                                             </span>
                                         )}
                                         {item.type === 'Track' && item.durationSeconds ? (

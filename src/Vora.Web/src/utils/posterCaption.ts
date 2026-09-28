@@ -1,4 +1,4 @@
-import { seasonEpisodeLabel } from './seasonLabel';
+import { seasonEpisodeLabel, seasonName } from './seasonLabel';
 // The structured caption shown under a poster/card, consistent everywhere we
 // render a list of posters. The shape varies by media type:
 //
@@ -62,10 +62,11 @@ function dotJoin(parts: (string | null | undefined)[]): string | null {
 // default "Season N" (so a named season like "Specials" shows as-is).
 function seasonLabel(item: PosterCaptionItem): string | null {
     const name = item.seasonName?.trim();
+    if (item.seasonNumber === 0) return seasonName(0, name);
     if (name && !/^season\s+\d+$/i.test(name)) {
         return /season|specials/i.test(name) ? name : `Season ${name}`;
     }
-    if (item.seasonNumber != null) return `Season ${item.seasonNumber}`;
+    if (item.seasonNumber != null) return seasonName(item.seasonNumber);
     return name || null;
 }
 
