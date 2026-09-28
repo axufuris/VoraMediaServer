@@ -729,10 +729,9 @@ public class MusicRepository : IMusicRepository
 
     public async Task<List<GenreSummary>> GetGenreSummariesAsync(MusicAccessFilter access)
     {
-        var albumQuery = _context.Albums.AsNoTracking().Where(a => a.Genre != null && a.Genre != string.Empty);
-        albumQuery = ApplyLibraryFilter(albumQuery, access);
-
-        var albums = await albumQuery
+        var albums = await PlayableAlbums(access, null)
+            .Where(a => a.Genre != null && a.Genre != string.Empty)
+            .OrderBy(a => a.Id)
             .Select(a => new { a.Id, a.Genre, a.ArtistId, a.ArtworkUrl })
             .ToListAsync();
 
@@ -916,6 +915,11 @@ public class MusicRepository : IMusicRepository
     {
         var genreAlbums = PlayableAlbums(access, genre);
         var albumCount = await genreAlbums.CountAsync();
+        var sampleArtworkUrl = await genreAlbums
+            .Where(a => a.ArtworkUrl != null && a.ArtworkUrl != string.Empty)
+            .OrderBy(a => a.Id)
+            .Select(a => a.ArtworkUrl)
+            .FirstOrDefaultAsync();
         var albums = await genreAlbums.Include(a => a.Artist).OrderByDescending(a => a.AddedAt).Take(60).ToListAsync();
 
         var artistIds = genreAlbums.Select(a => a.ArtistId);
@@ -936,6 +940,7 @@ public class MusicRepository : IMusicRepository
             Artists = artists,
             Albums = albums,
             AlbumCount = albumCount,
+            SampleArtworkUrl = sampleArtworkUrl,
             Tracks = tracks
         };
     }

@@ -179,4 +179,27 @@ public class MusicRepositoryAlbumPageTests
         total.Should().Be(4);
         albums.Select(a => a.Title).Should().Equal("One More Time", "Neighborhoods", "Enema of the State", "Undated");
     }
+
+    [Fact]
+    public async Task A_genres_tile_cover_is_the_same_album_every_time()
+    {
+        await using var db = NewContext();
+        var shelf = NewShelf(db);
+        var first = shelf.Album("First", 1);
+        var second = shelf.Album("Second", 2);
+        var bare = shelf.Album("No Art", 3);
+        first.Genre = second.Genre = bare.Genre = "Hip Hop";
+        first.ArtworkUrl = "/art/first.jpg";
+        second.ArtworkUrl = "/art/second.jpg";
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var expected = new[] { first, second }.OrderBy(a => a.Id).First().ArtworkUrl;
+
+        var repository = new MusicRepository(db);
+        var once = (await repository.GetGenreSummariesAsync(MusicAccessFilter.Unrestricted)).Single();
+        var again = (await repository.GetGenreSummariesAsync(MusicAccessFilter.Unrestricted)).Single();
+
+        once.SampleArtworkUrl.Should().Be(expected);
+        again.SampleArtworkUrl.Should().Be(expected);
+        once.AlbumCount.Should().Be(3);
+    }
 }

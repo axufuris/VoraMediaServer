@@ -3,6 +3,7 @@ import { musicService, type AlbumSortOrder, type AlbumVM } from '../../../../api
 import EmptyState from '../../../../components/Client/Primitives/EmptyState';
 import { thumbUrl } from '../../../../utils/thumbnails';
 import { albumCover } from '../../../../utils/albumCover';
+import LastFmCount from '../../../../components/Media/LastFmCount';
 
 const ALBUM_PAGE_SIZE = 60;
 
@@ -240,8 +241,11 @@ function AlbumRow({ album, onOpen }: { album: AlbumVM; onOpen: (album: AlbumVM) 
                 </span>
             </div>
 
+            <span className="hidden w-20 shrink-0 justify-end text-xs sm:flex" style={{ color: 'var(--vora-text-disabled)' }}>
+                <LastFmCount value={album.globalPlays} unit="plays" />
+            </span>
             <span
-                className="shrink-0 text-sm"
+                className="w-10 shrink-0 text-right text-sm"
                 style={{ color: 'var(--vora-text-muted)', fontVariantNumeric: 'tabular-nums' }}
             >
                 {album.year || ''}

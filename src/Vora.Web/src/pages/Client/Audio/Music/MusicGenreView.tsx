@@ -3,6 +3,7 @@ import { type MusicNavState } from './musicNavState';
 import MediaCard from '../../../../components/Client/Primitives/MediaCard';
 import MediaRow, { MediaRowItem } from '../../../../components/Client/Primitives/MediaRow';
 import { AlbumBrowser } from './MusicAlbumsView';
+import GenreTile from './GenreTile';
 
 interface MusicGenreViewProps {
     isLoading: boolean;
@@ -27,13 +28,7 @@ export default function MusicGenreView({ isLoading, currentGenre, serverId, refr
     return (
         <>
             <div className="mb-8 flex items-center gap-4 border-b border-[var(--vora-border-subtle)] pb-6">
-                <span
-                    className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-[var(--vora-radius-md)]"
-                    style={{ background: 'var(--vora-accent-soft)', color: 'var(--vora-accent-text)' }}
-                    aria-hidden="true"
-                >
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" /></svg>
-                </span>
+                <GenreTile name={currentGenre.name} artworkUrl={currentGenre.sampleArtworkUrl} className="shrink-0 !w-32 sm:!w-40" />
                 <div className="min-w-0">
                     <div className="text-xs font-bold uppercase tracking-widest text-[var(--vora-text-secondary)]">Genre</div>
                     <h2 className="truncate text-3xl font-bold text-[var(--vora-text-primary)]">{currentGenre.name}</h2>

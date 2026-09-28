@@ -1,5 +1,7 @@
 import { type GenreSummaryVM } from '../../../../api/Music/musicService';
 import { type MusicNavState } from './musicNavState';
+import MediaGrid from '../../../../components/Client/Primitives/MediaGrid';
+import GenreTile from './GenreTile';
 
 interface MusicGenresViewProps {
     isLoading: boolean;
@@ -23,25 +25,17 @@ export default function MusicGenresView({ isLoading, genres, updateNav }: MusicG
     return (
         <>
             <h2 className="text-lg font-bold text-[var(--vora-text-primary)] mb-4">Browse by Genre</h2>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
+            <MediaGrid size="xs">
                 {genres.map(g => (
-                    <button
+                    <GenreTile
                         key={g.name}
-                        type="button"
+                        name={g.name}
+                        artworkUrl={g.sampleArtworkUrl}
+                        detail={`${g.trackCount} tracks · ${g.artistCount} ${g.artistCount === 1 ? 'artist' : 'artists'}`}
                         onClick={() => updateNav({ view: 'genre', genre: g.name })}
-                        className="relative aspect-square rounded-lg overflow-hidden border border-[var(--vora-border-subtle)] hover:border-emerald-400 transition-all cursor-pointer group bg-gradient-to-br from-emerald-700 via-teal-900 to-indigo-900"
-                        title={g.name}
-                    >
-                        {g.sampleArtworkUrl && (
-                            <img src={g.sampleArtworkUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-40 transition-opacity" />
-                        )}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center">
-                            <div className="text-xl sm:text-2xl font-bold text-[var(--vora-text-primary)] drop-shadow-md">{g.name}</div>
-                            <div className="text-xs text-emerald-200/90 mt-1">{g.trackCount} tracks · {g.artistCount} {g.artistCount === 1 ? 'artist' : 'artists'}</div>
-                        </div>
-                    </button>
+                    />
                 ))}
-            </div>
+            </MediaGrid>
         </>
     );
 }

@@ -907,6 +907,7 @@ public class MusicManager : IMusicManager
             Artists = content.Artists.Select(MapArtist).ToList(),
             Albums = content.Albums.Select(a => MapAlbum(a, a.Artist?.Name ?? string.Empty, a.Artist?.ArtworkUrl)).ToList(),
             AlbumCount = content.AlbumCount,
+            SampleArtworkUrl = content.SampleArtworkUrl,
             Tracks = content.Tracks.Select(MapTrack).ToList()
         };
     }

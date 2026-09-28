@@ -66,4 +66,10 @@ describe('MusicGenreView', () => {
 
         expect(updateNav).toHaveBeenCalledWith({ view: 'artist', artistId: 'a2' });
     });
+
+    it("heads the page with the genre's own tile cover", () => {
+        const { container } = render(<MusicGenreView isLoading={false} currentGenre={genre({ sampleArtworkUrl: '/art/sample.jpg' })} refreshKey={0} updateNav={vi.fn()} />);
+
+        expect(container.querySelector('img[src="/art/sample.jpg"]')).not.toBeNull();
+    });
 });
