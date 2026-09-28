@@ -13,7 +13,7 @@ public class UpdateLibraryRequest
     public bool EnableVideoPreviewThumbnails { get; set; }
     public bool EnableCreditsDetection { get; set; }
     public bool EnablePreviewDetection { get; set; }
-    public int MinimumCollectionSize { get; set; }
+    public int? MinimumCollectionSize { get; set; }
 
     public string MetadataProviderId { get; set; } = string.Empty;
 

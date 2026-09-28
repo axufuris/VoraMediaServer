@@ -13,6 +13,7 @@ public class CollectionSummaryVM
     public DateTime? VisibleStartDate { get; set; }
     public DateTime? VisibleEndDate { get; set; }
     public bool SystemGenerated { get; set; }
+    public CollectionHiddenReason? HiddenReason { get; set; }
 
     public static Expression<Func<Collection, CollectionSummaryVM>> StandardProjection =>
         c => new CollectionSummaryVM

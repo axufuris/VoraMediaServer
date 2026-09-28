@@ -4,9 +4,9 @@ import { libraryService, type LibrarySummary } from '../../../api/Media/libraryS
 import { collectionService, type CollectionSummary } from '../../../api/Collections/collectionService';
 import CreateCollectionModal from '../../../components/Collections/CreateCollectionModal';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
-import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import { StorageKeys } from '../../../utils/storageKeys';
+import LibraryCollectionGrid from '../../../components/Collections/LibraryCollectionGrid';
 
 export default function CollectionsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -48,14 +48,14 @@ export default function CollectionsPage() {
         try {
             const data = activeTab === 'global'
                 ? await collectionService.getGlobalCollections(serverId)
-                : await collectionService.getLibraryCollections(activeTab, serverId);
+                : await collectionService.getLibraryCollections(activeTab, serverId, isAdmin);
             setCollections(data);
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
         }
-    }, [activeTab, serverId]);
+    }, [activeTab, serverId, isAdmin]);
 
     useEffect(() => {
         let isMounted = true;
@@ -133,7 +133,12 @@ export default function CollectionsPage() {
                     <MediaGrid>
                         {Array.from({ length: 10 }, (_, i) => <div key={i} className="vora-skeleton aspect-[2/3]" />)}
                     </MediaGrid>
-                ) : collections.length === 0 ? (
+                ) : (
+                    <LibraryCollectionGrid
+                        collections={collections}
+                        isAdmin={isAdmin && activeTab !== 'global'}
+                        onOpen={collection => navigate(serverId ? `/server/${serverId}/collection/${collection.id}` : `/collection/${collection.id}`)}
+                        empty={(
                     <EmptyState
                         title="No collections in this section"
                         description="Collections group related media — a film franchise, a curated set, a theme."
@@ -148,18 +153,8 @@ export default function CollectionsPage() {
                             </svg>
                         )}
                     />
-                ) : (
-                    <MediaGrid>
-                        {collections.map(collection => (
-                            <MediaCard
-                                key={collection.id}
-                                item={{ type: 'Collection', title: collection.title, itemCount: collection.itemCount }}
-                                imageUrl={collection.posterUrl}
-                                onClick={() => navigate(serverId ? `/server/${serverId}/collection/${collection.id}` : `/collection/${collection.id}`)}
-                                fill
-                            />
-                        ))}
-                    </MediaGrid>
+                        )}
+                    />
                 )}
             </div>
         </div>

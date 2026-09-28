@@ -85,6 +85,22 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         return _cachedLanguage;
     }
 
+    public async Task<string?> FetchCollectionOverviewAsync(int collectionId, CancellationToken cancellationToken = default)
+    {
+        var apiKey = await GetApiKeyAsync();
+        if (string.IsNullOrWhiteSpace(apiKey)) return null;
+
+        var lang = await GetLanguageAsync();
+        using var response = await _httpClient.GetAsync($"collection/{collectionId}?api_key={apiKey}&language={lang}", cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return string.Empty;
+        if (!response.IsSuccessStatusCode) return null;
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        return doc.RootElement.TryGetProperty("overview", out var overview) && overview.ValueKind == JsonValueKind.String
+            ? (overview.GetString() ?? string.Empty).Trim()
+            : string.Empty;
+    }
+
     public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();

@@ -15,7 +15,7 @@ public interface ICollectionManager
     Task<CollectionDetailsVM?> GetCollectionDetailsAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, CollectionSortOrder? sortOverride = null);
     Task<Guid> CreateCollectionAsync(CreateCollectionRequest request);
     Task AddMediaToCollectionAsync(Guid collectionId, Guid mediaItemId);
-    Task<IEnumerable<CollectionSummaryVM>> GetLibraryCollectionsAsync(Guid libraryId, bool hasAllAccess, List<Guid> allowedLibs);
+    Task<IEnumerable<CollectionSummaryVM>> GetLibraryCollectionsAsync(Guid libraryId, bool hasAllAccess, List<Guid> allowedLibs, bool includeHidden = false);
     Task<IEnumerable<CollectionSummaryVM>> GetAllCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs);
     Task<IEnumerable<CollectionSummaryVM>> GetGlobalCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs);
     Task UpdateCollectionAsync(Guid id, UpdateCollectionRequest request);
@@ -142,7 +142,9 @@ public class CollectionManager : ICollectionManager
             || collection.ExternalListId != request.ExternalListId;
 
         collection.Title = request.Title;
-        collection.Description = request.Description;
+        collection.Description = string.IsNullOrWhiteSpace(request.Description)
+            ? (collection.Description == string.Empty ? string.Empty : null)
+            : request.Description;
         collection.PosterUrl = request.PosterUrl;
         collection.BackdropUrl = request.BackdropUrl;
         collection.DefaultSort = request.DefaultSort;
@@ -206,13 +208,19 @@ public class CollectionManager : ICollectionManager
         _taskQueueManager.QueueReevaluateCollectionOrder(collectionId);
     }
 
-    public async Task<IEnumerable<CollectionSummaryVM>> GetLibraryCollectionsAsync(Guid libraryId, bool hasAllAccess, List<Guid> allowedLibs)
+    public async Task<IEnumerable<CollectionSummaryVM>> GetLibraryCollectionsAsync(Guid libraryId, bool hasAllAccess, List<Guid> allowedLibs, bool includeHidden = false)
     {
-        var minSize = await _repository.GetLibraryMinimumCollectionSizeAsync(libraryId);
-        if (minSize < 1) minSize = 1;
+        var minimum = await _repository.GetLibraryMinimumCollectionSizeAsync(libraryId);
 
-        var collections = await _repository.GetAllProjectedAsync(CollectionSummaryVM.LibraryProjection(libraryId), libraryId, false, hasAllAccess, allowedLibs);
-        return collections.Where(c => c.ItemCount >= minSize).OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase);
+        var collections = (await _repository.GetAllProjectedAsync(CollectionSummaryVM.LibraryProjection(libraryId), libraryId, false, hasAllAccess, allowedLibs)).ToList();
+        foreach (var collection in collections)
+        {
+            collection.HiddenReason = CollectionVisibility.HiddenReason(collection.SystemGenerated, collection.ItemCount, minimum);
+        }
+
+        return collections
+            .Where(c => includeHidden || c.HiddenReason == null)
+            .OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<IEnumerable<CollectionSummaryVM>> GetAllCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs)

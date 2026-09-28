@@ -37,6 +37,11 @@ public static class CollectionEndpoints
         group.MapPost("/{id:guid}/items/{mediaId:guid}", AddItemAsync)
             .Produces(StatusCodes.Status204NoContent);
 
+        group.MapPost("/{id:guid}/description/refresh", RefreshDescriptionAsync)
+            .RequireAuthorization("AdminOnly")
+            .Produces<CollectionDescriptionResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapPost("/{id:guid}/sync-chronology", ApplyChronologyAsync)
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest);
@@ -72,9 +77,15 @@ public static class CollectionEndpoints
         return Results.Ok(collections);
     }
 
-    private static async Task<IResult> GetLibraryCollectionsAsync(Guid libraryId, ClaimsPrincipal user, ICollectionManager manager)
+    private static async Task<IResult> RefreshDescriptionAsync(Guid id, ICollectionDescriptionService service, CancellationToken ct)
     {
-        var collections = await manager.GetLibraryCollectionsAsync(libraryId, user.HasAllLibraryAccess(), user.GetAllowedLibraryIds());
+        var description = await service.RefreshAsync(id, ct);
+        return description == null ? Results.NotFound() : Results.Ok(new CollectionDescriptionResponse { Description = description });
+    }
+
+    private static async Task<IResult> GetLibraryCollectionsAsync(Guid libraryId, [FromQuery] bool? includeHidden, ClaimsPrincipal user, ICollectionManager manager)
+    {
+        var collections = await manager.GetLibraryCollectionsAsync(libraryId, user.HasAllLibraryAccess(), user.GetAllowedLibraryIds(), includeHidden == true && user.IsAdmin());
         return Results.Ok(collections);
     }
 

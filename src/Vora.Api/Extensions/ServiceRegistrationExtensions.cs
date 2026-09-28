@@ -386,6 +386,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IBestPathDecisionManager, BestPathDecisionManager>();
         services.AddScoped<ICalendarManager, CalendarManager>();
         services.AddScoped<ICollectionManager, CollectionManager>();
+        services.AddScoped<ICollectionDescriptionService, CollectionDescriptionService>();
         services.AddScoped<IDashboardManager, DashboardManager>();
         services.AddScoped<IDeviceManager, DeviceManager>();
         services.AddScoped<IDiscoveryManager, DiscoveryManager>();

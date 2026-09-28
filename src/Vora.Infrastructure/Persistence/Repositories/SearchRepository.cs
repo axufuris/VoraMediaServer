@@ -1,3 +1,4 @@
+using Vora.Application.Collections;
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.Search;
 using Vora.Application.Search.ViewModels;
@@ -72,6 +73,11 @@ public class SearchRepository(VoraDbContext context) : ISearchRepository
         {
             dbQuery = dbQuery.Where(c => c.LibraryId == null || allowedLibs.Contains(c.LibraryId.Value));
         }
+
+        dbQuery = dbQuery.Where(c => c.Items.Any() && (!c.SystemGenerated || context.MediaLibraries.Any(l =>
+            l.Id == c.LibraryId
+            && l.MinimumCollectionSize > CollectionVisibility.HideAutomatic
+            && c.Items.Count >= l.MinimumCollectionSize)));
 
         var searchPattern = $"%{query}%";
         return await dbQuery

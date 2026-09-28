@@ -15,6 +15,7 @@ import LetterRail from '../../components/Client/Primitives/LetterRail';
 import { StorageKeys } from '../../utils/storageKeys';
 import { recentlyAddedTime } from '../../utils/recentlyAdded';
 import { yearOf } from '../../utils/serverTime';
+import LibraryCollectionGrid from '../../components/Collections/LibraryCollectionGrid';
 
 type LibraryTabKey = 'library' | 'collections' | 'recommendations';
 
@@ -415,6 +416,7 @@ export default function LibraryPage() {
     }, [id, activeTab]);
     const [items, setItems] = useState<LibraryItem[]>([]);
     const [collections, setCollections] = useState<CollectionSummary[]>([]);
+    const visibleCollections = useMemo(() => collections.filter(c => !c.hiddenReason), [collections]);
     const [library, setLibrary] = useState<MediaLibrary | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -459,7 +461,7 @@ export default function LibraryPage() {
             const [libData, mediaData, collectionData] = await Promise.all([
                 libraryService.getLibraryById(id, serverId),
                 libraryService.getLibraryMedia(id, serverId),
-                collectionService.getLibraryCollections(id, serverId)
+                collectionService.getLibraryCollections(id, serverId, isAdmin)
             ]);
 
             setLibrary(libData);
@@ -476,7 +478,7 @@ export default function LibraryPage() {
         } finally {
             if (!silent) setLoading(false);
         }
-    }, [id, serverId]);
+    }, [id, serverId, isAdmin]);
 
     useEffect(() => {
         loadData();
@@ -742,7 +744,7 @@ export default function LibraryPage() {
             <LibraryHero
                 library={library}
                 totalItems={items.length}
-                totalCollections={collections.length}
+                totalCollections={visibleCollections.length}
                 samplePosters={samplePosters}
                 actions={adminMenu}
             />
@@ -751,7 +753,7 @@ export default function LibraryPage() {
                 <Tabs<LibraryTabKey>
                     tabs={[
                         { key: 'library', label: 'Library' },
-                        { key: 'collections', label: 'Collections', badge: collections.length > 0 ? <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--vora-accent-soft)', color: 'var(--vora-accent-text)' }}>{collections.length}</span> : undefined },
+                        { key: 'collections', label: 'Collections', badge: visibleCollections.length > 0 ? <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--vora-accent-soft)', color: 'var(--vora-accent-text)' }}>{visibleCollections.length}</span> : undefined },
                         { key: 'recommendations', label: 'For You' },
                     ]}
                     active={activeTab}
@@ -816,24 +818,17 @@ export default function LibraryPage() {
 
             {activeTab === 'collections' && (
                 <div className="px-8 pt-6">
-                    {collections.length === 0 ? (
-                        <EmptyState
-                            title="No collections in this library yet"
-                            description="Collections group related media — like a movie franchise or a curated set."
-                        />
-                    ) : (
-                        <MediaGrid>
-                            {collections.map(collection => (
-                                <MediaCard
-                                    key={collection.id}
-                                    item={{ type: 'Collection', title: collection.title, itemCount: collection.itemCount }}
-                                    imageUrl={collection.posterUrl}
-                                    onClick={() => navigate(serverId ? `/server/${serverId}/collection/${collection.id}` : `/collection/${collection.id}`)}
-                                    fill
-                                />
-                            ))}
-                        </MediaGrid>
-                    )}
+                    <LibraryCollectionGrid
+                        collections={collections}
+                        isAdmin={isAdmin}
+                        onOpen={collection => navigate(serverId ? `/server/${serverId}/collection/${collection.id}` : `/collection/${collection.id}`)}
+                        empty={(
+                            <EmptyState
+                                title="No collections in this library yet"
+                                description="Collections group related media — like a movie franchise or a curated set."
+                            />
+                        )}
+                    />
                 </div>
             )}
 

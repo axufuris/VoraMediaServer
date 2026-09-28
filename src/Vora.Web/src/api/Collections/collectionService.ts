@@ -16,7 +16,11 @@ export interface CollectionSummary {
     visibleStartDate?: string;
     visibleEndDate?: string;
     systemGenerated: boolean;
+    // Only sent to admins (includeHidden): why viewers don't see it.
+    hiddenReason?: CollectionHiddenReason | null;
 }
+
+export type CollectionHiddenReason = 'Empty' | 'AutomaticCollectionsHidden' | 'BelowMinimumSize';
 
 export interface CollectionDetails {
     id: string;
@@ -28,6 +32,8 @@ export interface CollectionDetails {
     isMixedCollection: boolean;
     itemCount: number;
     lockedFields: string[];
+    // Set on automatic collections; lets an admin ask TMDB for the description again.
+    tmdbId?: number | null;
     items: CollectionDetailsLibraryItem[];
 
     defaultSort: CollectionSortOrder;
@@ -67,9 +73,18 @@ export interface CollectionDetailsLibraryItem {
 }
 
 export const collectionService = {
-    getLibraryCollections: async (libraryId: string, serverId?: string): Promise<CollectionSummary[]> => {
-        const response = await apiClient.get<CollectionSummary[]>(`/collections/library/${libraryId}`, { serverId });
+    // includeHidden is honoured for admins only; everyone else gets what viewers see.
+    getLibraryCollections: async (libraryId: string, serverId?: string, includeHidden = false): Promise<CollectionSummary[]> => {
+        const response = await apiClient.get<CollectionSummary[]>(`/collections/library/${libraryId}`, {
+            serverId,
+            params: includeHidden ? { includeHidden: true } : undefined,
+        });
         return response.data;
+    },
+
+    refreshDescription: async (collectionId: string, serverId?: string): Promise<string> => {
+        const response = await apiClient.post<{ description: string }>(`/collections/${collectionId}/description/refresh`, null, { serverId });
+        return response.data.description;
     },
 
     getCollectionDetails: async (collectionId: string, serverId?: string, sort?: CollectionSortOrder): Promise<CollectionDetails> => {

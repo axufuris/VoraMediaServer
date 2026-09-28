@@ -934,6 +934,12 @@ public class TaskQueueManager : ITaskQueueManager
         // units already handled isn't re-run).
         await RunStepAsync("Fetching details…", () => metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false, cancellationToken: ct));
 
+        var collectionDescriptions = sp.GetRequiredService<Vora.Application.Collections.ICollectionDescriptionService>();
+        if (libraryType == LibraryType.Movie && await collectionDescriptions.HasAwaitingAsync(libraryId))
+        {
+            await RunStepAsync("Fetching collection descriptions…", () => collectionDescriptions.FillAwaitingAsync(libraryId, ct));
+        }
+
         // Straight after the scan rather than waiting for the night, so a newly
         // added explicit album is labelled before a restricted profile finds it.
         if (libraryVm?.Type == nameof(LibraryType.Music))

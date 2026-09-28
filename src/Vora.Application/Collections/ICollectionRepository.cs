@@ -22,6 +22,7 @@ public interface ICollectionRepository
     Task UpdateContentSyncCacheAsync(Guid collectionId, string cacheJson);
     Task TouchContentSyncedAtAsync(Guid collectionId);
     Task UpdateDescriptionAsync(Guid collectionId, string description);
+    Task<List<CollectionDescriptionTarget>> GetCollectionsAwaitingDescriptionAsync(Guid libraryId);
     Task RemoveItemsFromCollectionAsync(Guid collectionId, IEnumerable<Guid> mediaItemIds);
 
     Task<IEnumerable<CollectionArtwork>> GetCollectionArtworkAsync(Guid collectionId);
@@ -56,3 +57,5 @@ public interface ICollectionRepository
 
     Task AttachCollectionItemUserStatesAsync(IEnumerable<CollectionDetailsLibraryItemVM> items, Guid profileId);
 }
+
+public sealed record CollectionDescriptionTarget(Guid CollectionId, int TmdbId);

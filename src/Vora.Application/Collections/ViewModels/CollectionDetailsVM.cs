@@ -25,6 +25,7 @@ public class CollectionDetailsVM
     public DateTime? VisibleStartDate { get; set; }
     public DateTime? VisibleEndDate { get; set; }
     public bool SystemGenerated { get; set; }
+    public int? TmdbId { get; set; }
     public string? ContentSyncProviderId { get; set; }
     public string? ContentSyncExternalId { get; set; }
     public int SyncIntervalDays { get; set; }
@@ -56,6 +57,7 @@ public class CollectionDetailsVM
             VisibleStartDate = c.VisibleStartDate,
             VisibleEndDate = c.VisibleEndDate,
             SystemGenerated = c.SystemGenerated,
+            TmdbId = c.TmdbId,
             LockedFields = c.LockedFields,
             ContentSyncProviderId = c.ContentSyncProviderId,
             ContentSyncExternalId = c.ContentSyncExternalId,
