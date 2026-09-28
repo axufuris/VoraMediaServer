@@ -1,10 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import MusicMixView from './MusicMixView';
 import type { GeneratedMixDetailVM } from '../../../../api/Music/musicService';
 
 vi.mock('../../../../components/Collections/SaveMixButton', () => ({ default: () => null }));
+
+const mocks = vi.hoisted(() => ({ confirm: vi.fn(), alert: vi.fn(), remove: vi.fn(), regenerate: vi.fn() }));
+vi.mock('../../../../dialogs', () => ({ useDialog: () => ({ confirm: mocks.confirm, alert: mocks.alert }) }));
+vi.mock('../../../../api/Music/aiPlaylistService', () => ({ aiPlaylistService: { remove: mocks.remove, regenerate: mocks.regenerate } }));
 
 const mix = (overrides: Partial<GeneratedMixDetailVM> = {}): GeneratedMixDetailVM => ({
     id: 'm1',
@@ -21,9 +25,11 @@ const mix = (overrides: Partial<GeneratedMixDetailVM> = {}): GeneratedMixDetailV
     ...overrides,
 });
 
-const renderMix = (value: GeneratedMixDetailVM) => render(
+const renderMix = (value: GeneratedMixDetailVM, onDeleted = vi.fn(), onRegenerated = vi.fn()) => render(
     <MemoryRouter>
         <MusicMixView
+            onDeleted={onDeleted}
+            onRegenerated={onRegenerated}
             isLoading={false}
             currentMix={value}
             isShuffled={false}
@@ -54,5 +60,45 @@ describe('MusicMixView', () => {
         renderMix(mix({ kind: 'DailyMix', slot: 3, descriptionTag: 'Rock' }));
 
         expect(screen.getByText('Daily Mix 3')).toBeInTheDocument();
+    });
+
+    it('offers Regenerate and Delete on a request, and neither on a Daily Mix', () => {
+        const { unmount } = renderMix(mix({ prompt: 'Cruising in the car' }));
+        expect(screen.getByRole('button', { name: 'Regenerate' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete playlist' })).toBeInTheDocument();
+        unmount();
+
+        renderMix(mix({ kind: 'DailyMix' }));
+        expect(screen.queryByRole('button', { name: 'Regenerate' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Delete playlist' })).toBeNull();
+    });
+
+    it('deletes only after the viewer confirms', async () => {
+        mocks.confirm.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+        mocks.remove.mockResolvedValue(undefined);
+        const onDeleted = vi.fn();
+        renderMix(mix({ prompt: 'x' }), onDeleted);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete playlist' }));
+        await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(1));
+        expect(mocks.remove).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete playlist' }));
+        await waitFor(() => expect(onDeleted).toHaveBeenCalled());
+        expect(mocks.remove).toHaveBeenCalledWith('m1', undefined);
+    });
+
+    it('regenerates with the saved words and a new length', async () => {
+        mocks.regenerate.mockResolvedValue({ mixId: 'm1' });
+        const onRegenerated = vi.fn();
+        renderMix(mix({ prompt: 'Cruising in the car' }), vi.fn(), onRegenerated);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
+        expect(screen.getByLabelText('What the playlist is for')).toHaveValue('Cruising in the car');
+        fireEvent.click(screen.getByRole('radio', { name: '30 songs' }));
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Regenerate' }));
+
+        await waitFor(() => expect(onRegenerated).toHaveBeenCalled());
+        expect(mocks.regenerate).toHaveBeenCalledWith('m1', 'Cruising in the car', 30, undefined);
     });
 });

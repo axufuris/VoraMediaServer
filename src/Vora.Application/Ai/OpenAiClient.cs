@@ -22,7 +22,7 @@ public class OpenAiClient(
     public async Task<bool> IsConfiguredAsync()
         => !string.IsNullOrWhiteSpace(await settings.GetPluginSettingAsync(KeyPluginId, "api_key"));
 
-    public async Task<string?> CompleteJsonAsync(string pluginId, string prompt, CancellationToken cancellationToken = default, double? temperature = null, string? modelSettingKey = null)
+    public async Task<string?> CompleteJsonAsync(string pluginId, string prompt, CancellationToken cancellationToken = default, double? temperature = null, string? modelSettingKey = null, Guid? profileId = null)
     {
         var apiKey = await settings.GetPluginSettingAsync(KeyPluginId, "api_key");
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -97,7 +97,8 @@ public class OpenAiClient(
             ModelUsed = model,
             PromptTokens = data.Usage?.PromptTokens ?? 0,
             CompletionTokens = data.Usage?.CompletionTokens ?? 0,
-            TotalTokens = data.Usage?.TotalTokens ?? 0
+            TotalTokens = data.Usage?.TotalTokens ?? 0,
+            ProfileId = profileId
         });
 
         return data.Choices[0].Message?.Content;

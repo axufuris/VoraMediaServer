@@ -9,7 +9,7 @@ public interface IOpenAiClient
     // returns the assistant's content string. Returns null when no API key is
     // configured. Throws InvalidOperationException when the configured monthly
     // token limit has been reached. Usage is logged against the calling plugin.
-    Task<string?> CompleteJsonAsync(string pluginId, string prompt, CancellationToken cancellationToken = default, double? temperature = null, string? modelSettingKey = null);
+    Task<string?> CompleteJsonAsync(string pluginId, string prompt, CancellationToken cancellationToken = default, double? temperature = null, string? modelSettingKey = null, Guid? profileId = null);
 
     // text-embedding-3-small vectors for the inputs, in input order; an entry
     // the response didn't cover is null. Null overall when no key is

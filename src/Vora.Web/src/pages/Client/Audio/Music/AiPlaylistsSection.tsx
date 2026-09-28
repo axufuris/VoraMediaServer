@@ -119,8 +119,16 @@ function AiTile({ playlist, onOpen }: { playlist: AiPlaylistVM; onOpen: (mixId: 
     );
 }
 
-function MakePlaylistDialog({ serverId, onClose, onMade }: { serverId?: string; onClose: () => void; onMade: (mixId: string) => void }) {
-    const [prompt, setPrompt] = useState('');
+interface MakePlaylistDialogProps {
+    serverId?: string;
+    onClose: () => void;
+    onMade: (mixId: string) => void;
+    // Set to make an existing request again instead of a new one.
+    regenerate?: { mixId: string; prompt: string; trackCount: number };
+}
+
+export function MakePlaylistDialog({ serverId, onClose, onMade, regenerate }: MakePlaylistDialogProps) {
+    const [prompt, setPrompt] = useState(regenerate?.prompt ?? '');
     const [songs, setSongs] = useState<number | null>(null);
     const [making, setMaking] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -131,7 +139,9 @@ function MakePlaylistDialog({ serverId, onClose, onMade }: { serverId?: string; 
         setMaking(true);
         setError(null);
         try {
-            const { mixId } = await aiPlaylistService.make(prompt.trim(), songs, serverId);
+            const { mixId } = regenerate
+                ? await aiPlaylistService.regenerate(regenerate.mixId, prompt.trim(), songs, serverId)
+                : await aiPlaylistService.make(prompt.trim(), songs, serverId);
             onMade(mixId);
         } catch (err) {
             setError(resolveReason(err) ?? 'Could not make that playlist.');
@@ -141,7 +151,7 @@ function MakePlaylistDialog({ serverId, onClose, onMade }: { serverId?: string; 
 
     return (
         <Modal isOpen onClose={onClose} size="sm" zIndex="z-[200]" cardClassName="p-6">
-            <ModalHeader title="Make me a playlist for…" onClose={onClose} bordered={false} />
+            <ModalHeader title={regenerate ? 'Regenerate playlist' : 'Make me a playlist for…'} onClose={onClose} bordered={false} />
             <form onSubmit={submit} className="space-y-3">
                 <textarea
                     autoFocus
@@ -176,14 +186,15 @@ function MakePlaylistDialog({ serverId, onClose, onMade }: { serverId?: string; 
                     ))}
                 </div>
                 <p className="text-xs text-[var(--vora-text-muted)]">
-                    {songs === null ? 'The AI picks a length that suits the request, from 10 to 60 songs. ' : ''}
+                    {songs === null ? `The AI picks a length that suits the request, from 10 to 60 songs${regenerate ? ` (now ${regenerate.trackCount})` : ''}. ` : ''}
+                    {regenerate ? 'The songs are picked again and count as one of your requests for today. ' : ''}
                     Songs come from your library and follow your profile's settings.
                 </p>
                 {error && <p role="alert" className="text-sm text-[var(--vora-danger-text)]">{error}</p>}
                 <div className="flex justify-end gap-2 pt-1">
                     <button type="button" onClick={onClose} className="vora-button-secondary">Cancel</button>
                     <button type="submit" disabled={!prompt.trim() || making} className="vora-button-primary disabled:opacity-50">
-                        {making ? 'Making your playlist…' : 'Make it'}
+                        {making ? (regenerate ? 'Regenerating…' : 'Making your playlist…') : (regenerate ? 'Regenerate' : 'Make it')}
                     </button>
                 </div>
             </form>

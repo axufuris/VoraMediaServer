@@ -44,6 +44,16 @@ export const aiPlaylistService = {
         const response = await apiClient.post<{ mixId: string }>('/music/ai/requests', { prompt, songs }, { serverId });
         return response.data;
     },
+    // Makes a requested playlist again in place: same playlist, new songs. Its
+    // saved words are used when no new ones are given. Counts as a request.
+    regenerate: async (mixId: string, prompt: string | null, songs: number | null, serverId?: string): Promise<{ mixId: string }> => {
+        const response = await apiClient.post<{ mixId: string }>(`/music/ai/requests/${mixId}/regenerate`, { prompt, songs }, { serverId });
+        return response.data;
+    },
+    // Requests and Blends only; the weekly ones are replaced each week anyway.
+    remove: async (mixId: string, serverId?: string): Promise<void> => {
+        await apiClient.delete(`/music/ai/playlists/${mixId}`, { serverId });
+    },
     getBlendPartners: async (serverId?: string): Promise<BlendPartner[]> => {
         const response = await apiClient.get<BlendPartner[]>('/music/ai/blend-partners', { serverId });
         return response.data;

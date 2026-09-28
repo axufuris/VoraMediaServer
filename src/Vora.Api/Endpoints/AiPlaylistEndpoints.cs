@@ -30,6 +30,20 @@ public static class AiPlaylistEndpoints
             .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesProblem(StatusCodes.Status502BadGateway);
 
+        group.MapPost("/requests/{mixId:guid}/regenerate", RegenerateAsync)
+            .WithName("RegenerateAiPlaylist")
+            .Produces<AiPlaylistCreatedResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .ProducesProblem(StatusCodes.Status502BadGateway);
+
+        group.MapDelete("/playlists/{mixId:guid}", DeleteAsync)
+            .WithName("DeleteAiPlaylist")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/blend-partners", GetPartnersAsync)
             .WithName("ListBlendPartners")
             .Produces<List<BlendPartner>>(StatusCodes.Status200OK);
@@ -63,6 +77,20 @@ public static class AiPlaylistEndpoints
         var profileId = user.GetProfileId();
         if (profileId == null) return Results.Forbid();
         return ToResult(await service.CreateFromRequestAsync(profileId.Value, request.Prompt, request.Songs, user.GetMusicAccessFilter(), ct));
+    }
+
+    private static async Task<IResult> RegenerateAsync(Guid mixId, [FromBody] RegenerateAiPlaylistRequest request, ClaimsPrincipal user, IAiPlaylistService service, CancellationToken ct)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        return ToResult(await service.RegenerateRequestAsync(profileId.Value, mixId, request.Prompt, request.Songs, user.GetMusicAccessFilter(), ct));
+    }
+
+    private static async Task<IResult> DeleteAsync(Guid mixId, ClaimsPrincipal user, IAiPlaylistService service)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        return await service.DeleteAsync(profileId.Value, mixId) ? Results.NoContent() : Results.NotFound();
     }
 
     private static async Task<IResult> GetPartnersAsync(ClaimsPrincipal user, IAiPlaylistService service)
