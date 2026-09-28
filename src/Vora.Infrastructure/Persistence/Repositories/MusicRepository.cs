@@ -518,21 +518,14 @@ public class MusicRepository : IMusicRepository
     internal static string EscapeLikePattern(string term) =>
         term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 
-    public async Task<(List<Album> Albums, int Total)> GetAlbumsPageAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit, string? search = null)
+    public async Task<(List<Album> Albums, int Total)> GetAlbumsPageAsync(Guid? libraryId, MusicAccessFilter access, AlbumSortOrder sort, int offset, int limit, string? search = null, string? genre = null)
     {
-        IQueryable<Album> query = _context.Albums.AsNoTracking();
+        var query = PlayableAlbums(access, genre);
         if (libraryId.HasValue)
         {
             var id = libraryId.Value;
             query = query.Where(a => a.LibraryId == id);
         }
-        query = ApplyLibraryFilter(query, access);
-
-        var playableAlbumIds = _context.Tracks.AsNoTracking().ApplyMusicRatings(access)
-            .Where(t => t.AlbumId != null)
-            .Select(t => t.AlbumId);
-
-        query = query.Where(a => playableAlbumIds.Contains(a.Id));
 
         // After the access filters and before the count, so a search can only ever
         // narrow what the profile could already see, and Total counts matches
@@ -568,6 +561,13 @@ public class MusicRepository : IMusicRepository
                 .OrderByDescending(a => a.GlobalPlays.HasValue)
                 .ThenByDescending(a => a.GlobalPlays)
                 .ThenBy(a => a.Artist!.SortName ?? a.Artist!.Name)
+                .ThenBy(a => a.Id),
+
+            AlbumSortOrder.Newest => query
+                .OrderByDescending(a => a.Year.HasValue)
+                .ThenByDescending(a => a.Year)
+                .ThenBy(a => a.Artist!.SortName ?? a.Artist!.Name)
+                .ThenBy(a => a.SortTitle ?? a.Title)
                 .ThenBy(a => a.Id),
 
             _ => query.OrderByDescending(a => a.AddedAt).ThenBy(a => a.Id),
@@ -914,15 +914,14 @@ public class MusicRepository : IMusicRepository
 
     public async Task<GenreContent> GetGenreContentAsync(string genre, MusicAccessFilter access)
     {
-        var albumQuery = _context.Albums.AsNoTracking().Include(a => a.Artist).Where(a => a.Genre != null && EF.Functions.ILike(a.Genre, genre));
-        albumQuery = ApplyLibraryFilter(albumQuery, access);
-        var albums = await albumQuery.OrderByDescending(a => a.AddedAt).Take(60).ToListAsync();
+        var genreAlbums = PlayableAlbums(access, genre);
+        var albumCount = await genreAlbums.CountAsync();
+        var albums = await genreAlbums.Include(a => a.Artist).OrderByDescending(a => a.AddedAt).Take(60).ToListAsync();
 
-        var artistIds = albums.Select(a => a.ArtistId).Distinct().ToList();
+        var artistIds = genreAlbums.Select(a => a.ArtistId);
         var artists = await _context.Artists.AsNoTracking()
             .Where(a => artistIds.Contains(a.Id))
-            .OrderBy(a => a.Name)
-            .Take(40)
+            .OrderBy(a => a.SortName ?? a.Name)
             .ToListAsync();
 
         var trackQuery = _context.Tracks.AsNoTracking().Include(t => t.Album)
@@ -936,8 +935,26 @@ public class MusicRepository : IMusicRepository
             Name = genre,
             Artists = artists,
             Albums = albums,
+            AlbumCount = albumCount,
             Tracks = tracks
         };
+    }
+
+    private IQueryable<Album> PlayableAlbums(MusicAccessFilter access, string? genre)
+    {
+        var query = ApplyLibraryFilter(_context.Albums.AsNoTracking(), access);
+
+        if (!string.IsNullOrWhiteSpace(genre))
+        {
+            var pattern = EscapeLikePattern(genre.Trim());
+            query = query.Where(a => a.Genre != null && EF.Functions.ILike(a.Genre, pattern, LikeEscapeCharacter));
+        }
+
+        var playableAlbumIds = _context.Tracks.AsNoTracking().ApplyMusicRatings(access)
+            .Where(t => t.AlbumId != null)
+            .Select(t => t.AlbumId);
+
+        return query.Where(a => playableAlbumIds.Contains(a.Id));
     }
 
     private static IQueryable<Artist> ApplyLibraryFilter(IQueryable<Artist> query, MusicAccessFilter access)

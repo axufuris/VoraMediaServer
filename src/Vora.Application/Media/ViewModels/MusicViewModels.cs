@@ -99,6 +99,7 @@ public class GenreContentVM
     public string Name { get; set; } = string.Empty;
     public List<ArtistVM> Artists { get; set; } = new();
     public List<AlbumVM> Albums { get; set; } = new();
+    public int AlbumCount { get; set; }
     public List<TrackVM> Tracks { get; set; } = new();
 }
 

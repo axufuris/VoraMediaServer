@@ -13,6 +13,8 @@ import { audioQualityStore } from '../../../utils/audioQuality';
 import { useDialog } from '../../../dialogs';
 import SmartPlaylistEditorModal from './SmartPlaylistEditorModal';
 import { PlaylistSharingControls, PlaylistUnavailable, SavedCopyBanner, type SavedCopyState } from './PlaylistSharing';
+import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
+import MediaCard from '../../../components/Client/Primitives/MediaCard';
 
 export default function SmartPlaylistDetailsPage() {
     const { serverId, id } = useParams<{ serverId?: string; id: string }>();
@@ -259,24 +261,19 @@ function MusicTable({ tracks, onPlay, formatDuration }: { tracks: ArtistTrackVM[
 
 function MovieGrid({ movies, onSelect }: { movies: { id: string; title: string; year?: number; posterUrl?: string; isWatched: boolean }[]; onSelect: (i: number) => void }) {
     return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <MediaGrid>
             {movies.map((m, idx) => (
-                <button
+                <MediaCard
                     key={m.id}
-                    type="button"
-                    onClick={() => onSelect(idx)}
-                    className="group text-left cursor-pointer"
                     title={m.title}
-                >
-                    <div className="w-full aspect-[2/3] rounded bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] group-hover:border-sky-500 transition-all overflow-hidden mb-2 relative">
-                        {m.posterUrl ? <img src={m.posterUrl} alt="" className="w-full h-full object-cover" /> : <div className="absolute inset-0 flex items-center justify-center text-3xl text-[var(--vora-text-muted)]">🎬</div>}
-                        {m.isWatched && <div className="absolute top-1 right-1 px-1.5 py-0.5 text-[9px] uppercase tracking-widest font-bold rounded bg-emerald-500/30 text-emerald-100 border border-emerald-400/40">Watched</div>}
-                    </div>
-                    <div className="text-sm font-bold text-[var(--vora-text-secondary)] truncate" title={m.title}>{m.title}</div>
-                    {m.year && <div className="text-xs text-[var(--vora-text-muted)]">{m.year}</div>}
-                </button>
+                    captionLines={m.year ? [String(m.year)] : []}
+                    imageUrl={m.posterUrl}
+                    isPlayed={m.isWatched}
+                    fill
+                    onClick={() => onSelect(idx)}
+                />
             ))}
-        </div>
+        </MediaGrid>
     );
 }
 

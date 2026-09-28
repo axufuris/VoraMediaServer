@@ -8,5 +8,7 @@ public enum AlbumSortOrder
     // World-wide popularity from the listening provider. Albums it has no
     // figure for sort last rather than being dropped, so the grid stays the
     // whole library in a different order.
-    Popular = 2
+    Popular = 2,
+
+    Newest = 3
 }
