@@ -17,13 +17,14 @@ const playlist = (overrides: Partial<PlaylistDetailsVM> = {}): PlaylistDetailsVM
     isShared: true, isOwner: true, ownerName: 'Andy', items: [song(1), song(2)], ...overrides,
 });
 
-const renderView = (p: PlaylistDetailsVM, handlers: { onPlay?: (i: number, s: boolean) => void; onRemove?: (id: string) => void } = {}) => render(
+const renderView = (p: PlaylistDetailsVM, handlers: { onPlay?: (i: number, s: boolean) => void; onQueue?: (i: number | null, next: boolean) => void; onRemove?: (id: string) => void } = {}) => render(
     <MemoryRouter>
         <MusicPlaylistView
             playlist={p}
             canEdit={p.isOwner}
             headerActions={null}
             onPlay={handlers.onPlay ?? vi.fn()}
+            onQueue={handlers.onQueue ?? vi.fn()}
             onRemove={handlers.onRemove ?? vi.fn()}
             draggedIndex={null}
             onDragStart={vi.fn()}
@@ -109,5 +110,35 @@ describe('playlist covers', () => {
 
         expect(playlistTileArt({ ...base, imageUrl: '/mine.png', posterUrls: ['/a', '/b'] })).toEqual({ imageUrl: '/mine.png' });
         expect(playlistTileArt({ ...base, posterUrls: ['/a', '/b'] })).toEqual({ mosaicUrls: ['/a', '/b'], imageUrl: '/a' });
+    });
+
+    it('queues the whole playlist next or at the end without replacing the queue', () => {
+        const onQueue = vi.fn();
+        renderView(playlist(), { onQueue });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Play next' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add to queue' }));
+
+        expect(onQueue).toHaveBeenNthCalledWith(1, null, true);
+        expect(onQueue).toHaveBeenNthCalledWith(2, null, false);
+    });
+
+    it('queues a single song from its menu without starting playback', () => {
+        const onQueue = vi.fn();
+        const onPlay = vi.fn();
+        renderView(playlist(), { onQueue, onPlay });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Queue options for Song 2' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Play next' }));
+
+        expect(onQueue).toHaveBeenCalledWith(1, true);
+        expect(onPlay).not.toHaveBeenCalled();
+    });
+
+    it('never shows played state on a song', () => {
+        renderView(playlist({ items: [song(1, { isPlayed: true, resumePositionSeconds: 42 })] }));
+
+        expect(screen.queryByText(/watched|played/i)).toBeNull();
+        expect(screen.queryByRole('progressbar')).toBeNull();
     });
 });

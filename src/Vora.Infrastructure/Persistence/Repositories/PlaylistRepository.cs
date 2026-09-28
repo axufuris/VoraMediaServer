@@ -261,8 +261,8 @@ public class PlaylistRepository : IPlaylistRepository
                 PosterUrl = i.MediaItem.PosterUrl,
                 BackgroundUrl = i.MediaItem.BackgroundUrl,
                 DurationMinutes = i.MediaItem.Analysis?.Duration.HasValue == true ? (int)i.MediaItem.Analysis.Duration.Value.TotalMinutes : (int?)null,
-                IsPlayed = state?.IsPlayed ?? false,
-                ResumePositionSeconds = state?.ResumePositionSeconds ?? 0,
+                IsPlayed = !hasTrackMeta && (state?.IsPlayed ?? false),
+                ResumePositionSeconds = hasTrackMeta ? 0 : state?.ResumePositionSeconds ?? 0,
                 ArtistName = hasTrackMeta ? trackInfo.ArtistName : null,
                 AlbumTitle = hasTrackMeta ? trackInfo.AlbumTitle : null,
                 AlbumId = hasTrackMeta ? trackInfo.AlbumId : null,
@@ -275,6 +275,13 @@ public class PlaylistRepository : IPlaylistRepository
 
         return playlist;
     }
+
+    public async Task<HashSet<Guid>> GetExistingMediaIdsAsync(IReadOnlyCollection<Guid> mediaIds) =>
+        (await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => mediaIds.Contains(m.Id))
+            .Select(m => m.Id)
+            .ToListAsync()).ToHashSet();
 
     public async Task<Guid> CreatePlaylistAsync(Playlist playlist)
     {

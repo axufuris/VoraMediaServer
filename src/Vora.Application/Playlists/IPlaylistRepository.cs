@@ -15,6 +15,7 @@ public interface IPlaylistRepository
     Task<bool> SetSharedAsync(Guid id, Guid ownerProfileId, bool isShared);
     Task<Guid?> CopyPlaylistAsync(Guid sourceId, Guid viewerProfileId, PlaylistAccessFilter access);
     Task<Guid> CreatePlaylistAsync(Playlist playlist);
+    Task<HashSet<Guid>> GetExistingMediaIdsAsync(IReadOnlyCollection<Guid> mediaIds);
 
     Task<bool> IsPlaylistOwnerAsync(Guid playlistId, Guid profileId);
     Task<int> GetMaxItemOrderAsync(Guid playlistId);

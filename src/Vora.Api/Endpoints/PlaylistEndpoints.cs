@@ -119,8 +119,14 @@ public static class PlaylistEndpoints
     private static async Task<IResult> GetPlaylistsContainingAsync(Guid mediaId, ClaimsPrincipal user, IPlaylistManager manager) =>
         Results.Ok(await manager.GetPlaylistsContainingItemAsync(RequireProfileId(user), mediaId));
 
-    private static async Task<IResult> CreatePlaylistAsync([FromBody] CreatePlaylistRequest req, ClaimsPrincipal user, IPlaylistManager manager) =>
-        Results.Ok(new CreatePlaylistResponse { Id = await manager.CreatePlaylistAsync(RequireProfileId(user), req.Name, req.Description, req.MediaType) });
+    private static async Task<IResult> CreatePlaylistAsync([FromBody] CreatePlaylistRequest req, ClaimsPrincipal user, IPlaylistManager manager)
+    {
+        var profileId = RequireProfileId(user);
+        var id = req.MediaItemIds is { Count: > 0 } items
+            ? await manager.CreatePlaylistWithItemsAsync(profileId, req.Name, req.Description, req.MediaType, items)
+            : await manager.CreatePlaylistAsync(profileId, req.Name, req.Description, req.MediaType);
+        return Results.Ok(new CreatePlaylistResponse { Id = id });
+    }
 
     private static async Task<IResult> AddItemAsync(Guid id, Guid mediaId, ClaimsPrincipal user, IPlaylistManager manager)
     {

@@ -7,9 +7,11 @@ import type { LyricsVM } from '../../api/Music/musicService';
 
 const getTrackLyrics = vi.fn<(trackId: string, serverId?: string) => Promise<LyricsVM | null>>();
 const addToPlaylist = vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
+const createPlaylistFromQueue = vi.fn<(name: string, ids: string[], serverId?: string) => Promise<{ id: string }>>(() => Promise.resolve({ id: 'new' }));
+const prompt = vi.fn<() => Promise<string | null>>(() => Promise.resolve(null));
 
 vi.mock('../../dialogs', () => ({
-    useDialog: () => ({ alert: () => Promise.resolve(), confirm: () => Promise.resolve(true), prompt: () => Promise.resolve(null) }),
+    useDialog: () => ({ alert: () => Promise.resolve(), confirm: () => Promise.resolve(true), prompt: () => prompt() }),
 }));
 
 // jsdom has no scrollTo on elements; the synced-lyrics auto-scroll calls it.
@@ -20,6 +22,7 @@ vi.mock('../../api/Collections/playlistService', () => ({
         getPlaylists: () => Promise.resolve([{ id: 'pl-1', name: 'Road Trip', mediaType: 'Music', itemCount: 4, posterUrls: [], backdropUrls: [] }]),
         getPlaylistsContainingItem: () => Promise.resolve([]),
         addToPlaylist: (...args: unknown[]) => addToPlaylist(...args),
+        createPlaylistFromQueue: (name: string, ids: string[], serverId?: string) => createPlaylistFromQueue(name, ids, serverId),
         removeMediaFromPlaylist: () => Promise.resolve(),
     },
 }));
@@ -230,5 +233,18 @@ Line two`, syncedLyrics: null, isSynced: false, providerName: 'Genius', sourceUr
 
         const panel = await screen.findByTestId('lyrics-panel');
         expect(panel.className).toContain('overflow-y-auto');
+    });
+
+    it('saves the songs in the queue as a playlist, in queue order', async () => {
+        getTrackLyrics.mockResolvedValue(null);
+        prompt.mockResolvedValueOnce('Saturday queue');
+        const next: PlayableMedia = { ...track, id: 'all-the-small-things', title: 'All the Small Things' };
+        const podcast: PlayableMedia = { ...track, id: 'episode', title: 'An episode', playbackContextType: 'Podcast' };
+        renderScreen(player({ queue: [track, next, podcast] }));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Queue' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save as playlist' }));
+
+        await waitFor(() => expect(createPlaylistFromQueue).toHaveBeenCalledWith('Saturday queue', ['carousel', 'all-the-small-things'], undefined));
     });
 });

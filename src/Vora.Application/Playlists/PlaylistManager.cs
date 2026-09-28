@@ -13,6 +13,7 @@ public interface IPlaylistManager
     Task<Guid?> CopyPlaylistAsync(Guid sourceId, Guid viewerProfileId, PlaylistAccessFilter access);
     Task<Guid> CreatePlaylistAsync(Guid profileId, string name, string? description, PlaylistMediaType mediaType);
     Task<Guid> CreatePlaylistFromMediaAsync(Guid profileId, string name, string? description, PlaylistMediaType mediaType, IReadOnlyList<Guid> mediaIds);
+    Task<Guid> CreatePlaylistWithItemsAsync(Guid profileId, string name, string? description, PlaylistMediaType mediaType, IReadOnlyList<Guid> mediaIds);
     Task AddToPlaylistAsync(Guid playlistId, Guid profileId, Guid mediaItemId);
     Task RemoveFromPlaylistAsync(Guid playlistId, Guid profileId, Guid playlistItemId);
     Task ReorderPlaylistAsync(Guid playlistId, Guid profileId, List<Guid> itemIds);
@@ -70,6 +71,12 @@ public class PlaylistManager : IPlaylistManager
             Items = mediaIds.Distinct().Select((id, i) => new PlaylistItem { MediaItemId = id, Order = i + 1 }).ToList()
         };
         return await _repository.CreatePlaylistAsync(playlist);
+    }
+
+    public async Task<Guid> CreatePlaylistWithItemsAsync(Guid profileId, string name, string? description, PlaylistMediaType mediaType, IReadOnlyList<Guid> mediaIds)
+    {
+        var existing = await _repository.GetExistingMediaIdsAsync(mediaIds);
+        return await CreatePlaylistFromMediaAsync(profileId, name, description, mediaType, mediaIds.Where(existing.Contains).ToList());
     }
 
     public async Task AddToPlaylistAsync(Guid playlistId, Guid profileId, Guid mediaItemId)
