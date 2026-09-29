@@ -1,6 +1,8 @@
+import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import type { NavItem } from '../MainLayout';
 import { renderNavIcon } from './navIcons';
+import { dropIndex } from '../../utils/navOrder';
 
 interface MainLayoutSidebarProps {
     navItems: NavItem[];
@@ -10,7 +12,7 @@ interface MainLayoutSidebarProps {
     showUnpinned: boolean;
     onToggleEditNav: (editing: boolean) => void;
     onToggleShowUnpinned: () => void;
-    onMoveItem: (index: number, direction: 'up' | 'down') => void;
+    onMoveItem: (from: number, to: number) => void;
     onTogglePin: (id: string, itemServerId?: string) => void;
 }
 
@@ -30,6 +32,32 @@ export default function MainLayoutSidebar({
     onMoveItem,
     onTogglePin,
 }: MainLayoutSidebarProps) {
+    const [dragIndex, setDragIndex] = useState<number | null>(null);
+    const [drop, setDrop] = useState<{ over: number; after: boolean } | null>(null);
+    const refocusKey = useRef<string | null>(null);
+    const handles = useRef(new Map<string, HTMLButtonElement>());
+
+    const keyOf = (item: NavItem) => `${item.serverId || 'local'}-${item.id}`;
+
+    useEffect(() => {
+        if (!refocusKey.current) return;
+        handles.current.get(refocusKey.current)?.focus();
+        refocusKey.current = null;
+    }, [navItems]);
+
+    const endDrag = () => {
+        setDragIndex(null);
+        setDrop(null);
+    };
+
+    const moveWithKeyboard = (e: React.KeyboardEvent, item: NavItem, index: number) => {
+        const to = e.key === 'ArrowUp' ? index - 1 : e.key === 'ArrowDown' ? index + 1 : null;
+        if (to === null || to < 0 || to >= navItems.length) return;
+        e.preventDefault();
+        refocusKey.current = keyOf(item);
+        onMoveItem(index, to);
+    };
+
     return (
         <div
             className="z-20 flex w-64 flex-col transition-all duration-300"
@@ -169,24 +197,69 @@ export default function MainLayoutSidebar({
                     >
                         Manage sidebar
                     </div>
-                    <div className="flex-1 space-y-1 overflow-y-auto p-2">
+                    <p className="px-4 pt-3 text-xs" style={{ color: 'var(--vora-text-disabled)' }}>Drag to reorder. Pin to show in the sidebar.</p>
+                    <div className="flex-1 space-y-1 overflow-y-auto p-2" onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop(null); }}>
                         {navItems.map((item, index) => {
                             const icon = renderNavIcon(item.type === 'library' ? item.mediaType : item.id, 'w-4 h-4');
+                            const key = keyOf(item);
+                            const showLine = drop !== null && dragIndex !== null && drop.over === index && dropIndex(dragIndex, index, drop.after) !== dragIndex;
                             return (
                                 <div
-                                    key={`${item.serverId || 'local'}-${item.id}`}
-                                    className="group flex items-center justify-between rounded-md p-2 transition-colors"
-                                    style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
+                                    key={key}
+                                    data-testid={`nav-row-${item.id}`}
+                                    draggable
+                                    onDragStart={e => {
+                                        e.dataTransfer.effectAllowed = 'move';
+                                        e.dataTransfer.setData('text/plain', key);
+                                        setDragIndex(index);
+                                    }}
+                                    onDragOver={e => {
+                                        if (dragIndex === null) return;
+                                        e.preventDefault();
+                                        e.dataTransfer.dropEffect = 'move';
+                                        const box = e.currentTarget.getBoundingClientRect();
+                                        const after = e.clientY > box.top + box.height / 2;
+                                        if (drop?.over !== index || drop.after !== after) setDrop({ over: index, after });
+                                    }}
+                                    onDrop={e => {
+                                        e.preventDefault();
+                                        if (dragIndex !== null && drop !== null) {
+                                            const to = dropIndex(dragIndex, drop.over, drop.after);
+                                            if (to !== dragIndex) onMoveItem(dragIndex, to);
+                                        }
+                                        endDrag();
+                                    }}
+                                    onDragEnd={endDrag}
+                                    className="group relative flex cursor-grab items-center justify-between rounded-md p-2 transition-colors active:cursor-grabbing"
+                                    style={{
+                                        background: 'var(--vora-bg-sunken)',
+                                        border: '1px solid var(--vora-border-subtle)',
+                                        opacity: dragIndex === index ? 0.4 : 1,
+                                    }}
                                 >
+                                    {showLine && (
+                                        <span
+                                            aria-hidden="true"
+                                            className="pointer-events-none absolute left-1 right-1 h-0.5 rounded-full"
+                                            style={{ background: 'var(--vora-accent-500)', [drop.after ? 'bottom' : 'top']: -3 }}
+                                        />
+                                    )}
                                     <div className="flex items-center gap-2">
-                                        <div className="flex flex-col" style={{ color: 'var(--vora-text-disabled)' }}>
-                                            <button type="button" onClick={() => onMoveItem(index, 'up')} disabled={index === 0} className="cursor-pointer p-0.5 hover:text-[var(--vora-text-primary)] disabled:opacity-30">
-                                                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24"><path d="M5 15l7-7 7 7" /></svg>
-                                            </button>
-                                            <button type="button" onClick={() => onMoveItem(index, 'down')} disabled={index === navItems.length - 1} className="cursor-pointer p-0.5 hover:text-[var(--vora-text-primary)] disabled:opacity-30">
-                                                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" /></svg>
-                                            </button>
-                                        </div>
+                                        <button
+                                            type="button"
+                                            ref={node => { if (node) handles.current.set(key, node); else handles.current.delete(key); }}
+                                            onKeyDown={e => moveWithKeyboard(e, item, index)}
+                                            aria-label={`Move ${item.title}. Use the up and down arrow keys.`}
+                                            title="Drag to reorder"
+                                            className="vora-icon-button cursor-grab rounded p-0.5"
+                                            style={{ color: 'var(--vora-text-disabled)' }}
+                                        >
+                                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                <circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" />
+                                                <circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" />
+                                                <circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" />
+                                            </svg>
+                                        </button>
                                         <div className="flex w-4 shrink-0 justify-center" style={{ color: item.isPinned ? 'var(--vora-text-secondary)' : 'var(--vora-text-disabled)' }}>
                                             {icon}
                                         </div>
