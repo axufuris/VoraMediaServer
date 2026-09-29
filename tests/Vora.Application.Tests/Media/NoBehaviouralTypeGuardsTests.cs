@@ -32,13 +32,6 @@ public class NoBehaviouralTypeGuardsTests
     // exemption with it.
     private static readonly IReadOnlyDictionary<string, string> Allowed = new Dictionary<string, string>
     {
-        // GetMediaIdsMissingMetadataAsync asks which FIELDS make each type
-        // incomplete, and the answer differs per type: a film wants a release
-        // date and a cast, an episode wants neither. That is a per-type rule like
-        // the overlay sweep's template lookup, not one capability wearing a set
-        // of class names — and it sits inside an OR branch, so it could not be
-        // hoisted into its own Where even if it were.
-        ["((m is Movie || m is TvShow) &&"] = "per-type field-completeness rules inside an OR branch",
     };
 
     private static DirectoryInfo SourceRoot()

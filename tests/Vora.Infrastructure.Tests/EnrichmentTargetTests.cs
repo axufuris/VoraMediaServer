@@ -91,4 +91,70 @@ public class EnrichmentTargetTests
         (await repo.GetMediaIdsMissingMetadataAsync(libraryId)).Should().Contain(movie.Id);
         (await repo.GetMediaIdsMissingArtworkAsync(libraryId)).Should().Contain(movie.Id);
     }
+
+    private static (Guid LibraryId, TvShow Show, Season Season) SeedShow(VoraDbContext db)
+    {
+        var libraryId = Guid.NewGuid();
+        db.Set<MediaLibrary>().Add(new MediaLibrary
+        {
+            Id = libraryId,
+            Name = "Shows",
+            Type = LibraryType.TvShow,
+            FolderPaths = new List<string> { "/media/tv" }
+        });
+        var show = new TvShow { Id = Guid.NewGuid(), Title = "Titus", LibraryId = libraryId, PosterUrl = "show.jpg", LastMetadataRefresh = DateTime.UtcNow };
+        var season = new Season { Id = Guid.NewGuid(), Title = "Season 1", SeasonNumber = 1, TvShowId = show.Id, LibraryId = libraryId, PosterUrl = "season.jpg", LastMetadataRefresh = DateTime.UtcNow };
+        db.Set<TvShow>().Add(show);
+        db.Set<Season>().Add(season);
+        db.SaveChanges();
+        return (libraryId, show, season);
+    }
+
+    [Fact]
+    public async Task A_refreshed_episode_is_not_a_metadata_target_even_with_fields_the_provider_never_fills()
+    {
+        using var db = NewContext();
+        var (libraryId, _, season) = SeedShow(db);
+        db.Set<Episode>().Add(new Episode
+        {
+            Id = Guid.NewGuid(),
+            Title = "Pilot",
+            LibraryId = libraryId,
+            SeasonId = season.Id,
+            EpisodeNumber = 1,
+            LastMetadataRefresh = DateTime.UtcNow.AddDays(-400)
+        });
+        db.SaveChanges();
+
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+
+        (await repo.GetMediaIdsMissingMetadataAsync(libraryId)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_new_episode_is_a_metadata_target()
+    {
+        using var db = NewContext();
+        var (libraryId, _, season) = SeedShow(db);
+        var episode = new Episode { Id = Guid.NewGuid(), Title = "Pilot", LibraryId = libraryId, SeasonId = season.Id, EpisodeNumber = 1 };
+        db.Set<Episode>().Add(episode);
+        db.SaveChanges();
+
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+
+        (await repo.GetMediaIdsMissingMetadataAsync(libraryId)).Should().BeEquivalentTo(new[] { episode.Id });
+    }
+
+    [Fact]
+    public async Task A_show_with_a_season_missing_its_poster_is_a_metadata_target()
+    {
+        using var db = NewContext();
+        var (libraryId, show, season) = SeedShow(db);
+        season.PosterUrl = null;
+        db.SaveChanges();
+
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+
+        (await repo.GetMediaIdsMissingMetadataAsync(libraryId)).Should().Contain(new[] { show.Id, season.Id });
+    }
 }
