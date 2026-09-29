@@ -19,6 +19,7 @@ import MainLayoutSidebar from './parts/MainLayoutSidebar';
 import MainLayoutUserMenu from './parts/MainLayoutUserMenu';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import type { FeatureFlagsVM } from '../api/System/featureFlagsService';
+import { moveNavItem } from '../utils/navOrder';
 
 const isNavItemEnabled = (item: NavItem, flags: FeatureFlagsVM): boolean => {
     if (item.type !== 'system') return true;
@@ -263,19 +264,9 @@ export default function MainLayout() {
         saveNavPrefs(updated);
     };
 
-    const moveItem = (index: number, direction: 'up' | 'down') => {
-        if (direction === 'up' && index === 0) return;
-        if (direction === 'down' && index === navItems.length - 1) return;
-
-        const updated = [...navItems];
-        const swapIndex = direction === 'up' ? index - 1 : index + 1;
-
-        const tempOrder = updated[index].order;
-        updated[index].order = updated[swapIndex].order;
-        updated[swapIndex].order = tempOrder;
-
-        updated.sort((a, b) => a.order - b.order).forEach((m, i) => m.order = i);
-        saveNavPrefs(updated);
+    const moveItem = (from: number, to: number) => {
+        if (from === to) return;
+        saveNavPrefs(moveNavItem(navItems, from, to));
     };
 
     useEffect(() => {
