@@ -566,11 +566,13 @@ works.
 ### Thanks to the Kometa team
 
 The overlay badge images Vora uses come from the
-[Kometa](https://kometa.wiki) project and are used with the Kometa
+[Kometa](https://kometa.wiki/) project and are used with the Kometa
 team's permission. A big thank you to the whole
 [Kometa team](https://github.com/Kometa-Team) for their work and for
 letting Vora use it, and a special thanks to **Sohjiro** and
 **Bullmoose**.
+
+Learn more about Kometa at <https://kometa.wiki/>.
 
 ## Versions and releases
 
