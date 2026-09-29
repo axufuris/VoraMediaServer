@@ -548,6 +548,32 @@ already saved a value through the admin UI, you can clear it in the
 UI to let the env var take effect on the next start, or just continue
 to manage it through the UI from then on.
 
+## Poster overlays
+
+Vora can add badges to your posters and episode thumbnails: resolution
+(4K, HDR, Dolby Vision…), audio codec, content rating, edition
+(Director's Cut, Extended…), a post-credits "stinger" tag, and a cluster
+of ratings. Design the layout in **Admin → Poster Overlays**, with a
+template each for movie, TV show and season posters (2:3) and episode
+thumbnails (16:9).
+Vora applies it after a library is scanned and analysed, and can also
+run on a schedule through the **Vora Native Overlays** plugin
+(`local_imagesharp_overlays`: `enable_schedule`, `schedule_time`).
+Deleting a template puts the posters back as they were. See
+[`docs/artwork-image-cache.md`](docs/artwork-image-cache.md) for how it
+works.
+
+### Thanks to the Kometa team
+
+The overlay badge images Vora uses come from the
+[Kometa](https://kometa.wiki/) project and are used with the Kometa
+team's permission. A big thank you to the whole
+[Kometa team](https://github.com/Kometa-Team) for their work and for
+letting Vora use it, and a special thanks to **Sohjiro** and
+**Bullmoose**.
+
+Learn more about Kometa at <https://kometa.wiki/>.
+
 ## Versions and releases
 
 Vora follows [semantic versioning](https://semver.org). Released images are
