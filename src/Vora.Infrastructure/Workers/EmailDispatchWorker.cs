@@ -72,7 +72,7 @@ public class EmailDispatchWorker : BackgroundService
             catch (Exception ex)
             {
                 lastError = ex;
-                _logger.LogWarning(ex, "Email send attempt {Attempt}/{Max} failed for {Template} to {To}", attempt, attempts, email.TemplateKey, email.ToAddress);
+                _logger.LogWarning(ex, "Email send attempt {Attempt}/{Max} failed (delivery log {LogId})", attempt, attempts, email.LogId);
 
                 if (attempt >= attempts) break;
 

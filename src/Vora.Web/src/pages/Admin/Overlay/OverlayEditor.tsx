@@ -292,15 +292,24 @@ export default function OverlayEditor() {
         }]);
     };
 
+    const knownPreviewPath = (type: BadgeType, imagePath: string) =>
+        PREVIEW_OPTIONS[type].find(option => option.path === imagePath)?.path;
+
     const updateElementPreview = (id: string, imagePath: string) => {
-        setElements(elements.map(el => el.id === id ? { ...el, previewImage: imagePath } : el));
+        setElements(elements.map(el => {
+            if (el.id !== id) return el;
+            const path = knownPreviewPath(el.type as BadgeType, imagePath);
+            return path ? { ...el, previewImage: path } : el;
+        }));
     };
 
     const updateCompositePreview = (id: string, slotIndex: number, imagePath: string) => {
+        const path = knownPreviewPath('critic_rating', imagePath);
+        if (!path) return;
         setElements(elements.map(el => {
             if (el.id !== id || !el.previewImages) return el;
             const newImages = [...el.previewImages];
-            newImages[slotIndex] = imagePath;
+            newImages[slotIndex] = path;
             return { ...el, previewImages: newImages };
         }));
     };

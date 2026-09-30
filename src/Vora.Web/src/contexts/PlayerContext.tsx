@@ -6,6 +6,7 @@ import { serverVault } from '../utils/serverVault';
 import { audioQualityStore, crossfadeStore, eqPresetStore, EQ_PRESETS } from '../utils/audioQuality';
 import { StorageKeys } from '../utils/storageKeys';
 import { usesNowPlayingScreen } from '../utils/nowPlayingScreen';
+import { safeMediaUrl } from '../utils/safeUrl';
 import { playQualifies } from '../utils/playQualification';
 import { useDialog } from '../dialogs';
 import {
@@ -332,10 +333,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
         musicService.resolveTrackStreamUrl(nextItem.id, baseUrl, audioQualityStore.get(), nextItem.serverId)
             .then((url) => {
-                if (preloadedUrlRef.current !== nextItem.id) return;
-                preloadedTrackUrlRef.current = { id: nextItem.id, url };
+                const safeUrl = safeMediaUrl(url);
+                if (preloadedUrlRef.current !== nextItem.id || !safeUrl) return;
+                preloadedTrackUrlRef.current = { id: nextItem.id, url: safeUrl };
                 try {
-                    el.src = url;
+                    el.src = safeUrl;
                     el.load();
                 } catch {
                     /* ignore */

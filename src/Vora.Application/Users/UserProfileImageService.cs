@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vora.Application.FileSystem;
+using Vora.Application.Logging;
 using Vora.Application.Settings;
 
 namespace Vora.Application.Users;
@@ -88,7 +89,7 @@ public class UserProfileImageService : IUserProfileImageService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to delete profile image at {ImageUrl}.", imageUrl);
+            _logger.LogWarning(ex, "Failed to delete profile image at {ImageUrl}.", LogValue.SingleLine(imageUrl));
         }
     }
 }
