@@ -24,6 +24,7 @@ import { placeCues } from '../../utils/subtitleCuePlacement';
 import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { ScrubThumbnail } from './VideoScrubThumbnails';
 import { seasonEpisodeLabel } from '../../utils/seasonLabel';
+import { safeMediaUrl } from '../../utils/safeUrl';
 
 type VideoTrackType = NonNullable<MediaPart['videoTracks']>[number];
 type AudioTrackType = NonNullable<MediaPart['audioTracks']>[number];
@@ -346,12 +347,13 @@ export default function GlobalVideoPlayer() {
 
     useEffect(() => {
         const video = videoRef.current;
-        if (!video || !currentMedia?.streamUrl) return;
+        const streamUrl = safeMediaUrl(currentMedia?.streamUrl);
+        if (!video || !streamUrl || !currentMedia?.streamUrl) return;
 
         let hls: Hls | null = null;
         let cancelled = false;
 
-        if (currentMedia.container === 'hls' || currentMedia.strategy === 'Transcode' || currentMedia.streamUrl.includes('.m3u8')) {
+        if (currentMedia.container === 'hls' || currentMedia.strategy === 'Transcode' || streamUrl.includes('.m3u8')) {
             (async () => {
                 const HlsClass = await loadHls();
                 if (cancelled) return;
@@ -363,7 +365,7 @@ export default function GlobalVideoPlayer() {
                     });
                     if (cancelled) { instance.destroy(); return; }
 
-                    instance.loadSource(currentMedia.streamUrl!);
+                    instance.loadSource(streamUrl);
                     instance.attachMedia(video);
                     instance.on(HlsClass.Events.MANIFEST_PARSED, () => {
                         video.play().catch(e => console.error('Auto-play blocked:', e));
@@ -381,14 +383,14 @@ export default function GlobalVideoPlayer() {
 
                     hls = instance;
                 } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                    video.src = currentMedia.streamUrl!;
+                    video.src = streamUrl;
                     video.addEventListener('loadedmetadata', () => {
                         video.play().catch(e => console.error('Auto-play blocked:', e));
                     });
                 }
             })();
         } else {
-            video.src = currentMedia.streamUrl;
+            video.src = streamUrl;
             video.play().catch(e => console.error('Auto-play blocked:', e));
         }
 

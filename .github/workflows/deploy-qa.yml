@@ -13,6 +13,9 @@ concurrency:
   group: deploy-qa
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/vora-media-server

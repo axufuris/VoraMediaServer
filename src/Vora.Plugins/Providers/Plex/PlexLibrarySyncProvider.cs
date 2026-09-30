@@ -246,7 +246,7 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            _logger.LogWarning("Plex home switch for account {AccountId} returned {StatusCode}: {Body}", accountId, (int)response.StatusCode, body);
+            _logger.LogWarning("Plex home user switch returned {StatusCode}: {Body}", (int)response.StatusCode, body);
 
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized
                 || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
@@ -254,7 +254,7 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
                 throw new InvalidOperationException("The PIN for this user is invalid or missing.");
             }
 
-            _logger.LogInformation("Falling back to admin token for account {AccountId} (switch unavailable).", accountId);
+            _logger.LogInformation("Plex home user switch unavailable; falling back to the admin token.");
             return adminAccessToken;
         }
 
@@ -265,7 +265,7 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         var token = ReadStringProperty(root, "authToken");
         if (string.IsNullOrEmpty(token))
         {
-            _logger.LogWarning("Plex home switch for account {AccountId} returned no authToken; falling back to admin token.", accountId);
+            _logger.LogWarning("Plex home user switch returned no authToken; falling back to the admin token.");
             return adminAccessToken;
         }
 

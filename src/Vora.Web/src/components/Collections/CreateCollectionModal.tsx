@@ -7,6 +7,7 @@ import { emptyDefinition, type SmartPlaylistDefinition } from '../../api/Music/s
 import { useDialog } from '../../dialogs';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../Common/Modal';
 import RuleTreeEditor from '../Common/RuleTreeEditor';
+import { safeMediaUrl } from '../../utils/safeUrl';
 
 const SMART_CONTENT = '__smart__';
 
@@ -406,8 +407,8 @@ export default function CreateCollectionModal({
                         <div className="space-y-3">
                             <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Poster URL</label>
                             <input type="url" value={posterUrl} onChange={e => setPosterUrl(e.target.value)} placeholder="https://…" className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
-                            {posterUrl.trim()
-                                ? <img src={posterUrl} alt="Poster preview" className="w-40 aspect-[2/3] object-cover rounded-md border border-[var(--vora-border-subtle)]" />
+                            {safeMediaUrl(posterUrl)
+                                ? <img src={safeMediaUrl(posterUrl)} alt="Poster preview" className="w-40 aspect-[2/3] object-cover rounded-md border border-[var(--vora-border-subtle)]" />
                                 : <div className="w-40 aspect-[2/3] rounded-md border border-dashed border-[var(--vora-border-subtle)] flex items-center justify-center text-xs text-[var(--vora-text-muted)] text-center p-2">Poster preview</div>}
                             <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">Paste an image URL for the poster. To upload a file or pick from an artwork provider, create the collection first, then edit it.</p>
                         </div>
@@ -417,8 +418,8 @@ export default function CreateCollectionModal({
                         <div className="space-y-3">
                             <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Backdrop URL</label>
                             <input type="url" value={backdropUrl} onChange={e => setBackdropUrl(e.target.value)} placeholder="https://…" className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
-                            {backdropUrl.trim()
-                                ? <img src={backdropUrl} alt="Backdrop preview" className="w-full max-w-md aspect-video object-cover rounded-md border border-[var(--vora-border-subtle)]" />
+                            {safeMediaUrl(backdropUrl)
+                                ? <img src={safeMediaUrl(backdropUrl)} alt="Backdrop preview" className="w-full max-w-md aspect-video object-cover rounded-md border border-[var(--vora-border-subtle)]" />
                                 : <div className="w-full max-w-md aspect-video rounded-md border border-dashed border-[var(--vora-border-subtle)] flex items-center justify-center text-xs text-[var(--vora-text-muted)]">Backdrop preview</div>}
                             <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">Paste an image URL for the backdrop. To upload a file or pick from an artwork provider, create the collection first, then edit it.</p>
                         </div>

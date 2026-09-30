@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
+using Vora.Application.Logging;
 
 namespace Vora.Api.Middleware;
 
@@ -35,11 +36,11 @@ public class VoraGlobalExceptionHandler : IExceptionHandler
 
         if (status >= 500)
         {
-            _logger.LogError(exception, "Unhandled exception while processing {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
+            _logger.LogError(exception, "Unhandled exception while processing {Method} {Path}", LogValue.SingleLine(httpContext.Request.Method), LogValue.SingleLine(httpContext.Request.Path.Value));
         }
         else
         {
-            _logger.LogWarning(exception, "Request failed: {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
+            _logger.LogWarning(exception, "Request failed: {Method} {Path}", LogValue.SingleLine(httpContext.Request.Method), LogValue.SingleLine(httpContext.Request.Path.Value));
         }
 
         httpContext.Response.StatusCode = status;

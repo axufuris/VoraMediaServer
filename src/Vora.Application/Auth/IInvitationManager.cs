@@ -136,7 +136,7 @@ public class InvitationManager : IInvitationManager
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to enqueue invitation email for {Email}", normalized);
+            _logger.LogError(ex, "Failed to enqueue invitation email for invitation {InvitationId}", ticket.Id);
             errorMessage = ex.Message;
         }
 

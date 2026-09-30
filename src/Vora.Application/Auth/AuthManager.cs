@@ -145,7 +145,7 @@ public class AuthManager(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to register invited user {Email}", normalizedEmail);
+                logger.LogError(ex, "Failed to register an invited user");
                 throw;
             }
 
@@ -194,7 +194,7 @@ public class AuthManager(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to register user {Email}", normalizedEmail);
+            logger.LogError(ex, "Failed to register a user");
             throw;
         }
 
@@ -223,7 +223,7 @@ public class AuthManager(
 
         var user = BuildUser(normalizedEmail, password, name, isAdmin: false);
         await repository.AddUserAsync(user);
-        logger.LogInformation("Admin created account {Email}", normalizedEmail);
+        logger.LogInformation("Admin created account {UserId}", user.Id);
         return AdminCreateUserResult.Created(user.Id);
     }
 
@@ -243,7 +243,7 @@ public class AuthManager(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to claim server with admin email {Email}", email);
+            logger.LogError(ex, "Failed to claim the server");
             throw;
         }
 
@@ -537,14 +537,14 @@ public class AuthManager(
 
         if (!TryRecordResetThrottle(normalizedEmail))
         {
-            logger.LogInformation("Password reset request throttled for {Email}", normalizedEmail);
+            logger.LogInformation("Password reset request throttled");
             return;
         }
 
         var settings = await settingsRepo.GetSettingsAsync();
         if (!settings.EmailEnabled)
         {
-            logger.LogDebug("Password reset requested for {Email} but email is disabled; ignoring", normalizedEmail);
+            logger.LogDebug("Password reset requested but email is disabled; ignoring");
             return;
         }
 
@@ -585,7 +585,7 @@ public class AuthManager(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to enqueue password reset email for {Email}", normalizedEmail);
+            logger.LogError(ex, "Failed to enqueue password reset email for user {UserId}", user.Id);
         }
     }
 
