@@ -67,7 +67,7 @@ public class EmailService : IEmailService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Immediate email send failed for template {Template} (delivery log {LogId})", queued.TemplateKey, queued.LogId);
+            _logger.LogWarning(ex, "Immediate email send failed (delivery log {LogId})", queued.LogId);
             await _logRepo.UpdateAsync(queued.LogId, EmailDeliveryStatus.Failed, attemptCount: 1, errorMessage: ex.Message, sentAt: null, cancellationToken);
             return EmailSendResult.Failed(ex.Message, queued.LogId);
         }
