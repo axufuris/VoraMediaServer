@@ -655,24 +655,9 @@ public partial class MediaRepository : IMediaRepository
                 (
                     m.LastMetadataRefresh == null
                     ||
-                    ((m is Movie || m is TvShow) &&
-                     (m.TmdbId == null ||
-                      m.PosterUrl == null ||
-                      m.BackgroundUrl == null ||
-                      m.Overview == null ||
-                      m.ReleaseDate == null ||
-                      m.ContentRating == null ||
-                      !m.Genres.Any() ||
-                      !m.Cast.Any()))
+                    (m is Season && (m.PosterUrl == null || m.PosterUrl == ""))
                     ||
-                    (m is Episode &&
-                     (m.TmdbId == null ||
-                      m.Overview == null ||
-                      m.PosterUrl == null ||
-                      m.BackgroundUrl == null ||
-                      m.ReleaseDate == null))
-                    ||
-                    (m is Season && m.PosterUrl == null)
+                    (m is TvShow && ((TvShow)m).Seasons.Any(s => s.MissingSince == null && (s.PosterUrl == null || s.PosterUrl == "")))
                 ))
             .OrderBy(m => m is TvShow ? 0 : m is Movie ? 0 : m is Season ? 1 : 2)
             .Select(m => m.Id)
