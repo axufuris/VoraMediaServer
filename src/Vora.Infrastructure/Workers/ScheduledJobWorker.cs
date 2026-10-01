@@ -19,19 +19,17 @@ public class ScheduledJobWorker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<ScheduledJobWorker> _logger;
 
-    private DateTime _lastNightlyScanDate = DateTime.MinValue.Date;
-    private DateTime _lastSilenceDetectionDate = DateTime.MinValue.Date;
-    private DateTime _lastChronologySyncDate = DateTime.MinValue.Date;
-    private DateTime _lastContentSyncDate = DateTime.MinValue.Date;
-    private DateTime _lastAiEmbedDate = DateTime.MinValue.Date;
-    private DateTime _lastOverlaySyncDate = DateTime.MinValue.Date;
-    private DateTime _lastIptvSyncDate = DateTime.MinValue.Date;
-    private DateTime _lastIptvHealthCheckDate = DateTime.MinValue.Date;
-    private DateTime _lastVideoThumbnailDate = DateTime.MinValue.Date;
-    private DateTime _lastTrashPurgeDate = DateTime.MinValue.Date;
-    private DateTime _lastMusicPopularityDate = DateTime.MinValue.Date;
-
-    private bool _startupCatchUpDone = false;
+    private readonly DailyScheduleGate _nightlyScan = new();
+    private readonly DailyScheduleGate _silenceDetection = new();
+    private readonly DailyScheduleGate _chronologySync = new();
+    private readonly DailyScheduleGate _contentSync = new();
+    private readonly DailyScheduleGate _aiEmbed = new();
+    private readonly DailyScheduleGate _overlaySync = new();
+    private readonly DailyScheduleGate _iptvSync = new();
+    private readonly DailyScheduleGate _iptvHealthCheck = new();
+    private readonly DailyScheduleGate _videoThumbnails = new();
+    private readonly DailyScheduleGate _trashPurge = new();
+    private readonly DailyScheduleGate _musicPopularity = new();
 
     private int _scannerFrequency = 5;
 
@@ -91,8 +89,6 @@ public class ScheduledJobWorker : BackgroundService
         // own night; a container with no TZ set would otherwise compare them
         // against UTC.
         var now = ScheduleClock.Now(settings.ScheduleTimeZone, DateTime.UtcNow);
-        var timeOfDay = now.TimeOfDay;
-        var today = now.Date;
 
         var aiScheduleStr = await settingsRepo.GetPluginSettingAsync("openai_recommendations", "schedule_time");
         var aiParsed = TimeSpan.TryParse(string.IsNullOrWhiteSpace(aiScheduleStr) ? "02:00" : aiScheduleStr, out var aiTime);
@@ -100,26 +96,7 @@ public class ScheduledJobWorker : BackgroundService
         var overlayScheduleStr = await settingsRepo.GetPluginSettingAsync("local_imagesharp_overlays", "schedule_time");
         var overlayParsed = TimeSpan.TryParse(string.IsNullOrWhiteSpace(overlayScheduleStr) ? "03:00" : overlayScheduleStr, out var overlayTime);
 
-        // First check after startup: don't retroactively fire daily jobs whose
-        // scheduled time already passed today — that made every restart re-run a
-        // storm of scans/overlays/EPG syncs. Baseline those as "already handled
-        // today" so they fire at their next scheduled time instead. Jobs whose
-        // time hasn't come yet still run today as normal.
-        if (!_startupCatchUpDone)
-        {
-            _startupCatchUpDone = true;
-            if (timeOfDay >= settings.NightlyScanTime) { _lastNightlyScanDate = today; _lastChronologySyncDate = today; _lastContentSyncDate = today; }
-            if (timeOfDay >= settings.DetectionScheduleTime) _lastSilenceDetectionDate = today;
-            if (aiParsed && timeOfDay >= aiTime) _lastAiEmbedDate = today;
-            if (overlayParsed && timeOfDay >= overlayTime) _lastOverlaySyncDate = today;
-            if (timeOfDay >= settings.IptvSyncTime) _lastIptvSyncDate = today;
-            if (timeOfDay >= settings.IptvHealthCheckTime) _lastIptvHealthCheckDate = today;
-            if (timeOfDay >= settings.VideoThumbnailScheduleTime) _lastVideoThumbnailDate = today;
-            if (timeOfDay >= settings.NightlyScanTime) _lastTrashPurgeDate = today;
-            if (timeOfDay >= settings.NightlyScanTime) _lastMusicPopularityDate = today;
-        }
-
-        if (settings.EnableNightlyScan && timeOfDay >= settings.NightlyScanTime && _lastNightlyScanDate < today)
+        if (_nightlyScan.IsDue(settings.NightlyScanTime, now) && settings.EnableNightlyScan)
         {
             _logger.LogInformation("Triggering Scheduled Nightly Library Scan.");
 
@@ -134,10 +111,10 @@ public class ScheduledJobWorker : BackgroundService
 
             taskQueue.QueueOverlayOrphanSweep();
 
-            _lastNightlyScanDate = today;
+            _nightlyScan.MarkRan(now);
         }
 
-        if (settings.EnableTrashAutoPurge && settings.MissingMediaRetentionDays > 0 && timeOfDay >= settings.NightlyScanTime && _lastTrashPurgeDate < today)
+        if (_trashPurge.IsDue(settings.NightlyScanTime, now) && settings.EnableTrashAutoPurge && settings.MissingMediaRetentionDays > 0)
         {
             var mediaManager = scope.ServiceProvider.GetRequiredService<IMediaManager>();
             var purged = await mediaManager.PurgeExpiredTrashAsync(settings.MissingMediaRetentionDays);
@@ -146,7 +123,7 @@ public class ScheduledJobWorker : BackgroundService
                 _logger.LogInformation("Purged {Count} expired missing media item(s) past the {Days}-day retention window.", purged, settings.MissingMediaRetentionDays);
             }
 
-            _lastTrashPurgeDate = today;
+            _trashPurge.MarkRan(now);
         }
 
         // Daily, but cheap on any day but the first: the refresher only asks about
@@ -154,11 +131,11 @@ public class ScheduledJobWorker : BackgroundService
         // tied to EnableNightlyScan — popularity has nothing to do with whether
         // the library is rescanned, and the refresher is a no-op when no listening
         // provider is configured.
-        if (timeOfDay >= settings.NightlyScanTime && _lastMusicPopularityDate < today)
+        if (_musicPopularity.IsDue(settings.NightlyScanTime, now))
         {
             taskQueue.QueueRefreshMusicPopularity();
             taskQueue.QueueRateMusicContent();
-            _lastMusicPopularityDate = today;
+            _musicPopularity.MarkRan(now);
         }
 
         // Queued before analysis on purpose: the two share the library-maint
@@ -168,7 +145,7 @@ public class ScheduledJobWorker : BackgroundService
         bool shouldRunThumbnails = settings.VideoThumbnailGeneration == Domain.Enums.DetectionTrigger.OnSchedule ||
                                    settings.VideoThumbnailGeneration == Domain.Enums.DetectionTrigger.OnAdditionAndSchedule;
 
-        if (shouldRunThumbnails && timeOfDay >= settings.VideoThumbnailScheduleTime && _lastVideoThumbnailDate < today)
+        if (_videoThumbnails.IsDue(settings.VideoThumbnailScheduleTime, now) && shouldRunThumbnails)
         {
             _logger.LogInformation("Triggering Scheduled Video Thumbnail Generation.");
 
@@ -188,13 +165,13 @@ public class ScheduledJobWorker : BackgroundService
                 taskQueue.QueueGenerateLibraryVideoThumbnails(lib.Id, lib.Name, isScheduleTrigger: true);
             }
 
-            _lastVideoThumbnailDate = today;
+            _videoThumbnails.MarkRan(now);
         }
 
         bool shouldRunDetections = settings.RunDetections == Domain.Enums.DetectionTrigger.OnSchedule ||
                                    settings.RunDetections == Domain.Enums.DetectionTrigger.OnAdditionAndSchedule;
 
-        if (shouldRunDetections && timeOfDay >= settings.DetectionScheduleTime && _lastSilenceDetectionDate < today)
+        if (_silenceDetection.IsDue(settings.DetectionScheduleTime, now) && shouldRunDetections)
         {
             _logger.LogInformation("Triggering Scheduled Silence Detection.");
 
@@ -205,10 +182,10 @@ public class ScheduledJobWorker : BackgroundService
                 taskQueue.QueueAnalyzeLibraryMediaContent(lib.Id, lib.Name, isScheduleTrigger: true);
             }
 
-            _lastSilenceDetectionDate = today;
+            _silenceDetection.MarkRan(now);
         }
 
-        if (settings.EnableNightlyScan && timeOfDay >= settings.NightlyScanTime && _lastChronologySyncDate < today)
+        if (_chronologySync.IsDue(settings.NightlyScanTime, now) && settings.EnableNightlyScan)
         {
             _logger.LogInformation("Triggering Scheduled Chronology Auto-Syncs.");
 
@@ -222,10 +199,10 @@ public class ScheduledJobWorker : BackgroundService
                 }
             }
 
-            _lastChronologySyncDate = today;
+            _chronologySync.MarkRan(now);
         }
 
-        if (settings.EnableNightlyScan && timeOfDay >= settings.NightlyScanTime && _lastContentSyncDate < today)
+        if (_contentSync.IsDue(settings.NightlyScanTime, now) && settings.EnableNightlyScan)
         {
             _logger.LogInformation("Triggering Scheduled Collection Auto-Fills.");
 
@@ -239,10 +216,10 @@ public class ScheduledJobWorker : BackgroundService
                 }
             }
 
-            _lastContentSyncDate = today;
+            _contentSync.MarkRan(now);
         }
 
-        if (aiParsed && timeOfDay >= aiTime && _lastAiEmbedDate < today)
+        if (aiParsed && _aiEmbed.IsDue(aiTime, now))
         {
             var isAiEnabled = await settingsRepo.GetPluginSettingAsync("openai_recommendations", "is_enabled");
             if (isAiEnabled != "false")
@@ -258,10 +235,10 @@ public class ScheduledJobWorker : BackgroundService
                 taskQueue.QueueGenerateAiPlaylists();
             }
 
-            _lastAiEmbedDate = today;
+            _aiEmbed.MarkRan(now);
         }
 
-        if (overlayParsed && timeOfDay >= overlayTime && _lastOverlaySyncDate < today)
+        if (overlayParsed && _overlaySync.IsDue(overlayTime, now))
         {
             var isOverlayEnabledStr = await settingsRepo.GetPluginSettingAsync("local_imagesharp_overlays", "enable_schedule");
 
@@ -276,19 +253,19 @@ public class ScheduledJobWorker : BackgroundService
                 }
             }
 
-            _lastOverlaySyncDate = today;
+            _overlaySync.MarkRan(now);
         }
 
-        if (timeOfDay >= settings.IptvSyncTime && _lastIptvSyncDate < today)
+        if (_iptvSync.IsDue(settings.IptvSyncTime, now))
         {
             _logger.LogInformation("Triggering Scheduled IPTV EPG Sync.");
 
             taskQueue.QueueIptvEpgSync();
 
-            _lastIptvSyncDate = today;
+            _iptvSync.MarkRan(now);
         }
 
-        if (timeOfDay >= settings.IptvHealthCheckTime && _lastIptvHealthCheckDate < today)
+        if (_iptvHealthCheck.IsDue(settings.IptvHealthCheckTime, now))
         {
             var iptvManager = scope.ServiceProvider.GetRequiredService<IIptvManager>();
             var playlists = await iptvManager.GetAllPlaylistsAsync();
@@ -302,7 +279,7 @@ public class ScheduledJobWorker : BackgroundService
                 }
             }
 
-            _lastIptvHealthCheckDate = today;
+            _iptvHealthCheck.MarkRan(now);
         }
 
     }
