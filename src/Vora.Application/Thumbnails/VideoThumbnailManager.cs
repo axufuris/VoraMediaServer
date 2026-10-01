@@ -138,7 +138,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
                 // between items. Showing the item as it starts keeps the "what it's
                 // on" line live.
                 var n = Interlocked.Increment(ref done);
-                _progress.Report($"{ProgressTitle(titles, id)} ({n}/{total})");
+                _progress.Report($"Generating video thumbnails — {ProgressTitle(titles, id)} ({n}/{total})");
 
                 try
                 {
