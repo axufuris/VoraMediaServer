@@ -71,6 +71,7 @@ public class ServerSettingsVM
     public bool EnableAiMusicPlaylists { get; set; }
     public bool EnableAiPlaylistRequests { get; set; } = true;
     public int AiPlaylistRequestsPerDay { get; set; } = 10;
+    public double AiPlaylistMatchCutoff { get; set; } = 0.55;
     public DateTime? WeeklyMixLastRefreshedAt { get; set; }
 
     public string? DvrStoragePath { get; set; }
@@ -153,6 +154,7 @@ public class ServerSettingsVM
             EnableAiMusicPlaylists = s.EnableAiMusicPlaylists,
             EnableAiPlaylistRequests = s.EnableAiPlaylistRequests,
             AiPlaylistRequestsPerDay = s.AiPlaylistRequestsPerDay,
+            AiPlaylistMatchCutoff = s.AiPlaylistMatchCutoff,
             WeeklyMixLastRefreshedAt = s.WeeklyMixLastRefreshedAt,
             DvrStoragePath = s.DvrStoragePath,
             DvrMaxStorageGb = s.DvrMaxStorageGb,

@@ -27,7 +27,7 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
         await context.SaveChangesAsync();
     }
 
-    public Task<List<Guid>> VectorSearchUnwatchedMediaAsync(Guid profileId, Guid? libraryId, float[] searchVector, int limit)
+    public async Task<List<Guid>> VectorSearchUnwatchedMediaAsync(Guid profileId, Guid? libraryId, float[] searchVector, int limit)
     {
         var pgVector = new Pgvector.Vector(searchVector);
 
@@ -44,12 +44,12 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
         query = query.Where(e =>
             !context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == e.MediaItemId && s.IsPlayed));
 
-        return query
+        return await VectorSearch.WideAsync(context, limit * 10, () => query
             .Where(e => e.Embedding!.CosineDistance(pgVector) < CosineDistanceThreshold)
             .OrderBy(e => e.Embedding!.CosineDistance(pgVector))
             .Take(limit)
             .Select(e => e.MediaItemId)
-            .ToListAsync();
+            .ToListAsync());
     }
 
     public Task<List<MediaItemForEmbeddingDto>> GetMediaItemsMissingEmbeddingsAsync(int batchSize) =>

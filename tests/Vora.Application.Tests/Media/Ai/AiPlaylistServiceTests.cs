@@ -38,6 +38,7 @@ public class AiPlaylistServiceTests
             .Returns(_ => Enumerable.Range(0, 40).Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i % 10}", "/art.jpg")).ToList());
         _openAi.EmbedAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns(ci => ci.Arg<IReadOnlyList<string>>().Select(_ => (float[]?)new[] { 0.5f, 0.5f }).ToList());
+        _repo.GetTrackArtAsync(Arg.Any<IReadOnlyCollection<Guid>>()).Returns(new List<AiTrackCandidate>());
     }
 
     private void Server(bool on = true, bool requests = true, int perDay = 10) =>
@@ -131,7 +132,7 @@ public class AiPlaylistServiceTests
         await Service().CreateFromRequestAsync(_me.Id, "road trip", null, CleanOnly, TestContext.Current.CancellationToken);
 
         await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Is<string>(p => p.Contains("from 10 to 60")), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
-        await _repo.Received().FindNearestTracksAsync(Arg.Any<float[]>(), CleanOnly, Arg.Any<AiTrackFilter>(), AiPlaylistService.MaxRequestSongs * 4);
+        await _repo.Received().FindNearestTracksAsync(Arg.Any<float[]>(), CleanOnly, Arg.Any<AiTrackFilter>(), AiPlaylistService.MaxRequestSongs * AiPlaylistService.CandidatesPerSong);
     }
 
     [Theory]
@@ -377,5 +378,179 @@ public class AiPlaylistServiceTests
 
         v[0].Should().BeApproximately(0.7071f, 0.001f);
         v[1].Should().BeApproximately(0.7071f, 0.001f);
+    }
+    [Fact]
+    public void When_two_per_artist_cannot_fill_the_list_each_artist_is_let_in_again()
+    {
+        var candidates = Enumerable.Range(0, 40)
+            .Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i % 5}", null))
+            .ToList();
+
+        var pick = AiPlaylistService.PickVaried(candidates, 18, new HashSet<Guid>());
+
+        pick.Tracks.Should().HaveCount(18);
+        pick.PerArtist.Should().Be(4);
+        pick.Tracks.GroupBy(c => c.ArtistKey).Select(g => g.Count()).Should().OnlyContain(n => n >= 3);
+    }
+
+    [Fact]
+    public void The_per_artist_cap_keeps_rising_until_the_list_is_full()
+    {
+        var candidates = Enumerable.Range(0, 12)
+            .Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i % 2}", null))
+            .ToList();
+
+        var pick = AiPlaylistService.PickVaried(candidates, 10, new HashSet<Guid>());
+
+        pick.Tracks.Should().HaveCount(10);
+        pick.PerArtist.Should().Be(5);
+    }
+
+    [Fact]
+    public void Two_per_artist_still_holds_when_the_pool_is_varied_enough()
+    {
+        var candidates = Enumerable.Range(0, 100)
+            .Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i % 30}", null))
+            .ToList();
+
+        var pick = AiPlaylistService.PickVaried(candidates, 60, new HashSet<Guid>());
+
+        pick.Tracks.Should().HaveCount(60);
+        pick.PerArtist.Should().Be(AiPlaylistService.MaxPerArtist);
+    }
+
+    [Fact]
+    public void Running_out_of_matches_ends_the_list_short()
+    {
+        var candidates = Enumerable.Range(0, 7)
+            .Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i % 3}", null))
+            .ToList();
+
+        var pick = AiPlaylistService.PickVaried(candidates, 25, new HashSet<Guid>());
+
+        pick.Tracks.Should().HaveCount(7);
+    }
+
+    [Fact]
+    public void Picks_keep_the_nearest_first_order()
+    {
+        var candidates = Enumerable.Range(0, 12)
+            .Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i % 2}", null))
+            .ToList();
+
+        var pick = AiPlaylistService.PickVaried(candidates, 6, new HashSet<Guid>());
+
+        pick.Tracks.Select(c => candidates.IndexOf(c)).Should().BeInAscendingOrder();
+    }
+
+    [Fact]
+    public void Songs_already_used_by_another_playlist_are_skipped()
+    {
+        var candidates = Enumerable.Range(0, 10)
+            .Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i}", null))
+            .ToList();
+        var used = new HashSet<Guid> { candidates[0].TrackId, candidates[1].TrackId };
+
+        var pick = AiPlaylistService.PickVaried(candidates, 5, used);
+
+        pick.Tracks.Should().NotContain(c => c.TrackId == candidates[0].TrackId || c.TrackId == candidates[1].TrackId);
+        used.Should().HaveCount(7);
+    }
+
+    [Fact]
+    public void Songs_past_the_cutoff_are_dropped()
+    {
+        var nearestFirst = new[] { 0.45, 0.50, 0.55, 0.551, 0.60 }
+            .Select(d => new AiTrackCandidate(Guid.NewGuid(), "a", null, d));
+
+        AiPlaylistService.WithinCutoff(nearestFirst, 0.55).Select(c => c.Distance).Should().Equal(0.45, 0.50, 0.55);
+    }
+
+    [Fact]
+    public async Task A_request_the_library_cannot_fill_comes_back_short_not_padded()
+    {
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>()).Returns(RequestJson);
+        _repo.FindNearestTracksAsync(Arg.Any<float[]>(), Arg.Any<MusicAccessFilter>(), Arg.Any<AiTrackFilter>(), Arg.Any<int>())
+            .Returns(_ => Enumerable.Range(0, 40).Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i % 10}", null, i < 12 ? 0.5 : 0.62)).ToList());
+        GeneratedMix? saved = null;
+        await _repo.AddRequestAsync(Arg.Do<GeneratedMix>(m => saved = m), Arg.Any<int>());
+
+        var result = await Service().CreateFromRequestAsync(_me.Id, "anything", null, CleanOnly, TestContext.Current.CancellationToken);
+
+        result.Outcome.Should().Be(AiOutcome.Made);
+        saved!.TrackOrder.Should().HaveCount(12);
+    }
+
+    [Fact]
+    public async Task A_request_with_almost_nothing_close_enough_is_nothing_found()
+    {
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>()).Returns(RequestJson);
+        _repo.FindNearestTracksAsync(Arg.Any<float[]>(), Arg.Any<MusicAccessFilter>(), Arg.Any<AiTrackFilter>(), Arg.Any<int>())
+            .Returns(_ => Enumerable.Range(0, 40).Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i}", null, i < 3 ? 0.5 : 0.65)).ToList());
+
+        var result = await Service().CreateFromRequestAsync(_me.Id, "jazz for dinner", null, CleanOnly, TestContext.Current.CancellationToken);
+
+        result.Outcome.Should().Be(AiOutcome.NothingFound);
+        await _repo.DidNotReceive().AddRequestAsync(Arg.Any<GeneratedMix>(), Arg.Any<int>());
+    }
+
+    [Fact]
+    public async Task The_cutoff_comes_from_the_server_setting()
+    {
+        _settings.GetSettingsAsync().Returns(new ServerSetting { EnableAiMusicPlaylists = true, EnableForYou = true, EnableAiPlaylistRequests = true, AiPlaylistRequestsPerDay = 10, AiPlaylistMatchCutoff = 0.65 });
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>()).Returns(RequestJson);
+        _repo.FindNearestTracksAsync(Arg.Any<float[]>(), Arg.Any<MusicAccessFilter>(), Arg.Any<AiTrackFilter>(), Arg.Any<int>())
+            .Returns(_ => Enumerable.Range(0, 40).Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i % 10}", null, i < 12 ? 0.5 : 0.62)).ToList());
+        GeneratedMix? saved = null;
+        await _repo.AddRequestAsync(Arg.Do<GeneratedMix>(m => saved = m), Arg.Any<int>());
+
+        await Service().CreateFromRequestAsync(_me.Id, "anything", null, CleanOnly, TestContext.Current.CancellationToken);
+
+        saved!.TrackOrder.Should().HaveCount(20);
+    }
+
+    [Fact]
+    public async Task An_ai_playlist_cover_is_a_mosaic_of_different_artists_covers()
+    {
+        var tracks = Enumerable.Range(0, 6).Select(_ => Guid.NewGuid()).ToList();
+        var mix = new GeneratedMix { Name = "Cooking Night", Kind = GeneratedMixKind.Requested, ArtworkUrl = "/a.jpg", TrackOrder = tracks };
+        _repo.GetAiMixesAsync(_me.Id).Returns(new List<GeneratedMix> { mix });
+        _repo.GetBlendPartnersAsync(_me.Id).Returns(new List<BlendPartner>());
+        _repo.GetTrackArtAsync(Arg.Any<IReadOnlyCollection<Guid>>()).Returns(new List<AiTrackCandidate>
+        {
+            new(tracks[0], "A", "/a.jpg"),
+            new(tracks[1], "A", "/a2.jpg"),
+            new(tracks[2], "B", "/b.jpg"),
+            new(tracks[3], "C", "/c.jpg"),
+            new(tracks[4], "D", "/d.jpg"),
+            new(tracks[5], "E", "/e.jpg"),
+        });
+
+        var vm = await Service().GetForProfileAsync(_me.Id);
+
+        vm.Requests.Single().ArtworkUrls.Should().Equal("/a.jpg", "/b.jpg", "/c.jpg", "/d.jpg");
+    }
+
+    [Fact]
+    public void A_mosaic_fills_from_the_same_artist_when_there_are_too_few_artists()
+    {
+        var urls = MixCoverArt.Pick(new[]
+        {
+            new AiTrackCandidate(Guid.NewGuid(), "A", "/a1.jpg"),
+            new AiTrackCandidate(Guid.NewGuid(), "A", "/a2.jpg"),
+            new AiTrackCandidate(Guid.NewGuid(), "B", "/b1.jpg"),
+            new AiTrackCandidate(Guid.NewGuid(), "B", "/b1.jpg"),
+            new AiTrackCandidate(Guid.NewGuid(), "C", null),
+        });
+
+        urls.Should().Equal("/a1.jpg", "/b1.jpg", "/a2.jpg");
+    }
+
+    [Fact]
+    public void Only_ai_mixes_use_a_mosaic()
+    {
+        MixCoverArt.UsesMosaic(GeneratedMixKind.Requested).Should().BeTrue();
+        MixCoverArt.UsesMosaic(GeneratedMixKind.AiPlaylist).Should().BeTrue();
+        MixCoverArt.UsesMosaic(GeneratedMixKind.DailyMix).Should().BeFalse();
     }
 }

@@ -109,6 +109,21 @@ export default function AiPlaylistsSettings({ serverSettings, savedSettings, onC
                     />
                     <p className="text-xs text-[var(--vora-text-muted)] mt-1.5">Each request costs a fraction of a cent. The weekly playlists are one small request per profile per week.</p>
                 </div>
+                <div className="max-w-xs">
+                    <label htmlFor="ai-match-cutoff" className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">Match cutoff</label>
+                    <input
+                        id="ai-match-cutoff"
+                        type="number"
+                        min={0.4}
+                        max={0.7}
+                        step={0.01}
+                        value={serverSettings.aiPlaylistMatchCutoff ?? 0.55}
+                        disabled={!enabled}
+                        onChange={e => onChange({ ...serverSettings, aiPlaylistMatchCutoff: parseFloat(e.target.value) || 0.55 })}
+                        className="vora-input"
+                    />
+                    <p className="text-xs text-[var(--vora-text-muted)] mt-1.5">How close a song has to be to what was asked for. Lower is stricter: playlists come back shorter but closer to the request, and a request your library can't fill comes back short instead of padded. 0.55 suits most libraries. Every playlist writes how close its songs were to the server log, so you can tune this.</p>
+                </div>
             </div>
         </section>
     );

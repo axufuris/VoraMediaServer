@@ -107,6 +107,7 @@ function AiTile({ playlist, onOpen }: { playlist: AiPlaylistVM; onOpen: (mixId: 
             title={playlist.name}
             captionLines={[caption]}
             imageUrl={playlist.artworkUrl ?? undefined}
+            mosaicUrls={playlist.artworkUrls}
             shape="square"
             size="xs"
             badge={

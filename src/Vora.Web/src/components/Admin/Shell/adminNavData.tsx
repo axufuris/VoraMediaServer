@@ -96,7 +96,7 @@ export const ADMIN_NAV: AdminNavEntry[] = [
 
     // === Features ===
     { label: 'Discover',             pathTemplate: '/admin/discovery',        section: 'Features', icon: 'compass',    keywords: ['discovery', 'tmdb'] },
-    { label: 'For You',              pathTemplate: '/admin/for-you',          section: 'Features', icon: 'star',       keywords: ['recommendations', 'mixes', 'daily mix'] },
+    { label: 'For You',              pathTemplate: '/admin/for-you',          section: 'Features', icon: 'star',       keywords: ['recommendations', 'mixes', 'daily mix', 'ai playlists', 'match cutoff'] },
     { label: 'Release Calendar',     pathTemplate: '/admin/release-calendar', section: 'Features', icon: 'calendar',   keywords: ['upcoming', 'calendar'] },
     { label: 'Live TV',              pathTemplate: '/admin/live-tv',          section: 'Features', icon: 'tv',         keywords: ['iptv', 'playlists', 'epg'] },
     { label: 'DVR',                  pathTemplate: '/admin/dvr-settings',     section: 'Features', icon: 'record',     keywords: ['recording', 'tuners'] },

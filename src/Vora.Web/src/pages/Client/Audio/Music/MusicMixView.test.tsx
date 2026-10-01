@@ -56,6 +56,21 @@ describe('MusicMixView', () => {
         expect(screen.queryByText(/Daily Mix/)).toBeNull();
     });
 
+    it('shows an AI playlist as a mosaic of its covers', () => {
+        const { container } = renderMix(mix({ artworkUrls: ['/a.jpg', '/b.jpg', '/c.jpg', '/d.jpg'] }));
+
+        const covers = Array.from(container.querySelectorAll('img')).map(img => img.getAttribute('src'));
+        expect(covers).toEqual(expect.arrayContaining(['/a.jpg', '/b.jpg', '/c.jpg', '/d.jpg']));
+        expect(covers).not.toContain('/art/cover.jpg');
+    });
+
+    it('keeps the single cover when there is nothing to make a mosaic from', () => {
+        const { container } = renderMix(mix({ artworkUrls: ['/a.jpg'] }));
+
+        const covers = Array.from(container.querySelectorAll('img')).map(img => img.getAttribute('src'));
+        expect(covers).toContain('/art/cover.jpg');
+    });
+
     it('still labels a Daily Mix by its slot', () => {
         renderMix(mix({ kind: 'DailyMix', slot: 3, descriptionTag: 'Rock' }));
 
