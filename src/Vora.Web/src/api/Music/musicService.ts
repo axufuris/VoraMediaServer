@@ -129,6 +129,8 @@ export interface GeneratedMixDetailVM {
     description?: string | null;
     prompt?: string | null;
     artworkUrl?: string;
+    // AI playlists only: up to four covers from different artists, for a mosaic.
+    artworkUrls?: string[];
     generatedAt: string;
     lastDriftAt?: string;
     tracks: TrackVM[];

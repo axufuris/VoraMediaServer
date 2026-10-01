@@ -7,6 +7,7 @@ import TrackListeners from '../../../../components/Media/TrackListeners';
 import { MakePlaylistDialog } from './AiPlaylistsSection';
 import { aiPlaylistService } from '../../../../api/Music/aiPlaylistService';
 import { RestartIcon, ShuffleIcon, TrashIcon } from '../../../../components/Client/Primitives/ActionIcons';
+import ArtMosaic from '../../../../components/Client/Primitives/ArtMosaic';
 import { useDialog } from '../../../../dialogs';
 import { resolveReason } from '../../../../utils/apiError';
 
@@ -67,7 +68,8 @@ export default function MusicMixView({
         return <div className="text-[var(--vora-text-muted)] py-12 text-center">Mix not found.</div>;
     }
 
-    const coverLabel = mixCoverLabel(currentMix.kind, currentMix.slot, !!currentMix.artworkUrl);
+    const mosaicUrls = currentMix.artworkUrls && currentMix.artworkUrls.length >= 2 ? currentMix.artworkUrls : null;
+    const coverLabel = mixCoverLabel(currentMix.kind, currentMix.slot, !!currentMix.artworkUrl || !!mosaicUrls);
     const canRegenerate = currentMix.kind === 'Requested' && !!currentMix.prompt;
     const canDelete = currentMix.kind === 'Requested' || currentMix.kind === 'Blend';
 
@@ -94,9 +96,11 @@ export default function MusicMixView({
                     className="w-32 h-32 sm:w-40 sm:h-40 rounded border flex items-center justify-center shrink-0 shadow-lg overflow-hidden relative"
                     style={{ background: 'var(--vora-bg-raised)', borderColor: 'var(--vora-border-subtle)' }}
                 >
-                    {currentMix.artworkUrl
-                        ? <img src={currentMix.artworkUrl} alt="" className={`w-full h-full object-cover ${coverLabel ? 'opacity-60' : ''}`} />
-                        : null}
+                    {mosaicUrls
+                        ? <ArtMosaic urls={mosaicUrls} className={coverLabel ? 'opacity-60' : ''} />
+                        : currentMix.artworkUrl
+                            ? <img src={currentMix.artworkUrl} alt="" className={`w-full h-full object-cover ${coverLabel ? 'opacity-60' : ''}`} />
+                            : null}
                     {coverLabel && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-[var(--vora-text-primary)] drop-shadow-lg">
                             <div className="text-xs uppercase tracking-widest text-[var(--vora-accent-text)] font-bold">{coverLabel}</div>

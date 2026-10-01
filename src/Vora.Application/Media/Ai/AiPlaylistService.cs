@@ -39,6 +39,9 @@ public class AiPlaylistService : IAiPlaylistService
     public const int BridgeLength = 20;
     public const int BlendLength = 30;
     public const int MaxPerArtist = 2;
+    public const int MaxPerArtistWhenShort = 4;
+    public const int CandidatesPerSong = 10;
+    public const int MaxCandidates = 1000;
     public const int MaxRequestLength = 300;
     public const int KeepRequests = 20;
 
@@ -89,10 +92,11 @@ public class AiPlaylistService : IAiPlaylistService
         // playlists off means no one can Blend with you, including ones made
         // before.
         var partners = (await _repository.GetBlendPartnersAsync(profileId)).ToDictionary(p => p.ProfileId);
+        var art = await GetCoverArtAsync(mixes);
         var blends = mixes
             .Where(m => m.Kind == GeneratedMixKind.Blend && m.PartnerProfileId is Guid pid && partners.ContainsKey(pid))
             .OrderByDescending(m => m.GeneratedAt)
-            .Select(m => Map(m, partners[m.PartnerProfileId!.Value].Name))
+            .Select(m => Map(m, m.PartnerProfileId is Guid pid ? partners[pid].Name : null, art))
             .ToList();
 
         return new AiPlaylistsVM
@@ -100,10 +104,10 @@ public class AiPlaylistService : IAiPlaylistService
             Enabled = true,
             RequestsEnabled = server.EnableAiPlaylistRequests,
             Weekly = mixes.Where(m => m.Kind is GeneratedMixKind.AiPlaylist or GeneratedMixKind.Bridge)
-                .OrderBy(m => m.Kind).ThenBy(m => m.Slot).Select(m => Map(m, null)).ToList(),
+                .OrderBy(m => m.Kind).ThenBy(m => m.Slot).Select(m => Map(m, null, art)).ToList(),
             Blends = blends,
             Requests = mixes.Where(m => m.Kind == GeneratedMixKind.Requested)
-                .OrderByDescending(m => m.GeneratedAt).Select(m => Map(m, null)).ToList(),
+                .OrderByDescending(m => m.GeneratedAt).Select(m => Map(m, null, art)).ToList(),
         };
     }
 
@@ -312,21 +316,44 @@ public class AiPlaylistService : IAiPlaylistService
     // collapse into one band's discography, skipping songs already used.
     private async Task<List<AiTrackCandidate>> PickAsync(float[] query, MusicAccessFilter access, int count, HashSet<Guid> used, AiTrackFilter? filter = null)
     {
-        var candidates = await _repository.FindNearestTracksAsync(query, access, (filter ?? AiTrackFilter.None) with { Exclude = used }, count * 4);
-        var perArtist = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var picked = new List<AiTrackCandidate>();
+        var pool = Math.Min(count * CandidatesPerSong, MaxCandidates);
+        var candidates = await _repository.FindNearestTracksAsync(query, access, (filter ?? AiTrackFilter.None) with { Exclude = used }, pool);
+        return PickVaried(candidates, count, used);
+    }
 
-        foreach (var c in candidates)
+    public static List<AiTrackCandidate> PickVaried(IReadOnlyList<AiTrackCandidate> candidates, int count, HashSet<Guid> used)
+    {
+        var perArtist = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var picked = new SortedDictionary<int, AiTrackCandidate>();
+
+        for (var cap = MaxPerArtist; cap <= MaxPerArtistWhenShort && picked.Count < count; cap++)
         {
-            if (picked.Count >= count) break;
-            if (used.Contains(c.TrackId)) continue;
-            perArtist.TryGetValue(c.ArtistKey, out var n);
-            if (n >= MaxPerArtist) continue;
-            perArtist[c.ArtistKey] = n + 1;
-            used.Add(c.TrackId);
-            picked.Add(c);
+            for (var i = 0; i < candidates.Count && picked.Count < count; i++)
+            {
+                var c = candidates[i];
+                if (used.Contains(c.TrackId)) continue;
+                perArtist.TryGetValue(c.ArtistKey, out var n);
+                if (n >= cap) continue;
+                perArtist[c.ArtistKey] = n + 1;
+                used.Add(c.TrackId);
+                picked[i] = c;
+            }
         }
-        return picked;
+
+        return picked.Values.ToList();
+    }
+
+    private async Task<Dictionary<Guid, AiTrackCandidate>> GetCoverArtAsync(IEnumerable<GeneratedMix> mixes)
+    {
+        var trackIds = mixes
+            .Where(m => MixCoverArt.UsesMosaic(m.Kind))
+            .SelectMany(m => m.TrackOrder.Take(MixCoverArt.TracksSampled))
+            .Distinct()
+            .ToList();
+        if (trackIds.Count == 0) return new Dictionary<Guid, AiTrackCandidate>();
+
+        var rows = await _repository.GetTrackArtAsync(trackIds);
+        return rows.ToDictionary(r => r.TrackId);
     }
 
     // A Bridge: equal steps along the straight line from one sound to the other,
@@ -496,7 +523,7 @@ public class AiPlaylistService : IAiPlaylistService
         GeneratedAt = DateTime.UtcNow
     };
 
-    private static AiPlaylistVM Map(GeneratedMix m, string? partnerName) => new()
+    private static AiPlaylistVM Map(GeneratedMix m, string? partnerName, IReadOnlyDictionary<Guid, AiTrackCandidate> art) => new()
     {
         Id = m.Id,
         Kind = m.Kind.ToString(),
@@ -505,6 +532,9 @@ public class AiPlaylistService : IAiPlaylistService
         Prompt = m.Prompt,
         PartnerName = partnerName,
         ArtworkUrl = m.ArtworkUrl,
+        ArtworkUrls = MixCoverArt.UsesMosaic(m.Kind)
+            ? MixCoverArt.Pick(m.TrackOrder.Take(MixCoverArt.TracksSampled).Where(art.ContainsKey).Select(id => art[id]))
+            : new List<string>(),
         TrackCount = m.TrackOrder.Count,
         GeneratedAt = m.GeneratedAt
     };
@@ -531,6 +561,7 @@ public class AiPlaylistVM
     public string? Prompt { get; set; }
     public string? PartnerName { get; set; }
     public string? ArtworkUrl { get; set; }
+    public List<string> ArtworkUrls { get; set; } = new();
     public int TrackCount { get; set; }
     public DateTime GeneratedAt { get; set; }
 }

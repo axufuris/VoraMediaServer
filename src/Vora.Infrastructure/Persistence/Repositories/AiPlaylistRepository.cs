@@ -50,21 +50,45 @@ public class AiPlaylistRepository : IAiPlaylistRepository
         if (filter.YearTo is int to) tracks = tracks.Where(t => t.Album != null && t.Album.Year <= to);
         if (exclude.Count > 0) tracks = tracks.Where(t => !exclude.Contains(t.Id));
 
-        var rows = await (from e in _context.MediaItemEmbeddings.AsNoTracking()
-                          join t in tracks on e.MediaItemId equals t.Id
-                          where e.Embedding != null
-                          orderby e.Embedding!.CosineDistance(target)
-                          select new
-                          {
-                              t.Id,
-                              Artist = t.Artist ?? (t.Album != null ? t.Album.Artist.Name : null),
-                              Art = t.Album == null
-                                  ? null
-                                  : t.Album.ArtworkUrl != null && t.Album.ArtworkUrl.Trim() != string.Empty
-                                      ? t.Album.ArtworkUrl
-                                      : t.Album.Artist.ArtworkUrl
-                          })
-            .Take(Math.Max(1, limit))
+        var take = Math.Max(1, limit);
+        var rows = await VectorSearch.WideAsync(_context, take, () =>
+            (from e in _context.MediaItemEmbeddings.AsNoTracking()
+             join t in tracks on e.MediaItemId equals t.Id
+             where e.Embedding != null
+             orderby e.Embedding!.CosineDistance(target)
+             select new
+             {
+                 t.Id,
+                 Artist = t.Artist ?? (t.Album != null ? t.Album.Artist.Name : null),
+                 Art = t.Album == null
+                     ? null
+                     : t.Album.ArtworkUrl != null && t.Album.ArtworkUrl.Trim() != string.Empty
+                         ? t.Album.ArtworkUrl
+                         : t.Album.Artist.ArtworkUrl
+             })
+            .Take(take)
+            .ToListAsync());
+
+        return rows.Select(r => new AiTrackCandidate(r.Id, r.Artist ?? string.Empty, r.Art)).ToList();
+    }
+
+    public async Task<List<AiTrackCandidate>> GetTrackArtAsync(IReadOnlyCollection<Guid> trackIds)
+    {
+        if (trackIds.Count == 0) return new List<AiTrackCandidate>();
+
+        var rows = await _context.Tracks
+            .AsNoTracking()
+            .Where(t => trackIds.Contains(t.Id))
+            .Select(t => new
+            {
+                t.Id,
+                Artist = t.Artist ?? (t.Album != null ? t.Album.Artist.Name : null),
+                Art = t.Album == null
+                    ? null
+                    : t.Album.ArtworkUrl != null && t.Album.ArtworkUrl.Trim() != string.Empty
+                        ? t.Album.ArtworkUrl
+                        : t.Album.Artist.ArtworkUrl
+            })
             .ToListAsync();
 
         return rows.Select(r => new AiTrackCandidate(r.Id, r.Artist ?? string.Empty, r.Art)).ToList();

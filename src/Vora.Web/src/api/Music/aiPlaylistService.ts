@@ -13,6 +13,8 @@ export interface AiPlaylistVM {
     // The other profile in a Blend.
     partnerName?: string | null;
     artworkUrl?: string | null;
+    // Up to four covers from different artists in the playlist, for a mosaic.
+    artworkUrls?: string[];
     trackCount: number;
     generatedAt: string;
 }

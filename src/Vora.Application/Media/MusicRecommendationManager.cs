@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
+using Vora.Application.Media.Ai;
 using Vora.Application.Media.ViewModels;
 using Vora.Application.Settings;
 using Vora.Application.Users;
@@ -194,6 +195,10 @@ public class MusicRecommendationManager : IMusicRecommendationManager
             Description = mix.Description,
             Prompt = mix.Prompt,
             ArtworkUrl = mix.ArtworkUrl,
+            ArtworkUrls = MixCoverArt.UsesMosaic(mix.Kind)
+                ? MixCoverArt.Pick(tracks.Take(MixCoverArt.TracksSampled).Select(t =>
+                    new AiTrackCandidate(t.Id, t.Artist ?? t.Album?.Artist?.Name ?? string.Empty, AlbumCoverArt.For(t.Album))))
+                : new List<string>(),
             GeneratedAt = mix.GeneratedAt,
             LastDriftAt = mix.LastDriftAt,
             Tracks = trackVms
@@ -1342,6 +1347,7 @@ public class GeneratedMixDetailVM
     public string? Description { get; set; }
     public string? Prompt { get; set; }
     public string? ArtworkUrl { get; set; }
+    public List<string> ArtworkUrls { get; set; } = new();
     public DateTime GeneratedAt { get; set; }
     public DateTime? LastDriftAt { get; set; }
     public List<TrackVM> Tracks { get; set; } = new();

@@ -12,6 +12,7 @@ public interface IAiPlaylistRepository
     // first. The only way AI playlists get songs, so the viewer's parental
     // controls apply to every one.
     Task<List<AiTrackCandidate>> FindNearestTracksAsync(float[] vector, MusicAccessFilter access, AiTrackFilter filter, int limit);
+    Task<List<AiTrackCandidate>> GetTrackArtAsync(IReadOnlyCollection<Guid> trackIds);
 
     Task<List<Guid>> GetProfilesDueForWeeklyAsync(DateTime generatedBefore, int minPlays, int withinDays);
     Task<List<BlendPartner>> GetBlendPartnersAsync(Guid profileId);
