@@ -64,12 +64,13 @@ public class AiPlaylistRepository : IAiPlaylistRepository
                      ? null
                      : t.Album.ArtworkUrl != null && t.Album.ArtworkUrl.Trim() != string.Empty
                          ? t.Album.ArtworkUrl
-                         : t.Album.Artist.ArtworkUrl
+                         : t.Album.Artist.ArtworkUrl,
+                 Distance = e.Embedding!.CosineDistance(target)
              })
             .Take(take)
             .ToListAsync());
 
-        return rows.Select(r => new AiTrackCandidate(r.Id, r.Artist ?? string.Empty, r.Art)).ToList();
+        return rows.Select(r => new AiTrackCandidate(r.Id, r.Artist ?? string.Empty, r.Art, r.Distance)).ToList();
     }
 
     public async Task<List<AiTrackCandidate>> GetTrackArtAsync(IReadOnlyCollection<Guid> trackIds)

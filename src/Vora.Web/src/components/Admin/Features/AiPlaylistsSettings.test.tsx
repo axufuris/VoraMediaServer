@@ -17,7 +17,7 @@ vi.mock('../../../dialogs', () => ({
 }));
 
 const settings = (overrides: Partial<ServerSettings> = {}): ServerSettings => ({
-    enableAiMusicPlaylists: false, enableAiPlaylistRequests: true, aiPlaylistRequestsPerDay: 10, ...overrides,
+    enableAiMusicPlaylists: false, enableAiPlaylistRequests: true, aiPlaylistRequestsPerDay: 10, aiPlaylistMatchCutoff: 0.55, ...overrides,
 } as ServerSettings);
 
 describe('AiPlaylistsSettings', () => {
@@ -41,6 +41,18 @@ describe('AiPlaylistsSettings', () => {
         render(<AiPlaylistsSettings serverSettings={settings({ enableAiMusicPlaylists: true })} savedSettings={settings({ enableAiMusicPlaylists: true })} onChange={vi.fn()} />);
 
         expect(await screen.findByRole('status')).toHaveTextContent(/needs For You switched on and an OpenAI API key/);
+    });
+
+    it('edits the match cutoff once AI playlists are on', async () => {
+        mocks.getFeatureFlags.mockResolvedValue({ aiPlaylists: true });
+        const onChange = vi.fn();
+        const on = settings({ enableAiMusicPlaylists: true });
+        render(<AiPlaylistsSettings serverSettings={on} savedSettings={on} onChange={onChange} />);
+
+        const cutoff = screen.getByRole('spinbutton', { name: 'Match cutoff' });
+        expect(cutoff).toHaveValue(0.55);
+        fireEvent.change(cutoff, { target: { value: '0.52' } });
+        expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ aiPlaylistMatchCutoff: 0.52 }));
     });
 
     it('says nothing more once it is running', async () => {

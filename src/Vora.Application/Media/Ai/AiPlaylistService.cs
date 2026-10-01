@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Ai;
+using Vora.Application.Logging;
 using Vora.Application.Settings;
 using Vora.Application.Users;
 using Vora.Domain.Entities.Media;
@@ -39,9 +40,11 @@ public class AiPlaylistService : IAiPlaylistService
     public const int BridgeLength = 20;
     public const int BlendLength = 30;
     public const int MaxPerArtist = 2;
-    public const int MaxPerArtistWhenShort = 4;
     public const int CandidatesPerSong = 10;
     public const int MaxCandidates = 1000;
+    public const int MinMatches = 5;
+    public const double MinMatchCutoff = 0.40;
+    public const double MaxMatchCutoff = 0.70;
     public const int MaxRequestLength = 300;
     public const int KeepRequests = 20;
 
@@ -179,8 +182,8 @@ public class AiPlaylistService : IAiPlaylistService
         for (var i = 0; i < plan.Playlists.Count; i++)
         {
             if (vectors[i] is not float[] theme) continue;
-            var tracks = await PickAsync(Blend(theme, 0.65f, taste, 0.35f), access, PlaylistLength, used);
-            if (tracks.Count < 5) continue;
+            var tracks = await PickAsync($"weekly \"{plan.Playlists[i].Title}\"", Blend(theme, 0.65f, taste, 0.35f), access, PlaylistLength, used);
+            if (tracks.Count < MinMatches) continue;
             mixes.Add(NewMix(profileId, GeneratedMixKind.AiPlaylist, mixes.Count + 1, plan.Playlists[i].Title, plan.Playlists[i].Why, tracks));
         }
 
@@ -261,8 +264,8 @@ public class AiPlaylistService : IAiPlaylistService
         var query = taste == null ? Normalize(search) : Blend(search, 0.8f, taste, 0.2f);
         if (vectors.Count > 1 && vectors[1] is float[] avoid) query = Blend(query, 1f, avoid, -0.35f);
 
-        var tracks = await PickAsync(query, access, songs ?? Math.Clamp(parsed.Songs, MinRequestSongs, MaxRequestSongs), new HashSet<Guid>(), new AiTrackFilter(parsed.YearFrom, parsed.YearTo));
-        if (tracks.Count == 0) return (AiResult.NothingFound, null);
+        var tracks = await PickAsync($"request \"{parsed.Title}\"", query, access, songs ?? Math.Clamp(parsed.Songs, MinRequestSongs, MaxRequestSongs), new HashSet<Guid>(), new AiTrackFilter(parsed.YearFrom, parsed.YearTo));
+        if (tracks.Count < MinMatches) return (AiResult.NothingFound, null);
 
         var mix = NewMix(profileId, GeneratedMixKind.Requested, 1, parsed.Title, parsed.Why, tracks);
         mix.Prompt = request;
@@ -285,8 +288,8 @@ public class AiPlaylistService : IAiPlaylistService
 
         // Where the two tastes meet, filtered by the VIEWER's controls: a child
         // blending with a parent never gets the parent's explicit songs.
-        var tracks = await PickAsync(Blend(mine, 0.5f, theirs, 0.5f), access, BlendLength, new HashSet<Guid>());
-        if (tracks.Count == 0) return AiResult.NothingFound;
+        var tracks = await PickAsync("blend", Blend(mine, 0.5f, theirs, 0.5f), access, BlendLength, new HashSet<Guid>());
+        if (tracks.Count < MinMatches) return AiResult.NothingFound;
 
         var mix = NewMix(profileId, GeneratedMixKind.Blend, 1, $"{profile.Name} + {partner.Name}", $"Where {profile.Name}'s and {partner.Name}'s tastes meet.", tracks);
         mix.PartnerProfileId = partnerProfileId;
@@ -312,21 +315,31 @@ public class AiPlaylistService : IAiPlaylistService
         return Normalize(sum);
     }
 
-    // Nearest first, at most MaxPerArtist from one artist so a theme doesn't
-    // collapse into one band's discography, skipping songs already used.
-    private async Task<List<AiTrackCandidate>> PickAsync(float[] query, MusicAccessFilter access, int count, HashSet<Guid> used, AiTrackFilter? filter = null)
+    // Nearest first, only songs within the server's match cutoff, so a list
+    // the library can't fill comes back short rather than padded.
+    private async Task<List<AiTrackCandidate>> PickAsync(string label, float[] query, MusicAccessFilter access, int count, HashSet<Guid> used, AiTrackFilter? filter = null)
     {
+        var cutoff = (await _settings.GetSettingsAsync()).AiPlaylistMatchCutoff;
         var pool = Math.Min(count * CandidatesPerSong, MaxCandidates);
         var candidates = await _repository.FindNearestTracksAsync(query, access, (filter ?? AiTrackFilter.None) with { Exclude = used }, pool);
-        return PickVaried(candidates, count, used);
+        var matches = WithinCutoff(candidates, cutoff);
+        var pick = PickVaried(matches, count, used);
+        LogSpread(label, count, cutoff, candidates, matches, pick);
+        return pick.Tracks;
     }
 
-    public static List<AiTrackCandidate> PickVaried(IReadOnlyList<AiTrackCandidate> candidates, int count, HashSet<Guid> used)
+    public static List<AiTrackCandidate> WithinCutoff(IEnumerable<AiTrackCandidate> nearestFirst, double cutoff) =>
+        nearestFirst.TakeWhile(c => c.Distance <= cutoff).ToList();
+
+    // Two per artist first for a spread; when that can't fill the list, each
+    // further pass lets every artist in once more.
+    public static AiPick PickVaried(IReadOnlyList<AiTrackCandidate> candidates, int count, HashSet<Guid> used)
     {
         var perArtist = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var picked = new SortedDictionary<int, AiTrackCandidate>();
+        var cap = MaxPerArtist;
 
-        for (var cap = MaxPerArtist; cap <= MaxPerArtistWhenShort && picked.Count < count; cap++)
+        while (true)
         {
             for (var i = 0; i < candidates.Count && picked.Count < count; i++)
             {
@@ -338,9 +351,28 @@ public class AiPlaylistService : IAiPlaylistService
                 used.Add(c.TrackId);
                 picked[i] = c;
             }
+
+            if (picked.Count >= count || candidates.All(c => used.Contains(c.TrackId))) break;
+            cap++;
         }
 
-        return picked.Values.ToList();
+        return new AiPick(picked.Values.ToList(), perArtist.Count == 0 ? 0 : perArtist.Values.Max());
+    }
+
+    private void LogSpread(string label, int wanted, double cutoff, IReadOnlyList<AiTrackCandidate> candidates, IReadOnlyList<AiTrackCandidate> matches, AiPick pick)
+    {
+        if (candidates.Count == 0)
+        {
+            _logger.LogInformation("AI playlist {Label}: asked for {Wanted} songs; the library returned no candidates.", LogValue.SingleLine(label), wanted);
+            return;
+        }
+
+        _logger.LogInformation(
+            "AI playlist {Label}: asked for {Wanted} songs. {Candidates} candidates, distance nearest {Nearest:F3}, 10th {Tenth:F3}, median {Median:F3}, furthest {Furthest:F3}. {Matches} within cutoff {Cutoff:F2} from {Artists} artists. Picked {Picked}, up to {PerArtist} per artist.",
+            LogValue.SingleLine(label), wanted, candidates.Count,
+            candidates[0].Distance, candidates[Math.Min(9, candidates.Count - 1)].Distance, candidates[candidates.Count / 2].Distance, candidates[^1].Distance,
+            matches.Count, cutoff, matches.Select(m => m.ArtistKey).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            pick.Tracks.Count, pick.PerArtist);
     }
 
     private async Task<Dictionary<Guid, AiTrackCandidate>> GetCoverArtAsync(IEnumerable<GeneratedMix> mixes)
@@ -539,6 +571,8 @@ public class AiPlaylistService : IAiPlaylistService
         GeneratedAt = m.GeneratedAt
     };
 }
+
+public sealed record AiPick(List<AiTrackCandidate> Tracks, int PerArtist);
 
 public class AiPlaylistsVM
 {

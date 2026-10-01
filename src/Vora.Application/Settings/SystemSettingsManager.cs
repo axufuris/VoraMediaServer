@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Vora.Application.Media.Ai;
 using Vora.Application.Plugins.ViewModels;
 using Vora.Application.Settings.ViewModels;
 using Vora.Application.Watchers;
@@ -169,6 +170,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.EnableAiMusicPlaylists = request.EnableAiMusicPlaylists;
         settings.EnableAiPlaylistRequests = request.EnableAiPlaylistRequests;
         settings.AiPlaylistRequestsPerDay = Math.Clamp(request.AiPlaylistRequestsPerDay, 1, 100);
+        settings.AiPlaylistMatchCutoff = Math.Round(Math.Clamp(request.AiPlaylistMatchCutoff, AiPlaylistService.MinMatchCutoff, AiPlaylistService.MaxMatchCutoff), 2);
 
         settings.DvrStoragePath = string.IsNullOrWhiteSpace(request.DvrStoragePath) ? null : request.DvrStoragePath;
         settings.DvrMaxStorageGb = Math.Max(0, request.DvrMaxStorageGb);

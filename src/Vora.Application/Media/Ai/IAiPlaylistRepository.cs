@@ -29,7 +29,7 @@ public interface IAiPlaylistRepository
 
 public sealed record PlayedVector(float[] Vector, int Plays);
 
-public sealed record AiTrackCandidate(Guid TrackId, string ArtistKey, string? ArtworkUrl);
+public sealed record AiTrackCandidate(Guid TrackId, string ArtistKey, string? ArtworkUrl, double Distance = 0);
 
 public sealed record AiTrackFilter(int? YearFrom = null, int? YearTo = null, IReadOnlyCollection<Guid>? Exclude = null)
 {

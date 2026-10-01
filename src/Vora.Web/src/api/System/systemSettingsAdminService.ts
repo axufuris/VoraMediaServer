@@ -69,6 +69,9 @@ export interface ServerSettings {
     enableAiMusicPlaylists: boolean;
     enableAiPlaylistRequests: boolean;
     aiPlaylistRequestsPerDay: number;
+    // Cosine distance past which a song no longer counts as a match. Lower is
+    // stricter: shorter playlists that stay closer to what was asked.
+    aiPlaylistMatchCutoff: number;
     weeklyMixLastRefreshedAt?: string;
     dvrStoragePath?: string | null;
     dvrMaxStorageGb: number;
