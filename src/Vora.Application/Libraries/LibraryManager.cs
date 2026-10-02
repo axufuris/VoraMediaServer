@@ -191,9 +191,7 @@ public class LibraryManager : ILibraryManager
 
         if (thumbnailsTurnedOff)
         {
-            using var purgeScope = _serviceProvider.CreateScope();
-            var thumbnailManager = purgeScope.ServiceProvider.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
-            await thumbnailManager.PurgeLibraryThumbnailsAsync(library.Id);
+            _taskQueueManager.QueueRemoveLibraryVideoThumbnails(library.Id, library.Name);
         }
     }
 
@@ -206,6 +204,9 @@ public class LibraryManager : ILibraryManager
         _folderWatcher.StopWatching(id);
 
         using var scope = _serviceProvider.CreateScope();
+        var itemIds = (await scope.ServiceProvider.GetRequiredService<Vora.Application.Media.IMediaRepository>().GetAllMediaItemIdsByLibraryAsync(id)).ToHashSet();
+        await _taskQueueManager.WaitForLibraryTasksToStopAsync(id, itemIds, cancellationToken);
+
         var thumbnailManager = scope.ServiceProvider.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
         await thumbnailManager.PurgeLibraryThumbnailFilesAsync(id, cancellationToken);
 

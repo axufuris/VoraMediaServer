@@ -99,15 +99,17 @@ public static class LibraryEndpoints
         return Results.Created($"/api/libraries/{id}", new { Id = id });
     }
 
-    private static IResult QueueScanAsync(Guid id, ITaskQueueManager taskQueue)
+    private static async Task<IResult> QueueScanAsync(Guid id, ITaskQueueManager taskQueue, ILibraryManager manager)
     {
-        taskQueue.QueueScanLibrary(id);
+        var library = await manager.GetLibraryByIdAsync(id);
+        taskQueue.QueueScanLibrary(id, library?.Name);
         return Results.Accepted();
     }
 
-    private static IResult QueueRefreshMetadataAsync(Guid id, [FromQuery] bool force, ITaskQueueManager taskQueue)
+    private static async Task<IResult> QueueRefreshMetadataAsync(Guid id, [FromQuery] bool force, ITaskQueueManager taskQueue, ILibraryManager manager)
     {
-        taskQueue.QueueRefreshLibraryMetadata(id, null, forceOverride: force);
+        var library = await manager.GetLibraryByIdAsync(id);
+        taskQueue.QueueRefreshLibraryMetadata(id, library?.Name, forceOverride: force);
         return Results.Accepted();
     }
 

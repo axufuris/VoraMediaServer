@@ -257,6 +257,8 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         if (partsToAnalyze.Count == 0) return;
 
         var primaryPart = item.MediaParts.First();
+        var reprobed = false;
+        var thumbnailsStale = false;
 
         foreach (var part in item.MediaParts)
         {
@@ -264,7 +266,17 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             cancellationToken.ThrowIfCancellationRequested();
 
             var analysis = await _analyzerService.AnalyzeFileAsync(part.FilePath, cancellationToken);
-            if (analysis == null) continue;
+            if (analysis == null || ProbeFailed(analysis))
+            {
+                _logger.LogWarning("Could not read {FilePath} for analysis; keeping its existing track data.", part.FilePath);
+                continue;
+            }
+            reprobed = true;
+            if (part.LastAnalyzedAt != null || part.VideoThumbnailSpriteVersion == null)
+            {
+                part.VideoThumbnailSpriteVersion = null;
+                thumbnailsStale = true;
+            }
 
             if (analysis.Duration != null && !item.IsLocked("Duration") && (part == primaryPart || item.Analysis?.Duration == null))
             {
@@ -296,7 +308,8 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // A part was (re)probed here (an added or replaced file — unchanged files
         // returned above), so any existing intro/credit markers are stale. Clear
         // the marker-analysis stamp so the skip-gate re-detects them next pass.
-        item.MarkersAnalyzedAt = null;
+        if (reprobed) item.MarkersAnalyzedAt = null;
+        if (thumbnailsStale) item.VideoThumbnailSpriteVersion = null;
 
         await _mediaRepository.UpdateMediaItemAsync(item);
 
@@ -332,13 +345,19 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
     }
 
+    private static bool ProbeFailed(MediaAnalysisResult analysis) =>
+        analysis.FileSizeBytes == null
+        && analysis.Duration == null
+        && analysis.VideoTracks.Count == 0
+        && analysis.AudioTracks.Count == 0;
+
     private static bool PartNeedsAnalysis(MediaPart part)
     {
-        if (part.LastAnalyzedAt == null) return true;
         try
         {
             var info = new FileInfo(part.FilePath);
-            return !info.Exists || info.Length != part.FileSizeBytes;
+            if (!info.Exists) return false;
+            return part.LastAnalyzedAt == null || info.Length != part.FileSizeBytes;
         }
         catch
         {
