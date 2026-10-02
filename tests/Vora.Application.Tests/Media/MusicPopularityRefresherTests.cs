@@ -194,4 +194,32 @@ public class MusicPopularityRefresherTests
             _progress.Report(null);
         });
     }
+
+    [Fact]
+    public async Task The_artists_tags_from_the_same_answer_are_saved_with_its_figures()
+    {
+        var artist = GivenDue("Daft Punk");
+        Due(artist);
+        Answers("Daft Punk", new ArtistPopularity { Outcome = PopularityLookupOutcome.Found, Listeners = 5, Tags = new[] { "electronic", "House", "dance" } });
+
+        await Refresher().RefreshDueArtistsAsync(TestContext.Current.CancellationToken);
+
+        Received.InOrder(() =>
+        {
+            _repository.StageArtistTagsAsync(artist.Id, Arg.Is<IReadOnlyList<string>>(t => t.SequenceEqual(new[] { "electronic", "House", "dance" })));
+            _repository.SaveMusicChangesAsync(Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task An_artist_last_fm_does_not_know_keeps_whatever_tags_it_had()
+    {
+        var artist = GivenDue("Unknown Local Band");
+        Due(artist);
+        Answers("Unknown Local Band", ArtistPopularity.NotFound);
+
+        await Refresher().RefreshDueArtistsAsync(TestContext.Current.CancellationToken);
+
+        await _repository.DidNotReceiveWithAnyArgs().StageArtistTagsAsync(default, default!);
+    }
 }

@@ -50,6 +50,8 @@ public interface IMusicRepository
     Task<Artist?> GetArtistForUpdateAsync(Guid artistId);
     Task<List<PopularityRefreshTarget>> GetArtistsDueForPopularityRefreshAsync(DateTime staleBefore, int limit);
     Task<Artist?> GetArtistCatalogForUpdateAsync(Guid artistId);
+    Task StageArtistTagsAsync(Guid artistId, IReadOnlyList<string> tags);
+    Task<List<string>> GetArtistTagNamesAsync(Guid artistId);
     Task SaveMusicChangesAsync(CancellationToken cancellationToken);
     Task<List<ContentRatingTarget>> GetAlbumsDueForContentRatingAsync(DateTime recheckBefore, int limit);
     Task<List<TrackForEmbedding>> GetTracksMissingEmbeddingsAsync(int limit);

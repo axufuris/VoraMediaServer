@@ -491,6 +491,31 @@ public class MusicRepository : IMusicRepository
     public Task SaveMusicChangesAsync(CancellationToken cancellationToken) =>
         _context.SaveChangesAsync(cancellationToken);
 
+    public async Task StageArtistTagsAsync(Guid artistId, IReadOnlyList<string> tags)
+    {
+        var existing = await _context.ArtistTags.Where(t => t.ArtistId == artistId).ToListAsync();
+        _context.ArtistTags.RemoveRange(existing);
+
+        var fetchedAt = DateTime.UtcNow;
+        _context.ArtistTags.AddRange(tags.Select((tag, rank) => new ArtistTag
+        {
+            ArtistId = artistId,
+            Tag = tag,
+            Weight = tags.Count - rank,
+            Source = "lastfm",
+            FetchedAt = fetchedAt
+        }));
+    }
+
+    public Task<List<string>> GetArtistTagNamesAsync(Guid artistId) =>
+        _context.ArtistTags
+            .AsNoTracking()
+            .Where(t => t.ArtistId == artistId)
+            .OrderByDescending(t => t.Weight)
+            .ThenBy(t => t.Tag)
+            .Select(t => t.Tag)
+            .ToListAsync();
+
     public async Task<List<Album>> GetRecentlyAddedAlbumsAsync(MusicAccessFilter access, int limit)
     {
         IQueryable<Album> query = _context.Albums.AsNoTracking().Include(a => a.Artist);

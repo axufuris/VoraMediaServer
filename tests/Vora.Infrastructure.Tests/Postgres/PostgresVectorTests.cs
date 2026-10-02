@@ -29,7 +29,7 @@ public class PostgresVectorTests(PostgresDatabase database) : IClassFixture<Post
         db.Set<MediaLibrary>().Add(library);
         db.Set<Artist>().Add(artist);
         db.Set<Album>().Add(album);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         return (library.Id, album.Id);
     }
 
@@ -55,7 +55,7 @@ public class PostgresVectorTests(PostgresDatabase database) : IClassFixture<Post
             db.Set<Track>().Add(track);
             db.MediaItemEmbeddings.Add(new MediaItemEmbedding { MediaItemId = track.Id, Embedding = new Pgvector.Vector(Vector(random)) });
         }
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var found = await new AiPlaylistRepository(db).FindNearestTracksAsync(Vector(random), MusicAccessFilter.Unrestricted, AiTrackFilter.None, 200);
 
@@ -75,7 +75,7 @@ public class PostgresVectorTests(PostgresDatabase database) : IClassFixture<Post
         db.Set<MediaLibrary>().Add(library);
         db.Set<Movie>().AddRange(embedded, fresh);
         db.MediaItemEmbeddings.Add(new MediaItemEmbedding { MediaItemId = embedded.Id, Embedding = new Pgvector.Vector(Vector(random)) });
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         db.ChangeTracker.Clear();
 
         var saved = await EmbeddingWrites.InsertNewAsync(db, new[]
@@ -86,6 +86,6 @@ public class PostgresVectorTests(PostgresDatabase database) : IClassFixture<Post
         });
 
         saved.Should().Be(1);
-        (await db.MediaItemEmbeddings.AsNoTracking().CountAsync(e => e.MediaItemId == fresh.Id || e.MediaItemId == embedded.Id)).Should().Be(2);
+        (await db.MediaItemEmbeddings.AsNoTracking().CountAsync(e => e.MediaItemId == fresh.Id || e.MediaItemId == embedded.Id, TestContext.Current.CancellationToken)).Should().Be(2);
     }
 }

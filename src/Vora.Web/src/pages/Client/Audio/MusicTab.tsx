@@ -75,6 +75,7 @@ export default function MusicTab() {
     const [artists, setArtists] = useState<ArtistVM[]>([]);
     const [currentArtist, setCurrentArtist] = useState<ArtistVM | null>(null);
     const [albums, setAlbums] = useState<AlbumVM[]>([]);
+    const [artistTags, setArtistTags] = useState<string[]>([]);
     const [currentAlbum, setCurrentAlbum] = useState<AlbumVM | null>(null);
     const [albumArtistBackgroundUrl, setAlbumArtistBackgroundUrl] = useState<string | null>(null);
     const [tracks, setTracks] = useState<TrackVM[]>([]);
@@ -437,6 +438,7 @@ export default function MusicTab() {
         setCurrentArtist(null);
         setCurrentAlbum(null);
         setAlbums([]);
+        setArtistTags([]);
         setTracks([]);
         setNav({ view: 'root' });
     }, []);
@@ -467,6 +469,7 @@ export default function MusicTab() {
             .then(detail => {
                 setCurrentArtist(detail.artist);
                 setAlbums(detail.albums);
+                setArtistTags(detail.tags ?? []);
             })
             .catch(err => {
                 console.error('Failed to load artist detail', err);
@@ -871,6 +874,7 @@ export default function MusicTab() {
                     isLoading={isLoading}
                     currentArtist={currentArtist}
                     albums={albums}
+                    tags={artistTags}
                     topTracks={artistTopTracks}
                     playArtistTrackList={playArtistTrackList}
                     formatDuration={formatDuration}

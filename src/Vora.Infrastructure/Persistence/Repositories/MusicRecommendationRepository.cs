@@ -479,15 +479,6 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
             .ToListAsync();
     }
 
-    public async Task ReplaceArtistTagsAsync(Guid artistId, IEnumerable<ArtistTag> entries)
-    {
-        var existing = await _context.ArtistTags.Where(t => t.ArtistId == artistId).ToListAsync();
-        if (existing.Count > 0) _context.ArtistTags.RemoveRange(existing);
-        var list = entries.ToList();
-        if (list.Count > 0) await _context.ArtistTags.AddRangeAsync(list);
-        await _context.SaveChangesAsync();
-    }
-
     public async Task<Dictionary<string, Domain.Entities.Media.Artist>> GetArtistsByNamesAsync(IEnumerable<string> names, MusicAccessFilter access)
     {
         var nameList = names.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.ToLower()).Distinct().ToList();

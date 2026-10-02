@@ -40,7 +40,6 @@ public interface IMusicRecommendationRepository
     Task ReplaceSimilaritiesAsync(Guid artistId, IEnumerable<ArtistSimilarity> entries);
 
     Task<List<ArtistTag>> GetArtistTagsAsync(Guid artistId);
-    Task ReplaceArtistTagsAsync(Guid artistId, IEnumerable<ArtistTag> entries);
 
     Task<Dictionary<string, Domain.Entities.Media.Artist>> GetArtistsByNamesAsync(IEnumerable<string> names, MusicAccessFilter access);
 

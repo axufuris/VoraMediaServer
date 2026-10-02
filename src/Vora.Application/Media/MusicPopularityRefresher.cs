@@ -30,6 +30,7 @@ public class MusicPopularityRefresher : IMusicPopularityRefresher
     // payload stays modest. Tracks outside an artist's top fifty stay null.
     public const int TopTracksPerArtist = 50;
     public const int TopAlbumsPerArtist = 50;
+    public const int MaxTagsPerArtist = 10;
 
     // Last.fm allows about five requests a second averaged over five minutes. A
     // refresh makes three in quick succession, so pausing between artists keeps
@@ -111,6 +112,10 @@ public class MusicPopularityRefresher : IMusicPopularityRefresher
             if (artist == null) continue;
 
             Apply(artist, popularity, DateTime.UtcNow);
+            if (popularity.Outcome == PopularityLookupOutcome.Found)
+            {
+                await _repository.StageArtistTagsAsync(artist.Id, popularity.Tags.Take(MaxTagsPerArtist).ToList());
+            }
             await _repository.SaveMusicChangesAsync(cancellationToken);
             refreshed++;
 

@@ -188,4 +188,31 @@ public class LastFmPopularityParsingTests
         result.TopTracks.Should().BeEmpty();
         result.TopAlbums.Should().HaveCount(2);
     }
+
+    [Fact]
+    public async Task The_artists_tags_come_from_the_info_call_already_made()
+    {
+        var (provider, handler) = Provider(new Dictionary<string, (HttpStatusCode, string)>
+        {
+            ["artist.getInfo"] = (HttpStatusCode.OK, """{"artist":{"name":"Daft Punk","stats":{"listeners":"5"},"tags":{"tag":[{"name":"electronic"},{"name":"House"},{"name":" dance "},{"name":"house"}]}}}"""),
+            ["artist.getTopTracks"] = (HttpStatusCode.OK, TopTracks),
+            ["artist.getTopAlbums"] = (HttpStatusCode.OK, TopAlbums),
+        });
+
+        var result = await provider.GetArtistPopularityAsync("Daft Punk", 50, 50, TestContext.Current.CancellationToken);
+
+        result.Tags.Should().Equal("electronic", "House", "dance");
+        handler.Methods.Should().HaveCount(3);
+    }
+
+    [Theory]
+    [InlineData("""{"name":"X","tags":{"tag":{"name":"emo"}}}""", new[] { "emo" })]
+    [InlineData("""{"name":"X","tags":""}""", new string[0])]
+    [InlineData("""{"name":"X"}""", new string[0])]
+    public void A_single_tag_or_no_tags_is_read_without_failing(string artistJson, string[] expected)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(artistJson);
+
+        LastFmListeningDataProvider.ReadTagNames(doc.RootElement).Should().Equal(expected);
+    }
 }

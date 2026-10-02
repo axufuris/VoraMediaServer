@@ -36,7 +36,7 @@ public class AiPlaylistSlotTests
         await repo.AddRequestAsync(Mix(GeneratedMixKind.Requested), 5);
         await repo.AddRequestAsync(Mix(GeneratedMixKind.Requested), 5);
 
-        var slots = await db.GeneratedMixes.Where(m => m.Kind == GeneratedMixKind.Requested).Select(m => m.Slot).ToListAsync();
+        var slots = await db.GeneratedMixes.Where(m => m.Kind == GeneratedMixKind.Requested).Select(m => m.Slot).ToListAsync(TestContext.Current.CancellationToken);
         slots.Should().OnlyHaveUniqueItems().And.HaveCount(3);
     }
 
@@ -48,11 +48,11 @@ public class AiPlaylistSlotTests
 
         await repo.ReplaceBlendAsync(Mix(GeneratedMixKind.Blend, _sam));
         await repo.ReplaceBlendAsync(Mix(GeneratedMixKind.Blend, _alex));
-        var samSlot = await db.GeneratedMixes.Where(m => m.PartnerProfileId == _sam).Select(m => m.Slot).SingleAsync();
+        var samSlot = await db.GeneratedMixes.Where(m => m.PartnerProfileId == _sam).Select(m => m.Slot).SingleAsync(TestContext.Current.CancellationToken);
 
         await repo.ReplaceBlendAsync(Mix(GeneratedMixKind.Blend, _sam));
 
-        var blends = await db.GeneratedMixes.Where(m => m.Kind == GeneratedMixKind.Blend).ToListAsync();
+        var blends = await db.GeneratedMixes.Where(m => m.Kind == GeneratedMixKind.Blend).ToListAsync(TestContext.Current.CancellationToken);
         blends.Should().HaveCount(2);
         blends.Select(m => m.Slot).Should().OnlyHaveUniqueItems();
         blends.Single(m => m.PartnerProfileId == _sam).Slot.Should().Be(samSlot);

@@ -318,6 +318,9 @@ export interface UpdateTrackRequest {
 export interface ArtistDetail {
     artist: ArtistVM;
     albums: AlbumVM[];
+    // Last.fm's top tags for the artist, most used first. Empty until the
+    // popularity refresh has reached the artist, or when Last.fm is off.
+    tags?: string[];
 }
 
 export interface AlbumDetail {

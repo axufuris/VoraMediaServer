@@ -342,13 +342,17 @@ public class LastFmListeningDataProvider : IListeningDataProvider, IPluginConnec
 
         long? listeners = null;
         long? plays = null;
+        IReadOnlyList<string> tags = Array.Empty<string>();
         using (info.Document)
         {
-            if (info.Document.RootElement.TryGetProperty("artist", out var artist)
-                && artist.TryGetProperty("stats", out var stats))
+            if (info.Document.RootElement.TryGetProperty("artist", out var artist))
             {
-                listeners = ReadCount(stats, "listeners");
-                plays = ReadCount(stats, "playcount");
+                if (artist.TryGetProperty("stats", out var stats))
+                {
+                    listeners = ReadCount(stats, "listeners");
+                    plays = ReadCount(stats, "playcount");
+                }
+                tags = ReadTagNames(artist);
             }
         }
 
@@ -365,7 +369,28 @@ public class LastFmListeningDataProvider : IListeningDataProvider, IPluginConnec
             Plays = plays,
             TopTracks = tracks,
             TopAlbums = albums,
+            Tags = tags,
         };
+    }
+
+    internal static IReadOnlyList<string> ReadTagNames(JsonElement artist)
+    {
+        if (!artist.TryGetProperty("tags", out var tags) || tags.ValueKind != JsonValueKind.Object) return Array.Empty<string>();
+        if (!tags.TryGetProperty("tag", out var tag)) return Array.Empty<string>();
+
+        var items = tag.ValueKind switch
+        {
+            JsonValueKind.Array => tag.EnumerateArray().ToList(),
+            JsonValueKind.Object => new List<JsonElement> { tag },
+            _ => new List<JsonElement>()
+        };
+
+        return items
+            .Select(item => item.ValueKind == JsonValueKind.Object && item.TryGetProperty("name", out var n) ? n.GetString()?.Trim() : null)
+            .OfType<string>()
+            .Where(name => name.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private async Task<IReadOnlyList<NamedPopularity>> ReadNamedListAsync(
