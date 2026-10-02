@@ -43,8 +43,10 @@ public class AiPlaylistService : IAiPlaylistService
     public const int CandidatesPerSong = 10;
     public const int MaxCandidates = 1000;
     public const int MinMatches = 5;
-    public const double MinMatchCutoff = 0.40;
-    public const double MaxMatchCutoff = 0.70;
+    public const double MinMatchWindow = 0.01;
+    public const double MaxMatchWindow = 0.20;
+    public const double MaxMatchDistance = 0.70;
+    public const int MatchAnchorRank = 10;
     public const int MaxRequestLength = 300;
     public const int KeepRequests = 20;
 
@@ -315,21 +317,24 @@ public class AiPlaylistService : IAiPlaylistService
         return Normalize(sum);
     }
 
-    // Nearest first, only songs within the server's match cutoff, so a list
-    // the library can't fill comes back short rather than padded.
     private async Task<List<AiTrackCandidate>> PickAsync(string label, float[] query, MusicAccessFilter access, int count, HashSet<Guid> used, AiTrackFilter? filter = null)
     {
-        var cutoff = (await _settings.GetSettingsAsync()).AiPlaylistMatchCutoff;
+        var window = (await _settings.GetSettingsAsync()).AiPlaylistMatchWindow;
         var pool = Math.Min(count * CandidatesPerSong, MaxCandidates);
         var candidates = await _repository.FindNearestTracksAsync(query, access, (filter ?? AiTrackFilter.None) with { Exclude = used }, pool);
-        var matches = WithinCutoff(candidates, cutoff);
+        var limit = MatchLimit(candidates, window);
+        var matches = candidates.TakeWhile(c => c.Distance <= limit).ToList();
         var pick = PickVaried(matches, count, used);
-        LogSpread(label, count, cutoff, candidates, matches, pick);
+        LogSpread(label, count, window, limit, candidates, matches, pick);
         return pick.Tracks;
     }
 
-    public static List<AiTrackCandidate> WithinCutoff(IEnumerable<AiTrackCandidate> nearestFirst, double cutoff) =>
-        nearestFirst.TakeWhile(c => c.Distance <= cutoff).ToList();
+    public static double MatchLimit(IReadOnlyList<AiTrackCandidate> nearestFirst, double window)
+    {
+        if (nearestFirst.Count == 0) return 0;
+        var anchor = nearestFirst[Math.Min(MatchAnchorRank, nearestFirst.Count) - 1].Distance;
+        return Math.Min(anchor + window, MaxMatchDistance);
+    }
 
     // Two per artist first for a spread; when that can't fill the list, each
     // further pass lets every artist in once more.
@@ -359,7 +364,7 @@ public class AiPlaylistService : IAiPlaylistService
         return new AiPick(picked.Values.ToList(), perArtist.Count == 0 ? 0 : perArtist.Values.Max());
     }
 
-    private void LogSpread(string label, int wanted, double cutoff, IReadOnlyList<AiTrackCandidate> candidates, IReadOnlyList<AiTrackCandidate> matches, AiPick pick)
+    private void LogSpread(string label, int wanted, double window, double limit, IReadOnlyList<AiTrackCandidate> candidates, IReadOnlyList<AiTrackCandidate> matches, AiPick pick)
     {
         if (candidates.Count == 0)
         {
@@ -368,10 +373,10 @@ public class AiPlaylistService : IAiPlaylistService
         }
 
         _logger.LogInformation(
-            "AI playlist {Label}: asked for {Wanted} songs. {Candidates} candidates, distance nearest {Nearest:F3}, 10th {Tenth:F3}, median {Median:F3}, furthest {Furthest:F3}. {Matches} within cutoff {Cutoff:F2} from {Artists} artists. Picked {Picked}, up to {PerArtist} per artist.",
+            "AI playlist {Label}: asked for {Wanted} songs. {Candidates} candidates, distance nearest {Nearest:F3}, 10th {Tenth:F3}, median {Median:F3}, furthest {Furthest:F3}. {Matches} within {Limit:F3} (10th + window {Window:F2}) from {Artists} artists. Picked {Picked}, up to {PerArtist} per artist.",
             LogValue.SingleLine(label), wanted, candidates.Count,
             candidates[0].Distance, candidates[Math.Min(9, candidates.Count - 1)].Distance, candidates[candidates.Count / 2].Distance, candidates[^1].Distance,
-            matches.Count, cutoff, matches.Select(m => m.ArtistKey).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            matches.Count, limit, window, matches.Select(m => m.ArtistKey).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
             pick.Tracks.Count, pick.PerArtist);
     }
 

@@ -170,7 +170,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.EnableAiMusicPlaylists = request.EnableAiMusicPlaylists;
         settings.EnableAiPlaylistRequests = request.EnableAiPlaylistRequests;
         settings.AiPlaylistRequestsPerDay = Math.Clamp(request.AiPlaylistRequestsPerDay, 1, 100);
-        settings.AiPlaylistMatchCutoff = Math.Round(Math.Clamp(request.AiPlaylistMatchCutoff, AiPlaylistService.MinMatchCutoff, AiPlaylistService.MaxMatchCutoff), 2);
+        settings.AiPlaylistMatchWindow = Math.Round(Math.Clamp(request.AiPlaylistMatchWindow, AiPlaylistService.MinMatchWindow, AiPlaylistService.MaxMatchWindow), 2);
 
         settings.DvrStoragePath = string.IsNullOrWhiteSpace(request.DvrStoragePath) ? null : request.DvrStoragePath;
         settings.DvrMaxStorageGb = Math.Max(0, request.DvrMaxStorageGb);

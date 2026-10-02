@@ -167,7 +167,7 @@ public class ServerSetting
     public bool EnableAiMusicPlaylists { get; set; }
     public bool EnableAiPlaylistRequests { get; set; } = true;
     public int AiPlaylistRequestsPerDay { get; set; } = 10;
-    public double AiPlaylistMatchCutoff { get; set; } = 0.55;
+    public double AiPlaylistMatchWindow { get; set; } = 0.04;
     public DateTime? WeeklyMixLastRefreshedAt { get; set; }
 
     public bool EnableDiscover { get; set; } = true;
