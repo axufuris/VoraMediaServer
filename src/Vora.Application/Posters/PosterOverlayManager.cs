@@ -30,6 +30,7 @@ public class PosterOverlayManager : IPosterOverlayManager
     private readonly string _originalArtworkCacheDir;
 
     private readonly IServiceScopeFactory _scopeFactory;
+    private static readonly TimeSpan OrphanGracePeriod = TimeSpan.FromMinutes(10);
 
     public PosterOverlayManager(
         IMediaRepository mediaRepo,
@@ -73,6 +74,7 @@ public class PosterOverlayManager : IPosterOverlayManager
     {
         if (!Directory.Exists(_overlayDirectory)) return 0;
 
+        var newerThan = DateTime.UtcNow - OrphanGracePeriod;
         var referenced = await _mediaRepo.GetReferencedOverlayFileNamesAsync();
 
         var deleted = 0;
@@ -83,6 +85,7 @@ public class PosterOverlayManager : IPosterOverlayManager
             var fileName = System.IO.Path.GetFileName(path);
             if (!fileName.Contains("_overlay_", StringComparison.Ordinal)) continue;
             if (referenced.Contains(fileName)) continue;
+            if (File.GetLastWriteTimeUtc(path) > newerThan) continue;
 
             _thumbnails.RemoveThumbnailsForSource($"/api/artwork/custom/{fileName}");
 
@@ -120,14 +123,16 @@ public class PosterOverlayManager : IPosterOverlayManager
             var itemsToRevert = await _mediaRepo.GetItemsPendingOverlayGenerationAsync(libraryId, DateTime.UtcNow, layoutVersion);
             foreach (var item in itemsToRevert.Where(m => !string.IsNullOrEmpty(m.OriginalPosterUrl)))
             {
-                var episodeBackdropWasOverlay = item is Episode && item.BackgroundUrl == item.PosterUrl;
-                CleanupOldOverlay(item.PosterUrl, item.OriginalPosterUrl);
-                item.PosterUrl = item.OriginalPosterUrl;
-
-                if (episodeBackdropWasOverlay) item.BackgroundUrl = null;
-
-                item.LastOverlayGeneratedAt = null;
-                await _mediaRepo.UpdateMediaItemAsync(item);
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    await RevertToOriginalPosterAsync(scope.ServiceProvider.GetRequiredService<IMediaRepository>(), item);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to revert the overlay for {Title} ({MediaItemId}).", item.Title, item.Id);
+                }
             }
             return true;
         }
@@ -214,14 +219,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         {
             if (item.LastOverlayGeneratedAt != null && !string.IsNullOrEmpty(item.OriginalPosterUrl))
             {
-                var episodeBackdropWasOverlay = item is Episode && item.BackgroundUrl == item.PosterUrl;
-                CleanupOldOverlay(item.PosterUrl, item.OriginalPosterUrl);
-                item.PosterUrl = item.OriginalPosterUrl;
-
-                if (episodeBackdropWasOverlay) item.BackgroundUrl = null;
-
-                item.LastOverlayGeneratedAt = null;
-                await _mediaRepo.UpdateMediaItemAsync(item);
+                await RevertToOriginalPosterAsync(_mediaRepo, item);
             }
             return;
         }
@@ -364,6 +362,20 @@ public class PosterOverlayManager : IPosterOverlayManager
         if (codec.Contains("truehd") || codec.Contains("dts-hd") || title.Contains("atmos")) return 3;
         if (codec.Contains("eac3") || codec.Contains("ac3") || (track.Channels ?? 0) >= 6) return 2;
         return 1;
+    }
+
+    private async Task RevertToOriginalPosterAsync(IMediaRepository repository, MediaItem item)
+    {
+        var overlayUrl = item.PosterUrl;
+        var originalUrl = item.OriginalPosterUrl;
+        var episodeBackdropWasOverlay = item is Episode && item.BackgroundUrl == item.PosterUrl;
+
+        item.PosterUrl = originalUrl;
+        if (episodeBackdropWasOverlay) item.BackgroundUrl = null;
+        item.LastOverlayGeneratedAt = null;
+        await repository.UpdateMediaItemAsync(item);
+
+        CleanupOldOverlay(overlayUrl, originalUrl);
     }
 
     private void CleanupOldOverlay(string? currentUrl, string? originalUrl)

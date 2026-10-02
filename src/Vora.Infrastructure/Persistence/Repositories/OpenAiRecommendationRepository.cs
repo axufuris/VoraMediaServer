@@ -63,8 +63,7 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
 
     public async Task SaveEmbeddingsAsync(List<MediaItemEmbedding> embeddings)
     {
-        await context.MediaItemEmbeddings.AddRangeAsync(embeddings);
-        await context.SaveChangesAsync();
+        await EmbeddingWrites.InsertNewAsync(context, embeddings);
     }
 
     public Task<bool> IsAiEnabledForProfileAsync(Guid profileId) =>

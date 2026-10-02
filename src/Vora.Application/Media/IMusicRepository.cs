@@ -54,7 +54,7 @@ public interface IMusicRepository
     Task<List<ContentRatingTarget>> GetAlbumsDueForContentRatingAsync(DateTime recheckBefore, int limit);
     Task<List<TrackForEmbedding>> GetTracksMissingEmbeddingsAsync(int limit);
     Task<int> CountTracksMissingEmbeddingsAsync();
-    Task SaveTrackEmbeddingsAsync(IReadOnlyList<(Guid TrackId, float[] Vector)> embeddings);
+    Task<int> SaveTrackEmbeddingsAsync(IReadOnlyList<(Guid TrackId, float[] Vector)> embeddings);
     Task<List<Track>> GetAlbumTracksForUpdateAsync(Guid albumId);
     Task<Album?> GetAlbumForUpdateAsync(Guid albumId);
     Task<Track?> GetTrackForUpdateAsync(Guid trackId);

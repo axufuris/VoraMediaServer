@@ -769,7 +769,7 @@ public class TaskQueueManager : ITaskQueueManager
             {
                 processed = await embeddingService.ProcessMissingEmbeddingsAsync(AiEmbeddingsBatchSize, ct);
             } while (processed == AiEmbeddingsBatchSize && !ct.IsCancellationRequested);
-        });
+        }, dedupeKey: "ai-embeddings");
     }
 
     public void QueueGenerateLibraryPosterOverlays(Guid libraryId, string? libraryName = null)
@@ -957,7 +957,15 @@ public class TaskQueueManager : ITaskQueueManager
     {
         EnqueueTask("Make AI Playlists", async (ct, sp) =>
         {
-            await sp.GetRequiredService<Vora.Application.Media.Ai.IMusicEmbeddingService>().EmbedMissingTracksAsync(ct);
+            try
+            {
+                await sp.GetRequiredService<Vora.Application.Media.Ai.IMusicEmbeddingService>().EmbedMissingTracksAsync(ct);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                sp.GetService<ILogger<TaskQueueManager>>()?.LogWarning(ex, "Preparing new songs for AI playlists failed; making this week's playlists from the songs already prepared.");
+            }
             await sp.GetRequiredService<Vora.Application.Media.Ai.IAiPlaylistService>().GenerateWeeklyForDueProfilesAsync(force, ct);
         }, dedupeKey: "music-ai-playlists");
     }

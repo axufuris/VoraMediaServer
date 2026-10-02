@@ -44,6 +44,7 @@ public class MusicEmbeddingServiceTests
         _repository.GetTracksMissingEmbeddingsAsync(Arg.Any<int>()).Returns(batch, new List<TrackForEmbedding>());
         _openAi.EmbedAsync(MusicEmbeddingService.PluginId, Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns(new float[]?[] { new[] { 1f }, new[] { 2f } });
+        _repository.SaveTrackEmbeddingsAsync(Arg.Any<IReadOnlyList<(Guid, float[])>>()).Returns(ci => ci.Arg<IReadOnlyList<(Guid, float[])>>().Count);
 
         var done = await Service().EmbedMissingTracksAsync(TestContext.Current.CancellationToken);
 
@@ -70,5 +71,18 @@ public class MusicEmbeddingServiceTests
     {
         MusicEmbeddingService.Describe(Track("What's My Age Again?"))
             .Should().Be("Song: What's My Age Again?. Artist: blink-182. Album: Enema of the State (1999). Genre: Punk");
+    }
+
+    [Fact]
+    public async Task Songs_deleted_while_their_batch_was_embedded_are_not_counted()
+    {
+        AiPlaylists(true);
+        var batch = new List<TrackForEmbedding> { Track("All the Small Things"), Track("Adam's Song") };
+        _repository.GetTracksMissingEmbeddingsAsync(Arg.Any<int>()).Returns(batch, new List<TrackForEmbedding>());
+        _openAi.EmbedAsync(MusicEmbeddingService.PluginId, Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new float[]?[] { new[] { 1f }, new[] { 2f } });
+        _repository.SaveTrackEmbeddingsAsync(Arg.Any<IReadOnlyList<(Guid, float[])>>()).Returns(1);
+
+        (await Service().EmbedMissingTracksAsync(TestContext.Current.CancellationToken)).Should().Be(1);
     }
 }
