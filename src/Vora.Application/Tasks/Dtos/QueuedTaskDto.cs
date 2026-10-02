@@ -28,4 +28,10 @@ public class QueuedTaskDto
     public Func<IServiceProvider, Task<string?>>? NameResolver { get; set; }
 
     public QueuedTaskDto? FollowUp { get; set; }
+
+    public Guid? LibraryId { get; set; }
+
+    public Guid? MediaItemId { get; set; }
+
+    public Action? OnCancelled { get; set; }
 }

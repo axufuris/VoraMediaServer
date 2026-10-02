@@ -17,6 +17,7 @@ public class LibraryManagerTests
     private readonly ITaskQueueManager _queue;
     private readonly IClientNotifier _notifier;
     private readonly LibraryManager _manager;
+    private readonly List<Guid> _libraryItems = new() { Guid.NewGuid(), Guid.NewGuid() };
 
     public LibraryManagerTests()
     {
@@ -37,6 +38,9 @@ public class LibraryManagerTests
         var factory = Substitute.For<IServiceScopeFactory>();
 
         scopeProvider.GetService(typeof(IVideoThumbnailManager)).Returns(thumbnails);
+        var media = Substitute.For<Vora.Application.Media.IMediaRepository>();
+        media.GetAllMediaItemIdsByLibraryAsync(Arg.Any<Guid>()).Returns(_libraryItems);
+        scopeProvider.GetService(typeof(Vora.Application.Media.IMediaRepository)).Returns(media);
         scope.ServiceProvider.Returns(scopeProvider);
         factory.CreateScope().Returns(scope);
         _services.GetService(typeof(IServiceScopeFactory)).Returns(factory);
@@ -72,6 +76,23 @@ public class LibraryManagerTests
         await _manager.DeleteLibraryAsync(libraryId, TestContext.Current.CancellationToken);
 
         _watcher.Received(1).StopWatching(libraryId);
+    }
+
+    [Fact]
+    public async Task DeleteLibraryAsync_stops_the_watcher_then_waits_for_the_librarys_tasks_and_items_before_deleting()
+    {
+        var thumbnails = WireThumbnailManager();
+        var libraryId = Guid.NewGuid();
+
+        await _manager.DeleteLibraryAsync(libraryId, TestContext.Current.CancellationToken);
+
+        Received.InOrder(() =>
+        {
+            _watcher.StopWatching(libraryId);
+            _queue.WaitForLibraryTasksToStopAsync(libraryId, Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.Count == 2 && _libraryItems.All(ids.Contains)), TestContext.Current.CancellationToken);
+            thumbnails.PurgeLibraryThumbnailFilesAsync(libraryId, TestContext.Current.CancellationToken);
+            _repo.DeleteLibraryAsync(libraryId, TestContext.Current.CancellationToken);
+        });
     }
 
     [Fact]

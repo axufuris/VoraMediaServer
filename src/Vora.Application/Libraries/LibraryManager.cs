@@ -206,6 +206,9 @@ public class LibraryManager : ILibraryManager
         _folderWatcher.StopWatching(id);
 
         using var scope = _serviceProvider.CreateScope();
+        var itemIds = (await scope.ServiceProvider.GetRequiredService<Vora.Application.Media.IMediaRepository>().GetAllMediaItemIdsByLibraryAsync(id)).ToHashSet();
+        await _taskQueueManager.WaitForLibraryTasksToStopAsync(id, itemIds, cancellationToken);
+
         var thumbnailManager = scope.ServiceProvider.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
         await thumbnailManager.PurgeLibraryThumbnailFilesAsync(id, cancellationToken);
 

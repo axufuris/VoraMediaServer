@@ -257,6 +257,8 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         if (partsToAnalyze.Count == 0) return;
 
         var primaryPart = item.MediaParts.First();
+        var reprobed = false;
+        var thumbnailsStale = false;
 
         foreach (var part in item.MediaParts)
         {
@@ -265,6 +267,12 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
 
             var analysis = await _analyzerService.AnalyzeFileAsync(part.FilePath, cancellationToken);
             if (analysis == null) continue;
+            reprobed = true;
+            if (part.LastAnalyzedAt != null || part.VideoThumbnailSpriteVersion == null)
+            {
+                part.VideoThumbnailSpriteVersion = null;
+                thumbnailsStale = true;
+            }
 
             if (analysis.Duration != null && !item.IsLocked("Duration") && (part == primaryPart || item.Analysis?.Duration == null))
             {
@@ -296,7 +304,8 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // A part was (re)probed here (an added or replaced file — unchanged files
         // returned above), so any existing intro/credit markers are stale. Clear
         // the marker-analysis stamp so the skip-gate re-detects them next pass.
-        item.MarkersAnalyzedAt = null;
+        if (reprobed) item.MarkersAnalyzedAt = null;
+        if (thumbnailsStale) item.VideoThumbnailSpriteVersion = null;
 
         await _mediaRepository.UpdateMediaItemAsync(item);
 

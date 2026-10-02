@@ -443,6 +443,15 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         }
     }
 
+    public async Task<bool> WantsAdditionThumbnailsAsync(Guid libraryId)
+    {
+        var (libraryType, enabled) = await GetLibraryThumbnailStateAsync(libraryId);
+        if (!libraryType.HasVideoContent() || !enabled) return false;
+
+        var trigger = (await _settingsRepo.GetSettingsAsync()).VideoThumbnailGeneration;
+        return trigger is DetectionTrigger.OnAddition or DetectionTrigger.OnAdditionAndSchedule;
+    }
+
     private async Task<(LibraryType Type, bool Enabled)> GetLibraryThumbnailStateAsync(Guid libraryId)
     {
         var meta = await _libraryRepository.GetProjectedByIdAsync(libraryId, l => new
