@@ -68,8 +68,7 @@ public class MusicEmbeddingService : IMusicEmbeddingService
             // songs again on the next pass.
             if (saved.Count == 0) break;
 
-            await _repository.SaveTrackEmbeddingsAsync(saved);
-            done += saved.Count;
+            done += await _repository.SaveTrackEmbeddingsAsync(saved);
         }
 
         _progress.Report(null);

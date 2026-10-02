@@ -471,19 +471,15 @@ public class MusicRepository : IMusicRepository
     public Task<int> CountTracksMissingEmbeddingsAsync() =>
         _context.Tracks.CountAsync(t => !_context.MediaItemEmbeddings.Any(e => e.MediaItemId == t.Id));
 
-    public async Task SaveTrackEmbeddingsAsync(IReadOnlyList<(Guid TrackId, float[] Vector)> embeddings)
-    {
-        foreach (var (trackId, vector) in embeddings)
-        {
-            _context.MediaItemEmbeddings.Add(new Vora.Domain.Entities.Ai.MediaItemEmbedding
+    public Task<int> SaveTrackEmbeddingsAsync(IReadOnlyList<(Guid TrackId, float[] Vector)> embeddings) =>
+        EmbeddingWrites.InsertNewAsync(_context, embeddings
+            .Select(e => new Vora.Domain.Entities.Ai.MediaItemEmbedding
             {
-                MediaItemId = trackId,
-                Embedding = new Pgvector.Vector(vector),
+                MediaItemId = e.TrackId,
+                Embedding = new Pgvector.Vector(e.Vector),
                 LastUpdatedAt = DateTime.UtcNow
-            });
-        }
-        await _context.SaveChangesAsync();
-    }
+            })
+            .ToList());
 
     public Task<List<Track>> GetAlbumTracksForUpdateAsync(Guid albumId) =>
         _context.Tracks
