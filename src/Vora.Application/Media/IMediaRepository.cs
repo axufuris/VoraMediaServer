@@ -33,6 +33,10 @@ public interface IMediaRepository
     Task<List<Guid>> GetTopLevelMediaItemIdsByLibraryAsync(Guid libraryId);
     Task<MarkerDetectionGateDto?> GetMarkerDetectionGateAsync(Guid mediaItemId);
     Task<bool> SeasonHasPendingMarkerWorkAsync(Guid seasonId);
+    Task<List<Guid>> GetMarkerDetectionTargetIdsAsync(Guid libraryId);
+    Task<List<Guid>> GetFileAnalysisTargetIdsAsync(Guid libraryId);
+    Task<List<PartFileStateDto>> GetLibraryPartFileStatesAsync(Guid libraryId);
+    Task MarkPartsChangedOnDiskAsync(IReadOnlyCollection<Guid> partIds);
     Task<SilenceDetectionInputsDto?> GetSilenceDetectionInputsAsync(Guid mediaItemId);
     Task<List<FingerprintInputDto>> GetSeasonFingerprintInputsAsync(Guid seasonId);
     Task<Dictionary<Guid, StoredAudioFingerprintDto>> GetAudioFingerprintsForEpisodesAsync(IReadOnlyCollection<Guid> mediaItemIds);

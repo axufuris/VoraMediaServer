@@ -117,7 +117,10 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     public async Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null, CancellationToken cancellationToken = default)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
-        var mediaIds = (await _mediaRepository.GetAllMediaItemIdsByLibraryAsync(libraryId)).ToList();
+        await CheckLibraryFilesOnDiskAsync(libraryId, cancellationToken);
+
+        var mediaIds = await _mediaRepository.GetFileAnalysisTargetIdsAsync(libraryId);
+        if (mediaIds.Count == 0) return;
         var titles = await _mediaRepository.GetDisplayTitlesByIdsAsync(mediaIds);
         var total = mediaIds.Count;
         var done = 0;
@@ -202,7 +205,9 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // skip it — and every season's episodes were then detected twice (once via
         // the show, once via the season). For a large TV library that's tens of
         // thousands of wasted queries before any real work starts.
-        var mediaIds = await _mediaRepository.GetTopLevelMediaItemIdsByLibraryAsync(libraryId);
+        var mediaIds = forceOverride
+            ? await _mediaRepository.GetTopLevelMediaItemIdsByLibraryAsync(libraryId)
+            : await _mediaRepository.GetMarkerDetectionTargetIdsAsync(libraryId);
         if (mediaIds.Count == 0) return;
 
         // Both marker toggles off → there's nothing to detect. Bail before the
@@ -318,32 +323,88 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
 
     public Task AnalyzeMediaFileAsync(Guid mediaItemId, CancellationToken cancellationToken = default) => RunFileAnalysisAsync(mediaItemId, cancellationToken);
 
-    // Dropping a .srt next to a video changes nothing ffprobe can see, so this
-    // deliberately runs on every analysis pass rather than only for parts whose
-    // file changed — otherwise a sidecar added to an unchanged library would
-    // never be picked up.
     private async Task SyncExternalSubtitleTracksAsync(IEnumerable<MediaPart> parts, CancellationToken cancellationToken)
     {
         foreach (var part in parts)
         {
             cancellationToken.ThrowIfCancellationRequested();
-
-            var incoming = _externalSubtitles.Discover(part.FilePath)
-                .Select(found => new MediaSubtitleTrack
-                {
-                    ExternalFilePath = found.FilePath,
-                    Codec = found.Codec,
-                    Language = found.Language,
-                    Title = found.Title,
-                    IsForced = found.IsForced,
-                    IsHearingImpaired = found.IsSdh,
-                    IsDefault = false,
-                })
-                .ToList();
-
-            await _mediaRepository.SyncExternalSubtitleTracksAsync(part.Id, incoming);
+            await _mediaRepository.SyncExternalSubtitleTracksAsync(part.Id, ToExternalTracks(_externalSubtitles.Discover(part.FilePath)));
         }
     }
+
+    private static List<MediaSubtitleTrack> ToExternalTracks(IEnumerable<Vora.Application.Subtitles.ExternalSubtitleFile> found) =>
+        found.Select(f => new MediaSubtitleTrack
+        {
+            ExternalFilePath = f.FilePath,
+            Codec = f.Codec,
+            Language = f.Language,
+            Title = f.Title,
+            IsForced = f.IsForced,
+            IsHearingImpaired = f.IsSdh,
+            IsDefault = false,
+        }).ToList();
+
+    private async Task CheckLibraryFilesOnDiskAsync(Guid libraryId, CancellationToken cancellationToken)
+    {
+        var parts = await _mediaRepository.GetLibraryPartFileStatesAsync(libraryId);
+        var folders = parts
+            .GroupBy(p => Path.GetDirectoryName(p.FilePath) ?? string.Empty, StringComparer.Ordinal)
+            .Where(g => g.Key.Length > 0)
+            .ToList();
+
+        var changed = new List<Guid>();
+        var checkedFolders = 0;
+
+        foreach (var folder in folders)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _progress.Report($"Checking for changed files ({++checkedFolders}/{folders.Count})");
+
+            var files = ListFolder(folder.Key);
+            if (files == null) continue;
+
+            var subtitleFiles = files.Keys
+                .Where(Vora.Application.Subtitles.ExternalSubtitleNaming.IsSubtitleExtension)
+                .Select(name => Path.Join(folder.Key, name))
+                .ToList();
+
+            foreach (var part in folder)
+            {
+                if (!files.TryGetValue(Path.GetFileName(part.FilePath), out var size)) continue;
+                if (part.LastAnalyzedAt != null && size != part.FileSizeBytes) changed.Add(part.PartId);
+
+                var found = _externalSubtitles.Match(part.FilePath, subtitleFiles);
+                if (!SamePaths(found.Select(f => f.FilePath), part.ExternalSubtitlePaths))
+                {
+                    await _mediaRepository.SyncExternalSubtitleTracksAsync(part.PartId, ToExternalTracks(found));
+                }
+            }
+        }
+
+        if (changed.Count > 0)
+        {
+            _logger.LogInformation("{Count} file(s) in library {LibraryId} changed on disk since they were analyzed; re-analyzing them.", changed.Count, libraryId);
+            await _mediaRepository.MarkPartsChangedOnDiskAsync(changed);
+        }
+    }
+
+    private Dictionary<string, long>? ListFolder(string folder)
+    {
+        try
+        {
+            var directory = new DirectoryInfo(folder);
+            if (!directory.Exists) return null;
+            return directory.EnumerateFiles().ToDictionary(f => f.Name, f => f.Length, StringComparer.Ordinal);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not list {Folder} while checking for changed files.", folder);
+            return null;
+        }
+    }
+
+    private static bool SamePaths(IEnumerable<string> found, IEnumerable<string> known) =>
+        found.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(known);
 
     private static bool ProbeFailed(MediaAnalysisResult analysis) =>
         analysis.FileSizeBytes == null
@@ -709,8 +770,6 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
 
         foreach (var (episodeId, markers) in episodesById)
         {
-            if (await _mediaRepository.AreMarkersLockedAsync(episodeId)) continue;
-
             var changed = false;
 
             if (canonicalIntroEnd != null)
@@ -733,7 +792,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
                 }
             }
 
-            if (changed)
+            if (changed && !await _mediaRepository.AreMarkersLockedAsync(episodeId))
             {
                 await _mediaRepository.ReplaceMarkersAsync(episodeId, markers);
                 await _notifier.NotifyMediaAnalysisUpdatedAsync(episodeId);
