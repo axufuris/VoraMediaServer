@@ -5,6 +5,7 @@ namespace Vora.Application.Subtitles;
 public interface IExternalSubtitleScanner
 {
     IReadOnlyList<ExternalSubtitleFile> Discover(string videoFilePath);
+    IReadOnlyList<ExternalSubtitleFile> Match(string videoFilePath, IEnumerable<string> subtitleFilePaths);
 }
 
 public class ExternalSubtitleScanner : IExternalSubtitleScanner
@@ -23,22 +24,25 @@ public class ExternalSubtitleScanner : IExternalSubtitleScanner
         var directory = Path.GetDirectoryName(videoFilePath);
         if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory)) return Array.Empty<ExternalSubtitleFile>();
 
-        var videoFileName = Path.GetFileName(videoFilePath);
-
         try
         {
-            return Directory.EnumerateFiles(directory)
-                .Where(ExternalSubtitleNaming.IsSubtitleExtension)
-                .Select(path => ExternalSubtitleNaming.TryParse(videoFileName, path))
-                .Where(match => match != null)
-                .Select(match => match!)
-                .OrderBy(match => match.FilePath, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            return Match(videoFilePath, Directory.EnumerateFiles(directory).ToList());
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Could not scan {Directory} for sidecar subtitles.", directory);
             return Array.Empty<ExternalSubtitleFile>();
         }
+    }
+
+    public IReadOnlyList<ExternalSubtitleFile> Match(string videoFilePath, IEnumerable<string> subtitleFilePaths)
+    {
+        var videoFileName = Path.GetFileName(videoFilePath);
+        var matches = new List<ExternalSubtitleFile>();
+        foreach (var path in subtitleFilePaths.Where(ExternalSubtitleNaming.IsSubtitleExtension))
+        {
+            if (ExternalSubtitleNaming.TryParse(videoFileName, path) is { } match) matches.Add(match);
+        }
+        return matches.OrderBy(match => match.FilePath, StringComparer.OrdinalIgnoreCase).ToList();
     }
 }

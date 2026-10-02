@@ -136,7 +136,7 @@ The separator **must** be a literal dot: `Movie (2026) Part 2.en.srt` must not a
 
 Three things follow from external tracks existing that are easy to get wrong:
 
-- **Discovery runs before the probe-skip guard.** Dropping a `.srt` beside an unchanged video changes nothing ffprobe can see, so a pass gated on "did the file change" would never find it.
+- **Discovery runs before the probe-skip guard.** Dropping a `.srt` beside an unchanged video changes nothing ffprobe can see, so a pass gated on "did the file change" would never find it. A library analysis therefore starts with one folder pass (`CheckLibraryFilesOnDiskAsync`): one listing per folder, sidecars matched to each part with `IExternalSubtitleScanner.Match`, and `SyncExternalSubtitleTracksAsync` called only for parts whose sidecar set differs. Single-item analysis still discovers per part.
 - **Reconciliation is split.** `SyncMediaTracksAsync` matches embedded tracks by `StreamIndex` and now filters to `ExternalFilePath == null`; sidecars reconcile by path in `SyncExternalSubtitleTracksAsync`. Left together, an ffprobe pass would delete every sidecar — and throw first, since sidecars all share the default stream index.
 - **The `0:s:N` ordinal counts container streams only.** External rows are excluded before indexing, in both the endpoint and the pre-extraction pass; counting them shifts every embedded ordinal after them.
 

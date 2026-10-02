@@ -474,13 +474,70 @@ public partial class MediaRepository : IMediaRepository
     {
         var rows = await _context.Set<Episode>()
             .AsNoTracking()
-            .Where(e => e.SeasonId == seasonId)
+            .Where(e => e.SeasonId == seasonId && e.MissingSince == null)
             .Select(e => new { e.LockedFields, e.MarkersAnalyzedAt })
             .ToListAsync();
 
-        return rows.Any(r =>
-            r.MarkersAnalyzedAt == null &&
-            !(r.LockedFields != null && r.LockedFields.Contains("Markers", StringComparer.OrdinalIgnoreCase)));
+        return rows.Any(r => r.MarkersAnalyzedAt == null && !AreMarkersLocked(r.LockedFields));
+    }
+
+    private static bool AreMarkersLocked(List<string>? lockedFields) =>
+        lockedFields != null && lockedFields.Contains("Markers", StringComparer.OrdinalIgnoreCase);
+
+    public async Task<List<Guid>> GetMarkerDetectionTargetIdsAsync(Guid libraryId)
+    {
+        var movies = await _context.Set<Movie>()
+            .AsNoTracking()
+            .Where(m => m.LibraryId == libraryId && m.MissingSince == null && m.MarkersAnalyzedAt == null)
+            .Select(m => new { m.Id, m.LockedFields })
+            .ToListAsync();
+
+        var episodes = await _context.Set<Episode>()
+            .AsNoTracking()
+            .Where(e => e.Season.TvShow.LibraryId == libraryId && e.MissingSince == null && e.MarkersAnalyzedAt == null)
+            .Select(e => new { ShowId = e.Season.TvShowId, e.LockedFields })
+            .ToListAsync();
+
+        return movies.Where(m => !AreMarkersLocked(m.LockedFields)).Select(m => m.Id)
+            .Concat(episodes.Where(e => !AreMarkersLocked(e.LockedFields)).Select(e => e.ShowId).Distinct())
+            .ToList();
+    }
+
+    public Task<List<Guid>> GetFileAnalysisTargetIdsAsync(Guid libraryId) =>
+        _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.LibraryId == libraryId && m.MissingSince == null && m.MediaParts.Any(p => p.LastAnalyzedAt == null))
+            .Select(m => m.Id)
+            .ToListAsync();
+
+    public Task<List<Vora.Application.Media.Dtos.PartFileStateDto>> GetLibraryPartFileStatesAsync(Guid libraryId) =>
+        _context.MediaParts
+            .AsNoTracking()
+            .Where(p => p.MediaItem != null && p.MediaItem.LibraryId == libraryId && p.MediaItem.MissingSince == null)
+            .Select(p => new Vora.Application.Media.Dtos.PartFileStateDto
+            {
+                PartId = p.Id,
+                FilePath = p.FilePath,
+                FileSizeBytes = p.FileSizeBytes,
+                LastAnalyzedAt = p.LastAnalyzedAt,
+                ExternalSubtitlePaths = p.SubtitleTracks
+                    .Where(t => t.ExternalFilePath != null && !t.IsDownloaded)
+                    .Select(t => t.ExternalFilePath ?? string.Empty)
+                    .ToList()
+            })
+            .ToListAsync();
+
+    public async Task MarkPartsChangedOnDiskAsync(IReadOnlyCollection<Guid> partIds)
+    {
+        if (partIds.Count == 0) return;
+
+        var parts = await _context.MediaParts.Where(p => partIds.Contains(p.Id)).ToListAsync();
+        foreach (var part in parts)
+        {
+            part.LastAnalyzedAt = null;
+            part.VideoThumbnailSpriteVersion = null;
+        }
+        await _context.SaveChangesAsync();
     }
 
     public async Task<Vora.Application.Media.Dtos.SilenceDetectionInputsDto?> GetSilenceDetectionInputsAsync(Guid mediaItemId)
