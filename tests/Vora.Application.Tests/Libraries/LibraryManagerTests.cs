@@ -268,4 +268,24 @@ public class LibraryManagerTests
         _watcher.Received(1).StopWatching(libraryId);
         _watcher.DidNotReceive().StartWatching(Arg.Any<Guid>(), Arg.Any<IEnumerable<string>>());
     }
+
+    [Fact]
+    public async Task Turning_thumbnails_off_hands_the_removal_to_the_queue_instead_of_purging_inline()
+    {
+        var thumbnails = WireThumbnailManager();
+        var library = new Vora.Domain.Entities.Library.MediaLibrary
+        {
+            Id = Guid.NewGuid(),
+            Name = "Movies",
+            Type = LibraryType.Movie,
+            FolderPaths = new List<string> { "/media/movies" },
+            EnableVideoPreviewThumbnails = true
+        };
+        _repo.GetForUpdateAsync(library.Id).Returns(library);
+
+        await _manager.UpdateLibraryAsync(library.Id, new UpdateLibraryRequest { Name = "Movies", FolderPaths = new List<string> { "/media/movies" }, EnableVideoPreviewThumbnails = false });
+
+        _queue.Received(1).QueueRemoveLibraryVideoThumbnails(library.Id, "Movies");
+        await thumbnails.DidNotReceive().PurgeLibraryThumbnailsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
 }

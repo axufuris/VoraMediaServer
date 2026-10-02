@@ -39,7 +39,7 @@ Changing any of the geometry/quality values above bumps the sprite-version hash,
 
 `MediaLibrary.EnableVideoPreviewThumbnails` (existing flag). The UI checkbox is hidden for Music, LiveTv, and any non-video MediaType; `LibraryManager.CreateLibraryAsync` and `UpdateLibraryAsync` also coerce the value to `false` server-side for those types, so a stale client can't enable it.
 
-When the flag flips `true → false`, `LibraryManager.UpdateLibraryAsync` calls `IVideoThumbnailManager.PurgeLibraryThumbnailsAsync` to wipe stored sprites for that library.
+When the flag flips `true → false`, `LibraryManager.UpdateLibraryAsync` calls `QueueRemoveLibraryVideoThumbnails`: it cancels the library's **Generate Video Thumbnails** task (queued or running — a running *Regenerate all* ignores the flag) and queues **Remove Video Thumbnails: <library>** on the same `LibraryMaintenanceKey`, so `PurgeLibraryThumbnailsAsync` runs only after any running pass has stopped, and off the save request.
 
 ## Per-item state
 

@@ -191,9 +191,7 @@ public class LibraryManager : ILibraryManager
 
         if (thumbnailsTurnedOff)
         {
-            using var purgeScope = _serviceProvider.CreateScope();
-            var thumbnailManager = purgeScope.ServiceProvider.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
-            await thumbnailManager.PurgeLibraryThumbnailsAsync(library.Id);
+            _taskQueueManager.QueueRemoveLibraryVideoThumbnails(library.Id, library.Name);
         }
     }
 

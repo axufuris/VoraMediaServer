@@ -221,15 +221,17 @@ public static class MediaEndpoints
         }
     }
 
-    private static IResult QueueScanAsync(Guid id, ITaskQueueManager taskQueue)
+    private static async Task<IResult> QueueScanAsync(Guid id, ITaskQueueManager taskQueue, IMediaRepository repository)
     {
-        taskQueue.QueueScanMediaItem(id);
+        var item = await repository.GetProjectedAsync(id, m => new { m.Title, m.LibraryId });
+        taskQueue.QueueScanMediaItem(id, item?.Title, libraryId: item?.LibraryId);
         return Results.Accepted();
     }
 
-    private static IResult QueueRefreshMetadataAsync(Guid id, [FromQuery] bool force, ITaskQueueManager taskQueue)
+    private static async Task<IResult> QueueRefreshMetadataAsync(Guid id, [FromQuery] bool force, ITaskQueueManager taskQueue, IMediaRepository repository)
     {
-        taskQueue.QueueRefreshMediaItemMetadata(id, null, forceOverride: force);
+        var item = await repository.GetProjectedAsync(id, m => new { m.Title, m.LibraryId });
+        taskQueue.QueueRefreshMediaItemMetadata(id, item?.Title, forceOverride: force, libraryId: item?.LibraryId);
         return Results.Accepted();
     }
 
@@ -251,9 +253,10 @@ public static class MediaEndpoints
         return Results.Accepted();
     }
 
-    private static IResult QueueRefreshArtworkAsync(Guid id, [FromQuery] bool force, ITaskQueueManager taskQueue)
+    private static async Task<IResult> QueueRefreshArtworkAsync(Guid id, [FromQuery] bool force, ITaskQueueManager taskQueue, IMediaRepository repository)
     {
-        taskQueue.QueueRefreshMediaItemArtwork(id, forceOverride: force);
+        var libraryId = await repository.GetProjectedAsync(id, m => (Guid?)m.LibraryId);
+        taskQueue.QueueRefreshMediaItemArtwork(id, forceOverride: force, libraryId: libraryId);
         return Results.Accepted();
     }
 

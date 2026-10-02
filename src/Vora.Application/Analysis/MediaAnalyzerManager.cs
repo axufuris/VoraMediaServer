@@ -266,7 +266,11 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             cancellationToken.ThrowIfCancellationRequested();
 
             var analysis = await _analyzerService.AnalyzeFileAsync(part.FilePath, cancellationToken);
-            if (analysis == null) continue;
+            if (analysis == null || ProbeFailed(analysis))
+            {
+                _logger.LogWarning("Could not read {FilePath} for analysis; keeping its existing track data.", part.FilePath);
+                continue;
+            }
             reprobed = true;
             if (part.LastAnalyzedAt != null || part.VideoThumbnailSpriteVersion == null)
             {
@@ -341,13 +345,19 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
     }
 
+    private static bool ProbeFailed(MediaAnalysisResult analysis) =>
+        analysis.FileSizeBytes == null
+        && analysis.Duration == null
+        && analysis.VideoTracks.Count == 0
+        && analysis.AudioTracks.Count == 0;
+
     private static bool PartNeedsAnalysis(MediaPart part)
     {
-        if (part.LastAnalyzedAt == null) return true;
         try
         {
             var info = new FileInfo(part.FilePath);
-            return !info.Exists || info.Length != part.FileSizeBytes;
+            if (!info.Exists) return false;
+            return part.LastAnalyzedAt == null || info.Length != part.FileSizeBytes;
         }
         catch
         {

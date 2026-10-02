@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Vora.Application.Analysis;
+using Vora.Application.Libraries;
 using Vora.Application.Tasks;
 using Vora.Application.Thumbnails;
 using Vora.Plugins.Interfaces;
@@ -160,9 +161,12 @@ public class LibraryTaskLifecycleTests
     {
         var thumbnails = Substitute.For<IVideoThumbnailManager>();
         var queue = Substitute.For<ITaskQueueManager>();
+        var libraries = Substitute.For<ILibraryRepository>();
+        libraries.GetProjectedByIdAsync(Arg.Any<Guid>(), Arg.Any<System.Linq.Expressions.Expression<Func<Vora.Domain.Entities.Library.MediaLibrary, string>>>()).Returns("Shows");
         var sp = new ServiceCollection()
             .AddSingleton(thumbnails)
             .AddSingleton(queue)
+            .AddSingleton(libraries)
             .AddSingleton<ITaskProgressReporter>(new NullTaskProgressReporter())
             .BuildServiceProvider();
         return (sp, thumbnails, queue);
@@ -255,5 +259,80 @@ public class LibraryTaskLifecycleTests
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         _queue.GetAllTasks().Single().Status.Should().Be("Pending");
+    }
+
+    [Fact]
+    public async Task A_pass_queued_for_a_new_file_is_named_after_its_library_while_it_waits()
+    {
+        var (sp, thumbnails, queue) = Services();
+        var library = Guid.NewGuid();
+        thumbnails.WantsAdditionThumbnailsAsync(library).Returns(true);
+
+        await TaskQueueManager.QueueAdditionThumbnailsIfWantedAsync(sp, library, null);
+
+        queue.Received(1).QueueGenerateLibraryVideoThumbnails(library, "Shows", false, false, true);
+    }
+
+    [Fact]
+    public async Task Turning_thumbnails_off_stops_the_running_pass_and_removes_them_after_it_stops()
+    {
+        _queue.QueueGenerateLibraryVideoThumbnails(_movies, "Movies", forceOverride: true);
+        var running = IdOf("Generate Video Thumbnails: Movies");
+        await Task.Run(() => _queue.MarkTaskAsRunning(running), TestContext.Current.CancellationToken);
+
+        _queue.QueueRemoveLibraryVideoThumbnails(_movies, "Movies");
+
+        _queue.GetAllTasks().Single(t => t.Id == running).Status.Should().Be("Cancelling");
+        _queue.GetAllTasks().Select(t => t.Name).Should().Contain("Remove Video Thumbnails: Movies");
+        _queue.PendingThumbnailReasons(_movies).Should().Be(LibraryThumbnailReason.None);
+    }
+
+    [Fact]
+    public void Turning_thumbnails_off_drops_a_queued_pass()
+    {
+        _queue.QueueGenerateLibraryVideoThumbnails(_movies, "Movies", isScheduleTrigger: true);
+
+        _queue.QueueRemoveLibraryVideoThumbnails(_movies, "Movies");
+
+        _queue.GetAllTasks().Select(t => t.Name).Should().Equal("Remove Video Thumbnails: Movies");
+    }
+
+    private async Task<List<Vora.Application.Tasks.Dtos.QueuedTaskDto>> Dequeued(int count)
+    {
+        var tasks = new List<Vora.Application.Tasks.Dtos.QueuedTaskDto>();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        await foreach (var task in _queue.DequeueAsync(cts.Token))
+        {
+            tasks.Add(task);
+            if (tasks.Count == count) break;
+        }
+        return tasks;
+    }
+
+    [Fact]
+    public async Task Item_scans_and_refreshes_wait_for_their_librarys_scan_instead_of_racing_it()
+    {
+        var item = Guid.NewGuid();
+        _queue.QueueScanLibrary(_movies, "Movies");
+        _queue.QueueScanMediaItem(item, "Dead Snow", libraryId: _movies);
+        _queue.QueueRefreshMediaItemMetadata(item, "Dead Snow", libraryId: _movies);
+        _queue.QueueRefreshMediaItemArtwork(item, libraryId: _movies);
+        _queue.QueueRefreshLibraryRatings(_movies);
+
+        var tasks = await Dequeued(5);
+
+        tasks.Select(t => t.ResourceKey).Distinct().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Deleting_a_library_cancels_queued_item_scans_and_refreshes_in_it()
+    {
+        var item = Guid.NewGuid();
+        _queue.QueueScanMediaItem(item, "Dead Snow", libraryId: _movies);
+        _queue.QueueRefreshMediaItemMetadata(item, "Dead Snow", libraryId: _movies);
+
+        _queue.QueueDeleteLibrary(_movies, "Movies");
+
+        _queue.GetAllTasks().Select(t => t.Name).Should().Equal("Delete Library: Movies");
     }
 }

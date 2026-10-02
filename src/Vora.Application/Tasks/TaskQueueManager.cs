@@ -29,16 +29,16 @@ public interface ITaskQueueManager
     void QueueDeleteLibrary(Guid libraryId, string? libraryName = null);
     void QueueRefreshLibraryMetadata(Guid libraryId, string? libraryName = null, bool forceOverride = false);
     void QueueAnalyzeLibraryMediaContent(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false);
-    void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
+    void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, Guid? libraryId = null);
     void QueueScanNewFile(Guid libraryId, string filePath);
     void QueueLibraryPostScan(Guid libraryId, string? libraryName = null, bool forceOverride = false);
     void QueueScanNewMusicFile(Guid libraryId, string filePath);
-    void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
+    void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, Guid? libraryId = null);
     void QueueRefreshMatchedMediaItem(Guid mediaItemId, Guid libraryId, bool isTvShow);
     void QueueAnalyzeMediaItemContent(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueArtworkProviderSwap(Guid libraryId, string libraryName);
     void QueueRefreshLibraryRatings(Guid libraryId, bool forceOverride = false);
-    void QueueRefreshMediaItemArtwork(Guid mediaItemId, bool forceOverride = false);
+    void QueueRefreshMediaItemArtwork(Guid mediaItemId, bool forceOverride = false, Guid? libraryId = null);
     void QueueRefreshArtistArtwork(Guid artistId, string? artistName = null, bool forceOverride = false);
     void QueueRefreshAlbumArtwork(Guid albumId, string? albumName = null, bool forceOverride = false);
     void QueueRefreshAllActorMetadata();
@@ -69,6 +69,7 @@ public interface ITaskQueueManager
     void QueueIptvHealthCheck(Guid playlistId, string? playlistName = null);
     void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false);
     Task WaitForLibraryTasksToStopAsync(Guid libraryId, IReadOnlyCollection<Guid>? mediaItemIds = null, CancellationToken cancellationToken = default);
+    void QueueRemoveLibraryVideoThumbnails(Guid libraryId, string? libraryName = null);
     void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueuePreExtractMediaItemSubtitles(Guid mediaItemId, string? mediaItemName = null);
     void QueuePreExtractLibrarySubtitles(Guid libraryId, string? libraryName = null);
@@ -213,7 +214,7 @@ public class TaskQueueManager : ITaskQueueManager
             : isScheduleTrigger ? LibraryAnalysisReason.Schedule
             : LibraryAnalysisReason.Manual);
 
-    public void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
+    public void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, Guid? libraryId = null)
     {
         Enqueue($"Scan Media Item: {ResolveDisplayName(mediaItemId, mediaItemName)}", async (ct, sp) =>
         {
@@ -234,9 +235,13 @@ public class TaskQueueManager : ITaskQueueManager
 
             await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
 
-            var libraryId = await sp.GetRequiredService<IMediaRepository>().GetProjectedAsync(mediaItemId, m => (Guid?)m.LibraryId);
-            if (libraryId.HasValue) await QueueAdditionThumbnailsIfWantedAsync(sp, libraryId.Value, null);
-        }, mediaItemId: mediaItemId);
+            var itemLibraryId = libraryId ?? await sp.GetRequiredService<IMediaRepository>().GetProjectedAsync(mediaItemId, m => (Guid?)m.LibraryId);
+            if (itemLibraryId.HasValue) await QueueAdditionThumbnailsIfWantedAsync(sp, itemLibraryId.Value, null);
+        },
+        mediaItemName == null ? MediaLabel(mediaItemId, "Scan Media Item: {0}") : null,
+        resourceKey: libraryId.HasValue ? LibraryKey(libraryId.Value) : null,
+        libraryId: libraryId,
+        mediaItemId: mediaItemId);
     }
 
     public void QueueScanNewMusicFile(Guid libraryId, string filePath)
@@ -310,7 +315,7 @@ public class TaskQueueManager : ITaskQueueManager
         }, resourceKey: LibraryKey(libraryId), libraryId: libraryId);
     }
 
-    public void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
+    public void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, Guid? libraryId = null)
     {
         Enqueue($"Refresh Metadata for Media Item: {ResolveDisplayName(mediaItemId, mediaItemName)}", async (ct, sp) =>
         {
@@ -323,7 +328,11 @@ public class TaskQueueManager : ITaskQueueManager
             await metadataManager.TriggerActorMetadataRefreshAsync(ct);
 
             await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
-        }, mediaItemId: mediaItemId);
+        },
+        mediaItemName == null ? MediaLabel(mediaItemId, "Refresh Metadata for Media Item: {0}") : null,
+        resourceKey: libraryId.HasValue ? LibraryKey(libraryId.Value) : null,
+        libraryId: libraryId,
+        mediaItemId: mediaItemId);
     }
 
     public void QueueRefreshMatchedMediaItem(Guid mediaItemId, Guid libraryId, bool isTvShow)
@@ -381,10 +390,10 @@ public class TaskQueueManager : ITaskQueueManager
             await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, null, forceOverride, ct);
 
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
-        }, LibraryLabel(libraryId, "Refresh Ratings for Library: {0}"), libraryId: libraryId);
+        }, LibraryLabel(libraryId, "Refresh Ratings for Library: {0}"), resourceKey: LibraryKey(libraryId), libraryId: libraryId);
     }
 
-    public void QueueRefreshMediaItemArtwork(Guid mediaItemId, bool forceOverride = false)
+    public void QueueRefreshMediaItemArtwork(Guid mediaItemId, bool forceOverride = false, Guid? libraryId = null)
     {
         Enqueue($"Refresh Artwork for Media Item: {mediaItemId}", async (ct, sp) =>
         {
@@ -394,7 +403,10 @@ public class TaskQueueManager : ITaskQueueManager
             await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, forceOverride, ct);
 
             await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
-        }, MediaLabel(mediaItemId, "Refresh Artwork for Media Item: {0}"), mediaItemId: mediaItemId);
+        }, MediaLabel(mediaItemId, "Refresh Artwork for Media Item: {0}"),
+        resourceKey: libraryId.HasValue ? LibraryKey(libraryId.Value) : null,
+        libraryId: libraryId,
+        mediaItemId: mediaItemId);
     }
 
     public void QueueRefreshArtistArtwork(Guid artistId, string? artistName = null, bool forceOverride = false)
@@ -870,7 +882,27 @@ public class TaskQueueManager : ITaskQueueManager
     internal static async Task QueueAdditionThumbnailsIfWantedAsync(IServiceProvider sp, Guid libraryId, string? libraryName)
     {
         if (!await sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>().WantsAdditionThumbnailsAsync(libraryId)) return;
-        sp.GetRequiredService<ITaskQueueManager>().QueueGenerateLibraryVideoThumbnails(libraryId, libraryName, isAdditionTrigger: true);
+        var name = libraryName ?? await sp.GetRequiredService<ILibraryRepository>().GetProjectedByIdAsync(libraryId, l => l.Name);
+        sp.GetRequiredService<ITaskQueueManager>().QueueGenerateLibraryVideoThumbnails(libraryId, name, isAdditionTrigger: true);
+    }
+
+    public void QueueRemoveLibraryVideoThumbnails(Guid libraryId, string? libraryName = null)
+    {
+        var generating = _taskStates.Values
+            .Where(t => t.DedupeKey == LibraryThumbnailsKey(libraryId) && t.Status != CancellingStatus)
+            .Select(t => t.Id)
+            .ToList();
+        foreach (var id in generating) CancelTask(id);
+
+        Enqueue($"Remove Video Thumbnails: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
+        {
+            var manager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
+            await manager.PurgeLibraryThumbnailsAsync(libraryId, ct);
+        },
+        libraryName == null ? LibraryLabel(libraryId, "Remove Video Thumbnails: {0}") : null,
+        resourceKey: LibraryMaintenanceKey(libraryId),
+        dedupeKey: $"library-thumbnails-remove:{libraryId}",
+        libraryId: libraryId);
     }
 
     public void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
@@ -1097,7 +1129,7 @@ public class TaskQueueManager : ITaskQueueManager
 
         await RunStepAsync("Refreshing actor metadata…", () => metadataManager.TriggerActorMetadataRefreshAsync(ct));
 
-        sp.GetRequiredService<ITaskQueueManager>().QueueLibraryPostScan(libraryId, libraryName, forceOverride);
+        sp.GetRequiredService<ITaskQueueManager>().QueueLibraryPostScan(libraryId, libraryVm?.Name ?? libraryName, forceOverride);
 
         workflowStopwatch.Stop();
         logger?.LogInformation("Full library workflow for {LibraryId} completed in {Wall:n1}s.", libraryId, workflowStopwatch.Elapsed.TotalSeconds);
