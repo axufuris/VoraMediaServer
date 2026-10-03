@@ -157,4 +157,33 @@ public class EnrichmentTargetTests
 
         (await repo.GetMediaIdsMissingMetadataAsync(libraryId)).Should().Contain(new[] { show.Id, season.Id });
     }
+
+    [Fact]
+    public async Task A_forced_refresh_of_a_music_library_has_no_track_to_walk()
+    {
+        using var db = NewContext();
+        var libraryId = SeedMusicLibrary(db, out var trackId);
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+
+        var targets = await repo.GetEnrichableMediaIdsAsync(libraryId);
+
+        targets.Should().NotContain(trackId).And.BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_forced_refresh_of_a_movie_library_takes_every_movie_still_present()
+    {
+        using var db = NewContext();
+        var libraryId = Guid.NewGuid();
+        db.Set<MediaLibrary>().Add(new MediaLibrary { Id = libraryId, Name = "Movies", Type = LibraryType.Movie, FolderPaths = new List<string> { "/media/movies" } });
+        var present = new Movie { Id = Guid.NewGuid(), Title = "Heat", LibraryId = libraryId };
+        var trashed = new Movie { Id = Guid.NewGuid(), Title = "Gone", LibraryId = libraryId, MissingSince = DateTime.UtcNow };
+        db.Set<Movie>().AddRange(present, trashed);
+        db.SaveChanges();
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+
+        var targets = await repo.GetEnrichableMediaIdsAsync(libraryId);
+
+        targets.Should().Equal(present.Id);
+    }
 }

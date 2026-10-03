@@ -98,7 +98,7 @@ public class MetadataManager : IMetadataManager
     public async Task TriggerLibraryMetadataRefreshAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, CancellationToken cancellationToken = default)
     {
         var ids = forceOverride
-            ? await _repository.GetAllProjectedAsync(n => n.Id, libraryId)
+            ? await _repository.GetEnrichableMediaIdsAsync(libraryId)
             : await _repository.GetMediaIdsMissingMetadataAsync(libraryId);
 
         await ProcessLibraryItemsAsync(libraryId, ids, "metadata", async id =>
@@ -115,7 +115,7 @@ public class MetadataManager : IMetadataManager
         // re-runs fill in items skipped when the provider's daily quota tripped
         // — instead of re-spending the quota on already-rated items every pass.
         var ids = forceOverride
-            ? await _repository.GetAllProjectedAsync(n => n.Id, libraryId)
+            ? await _repository.GetEnrichableMediaIdsAsync(libraryId)
             : await _repository.GetMediaIdsMissingRatingsAsync(libraryId);
 
         await ProcessLibraryItemsAsync(libraryId, ids, "ratings", id => RefreshRatingsAsync(id, forceOverride), cancellationToken);
@@ -127,7 +127,7 @@ public class MetadataManager : IMetadataManager
         // the nightly scan) doesn't re-pull artwork for the whole library — only
         // genuinely new items. Force still refreshes everything.
         var ids = forceOverride
-            ? await _repository.GetAllProjectedAsync(n => n.Id, libraryId)
+            ? await _repository.GetEnrichableMediaIdsAsync(libraryId)
             : await _repository.GetMediaIdsMissingArtworkAsync(libraryId);
         await ProcessLibraryItemsAsync(libraryId, ids, "artwork", id => RefreshArtworkAsync(id, forceOverride), cancellationToken);
     }
@@ -144,7 +144,7 @@ public class MetadataManager : IMetadataManager
 
         if (forceOverride)
         {
-            ordered = (await _repository.GetAllProjectedAsync(n => n.Id, libraryId)).ToList();
+            ordered = (await _repository.GetEnrichableMediaIdsAsync(libraryId)).ToList();
             metaSet = ordered.ToHashSet();
             artSet = metaSet;
             ratSet = metaSet;
@@ -258,7 +258,7 @@ public class MetadataManager : IMetadataManager
     public async Task RefreshMetadataAsync(Guid mediaItemId, bool forceOverride = false, bool notify = true)
     {
         var item = await _repository.GetForMetadataSyncAsync(mediaItemId);
-        if (item == null) return;
+        if (item == null || !item.CanBeEnriched()) return;
 
         var seasonNeedsPoster = item is Season && string.IsNullOrEmpty(item.PosterUrl);
         var showHasSeasonMissingArtwork = item is TvShow show
@@ -295,7 +295,7 @@ public class MetadataManager : IMetadataManager
     private async Task RefreshArtworkAsync(Guid mediaItemId, bool forceOverride = false)
     {
         var item = await _repository.GetForMetadataSyncAsync(mediaItemId);
-        if (item?.Library == null) return;
+        if (item?.Library == null || !item.CanBeEnriched()) return;
 
         var artworkEntities = await _fetchService.GetArtworkAsync(item);
 
@@ -311,7 +311,7 @@ public class MetadataManager : IMetadataManager
     private async Task RefreshRatingsAsync(Guid mediaItemId, bool forceOverride = false)
     {
         var item = await _repository.GetForMetadataSyncAsync(mediaItemId);
-        if (item == null) return;
+        if (item == null || !item.CanBeEnriched()) return;
 
         var ratingsData = await _fetchService.GetRatingsAsync(item);
 

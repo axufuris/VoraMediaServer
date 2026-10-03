@@ -723,6 +723,14 @@ public partial class MediaRepository : IMediaRepository
 
     // Same exclusion: a track's cover art lives on its Album, so PosterUrl on the
     // track itself is always null and every track looked permanently un-arted.
+    public async Task<IEnumerable<Guid>> GetEnrichableMediaIdsAsync(Guid libraryId) =>
+        await _context.MediaItems
+            .AsNoTracking()
+            .Where(MediaCapabilities.SupportsMetadataEnrichment)
+            .Where(m => m.LibraryId == libraryId && m.MissingSince == null && !(m is Episode) && !(m is Season))
+            .Select(m => m.Id)
+            .ToListAsync();
+
     public async Task<IEnumerable<Guid>> GetMediaIdsMissingArtworkAsync(Guid libraryId)
     {
         return await _context.MediaItems

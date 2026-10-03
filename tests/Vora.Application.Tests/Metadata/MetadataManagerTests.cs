@@ -236,4 +236,34 @@ public class MetadataManagerTests
         await _media.Received(1).GetForMetadataSyncAsync(idB);
         await _notifier.Received().NotifyLibraryUpdatedAsync(libId);
     }
+
+    [Fact]
+    public async Task A_forced_library_refresh_walks_only_items_that_can_be_enriched()
+    {
+        var libId = Guid.NewGuid();
+        _media.GetEnrichableMediaIdsAsync(libId).Returns(Array.Empty<Guid>());
+
+        await _manager.TriggerLibraryArtworkRefreshAsync(libId, forceOverride: true, cancellationToken: TestContext.Current.CancellationToken);
+        await _manager.TriggerLibraryRatingsRefreshAsync(libId, forceOverride: true, cancellationToken: TestContext.Current.CancellationToken);
+        await _manager.TriggerLibraryMetadataRefreshAsync(libId, forceOverride: true, cancellationToken: TestContext.Current.CancellationToken);
+        await _manager.TriggerLibraryEnrichmentAsync(libId, forceOverride: true, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _media.Received(4).GetEnrichableMediaIdsAsync(libId);
+        await _media.DidNotReceive().GetAllProjectedAsync(Arg.Any<System.Linq.Expressions.Expression<Func<Vora.Domain.Entities.Media.MediaItem, Guid>>>(), Arg.Any<Guid?>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task A_song_is_never_sent_to_the_metadata_artwork_or_ratings_providers()
+    {
+        var trackId = Guid.NewGuid();
+        var track = new Vora.Domain.Entities.Media.Track { Id = trackId, Title = "Punchdrunk Lovesick Singalong", Library = new Vora.Domain.Entities.Library.MediaLibrary { Name = "Music" } };
+        _media.GetForMetadataSyncAsync(trackId).Returns(track);
+
+        await _manager.RefreshMetadataAsync(trackId, forceOverride: true);
+        await _manager.TriggerMediaItemArtworkRefreshAsync(trackId, forceOverride: true, TestContext.Current.CancellationToken);
+
+        await _fetch.DidNotReceive().GetTextMetadataAsync(Arg.Any<Vora.Domain.Entities.Media.MediaItem>());
+        await _fetch.DidNotReceive().GetArtworkAsync(Arg.Any<Vora.Domain.Entities.Media.MediaItem>());
+        await _media.DidNotReceive().UpdateMediaItemAsync(Arg.Any<Vora.Domain.Entities.Media.MediaItem>());
+    }
 }
