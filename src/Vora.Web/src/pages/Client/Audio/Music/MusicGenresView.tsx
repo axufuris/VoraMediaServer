@@ -1,7 +1,7 @@
 import { type GenreSummaryVM } from '../../../../api/Music/musicService';
 import { type MusicNavState } from './musicNavState';
 import MediaGrid from '../../../../components/Client/Primitives/MediaGrid';
-import GenreTile from './GenreTile';
+import BrowseTile from './BrowseTile';
 
 interface MusicGenresViewProps {
     isLoading: boolean;
@@ -27,7 +27,7 @@ export default function MusicGenresView({ isLoading, genres, updateNav }: MusicG
             <h2 className="text-lg font-bold text-[var(--vora-text-primary)] mb-4">Browse by Genre</h2>
             <MediaGrid size="xs">
                 {genres.map(g => (
-                    <GenreTile
+                    <BrowseTile
                         key={g.name}
                         name={g.name}
                         artworkUrl={g.sampleArtworkUrl}

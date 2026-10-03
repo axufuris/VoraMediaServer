@@ -343,6 +343,7 @@ public class LastFmListeningDataProvider : IListeningDataProvider, IPluginConnec
         long? listeners = null;
         long? plays = null;
         IReadOnlyList<string> tags = Array.Empty<string>();
+        string? biography = null;
         using (info.Document)
         {
             if (info.Document.RootElement.TryGetProperty("artist", out var artist))
@@ -353,6 +354,7 @@ public class LastFmListeningDataProvider : IListeningDataProvider, IPluginConnec
                     plays = ReadCount(stats, "playcount");
                 }
                 tags = ReadTagNames(artist);
+                biography = ReadBiography(artist);
             }
         }
 
@@ -370,7 +372,30 @@ public class LastFmListeningDataProvider : IListeningDataProvider, IPluginConnec
             TopTracks = tracks,
             TopAlbums = albums,
             Tags = tags,
+            Biography = biography,
         };
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex ReadMoreLink = new(
+        @"<a\s[^>]*>\s*Read more on Last\.fm\s*</a>.*$",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static readonly System.Text.RegularExpressions.Regex HtmlTag = new(@"<[^>]+>", System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex ExtraBlankLines = new(@"\n{3,}", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    internal static string? ReadBiography(JsonElement artist)
+    {
+        if (!artist.TryGetProperty("bio", out var bio) || bio.ValueKind != JsonValueKind.Object) return null;
+
+        var text = (bio.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String ? content.GetString() : null)
+            ?? (bio.TryGetProperty("summary", out var summary) && summary.ValueKind == JsonValueKind.String ? summary.GetString() : null);
+        if (string.IsNullOrWhiteSpace(text)) return null;
+
+        text = ReadMoreLink.Replace(text, string.Empty);
+        text = HtmlTag.Replace(text, string.Empty);
+        text = System.Net.WebUtility.HtmlDecode(text).Replace("\r\n", "\n").Trim();
+        text = ExtraBlankLines.Replace(text, "\n\n");
+        return text.Length == 0 ? null : text;
     }
 
     internal static IReadOnlyList<string> ReadTagNames(JsonElement artist)

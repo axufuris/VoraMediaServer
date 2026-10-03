@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
-import { musicService, type LyricsVM } from '../../api/Music/musicService';
+import { musicService, type LyricsVM, type TrackInfoVM } from '../../api/Music/musicService';
+import AudioQualityChip from '../Media/AudioQualityChip';
+import SongFeel from '../Media/SongFeel';
 import { parseLrc, findActiveLineIndex, type LrcLine } from '../../utils/lrcParser';
 import { audioQualityStore, crossfadeStore, eqPresetStore, type AudioQuality, type EqPreset } from '../../utils/audioQuality';
 import { Modal } from '../Common/Modal';
@@ -61,6 +63,7 @@ export default function NowPlayingFullscreen() {
     const updateEqPreset = (v: EqPreset) => { eqPresetStore.set(v); setEqPresetState(v); window.dispatchEvent(new CustomEvent('audio-eq-changed')); };
 
     const [lyrics, setLyrics] = useState<LyricsVM | null>(null);
+    const [trackInfo, setTrackInfo] = useState<TrackInfoVM | null>(null);
     const [lyricsLoading, setLyricsLoading] = useState(false);
     const [isLiked, setIsLiked] = useState(false);
     const [savingStation, setSavingStation] = useState(false);
@@ -132,6 +135,18 @@ export default function NowPlayingFullscreen() {
             .then(data => { if (!cancelled) setLyrics(data); })
             .catch(() => { /* ignore */ })
             .finally(() => { if (!cancelled) setLyricsLoading(false); });
+        return () => { cancelled = true; };
+    }, [isFullscreen, currentMedia, serverId]);
+
+    useEffect(() => {
+        if (!isFullscreen || !currentMedia || currentMedia.playbackContextType !== 'Music') {
+            return;
+        }
+        let cancelled = false;
+        setTrackInfo(null);
+        musicService.getTrackInfo(currentMedia.id, serverId)
+            .then(info => { if (!cancelled) setTrackInfo(info); })
+            .catch(() => { /* the screen works without it */ });
         return () => { cancelled = true; };
     }, [isFullscreen, currentMedia, serverId]);
 
@@ -429,6 +444,13 @@ export default function NowPlayingFullscreen() {
                     compact={lyricsOpen}
                     fallbackIcon={posterFallback}
                 />
+
+                {!lyricsOpen && trackInfo && trackInfo.id === currentMedia.id && (
+                    <div className="mt-3 flex flex-col items-center gap-1.5 text-center" data-testid="now-playing-track-info">
+                        <AudioQualityChip quality={trackInfo.quality} />
+                        <SongFeel moods={trackInfo.moods} energy={trackInfo.energy} isInstrumental={trackInfo.isInstrumental} />
+                    </div>
+                )}
 
                 {lyricsOpen && (
                     <div

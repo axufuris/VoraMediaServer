@@ -3,9 +3,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import NowPlayingFullscreen from './NowPlayingFullscreen';
 import { PlayerContext, PlayerTimeContext, type PlayableMedia, type PlayerContextType } from '../../contexts/usePlayer';
-import type { LyricsVM } from '../../api/Music/musicService';
+import type { LyricsVM, TrackInfoVM } from '../../api/Music/musicService';
 
 const getTrackLyrics = vi.fn<(trackId: string, serverId?: string) => Promise<LyricsVM | null>>();
+const getTrackInfo = vi.fn<(trackId: string, serverId?: string) => Promise<TrackInfoVM | null>>(() => Promise.resolve(null));
 const addToPlaylist = vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
 const createPlaylistFromQueue = vi.fn<(name: string, ids: string[], serverId?: string) => Promise<{ id: string }>>(() => Promise.resolve({ id: 'new' }));
 const prompt = vi.fn<() => Promise<string | null>>(() => Promise.resolve(null));
@@ -31,6 +32,7 @@ vi.mock('../../api/Music/musicService', () => ({
     musicService: {
         getLikedTracks: () => Promise.resolve({ tracks: [] }),
         getTrackLyrics: (trackId: string, serverId?: string) => getTrackLyrics(trackId, serverId),
+        getTrackInfo: (trackId: string, serverId?: string) => getTrackInfo(trackId, serverId),
         likeTrack: () => Promise.resolve(),
         unlikeTrack: () => Promise.resolve(),
         saveStation: () => Promise.resolve(),
@@ -246,5 +248,24 @@ Line two`, syncedLyrics: null, isSynced: false, providerName: 'Genius', sourceUr
         fireEvent.click(screen.getByRole('button', { name: 'Save as playlist' }));
 
         await waitFor(() => expect(createPlaylistFromQueue).toHaveBeenCalledWith('Saturday queue', ['carousel', 'all-the-small-things'], undefined));
+    });
+
+    it("shows the song's quality and how it feels under the artwork", async () => {
+        getTrackLyrics.mockResolvedValue(null);
+        getTrackInfo.mockResolvedValue({
+            id: track.id,
+            quality: { format: 'FLAC', sampleRate: 96000, bitrate: null, lossless: true, hiRes: true, label: 'Hi-Res · FLAC 96 kHz' },
+            moods: ['euphoric', 'upbeat'],
+            energy: 'High',
+            themes: [],
+            goodFor: ['party'],
+            isInstrumental: false,
+        });
+        renderScreen(player());
+
+        const info = await screen.findByTestId('now-playing-track-info');
+        expect(info).toHaveTextContent('Hi-Res · FLAC 96 kHz');
+        expect(info).toHaveTextContent('Euphoric · Upbeat · High energy');
+        expect(getTrackInfo).toHaveBeenCalledWith(track.id, undefined);
     });
 });

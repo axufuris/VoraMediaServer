@@ -463,8 +463,8 @@ public class AiPlaylistService : IAiPlaylistService
         "{\"playlists\":[{\"title\":\"at most 40 characters\",\"why\":\"one sentence to the listener, at most 120 characters\"," + ProfileFields + "}]," +
         "\"bridge\":{\"title\":\"at most 40 characters\",\"why\":\"one sentence\",\"from\":{" + ProfileFields + "},\"to\":{" + ProfileFields + "}}}";
 
-    private const string ProfileFields =
-        "\"genres\":[\"1 to 4 genres, or none for any\"],\"moods\":[\"2 to 4 mood words\"],\"energy\":\"low, medium, high or any\"," +
+    private static readonly string ProfileFields =
+        "\"genres\":[\"1 to 4 genres, or none for any\"],\"moods\":[\"2 to 4 of: " + string.Join(", ", SongMoods.All) + "\"],\"energy\":\"low, medium, high or any\"," +
         "\"themes\":[\"0 to 3 things the songs are about\"],\"goodFor\":[\"2 to 4 occasions\"],\"instrumental\":false";
 
     internal static string RequestPrompt(string request, int? songs = null) =>

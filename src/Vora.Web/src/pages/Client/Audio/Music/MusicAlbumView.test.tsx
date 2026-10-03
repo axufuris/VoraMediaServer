@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import MusicAlbumView from './MusicAlbumView';
-import type { AlbumVM, TrackVM } from '../../../../api/Music/musicService';
+import type { AlbumVM, AudioQualityVM, TrackVM } from '../../../../api/Music/musicService';
 
 const album = (overrides: Partial<AlbumVM> = {}): AlbumVM => ({
     id: 'a1', title: 'Crash My Party', isCompilation: false, artistId: 'ar1', artistName: 'Luke Bryan', lockedFields: [], ...overrides,
@@ -11,11 +11,13 @@ const track = (overrides: Partial<TrackVM> = {}): TrackVM => ({
     id: 't1', title: 'Play It Again', trackNumber: 1, isLiked: false, lockedFields: [], ...overrides,
 });
 
-const renderAlbum = (currentAlbum: AlbumVM, tracks: TrackVM[]) => render(
+const renderAlbum = (currentAlbum: AlbumVM, tracks: TrackVM[], extra: { quality?: AudioQualityVM | null; moods?: string[] } = {}) => render(
     <MusicAlbumView
         isLoading={false}
         currentAlbum={currentAlbum}
         tracks={tracks}
+        quality={extra.quality}
+        moods={extra.moods}
         isServerAdmin={false}
         playFromIndex={vi.fn()}
         playWholeAlbum={vi.fn()}
@@ -61,5 +63,24 @@ describe('MusicAlbumView header', () => {
         const { container } = renderAlbum(album({ backgroundUrl: '/art/background.jpg', coverUrl: '/art/cover.jpg' }), [track()]);
 
         expect(container.querySelector('img[src="/art/background.jpg"]')).toBeNull();
+    });
+});
+
+describe('MusicAlbumView quality and moods', () => {
+    it('shows the album format and its most common moods', () => {
+        renderAlbum(album(), [track()], {
+            quality: { format: 'FLAC', sampleRate: 44100, bitrate: null, lossless: true, hiRes: false, label: 'Lossless · FLAC 44.1 kHz' },
+            moods: ['upbeat', 'nostalgic'],
+        });
+
+        expect(screen.getByText('Lossless · FLAC 44.1 kHz')).toBeInTheDocument();
+        expect(screen.getByLabelText('Moods')).toHaveTextContent('upbeat · nostalgic');
+    });
+
+    it('shows neither before the album has been described', () => {
+        renderAlbum(album(), [track()]);
+
+        expect(screen.queryByLabelText('Moods')).toBeNull();
+        expect(screen.queryByText(/kHz|kbps/)).toBeNull();
     });
 });

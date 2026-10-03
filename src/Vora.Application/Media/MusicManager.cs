@@ -19,7 +19,8 @@ public interface IMusicManager
 {
     Task<List<ArtistVM>> GetArtistsAsync(Guid? libraryId, MusicAccessFilter access, int? limit = null);
     Task<ArtistDetailVM?> GetArtistDetailAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
-    Task<(AlbumVM? Album, List<TrackVM> Tracks, string? ArtistBackgroundUrl)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access);
+    Task<AlbumDetailVM?> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access);
+    Task<TrackInfoVM?> GetTrackInfoAsync(Guid trackId, MusicAccessFilter access);
     Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
     Task<List<ArtistTrackVM>> GetTopTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access, int limit);
     Task<string?> GetTrackFilePathAsync(Guid trackId, MusicAccessFilter access);
@@ -65,6 +66,10 @@ public interface IMusicManager
     Task<List<GenreSummaryVM>> GetGenresAsync(MusicAccessFilter access);
     Task<GenreContentVM?> GetGenreContentAsync(string genre, MusicAccessFilter access);
 
+    Task<List<MoodSummaryVM>> GetMoodsAsync(MusicAccessFilter access);
+    Task<MoodTracksVM?> GetMoodTracksAsync(string mood, Guid? profileId, MusicAccessFilter access, int skip, int take);
+    Task<List<ArtistTrackVM>?> GetMoodShuffleAsync(string mood, Guid? profileId, MusicAccessFilter access, int count);
+
     Task<AdminMusicHistoryVM> GetAdminMusicHistoryAsync(Guid? profileId, DateTime? from, DateTime? to, string? search, int page, int pageSize);
     Task<AdminMusicSummaryVM> GetAdminMusicSummaryAsync(DateTime? from, DateTime? to);
 
@@ -83,6 +88,9 @@ public class MusicManager : IMusicManager
 {
     public const int DefaultAlbumPageSize = 60;
     public const int MaxAlbumPageSize = 200;
+    public const int DefaultMoodTracks = 100;
+    public const int MaxMoodTracks = 200;
+    public const int MoodArtworkCandidates = 10;
 
     private const string MusicArtworkUrlPrefix = "/api/artwork/custom/";
 
@@ -185,10 +193,10 @@ public class MusicManager : IMusicManager
         return result;
     }
 
-    public async Task<(AlbumVM? Album, List<TrackVM> Tracks, string? ArtistBackgroundUrl)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access)
+    public async Task<AlbumDetailVM?> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access)
     {
         var album = await _repository.GetAlbumByIdAsync(albumId, access);
-        if (album == null) return (null, new List<TrackVM>(), null);
+        if (album == null) return null;
 
         var tracks = await _repository.GetTracksForAlbumAsync(albumId, access);
         var likedIds = profileId.HasValue
@@ -224,7 +232,45 @@ public class MusicManager : IMusicManager
             artistBackgroundUrl = artist?.BackgroundUrl;
         }
 
-        return (albumVm, trackVms, artistBackgroundUrl);
+        return new AlbumDetailVM
+        {
+            Album = albumVm,
+            Tracks = trackVms,
+            ArtistBackgroundUrl = artistBackgroundUrl,
+            Quality = AudioQuality.ForAlbum(tracks),
+            Moods = CommonMoods(tracks)
+        };
+    }
+
+    public const int AlbumMoodCount = 4;
+
+    internal static List<string> CommonMoods(IEnumerable<Track> tracks) =>
+        tracks
+            .SelectMany(t => t.Moods ?? new List<string>())
+            .Select((mood, order) => (Mood: mood.Trim().ToLowerInvariant(), Order: order))
+            .Where(m => m.Mood.Length > 0)
+            .GroupBy(m => m.Mood)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => g.Min(m => m.Order))
+            .Take(AlbumMoodCount)
+            .Select(g => g.Key)
+            .ToList();
+
+    public async Task<TrackInfoVM?> GetTrackInfoAsync(Guid trackId, MusicAccessFilter access)
+    {
+        var track = await _repository.GetTrackByIdAsync(trackId, access);
+        if (track == null) return null;
+
+        return new TrackInfoVM
+        {
+            Id = track.Id,
+            Quality = AudioQuality.For(track.AudioCodec, track.SampleRate, track.Bitrate),
+            Moods = track.Moods ?? new List<string>(),
+            Energy = track.Energy,
+            Themes = track.Themes ?? new List<string>(),
+            GoodFor = track.GoodFor ?? new List<string>(),
+            IsInstrumental = track.IsInstrumental == true
+        };
     }
 
     public async Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
@@ -898,6 +944,52 @@ public class MusicManager : IMusicManager
             ArtistCount = s.ArtistCount,
             SampleArtworkUrl = s.SampleArtworkUrl
         }).ToList();
+    }
+
+    public async Task<List<MoodSummaryVM>> GetMoodsAsync(MusicAccessFilter access)
+    {
+        var counts = await _repository.GetMoodTrackCountsAsync(access);
+        var usedArtwork = new HashSet<string>(StringComparer.Ordinal);
+        var moods = new List<MoodSummaryVM>();
+        foreach (var mood in SongMoods.All)
+        {
+            if (!counts.TryGetValue(mood, out var count) || count < SongMoods.MinTracksToBrowse) continue;
+
+            var popular = await _repository.GetTracksForMoodAsync(mood, access, 0, MoodArtworkCandidates);
+            var covers = popular.Select(t => AlbumCoverArt.For(t.Album)).OfType<string>().ToList();
+            var artwork = covers.FirstOrDefault(c => !usedArtwork.Contains(c)) ?? covers.FirstOrDefault();
+            if (artwork != null) usedArtwork.Add(artwork);
+
+            moods.Add(new MoodSummaryVM { Mood = mood, Name = SongMoods.DisplayName(mood), TrackCount = count, SampleArtworkUrl = artwork });
+        }
+        return moods;
+    }
+
+    public async Task<MoodTracksVM?> GetMoodTracksAsync(string mood, Guid? profileId, MusicAccessFilter access, int skip, int take)
+    {
+        var key = SongMoods.Normalize(mood);
+        if (key == null) return null;
+
+        var total = await _repository.CountTracksForMoodAsync(key, access);
+        var tracks = total == 0
+            ? new List<Domain.Entities.Media.Track>()
+            : await _repository.GetTracksForMoodAsync(key, access, Math.Max(0, skip), Math.Clamp(take, 1, MaxMoodTracks));
+        return new MoodTracksVM
+        {
+            Mood = key,
+            Name = SongMoods.DisplayName(key),
+            TotalCount = total,
+            Tracks = await HydrateArtistTracksAsync(tracks, profileId)
+        };
+    }
+
+    public async Task<List<ArtistTrackVM>?> GetMoodShuffleAsync(string mood, Guid? profileId, MusicAccessFilter access, int count)
+    {
+        var key = SongMoods.Normalize(mood);
+        if (key == null) return null;
+
+        var tracks = await _repository.GetRandomTracksForMoodAsync(key, access, Math.Clamp(count, 1, MaxMoodTracks));
+        return await HydrateArtistTracksAsync(tracks, profileId);
     }
 
     public async Task<GenreContentVM?> GetGenreContentAsync(string genre, MusicAccessFilter access)

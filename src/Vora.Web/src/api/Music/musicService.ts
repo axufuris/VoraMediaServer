@@ -150,6 +150,20 @@ export interface GenreSummaryVM {
     sampleArtworkUrl?: string;
 }
 
+export interface MoodSummaryVM {
+    mood: string;
+    name: string;
+    trackCount: number;
+    sampleArtworkUrl?: string | null;
+}
+
+export interface MoodTracksVM {
+    mood: string;
+    name: string;
+    totalCount: number;
+    tracks: ArtistTrackVM[];
+}
+
 export interface GenreContentVM {
     name: string;
     artists: ArtistVM[];
@@ -323,9 +337,35 @@ export interface ArtistDetail {
     tags?: string[];
 }
 
+export type TrackEnergy = 'Low' | 'Medium' | 'High';
+
+// Server-computed so every client words it the same: "Hi-Res · FLAC 96 kHz",
+// "Lossless · FLAC 44.1 kHz", "MP3 · 320 kbps".
+export interface AudioQualityVM {
+    format: string;
+    sampleRate?: number | null;
+    bitrate?: number | null;
+    lossless: boolean;
+    hiRes: boolean;
+    label: string;
+}
+
+export interface TrackInfoVM {
+    id: string;
+    quality?: AudioQualityVM | null;
+    moods: string[];
+    energy?: TrackEnergy | null;
+    themes: string[];
+    goodFor: string[];
+    isInstrumental: boolean;
+}
+
 export interface AlbumDetail {
     album: AlbumVM;
     tracks: TrackVM[];
+    // The album's most common format and its tracks' most common moods.
+    quality?: AudioQualityVM | null;
+    moods?: string[];
     // The ARTIST's background, sent only when the album has none of its own, for
     // dressing the page. Never written back — album.backgroundUrl stays the
     // album's own value, including null, which is what the edit modal reads.
@@ -621,6 +661,16 @@ export const musicService = {
         return response.data;
     },
 
+    getTrackInfo: async (trackId: string, serverId?: string): Promise<TrackInfoVM | null> => {
+        try {
+            const response = await apiClient.get<TrackInfoVM>(`/music/tracks/${trackId}/info`, { serverId });
+            return response.data;
+        } catch (err: unknown) {
+            if (getResponseStatus(err) === 404) return null;
+            throw err;
+        }
+    },
+
     getTrackLyrics: async (trackId: string, serverId?: string): Promise<LyricsVM | null> => {
         try {
             const response = await apiClient.get<LyricsVM>(`/music/tracks/${trackId}/lyrics`, { serverId });
@@ -764,6 +814,26 @@ export const musicService = {
 
     getGenres: async (serverId?: string): Promise<GenreSummaryVM[]> => {
         const response = await apiClient.get<GenreSummaryVM[]>(`/music/genres`, { serverId });
+        return response.data;
+    },
+
+    getMoods: async (serverId?: string): Promise<MoodSummaryVM[]> => {
+        const response = await apiClient.get<MoodSummaryVM[]>(`/music/moods`, { serverId });
+        return response.data;
+    },
+
+    getMoodTracks: async (mood: string, skip: number, take: number, serverId?: string): Promise<MoodTracksVM | null> => {
+        try {
+            const response = await apiClient.get<MoodTracksVM>(`/music/moods/${encodeURIComponent(mood)}/tracks`, { serverId, params: { skip, take } });
+            return response.data;
+        } catch (err: unknown) {
+            if (getResponseStatus(err) === 404) return null;
+            throw err;
+        }
+    },
+
+    getMoodShuffle: async (mood: string, count: number, serverId?: string): Promise<ArtistTrackVM[]> => {
+        const response = await apiClient.get<ArtistTrackVM[]>(`/music/moods/${encodeURIComponent(mood)}/shuffle`, { serverId, params: { count } });
         return response.data;
     },
 

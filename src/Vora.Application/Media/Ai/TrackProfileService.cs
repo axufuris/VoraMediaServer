@@ -91,7 +91,7 @@ public class TrackProfileService : ITrackProfileService
     {
         var prompt = new StringBuilder()
             .Append("Describe how each song feels, so it can be matched to playlist requests. For every song give:\n")
-            .Append("moods: 2 to 4 words for its mood (e.g. euphoric, melancholy, aggressive, mellow, romantic, nostalgic),\n")
+            .Append("moods: 2 to 4 words for its mood, only from this list: ").Append(string.Join(", ", SongMoods.All)).Append(",\n")
             .Append("energy: low, medium or high,\n")
             .Append("themes: 1 to 3 things it is about (e.g. heartbreak, partying, love, freedom, rebellion, loss),\n")
             .Append("goodFor: 2 to 4 occasions it suits (e.g. party, workout, road trip, study, dinner, sleep, rainy day),\n")

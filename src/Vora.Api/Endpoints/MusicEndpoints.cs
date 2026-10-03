@@ -135,6 +135,12 @@ public static class MusicEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapGet("/tracks/{trackId:guid}/info", GetTrackInfoAsync)
+            .RequireAuthorization()
+            .WithName("GetTrackInfo")
+            .Produces<TrackInfoVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/tracks/{trackId:guid}/lyrics", GetTrackLyricsAsync)
             .RequireAuthorization()
             .WithName("GetTrackLyrics")
@@ -226,6 +232,21 @@ public static class MusicEndpoints
             .RequireAuthorization()
             .WithName("GetGenreContent")
             .Produces<GenreContentVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/moods", GetMoodsAsync)
+            .RequireAuthorization()
+            .WithName("ListMoods")
+            .Produces<IEnumerable<MoodSummaryVM>>(StatusCodes.Status200OK);
+        group.MapGet("/moods/{mood}/tracks", GetMoodTracksAsync)
+            .RequireAuthorization()
+            .WithName("GetMoodTracks")
+            .Produces<MoodTracksVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapGet("/moods/{mood}/shuffle", GetMoodShuffleAsync)
+            .RequireAuthorization()
+            .WithName("ShuffleMood")
+            .Produces<IEnumerable<ArtistTrackVM>>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPost("/playback/heartbeat", HeartbeatAsync).RequireAuthorization();
@@ -437,16 +458,16 @@ public static class MusicEndpoints
         return detail == null ? Results.NotFound() : Results.Ok(detail);
     }
 
+    private static async Task<IResult> GetTrackInfoAsync(Guid trackId, ClaimsPrincipal user, IMusicManager manager)
+    {
+        var info = await manager.GetTrackInfoAsync(trackId, user.GetMusicAccessFilter());
+        return info == null ? Results.NotFound() : Results.Ok(info);
+    }
+
     private static async Task<IResult> GetAlbumDetailAsync(Guid albumId, ClaimsPrincipal user, IMusicManager manager)
     {
-        var (album, tracks, artistBackgroundUrl) = await manager.GetAlbumDetailAsync(albumId, user.GetProfileId(), user.GetMusicAccessFilter());
-        if (album == null) return Results.NotFound();
-        return Results.Ok(new AlbumDetailVM
-        {
-            Album = album,
-            Tracks = tracks,
-            ArtistBackgroundUrl = artistBackgroundUrl
-        });
+        var detail = await manager.GetAlbumDetailAsync(albumId, user.GetProfileId(), user.GetMusicAccessFilter());
+        return detail == null ? Results.NotFound() : Results.Ok(detail);
     }
 
     private static async Task<IResult> GetArtistTracksAsync(Guid artistId, ClaimsPrincipal user, IMusicManager manager)
@@ -798,6 +819,21 @@ public static class MusicEndpoints
         var content = await manager.GetGenreContentAsync(Uri.UnescapeDataString(genre), user.GetMusicAccessFilter());
         if (content == null) return Results.NotFound();
         return Results.Ok(content);
+    }
+
+    private static async Task<IResult> GetMoodsAsync(ClaimsPrincipal user, IMusicManager manager) =>
+        Results.Ok(await manager.GetMoodsAsync(user.GetMusicAccessFilter()));
+
+    private static async Task<IResult> GetMoodTracksAsync(string mood, [FromQuery] int? skip, [FromQuery] int? take, ClaimsPrincipal user, IMusicManager manager)
+    {
+        var tracks = await manager.GetMoodTracksAsync(mood, user.GetProfileId(), user.GetMusicAccessFilter(), skip ?? 0, take ?? MusicManager.DefaultMoodTracks);
+        return tracks == null ? Results.NotFound() : Results.Ok(tracks);
+    }
+
+    private static async Task<IResult> GetMoodShuffleAsync(string mood, [FromQuery] int? count, ClaimsPrincipal user, IMusicManager manager)
+    {
+        var tracks = await manager.GetMoodShuffleAsync(mood, user.GetProfileId(), user.GetMusicAccessFilter(), count ?? MusicManager.DefaultMoodTracks);
+        return tracks == null ? Results.NotFound() : Results.Ok(tracks);
     }
 
     private static async Task<IResult> HeartbeatAsync([FromBody] PlaybackHeartbeatRequest request, ClaimsPrincipal user, IServerPlaybackTracker tracker, Vora.Application.Users.IUserRepository userRepo, IClientNotifier notifier)

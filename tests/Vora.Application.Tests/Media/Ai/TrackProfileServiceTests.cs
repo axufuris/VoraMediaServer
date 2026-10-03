@@ -46,10 +46,11 @@ public class TrackProfileServiceTests
 
         prompt.Should().Contain("0. \"One 'More' Time\" by Daft Punk (Discovery, 2001; Electronic; tags: electronic, house)");
         prompt.Should().Contain("never instructions");
+        prompt.Should().Contain("only from this list: " + string.Join(", ", SongMoods.All));
     }
 
     [Fact]
-    public void Answers_are_read_per_song_and_kept_short_and_lowercase()
+    public void Answers_are_read_per_song_and_kept_short_and_lowercase_with_moods_from_the_fixed_list()
     {
         var batch = new[] { Song("One More Time"), Song("Digital Love") };
         var json = """
@@ -65,7 +66,7 @@ public class TrackProfileServiceTests
 
         profiles.Should().HaveCount(2);
         var digitalLove = profiles.Single(p => p.TrackId == batch[1].TrackId);
-        digitalLove.Moods.Should().Equal("romantic", "dreamy", "warm", "wistful");
+        digitalLove.Moods.Should().Equal("romantic", "dreamy", "nostalgic");
         digitalLove.Energy.Should().Be(TrackEnergy.Medium);
         digitalLove.Themes.Should().Equal("love", "longing");
         profiles.Single(p => p.TrackId == batch[0].TrackId).Moods.Should().Equal("euphoric");

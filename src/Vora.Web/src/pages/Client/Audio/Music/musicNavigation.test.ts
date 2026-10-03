@@ -9,6 +9,10 @@ describe('parseMusicNavState', () => {
             .toEqual({ view: 'album', albumId: 'a1', artistId: 'r1' });
     });
 
+    it('restores a mood page', () => {
+        expect(parseMusicNavState('{"view":"mood","mood":"chill"}')).toEqual({ view: 'mood', mood: 'chill' });
+    });
+
     it('sends the old hub view back to the sub-tab root', () => {
         expect(parseMusicNavState('{"view":"artists"}')).toEqual({ view: 'root' });
     });

@@ -30,7 +30,7 @@ public sealed record SongProfile(
 
     public static SongProfile Read(JsonElement e) => new(
         Words(e, "genres"),
-        Words(e, "moods"),
+        SongMoods.Normalize(CleanWords(e, "moods")).Take(MaxWords).ToList(),
         ReadEnergy(e),
         Words(e, "themes"),
         Words(e, "goodFor"),
@@ -59,9 +59,11 @@ public sealed record SongProfile(
         if (instrumental) parts.Add("Instrumental");
     }
 
-    internal static List<string> Words(JsonElement e, string name)
+    internal static List<string> Words(JsonElement e, string name) => CleanWords(e, name).Take(MaxWords).ToList();
+
+    private static IEnumerable<string> CleanWords(JsonElement e, string name)
     {
-        if (!e.TryGetProperty(name, out var v)) return new List<string>();
+        if (!e.TryGetProperty(name, out var v)) return Enumerable.Empty<string>();
         var raw = v.ValueKind switch
         {
             JsonValueKind.Array => v.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString() ?? string.Empty),
@@ -72,7 +74,6 @@ public sealed record SongProfile(
             .Select(w => w.Trim().ToLowerInvariant())
             .Where(w => w.Length is > 0 and <= MaxWordLength)
             .Distinct()
-            .Take(MaxWords)
             .ToList();
     }
 

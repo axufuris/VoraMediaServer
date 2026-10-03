@@ -1,4 +1,4 @@
-interface GenreTileProps {
+interface BrowseTileProps {
     name: string;
     artworkUrl?: string | null;
     detail?: string;
@@ -6,10 +6,7 @@ interface GenreTileProps {
     className?: string;
 }
 
-// A genre's tile: a sample album cover, dimmed, under the genre's name. The
-// Genres screen and the genre's own page both draw it, so the genre looks the
-// same in both places.
-export default function GenreTile({ name, artworkUrl, detail, onClick, className }: GenreTileProps) {
+export default function BrowseTile({ name, artworkUrl, detail, onClick, className }: BrowseTileProps) {
     const body = (
         <>
             {artworkUrl && (

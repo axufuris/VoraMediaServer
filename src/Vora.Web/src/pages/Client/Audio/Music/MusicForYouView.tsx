@@ -4,11 +4,13 @@ import {
     type ArtistVM,
     type ArtistTrackVM,
     type GeneratedMixSummaryVM,
+    type MoodSummaryVM,
     type BecauseYouPlayedRowVM,
     type StationVM,
     type ServerPlaybackSessionVM,
 } from '../../../../api/Music/musicService';
 import type { AiPlaylistsVM } from '../../../../api/Music/aiPlaylistService';
+import BrowseByMoodRow from './BrowseByMoodRow';
 import { useDialog } from '../../../../dialogs';
 import MediaCard from '../../../../components/Client/Primitives/MediaCard';
 import MediaRow, { MediaRowItem } from '../../../../components/Client/Primitives/MediaRow';
@@ -35,6 +37,7 @@ interface MusicForYouViewProps {
     availableYears: number[];
     hasAnyHistory: boolean;
     aiPlaylists: AiPlaylistsVM | null;
+    moods?: MoodSummaryVM[];
     updateNav: (next: MusicNavState) => void;
     playArtistTrackList: (tracks: ArtistTrackVM[], startIndex: number) => void;
     startStationRadio: (station: StationVM) => Promise<void>;
@@ -81,6 +84,7 @@ export default function MusicForYouView({
     availableYears,
     hasAnyHistory,
     aiPlaylists,
+    moods = [],
     updateNav,
     playArtistTrackList,
     startStationRadio,
@@ -108,7 +112,7 @@ export default function MusicForYouView({
 
     const madeForYou = dailyMixes.filter(m => m.kind === 'DailyMix' || m.kind === 'DiscoverMix');
     const releaseRadar = dailyMixes.filter(m => m.kind === 'ReleaseRadar');
-    const moods = dailyMixes.filter(m => m.kind === 'MoodMix');
+    const moodMixes = dailyMixes.filter(m => m.kind === 'MoodMix');
     const recapYear = availableYears[0] ?? new Date().getFullYear();
 
     const mixRow = (title: string, mixes: GeneratedMixSummaryVM[], kicker: (mix: GeneratedMixSummaryVM) => string, badge?: ReactNode) => mixes.length > 0 && (
@@ -173,7 +177,7 @@ export default function MusicForYouView({
                     />
                     <Shortcut
                         label="Browse by Genre"
-                        detail="Discover by mood"
+                        detail="Every genre in your library"
                         onClick={() => updateNav({ view: 'genres' })}
                         icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" /></svg>}
                     />
@@ -201,7 +205,9 @@ export default function MusicForYouView({
                 </span>
             ))}
 
-            {mixRow('Moods', moods, mix => mix.descriptionTag ?? 'Mood')}
+            {mixRow('Moods', moodMixes, mix => mix.descriptionTag ?? 'Mood')}
+
+            <BrowseByMoodRow moods={moods} onOpen={mood => updateNav({ view: 'mood', mood })} />
 
             {stations.length > 0 && (
                 <MediaRow title="Your Stations">

@@ -88,7 +88,7 @@ public class AlbumCoverArtistFallbackTests
         _repository.GetAlbumForUpdateAsync(album.Id).Returns(album);
 
         var detail = await _manager.GetAlbumDetailAsync(album.Id, null, MusicAccessFilter.Unrestricted);
-        var albumVm = detail.Album ?? throw new InvalidOperationException("album detail missing");
+        var albumVm = detail?.Album ?? throw new InvalidOperationException("album detail missing");
         albumVm.ArtistArtworkUrl.Should().Be(ArtistThumb);
 
         await _manager.UpdateAlbumAsync(album.Id, new UpdateAlbumRequest
