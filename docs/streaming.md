@@ -150,7 +150,7 @@ An external track's cached VTT is fingerprinted against the **sidecar**, not the
 
 `ISubtitlePreExtractionManager` is its own job with its own triggers, deliberately not chained to the thumbnail step:
 
-- **Library scan** — `RunFullLibraryWorkflowAsync` queues `QueuePreExtractLibrarySubtitles` as its own step. Queued rather than awaited: the pass parks while anything is transcoding, which must not hold a scan open.
+- **Library scan** — `RunFullLibraryWorkflowAsync` queues `QueuePreExtractLibrarySubtitles` as its own step. Queued rather than awaited: the pass parks while anything is transcoding, which must not hold a scan open. Progress counts every extractable track in the library, already-cached ones included (`Pre-extracting subtitles (566/2967)`), so a pass resumed after a restart reads as resumed rather than starting from 1.
 - **Single-file ingest** (`QueueScanNewFile`) and **per-item Analyze** — queue `QueuePreExtractMediaItemSubtitles` right after analysis, which is the point at which the item's subtitle tracks are known.
 - **Backfill** — `POST /api/metadata/subtitles/backfill` (admin) walks every video library and fills whatever is missing, so an existing library is warmed without a rescan. There is a button for it under the same settings card.
 
@@ -209,7 +209,7 @@ The result is an external `MediaSubtitleTrack` with `IsDownloaded = true`, which
 **Nothing is evicted by age or size.** Once extracted, a VTT is kept indefinitely — the point of pre-extraction is that unchanged media is never read twice. Invalidation is driven entirely by the content changing, in two layers:
 
 1. **The fingerprint** (above) makes a stale entry a miss by construction, on both the pre-extraction skip check and the on-demand endpoint. They use the same check, so neither can serve a VTT the other would consider stale.
-2. **Identity purges.** `MediaAnalyzerManager` purges a part's cached subtitles when it re-probes that part — which only happens for a new or changed file, and covers a track being dropped from the file. `MediaManager.DeleteMediaAsync` purges an item's parts before the row goes. And because deletions can bypass that path (a dedupe merge dropping a part, for one), the **backfill sweeps orphans**: it is the only pass that sees every live `MediaPart` id, so it is the only one that can tell an orphaned cache file from another library's entry.
+2. **Identity purges.** `MediaAnalyzerManager` purges a part's cached subtitles when it re-probes that part — which only happens for a new or changed file, and covers a track being dropped from the file. `MediaManager.DeleteMediaAsync` purges an item's parts before the row goes. And because deletions can bypass that path (a dedupe merge dropping a part, a library deleted and re-added, a database rebuilt), **every library pass and the backfill first sweep orphans**: any cache file whose part id is not among all live `MediaPart` ids (`GetAllMediaPartIdsAsync`, across every library) is removed. QA had 3,523 such files (235 MB) after its database was rebuilt, kept because only the manual backfill swept.
 
 ### Client support
 

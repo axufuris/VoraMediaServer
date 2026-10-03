@@ -240,4 +240,29 @@ public class MusicPopularityRefresherTests
         written.Biography.Should().Be("Written by the admin.");
         locked.Biography.Should().BeNull();
     }
+
+    [Fact]
+    public async Task A_library_refresh_asks_about_every_artist_in_it_however_recently_refreshed()
+    {
+        var libraryId = Guid.NewGuid();
+        var artist = GivenDue("Luke Bryan", ("Crash My Party", new[] { "Play It Again" }));
+        artist.PopularityRefreshedAt = DateTime.UtcNow.AddDays(-1);
+        _repository.GetLibraryArtistsForPopularityRefreshAsync(libraryId)
+            .Returns(new List<PopularityRefreshTarget> { new(artist.Id, artist.Name) });
+        Answers("Luke Bryan", new ArtistPopularity { Outcome = PopularityLookupOutcome.Found, Listeners = 2_140_000 });
+
+        var refreshed = await Refresher().RefreshLibraryArtistsAsync(libraryId, TestContext.Current.CancellationToken);
+
+        refreshed.Should().Be(1);
+        artist.GlobalListeners.Should().Be(2_140_000);
+        await _repository.DidNotReceive().GetArtistsDueForPopularityRefreshAsync(Arg.Any<DateTime>(), Arg.Any<int>());
+    }
+
+    [Fact]
+    public async Task A_library_refresh_with_no_listening_provider_does_nothing()
+    {
+        (await Refresher(withProvider: false).RefreshLibraryArtistsAsync(Guid.NewGuid(), TestContext.Current.CancellationToken)).Should().Be(0);
+
+        await _repository.DidNotReceive().GetLibraryArtistsForPopularityRefreshAsync(Arg.Any<Guid>());
+    }
 }

@@ -30,9 +30,9 @@ public class SubtitlePreExtractionTests
 
     private readonly string _store = Path.Combine(Path.GetTempPath(), "vora-preextract-store-" + Guid.NewGuid().ToString("N"));
 
-    private SubtitlePreExtractionManager NewManager() => new(
+    private SubtitlePreExtractionManager NewManager(Vora.Plugins.Interfaces.ITaskProgressReporter? progress = null) => new(
         _media, _libraries, _settings, _extractor, _transcodes,
-        new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
+        progress ?? new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
         Options.Create(new StoragePathsOptions { Subtitles = _store }),
         NullLogger<SubtitlePreExtractionManager>.Instance);
 
@@ -212,5 +212,41 @@ public class SubtitlePreExtractionTests
         await NewManager().PurgeItemAsync(ItemId);
 
         _extractor.Received(1).PurgePart(TempDir, PartId);
+    }
+
+    [Fact]
+    public async Task A_library_pass_counts_progress_against_every_track_including_ones_already_cached()
+    {
+        var libraryId = Guid.NewGuid();
+        var cachedTrack = Guid.NewGuid();
+        Arrange(tracks: Text(TextTrackId, 3));
+        _media.GetSubtitleExtractionTargetsForLibraryAsync(libraryId).Returns(new List<SubtitleExtractionTargetDto>
+        {
+            new() { MediaItemId = ItemId, MediaPartId = PartId, FilePath = "/media/movie.mkv", Tracks = new List<SubtitleTrackTargetDto> { Text(cachedTrack, 2), Text(TextTrackId, 3) } }
+        });
+        _extractor.HasValidCachedWebVtt(TempDir, PartId, cachedTrack, Arg.Any<SubtitleSource>()).Returns(true);
+        _media.GetAllMediaPartIdsAsync().Returns(new HashSet<Guid> { PartId });
+        var progress = Substitute.For<Vora.Plugins.Interfaces.ITaskProgressReporter>();
+
+        await NewManager(progress).PreExtractForLibraryAsync(libraryId, TestContext.Current.CancellationToken);
+
+        progress.Received(1).Report("Pre-extracting subtitles (2/2)");
+        await _extractor.DidNotReceive().GetOrExtractWebVttAsync(Arg.Any<SubtitleSource>(), Arg.Any<string>(), PartId, cachedTrack, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_library_pass_first_removes_cached_subtitles_for_parts_that_no_longer_exist()
+    {
+        var libraryId = Guid.NewGuid();
+        var goneTwoWeeksAgo = Guid.NewGuid();
+        Arrange();
+        _media.GetSubtitleExtractionTargetsForLibraryAsync(libraryId).Returns(new List<SubtitleExtractionTargetDto>());
+        _media.GetAllMediaPartIdsAsync().Returns(new HashSet<Guid> { PartId });
+        _extractor.ListCachedPartIds(TempDir).Returns(new[] { PartId, goneTwoWeeksAgo });
+
+        await NewManager().PreExtractForLibraryAsync(libraryId, TestContext.Current.CancellationToken);
+
+        _extractor.Received(1).PurgePart(TempDir, goneTwoWeeksAgo);
+        _extractor.DidNotReceive().PurgePart(TempDir, PartId);
     }
 }

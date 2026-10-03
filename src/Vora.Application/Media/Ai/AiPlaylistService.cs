@@ -472,7 +472,8 @@ public class AiPlaylistService : IAiPlaylistService
         $"\"{request.Replace("\"", "'")}\"\n" +
         (songs is int n
             ? $"They want {n} songs.\n"
-            : $"Choose how many songs, from {MinRequestSongs} to {MaxRequestSongs}, to suit the request: a long drive or a party wants more, a short moment fewer. Use {PlaylistLength} when nothing suggests a length.\n") +
+            : $"Choose how many songs ({MinRequestSongs} to {MaxRequestSongs}) from what the request is for: a party, road trip, workout or long drive wants 45 to 60; " +
+              "an evening, dinner, study or work session, or a mood or genre with no occasion, 30 to 40; a short moment such as a coffee, a shower or winding down, 12 to 20.\n") +
         "Describe the playlist as ONE profile that every song in it should match, never one per song. Never name specific songs or artists. " +
         "Set instrumental to true only when they ask for no vocals or lyrics.\n" +
         "Give yearFrom and yearTo only when the request names a year, decade or era; otherwise null.\n" +
@@ -481,7 +482,7 @@ public class AiPlaylistService : IAiPlaylistService
         "{\"title\":\"at most 40 characters\",\"why\":\"one sentence, at most 120 characters\"," + ProfileFields + "," +
         "\"avoid\":\"what to steer away from, or empty\"," +
         "\"yearFrom\":null,\"yearTo\":null," +
-        "\"songs\":\"the number of songs, as a number\",\"ordered\":false}";
+        "\"songs\":\"the number you chose, as a JSON number\",\"ordered\":false}";
 
     internal static string OrderPrompt(string request, IReadOnlyList<TrackForOrdering?> songs)
     {
@@ -580,7 +581,7 @@ public class AiPlaylistService : IAiPlaylistService
             var title = Text(r, "title", 40);
             var search = QueryText(r, "search");
             if (title == null || search == null) return null;
-            var songs = Number(r, "songs") ?? PlaylistLength;
+            var songs = SongCount(r) ?? PlaylistLength;
             var ordered = r.TryGetProperty("ordered", out var o) && o.ValueKind == JsonValueKind.True;
             return new RequestPlan(title, Text(r, "why", 200) ?? string.Empty, search, Text(r, "avoid", 200), Year(r, "yearFrom"), Year(r, "yearTo"), songs, ordered);
         }
@@ -620,6 +621,14 @@ public class AiPlaylistService : IAiPlaylistService
 
     private static int? Number(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? n : null;
+
+    private static int? SongCount(JsonElement e)
+    {
+        if (!e.TryGetProperty("songs", out var v)) return null;
+        if (v.ValueKind == JsonValueKind.Number) return v.TryGetDouble(out var d) && d is > 0 and < 1000 ? (int)Math.Round(d) : null;
+        if (v.ValueKind == JsonValueKind.String) return int.TryParse(v.GetString()?.Trim(), out var parsed) ? parsed : null;
+        return null;
+    }
 
     // ---------- Helpers ----------
 

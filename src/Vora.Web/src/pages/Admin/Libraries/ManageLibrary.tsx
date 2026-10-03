@@ -347,6 +347,7 @@ export default function ManageLibrary() {
     const availableRatingProviders = ratingProviders;
     const availableArtworkProviders = artworkProviders;
     const isTvShow = library.type.toLowerCase() === 'tvshow';
+    const isMusic = library.type.toLowerCase() === 'music';
     const showVideoOptions = library.type.toLowerCase() === 'movie' || library.type.toLowerCase() === 'tvshow';
     const showVideoPreviewThumbnails = library.type.toLowerCase() === 'movie' || library.type.toLowerCase() === 'tvshow' || library.type.toLowerCase() === 'homevideo';
     const backUrl = serverId ? `/admin/server/${serverId}/libraries` : '/admin/libraries';
@@ -399,15 +400,18 @@ export default function ManageLibrary() {
                             onClick={async () => {
                                 try {
                                     await libraryAdminService.refreshRatings(library.id, true, serverId);
-                                    showAlert('Refresh started', 'Ratings refresh triggered.');
+                                    showAlert('Refresh started', isMusic
+                                        ? 'Fetching Last.fm listeners, plays, tags and biographies for every artist in this library.'
+                                        : 'Ratings refresh triggered.');
                                 } catch (err) {
                                     console.error(err);
-                                    showAlert('Error', 'Failed to trigger ratings refresh.');
+                                    showAlert('Error', isMusic ? 'Failed to start the popularity refresh.' : 'Failed to trigger ratings refresh.');
                                 }
                             }}
+                            title={isMusic ? 'Fetch Last.fm listeners, plays, tags and biographies for every artist now, without waiting for the monthly refresh' : undefined}
                             className="vora-button-secondary text-xs"
                         >
-                            Refresh ratings
+                            {isMusic ? 'Refresh popularity' : 'Refresh ratings'}
                         </button>
                         <button
                             type="button"

@@ -8,6 +8,7 @@ namespace Vora.Application.Media;
 public interface IMusicPopularityRefresher
 {
     Task<int> RefreshDueArtistsAsync(CancellationToken cancellationToken);
+    Task<int> RefreshLibraryArtistsAsync(Guid libraryId, CancellationToken cancellationToken);
 }
 
 // World-wide popularity changes slowly, so it is fetched once and kept, and only
@@ -80,6 +81,24 @@ public class MusicPopularityRefresher : IMusicPopularityRefresher
         if (provider == null) return 0;
 
         var due = await _repository.GetArtistsDueForPopularityRefreshAsync(DateTime.UtcNow - StaleAfter, MaxArtistsPerRun);
+        return await RefreshAsync(provider, due, cancellationToken);
+    }
+
+    public async Task<int> RefreshLibraryArtistsAsync(Guid libraryId, CancellationToken cancellationToken)
+    {
+        var provider = await FirstEnabledProviderAsync();
+        if (provider == null)
+        {
+            _logger.LogWarning("Music popularity was not refreshed: no listening data provider (Last.fm) is turned on.");
+            return 0;
+        }
+
+        var artists = await _repository.GetLibraryArtistsForPopularityRefreshAsync(libraryId);
+        return await RefreshAsync(provider, artists, cancellationToken);
+    }
+
+    private async Task<int> RefreshAsync(IListeningDataProvider provider, IReadOnlyList<PopularityRefreshTarget> due, CancellationToken cancellationToken)
+    {
         if (due.Count == 0) return 0;
 
         var refreshed = 0;
