@@ -50,6 +50,7 @@ public interface IMediaRepository
     Task<MediaItem?> GetForMetadataSyncAsync(Guid id);
     Task<IEnumerable<Guid>> GetMediaIdsMissingMetadataAsync(Guid libraryId);
     Task<IEnumerable<Guid>> GetMediaIdsMissingArtworkAsync(Guid libraryId);
+    Task<IEnumerable<Guid>> GetEnrichableMediaIdsAsync(Guid libraryId);
     Task<IEnumerable<Guid>> GetMediaIdsMissingRatingsAsync(Guid libraryId);
     Task<List<Guid>> GetMediaIdsMissingTvdbIdAsync();
     Task<MediaItem?> GetForBasicUpdateAsync(Guid id);
