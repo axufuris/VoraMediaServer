@@ -171,7 +171,7 @@ function LibraryToolbar({
                                             key={opt}
                                             type="button"
                                             onClick={() => { onFilterChange({ kind: 'preset', preset: opt }); closeAndReset(); }}
-                                            className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5"
+                                            className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-left text-sm vora-row-interactive"
                                             style={{ color: isPresetActive(opt) ? 'var(--vora-accent-text)' : 'var(--vora-text-primary)' }}
                                         >
                                             <span>{FILTER_PRESET_LABELS[opt]}</span>
@@ -189,7 +189,7 @@ function LibraryToolbar({
                                                 key={cat}
                                                 type="button"
                                                 onClick={() => onFilterSubmenuChange(cat)}
-                                                className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5"
+                                                className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-left text-sm vora-row-interactive"
                                                 style={{ color: 'var(--vora-text-primary)' }}
                                             >
                                                 <span>{FILTER_CATEGORY_LABELS[cat]}</span>
@@ -203,7 +203,7 @@ function LibraryToolbar({
                                     <button
                                         type="button"
                                         onClick={() => onFilterSubmenuChange(null)}
-                                        className="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider transition-colors hover:bg-white/5"
+                                        className="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider vora-row-interactive"
                                         style={{ color: 'var(--vora-text-muted)' }}
                                     >
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
@@ -215,7 +215,7 @@ function LibraryToolbar({
                                             key={value}
                                             type="button"
                                             onClick={() => { onFilterChange({ kind: 'category', category: filterSubmenu, value }); closeAndReset(); }}
-                                            className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5"
+                                            className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-left text-sm vora-row-interactive"
                                             style={{ color: isCategoryValueActive(filterSubmenu, value) ? 'var(--vora-accent-text)' : 'var(--vora-text-primary)' }}
                                         >
                                             <span>{value}</span>
@@ -246,7 +246,7 @@ function LibraryToolbar({
                                         key={opt}
                                         type="button"
                                         onClick={() => { onSortByChange(opt); onCloseMenus(); }}
-                                        className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5"
+                                        className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-left text-sm vora-row-interactive"
                                         style={{ color: sortBy === opt ? 'var(--vora-accent-text)' : 'var(--vora-text-primary)' }}
                                     >
                                         <span>{SORT_LABELS[opt]}</span>
@@ -639,9 +639,9 @@ export default function LibraryPage() {
         if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
-    const handleScan = () => { if (id) { libraryAdminService.triggerScan(id); setShowMenu(false); } };
-    const handleRefresh = () => { if (id) { libraryAdminService.refreshMetadata(id); setShowMenu(false); } };
-    const handleAnalyze = () => { if (id) { libraryAdminService.analyzeLibrary(id); setShowMenu(false); } };
+    const handleScan = () => { if (id) { libraryAdminService.triggerScan(id, serverId); setShowMenu(false); } };
+    const handleRefresh = () => { if (id) { libraryAdminService.refreshMetadata(id, false, serverId); setShowMenu(false); } };
+    const handleAnalyze = () => { if (id) { libraryAdminService.analyzeLibrary(id, false, serverId); setShowMenu(false); } };
     const handleEmptyTrash = async () => { await dialog.alert('Empty Trash is not implemented yet.'); setShowMenu(false); };
 
     const handleDelete = async () => {
@@ -653,7 +653,7 @@ export default function LibraryPage() {
             tone: 'danger',
         })) {
             try {
-                await libraryAdminService.deleteLibrary(id);
+                await libraryAdminService.deleteLibrary(id, serverId);
                 navigate('/');
             } catch (err) {
                 await dialog.alert('Failed to delete library. Please check the console.');
@@ -725,13 +725,13 @@ export default function LibraryPage() {
                         }}
                     >
                         <div className="py-1">
-                            <button type="button" onClick={() => { navigate(`/admin/libraries/${id}/manage`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Edit</button>
-                            <button type="button" onClick={handleScan} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Scan library files</button>
-                            <button type="button" onClick={handleRefresh} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Refresh metadata</button>
-                            <button type="button" onClick={handleAnalyze} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Analyze</button>
+                            <button type="button" onClick={() => { navigate(`/admin/libraries/${id}/manage`); setShowMenu(false); }} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm vora-row-interactive" style={{ color: 'var(--vora-text-primary)' }}>Edit</button>
+                            <button type="button" onClick={handleScan} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm vora-row-interactive" style={{ color: 'var(--vora-text-primary)' }}>Scan library files</button>
+                            <button type="button" onClick={handleRefresh} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm vora-row-interactive" style={{ color: 'var(--vora-text-primary)' }}>Refresh metadata</button>
+                            <button type="button" onClick={handleAnalyze} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm vora-row-interactive" style={{ color: 'var(--vora-text-primary)' }}>Analyze</button>
                             <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />
-                            <button type="button" onClick={handleEmptyTrash} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>Empty trash</button>
-                            <button type="button" onClick={handleDelete} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/5" style={{ color: 'var(--vora-danger-text)' }}>Delete library</button>
+                            <button type="button" onClick={handleEmptyTrash} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm vora-row-interactive" style={{ color: 'var(--vora-text-primary)' }}>Empty trash</button>
+                            <button type="button" onClick={handleDelete} className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium vora-row-interactive" style={{ color: 'var(--vora-danger-text)' }}>Delete library</button>
                         </div>
                     </div>
                 </>

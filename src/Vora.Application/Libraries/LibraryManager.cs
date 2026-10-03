@@ -96,7 +96,10 @@ public class LibraryManager : ILibraryManager
 
     public async Task<IEnumerable<LibrarySummaryVM>> GetLibrariesAsync(bool hasAllAccess, List<Guid> allowedLibs)
     {
-        var summaries = await _repository.GetAllProjectedAsync(LibrarySummaryVM.Projection, hasAllAccess, allowedLibs);
+        var summaries = (await _repository.GetAllProjectedAsync(LibrarySummaryVM.Projection, hasAllAccess, allowedLibs))
+            .OrderBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(s => s.Id)
+            .ToList();
 
         foreach (var summary in summaries) summary.IsBeingWatched = _folderWatcher.IsWatching(summary.Id);
         return summaries;

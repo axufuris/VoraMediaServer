@@ -417,8 +417,34 @@ export default function ManageLibrary() {
                             type="button"
                             onClick={async () => {
                                 try {
+                                    await libraryAdminService.refreshMetadata(library.id, false, serverId);
+                                    showAlert('Refresh started', isMusic
+                                        ? 'Fetching artwork for artists and albums that are missing it.'
+                                        : 'Fetching details, artwork and ratings for items that are missing them.');
+                                } catch (err) {
+                                    console.error(err);
+                                    showAlert('Error', 'Failed to trigger metadata refresh.');
+                                }
+                            }}
+                            title="Fill in details and artwork that are missing; items that already have them are left alone"
+                            className="vora-button-secondary text-xs"
+                        >
+                            Refresh metadata
+                        </button>
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                const ok = await dialog.confirm({
+                                    title: 'Replace all metadata?',
+                                    message: isMusic
+                                        ? 'This re-fetches artwork for every artist and album in this library, replacing anything that is not locked.'
+                                        : 'This re-fetches details, artwork and ratings for every item in this library, replacing anything that is not locked. On a large library it can take hours.',
+                                    confirmText: 'Replace all',
+                                });
+                                if (!ok) return;
+                                try {
                                     await libraryAdminService.refreshMetadata(library.id, true, serverId);
-                                    showAlert('Refresh started', 'Metadata refresh triggered.');
+                                    showAlert('Refresh started', 'Re-fetching metadata for everything in this library.');
                                 } catch (err) {
                                     console.error(err);
                                     showAlert('Error', 'Failed to trigger metadata refresh.');
@@ -426,7 +452,7 @@ export default function ManageLibrary() {
                             }}
                             className="vora-button-secondary text-xs"
                         >
-                            Refresh metadata
+                            Replace all metadata
                         </button>
                     </div>
                 </div>

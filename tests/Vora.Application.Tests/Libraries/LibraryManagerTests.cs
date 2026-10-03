@@ -288,4 +288,17 @@ public class LibraryManagerTests
         _queue.Received(1).QueueRemoveLibraryVideoThumbnails(library.Id, "Movies");
         await thumbnails.DidNotReceive().PurgeLibraryThumbnailsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Libraries_are_listed_alphabetically_whatever_order_they_were_added_in()
+    {
+        _repo.GetAllProjectedAsync(Arg.Any<System.Linq.Expressions.Expression<Func<Vora.Domain.Entities.Library.MediaLibrary, Vora.Application.Libraries.ViewModels.LibrarySummaryVM>>>(), true, Arg.Any<List<Guid>>())
+            .Returns(new[] { "Shows", "music videos", "Movies", "Audiobooks" }
+                .Select(name => new Vora.Application.Libraries.ViewModels.LibrarySummaryVM { Id = Guid.NewGuid(), Name = name })
+                .ToList());
+
+        var libraries = await _manager.GetLibrariesAsync(true, new List<Guid>());
+
+        libraries.Select(l => l.Name).Should().Equal("Audiobooks", "Movies", "music videos", "Shows");
+    }
 }
