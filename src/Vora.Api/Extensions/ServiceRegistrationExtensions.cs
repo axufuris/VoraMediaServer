@@ -410,6 +410,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMusicManager, MusicManager>();
         services.AddScoped<IMusicPopularityRefresher, MusicPopularityRefresher>();
         services.AddScoped<Vora.Application.Media.Ai.IMusicEmbeddingService, Vora.Application.Media.Ai.MusicEmbeddingService>();
+        services.AddScoped<Vora.Application.Media.Ai.ITrackProfileService, Vora.Application.Media.Ai.TrackProfileService>();
         services.AddScoped<Vora.Application.Media.Ai.IAiPlaylistService, Vora.Application.Media.Ai.AiPlaylistService>();
         services.AddScoped<IMusicContentRatingRefresher, MusicContentRatingRefresher>();
         services.AddScoped<IMusicRecommendationManager, MusicRecommendationManager>();

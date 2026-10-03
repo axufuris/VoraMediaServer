@@ -62,7 +62,7 @@ Surfaced through `/api/music/recommendations/mixes`, rendered in the Music tab "
 
 ## Artist similarity
 
-`ArtistSimilarity` and `ArtistTag` entities cache Last.fm responses with a TTL. `MusicRecommendationManager.GetSimilarArtistsAsync` is cache-or-fetch: it returns cached entries if fresh, otherwise calls the Last.fm provider, then resolves remote names back to in-library artists via `GetArtistsByNamesAsync`. Out-of-library similar artists are dropped (intentional — Vora only surfaces what the user can actually play).
+`ArtistTag` rows are the artist's Last.fm top tags, saved by `MusicPopularityRefresher` from the `artist.getInfo` answer it already fetches (no extra calls; refreshed with popularity every 30 days, most used first). They feed Mood Mixes, AI playlist song descriptions and the artist page (`ArtistDetailVM.Tags`); nothing else fetches them. `ArtistSimilarity` caches Last.fm responses with a TTL. `MusicRecommendationManager.GetSimilarArtistsAsync` is cache-or-fetch: it returns cached entries if fresh, otherwise calls the Last.fm provider, then resolves remote names back to in-library artists via `GetArtistsByNamesAsync`. Out-of-library similar artists are dropped (intentional — Vora only surfaces what the user can actually play).
 
 ## Lyrics
 

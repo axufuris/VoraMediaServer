@@ -453,30 +453,90 @@ public class MusicRepository : IMusicRepository
             .ToListAsync();
     }
 
-    public Task<List<TrackForEmbedding>> GetTracksMissingEmbeddingsAsync(int limit) =>
+    public Task<List<TrackForProfile>> GetTracksNeedingProfilesAsync() =>
         _context.Tracks
             .AsNoTracking()
-            .Where(t => !_context.MediaItemEmbeddings.Any(e => e.MediaItemId == t.Id))
+            .Where(t => t.ProfiledAt == null)
             .OrderBy(t => t.Id)
-            .Take(Math.Max(1, limit))
-            .Select(t => new TrackForEmbedding(
+            .Select(t => new TrackForProfile(
                 t.Id,
                 t.Title,
                 t.Artist ?? (t.Album != null ? t.Album.Artist.Name : null),
                 t.Album != null ? t.Album.Title : null,
                 t.Album != null ? t.Album.Year : null,
-                t.Album != null ? t.Album.Genre : null))
+                t.Album != null ? t.Album.Genre : null,
+                t.Album != null ? t.Album.ArtistId : null))
             .ToListAsync();
 
-    public Task<int> CountTracksMissingEmbeddingsAsync() =>
-        _context.Tracks.CountAsync(t => !_context.MediaItemEmbeddings.Any(e => e.MediaItemId == t.Id));
+    public async Task<int> SaveTrackProfilesAsync(IReadOnlyList<TrackProfileUpdate> profiles)
+    {
+        if (profiles.Count == 0) return 0;
 
-    public Task<int> SaveTrackEmbeddingsAsync(IReadOnlyList<(Guid TrackId, float[] Vector)> embeddings) =>
-        EmbeddingWrites.InsertNewAsync(_context, embeddings
+        var byId = profiles.GroupBy(p => p.TrackId).ToDictionary(g => g.Key, g => g.Last());
+        var ids = byId.Keys.ToList();
+        var tracks = await _context.Tracks.Where(t => ids.Contains(t.Id)).ToListAsync();
+        var profiledAt = DateTime.UtcNow;
+
+        foreach (var track in tracks)
+        {
+            var profile = byId[track.Id];
+            track.Moods = profile.Moods;
+            track.Energy = profile.Energy;
+            track.Themes = profile.Themes;
+            track.GoodFor = profile.GoodFor;
+            track.IsInstrumental = profile.IsInstrumental;
+            track.ProfiledAt = profiledAt;
+        }
+
+        await _context.SaveChangesAsync();
+        return tracks.Count;
+    }
+
+    public Task<List<TrackDescriptor>> GetTrackDescriptorsAsync() =>
+        (from t in _context.Tracks.AsNoTracking()
+         join e in _context.MediaItemEmbeddings.AsNoTracking() on t.Id equals e.MediaItemId into embeddings
+         from e in embeddings.DefaultIfEmpty()
+         orderby t.Id
+         select new TrackDescriptor(
+             t.Id,
+             t.Title,
+             t.Artist ?? (t.Album != null ? t.Album.Artist.Name : null),
+             t.Album != null ? t.Album.Title : null,
+             t.Album != null ? t.Album.Year : null,
+             t.Album != null ? t.Album.Genre : null,
+             t.Album != null ? t.Album.ArtistId : null,
+             t.Moods,
+             t.Energy,
+             t.Themes,
+             t.GoodFor,
+             t.IsInstrumental,
+             e != null ? e.SourceHash : null,
+             e != null ? e.Model : null))
+        .ToListAsync();
+
+    public async Task<Dictionary<Guid, List<string>>> GetAllArtistTagNamesAsync(int perArtist)
+    {
+        var rows = await _context.ArtistTags
+            .AsNoTracking()
+            .OrderBy(t => t.ArtistId)
+            .ThenByDescending(t => t.Weight)
+            .ThenBy(t => t.Tag)
+            .Select(t => new { t.ArtistId, t.Tag })
+            .ToListAsync();
+
+        return rows
+            .GroupBy(r => r.ArtistId)
+            .ToDictionary(g => g.Key, g => g.Select(r => r.Tag).Take(perArtist).ToList());
+    }
+
+    public Task<int> SaveTrackEmbeddingsAsync(IReadOnlyList<TrackEmbeddingUpdate> embeddings) =>
+        EmbeddingWrites.UpsertAsync(_context, embeddings
             .Select(e => new Vora.Domain.Entities.Ai.MediaItemEmbedding
             {
                 MediaItemId = e.TrackId,
                 Embedding = new Pgvector.Vector(e.Vector),
+                SourceHash = e.SourceHash,
+                Model = e.Model,
                 LastUpdatedAt = DateTime.UtcNow
             })
             .ToList());
@@ -490,6 +550,31 @@ public class MusicRepository : IMusicRepository
 
     public Task SaveMusicChangesAsync(CancellationToken cancellationToken) =>
         _context.SaveChangesAsync(cancellationToken);
+
+    public async Task StageArtistTagsAsync(Guid artistId, IReadOnlyList<string> tags)
+    {
+        var existing = await _context.ArtistTags.Where(t => t.ArtistId == artistId).ToListAsync();
+        _context.ArtistTags.RemoveRange(existing);
+
+        var fetchedAt = DateTime.UtcNow;
+        _context.ArtistTags.AddRange(tags.Select((tag, rank) => new ArtistTag
+        {
+            ArtistId = artistId,
+            Tag = tag,
+            Weight = tags.Count - rank,
+            Source = "lastfm",
+            FetchedAt = fetchedAt
+        }));
+    }
+
+    public Task<List<string>> GetArtistTagNamesAsync(Guid artistId) =>
+        _context.ArtistTags
+            .AsNoTracking()
+            .Where(t => t.ArtistId == artistId)
+            .OrderByDescending(t => t.Weight)
+            .ThenBy(t => t.Tag)
+            .Select(t => t.Tag)
+            .ToListAsync();
 
     public async Task<List<Album>> GetRecentlyAddedAlbumsAsync(MusicAccessFilter access, int limit)
     {

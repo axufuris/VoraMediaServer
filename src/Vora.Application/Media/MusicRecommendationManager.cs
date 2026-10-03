@@ -32,7 +32,6 @@ public interface IMusicRecommendationManager
 
     Task<List<ArtistVM>> GetSimilarArtistsAsync(Guid artistId, MusicAccessFilter access, CancellationToken cancellationToken);
     Task<List<ArtistVM>> GetCoPlayedArtistsAsync(Guid artistId, MusicAccessFilter access);
-    Task<List<string>> GetArtistTagsAsync(Guid artistId, CancellationToken cancellationToken);
 
     Task RefreshWeeklyMixesForAllAsync(CancellationToken cancellationToken);
 }
@@ -959,46 +958,6 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         return ordered;
     }
 
-    public async Task<List<string>> GetArtistTagsAsync(Guid artistId, CancellationToken cancellationToken)
-    {
-        var artist = await _musicRepo.GetArtistByIdAsync(artistId, MusicAccessFilter.Unrestricted);
-        if (artist == null) return new List<string>();
-
-        var cached = await _repo.GetArtistTagsAsync(artistId);
-        var fresh = cached.Any() && (DateTime.UtcNow - cached.Max(t => t.FetchedAt)) < SimilarityCacheTtl;
-
-        if (!fresh)
-        {
-            var provider = _listeningProviders.FirstOrDefault(p => p.Id == "lastfm_listening");
-            if (provider != null)
-            {
-                try
-                {
-                    var fetched = await provider.GetArtistTopTagsAsync(artist.Name, 20, cancellationToken);
-                    if (fetched.Count > 0)
-                    {
-                        var entries = fetched.Select(f => new ArtistTag
-                        {
-                            ArtistId = artistId,
-                            Tag = f.Tag,
-                            Weight = f.Weight,
-                            Source = "lastfm",
-                            FetchedAt = DateTime.UtcNow
-                        }).ToList();
-                        await _repo.ReplaceArtistTagsAsync(artistId, entries);
-                        cached = entries;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug(ex, "Last.fm tags lookup failed for {Artist}", artist.Name);
-                }
-            }
-        }
-
-        return cached.OrderByDescending(t => t.Weight).Select(t => t.Tag).ToList();
-    }
-
     private static readonly Dictionary<string, (string[] Tags, string[] GenreKeywords)> MoodDefinitions = new()
     {
         ["Focus"] = (
@@ -1163,32 +1122,12 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         var topArtists = await _repo.GetTopArtistsForProfileAsync(profileId, access, 180, 50);
         if (topArtists.Count < 3) return;
 
-        var provider = _listeningProviders.FirstOrDefault(p => p.Id == "lastfm_listening");
         var artistTags = new Dictionary<Guid, List<string>>();
-        if (provider != null)
+        foreach (var artist in topArtists)
         {
-            foreach (var artist in topArtists.Take(30))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                try
-                {
-                    var cached = await _repo.GetArtistTagsAsync(artist.ArtistId);
-                    if (cached.Count == 0 || (DateTime.UtcNow - cached.Max(t => t.FetchedAt)) > SimilarityCacheTtl)
-                    {
-                        var fetched = await provider.GetArtistTopTagsAsync(artist.ArtistName, 10, cancellationToken);
-                        if (fetched.Count > 0)
-                        {
-                            cached = fetched.Select(f => new ArtistTag { ArtistId = artist.ArtistId, Tag = f.Tag, Weight = f.Weight, Source = "lastfm", FetchedAt = DateTime.UtcNow }).ToList();
-                            await _repo.ReplaceArtistTagsAsync(artist.ArtistId, cached);
-                        }
-                    }
-                    artistTags[artist.ArtistId] = cached.Select(t => t.Tag.ToLowerInvariant()).ToList();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug(ex, "Mood mix tag lookup failed for {Artist}", artist.ArtistName);
-                }
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            var tags = await _repo.GetArtistTagsAsync(artist.ArtistId);
+            artistTags[artist.ArtistId] = tags.Select(t => t.Tag.ToLowerInvariant()).ToList();
         }
 
         var artistGenres = await _repo.GetGenresForArtistsAsync(topArtists.Select(a => a.ArtistId));

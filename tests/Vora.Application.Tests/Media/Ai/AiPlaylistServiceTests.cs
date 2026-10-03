@@ -584,4 +584,110 @@ public class AiPlaylistServiceTests
         MixCoverArt.UsesMosaic(GeneratedMixKind.AiPlaylist).Should().BeTrue();
         MixCoverArt.UsesMosaic(GeneratedMixKind.DailyMix).Should().BeFalse();
     }
+
+    private void Answers(params string[] replies) =>
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>())
+            .Returns(replies[0], replies.Skip(1).ToArray());
+
+    private const string ProfileRequestJson = """
+    {"title":"House Party","why":"Keeps the room moving.","genres":["house","dance"],"moods":["Euphoric","upbeat"],"energy":"high",
+     "themes":["partying"],"goodFor":["party","dancing"],"instrumental":false,"avoid":"slow ballads","yearFrom":1990,"yearTo":null,"songs":20,"ordered":false}
+    """;
+
+    [Theory]
+    [InlineData("90's rock and punk rock", true)]
+    [InlineData("songs from the 1980s", true)]
+    [InlineData("hits from 2004", true)]
+    [InlineData("nineties grunge", true)]
+    [InlineData("recent indie", true)]
+    [InlineData("House party music", false)]
+    [InlineData("Upbeat road trip", false)]
+    [InlineData("new wave for a rainy day", false)]
+    public void An_era_counts_only_when_the_request_names_one(string request, bool named)
+    {
+        AiPlaylistService.NamesAnEra(request).Should().Be(named);
+    }
+
+    [Fact]
+    public async Task Years_the_request_never_mentioned_are_not_applied()
+    {
+        Answers(ProfileRequestJson);
+
+        await Service().CreateFromRequestAsync(_me.Id, "House party music", null, CleanOnly, TestContext.Current.CancellationToken);
+
+        await _repo.Received().FindNearestTracksAsync(Arg.Any<float[]>(), CleanOnly, Arg.Is<AiTrackFilter>(f => f.YearFrom == null && f.YearTo == null), Arg.Any<int>());
+    }
+
+    [Fact]
+    public async Task A_request_is_searched_by_its_profile()
+    {
+        Answers(ProfileRequestJson);
+
+        await Service().CreateFromRequestAsync(_me.Id, "House party music", null, CleanOnly, TestContext.Current.CancellationToken);
+
+        await _openAi.Received(1).EmbedAsync(Arg.Any<string>(), Arg.Is<IReadOnlyList<string>>(l =>
+            l[0] == "Genre: house, dance. Mood: euphoric, upbeat. Energy: high. Themes: partying. Good for: party, dancing" && l[1] == "slow ballads"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_request_whose_order_does_not_matter_makes_one_call()
+    {
+        Answers(ProfileRequestJson);
+
+        await Service().CreateFromRequestAsync(_me.Id, "House party music", null, CleanOnly, TestContext.Current.CancellationToken);
+
+        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+        await _repo.DidNotReceive().GetTracksForOrderingAsync(Arg.Any<IReadOnlyCollection<Guid>>());
+    }
+
+    [Fact]
+    public async Task A_request_that_builds_is_put_in_order_by_a_second_call()
+    {
+        var candidates = Enumerable.Range(0, 40).Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i}", null, 0.5)).ToList();
+        _repo.FindNearestTracksAsync(Arg.Any<float[]>(), Arg.Any<MusicAccessFilter>(), Arg.Any<AiTrackFilter>(), Arg.Any<int>()).Returns(candidates);
+        _repo.GetTracksForOrderingAsync(Arg.Any<IReadOnlyCollection<Guid>>())
+            .Returns(ci => ci.Arg<IReadOnlyCollection<Guid>>().Select(id => new TrackForOrdering(id, "Song", "Artist", Vora.Domain.Enums.TrackEnergy.Low, new List<string> { "calm" })).ToList());
+        var ordered = ProfileRequestJson.Replace("\"songs\":20,\"ordered\":false", "\"songs\":3,\"ordered\":true");
+        Answers(ordered, """{"order":[2,0,1]}""");
+        GeneratedMix? saved = null;
+        await _repo.AddRequestAsync(Arg.Do<GeneratedMix>(m => saved = m), Arg.Any<int>());
+
+        await Service().CreateFromRequestAsync(_me.Id, "A road trip that builds from calm to loud", null, CleanOnly, TestContext.Current.CancellationToken);
+
+        saved!.TrackOrder.Should().Equal(new[] { candidates[2], candidates[0], candidates[1] }
+            .Concat(candidates.Skip(3).Take(AiPlaylistService.MinRequestSongs - 3))
+            .Select(c => c.TrackId));
+        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Is<string>(p => p.Contains("Put these songs in the order")), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), _me.Id);
+    }
+
+    [Fact]
+    public void An_order_answer_that_skips_or_repeats_songs_still_keeps_every_song_once()
+    {
+        var tracks = Enumerable.Range(0, 4).Select(i => new AiTrackCandidate(Guid.NewGuid(), $"a{i}", null, 0.5)).ToList();
+
+        AiPlaylistService.ApplyOrder(tracks, """{"order":[3,3,9,1]}""").Should().Equal(tracks[3], tracks[1], tracks[0], tracks[2]);
+        AiPlaylistService.ApplyOrder(tracks, "not json").Should().Equal(tracks);
+        AiPlaylistService.ApplyOrder(tracks, null).Should().Equal(tracks);
+    }
+
+    [Fact]
+    public void A_weekly_answer_in_profile_shape_is_read_for_themes_and_both_ends_of_the_bridge()
+    {
+        var plan = AiPlaylistService.ParseWeekly("""
+        {"playlists":[{"title":"Late Night Drive","why":"For after dark.","genres":["synthwave"],"moods":["moody"],"energy":"medium","goodFor":["night drive"]}],
+         "bridge":{"title":"Punk to Pop","why":"From loud to bright.","from":{"genres":["punk"],"energy":"high"},"to":{"genres":["pop"],"moods":["bright"]}}}
+        """);
+
+        plan!.Playlists.Single().Search.Should().Be("Genre: synthwave. Mood: moody. Energy: medium. Good for: night drive");
+        plan.Bridge!.From.Should().Be("Genre: punk. Energy: high");
+        plan.Bridge.To.Should().Be("Genre: pop. Mood: bright");
+    }
+
+    [Fact]
+    public void A_request_for_no_lyrics_is_searched_as_instrumental()
+    {
+        var plan = AiPlaylistService.ParseRequest("""{"title":"Focus","genres":["ambient"],"moods":["calm"],"energy":"low","instrumental":true}""");
+
+        plan!.Search.Should().Be("Genre: ambient. Mood: calm. Energy: low. Instrumental");
+    }
 }

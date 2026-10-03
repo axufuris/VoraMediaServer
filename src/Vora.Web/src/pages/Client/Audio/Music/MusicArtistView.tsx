@@ -16,6 +16,7 @@ interface MusicArtistViewProps {
     isLoading: boolean;
     currentArtist: ArtistVM | null;
     albums: AlbumVM[];
+    tags: string[];
     topTracks: ArtistTrackVM[];
     playArtistTrackList: (tracks: ArtistTrackVM[], startIndex: number) => void;
     formatDuration: (seconds?: number) => string;
@@ -35,6 +36,7 @@ export default function MusicArtistView({
     isLoading,
     currentArtist,
     albums,
+    tags,
     topTracks,
     playArtistTrackList,
     formatDuration,
@@ -148,6 +150,18 @@ export default function MusicArtistView({
                                         </div>
                                     )}
                                 </div>
+                                {tags.length > 0 && (
+                                    <ul className="flex flex-wrap gap-1.5" aria-label="Tags">
+                                        {tags.slice(0, 6).map(tag => (
+                                            <li
+                                                key={tag}
+                                                className="rounded-full border border-[var(--vora-border-subtle)] px-2.5 py-0.5 text-xs capitalize text-[var(--vora-text-secondary)]"
+                                            >
+                                                {tag}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                                 <div className="flex flex-wrap items-center gap-2">
                                     {albums.length > 0 && (
                                         <>

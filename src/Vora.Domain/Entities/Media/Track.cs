@@ -1,3 +1,5 @@
+using Vora.Domain.Enums;
+
 namespace Vora.Domain.Entities.Media;
 
 public class Track : MediaItem
@@ -43,4 +45,11 @@ public class Track : MediaItem
 
     public bool HasEmbeddedLyrics { get; set; }
     public string? ExternalLyricsPath { get; set; }
+
+    public List<string>? Moods { get; set; }
+    public TrackEnergy? Energy { get; set; }
+    public List<string>? Themes { get; set; }
+    public List<string>? GoodFor { get; set; }
+    public bool? IsInstrumental { get; set; }
+    public DateTime? ProfiledAt { get; set; }
 }

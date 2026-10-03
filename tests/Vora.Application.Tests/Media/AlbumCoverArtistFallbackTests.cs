@@ -73,7 +73,7 @@ public class AlbumCoverArtistFallbackTests
         _repository.GetArtistByIdAsync(_artist.Id, Arg.Any<MusicAccessFilter>()).Returns(_artist);
         _repository.GetAlbumsForArtistAsync(_artist.Id, Arg.Any<MusicAccessFilter>()).Returns(new List<Album> { album });
 
-        var (_, albums) = await _manager.GetArtistDetailAsync(_artist.Id, null, MusicAccessFilter.Unrestricted);
+        var albums = (await _manager.GetArtistDetailAsync(_artist.Id, null, MusicAccessFilter.Unrestricted))!.Albums;
 
         albums.Single().ArtworkUrl.Should().BeNull();
         albums.Single().ArtistArtworkUrl.Should().Be(ArtistThumb);

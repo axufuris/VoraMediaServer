@@ -433,9 +433,8 @@ public static class MusicEndpoints
 
     private static async Task<IResult> GetArtistDetailAsync(Guid artistId, ClaimsPrincipal user, IMusicManager manager)
     {
-        var (artist, albums) = await manager.GetArtistDetailAsync(artistId, user.GetProfileId(), user.GetMusicAccessFilter());
-        if (artist == null) return Results.NotFound();
-        return Results.Ok(new ArtistDetailVM { Artist = artist, Albums = albums });
+        var detail = await manager.GetArtistDetailAsync(artistId, user.GetProfileId(), user.GetMusicAccessFilter());
+        return detail == null ? Results.NotFound() : Results.Ok(detail);
     }
 
     private static async Task<IResult> GetAlbumDetailAsync(Guid albumId, ClaimsPrincipal user, IMusicManager manager)

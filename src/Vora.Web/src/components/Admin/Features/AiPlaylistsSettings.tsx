@@ -62,6 +62,10 @@ export default function AiPlaylistsSettings({ serverSettings, savedSettings, onC
                 Songs always come from your own library and each profile's parental controls. Uses the OpenAI key from the OpenAI plugin;
                 each profile's listening summary is sent to OpenAI, and any profile can opt out in its own settings.
             </p>
+            <p className="mt-2 text-sm text-[var(--vora-text-muted)] pl-6">
+                Turning it on prepares your music once in the background: each song is described by mood, energy and occasion
+                (about $0.03 per 1,000 songs, roughly a minute per 1,000), then only new songs are. See Background Tasks for progress.
+            </p>
 
             {unsaved && (
                 <p className="mt-3 pl-6 text-sm text-[var(--vora-text-muted)]">

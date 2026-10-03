@@ -77,6 +77,7 @@ public interface ITaskQueueManager
     void QueueRefreshMusicPopularity();
     void QueueRateMusicContent();
     void QueueGenerateAiPlaylists(bool force = false);
+    void QueuePrepareMusicForAiPlaylists();
 }
 
 public class TaskQueueManager : ITaskQueueManager
@@ -959,7 +960,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             try
             {
-                await sp.GetRequiredService<Vora.Application.Media.Ai.IMusicEmbeddingService>().EmbedMissingTracksAsync(ct);
+                await sp.GetRequiredService<Vora.Application.Media.Ai.IMusicEmbeddingService>().PrepareTracksAsync(ct);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
@@ -967,7 +968,16 @@ public class TaskQueueManager : ITaskQueueManager
                 sp.GetService<ILogger<TaskQueueManager>>()?.LogWarning(ex, "Preparing new songs for AI playlists failed; making this week's playlists from the songs already prepared.");
             }
             await sp.GetRequiredService<Vora.Application.Media.Ai.IAiPlaylistService>().GenerateWeeklyForDueProfilesAsync(force, ct);
-        }, dedupeKey: "music-ai-playlists");
+        }, resourceKey: MusicAiKey, dedupeKey: "music-ai-playlists");
+    }
+
+    public void QueuePrepareMusicForAiPlaylists()
+    {
+        EnqueueTask("Prepare Music for AI Playlists", async (ct, sp) =>
+            await sp.GetRequiredService<Vora.Application.Media.Ai.IMusicEmbeddingService>().PrepareTracksAsync(ct),
+            resourceKey: MusicAiKey,
+            dedupeKey: "music-ai-prepare",
+            rerunIfRunning: true);
     }
 
     // Deduplicated for the same reason as the popularity refresh, and likewise
@@ -1116,11 +1126,9 @@ public class TaskQueueManager : ITaskQueueManager
             // had no numbers until the next night.
             await RunStepAsync("Fetching popularity…", () => sp.GetRequiredService<IMusicPopularityRefresher>().RefreshDueArtistsAsync(ct));
 
-            // Only the scan's new songs, and only while AI playlists are on - the
-            // step isn't shown at all otherwise.
             if ((await sp.GetRequiredService<Vora.Application.Settings.ISystemSettingsRepository>().GetSettingsAsync()).EnableAiMusicPlaylists)
             {
-                await RunStepAsync("Preparing music for AI playlists…", () => sp.GetRequiredService<Vora.Application.Media.Ai.IMusicEmbeddingService>().EmbedMissingTracksAsync(ct));
+                sp.GetRequiredService<ITaskQueueManager>().QueuePrepareMusicForAiPlaylists();
             }
         }
 
@@ -1286,6 +1294,8 @@ public class TaskQueueManager : ITaskQueueManager
     // and they race writing the same MediaItem rows in parallel DbContexts.
     // The sweep shares the key too so it never deletes a file mid-generation.
     private const string OverlaySyncKey = "poster-overlay-sync";
+
+    private const string MusicAiKey = "music-ai";
 
     private static string CleanUnitLabel(string label)
     {

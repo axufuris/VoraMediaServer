@@ -18,7 +18,7 @@ namespace Vora.Application.Media;
 public interface IMusicManager
 {
     Task<List<ArtistVM>> GetArtistsAsync(Guid? libraryId, MusicAccessFilter access, int? limit = null);
-    Task<(ArtistVM? Artist, List<AlbumVM> Albums)> GetArtistDetailAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
+    Task<ArtistDetailVM?> GetArtistDetailAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
     Task<(AlbumVM? Album, List<TrackVM> Tracks, string? ArtistBackgroundUrl)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access);
     Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
     Task<List<ArtistTrackVM>> GetTopTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access, int limit);
@@ -131,10 +131,10 @@ public class MusicManager : IMusicManager
         return artists.Select(MapArtist).ToList();
     }
 
-    public async Task<(ArtistVM? Artist, List<AlbumVM> Albums)> GetArtistDetailAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
+    public async Task<ArtistDetailVM?> GetArtistDetailAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
     {
         var artist = await _repository.GetArtistByIdAsync(artistId, access);
-        if (artist == null) return (null, new List<AlbumVM>());
+        if (artist == null) return null;
 
         var albums = await _repository.GetAlbumsForArtistAsync(artistId, access);
         var artistVm = MapArtist(artist);
@@ -155,7 +155,12 @@ public class MusicManager : IMusicManager
             }
         }
 
-        return (artistVm, albumVms);
+        return new ArtistDetailVM
+        {
+            Artist = artistVm,
+            Albums = albumVms,
+            Tags = await _repository.GetArtistTagNamesAsync(artistId)
+        };
     }
 
     public async Task<SetMusicRatingResult> SetAlbumRatingAsync(Guid profileId, Guid albumId, decimal? rating, bool isAdmin)

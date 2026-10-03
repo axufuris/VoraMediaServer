@@ -7,68 +7,62 @@ namespace Vora.Application.Media.Ai;
 
 public interface IMusicEmbeddingService
 {
-    Task<int> EmbedMissingTracksAsync(CancellationToken cancellationToken);
+    Task<int> PrepareTracksAsync(CancellationToken cancellationToken);
 }
 
-// One vector per song, so AI playlists can find songs by meaning with a
-// database query instead of asking a chat model to read the library. A song is
-// embedded once - about forty tokens, so a 100,000-song library costs around
-// twenty cents - and never again unless it is new.
-//
-// Only while an admin has AI playlists switched on: a server that never uses
-// them never pays for them.
 public class MusicEmbeddingService : IMusicEmbeddingService
 {
     public const string PluginId = "openai_music_playlists";
-
-    // OpenAI takes up to 2,048 inputs a request; smaller batches keep one
-    // failure cheap and the progress line moving.
     public const int BatchSize = 256;
 
     private readonly IMusicRepository _repository;
+    private readonly ITrackProfileService _profiles;
     private readonly IOpenAiClient _openAi;
     private readonly ISystemSettingsRepository _settings;
     private readonly ITaskProgressReporter _progress;
     private readonly ILogger<MusicEmbeddingService> _logger;
 
-    public MusicEmbeddingService(IMusicRepository repository, IOpenAiClient openAi, ISystemSettingsRepository settings, ITaskProgressReporter progress, ILogger<MusicEmbeddingService> logger)
+    public MusicEmbeddingService(IMusicRepository repository, ITrackProfileService profiles, IOpenAiClient openAi, ISystemSettingsRepository settings, ITaskProgressReporter progress, ILogger<MusicEmbeddingService> logger)
     {
         _repository = repository;
+        _profiles = profiles;
         _openAi = openAi;
         _settings = settings;
         _progress = progress;
         _logger = logger;
     }
 
-    public async Task<int> EmbedMissingTracksAsync(CancellationToken cancellationToken)
+    public async Task<int> PrepareTracksAsync(CancellationToken cancellationToken)
     {
         var server = await _settings.GetSettingsAsync();
         if (!server.EnableAiMusicPlaylists || !await _openAi.IsConfiguredAsync()) return 0;
 
-        var total = await _repository.CountTracksMissingEmbeddingsAsync();
+        await _profiles.ProfileTracksAsync(cancellationToken);
+
+        var tags = await _repository.GetAllArtistTagNamesAsync(TrackProfileService.TagsPerArtist);
+        var due = (await _repository.GetTrackDescriptorsAsync())
+            .Select(t => (Track: t, Text: SongProfile.Describe(t, ArtistTags(t, tags))))
+            .Select(x => (x.Track, x.Text, Hash: SongProfile.Fingerprint(x.Text)))
+            .Where(x => x.Hash != x.Track.EmbeddedHash || x.Track.EmbeddedModel != OpenAiClient.EmbeddingModel)
+            .ToList();
+
         var done = 0;
-
-        while (!cancellationToken.IsCancellationRequested)
+        foreach (var batch in due.Chunk(BatchSize))
         {
-            var batch = await _repository.GetTracksMissingEmbeddingsAsync(BatchSize);
-            if (batch.Count == 0) break;
+            cancellationToken.ThrowIfCancellationRequested();
+            _progress.Report($"Preparing music for AI playlists {done:N0}/{due.Count:N0}");
 
-            _progress.Report($"Preparing music for AI playlists {done:N0}/{total:N0}");
-
-            var vectors = await _openAi.EmbedAsync(PluginId, batch.Select(Describe).ToList(), cancellationToken);
+            var vectors = await _openAi.EmbedAsync(PluginId, batch.Select(x => x.Text).ToList(), cancellationToken);
             if (vectors == null) break;
 
-            var saved = batch
-                .Select((track, i) => (track.TrackId, Vector: vectors[i]))
+            var updates = batch
+                .Select((x, i) => (x.Track.TrackId, x.Hash, Vector: i < vectors.Count ? vectors[i] : null))
                 .Where(x => x.Vector != null)
-                .Select(x => (x.TrackId, x.Vector!))
+                .Select(x => new TrackEmbeddingUpdate(x.TrackId, x.Vector ?? Array.Empty<float>(), x.Hash, OpenAiClient.EmbeddingModel))
                 .ToList();
+            if (updates.Count == 0) break;
 
-            // Nothing came back for this batch: stop rather than pay for the same
-            // songs again on the next pass.
-            if (saved.Count == 0) break;
-
-            done += await _repository.SaveTrackEmbeddingsAsync(saved);
+            done += await _repository.SaveTrackEmbeddingsAsync(updates);
         }
 
         _progress.Report(null);
@@ -76,15 +70,6 @@ public class MusicEmbeddingService : IMusicEmbeddingService
         return done;
     }
 
-    // What the model reads for a song. The title and artist carry most of the
-    // meaning - the model already knows most released songs by name - and the
-    // album, year and genre place the rest.
-    internal static string Describe(TrackForEmbedding t)
-    {
-        var parts = new List<string> { $"Song: {t.Title}" };
-        if (!string.IsNullOrWhiteSpace(t.Artist)) parts.Add($"Artist: {t.Artist}");
-        if (!string.IsNullOrWhiteSpace(t.AlbumTitle)) parts.Add(t.Year is int y ? $"Album: {t.AlbumTitle} ({y})" : $"Album: {t.AlbumTitle}");
-        if (!string.IsNullOrWhiteSpace(t.Genre)) parts.Add($"Genre: {t.Genre}");
-        return string.Join(". ", parts);
-    }
+    private static IReadOnlyList<string> ArtistTags(TrackDescriptor track, IReadOnlyDictionary<Guid, List<string>> tags) =>
+        track.AlbumArtistId is Guid artistId && tags.TryGetValue(artistId, out var found) ? found : Array.Empty<string>();
 }
