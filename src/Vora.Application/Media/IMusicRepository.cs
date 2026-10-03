@@ -67,6 +67,11 @@ public interface IMusicRepository
     Task<List<GenreSummary>> GetGenreSummariesAsync(MusicAccessFilter access);
     Task<GenreContent> GetGenreContentAsync(string genre, MusicAccessFilter access);
 
+    Task<Dictionary<string, int>> GetMoodTrackCountsAsync(MusicAccessFilter access);
+    Task<int> CountTracksForMoodAsync(string mood, MusicAccessFilter access);
+    Task<List<Track>> GetTracksForMoodAsync(string mood, MusicAccessFilter access, int skip, int take);
+    Task<List<Track>> GetRandomTracksForMoodAsync(string mood, MusicAccessFilter access, int count);
+
     Task<(List<AdminPlayHistoryRow> Rows, int Total)> GetAdminPlayHistoryAsync(Guid? profileId, DateTime? from, DateTime? to, string? search, int page, int pageSize);
     Task<List<AdminTopTrackRow>> GetServerTopTracksAsync(DateTime? from, DateTime? to, int limit);
     Task<List<AdminTopArtistRow>> GetServerTopArtistsAsync(DateTime? from, DateTime? to, int limit);

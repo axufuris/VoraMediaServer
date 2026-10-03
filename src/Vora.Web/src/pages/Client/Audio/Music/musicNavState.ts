@@ -1,4 +1,4 @@
-export type MusicView = 'root' | 'artist' | 'album' | 'likes' | 'top' | 'mix' | 'recap' | 'genres' | 'genre';
+export type MusicView = 'root' | 'artist' | 'album' | 'likes' | 'top' | 'mix' | 'recap' | 'genres' | 'genre' | 'mood';
 
 export interface MusicNavState {
     view: MusicView;
@@ -7,9 +7,10 @@ export interface MusicNavState {
     mixId?: string;
     year?: number;
     genre?: string;
+    mood?: string;
 }
 
-const MUSIC_VIEWS: readonly MusicView[] = ['root', 'artist', 'album', 'likes', 'top', 'mix', 'recap', 'genres', 'genre'];
+const MUSIC_VIEWS: readonly MusicView[] = ['root', 'artist', 'album', 'likes', 'top', 'mix', 'recap', 'genres', 'genre', 'mood'];
 
 // Stored state can predate a rename (the hub used to be the 'artists' view), so
 // anything unrecognised lands back on the sub-tab root instead of a blank page.

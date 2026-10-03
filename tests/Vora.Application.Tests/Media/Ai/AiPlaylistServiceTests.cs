@@ -674,13 +674,13 @@ public class AiPlaylistServiceTests
     public void A_weekly_answer_in_profile_shape_is_read_for_themes_and_both_ends_of_the_bridge()
     {
         var plan = AiPlaylistService.ParseWeekly("""
-        {"playlists":[{"title":"Late Night Drive","why":"For after dark.","genres":["synthwave"],"moods":["moody"],"energy":"medium","goodFor":["night drive"]}],
-         "bridge":{"title":"Punk to Pop","why":"From loud to bright.","from":{"genres":["punk"],"energy":"high"},"to":{"genres":["pop"],"moods":["bright"]}}}
+        {"playlists":[{"title":"Late Night Drive","why":"For after dark.","genres":["synthwave"],"moods":["brooding","mysterious"],"energy":"medium","goodFor":["night drive"]}],
+         "bridge":{"title":"Punk to Pop","why":"From loud to bright.","from":{"genres":["punk"],"energy":"high"},"to":{"genres":["pop"],"moods":["bright","happy"]}}}
         """);
 
-        plan!.Playlists.Single().Search.Should().Be("Genre: synthwave. Mood: moody. Energy: medium. Good for: night drive");
+        plan!.Playlists.Single().Search.Should().Be("Genre: synthwave. Mood: dark, mysterious. Energy: medium. Good for: night drive");
         plan.Bridge!.From.Should().Be("Genre: punk. Energy: high");
-        plan.Bridge.To.Should().Be("Genre: pop. Mood: bright");
+        plan.Bridge.To.Should().Be("Genre: pop. Mood: happy");
     }
 
     [Fact]
@@ -689,5 +689,14 @@ public class AiPlaylistServiceTests
         var plan = AiPlaylistService.ParseRequest("""{"title":"Focus","genres":["ambient"],"moods":["calm"],"energy":"low","instrumental":true}""");
 
         plan!.Search.Should().Be("Genre: ambient. Mood: calm. Energy: low. Instrumental");
+    }
+
+    [Fact]
+    public void Requests_and_weekly_themes_pick_moods_from_the_same_list_as_songs()
+    {
+        var moods = "2 to 4 of: " + string.Join(", ", SongMoods.All);
+
+        AiPlaylistService.RequestPrompt("rainy sunday").Should().Contain(moods);
+        AiPlaylistService.WeeklyPrompt(new[] { "Portishead" }, new[] { "trip hop" }).Should().Contain(moods);
     }
 }

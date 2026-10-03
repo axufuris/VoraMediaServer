@@ -150,6 +150,20 @@ export interface GenreSummaryVM {
     sampleArtworkUrl?: string;
 }
 
+export interface MoodSummaryVM {
+    mood: string;
+    name: string;
+    trackCount: number;
+    sampleArtworkUrl?: string | null;
+}
+
+export interface MoodTracksVM {
+    mood: string;
+    name: string;
+    totalCount: number;
+    tracks: ArtistTrackVM[];
+}
+
 export interface GenreContentVM {
     name: string;
     artists: ArtistVM[];
@@ -800,6 +814,26 @@ export const musicService = {
 
     getGenres: async (serverId?: string): Promise<GenreSummaryVM[]> => {
         const response = await apiClient.get<GenreSummaryVM[]>(`/music/genres`, { serverId });
+        return response.data;
+    },
+
+    getMoods: async (serverId?: string): Promise<MoodSummaryVM[]> => {
+        const response = await apiClient.get<MoodSummaryVM[]>(`/music/moods`, { serverId });
+        return response.data;
+    },
+
+    getMoodTracks: async (mood: string, skip: number, take: number, serverId?: string): Promise<MoodTracksVM | null> => {
+        try {
+            const response = await apiClient.get<MoodTracksVM>(`/music/moods/${encodeURIComponent(mood)}/tracks`, { serverId, params: { skip, take } });
+            return response.data;
+        } catch (err: unknown) {
+            if (getResponseStatus(err) === 404) return null;
+            throw err;
+        }
+    },
+
+    getMoodShuffle: async (mood: string, count: number, serverId?: string): Promise<ArtistTrackVM[]> => {
+        const response = await apiClient.get<ArtistTrackVM[]>(`/music/moods/${encodeURIComponent(mood)}/shuffle`, { serverId, params: { count } });
         return response.data;
     },
 

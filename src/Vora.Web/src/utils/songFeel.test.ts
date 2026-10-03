@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { songFeelParts } from './songFeel';
+import { moodName, songFeelParts } from './songFeel';
 
 describe('songFeelParts', () => {
     it('capitalises up to three moods and adds energy and instrumental', () => {
@@ -9,5 +9,12 @@ describe('songFeelParts', () => {
 
     it('is empty for a song not described yet', () => {
         expect(songFeelParts({})).toEqual([]);
+    });
+});
+
+describe('moodName', () => {
+    it('capitalises a mood for display and is empty without one', () => {
+        expect(moodName('melancholy')).toBe('Melancholy');
+        expect(moodName(undefined)).toBe('');
     });
 });

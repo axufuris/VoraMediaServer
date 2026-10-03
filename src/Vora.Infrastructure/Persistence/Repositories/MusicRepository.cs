@@ -992,6 +992,47 @@ public class MusicRepository : IMusicRepository
         }).ToList();
     }
 
+    public async Task<Dictionary<string, int>> GetMoodTrackCountsAsync(MusicAccessFilter access)
+    {
+        IQueryable<Track> query = _context.Tracks.AsNoTracking().Where(t => t.Moods != null);
+        query = ApplyLibraryFilter(query, access);
+        query = query.ApplyMusicRatings(access);
+
+        var moods = await query.Select(t => t.Moods).ToListAsync();
+        return moods
+            .SelectMany(m => m ?? new List<string>())
+            .GroupBy(m => m, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+    }
+
+    public Task<int> CountTracksForMoodAsync(string mood, MusicAccessFilter access) =>
+        TracksWithMood(mood, access).CountAsync();
+
+    public Task<List<Track>> GetTracksForMoodAsync(string mood, MusicAccessFilter access, int skip, int take) =>
+        TracksWithMood(mood, access)
+            .Include(MusicIncludePaths.TrackAlbumArtist)
+            .OrderByDescending(t => t.GlobalListeners.HasValue)
+            .ThenByDescending(t => t.GlobalListeners)
+            .ThenBy(t => t.Title)
+            .ThenBy(t => t.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+    public Task<List<Track>> GetRandomTracksForMoodAsync(string mood, MusicAccessFilter access, int count) =>
+        TracksWithMood(mood, access)
+            .Include(MusicIncludePaths.TrackAlbumArtist)
+            .OrderBy(t => EF.Functions.Random())
+            .Take(count)
+            .ToListAsync();
+
+    private IQueryable<Track> TracksWithMood(string mood, MusicAccessFilter access)
+    {
+        IQueryable<Track> query = _context.Tracks.AsNoTracking().Where(t => t.Moods != null && t.Moods.Contains(mood));
+        query = ApplyLibraryFilter(query, access);
+        return query.ApplyMusicRatings(access);
+    }
+
     public async Task<GenreContent> GetGenreContentAsync(string genre, MusicAccessFilter access)
     {
         var genreAlbums = PlayableAlbums(access, genre);

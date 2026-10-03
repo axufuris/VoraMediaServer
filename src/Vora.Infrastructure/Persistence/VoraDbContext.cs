@@ -261,13 +261,6 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.Isrc).HasMaxLength(12);
             entity.Property(e => e.ContentRatingProvider).HasMaxLength(64);
 
-            entity.Property(e => e.Moods).HasConversion(converters.NullableStringList).HasMaxLength(512)
-                .Metadata.SetValueComparer(converters.NullableStringListComparer);
-            entity.Property(e => e.Themes).HasConversion(converters.NullableStringList).HasMaxLength(512)
-                .Metadata.SetValueComparer(converters.NullableStringListComparer);
-            entity.Property(e => e.GoodFor).HasConversion(converters.NullableStringList).HasMaxLength(512)
-                .Metadata.SetValueComparer(converters.NullableStringListComparer);
-
             entity.HasOne(e => e.Album)
                   .WithMany(a => a.Tracks)
                   .HasForeignKey(e => e.AlbumId)
@@ -1586,8 +1579,6 @@ public class VoraDbContext : DbContext
     {
         public ValueConverter<List<string>, string> StringList { get; }
         public ValueComparer<List<string>> StringListComparer { get; }
-        public ValueComparer<List<string>?> NullableStringListComparer { get; }
-        public ValueConverter<List<string>?, string?> NullableStringList { get; }
         public ValueConverter<List<Guid>, string> GuidList { get; }
         public ValueComparer<List<Guid>> GuidListComparer { get; }
 
@@ -1604,19 +1595,6 @@ public class VoraDbContext : DbContext
                 (c1, c2) => c1 != null && c2 != null && c1.SequenceEqual(c2),
                 c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
                 c => c.ToList()
-            );
-
-            NullableStringList = new ValueConverter<List<string>?, string?>(
-                v => v == null ? null : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                v => string.IsNullOrWhiteSpace(v)
-                    ? null
-                    : JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null)
-            );
-
-            NullableStringListComparer = new ValueComparer<List<string>?>(
-                (c1, c2) => c1 == null ? c2 == null : c2 != null && c1.SequenceEqual(c2),
-                c => c == null ? 0 : c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
-                c => c == null ? null : c.ToList()
             );
 
             GuidList = new ValueConverter<List<Guid>, string>(

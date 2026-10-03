@@ -3,7 +3,7 @@ import { type MusicNavState } from './musicNavState';
 import MediaCard from '../../../../components/Client/Primitives/MediaCard';
 import MediaRow, { MediaRowItem } from '../../../../components/Client/Primitives/MediaRow';
 import { AlbumBrowser } from './MusicAlbumsView';
-import GenreTile from './GenreTile';
+import BrowseTile from './BrowseTile';
 
 interface MusicGenreViewProps {
     isLoading: boolean;
@@ -28,7 +28,7 @@ export default function MusicGenreView({ isLoading, currentGenre, serverId, refr
     return (
         <>
             <div className="mb-8 flex items-center gap-4 border-b border-[var(--vora-border-subtle)] pb-6">
-                <GenreTile name={currentGenre.name} artworkUrl={currentGenre.sampleArtworkUrl} className="shrink-0 !w-32 sm:!w-40" />
+                <BrowseTile name={currentGenre.name} artworkUrl={currentGenre.sampleArtworkUrl} className="shrink-0 !w-32 sm:!w-40" />
                 <div className="min-w-0">
                     <div className="text-xs font-bold uppercase tracking-widest text-[var(--vora-text-secondary)]">Genre</div>
                     <h2 className="truncate text-3xl font-bold text-[var(--vora-text-primary)]">{currentGenre.name}</h2>

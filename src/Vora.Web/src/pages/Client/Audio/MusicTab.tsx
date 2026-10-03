@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { StorageKeys, SessionKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
-import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type ArtistTrackVM, type MusicSearchResultVM, type GeneratedMixSummaryVM, type GeneratedMixDetailVM, type BecauseYouPlayedRowVM, type RadioSeed, type StationVM, type YearRecapVM, type GenreSummaryVM, type GenreContentVM, type ServerPlaybackSessionVM, type AudioQualityVM } from '../../../api/Music/musicService';
+import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type ArtistTrackVM, type MusicSearchResultVM, type GeneratedMixSummaryVM, type GeneratedMixDetailVM, type BecauseYouPlayedRowVM, type RadioSeed, type StationVM, type YearRecapVM, type GenreSummaryVM, type GenreContentVM, type MoodSummaryVM, type ServerPlaybackSessionVM, type AudioQualityVM } from '../../../api/Music/musicService';
 import { mediaService } from '../../../api/Media/mediaService';
 import { usePlayer, type PlayableMedia } from '../../../contexts/usePlayer';
 import { serverVault } from '../../../utils/serverVault';
@@ -24,6 +24,8 @@ import MusicGenreView from './Music/MusicGenreView';
 import MusicLikesView from './Music/MusicLikesView';
 import MusicTopView from './Music/MusicTopView';
 import MusicMixView from './Music/MusicMixView';
+import MusicMoodView from './Music/MusicMoodView';
+import { moodName } from '../../../utils/songFeel';
 import MusicAlbumView from './Music/MusicAlbumView';
 import MusicArtistView from './Music/MusicArtistView';
 import MusicForYouView from './Music/MusicForYouView';
@@ -112,6 +114,7 @@ export default function MusicTab() {
     const [artistTopTracks, setArtistTopTracks] = useState<ArtistTrackVM[]>([]);
     const [coPlayedArtists, setCoPlayedArtists] = useState<ArtistVM[]>([]);
     const [genres, setGenres] = useState<GenreSummaryVM[]>([]);
+    const [moods, setMoods] = useState<MoodSummaryVM[]>([]);
     const [currentGenre, setCurrentGenre] = useState<GenreContentVM | null>(null);
     const [serverPlayback, setServerPlayback] = useState<ServerPlaybackSessionVM[]>([]);
 
@@ -258,7 +261,7 @@ export default function MusicTab() {
 
     const loadHomeRows = useCallback(async () => {
         try {
-            const [recent, top, artistsTop, recentAlbums, mixes, byp, st, years] = await Promise.all([
+            const [recent, top, artistsTop, recentAlbums, mixes, byp, st, years, moodList] = await Promise.all([
                 musicService.getRecentlyPlayed(12, serverId),
                 musicService.getTopTracks(12, serverId),
                 musicService.getTopArtists(8, serverId),
@@ -266,7 +269,8 @@ export default function MusicTab() {
                 musicService.getMixes(serverId).catch(() => [] as GeneratedMixSummaryVM[]),
                 musicService.getBecauseYouPlayed(serverId).catch(() => [] as BecauseYouPlayedRowVM[]),
                 musicService.listStations(serverId).catch(() => [] as StationVM[]),
-                musicService.getYearsWithHistory(serverId).catch(() => [] as number[])
+                musicService.getYearsWithHistory(serverId).catch(() => [] as number[]),
+                musicService.getMoods(serverId).catch(() => [] as MoodSummaryVM[])
             ]);
             setRecentlyPlayed(recent);
             setTopTracks(top);
@@ -277,6 +281,7 @@ export default function MusicTab() {
             setStations(st);
             setAvailableYears(years);
             setHasAnyHistory(years.length > 0);
+            setMoods(moodList);
         } catch (err) {
             console.error('Failed to load music home rows', err);
         } finally {
@@ -708,6 +713,12 @@ export default function MusicTab() {
                     <span className="text-[var(--vora-accent-text)] font-bold">{nav.genre}</span>
                 </>
             )}
+            {nav.view === 'mood' && (
+                <>
+                    <span className="text-[var(--vora-text-disabled)]">/</span>
+                    <span className="text-[var(--vora-accent-text)] font-bold">{moodName(nav.mood)}</span>
+                </>
+            )}
         </nav>
     );
 
@@ -843,6 +854,7 @@ export default function MusicTab() {
                         availableYears={availableYears}
                         hasAnyHistory={hasAnyHistory}
                         aiPlaylists={aiPlaylists.data}
+                        moods={moods}
                         updateNav={updateNav}
                         playArtistTrackList={playArtistTrackList}
                         startStationRadio={startStationRadio}
@@ -992,6 +1004,19 @@ export default function MusicTab() {
                     serverId={serverId}
                     refreshKey={libraryVersion}
                     updateNav={updateNav}
+                />
+            )}
+
+            {nav.view === 'mood' && nav.mood && (
+                <MusicMoodView
+                    mood={nav.mood}
+                    serverId={serverId}
+                    refreshKey={libraryVersion}
+                    isShuffled={isShuffled}
+                    toggleShuffle={toggleShuffle}
+                    playArtistTrackList={playArtistTrackList}
+                    formatDuration={formatDuration}
+                    onMissing={resetToRootView}
                 />
             )}
 
