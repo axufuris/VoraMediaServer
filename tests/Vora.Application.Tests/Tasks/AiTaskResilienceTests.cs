@@ -20,7 +20,7 @@ public class AiTaskResilienceTests
     public async Task Weekly_ai_playlists_are_still_made_when_preparing_new_songs_fails()
     {
         var embeddings = Substitute.For<IMusicEmbeddingService>();
-        embeddings.EmbedMissingTracksAsync(Arg.Any<CancellationToken>()).Returns<Task<int>>(_ => throw new InvalidOperationException("insert failed"));
+        embeddings.PrepareTracksAsync(Arg.Any<CancellationToken>()).Returns<Task<int>>(_ => throw new InvalidOperationException("insert failed"));
         var playlists = Substitute.For<IAiPlaylistService>();
         var sp = new ServiceCollection().AddSingleton(embeddings).AddSingleton(playlists).BuildServiceProvider();
 

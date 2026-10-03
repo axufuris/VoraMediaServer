@@ -8,6 +8,9 @@ public class MediaItemEmbedding
 
     public DateTime LastUpdatedAt { get; set; } = DateTime.UtcNow;
 
+    public string? SourceHash { get; set; }
+    public string? Model { get; set; }
+
     public Guid MediaItemId { get; set; }
     public virtual MediaItem MediaItem { get; set; } = null!;
 }

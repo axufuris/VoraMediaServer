@@ -88,7 +88,7 @@ public sealed class LibraryFileCheckTests : IDisposable
         await Analyze();
 
         await _scopedAnalyzer.Received(1).AnalyzeMediaFileAsync(target, Arg.Any<CancellationToken>());
-        await _scopedAnalyzer.ReceivedWithAnyArgs(1).AnalyzeMediaFileAsync(default);
+        await _scopedAnalyzer.ReceivedWithAnyArgs(1).AnalyzeMediaFileAsync(default, TestContext.Current.CancellationToken);
         await _media.DidNotReceive().GetAllMediaItemIdsByLibraryAsync(Arg.Any<Guid>());
     }
 
@@ -140,7 +140,7 @@ public sealed class LibraryFileCheckTests : IDisposable
 
         await _media.Received(1).SyncExternalSubtitleTracksAsync(part.PartId, Arg.Is<List<MediaSubtitleTrack>>(tracks =>
             tracks.Count == 1 && tracks[0].ExternalFilePath == sidecar && tracks[0].Language == "en"));
-        await _scopedAnalyzer.DidNotReceiveWithAnyArgs().AnalyzeMediaFileAsync(default);
+        await _scopedAnalyzer.DidNotReceiveWithAnyArgs().AnalyzeMediaFileAsync(default, TestContext.Current.CancellationToken);
     }
 
     [Fact]

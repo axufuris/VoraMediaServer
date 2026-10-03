@@ -193,7 +193,7 @@ public class LibraryTaskLifecycleTests
         await TaskQueueManager.RunLibraryThumbnailsAsync(sp, library, LibraryThumbnailReason.Manual | LibraryThumbnailReason.Addition, CancellationToken.None);
 
         await thumbnails.Received(1).TriggerLibraryThumbnailGenerationAsync(library, false, false, false, Arg.Any<CancellationToken>());
-        await thumbnails.ReceivedWithAnyArgs(1).TriggerLibraryThumbnailGenerationAsync(default);
+        await thumbnails.ReceivedWithAnyArgs(1).TriggerLibraryThumbnailGenerationAsync(default, cancellationToken: TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -205,7 +205,7 @@ public class LibraryTaskLifecycleTests
         await TaskQueueManager.RunLibraryThumbnailsAsync(sp, library, LibraryThumbnailReason.Force | LibraryThumbnailReason.Manual | LibraryThumbnailReason.Schedule, CancellationToken.None);
 
         await thumbnails.Received(1).TriggerLibraryThumbnailGenerationAsync(library, true, false, false, Arg.Any<CancellationToken>());
-        await thumbnails.ReceivedWithAnyArgs(1).TriggerLibraryThumbnailGenerationAsync(default);
+        await thumbnails.ReceivedWithAnyArgs(1).TriggerLibraryThumbnailGenerationAsync(default, cancellationToken: TestContext.Current.CancellationToken);
     }
 
     [Fact]

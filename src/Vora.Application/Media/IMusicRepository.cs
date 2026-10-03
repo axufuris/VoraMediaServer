@@ -54,9 +54,11 @@ public interface IMusicRepository
     Task<List<string>> GetArtistTagNamesAsync(Guid artistId);
     Task SaveMusicChangesAsync(CancellationToken cancellationToken);
     Task<List<ContentRatingTarget>> GetAlbumsDueForContentRatingAsync(DateTime recheckBefore, int limit);
-    Task<List<TrackForEmbedding>> GetTracksMissingEmbeddingsAsync(int limit);
-    Task<int> CountTracksMissingEmbeddingsAsync();
-    Task<int> SaveTrackEmbeddingsAsync(IReadOnlyList<(Guid TrackId, float[] Vector)> embeddings);
+    Task<List<TrackForProfile>> GetTracksNeedingProfilesAsync();
+    Task<int> SaveTrackProfilesAsync(IReadOnlyList<TrackProfileUpdate> profiles);
+    Task<List<TrackDescriptor>> GetTrackDescriptorsAsync();
+    Task<Dictionary<Guid, List<string>>> GetAllArtistTagNamesAsync(int perArtist);
+    Task<int> SaveTrackEmbeddingsAsync(IReadOnlyList<TrackEmbeddingUpdate> embeddings);
     Task<List<Track>> GetAlbumTracksForUpdateAsync(Guid albumId);
     Task<Album?> GetAlbumForUpdateAsync(Guid albumId);
     Task<Track?> GetTrackForUpdateAsync(Guid trackId);
@@ -164,4 +166,24 @@ public sealed record PopularityRefreshTarget(Guid ArtistId, string ArtistName);
 
 public sealed record ContentRatingTarget(Guid AlbumId, string ArtistName, string AlbumTitle);
 
-public sealed record TrackForEmbedding(Guid TrackId, string Title, string? Artist, string? AlbumTitle, int? Year, string? Genre);
+public sealed record TrackForProfile(Guid TrackId, string Title, string? Artist, string? AlbumTitle, int? Year, string? Genre, Guid? AlbumArtistId);
+
+public sealed record TrackProfileUpdate(Guid TrackId, List<string> Moods, Vora.Domain.Enums.TrackEnergy? Energy, List<string> Themes, List<string> GoodFor, bool IsInstrumental);
+
+public sealed record TrackDescriptor(
+    Guid TrackId,
+    string Title,
+    string? Artist,
+    string? AlbumTitle,
+    int? Year,
+    string? Genre,
+    Guid? AlbumArtistId,
+    List<string>? Moods,
+    Vora.Domain.Enums.TrackEnergy? Energy,
+    List<string>? Themes,
+    List<string>? GoodFor,
+    bool? IsInstrumental,
+    string? EmbeddedHash,
+    string? EmbeddedModel);
+
+public sealed record TrackEmbeddingUpdate(Guid TrackId, float[] Vector, string SourceHash, string Model);

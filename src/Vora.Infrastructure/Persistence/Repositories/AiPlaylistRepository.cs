@@ -73,6 +73,22 @@ public class AiPlaylistRepository : IAiPlaylistRepository
         return rows.Select(r => new AiTrackCandidate(r.Id, r.Artist ?? string.Empty, r.Art, r.Distance)).ToList();
     }
 
+    public async Task<List<TrackForOrdering>> GetTracksForOrderingAsync(IReadOnlyCollection<Guid> trackIds)
+    {
+        if (trackIds.Count == 0) return new List<TrackForOrdering>();
+
+        return await _context.Tracks
+            .AsNoTracking()
+            .Where(t => trackIds.Contains(t.Id))
+            .Select(t => new TrackForOrdering(
+                t.Id,
+                t.Title,
+                t.Artist ?? (t.Album != null ? t.Album.Artist.Name : null),
+                t.Energy,
+                t.Moods))
+            .ToListAsync();
+    }
+
     public async Task<List<AiTrackCandidate>> GetTrackArtAsync(IReadOnlyCollection<Guid> trackIds)
     {
         if (trackIds.Count == 0) return new List<AiTrackCandidate>();
