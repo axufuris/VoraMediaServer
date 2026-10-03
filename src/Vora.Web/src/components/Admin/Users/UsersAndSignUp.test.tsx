@@ -113,8 +113,9 @@ describe('SignUpCard', () => {
     it('saves a new mode straight away, and only the mode', async () => {
         withMode(1);
         renderCard();
+        await screen.findByRole('button', { name: 'Copy link' });
 
-        fireEvent.change(await screen.findByRole('combobox', { name: 'How people sign up' }), { target: { value: '3' } });
+        fireEvent.change(screen.getByRole('combobox', { name: 'How people sign up' }), { target: { value: '3' } });
 
         await waitFor(() => expect(mocks.updateRegistrationMode).toHaveBeenCalledWith(3, undefined));
         expect(await screen.findByRole('button', { name: 'Send invitation' })).toBeInTheDocument();
