@@ -428,6 +428,16 @@ public class MusicRepository : IMusicRepository
             .Select(a => new PopularityRefreshTarget(a.Id, a.Name))
             .ToListAsync();
 
+    public Task<List<PopularityRefreshTarget>> GetLibraryArtistsForPopularityRefreshAsync(Guid libraryId) =>
+        _context.Artists
+            .AsNoTracking()
+            .Where(a => a.LibraryId == libraryId)
+            .OrderBy(a => a.PopularityRefreshedAt.HasValue)
+            .ThenBy(a => a.PopularityRefreshedAt)
+            .ThenBy(a => a.Name)
+            .Select(a => new PopularityRefreshTarget(a.Id, a.Name))
+            .ToListAsync();
+
     // Tracked, with every album and every track, because a refresh rewrites the
     // artist's whole catalogue as one snapshot.
     public Task<Artist?> GetArtistCatalogForUpdateAsync(Guid artistId) =>

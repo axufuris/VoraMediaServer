@@ -385,13 +385,20 @@ public class TaskQueueManager : ITaskQueueManager
     {
         Enqueue($"Refresh Ratings for Library: {libraryId}", async (ct, sp) =>
         {
+            var libraryType = await sp.GetRequiredService<ILibraryRepository>().GetProjectedByIdAsync(libraryId, l => (LibraryType?)l.Type);
+            if (libraryType == LibraryType.Music)
+            {
+                await sp.GetRequiredService<IMusicPopularityRefresher>().RefreshLibraryArtistsAsync(libraryId, ct);
+                return;
+            }
+
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
             await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, null, forceOverride, ct);
 
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
-        }, LibraryLabel(libraryId, "Refresh Ratings for Library: {0}"), resourceKey: LibraryKey(libraryId), libraryId: libraryId);
+        }, RatingsLabel(libraryId), resourceKey: LibraryKey(libraryId), libraryId: libraryId);
     }
 
     public void QueueRefreshMediaItemArtwork(Guid mediaItemId, bool forceOverride = false, Guid? libraryId = null)
@@ -585,6 +592,16 @@ public class TaskQueueManager : ITaskQueueManager
             var repo = sp.GetRequiredService<ILibraryRepository>();
             var name = await repo.GetProjectedByIdAsync(libraryId, l => l.Name);
             return string.IsNullOrWhiteSpace(name) ? null : string.Format(format, name);
+        };
+
+    private static Func<IServiceProvider, Task<string?>> RatingsLabel(Guid libraryId) =>
+        async sp =>
+        {
+            var library = await sp.GetRequiredService<ILibraryRepository>().GetProjectedByIdAsync(libraryId, l => new { l.Name, l.Type });
+            if (library == null || string.IsNullOrWhiteSpace(library.Name)) return null;
+            return library.Type == LibraryType.Music
+                ? $"Refresh Popularity for Library: {library.Name}"
+                : $"Refresh Ratings for Library: {library.Name}";
         };
 
     private static Func<IServiceProvider, Task<string?>> MediaLabel(Guid mediaItemId, string format) =>

@@ -131,7 +131,7 @@ public class AiPlaylistServiceTests
 
         await Service().CreateFromRequestAsync(_me.Id, "road trip", null, CleanOnly, TestContext.Current.CancellationToken);
 
-        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Is<string>(p => p.Contains("from 10 to 60")), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Is<string>(p => p.Contains("(10 to 60)")), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
         await _repo.Received().FindNearestTracksAsync(Arg.Any<float[]>(), CleanOnly, Arg.Any<AiTrackFilter>(), AiPlaylistService.MaxRequestSongs * AiPlaylistService.CandidatesPerSong);
     }
 
@@ -698,5 +698,29 @@ public class AiPlaylistServiceTests
 
         AiPlaylistService.RequestPrompt("rainy sunday").Should().Contain(moods);
         AiPlaylistService.WeeklyPrompt(new[] { "Portishead" }, new[] { "trip hop" }).Should().Contain(moods);
+    }
+
+    [Fact]
+    public void Left_to_the_ai_the_length_follows_what_the_playlist_is_for_with_no_single_default()
+    {
+        var prompt = AiPlaylistService.RequestPrompt("upbeat road trip");
+
+        prompt.Should().Contain("a party, road trip, workout or long drive wants 45 to 60");
+        prompt.Should().Contain("a short moment such as a coffee, a shower or winding down, 12 to 20");
+        prompt.Should().NotContain($"Use {AiPlaylistService.PlaylistLength}");
+        AiPlaylistService.RequestPrompt("upbeat road trip", 40).Should().Contain("They want 40 songs.").And.NotContain("45 to 60");
+    }
+
+    [Theory]
+    [InlineData("45", 45)]
+    [InlineData("\"45\"", 45)]
+    [InlineData("45.0", 45)]
+    [InlineData("\"lots\"", AiPlaylistService.PlaylistLength)]
+    public void The_chosen_length_is_read_whether_it_comes_back_as_a_number_or_text(string value, int songs)
+    {
+        var plan = AiPlaylistService.ParseRequest($$"""{"title":"Road Trip","genres":["rock"],"moods":["upbeat"],"songs":{{value}}}""");
+
+        plan.Should().NotBeNull();
+        plan?.Songs.Should().Be(songs);
     }
 }

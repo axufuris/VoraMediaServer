@@ -63,6 +63,8 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
     {
         if (!await IsEnabledAsync()) return;
 
+        await SweepOrphanedCacheAsync();
+
         var targets = await _mediaRepository.GetSubtitleExtractionTargetsForLibraryAsync(libraryId);
         await RunAsync(targets, cancellationToken);
     }
@@ -87,10 +89,6 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
         }
     }
 
-    // Deletions that never pass through MediaManager.DeleteMediaAsync — a dedupe
-    // merge dropping a part, for one — leave cache files nothing owns. The
-    // backfill is the only pass that sees every live part id, so it is the only
-    // place that can tell an orphan from another library's entry.
     private async Task SweepOrphanedCacheAsync()
     {
         var root = await ResolveCacheDirectoryRootAsync();
@@ -174,13 +172,13 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
 
         if (pending.Count == 0) return;
 
-        var done = 0;
+        var done = work.Count - pending.Count;
         foreach (var item in pending)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await WaitForIdleTranscodersAsync(cancellationToken);
 
-            _progress.Report($"Pre-extracting subtitles ({++done}/{pending.Count})");
+            _progress.Report($"Pre-extracting subtitles ({++done}/{work.Count})");
 
             try
             {
