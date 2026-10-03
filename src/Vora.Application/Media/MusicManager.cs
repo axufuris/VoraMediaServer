@@ -19,7 +19,8 @@ public interface IMusicManager
 {
     Task<List<ArtistVM>> GetArtistsAsync(Guid? libraryId, MusicAccessFilter access, int? limit = null);
     Task<ArtistDetailVM?> GetArtistDetailAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
-    Task<(AlbumVM? Album, List<TrackVM> Tracks, string? ArtistBackgroundUrl)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access);
+    Task<AlbumDetailVM?> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access);
+    Task<TrackInfoVM?> GetTrackInfoAsync(Guid trackId, MusicAccessFilter access);
     Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
     Task<List<ArtistTrackVM>> GetTopTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access, int limit);
     Task<string?> GetTrackFilePathAsync(Guid trackId, MusicAccessFilter access);
@@ -185,10 +186,10 @@ public class MusicManager : IMusicManager
         return result;
     }
 
-    public async Task<(AlbumVM? Album, List<TrackVM> Tracks, string? ArtistBackgroundUrl)> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access)
+    public async Task<AlbumDetailVM?> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access)
     {
         var album = await _repository.GetAlbumByIdAsync(albumId, access);
-        if (album == null) return (null, new List<TrackVM>(), null);
+        if (album == null) return null;
 
         var tracks = await _repository.GetTracksForAlbumAsync(albumId, access);
         var likedIds = profileId.HasValue
@@ -224,7 +225,45 @@ public class MusicManager : IMusicManager
             artistBackgroundUrl = artist?.BackgroundUrl;
         }
 
-        return (albumVm, trackVms, artistBackgroundUrl);
+        return new AlbumDetailVM
+        {
+            Album = albumVm,
+            Tracks = trackVms,
+            ArtistBackgroundUrl = artistBackgroundUrl,
+            Quality = AudioQuality.ForAlbum(tracks),
+            Moods = CommonMoods(tracks)
+        };
+    }
+
+    public const int AlbumMoodCount = 4;
+
+    internal static List<string> CommonMoods(IEnumerable<Track> tracks) =>
+        tracks
+            .SelectMany(t => t.Moods ?? new List<string>())
+            .Select((mood, order) => (Mood: mood.Trim().ToLowerInvariant(), Order: order))
+            .Where(m => m.Mood.Length > 0)
+            .GroupBy(m => m.Mood)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => g.Min(m => m.Order))
+            .Take(AlbumMoodCount)
+            .Select(g => g.Key)
+            .ToList();
+
+    public async Task<TrackInfoVM?> GetTrackInfoAsync(Guid trackId, MusicAccessFilter access)
+    {
+        var track = await _repository.GetTrackByIdAsync(trackId, access);
+        if (track == null) return null;
+
+        return new TrackInfoVM
+        {
+            Id = track.Id,
+            Quality = AudioQuality.For(track.AudioCodec, track.SampleRate, track.Bitrate),
+            Moods = track.Moods ?? new List<string>(),
+            Energy = track.Energy,
+            Themes = track.Themes ?? new List<string>(),
+            GoodFor = track.GoodFor ?? new List<string>(),
+            IsInstrumental = track.IsInstrumental == true
+        };
     }
 
     public async Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)

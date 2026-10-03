@@ -31,6 +31,7 @@ public class MusicPopularityRefresher : IMusicPopularityRefresher
     public const int TopTracksPerArtist = 50;
     public const int TopAlbumsPerArtist = 50;
     public const int MaxTagsPerArtist = 10;
+    public const int MaxBiographyLength = 8000;
 
     // Last.fm allows about five requests a second averaged over five minutes. A
     // refresh makes three in quick succession, so pausing between artists keeps
@@ -157,6 +158,11 @@ public class MusicPopularityRefresher : IMusicPopularityRefresher
 
         artist.GlobalListeners = popularity.Listeners;
         artist.GlobalPlays = popularity.Plays;
+
+        if (string.IsNullOrWhiteSpace(artist.Biography) && !artist.IsLocked(nameof(Artist.Biography)) && !string.IsNullOrWhiteSpace(popularity.Biography))
+        {
+            artist.Biography = popularity.Biography.Length > MaxBiographyLength ? popularity.Biography[..MaxBiographyLength].TrimEnd() : popularity.Biography;
+        }
 
         var albumsByName = ByKey(popularity.TopAlbums);
         var tracksByName = ByKey(popularity.TopTracks);

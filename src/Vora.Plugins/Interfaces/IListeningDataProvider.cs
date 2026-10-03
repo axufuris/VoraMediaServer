@@ -47,6 +47,7 @@ public sealed class ArtistPopularity
     public IReadOnlyList<NamedPopularity> TopTracks { get; init; } = Array.Empty<NamedPopularity>();
     public IReadOnlyList<NamedPopularity> TopAlbums { get; init; } = Array.Empty<NamedPopularity>();
     public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
+    public string? Biography { get; init; }
 
     public static ArtistPopularity NotFound { get; } = new() { Outcome = PopularityLookupOutcome.NotFound };
     public static ArtistPopularity Unavailable { get; } = new() { Outcome = PopularityLookupOutcome.Unavailable };

@@ -222,4 +222,22 @@ public class MusicPopularityRefresherTests
 
         await _repository.DidNotReceiveWithAnyArgs().StageArtistTagsAsync(default, default!);
     }
+
+    [Fact]
+    public void A_biography_fills_only_an_empty_unlocked_one()
+    {
+        var found = new ArtistPopularity { Outcome = PopularityLookupOutcome.Found, Biography = "From Last.fm." };
+        var empty = new Artist { Name = "Daft Punk" };
+        var written = new Artist { Name = "Justice", Biography = "Written by the admin." };
+        var locked = new Artist { Name = "Air" };
+        locked.LockField(nameof(Artist.Biography));
+
+        MusicPopularityRefresher.Apply(empty, found, DateTime.UtcNow);
+        MusicPopularityRefresher.Apply(written, found, DateTime.UtcNow);
+        MusicPopularityRefresher.Apply(locked, found, DateTime.UtcNow);
+
+        empty.Biography.Should().Be("From Last.fm.");
+        written.Biography.Should().Be("Written by the admin.");
+        locked.Biography.Should().BeNull();
+    }
 }

@@ -1,4 +1,4 @@
-import { type AlbumVM, type TrackVM, type RadioSeed } from '../../../../api/Music/musicService';
+import { type AlbumVM, type TrackVM, type RadioSeed, type AudioQualityVM } from '../../../../api/Music/musicService';
 import AddToPlaylistButton from '../../../../components/Collections/AddToPlaylistButton';
 import LastFmMark from '../../../../components/Media/LastFmMark';
 import TrackListeners from '../../../../components/Media/TrackListeners';
@@ -7,6 +7,7 @@ import { hasExplicitTrack } from '../../../../utils/musicContentRating';
 import { formatCompactCount } from '../../../../utils/compactCount';
 import StarRating from '../../../../components/Client/Primitives/StarRating';
 import { albumCover } from '../../../../utils/albumCover';
+import AudioQualityChip from '../../../../components/Media/AudioQualityChip';
 
 export interface AlbumTrackContextMenuPayload {
     x: number;
@@ -19,6 +20,8 @@ interface MusicAlbumViewProps {
     isLoading: boolean;
     currentAlbum: AlbumVM | null;
     tracks: TrackVM[];
+    quality?: AudioQualityVM | null;
+    moods?: string[];
     isServerAdmin: boolean;
     playFromIndex: (startIndex: number) => void;
     playWholeAlbum: () => void;
@@ -36,6 +39,8 @@ export default function MusicAlbumView({
     isLoading,
     currentAlbum,
     tracks,
+    quality,
+    moods = [],
     isServerAdmin,
     playFromIndex,
     playWholeAlbum,
@@ -93,7 +98,11 @@ export default function MusicAlbumView({
                             <p className="text-xs sm:text-sm text-[var(--vora-text-muted)] mt-1 flex flex-wrap items-center gap-x-1.5 justify-center sm:justify-start">
                                 {hasExplicitTrack(tracks) && <ContentRatingBadge rating="Explicit" />}
                                 <span>{currentAlbum.year || ''}{currentAlbum.genre ? ` • ${currentAlbum.genre}` : ''}{tracks.length > 0 ? ` • ${tracks.length} tracks` : ''}</span>
+                                <AudioQualityChip quality={quality} />
                             </p>
+                            {moods.length > 0 && (
+                                <p className="mt-1 text-xs capitalize text-[var(--vora-text-muted)]" aria-label="Moods">{moods.join(' · ')}</p>
+                            )}
                             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 justify-center sm:justify-start">
                                 {/* The world's figure, labelled with its source so it is not
                                     read as this household's plays. Last.fm gives albums a play

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { StorageKeys, SessionKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
-import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type ArtistTrackVM, type MusicSearchResultVM, type GeneratedMixSummaryVM, type GeneratedMixDetailVM, type BecauseYouPlayedRowVM, type RadioSeed, type StationVM, type YearRecapVM, type GenreSummaryVM, type GenreContentVM, type ServerPlaybackSessionVM } from '../../../api/Music/musicService';
+import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type ArtistTrackVM, type MusicSearchResultVM, type GeneratedMixSummaryVM, type GeneratedMixDetailVM, type BecauseYouPlayedRowVM, type RadioSeed, type StationVM, type YearRecapVM, type GenreSummaryVM, type GenreContentVM, type ServerPlaybackSessionVM, type AudioQualityVM } from '../../../api/Music/musicService';
 import { mediaService } from '../../../api/Media/mediaService';
 import { usePlayer, type PlayableMedia } from '../../../contexts/usePlayer';
 import { serverVault } from '../../../utils/serverVault';
@@ -78,6 +78,8 @@ export default function MusicTab() {
     const [artistTags, setArtistTags] = useState<string[]>([]);
     const [currentAlbum, setCurrentAlbum] = useState<AlbumVM | null>(null);
     const [albumArtistBackgroundUrl, setAlbumArtistBackgroundUrl] = useState<string | null>(null);
+    const [albumQuality, setAlbumQuality] = useState<AudioQualityVM | null>(null);
+    const [albumMoods, setAlbumMoods] = useState<string[]>([]);
     const [tracks, setTracks] = useState<TrackVM[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -492,6 +494,8 @@ export default function MusicTab() {
                 setCurrentAlbum(detail.album);
                 setTracks(detail.tracks);
                 setAlbumArtistBackgroundUrl(detail.artistBackgroundUrl);
+                setAlbumQuality(detail.quality ?? null);
+                setAlbumMoods(detail.moods ?? []);
             })
             .catch(err => {
                 console.error('Failed to load album detail', err);
@@ -896,6 +900,8 @@ export default function MusicTab() {
                     isLoading={isLoading}
                     currentAlbum={currentAlbum}
                     tracks={tracks}
+                    quality={albumQuality}
+                    moods={albumMoods}
                     isServerAdmin={isServerAdmin}
                     playFromIndex={playFromIndex}
                     playWholeAlbum={playWholeAlbum}

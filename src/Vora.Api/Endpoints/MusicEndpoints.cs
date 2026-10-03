@@ -135,6 +135,12 @@ public static class MusicEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapGet("/tracks/{trackId:guid}/info", GetTrackInfoAsync)
+            .RequireAuthorization()
+            .WithName("GetTrackInfo")
+            .Produces<TrackInfoVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/tracks/{trackId:guid}/lyrics", GetTrackLyricsAsync)
             .RequireAuthorization()
             .WithName("GetTrackLyrics")
@@ -437,16 +443,16 @@ public static class MusicEndpoints
         return detail == null ? Results.NotFound() : Results.Ok(detail);
     }
 
+    private static async Task<IResult> GetTrackInfoAsync(Guid trackId, ClaimsPrincipal user, IMusicManager manager)
+    {
+        var info = await manager.GetTrackInfoAsync(trackId, user.GetMusicAccessFilter());
+        return info == null ? Results.NotFound() : Results.Ok(info);
+    }
+
     private static async Task<IResult> GetAlbumDetailAsync(Guid albumId, ClaimsPrincipal user, IMusicManager manager)
     {
-        var (album, tracks, artistBackgroundUrl) = await manager.GetAlbumDetailAsync(albumId, user.GetProfileId(), user.GetMusicAccessFilter());
-        if (album == null) return Results.NotFound();
-        return Results.Ok(new AlbumDetailVM
-        {
-            Album = album,
-            Tracks = tracks,
-            ArtistBackgroundUrl = artistBackgroundUrl
-        });
+        var detail = await manager.GetAlbumDetailAsync(albumId, user.GetProfileId(), user.GetMusicAccessFilter());
+        return detail == null ? Results.NotFound() : Results.Ok(detail);
     }
 
     private static async Task<IResult> GetArtistTracksAsync(Guid artistId, ClaimsPrincipal user, IMusicManager manager)

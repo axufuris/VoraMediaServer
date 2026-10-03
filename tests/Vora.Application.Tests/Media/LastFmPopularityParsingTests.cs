@@ -215,4 +215,25 @@ public class LastFmPopularityParsingTests
 
         LastFmListeningDataProvider.ReadTagNames(doc.RootElement).Should().Equal(expected);
     }
+
+    [Fact]
+    public void The_biography_comes_without_the_link_licence_line_or_markup()
+    {
+        const string json = "{\"name\":\"Daft Punk\",\"bio\":{\"summary\":\"short\",\"content\":\"Daft Punk were a French duo &amp; band.\\n\\n\\n\\nThey formed in 1993. <b>Discovery</b> (2001) <a href=\\\"https://www.last.fm/music/Daft+Punk\\\">Read more on Last.fm</a>. User-contributed text is available under the Creative Commons By-SA License; additional terms may apply.\"}}";
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+
+        LastFmListeningDataProvider.ReadBiography(doc.RootElement)
+            .Should().Be("Daft Punk were a French duo & band.\n\nThey formed in 1993. Discovery (2001)");
+    }
+
+    [Theory]
+    [InlineData("{\"name\":\"X\"}")]
+    [InlineData("{\"name\":\"X\",\"bio\":{\"content\":\"\"}}")]
+    [InlineData("{\"name\":\"X\",\"bio\":{\"content\":\" <a href=\\\"x\\\">Read more on Last.fm</a>\"}}")]
+    public void An_artist_with_no_biography_has_none(string artistJson)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(artistJson);
+
+        LastFmListeningDataProvider.ReadBiography(doc.RootElement).Should().BeNull();
+    }
 }

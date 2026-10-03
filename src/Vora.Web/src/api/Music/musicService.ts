@@ -323,9 +323,35 @@ export interface ArtistDetail {
     tags?: string[];
 }
 
+export type TrackEnergy = 'Low' | 'Medium' | 'High';
+
+// Server-computed so every client words it the same: "Hi-Res · FLAC 96 kHz",
+// "Lossless · FLAC 44.1 kHz", "MP3 · 320 kbps".
+export interface AudioQualityVM {
+    format: string;
+    sampleRate?: number | null;
+    bitrate?: number | null;
+    lossless: boolean;
+    hiRes: boolean;
+    label: string;
+}
+
+export interface TrackInfoVM {
+    id: string;
+    quality?: AudioQualityVM | null;
+    moods: string[];
+    energy?: TrackEnergy | null;
+    themes: string[];
+    goodFor: string[];
+    isInstrumental: boolean;
+}
+
 export interface AlbumDetail {
     album: AlbumVM;
     tracks: TrackVM[];
+    // The album's most common format and its tracks' most common moods.
+    quality?: AudioQualityVM | null;
+    moods?: string[];
     // The ARTIST's background, sent only when the album has none of its own, for
     // dressing the page. Never written back — album.backgroundUrl stays the
     // album's own value, including null, which is what the edit modal reads.
@@ -619,6 +645,16 @@ export const musicService = {
     getLikedTracks: async (serverId?: string): Promise<LikedTracksVM> => {
         const response = await apiClient.get<LikedTracksVM>(`/music/likes`, { serverId });
         return response.data;
+    },
+
+    getTrackInfo: async (trackId: string, serverId?: string): Promise<TrackInfoVM | null> => {
+        try {
+            const response = await apiClient.get<TrackInfoVM>(`/music/tracks/${trackId}/info`, { serverId });
+            return response.data;
+        } catch (err: unknown) {
+            if (getResponseStatus(err) === 404) return null;
+            throw err;
+        }
     },
 
     getTrackLyrics: async (trackId: string, serverId?: string): Promise<LyricsVM | null> => {

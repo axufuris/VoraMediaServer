@@ -11,6 +11,7 @@ import MediaGrid from '../../../../components/Client/Primitives/MediaGrid';
 import MediaCard from '../../../../components/Client/Primitives/MediaCard';
 import LastFmCount from '../../../../components/Media/LastFmCount';
 import { albumCaption } from './musicCaptions';
+import ArtistBiography from './ArtistBiography';
 
 interface MusicArtistViewProps {
     isLoading: boolean;
@@ -273,6 +274,7 @@ export default function MusicArtistView({
                             );
                         })}
                     </MediaGrid>
+                    {currentArtist?.biography && <ArtistBiography text={currentArtist.biography} />}
                     {similarArtists.length > 0 && (
                         <div className="mt-10">
                             <h3 className="text-lg font-bold text-[var(--vora-text-primary)] mb-3">Fans Also Listen To</h3>

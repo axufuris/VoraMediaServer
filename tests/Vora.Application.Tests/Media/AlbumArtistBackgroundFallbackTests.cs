@@ -70,8 +70,11 @@ public class AlbumArtistBackgroundFallbackTests
     private void GivenArtistIsNotVisible() =>
         _repository.GetArtistByIdAsync(_artistId, Arg.Any<MusicAccessFilter>()).Returns((Artist?)null);
 
-    private Task<(AlbumVM? Album, List<TrackVM> Tracks, string? ArtistBackgroundUrl)> Detail() =>
-        _manager.GetAlbumDetailAsync(_albumId, null, MusicAccessFilter.Unrestricted);
+    private async Task<(AlbumVM? Album, List<TrackVM> Tracks, string? ArtistBackgroundUrl)> Detail()
+    {
+        var detail = await _manager.GetAlbumDetailAsync(_albumId, null, MusicAccessFilter.Unrestricted);
+        return (detail?.Album, detail?.Tracks ?? new List<TrackVM>(), detail?.ArtistBackgroundUrl);
+    }
 
     [Fact]
     public async Task An_album_with_no_background_borrows_the_artists()

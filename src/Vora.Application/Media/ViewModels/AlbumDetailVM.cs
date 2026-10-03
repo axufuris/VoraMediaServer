@@ -21,4 +21,7 @@ public class AlbumDetailVM
     // and artist detail, where this would be payload on every row that nothing
     // renders.
     public string? ArtistBackgroundUrl { get; set; }
+
+    public AudioQualityVM? Quality { get; set; }
+    public List<string> Moods { get; set; } = new();
 }
