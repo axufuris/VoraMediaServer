@@ -154,7 +154,7 @@ A **season's** poster and (metadata) fields come from the parent **show's** meta
 - `IMediaIngestionService.SeasonExistsAsync(tvShow, seasonNumber)` is checked **before** `EnsureSeasonAsync`, so `IngestTvFileAsync` knows whether it created a new season (`ScanFileResult.NewSeasonCreated`).
 - `QueueScanNewFile` refreshes the parent show's metadata **exactly once** for a genuinely new season. Because the single consumer runs tasks sequentially, the first file of a new season sees `NewSeasonCreated = true` and the rest see the season already exists — so a 20-episode season copy maps the show once, not 20 times.
 
-Manual "Refresh metadata" (force) still re-maps everything; this just makes the common add-a-season case self-heal.
+That makes the common add-a-season case self-heal. By hand, a library's Manage page has **Refresh metadata** (`force=false`, same as the library page's ⋯ menu item) to fill in only items missing metadata, artwork or ratings, and **Replace all metadata** (`force=true`, after a confirmation) to re-map everything not locked. The Manage button used to send `force=true` under the "Refresh" name while the menu item of the same name did not.
 
 ### Duplicate-item prevention
 
