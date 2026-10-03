@@ -7,17 +7,20 @@ interface NowPlayingArtworkProps {
     subtitle?: string;
     meta?: ReactNode;
     fallbackIcon: ReactNode;
-    compact?: boolean;
+    size?: 'full' | 'compact' | 'mini';
     fit?: 'cover' | 'contain';
 }
 
-export function NowPlayingArtwork({ artworkKey, posterUrl, title, subtitle, meta, fallbackIcon, compact = false, fit = 'cover' }: NowPlayingArtworkProps) {
+const ART_WIDTH = { full: 'w-[min(420px,55vh)]', compact: 'w-[200px]', mini: 'w-[min(120px,14vh)]' } as const;
+
+export function NowPlayingArtwork({ artworkKey, posterUrl, title, subtitle, meta, fallbackIcon, size = 'full', fit = 'cover' }: NowPlayingArtworkProps) {
+    const compact = size !== 'full';
     return (
         <>
             <div className={`shrink-0 transition-all duration-500 ${compact ? 'mt-2' : 'flex flex-1 items-end pb-6'}`}>
                 <div
                     key={artworkKey}
-                    className={`aspect-square overflow-hidden transition-all duration-500 ${compact ? 'w-[200px]' : 'w-[min(420px,55vh)]'}`}
+                    className={`aspect-square overflow-hidden transition-all duration-500 ${ART_WIDTH[size]}`}
                     style={{
                         borderRadius: 'var(--vora-radius-lg)',
                         boxShadow: 'var(--vora-shadow-overlay)',
@@ -35,9 +38,9 @@ export function NowPlayingArtwork({ artworkKey, posterUrl, title, subtitle, meta
                 </div>
             </div>
 
-            <div className="mt-5 w-full max-w-[640px] shrink-0 text-center">
+            <div className={`${size === 'mini' ? 'mt-3' : 'mt-5'} w-full max-w-[640px] shrink-0 text-center`}>
                 <h1
-                    className={`m-0 truncate font-semibold transition-all duration-300 ${compact ? 'text-2xl' : 'text-3xl'}`}
+                    className={`m-0 truncate font-semibold transition-all duration-300 ${size === 'mini' ? 'text-xl' : compact ? 'text-2xl' : 'text-3xl'}`}
                     style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}
                     title={title}
                 >

@@ -98,6 +98,8 @@ export interface ArtistTrackVM {
     isLiked: boolean;
     serverAdminRating?: number;
     myRating?: number;
+    globalListeners?: number | null;
+    globalPlays?: number | null;
 }
 
 export interface LikedTracksVM {

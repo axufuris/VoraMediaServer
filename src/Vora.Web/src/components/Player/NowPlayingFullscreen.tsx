@@ -14,6 +14,8 @@ import { lyricsScrollTop } from '../../utils/lyricsScroll';
 import AddToPlaylistModal from '../Collections/AddToPlaylistModal';
 import { useDialog } from '../../dialogs';
 import { playlistService } from '../../api/Collections/playlistService';
+import { nowPlayingViewStore } from '../../utils/nowPlayingView';
+import SynthVisualizer from './NowPlaying/SynthVisualizer';
 
 export default function NowPlayingFullscreen() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -22,14 +24,17 @@ export default function NowPlayingFullscreen() {
         togglePlayPause, nextTrack, previousTrack, hasNext, hasPrevious, seek,
         queue, queueIndex, jumpToQueueIndex,
         isShuffled, toggleShuffle, repeatMode, cycleRepeatMode, closePlayer,
-        radioSeed, radioLabel, volume, setVolume,
+        radioSeed, radioLabel, volume, setVolume, getAudioAnalyser,
     } = usePlayer();
     const { currentTime, duration } = usePlayerTime();
 
     const playButtonRef = useRef<HTMLButtonElement>(null);
     const minimize = useCallback(() => setFullscreen(false), [setFullscreen]);
 
-    const [lyricsWanted, setLyricsWanted] = useState(false);
+    const [lyricsWanted, setLyricsWantedState] = useState(nowPlayingViewStore.lyrics);
+    const [synthOn, setSynthOnState] = useState(nowPlayingViewStore.synth);
+    const setLyricsWanted = (on: boolean) => { nowPlayingViewStore.setLyrics(on); setLyricsWantedState(on); };
+    const setSynthOn = (on: boolean) => { nowPlayingViewStore.setSynth(on); setSynthOnState(on); };
     const [queueOpen, setQueueOpen] = useState(false);
     const dialog = useDialog();
     const queuedSongIds = useMemo(() => queue.filter(item => item.playbackContextType === 'Music').map(item => item.id), [queue]);
@@ -284,6 +289,13 @@ export default function NowPlayingFullscreen() {
                                     />
                                 )}
                                 <NowPlayingPill
+                                    label="Synth"
+                                    title={synthOn ? 'Hide the visualizer' : 'Show a visualizer that moves with the music'}
+                                    active={synthOn}
+                                    onClick={() => setSynthOn(!synthOn)}
+                                    icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="4" y1="10" x2="4" y2="14" /><line x1="8" y1="6" x2="8" y2="18" /><line x1="12" y1="3" x2="12" y2="21" /><line x1="16" y1="8" x2="16" y2="16" /><line x1="20" y1="11" x2="20" y2="13" /></svg>}
+                                />
+                                <NowPlayingPill
                                     label="Queue"
                                     title={queueOpen ? 'Hide queue' : 'Show queue'}
                                     active={queueOpen}
@@ -441,7 +453,7 @@ export default function NowPlayingFullscreen() {
                     posterUrl={posterUrl}
                     title={currentMedia.title}
                     subtitle={currentMedia.subtitle}
-                    compact={lyricsOpen}
+                    size={synthOn ? 'mini' : lyricsOpen ? 'compact' : 'full'}
                     fallbackIcon={posterFallback}
                 />
 
@@ -452,13 +464,19 @@ export default function NowPlayingFullscreen() {
                     </div>
                 )}
 
+                {synthOn && (
+                    <div data-testid="synth-panel" className={`mt-4 min-h-[120px] w-full max-w-[960px] ${lyricsOpen ? 'flex-[3]' : 'flex-1'}`}>
+                        <SynthVisualizer getAnalyser={getAudioAnalyser} />
+                    </div>
+                )}
+
                 {lyricsOpen && (
                     <div
                         ref={lyricsScrollRef}
                         data-testid="lyrics-panel"
                         aria-label="Lyrics"
                         tabIndex={plainLyricsOpen ? 0 : undefined}
-                        className="mt-6 min-h-0 w-full max-w-[640px] flex-1 overflow-y-auto px-4"
+                        className={`min-h-0 w-full max-w-[640px] overflow-y-auto px-4 ${synthOn ? 'mt-2 min-h-[96px] flex-[2]' : 'mt-6 flex-1'}`}
                     >
                         {lyricsLoading ? (
                             <div className="py-16 text-center text-sm" style={{ color: 'var(--vora-text-muted)' }}>Loading lyrics…</div>
@@ -473,7 +491,7 @@ export default function NowPlayingFullscreen() {
                                             key={i}
                                             data-line={i}
                                             onClick={() => seek(line.time)}
-                                            className={`cursor-pointer rounded px-2 py-1 text-center transition-all ${isActive ? 'text-2xl font-semibold' : 'text-base'}`}
+                                            className={`cursor-pointer rounded px-2 py-1 text-center transition-all ${isActive ? `${synthOn ? 'text-lg' : 'text-2xl'} font-semibold` : synthOn ? 'text-sm' : 'text-base'}`}
                                             style={{ color: isActive ? 'var(--vora-text-primary)' : 'var(--vora-text-muted)' }}
                                         >
                                             {line.text || '♪'}

@@ -147,6 +147,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
     const audioGainRef = useRef<GainNode | null>(null);
     const audioEqNodesRef = useRef<BiquadFilterNode[]>([]);
+    const audioAnalyserRef = useRef<AnalyserNode | null>(null);
     const fadingOutRef = useRef(false);
 
     const applyEqPreset = useCallback((preset: ReturnType<typeof eqPresetStore.get>) => {
@@ -191,11 +192,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             const source = ctx.createMediaElementSource(video);
             const gain = ctx.createGain();
             gain.gain.value = 1;
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 2048;
+            analyser.smoothingTimeConstant = 0.8;
             source.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(analyser);
+            analyser.connect(ctx.destination);
             audioContextRef.current = ctx;
             audioSourceRef.current = source;
             audioGainRef.current = gain;
+            audioAnalyserRef.current = analyser;
             applyEqPreset(eqPresetStore.get());
         } catch (err) {
             console.warn('AudioContext setup failed', err);
@@ -828,6 +834,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setIsFullscreen(v => !v);
     }, []);
 
+    const getAudioAnalyser = useCallback(() => audioAnalyserRef.current, []);
+
     const contextValue = useMemo<PlayerContextType>(() => ({
         currentMedia,
         isPlaying,
@@ -864,6 +872,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         radioSeed,
         radioLabel,
         startRadio,
+        getAudioAnalyser,
     }), [
         currentMedia,
         isPlaying,
@@ -897,6 +906,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         radioSeed,
         radioLabel,
         startRadio,
+        getAudioAnalyser,
     ]);
 
     const timeValue = useMemo<PlayerTimeContextType>(() => ({

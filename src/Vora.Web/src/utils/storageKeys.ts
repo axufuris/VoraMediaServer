@@ -10,6 +10,8 @@ export const StorageKeys = {
     iptvPrefs: (profileId: string, deviceId: string) => `iptv_prefs_${profileId}_${deviceId}`,
     calendarViewMode: 'calendar_view_mode_v2',
     musicSubTab: 'music_sub_tab',
+    nowPlayingLyrics: 'now_playing_lyrics',
+    nowPlayingSynth: 'now_playing_synth',
 } as const;
 
 export const SessionKeys = {

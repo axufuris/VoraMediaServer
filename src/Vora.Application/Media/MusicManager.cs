@@ -1085,7 +1085,9 @@ public class MusicManager : IMusicManager
             AlbumId = t.AlbumId,
             AlbumTitle = t.Album?.Title,
             AlbumArtworkUrl = AlbumCoverArt.For(t.Album),
-            IsLiked = likedIds.Contains(t.Id)
+            IsLiked = likedIds.Contains(t.Id),
+            GlobalListeners = t.GlobalListeners,
+            GlobalPlays = t.GlobalPlays
         }).ToList();
     }
 

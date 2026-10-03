@@ -66,7 +66,7 @@ Surfaced through `/api/music/recommendations/mixes`, rendered in the Music tab "
 
 ## Lyrics
 
-`ILyricsProvider` is a Vora plugin. Implementations: `LrcLibLyricsProvider` (primary, free), `GeniusLyricsProvider` (fallback). `MusicManager.GetTrackLyricsAsync` tries embedded → external `.lrc` file → providers in registration order. Returns `LyricsResult` with `PlainLyrics`, `SyncedLyrics`, `IsSynced`. Surfaced in `NowPlayingFullscreen`.
+`ILyricsProvider` is a Vora plugin. Implementations: `LrcLibLyricsProvider` (primary, free), `GeniusLyricsProvider` (fallback). `MusicManager.GetTrackLyricsAsync` tries embedded → external `.lrc` file → providers in registration order. Returns `LyricsResult` with `PlainLyrics`, `SyncedLyrics`, `IsSynced`. Surfaced in `NowPlayingFullscreen`. The For You song rows (Because you played, Recently Played) show each song's Last.fm listeners under it, as Recently Added shows album plays; `MusicManager.MapArtistTracksWithLikesAsync` and `MusicRecommendationManager.MapArtistTrack` carry `GlobalListeners` / `GlobalPlays`.
 
 ## Last.fm
 
@@ -137,7 +137,7 @@ a direct play reports the file's own container.
 - **Endless radio** — when `currentRadioSeed` is set and the queue runs low, calls `extendRadio` and appends.
 - **Gapless playback** — preloads next track when current is near end.
 - **Crossfade** — Web Audio API. Per-device localStorage setting. Fade-in ramp on track change (0→1 over `min(crossfade, 3)`s).
-- **EQ presets** — Web Audio `BiquadFilterNode`s applied in series after `MediaElementSource`.
+- **EQ presets** — Web Audio `BiquadFilterNode`s applied in series after `MediaElementSource`. The graph ends `gain → AnalyserNode (fftSize 2048) → destination`; `usePlayer().getAudioAnalyser()` returns that analyser (null until a song has played) for the **Synth** visualizer (`NowPlaying/SynthVisualizer.tsx`, a canvas of 48 log-spaced bands mirrored about the centre with reflections, falling peak caps, the waveform and a moving grid; maths in `utils/synthBands.ts`; colours from `--vora-accent-500` / `--vora-accent-text` / `--vora-text-primary` / `--vora-border-strong`; 10 fps without glow under `prefers-reduced-motion`; a gentle idle motion when there is no analyser). The **Lyrics** and **Synth** toggles are remembered per device (`nowPlayingViewStore`, `now_playing_lyrics` / `now_playing_synth`). Synth on shrinks the cover to `size="mini"`; with lyrics on as well the synth takes `flex-[3]` and the lyrics a smaller `flex-[2]` panel under it.
 - **Audio quality** — per-device localStorage (`audioQualityStore`). Frontend dispatches `audio-quality-changed` window event; `PlayerContext` listens, rebuilds the stream URL on the current track preserving position.
 
 **`PlayableMedia.playbackContextType`** is the discriminator that controls UI:

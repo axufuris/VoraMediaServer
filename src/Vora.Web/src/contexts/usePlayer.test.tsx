@@ -47,6 +47,7 @@ const makePlayerContextStub = (): PlayerContextType => ({
     radioSeed: null,
     radioLabel: null,
     startRadio: () => { },
+    getAudioAnalyser: () => null,
 });
 
 describe('usePlayer', () => {

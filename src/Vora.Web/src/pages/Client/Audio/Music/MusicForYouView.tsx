@@ -238,6 +238,7 @@ export default function MusicForYouView({
                         <MediaRowItem key={t.id}>
                             <MediaCard
                                 item={trackCaption(t)}
+                                captionExtra={<LastFmCount value={t.globalListeners} unit="listeners" />}
                                 imageUrl={t.albumArtworkUrl}
                                 shape="square"
                                 size="xs"
@@ -254,6 +255,7 @@ export default function MusicForYouView({
                         <MediaRowItem key={t.id}>
                             <MediaCard
                                 item={trackCaption(t)}
+                                captionExtra={<LastFmCount value={t.globalListeners} unit="listeners" />}
                                 imageUrl={t.albumArtworkUrl}
                                 shape="square"
                                 size="xs"
