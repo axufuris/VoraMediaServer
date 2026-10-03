@@ -15,7 +15,7 @@ namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
     [Migration("20261003013801_StoreSongProfileListsAsArrays")]
-    partial class StoreSongProfileListsAsArrays
+    partial class ChangesSinceInitial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

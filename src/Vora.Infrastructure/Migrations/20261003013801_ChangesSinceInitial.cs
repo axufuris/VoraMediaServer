@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,22 +7,28 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Vora.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddSongProfilesAndEmbeddingSource : Migration
+    public partial class ChangesSinceInitial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<double>(
+                name: "AiPlaylistMatchWindow",
+                table: "ServerSettings",
+                type: "double precision",
+                nullable: false,
+                defaultValue: 0.04);
+
             migrationBuilder.AddColumn<int>(
                 name: "Energy",
                 table: "MediaItems",
                 type: "integer",
                 nullable: true);
 
-            migrationBuilder.AddColumn<string>(
+            migrationBuilder.AddColumn<List<string>>(
                 name: "GoodFor",
                 table: "MediaItems",
-                type: "character varying(512)",
-                maxLength: 512,
+                type: "text[]",
                 nullable: true);
 
             migrationBuilder.AddColumn<bool>(
@@ -30,11 +37,10 @@ namespace Vora.Infrastructure.Migrations
                 type: "boolean",
                 nullable: true);
 
-            migrationBuilder.AddColumn<string>(
+            migrationBuilder.AddColumn<List<string>>(
                 name: "Moods",
                 table: "MediaItems",
-                type: "character varying(512)",
-                maxLength: 512,
+                type: "text[]",
                 nullable: true);
 
             migrationBuilder.AddColumn<DateTime>(
@@ -43,11 +49,10 @@ namespace Vora.Infrastructure.Migrations
                 type: "timestamp with time zone",
                 nullable: true);
 
-            migrationBuilder.AddColumn<string>(
+            migrationBuilder.AddColumn<List<string>>(
                 name: "Themes",
                 table: "MediaItems",
-                type: "character varying(512)",
-                maxLength: 512,
+                type: "text[]",
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
@@ -63,15 +68,15 @@ namespace Vora.Infrastructure.Migrations
                 type: "character varying(64)",
                 maxLength: 64,
                 nullable: true);
-
-            migrationBuilder.Sql(
-                "UPDATE \"Artists\" a SET \"PopularityRefreshedAt\" = NULL " +
-                "WHERE NOT EXISTS (SELECT 1 FROM \"ArtistTags\" t WHERE t.\"ArtistId\" = a.\"Id\");");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "AiPlaylistMatchWindow",
+                table: "ServerSettings");
+
             migrationBuilder.DropColumn(
                 name: "Energy",
                 table: "MediaItems");
