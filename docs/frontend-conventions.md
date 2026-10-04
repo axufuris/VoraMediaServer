@@ -66,7 +66,7 @@ components/Media/         MediaEpisodesList, MediaExtrasRow,
 components/Collections/   AddToCollectionModal, CreateCollectionModal,
                           EditCollectionModal, ReorderCollectionModal,
                           AddToPlaylistModal
-components/Home/          HomeCustomizeModal
+components/Home/          HomeCustomizeModal, SmartListRow
 components/Discovery/     DiscoveryCustomizeModal
 components/Admin/         AdminNotificationBell, UserAccessModal,
                           IptvChannelsModal, IptvPlaylistEditModal,
@@ -116,7 +116,7 @@ pages/Admin/              DashboardPage, AiStatsPage, HistoryPage,
                           AuthorizedDevicesPage, AppearancePage,
                           MediaTrashPage
 pages/Admin/Libraries/    CreateLibrary, ManageLibrary
-pages/Admin/SmartLists/   SmartListsPage
+pages/Admin/SmartLists/   SmartListsPage, SmartListEditorModal (+ smartListForm.ts)
 pages/Admin/Discovery/    DiscoveryPage
 pages/Admin/Features/     ForYouPage, ReleaseCalendarPage, DvrPage
 pages/Admin/Iptv/         IptvPage (renders Live TV + Internet Radio via prop)

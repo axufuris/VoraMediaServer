@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.FileSystem;
@@ -30,10 +31,15 @@ public static class DvrPlaybackEndpoints
         return group;
     }
 
-    private static async Task<IResult> GetPlaybackUrlAsync(Guid sessionId, IIptvRepository iptvRepo, IStreamingTokenSigner signer)
+    private static async Task<IResult> GetPlaybackUrlAsync(Guid sessionId, ClaimsPrincipal user, IIptvRepository iptvRepo, IStreamingTokenSigner signer)
     {
         var session = await iptvRepo.GetSessionByIdAsync(sessionId);
-        if (session == null || string.IsNullOrWhiteSpace(session.OutputFilePath) || !File.Exists(session.OutputFilePath))
+        if (session == null || !DvrEndpoints.CallerOwnsSession(user, session))
+        {
+            return Results.NotFound("Recording not found or file is inaccessible.");
+        }
+
+        if (string.IsNullOrWhiteSpace(session.OutputFilePath) || !File.Exists(session.OutputFilePath))
         {
             return Results.NotFound("Recording not found or file is inaccessible.");
         }

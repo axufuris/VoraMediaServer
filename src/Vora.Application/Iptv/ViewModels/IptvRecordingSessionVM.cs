@@ -1,3 +1,5 @@
+using Vora.Domain.Entities.Iptv;
+
 namespace Vora.Application.Iptv.ViewModels;
 
 public class IptvRecordingSessionVM
@@ -16,6 +18,32 @@ public class IptvRecordingSessionVM
     public long? FileSizeBytes { get; set; }
     public string? ExternalProgramId { get; set; }
     public IptvRecordingScheduleVM Schedule { get; set; } = new();
+
+    public static IptvRecordingSessionVM FromEntity(IptvRecordingSession session) => new()
+    {
+        Id = session.Id,
+        Title = session.Title,
+        EpisodeTitle = session.EpisodeTitle,
+        SeasonNumber = session.SeasonNumber,
+        EpisodeNumber = session.EpisodeNumber,
+        StartTime = session.StartTime,
+        EndTime = session.EndTime,
+        Status = session.Status.ToString(),
+        OutputFilePath = session.OutputFilePath,
+        ErrorMessage = session.ErrorMessage,
+        CommercialMarkersJson = session.CommercialMarkersJson,
+        FileSizeBytes = session.FileSizeBytes,
+        ExternalProgramId = session.ExternalProgramId,
+        Schedule = new IptvRecordingScheduleVM
+        {
+            IsSeries = session.Schedule?.IsSeriesRecording ?? false,
+            Channel = new IptvRecordingChannelVM
+            {
+                Name = session.Schedule?.Channel?.Name ?? "Unknown Channel",
+                LogoUrl = session.Schedule?.Channel?.LogoUrl,
+            },
+        },
+    };
 }
 
 public class IptvRecordingScheduleVM

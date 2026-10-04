@@ -47,17 +47,19 @@ Frontend services align 1:1 — don't lump DVR or timeshift methods back into `i
 - A stale `LastSyncedAt` next to a non-null `LastError` reads as "last good sync was at X, broken since" — failures preserve the previous timestamp rather than clearing it.
 - Programs are looked up via `GET /api/iptv/guide` with channel IDs and a time window.
 - **Recording schedule** — links a channel + program (or series) to a future recording session, with optional `KeepMaxEpisodes`.
-- **Recording session** — a single recording instance. Has status (`Pending`, `Recording`, `Completed`, `Completed (Partial)`, `Post-Processing`, `Failed`, `Conflict`, `Cancelled`), output file path, commercial markers JSON, file size, etc. See `IptvRecordingSessionVM`.
+- **Recording session** — a single recording instance. Has status (`IptvRecordingSessionStatus`: `Pending`, `Recording`, `PostProcessing`, `DetectingCommercials`, `Completed`, `Failed`, `Conflict`, `Cancelled`, sent as those names), output file path, commercial markers JSON, file size, etc. See `IptvRecordingSessionVM`.
 
 ## DVR session statuses
 
-The DVR Dashboard groups sessions into three tabs (`Completed`, `Upcoming`, `Failed`) by mapping statuses:
+The DVR Dashboard groups sessions into three tabs (`Completed`, `Upcoming`, `Failed`) by mapping statuses (`utils/dvrDisplay.ts`, which also holds the labels and token colours):
 
 - Upcoming: `Pending`, `Recording`
-- Completed: `Completed`, `Completed (Partial)`, `Post-Processing`
+- Completed: `Completed`, `PostProcessing`, `DetectingCommercials`
 - Failed: `Failed`, `Conflict`, `Cancelled`
 
-A `Post-Processing` recording is one that finished but hasn't been transcoded/scanned yet; playback is disabled until that completes.
+`PostProcessing` and `DetectingCommercials` recordings have finished but aren't ready yet; playback is disabled until they reach `Completed`. The dashboard used to look for `Post-Processing` and `Completed (Partial)`, names the server never sends, so processing recordings fell into the Failed tab.
+
+**Playback is owner-only.** `POST /api/streaming/dvr/play/{sessionId}` signs a file URL only for an admin or the account that owns the recording's schedule (`DvrEndpoints.CallerOwnsSession`, the same rule as delete and cancel-series); anyone else gets a 404.
 
 ## Series recording vs single
 
@@ -71,17 +73,20 @@ Timeshift lets the user pause/rewind live TV. `POST /api/iptv/timeshift/start` r
 
 **Permission gating in the client.** The Live TV skip-back/forward and record buttons are gated by `canTimeshiftIptv` / `canRecordLiveTv`. These are user-level (account-level) settings, edited in the admin `UserAccessModal`. Permissions are written into the profile JWT at sign-in, but they go stale after admin edits — so `LiveTvPlayer` calls `userService.getUserAccount(userId)` on mount and overwrites the JWT-derived values with the fresh server response. New player surfaces that gate on these claims should follow the same pattern.
 
-## Per-profile preferences
+## Per-profile favorites, per-device guide prefs
 
-Per-user / per-device IPTV state is stored under `ProfileDeviceIptvPrefs` (managed via `profileDeviceSettingsService`):
+**Favorites belong to the profile.** Favorite Live TV channels and favorite radio stations live in `ProfileChannelFavorites`, keyed by `(ProfileId, PlaylistId, ExternalChannelId)` — not by channel row id, so a channel that drops out of an M3U and comes back (a new row) is still a favorite, and a restore onto a server whose channels were re-created still lines up. TV vs radio follows the channel's `Kind`. The table is backed up by the `users.channel-favorites` section.
 
-- Favorite channel IDs
-- Hidden channel IDs
-- Region filter (e.g. "US East")
-- Resolution filter
-- "Hide empty channels" toggle
+The clients keep using the prefs endpoints they already had; `IChannelFavoritesManager` sits behind them:
 
-This is what disappears if the `ClientDevice` row gets orphaned because the `X-Vora-Device-Id` header isn't matched correctly — see `docs/auth-and-devices.md`.
+- `GET .../devices/{deviceId}/iptv` writes the profile's TV favorites into `favoriteChannels` (external channel ids). `PUT` replaces the profile's TV favorites with the ids it sends, then stores the rest of the JSON per device without them.
+- `GET/PUT /api/users/profiles/{profileId}/radio-prefs` (and the old per-device `/radio`) do the same with `favoriteIds` (channel ids).
+- **A PUT without the favorites field leaves favorites alone**, so a screen that only edits providers or hidden channels can't wipe them. The web Providers settings tab relies on this.
+- A change fires `ChannelFavoritesUpdated` (profile group) so the guide and the Home favorites rows on other devices refresh.
+
+The `ChangesSinceInitial` migration copies every device's `favoriteChannels` (union per profile, matched case-insensitively to TV channels) and every profile/device `favoriteIds` into the table; unparseable JSON is skipped rather than failing the migration.
+
+The rest of the guide state stays **per device** in `ProfileDeviceSetting.IptvPrefsJson`: enabled providers, hidden channels, region and resolution filters, "Hide empty channels". That is what disappears if the `ClientDevice` row gets orphaned because the `X-Vora-Device-Id` header isn't matched correctly — see `docs/auth-and-devices.md`. The web guide reads the server copy first and only falls back to its `iptv_prefs_*` localStorage cache when the server can't be reached.
 
 ## Frontend pages
 

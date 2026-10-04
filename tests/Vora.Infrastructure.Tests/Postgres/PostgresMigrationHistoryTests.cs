@@ -1,39 +1,54 @@
 using Microsoft.EntityFrameworkCore;
 using Vora.Domain.Entities.Settings;
+using Vora.Domain.Entities.Users;
+using Vora.Domain.Enums;
 
 namespace Vora.Infrastructure.Tests.Postgres;
 
 public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFixture<PostgresDatabase>
 {
-    private static readonly string[] SquashedAway =
-    {
-        "20260927192048_StopSeedingServerSettings",
-        "20260928151531_NameSeasonZeroSpecials",
-        "20261001232631_AddAiPlaylistMatchCutoff",
-        "20261002220851_ReplaceAiPlaylistMatchCutoffWithWindow",
-        "20261002235840_AddSongProfilesAndEmbeddingSource",
-        "20261003010710_RefreshArtistsForBiographies",
-    };
-
     [Fact]
-    public async Task A_database_that_ran_every_migration_before_the_squash_has_nothing_left_to_apply()
+    public async Task A_database_in_qa_state_takes_only_the_collapsed_migration_and_keeps_its_settings()
     {
         Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using (var db = database.NewContext())
+        await using var legacy = new LegacyDatabase();
+        await legacy.BuildQaStateAsync(withSetupGuide: false, cancellationToken);
+        await using (var before = legacy.NewContext())
         {
-            foreach (var id in SquashedAway)
-            {
-                await db.Database.ExecuteSqlAsync(
-                    $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({id}, '10.0.0') ON CONFLICT DO NOTHING",
-                    cancellationToken);
-            }
+            await before.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"AiPlaylistMatchWindow\" = 0.07", cancellationToken);
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
         }
 
-        await using var check = database.NewContext();
+        await legacy.MigrateAsync(cancellationToken);
 
-        (await check.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
-        await check.Database.MigrateAsync(cancellationToken);
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var settings = await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
+        settings.AiPlaylistMatchWindow.Should().Be(0.07);
+        (await after.ProfileChannelFavorites.CountAsync(cancellationToken)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_database_that_already_ran_the_setup_guide_migration_keeps_its_guide_progress()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        await legacy.BuildQaStateAsync(withSetupGuide: true, cancellationToken);
+        await using (var before = legacy.NewContext())
+        {
+            before.Set<User>().Add(new User { Email = "admin@example.com", DisplayName = "Admin", IsAdmin = true });
+            await before.SaveChangesAsync(cancellationToken);
+            await before.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"SetupGuideStatus\" = 3, \"SetupGuideContent\" = 5", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        var settings = await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
+        settings.SetupGuideStatus.Should().Be(SetupGuideStatus.Completed);
+        settings.SetupGuideContent.Should().Be(SetupGuideContent.MoviesAndShows | SetupGuideContent.LiveTv);
     }
 
     [Fact]

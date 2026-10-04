@@ -247,6 +247,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.WatchHistoryBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.RatingsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ExternalConnectionsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ChannelFavoritesBackupSection>();
 
         services.AddHostedService<BackupScheduleWorker>();
         return services;
@@ -343,6 +344,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IEmailDeliveryLogRepository, EmailDeliveryLogRepository>();
         services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
         services.AddScoped<IInvitationRepository, InvitationRepository>();
+        services.AddScoped<IChannelFavoriteRepository, ChannelFavoriteRepository>();
         services.AddScoped<IIptvRepository, IptvRepository>();
         services.AddScoped<ILibraryRepository, LibraryRepository>();
         services.AddScoped<IMediaArtworkRepository, MediaArtworkRepository>();
@@ -395,6 +397,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IEmailSettingsManager, EmailSettingsManager>();
         services.AddScoped<IEmailTemplateManager, EmailTemplateManager>();
         services.AddScoped<IInvitationManager, InvitationManager>();
+        services.AddScoped<IChannelFavoritesManager, ChannelFavoritesManager>();
         services.AddScoped<IIptvManager, IptvManager>();
         services.AddScoped<Vora.Application.Iptv.IIptvHealthCheckService, Vora.Application.Iptv.IptvHealthCheckService>();
         services.AddScoped<ILibraryManager, LibraryManager>();
@@ -432,6 +435,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IRequestManager, RequestManager>();
         services.AddScoped<ISearchManager, SearchManager>();
         services.AddScoped<ISmartListManager, SmartListManager>();
+        services.AddScoped<ISmartListSourceResolver, SmartListSourceResolver>();
         services.AddScoped<IStreamManager, StreamManager>();
         services.AddScoped<ISyncAndStateManager, SyncAndStateManager>();
         services.AddScoped<ISystemSettingsManager, SystemSettingsManager>();

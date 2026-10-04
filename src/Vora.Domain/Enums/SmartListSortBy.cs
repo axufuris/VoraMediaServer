@@ -7,5 +7,6 @@ public enum SmartListSortBy
     ReleaseDateAsc,
     Random,
     TopRated,
-    MostWatched
+    MostWatched,
+    TitleAsc
 }

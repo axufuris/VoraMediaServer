@@ -14,8 +14,8 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261004030256_AddSetupGuide")]
-    partial class AddSetupGuide
+    [Migration("20261004151213_ChangesSinceInitial")]
+    partial class ChangesSinceInitial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -747,6 +747,28 @@ namespace Vora.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("IptvTunerProfiles");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Iptv.ProfileChannelFavorite", b =>
+                {
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PlaylistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ExternalChannelId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ProfileId", "PlaylistId", "ExternalChannelId");
+
+                    b.HasIndex("PlaylistId");
+
+                    b.ToTable("ProfileChannelFavorites");
                 });
 
             modelBuilder.Entity("Vora.Domain.Entities.Library.Collection", b =>
@@ -3202,6 +3224,10 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<Guid?>("CollectionId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("DefaultKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer");
 
@@ -3226,6 +3252,9 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<int>("SortBy")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -3235,6 +3264,9 @@ namespace Vora.Infrastructure.Migrations
 
                     b.HasIndex("CollectionId");
 
+                    b.HasIndex("DefaultKey")
+                        .IsUnique();
+
                     b.HasIndex("LibraryId");
 
                     b.ToTable("SmartLists");
@@ -3243,68 +3275,145 @@ namespace Vora.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("73c33c2c-1fe6-4885-875e-481a1dac5462"),
+                            DefaultKey = "recently-released-movies-episodes",
                             DisplayOrder = 0,
                             FilterRulesJson = "{\"mediaTypes\":[\"Movie\",\"Episode\"]}",
                             MaxItems = 20,
                             ShowOnHomepage = true,
                             ShowToFriends = true,
                             SortBy = 1,
+                            Source = 0,
                             Title = "Recently Released Movies & Episodes"
                         },
                         new
                         {
                             Id = new Guid("17ddede2-2de0-42b8-9b33-32708b4d29b8"),
+                            DefaultKey = "recently-added-movies-shows",
                             DisplayOrder = 1,
                             FilterRulesJson = "{\"mediaTypes\":[\"Movie\",\"TvShow\",\"Season\",\"Episode\"]}",
                             MaxItems = 20,
                             ShowOnHomepage = true,
                             ShowToFriends = true,
                             SortBy = 0,
+                            Source = 0,
                             Title = "Recently Added Movies & Shows"
                         },
                         new
                         {
                             Id = new Guid("ebbefd92-4232-4cae-9c5d-2134943b8bf8"),
+                            DefaultKey = "recently-released-movies",
                             DisplayOrder = 2,
                             FilterRulesJson = "{\"mediaTypes\":[\"Movie\"]}",
                             MaxItems = 20,
                             ShowOnHomepage = true,
                             ShowToFriends = true,
                             SortBy = 1,
+                            Source = 0,
                             Title = "Recently Released Movies"
                         },
                         new
                         {
                             Id = new Guid("c88d6c8a-57ea-4b24-a7be-3f2638a38aca"),
+                            DefaultKey = "recently-added-movies",
                             DisplayOrder = 3,
                             FilterRulesJson = "{\"mediaTypes\":[\"Movie\"]}",
                             MaxItems = 20,
                             ShowOnHomepage = true,
                             ShowToFriends = true,
                             SortBy = 0,
+                            Source = 0,
                             Title = "Recently Added Movies"
                         },
                         new
                         {
                             Id = new Guid("58424b85-b6da-4a9c-8204-e364f1319508"),
+                            DefaultKey = "recently-released-episodes",
                             DisplayOrder = 4,
                             FilterRulesJson = "{\"mediaTypes\":[\"Episode\"]}",
                             MaxItems = 20,
                             ShowOnHomepage = true,
                             ShowToFriends = true,
                             SortBy = 1,
+                            Source = 0,
                             Title = "Recently Released Episodes"
                         },
                         new
                         {
                             Id = new Guid("dfc420d4-421c-4e14-aec4-a5bedefd2f2e"),
+                            DefaultKey = "recently-added-shows",
                             DisplayOrder = 5,
                             FilterRulesJson = "{\"mediaTypes\":[\"TvShow\"]}",
                             MaxItems = 20,
                             ShowOnHomepage = true,
                             ShowToFriends = true,
                             SortBy = 0,
+                            Source = 0,
                             Title = "Recently Added Shows"
+                        },
+                        new
+                        {
+                            Id = new Guid("80d62ff0-9b1a-4381-a03a-2595af4b1d9d"),
+                            DefaultKey = "favorite-channels",
+                            DisplayOrder = 6,
+                            FilterRulesJson = "{}",
+                            MaxItems = 30,
+                            ShowOnHomepage = true,
+                            ShowToFriends = true,
+                            SortBy = 6,
+                            Source = 1,
+                            Title = "Favorite Channels"
+                        },
+                        new
+                        {
+                            Id = new Guid("666c043f-f0f7-47f8-810b-8b0d5afcaeb9"),
+                            DefaultKey = "recently-added-music",
+                            DisplayOrder = 7,
+                            FilterRulesJson = "{}",
+                            MaxItems = 20,
+                            ShowOnHomepage = true,
+                            ShowToFriends = true,
+                            SortBy = 0,
+                            Source = 4,
+                            Title = "Recently Added Music"
+                        },
+                        new
+                        {
+                            Id = new Guid("2133070b-8810-4b2e-9514-619a682b04b1"),
+                            DefaultKey = "new-podcast-episodes",
+                            DisplayOrder = 8,
+                            FilterRulesJson = "{\"unwatchedOnly\":true,\"days\":14}",
+                            MaxItems = 20,
+                            ShowOnHomepage = true,
+                            ShowToFriends = true,
+                            SortBy = 0,
+                            Source = 3,
+                            Title = "New Podcast Episodes"
+                        },
+                        new
+                        {
+                            Id = new Guid("ee067d88-cd48-4382-8b05-1f75b39020eb"),
+                            DefaultKey = "favorite-stations",
+                            DisplayOrder = 9,
+                            FilterRulesJson = "{}",
+                            MaxItems = 30,
+                            ShowOnHomepage = true,
+                            ShowToFriends = true,
+                            SortBy = 6,
+                            Source = 2,
+                            Title = "Favorite Radio Stations"
+                        },
+                        new
+                        {
+                            Id = new Guid("1cca6bf0-87a6-4186-82a0-1d1efce4e6b8"),
+                            DefaultKey = "recent-recordings",
+                            DisplayOrder = 10,
+                            FilterRulesJson = "{}",
+                            MaxItems = 20,
+                            ShowOnHomepage = true,
+                            ShowToFriends = true,
+                            SortBy = 0,
+                            Source = 5,
+                            Title = "Recent Recordings"
                         });
                 });
 
@@ -4602,6 +4711,25 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Playlist");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Iptv.ProfileChannelFavorite", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Iptv.IptvPlaylist", "Playlist")
+                        .WithMany()
+                        .HasForeignKey("PlaylistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vora.Domain.Entities.Users.UserProfile", "Profile")
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Playlist");
+
+                    b.Navigation("Profile");
                 });
 
             modelBuilder.Entity("Vora.Domain.Entities.Media.Album", b =>

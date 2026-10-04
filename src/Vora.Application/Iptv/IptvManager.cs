@@ -584,23 +584,7 @@ public class IptvManager : IIptvManager
             DefaultChannelKind = entity.DefaultChannelKind.ToString(),
             CountryFilter = entity.CountryFilter,
             EnableHealthCheck = entity.EnableHealthCheck,
-            Channels = channels.Select(c => new IptvChannelVM
-            {
-                Id = c.Id,
-                PlaylistId = c.PlaylistId,
-                PlaylistName = entity.Name,
-                ExternalChannelId = c.ExternalChannelId,
-                Name = c.Name,
-                LogoUrl = c.LogoUrl,
-                GroupTitle = c.GroupTitle,
-                StreamUrl = c.StreamUrl,
-                Resolution = c.Resolution,
-                CountryCode = c.CountryCode,
-                IsHiddenByAdmin = c.IsHiddenByAdmin,
-                IsHealthy = c.IsHealthy,
-                LastHealthCheckAt = c.LastHealthCheckAt,
-                Kind = c.Kind.ToString()
-            }).ToList()
+            Channels = channels.Select(c => IptvChannelVM.FromEntity(c, entity.Name)).ToList()
         };
     }
 

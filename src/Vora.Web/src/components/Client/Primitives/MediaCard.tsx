@@ -8,6 +8,7 @@ import { CornerChip, PosterCorner, UnplayedCountBadge, WatchedBadge } from './Wa
 
 export type MediaCardShape = 'poster' | 'still' | 'square' | 'circle';
 export type MediaCardSize = 'xs' | 'sm' | 'md' | 'lg';
+export type MediaCardImageFit = 'cover' | 'contain';
 
 export interface MediaCardProps {
     item?: PosterCaptionItem;
@@ -16,6 +17,13 @@ export interface MediaCardProps {
     // One more caption line that isn't plain text, e.g. a Last.fm figure.
     captionExtra?: ReactNode;
     imageUrl?: string | null;
+    // 'contain' draws the whole image inset on the card's surface, for channel
+    // and station logos that a crop would cut in half.
+    imageFit?: MediaCardImageFit;
+    // Loads imageUrl as-is instead of through the server's resize cache, which
+    // only fetches from known artwork hosts. Podcast feeds and IPTV playlists
+    // point at any host, so their art would otherwise come back a placeholder.
+    uncachedImage?: boolean;
     mosaicUrls?: string[];
     shape?: MediaCardShape;
     size?: MediaCardSize;
@@ -60,7 +68,7 @@ const THUMB_WIDTH: Record<MediaCardShape, number> = {
 // caption is decided by posterCaption() from the item's type — pass `item` and
 // the card captions itself, or pass title/captionLines for non-media tiles.
 export default function MediaCard({
-    item, title, captionLines, captionExtra, imageUrl, mosaicUrls,
+    item, title, captionLines, captionExtra, imageUrl, imageFit = 'cover', uncachedImage, mosaicUrls,
     shape = 'poster', size = 'md', fill, onClick,
     isPlayed, unplayedCount, progressPercent, inWatchlist,
     badge, hoverBadge, bottomLeftBadge, onRemove, onDelete, className,
@@ -126,12 +134,12 @@ export default function MediaCard({
                     <ArtMosaic urls={mosaic} className="opacity-80 transition-opacity group-hover:opacity-100" />
                 ) : showImage ? (
                     <img
-                        src={thumbUrl(imageUrl!, THUMB_WIDTH[shape], shape === 'still' ? 'still' : undefined)}
+                        src={uncachedImage ? imageUrl ?? undefined : thumbUrl(imageUrl, THUMB_WIDTH[shape], imageFit === 'contain' ? 'logo' : shape === 'still' ? 'still' : undefined)}
                         alt={displayTitle}
                         loading="lazy"
                         decoding="async"
                         onError={() => setFailedUrl(imageUrl ?? null)}
-                        className="h-full w-full object-cover"
+                        className={imageFit === 'contain' ? 'h-full w-full object-contain p-[14%]' : 'h-full w-full object-cover'}
                     />
                 ) : (
                     <MediaPlaceholder title={displayTitle} variant={round ? 'actor' : shape === 'still' ? 'still' : 'poster'} />

@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Text.Json;
+using Vora.Application.SmartLists;
 using Vora.Domain.Entities.Actors;
 using Vora.Domain.Entities.Collections;
 using Vora.Domain.Entities.Discovery;
@@ -97,6 +98,7 @@ public class VoraDbContext : DbContext
     public DbSet<IptvPlaylist> IptvPlaylists { get; set; }
     public DbSet<IptvEpgSource> IptvEpgSources { get; set; }
     public DbSet<IptvChannel> IptvChannels { get; set; }
+    public DbSet<ProfileChannelFavorite> ProfileChannelFavorites { get; set; }
     public DbSet<IptvTunerProfile> IptvTunerProfiles { get; set; }
     public DbSet<IptvRecordingSchedule> IptvRecordingSchedules { get; set; }
     public DbSet<IptvRecordingSession> IptvRecordingSessions { get; set; }
@@ -1041,6 +1043,8 @@ public class VoraDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Title).IsRequired().HasMaxLength(256);
             entity.Property(e => e.FilterRulesJson).IsRequired().HasDefaultValue("{}");
+            entity.Property(e => e.DefaultKey).HasMaxLength(64);
+            entity.HasIndex(e => e.DefaultKey).IsUnique();
 
             entity.HasOne<MediaLibrary>()
                   .WithMany()
@@ -1100,6 +1104,22 @@ public class VoraDbContext : DbContext
         modelBuilder.Entity<IptvTunerProfile>(entity =>
         {
             entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<ProfileChannelFavorite>(entity =>
+        {
+            entity.HasKey(e => new { e.ProfileId, e.PlaylistId, e.ExternalChannelId });
+            entity.Property(e => e.ExternalChannelId).IsRequired().HasMaxLength(256);
+
+            entity.HasOne(e => e.Profile)
+                  .WithMany()
+                  .HasForeignKey(e => e.ProfileId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Playlist)
+                  .WithMany()
+                  .HasForeignKey(e => e.PlaylistId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<IptvRecordingSchedule>(entity =>
@@ -1506,74 +1526,7 @@ public class VoraDbContext : DbContext
             new Genre { Id = 10768, Name = "War & Politics" }
         );
 
-        modelBuilder.Entity<SmartList>().HasData(
-            new SmartList
-            {
-                Id = Guid.Parse("73c33c2c-1fe6-4885-875e-481a1dac5462"),
-                Title = "Recently Released Movies & Episodes",
-                ShowOnHomepage = true,
-                ShowToFriends = true,
-                SortBy = SmartListSortBy.ReleaseDateDesc,
-                MaxItems = 20,
-                DisplayOrder = 0,
-                FilterRulesJson = "{\"mediaTypes\":[\"Movie\",\"Episode\"]}"
-            },
-            new SmartList
-            {
-                Id = Guid.Parse("17ddede2-2de0-42b8-9b33-32708b4d29b8"),
-                Title = "Recently Added Movies & Shows",
-                ShowOnHomepage = true,
-                ShowToFriends = true,
-                SortBy = SmartListSortBy.DateAddedDesc,
-                MaxItems = 20,
-                DisplayOrder = 1,
-                FilterRulesJson = "{\"mediaTypes\":[\"Movie\",\"TvShow\",\"Season\",\"Episode\"]}"
-            },
-            new SmartList
-            {
-                Id = Guid.Parse("ebbefd92-4232-4cae-9c5d-2134943b8bf8"),
-                Title = "Recently Released Movies",
-                ShowOnHomepage = true,
-                ShowToFriends = true,
-                SortBy = SmartListSortBy.ReleaseDateDesc,
-                MaxItems = 20,
-                DisplayOrder = 2,
-                FilterRulesJson = "{\"mediaTypes\":[\"Movie\"]}"
-            },
-            new SmartList
-            {
-                Id = Guid.Parse("c88d6c8a-57ea-4b24-a7be-3f2638a38aca"),
-                Title = "Recently Added Movies",
-                ShowOnHomepage = true,
-                ShowToFriends = true,
-                SortBy = SmartListSortBy.DateAddedDesc,
-                MaxItems = 20,
-                DisplayOrder = 3,
-                FilterRulesJson = "{\"mediaTypes\":[\"Movie\"]}"
-            },
-            new SmartList
-            {
-                Id = Guid.Parse("58424b85-b6da-4a9c-8204-e364f1319508"),
-                Title = "Recently Released Episodes",
-                ShowOnHomepage = true,
-                ShowToFriends = true,
-                SortBy = SmartListSortBy.ReleaseDateDesc,
-                MaxItems = 20,
-                DisplayOrder = 4,
-                FilterRulesJson = "{\"mediaTypes\":[\"Episode\"]}"
-            },
-            new SmartList
-            {
-                Id = Guid.Parse("dfc420d4-421c-4e14-aec4-a5bedefd2f2e"),
-                Title = "Recently Added Shows",
-                ShowOnHomepage = true,
-                ShowToFriends = true,
-                SortBy = SmartListSortBy.DateAddedDesc,
-                MaxItems = 20,
-                DisplayOrder = 5,
-                FilterRulesJson = "{\"mediaTypes\":[\"TvShow\"]}"
-            }
-        );
+        modelBuilder.Entity<SmartList>().HasData(SmartListDefaults.All.Select(d => d.ToEntity()).ToArray());
     }
 
     private sealed class ListValueConverters

@@ -7,4 +7,5 @@ public class SmartListRulesDto
     public bool? UnwatchedOnly { get; set; }
     public List<string>? MediaTypes { get; set; }
     public string? ContentRating { get; set; }
+    public int? Days { get; set; }
 }

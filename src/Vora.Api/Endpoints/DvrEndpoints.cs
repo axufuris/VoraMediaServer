@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.Iptv;
 using Vora.Application.Iptv.ViewModels;
+using Vora.Domain.Entities.Iptv;
 
 namespace Vora.Api.Endpoints;
 
@@ -41,31 +42,7 @@ public static class DvrEndpoints
     {
         var sessions = await repo.GetSessionsForProfileAsync(profileId);
 
-        var viewModels = sessions.Select(s => new IptvRecordingSessionVM
-        {
-            Id = s.Id,
-            Title = s.Title,
-            EpisodeTitle = s.EpisodeTitle,
-            SeasonNumber = s.SeasonNumber,
-            EpisodeNumber = s.EpisodeNumber,
-            StartTime = s.StartTime,
-            EndTime = s.EndTime,
-            Status = s.Status.ToString(),
-            OutputFilePath = s.OutputFilePath,
-            ErrorMessage = s.ErrorMessage,
-            CommercialMarkersJson = s.CommercialMarkersJson,
-            FileSizeBytes = s.FileSizeBytes,
-            ExternalProgramId = s.ExternalProgramId,
-            Schedule = new IptvRecordingScheduleVM
-            {
-                IsSeries = s.Schedule?.IsSeriesRecording ?? false,
-                Channel = new IptvRecordingChannelVM
-                {
-                    Name = s.Schedule?.Channel?.Name ?? "Unknown Channel",
-                    LogoUrl = s.Schedule?.Channel?.LogoUrl,
-                },
-            },
-        });
+        var viewModels = sessions.Select(IptvRecordingSessionVM.FromEntity);
 
         return Results.Ok(viewModels);
     }
@@ -127,10 +104,15 @@ public static class DvrEndpoints
     private static async Task<bool> CallerOwnsSessionAsync(ClaimsPrincipal user, Guid sessionId, IIptvRepository repo)
     {
         if (user.IsAdmin()) return true;
-        var accountId = user.GetAccountId();
-        if (accountId == null) return false;
         var session = await repo.GetSessionByIdAsync(sessionId);
-        return session?.Schedule?.UserId == accountId.Value;
+        return session != null && CallerOwnsSession(user, session);
+    }
+
+    internal static bool CallerOwnsSession(ClaimsPrincipal user, IptvRecordingSession session)
+    {
+        if (user.IsAdmin()) return true;
+        var accountId = user.GetAccountId();
+        return accountId != null && session.Schedule?.UserId == accountId.Value;
     }
 
     private static async Task<bool> HasDvrQuotaCapacityAsync(Guid profileId, IIptvRepository repo)
