@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { searchService, type AggregatedGlobalSearchResponse } from '../../api/Discovery/searchService';
 import { discoveryService, type DiscoveryItem } from '../../api/Discovery/discoveryService';
-import { StorageKeys, SessionKeys, getProfileIdFromToken } from '../../utils/storageKeys';
+import { storeMusicNav } from './Audio/Music/storeMusicNav';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import PersonCard from '../../components/Client/Primitives/PersonCard';
 import MediaGrid from '../../components/Client/Primitives/MediaGrid';
@@ -107,15 +107,7 @@ export default function SearchPage() {
     };
 
     const handleMusicNavigate = (targetServerId: string, artistId?: string, albumId?: string) => {
-        try {
-            const navState = albumId
-                ? { view: 'album', albumId, artistId }
-                : { view: 'artist', artistId };
-            sessionStorage.setItem(SessionKeys.musicNavState, JSON.stringify(navState));
-            const token = localStorage.getItem(StorageKeys.profileToken);
-            const profileId = getProfileIdFromToken(token) ?? '';
-            sessionStorage.setItem(SessionKeys.musicNavProfile, profileId || '');
-        } catch { /* ignore */ }
+        storeMusicNav(albumId ? { view: 'album', albumId, artistId } : { view: 'artist', artistId });
         navigate(`/server/${targetServerId}/music`);
     };
 

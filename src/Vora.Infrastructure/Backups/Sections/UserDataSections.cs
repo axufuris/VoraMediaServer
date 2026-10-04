@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.Backups;
+using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Streaming;
 using Vora.Domain.Entities.Users;
@@ -171,4 +172,47 @@ public sealed class ExternalConnectionsBackupSection : EntityTableBackupSection<
     public override bool RequiresExplicitConfirm => true;
     public override string? DestructiveWarning => "Replaces linked third-party accounts (e.g. Trakt). Existing tokens are overwritten.";
     protected override DbSet<UserProviderConnection> Set(VoraDbContext db) => db.UserProviderConnections;
+}
+
+public sealed class ChannelFavoritesBackupSection : IBackupSection
+{
+    private readonly VoraDbContext _db;
+    public ChannelFavoritesBackupSection(VoraDbContext db) { _db = db; }
+
+    public string Key => "users.channel-favorites";
+    public string DisplayName => "Live TV & Radio Favorites";
+    public BackupSectionGroup Group => BackupSectionGroup.UserData;
+    public bool RequiresExplicitConfirm => true;
+    public string? DestructiveWarning => "Replaces every profile's favorite Live TV channels and radio stations.";
+
+    public async Task WriteAsync(IBackupWriter writer, CancellationToken ct)
+    {
+        await writer.WriteJsonAsync($"{Key}/rows.json", await _db.ProfileChannelFavorites.AsNoTracking().ToListAsync(ct), ct);
+    }
+
+    public async Task<BackupSectionImportResult> ReadAsync(IBackupReader reader, CancellationToken ct)
+    {
+        var rows = await reader.ReadJsonAsync<List<ProfileChannelFavorite>>($"{Key}/rows.json", ct);
+        if (rows == null) return new BackupSectionImportResult();
+
+        var profileIds = (await _db.UserProfiles.Select(p => p.Id).ToListAsync(ct)).ToHashSet();
+        var playlistIds = (await _db.IptvPlaylists.Select(p => p.Id).ToListAsync(ct)).ToHashSet();
+        var restorable = rows
+            .Where(r => profileIds.Contains(r.ProfileId) && playlistIds.Contains(r.PlaylistId))
+            .DistinctBy(r => (r.ProfileId, r.PlaylistId, r.ExternalChannelId))
+            .Select(r => new ProfileChannelFavorite { ProfileId = r.ProfileId, PlaylistId = r.PlaylistId, ExternalChannelId = r.ExternalChannelId, AddedAt = r.AddedAt })
+            .ToList();
+
+        _db.ProfileChannelFavorites.RemoveRange(await _db.ProfileChannelFavorites.ToListAsync(ct));
+        await _db.SaveChangesAsync(ct);
+        await _db.ProfileChannelFavorites.AddRangeAsync(restorable, ct);
+        await _db.SaveChangesAsync(ct);
+
+        var result = new BackupSectionImportResult { RowsImported = restorable.Count, RowsSkipped = rows.Count - restorable.Count };
+        if (result.RowsSkipped > 0)
+        {
+            result.Warnings.Add($"{result.RowsSkipped} favorites were skipped because their profile or playlist is not on this server.");
+        }
+        return result;
+    }
 }

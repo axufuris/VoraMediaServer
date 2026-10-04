@@ -5,6 +5,7 @@ namespace Vora.Application.SmartLists.Requests;
 public class SmartListSaveRequest
 {
     public string Title { get; set; } = string.Empty;
+    public SmartListSource Source { get; set; } = SmartListSource.Library;
     public string FilterRulesJson { get; set; } = "{}";
     public SmartListSortBy SortBy { get; set; } = SmartListSortBy.DateAddedDesc;
     public int MaxItems { get; set; } = 20;

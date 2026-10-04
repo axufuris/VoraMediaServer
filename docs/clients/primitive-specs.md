@@ -81,6 +81,8 @@ The single media tile. One primitive covers every aspect ratio rather than a sep
 - `shape: 'poster' | 'still' | 'square' | 'circle' = 'poster'` — 2:3, 16:9, 1:1, or 1:1 masked to a circle (people, music artists).
 - `size: 'sm' | 'md' | 'lg' = 'md'` — width variant. `md` is the default rail size.
 - `showCaption: boolean = true` — whether to render the caption block below the artwork.
+- `imageFit: 'cover' | 'contain' = 'cover'` — `contain` insets the whole image on the card surface instead of cropping it. Used for channel and station logos.
+- `uncachedImage: boolean = false` — load the artwork URL directly instead of through the server's resize cache (`/api/artwork/thumb`), which only fetches from known artwork hosts. Podcast feeds and IPTV playlists point at any host, so their art must load directly.
 
 **Behavior:**
 - Artwork renders at the shape's aspect ratio, lazy-loaded, with a low-contrast skeleton placeholder using `misc.skeletonShimmer` while loading, falling back to the branded placeholder if the source is missing or fails.

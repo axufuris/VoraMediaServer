@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { smartListService, type SmartListClientDto } from '../../api/Collections/smartListService';
-import { type LibraryItem } from '../../api/Media/libraryService';
 import { syncService, type ContinueWatchingItem } from '../../api/Media/syncService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import ClientHomeCustomizeModal, { type HomeLayoutItem } from '../../components/Home/HomeCustomizeModal';
+import SmartListRow from '../../components/Home/SmartListRow';
 import { profileDeviceSettingsService } from '../../api/Users/profileDeviceSettingsService';
 import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 import Tabs from '../../components/Client/Primitives/Tabs';
@@ -100,46 +100,6 @@ function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serve
     );
 }
 
-function SmartListRow({ list, serverId }: { list: SmartListClientDto, serverId?: string }) {
-    const navigate = useNavigate();
-    const [items, setItems] = useState<LibraryItem[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    const fetchItems = useCallback((silent = false) => {
-        smartListService.getListItems(list.id, serverId)
-            .then(setItems)
-            .catch(console.error)
-            .finally(() => {
-                if (!silent) setLoading(false);
-            });
-    }, [list.id, serverId]);
-
-    useEffect(() => {
-        fetchItems();
-    }, [fetchItems]);
-
-    useSignalREvent('LibraryUpdated', useCallback(() => fetchItems(true), [fetchItems]));
-    useSignalREvent('MediaItemUpdated', useCallback(() => fetchItems(true), [fetchItems]));
-
-    if (loading) return <div className="vora-skeleton mx-8 mb-8 h-48" />;
-    if (items.length === 0) return null;
-
-    return (
-        <MediaRow title={list.title}>
-            {items.map(item => (
-                <MediaRowItem key={item.id}>
-                    <MediaCard
-                        item={item}
-                        imageUrl={item.posterUrl}
-                        isPlayed={item.isPlayed}
-                        onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
-                    />
-                </MediaRowItem>
-            ))}
-        </MediaRow>
-    );
-}
-
 export default function HomePage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const flags = useFeatureFlags();
@@ -157,6 +117,10 @@ export default function HomePage() {
     const profileToken = localStorage.getItem(StorageKeys.profileToken);
     const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
     const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
+
+    useSignalREvent('SmartListsUpdated', useCallback(() => {
+        smartListService.getActiveLists(serverId).then(setLists).catch(console.error);
+    }, [serverId]));
 
     useEffect(() => {
         const fetchData = async () => {

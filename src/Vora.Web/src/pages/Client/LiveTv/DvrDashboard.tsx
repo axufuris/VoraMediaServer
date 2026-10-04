@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { dvrService, type IptvRecordingSessionVM } from '../../../api/Iptv/dvrService';
-import { dvrPlaybackService } from '../../../api/Iptv/dvrPlaybackService';
 import { serverVault } from '../../../utils/serverVault';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
@@ -13,8 +12,8 @@ import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import Tabs from '../../../components/Client/Primitives/Tabs';
 import { Modal } from '../../../components/Common/Modal';
 import { parseServerDate, serverTimeMs } from '../../../utils/serverTime';
-
-type DvrTabKey = 'Completed' | 'Upcoming' | 'Failed';
+import { dvrTabFor, formatAiredAt, type DvrTabKey } from '../../../utils/dvrDisplay';
+import { recordingPlayable } from '../../../utils/playables';
 
 interface SeriesPromptState {
     title: string;
@@ -82,33 +81,15 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
         fetchFreshSessions();
     }, []));
 
-    const formatTime = (dateStr: string) => {
-        const date = (parseServerDate(dateStr) ?? new Date(0));
-        return date.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-    };
+    const formatTime = formatAiredAt;
 
     const getDurationString = (start: string, end: string) => {
         const diff = (parseServerDate(end) ?? new Date(0)).getTime() - (parseServerDate(start) ?? new Date(0)).getTime();
         return Math.max(1, Math.round(diff / 60000)) + ' min';
     };
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'Recording': return 'text-[var(--vora-danger-500)] bg-red-500/10 border-red-500/50';
-            case 'Pending': return 'text-blue-400 bg-blue-400/10 border-blue-400/50';
-            case 'Completed': return 'text-green-500 bg-green-500/10 border-green-500/50';
-            case 'Completed (Partial)': return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/50';
-            case 'Post-Processing': return 'text-[var(--vora-accent-500)] bg-orange-400/10 border-orange-400/50';
-            default: return 'text-[var(--vora-text-muted)] bg-[var(--vora-bg-raised)]/50 border-[var(--vora-border-subtle)]/50';
-        }
-    };
-
     const filteredSessions = useMemo(() => {
-        return sessions.filter(s => {
-            if (activeTab === 'Upcoming') return s.status === 'Pending' || s.status === 'Recording';
-            if (activeTab === 'Completed') return s.status === 'Completed' || s.status === 'Completed (Partial)' || s.status === 'Post-Processing';
-            return s.status === 'Failed' || s.status === 'Conflict' || s.status === 'Cancelled';
-        }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+        return sessions.filter(s => dvrTabFor(s.status) === activeTab).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     }, [sessions, activeTab]);
 
     const groupedSessions = useMemo(() => {
@@ -143,30 +124,14 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
 
     const counts = useMemo(() => {
         const c: Record<DvrTabKey, number> = { Completed: 0, Upcoming: 0, Failed: 0 };
-        sessions.forEach(s => {
-            if (s.status === 'Pending' || s.status === 'Recording') c.Upcoming++;
-            else if (s.status === 'Completed' || s.status === 'Completed (Partial)' || s.status === 'Post-Processing') c.Completed++;
-            else c.Failed++;
-        });
+        sessions.forEach(s => { c[dvrTabFor(s.status)]++; });
         return c;
     }, [sessions]);
 
     const handlePlay = async (session: IptvRecordingSessionVM) => {
         try {
             setPlayingId(session.id);
-            const targetServer = serverId ? serverVault.getServer(serverId) : serverVault.getActiveServer();
-            const data = await dvrPlaybackService.playDvrSession(session.id, targetServer?.id);
-
-            playMedia({
-                id: session.id,
-                title: session.title,
-                subtitle: session.episodeTitle || formatTime(session.startTime),
-                streamUrl: `${import.meta.env.VITE_API_URL || ''}${data.url}`,
-                serverId: targetServer?.id,
-                container: 'mp4',
-                playbackContextType: 'Dvr',
-                commercialMarkers: session.commercialMarkersJson ? JSON.parse(session.commercialMarkersJson) : [],
-            });
+            playMedia(await recordingPlayable(session, formatAiredAt(session.startTime), serverId));
         } catch (err) {
             console.error('DVR Playback Error:', err);
             await dialog.alert({
@@ -254,7 +219,6 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
             playingId={playingId}
             formatTime={formatTime}
             getDurationString={getDurationString}
-            getStatusColor={getStatusColor}
             onPlay={handlePlay}
             onDelete={handleDelete}
         />

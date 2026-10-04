@@ -1,3 +1,5 @@
+using Vora.Domain.Entities.Iptv;
+
 namespace Vora.Application.Iptv.ViewModels;
 
 public class IptvChannelVM
@@ -16,4 +18,22 @@ public class IptvChannelVM
     public bool? IsHealthy { get; set; }
     public DateTime? LastHealthCheckAt { get; set; }
     public string Kind { get; set; } = "Tv";
+
+    public static IptvChannelVM FromEntity(IptvChannel channel, string playlistName) => new()
+    {
+        Id = channel.Id,
+        PlaylistId = channel.PlaylistId,
+        PlaylistName = playlistName,
+        ExternalChannelId = channel.ExternalChannelId,
+        Name = channel.Name,
+        LogoUrl = channel.LogoUrl,
+        GroupTitle = channel.GroupTitle,
+        StreamUrl = channel.StreamUrl,
+        Resolution = channel.Resolution,
+        CountryCode = channel.CountryCode,
+        IsHiddenByAdmin = channel.IsHiddenByAdmin,
+        IsHealthy = channel.IsHealthy,
+        LastHealthCheckAt = channel.LastHealthCheckAt,
+        Kind = channel.Kind.ToString()
+    };
 }

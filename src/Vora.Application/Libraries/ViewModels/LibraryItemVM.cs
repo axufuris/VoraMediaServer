@@ -21,6 +21,7 @@ public class LibraryItemVM
     public int? DurationSeconds { get; set; }
     public int? NumberOfSeasons { get; set; }
     public string? TvShowTitle { get; set; }
+    public string? Artist { get; set; }
     public int? SeasonNumber { get; set; }
     public string? SeasonName { get; set; }
     public int? EpisodeNumber { get; set; }
@@ -48,6 +49,7 @@ public class LibraryItemVM
                 : item is TvShow ? "TvShow"
                 : item is Season ? "Season"
                 : item is Episode ? "Episode"
+                : item is Track ? "Track"
                 : "Unknown",
             // Episodes in a list use their season's poster (falling back to the
             // show's) rather than the 16:9 still — the still only belongs on the
@@ -87,6 +89,7 @@ public class LibraryItemVM
                 : item is Episode ? ((Episode)item).Season.Title
                 : null,
             EpisodeNumber = item is Episode ? ((Episode)item).EpisodeNumber : (int?)null,
+            Artist = item is Track ? ((Track)item).Artist : null,
             Edition = item is Movie ? item.Edition : null,
             Genres = item.Genres.Select(g => g.Name).ToList()
         };

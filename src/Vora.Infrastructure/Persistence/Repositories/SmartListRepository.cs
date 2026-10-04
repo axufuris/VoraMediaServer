@@ -78,10 +78,36 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
             query = query.Where(m => !(m is Episode) || keptEpisodeIds.Contains(m.Id));
         }
 
-        return await query
+        var items = await query
             .Select(LibraryItemVM.Projection)
             .Take(maxItems)
             .ToListAsync();
+
+        await AttachTrackArtworkAsync(items);
+        return items;
+    }
+
+    private async Task AttachTrackArtworkAsync(List<LibraryItemVM> items)
+    {
+        var trackIds = items.Where(i => i.Type == "Track" && i.PosterUrl == null).Select(i => i.Id).ToList();
+        if (trackIds.Count == 0)
+        {
+            return;
+        }
+
+        var artwork = await context.Set<Track>()
+            .AsNoTracking()
+            .Where(t => trackIds.Contains(t.Id) && t.Album != null)
+            .Select(t => new { t.Id, ArtworkUrl = t.Album != null ? t.Album.ArtworkUrl : null })
+            .ToDictionaryAsync(t => t.Id, t => t.ArtworkUrl);
+
+        foreach (var item in items)
+        {
+            if (artwork.TryGetValue(item.Id, out var url) && url != null)
+            {
+                item.PosterUrl = url;
+            }
+        }
     }
 
     public async Task<List<SmartListClientVM>> GetActiveClientListsAsync(bool isAdmin)
@@ -95,6 +121,7 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
                 l.Id,
                 l.Title,
                 l.DisplayOrder,
+                l.Source,
                 l.ActiveStartMonth,
                 l.ActiveStartDay,
                 l.ActiveEndMonth,
@@ -110,7 +137,7 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         return lists
             .Where(l => IsListActive(l.CollectionId, l.CollectionStartDate, l.CollectionEndDate,
                                      l.ActiveStartMonth, l.ActiveStartDay, l.ActiveEndMonth, l.ActiveEndDay, now))
-            .Select(l => new SmartListClientVM { Id = l.Id, Title = l.Title, DisplayOrder = l.DisplayOrder })
+            .Select(l => new SmartListClientVM { Id = l.Id, Title = l.Title, DisplayOrder = l.DisplayOrder, Source = l.Source })
             .ToList();
     }
 
@@ -157,6 +184,21 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
 
         await context.SaveChangesAsync();
     }
+
+    public async Task<HashSet<string>> GetDefaultKeysAsync()
+    {
+        var keys = await context.SmartLists
+            .AsNoTracking()
+            .Where(l => l.DefaultKey != null)
+            .Select(l => l.DefaultKey ?? string.Empty)
+            .ToListAsync();
+        return keys.ToHashSet(StringComparer.Ordinal);
+    }
+
+    public async Task<int> GetMaxDisplayOrderAsync() =>
+        await context.SmartLists.AnyAsync()
+            ? await context.SmartLists.MaxAsync(l => l.DisplayOrder)
+            : -1;
 
     public async Task AttachLibraryItemUserStatesAsync(IEnumerable<LibraryItemVM> items, Guid profileId)
     {
@@ -270,6 +312,8 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
                 return query.OrderByDescending(m => m.ThirdPartyRating1.HasValue).ThenByDescending(m => m.ThirdPartyRating1);
             case SmartListSortBy.Random:
                 return query.OrderBy(m => EF.Functions.Random());
+            case SmartListSortBy.TitleAsc:
+                return query.OrderBy(m => m.SortTitle ?? m.Title).ThenBy(m => m.Id);
             case SmartListSortBy.MostWatched:
                 if (!profileId.HasValue) return query.OrderByDescending(m => m.LastContentAddedAt ?? m.AddedAt);
                 var pid = profileId.Value;

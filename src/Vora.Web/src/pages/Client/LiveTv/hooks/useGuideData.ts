@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { type IptvChannelVM } from '../../../../api/Iptv/iptvAdminService';
 import { iptvClientService, type IptvProgramDto } from '../../../../api/Iptv/iptvClientService';
 import { dvrService, type IptvRecordingSessionVM } from '../../../../api/Iptv/dvrService';
@@ -25,6 +25,24 @@ const emptyPrefs = (): GuidePrefs => ({
     hideEmpty: false,
 });
 
+// Older saves are a bare array of enabled provider ids.
+export function parseGuidePrefs(json: string | null | undefined): GuidePrefs | null {
+    if (!json || json === '[]') return null;
+    try {
+        const raw = JSON.parse(json) as Partial<GuidePrefs> | string[] | null;
+        if (Array.isArray(raw)) return { ...emptyPrefs(), enabledProviders: raw.filter(id => typeof id === 'string') };
+        if (raw && typeof raw === 'object') return { ...emptyPrefs(), ...raw };
+    } catch {
+        /* a corrupt save reads as no save */
+    }
+    return null;
+}
+
+const readDeviceId = (): string => localStorage.getItem(StorageKeys.deviceId) || 'unknown';
+
+const activeProfileIdFor = (activeServer: { profileId: string }): string =>
+    getProfileIdFromToken(localStorage.getItem(StorageKeys.profileToken)) ?? activeServer.profileId;
+
 export interface UseGuideDataResult {
     channels: IptvChannelVM[];
     guideData: Record<string, IptvProgramDto[]>;
@@ -41,6 +59,7 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
     const [recordingSessions, setRecordingSessions] = useState<IptvRecordingSessionVM[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [prefs, setPrefs] = useState<GuidePrefs>(emptyPrefs());
+    const lastLocalSaveAt = useRef(0);
 
     useSignalREvent("DvrSessionsUpdated", useCallback(() => {
         const fetchFreshSessions = async () => {
@@ -48,10 +67,7 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
                 const activeServer = serverVault.getActiveServer();
                 if (!activeServer) return;
 
-                const profileToken = localStorage.getItem(StorageKeys.profileToken);
-                const activeProfileId = getProfileIdFromToken(profileToken) ?? activeServer.profileId;
-
-                const sessions = await dvrService.getRecordingSessions(activeProfileId, activeServer.id);
+                const sessions = await dvrService.getRecordingSessions(activeProfileIdFor(activeServer), activeServer.id);
                 setRecordingSessions(sessions);
             } catch (e) {
                 console.error("SignalR: Failed to refresh DVR sessions", e);
@@ -65,13 +81,28 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
         const activeServer = serverVault.getActiveServer();
         if (!activeServer) return;
 
-        const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
+        const profileId = activeProfileIdFor(activeServer);
+        const deviceId = readDeviceId();
         const json = JSON.stringify(newPrefs);
-        localStorage.setItem(StorageKeys.iptvPrefs(activeServer.profileId, deviceId), json);
-        if (profileDeviceSettingsService.saveIptvPrefs) {
-            profileDeviceSettingsService.saveIptvPrefs(activeServer.profileId, deviceId, json, serverId).catch(console.error);
-        }
+        localStorage.setItem(StorageKeys.iptvPrefs(profileId, deviceId), json);
+        lastLocalSaveAt.current = Date.now();
+        profileDeviceSettingsService.saveIptvPrefs(profileId, deviceId, json, serverId).catch(console.error);
     }, [serverId]);
+
+    useSignalREvent('ChannelFavoritesUpdated', useCallback((eventProfileId: string) => {
+        const activeServer = serverVault.getActiveServer();
+        if (!activeServer) return;
+        const profileId = activeProfileIdFor(activeServer);
+        if (eventProfileId.toLowerCase() !== profileId.toLowerCase()) return;
+        if (Date.now() - lastLocalSaveAt.current < 2000) return;
+
+        profileDeviceSettingsService.getIptvPrefs(profileId, readDeviceId(), serverId)
+            .then(json => {
+                const fresh = parseGuidePrefs(json);
+                if (fresh) setPrefs(prev => ({ ...prev, favoriteChannels: fresh.favoriteChannels }));
+            })
+            .catch(console.error);
+    }, [serverId]));
 
     useEffect(() => {
         const loadGuide = async () => {
@@ -79,22 +110,18 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
                 const activeServer = serverVault.getActiveServer();
                 if (!activeServer) return;
 
-                const profileToken = localStorage.getItem(StorageKeys.profileToken);
-                const activeProfileId = getProfileIdFromToken(profileToken) ?? activeServer.profileId;
+                const activeProfileId = activeProfileIdFor(activeServer);
                 const userId = localStorage.getItem(StorageKeys.userId) || activeProfileId;
-                const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
+                const deviceId = readDeviceId();
+                const cacheKey = StorageKeys.iptvPrefs(activeProfileId, deviceId);
 
-                const allProviders = await iptvClientService.getPlaylists(userId, activeProfileId, serverId);
+                const [allProviders, serverPrefs] = await Promise.all([
+                    iptvClientService.getPlaylists(userId, activeProfileId, serverId),
+                    profileDeviceSettingsService.getIptvPrefs(activeProfileId, deviceId, serverId).catch(() => null),
+                ]);
 
-                let currentPrefs = emptyPrefs();
-
-                const savedIptv = localStorage.getItem(StorageKeys.iptvPrefs(activeProfileId, deviceId));
-
-                if (savedIptv && savedIptv !== "[]" && savedIptv !== "") {
-                    const raw = JSON.parse(savedIptv);
-                    if (Array.isArray(raw)) currentPrefs.enabledProviders = raw;
-                    else currentPrefs = { ...currentPrefs, ...raw };
-                }
+                if (serverPrefs) localStorage.setItem(cacheKey, serverPrefs);
+                const currentPrefs = parseGuidePrefs(serverPrefs ?? localStorage.getItem(cacheKey)) ?? emptyPrefs();
 
                 currentPrefs.enabledProviders = currentPrefs.enabledProviders.filter(id => allProviders.some(p => p.id === id));
 

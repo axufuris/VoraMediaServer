@@ -1,4 +1,5 @@
 import type { IptvRecordingSessionVM } from '../../api/Iptv/dvrService';
+import { dvrStatusClasses, dvrStatusLabel, isDvrPlayable, isDvrProcessing } from '../../utils/dvrDisplay';
 
 interface DvrSessionCardProps {
     session: IptvRecordingSessionVM;
@@ -6,7 +7,6 @@ interface DvrSessionCardProps {
     playingId: string | null;
     formatTime: (dateStr: string) => string;
     getDurationString: (start: string, end: string) => string;
-    getStatusColor: (status: string) => string;
     onPlay: (session: IptvRecordingSessionVM) => Promise<void>;
     onDelete: (session: IptvRecordingSessionVM) => void;
 }
@@ -17,7 +17,6 @@ export default function DvrSessionCard({
     playingId,
     formatTime,
     getDurationString,
-    getStatusColor,
     onPlay,
     onDelete
 }: DvrSessionCardProps) {
@@ -52,8 +51,8 @@ export default function DvrSessionCard({
                         <span className="font-bold text-[var(--vora-text-secondary)]">Airing:</span> {formatTime(session.startTime)}
                     </p>
                     <div className="flex items-center gap-3">
-                        <span className={`text-xs font-bold px-2 py-1 rounded border ${getStatusColor(session.status)}`}>
-                            {session.status}
+                        <span className={`text-xs font-bold px-2 py-1 rounded border ${dvrStatusClasses(session.status)}`}>
+                            {dvrStatusLabel(session.status)}
                         </span>
                         <span className="text-xs text-[var(--vora-text-muted)] font-bold bg-[var(--vora-bg-raised)]/50 px-2 py-1 rounded border border-[var(--vora-border-subtle)]">
                             {getDurationString(session.startTime, session.endTime)}
@@ -67,14 +66,14 @@ export default function DvrSessionCard({
                 </div>
 
                 {session.errorMessage && (
-                    <div className="bg-[var(--vora-danger-soft)]/20 border border-red-900/50 p-2 rounded text-xs text-[var(--vora-danger-500)] line-clamp-2" title={session.errorMessage}>
+                    <div className="bg-[var(--vora-danger-soft)] border border-[var(--vora-danger-500)] p-2 rounded text-xs text-[var(--vora-danger-text)] line-clamp-2" title={session.errorMessage}>
                         {session.errorMessage}
                     </div>
                 )}
 
                 {activeTab === 'Completed' && (
                     <>
-                        {session.status === 'Completed' || session.status === 'Completed (Partial)' ? (
+                        {isDvrPlayable(session.status) ? (
                             <button
                                 disabled={playingId === session.id}
                                 onClick={() => onPlay(session)}
@@ -86,7 +85,7 @@ export default function DvrSessionCard({
                                     <><svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg> Watch Now</>
                                 )}
                             </button>
-                        ) : session.status === 'Post-Processing' ? (
+                        ) : isDvrProcessing(session.status) ? (
                             <button disabled className="w-full py-2 bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] font-bold rounded cursor-not-allowed flex items-center justify-center gap-2">
                                 <svg className="animate-spin h-4 w-4 text-[var(--vora-text-muted)]" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                 Processing Video...

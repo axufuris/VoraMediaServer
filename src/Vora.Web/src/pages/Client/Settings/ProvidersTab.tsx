@@ -3,6 +3,7 @@ import { type IptvPlaylistVM, type IptvChannelVM } from '../../../api/Iptv/iptvA
 import { iptvClientService } from '../../../api/Iptv/iptvClientService';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
 import { StorageKeys } from '../../../utils/storageKeys';
+import { parseGuidePrefs } from '../LiveTv/hooks/useGuideData';
 
 export default function ProvidersTab({ activeProfileId, serverId, onSaved }: { activeProfileId: string, serverId?: string, onSaved: () => void }) {
     const [providers, setProviders] = useState<IptvPlaylistVM[]>([]);
@@ -22,16 +23,12 @@ export default function ProvidersTab({ activeProfileId, serverId, onSaved }: { a
                 const provs = await iptvClientService.getPlaylists(userId, activeProfileId, serverId);
                 setProviders(provs);
                 const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
-                let savedIptv = localStorage.getItem(StorageKeys.iptvPrefs(activeProfileId, deviceId));
-                if (!savedIptv || savedIptv === '[]') {
-                    const serverIptv = await profileDeviceSettingsService
-                        .getIptvPrefs(activeProfileId, deviceId, serverId)
-                        .catch(() => null);
-                    if (serverIptv && serverIptv !== '[]' && serverIptv !== '{}') {
-                        savedIptv = serverIptv;
-                        localStorage.setItem(StorageKeys.iptvPrefs(activeProfileId, deviceId), serverIptv);
-                    }
-                }
+                const cacheKey = StorageKeys.iptvPrefs(activeProfileId, deviceId);
+                const serverIptv = await profileDeviceSettingsService
+                    .getIptvPrefs(activeProfileId, deviceId, serverId)
+                    .catch(() => null);
+                if (serverIptv) localStorage.setItem(cacheKey, serverIptv);
+                const savedIptv = serverIptv ?? localStorage.getItem(cacheKey);
 
                 let parsedIptv = {
                     enabledProviders: [] as string[],
@@ -41,18 +38,12 @@ export default function ProvidersTab({ activeProfileId, serverId, onSaved }: { a
                     resolutions: [] as string[],
                     hideEmpty: false,
                 };
-                let hasSavedSettings = false;
-                if (savedIptv && savedIptv !== '[]' && savedIptv !== '') {
-                    hasSavedSettings = true;
-                    const raw = JSON.parse(savedIptv);
-                    if (Array.isArray(raw)) {
-                        parsedIptv.enabledProviders = raw.filter((id: string) => provs.some(p => p.id === id));
-                    } else {
-                        parsedIptv = { ...parsedIptv, ...raw };
-                        parsedIptv.enabledProviders = parsedIptv.enabledProviders.filter((id: string) => provs.some(p => p.id === id));
-                    }
+                const saved = parseGuidePrefs(savedIptv);
+                if (saved) {
+                    parsedIptv = { ...parsedIptv, ...saved };
+                    parsedIptv.enabledProviders = parsedIptv.enabledProviders.filter(id => provs.some(p => p.id === id));
                 }
-                if (!hasSavedSettings && parsedIptv.enabledProviders.length === 0 && provs.length > 0) {
+                if (parsedIptv.enabledProviders.length === 0 && provs.length > 0) {
                     parsedIptv.enabledProviders = provs.filter(p => p.m3uUrl).map(p => p.id);
                 }
                 setIptvPrefs(parsedIptv);
@@ -82,8 +73,14 @@ export default function ProvidersTab({ activeProfileId, serverId, onSaved }: { a
     const save = async () => {
         const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
         const iptvKey = StorageKeys.iptvPrefs(activeProfileId, deviceId);
-        const iptvPrefsString = JSON.stringify(iptvPrefs);
-        localStorage.setItem(iptvKey, iptvPrefsString);
+        localStorage.setItem(iptvKey, JSON.stringify(iptvPrefs));
+        const iptvPrefsString = JSON.stringify({
+            enabledProviders: iptvPrefs.enabledProviders,
+            hiddenChannels: iptvPrefs.hiddenChannels,
+            regions: iptvPrefs.regions,
+            resolutions: iptvPrefs.resolutions,
+            hideEmpty: iptvPrefs.hideEmpty,
+        });
 
         if (activeProfileId) {
             try {

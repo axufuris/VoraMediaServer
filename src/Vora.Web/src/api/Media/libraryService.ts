@@ -43,6 +43,7 @@ export interface LibraryItem {
     lastContentAddedAt?: string | null;
     type: string;
     tvShowTitle?: string;
+    artist?: string | null;
     seasonNumber?: number;
     seasonName?: string;
     episodeNumber?: number;

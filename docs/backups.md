@@ -21,7 +21,7 @@ public interface IBackupSection
 
 Concrete implementations live in `Vora.Infrastructure/Backups/Sections/` (because they touch `VoraDbContext`). A shared `EntityTableBackupSection<TEntity>` base in the same folder covers the common "dump a DbSet to JSON" pattern — most sections are 5–10 lines.
 
-Currently in the box: server settings, plugin settings, DataProtection keys (filesystem, not DB), email templates, client template schedules, overlay templates, smart lists, dedupe rules, IPTV playlists / EPG sources / tuner profiles / recording schedules, discovery row configs, request servers, and the user-data group (users + profiles + access schedules, devices + per-device settings, watch history, ratings, external connections).
+Currently in the box: server settings, plugin settings, DataProtection keys (filesystem, not DB), email templates, client template schedules, overlay templates, smart lists, dedupe rules, IPTV playlists / EPG sources / tuner profiles / recording schedules, discovery row configs, request servers, and the user-data group (users + profiles + access schedules, devices + per-device settings, watch history, ratings, external connections, Live TV & radio favorites). The favorites section skips rows whose profile or playlist isn't on the server it restores to, and reports how many it skipped.
 
 User-data sections set `RequiresExplicitConfirm = true` and carry a `DestructiveWarning`. Restore UI uses these flags to surface warnings and keep destructive sections unchecked by default.
 

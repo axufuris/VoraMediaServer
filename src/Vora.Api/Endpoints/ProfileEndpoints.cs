@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using Vora.Api.Extensions;
+using Vora.Application.Iptv;
 using Vora.Application.Users;
 using Vora.Application.Users.ViewModels;
 
@@ -359,36 +360,38 @@ public static class ProfileEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> GetIptvPrefsAsync(Guid profileId, string deviceId, IUserManager manager)
+    private static async Task<IResult> GetIptvPrefsAsync(Guid profileId, string deviceId, IUserManager manager, IChannelFavoritesManager favorites)
     {
         var json = await manager.GetProfileDeviceIptvPrefsAsync(profileId, deviceId);
-        return Results.Ok(new IptvPrefsResponse { IptvPrefsJson = json });
+        return Results.Ok(new IptvPrefsResponse { IptvPrefsJson = await favorites.MergeTvFavoritesAsync(profileId, json) });
     }
 
-    private static async Task<IResult> SaveIptvPrefsAsync(Guid profileId, string deviceId, [FromBody] UpdateIptvPrefsDto request, IUserManager manager)
+    private static async Task<IResult> SaveIptvPrefsAsync(Guid profileId, string deviceId, [FromBody] UpdateIptvPrefsDto request, IUserManager manager, IChannelFavoritesManager favorites)
     {
+        var prefs = await favorites.SyncTvFavoritesAsync(profileId, request.IptvPrefsJson);
         var existingPlayback = await manager.GetProfileDevicePlaybackPrefsAsync(profileId, deviceId) ?? string.Empty;
-        await manager.SaveProfileDeviceSettingsAsync(profileId, deviceId, existingPlayback, request.IptvPrefsJson);
+        await manager.SaveProfileDeviceSettingsAsync(profileId, deviceId, existingPlayback, prefs);
         return Results.NoContent();
     }
 
-    private static async Task<IResult> GetRadioPrefsAsync(Guid profileId, string deviceId, IUserManager manager)
+    private static async Task<IResult> GetRadioPrefsAsync(Guid profileId, string deviceId, IUserManager manager, IChannelFavoritesManager favorites)
     {
         var json = await manager.GetProfileDeviceRadioPrefsAsync(profileId, deviceId);
-        return Results.Ok(new RadioPrefsResponse { RadioPrefsJson = json });
+        return Results.Ok(new RadioPrefsResponse { RadioPrefsJson = await favorites.MergeRadioFavoritesAsync(profileId, json) });
     }
 
-    private static async Task<IResult> GetProfileRadioPrefsAsync(Guid profileId, IUserManager manager)
+    private static async Task<IResult> GetProfileRadioPrefsAsync(Guid profileId, IUserManager manager, IChannelFavoritesManager favorites)
     {
         var json = await manager.GetProfileRadioPrefsAsync(profileId);
-        return Results.Ok(new RadioPrefsResponse { RadioPrefsJson = json });
+        return Results.Ok(new RadioPrefsResponse { RadioPrefsJson = await favorites.MergeRadioFavoritesAsync(profileId, json) });
     }
 
-    private static async Task<IResult> SaveProfileRadioPrefsAsync(Guid profileId, [FromBody] UpdateRadioPrefsDto request, IUserManager manager)
+    private static async Task<IResult> SaveProfileRadioPrefsAsync(Guid profileId, [FromBody] UpdateRadioPrefsDto request, IUserManager manager, IChannelFavoritesManager favorites)
     {
         try
         {
-            await manager.SaveProfileRadioPrefsAsync(profileId, request.RadioPrefsJson);
+            var prefs = await favorites.SyncRadioFavoritesAsync(profileId, request.RadioPrefsJson);
+            await manager.SaveProfileRadioPrefsAsync(profileId, prefs);
             return Results.NoContent();
         }
         catch (InvalidOperationException)
@@ -397,9 +400,10 @@ public static class ProfileEndpoints
         }
     }
 
-    private static async Task<IResult> SaveRadioPrefsAsync(Guid profileId, string deviceId, [FromBody] UpdateRadioPrefsDto request, IUserManager manager)
+    private static async Task<IResult> SaveRadioPrefsAsync(Guid profileId, string deviceId, [FromBody] UpdateRadioPrefsDto request, IUserManager manager, IChannelFavoritesManager favorites)
     {
-        await manager.SaveProfileDeviceRadioPrefsAsync(profileId, deviceId, request.RadioPrefsJson);
+        var prefs = await favorites.SyncRadioFavoritesAsync(profileId, request.RadioPrefsJson);
+        await manager.SaveProfileDeviceRadioPrefsAsync(profileId, deviceId, prefs);
         return Results.NoContent();
     }
 
@@ -448,9 +452,10 @@ public static class ProfileEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> SaveClientSettingsAsync(Guid profileId, string deviceId, [FromBody] UpdateClientSettingsDto request, IUserManager manager)
+    private static async Task<IResult> SaveClientSettingsAsync(Guid profileId, string deviceId, [FromBody] UpdateClientSettingsDto request, IUserManager manager, IChannelFavoritesManager favorites)
     {
-        await manager.SaveProfileDeviceSettingsAsync(profileId, deviceId, request.PlaybackPrefs, request.IptvPrefsJson);
+        var iptvPrefs = request.IptvPrefsJson == null ? null : await favorites.SyncTvFavoritesAsync(profileId, request.IptvPrefsJson);
+        await manager.SaveProfileDeviceSettingsAsync(profileId, deviceId, request.PlaybackPrefs, iptvPrefs);
         return Results.NoContent();
     }
 }
