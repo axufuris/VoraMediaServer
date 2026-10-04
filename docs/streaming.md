@@ -150,7 +150,7 @@ An external track's cached VTT is fingerprinted against the **sidecar**, not the
 
 `ISubtitlePreExtractionManager` is its own job with its own triggers, deliberately not chained to the thumbnail step:
 
-- **Library scan** — `RunFullLibraryWorkflowAsync` queues `QueuePreExtractLibrarySubtitles` as its own step. Queued rather than awaited: the pass parks while anything is transcoding, which must not hold a scan open. Progress counts every extractable track in the library, already-cached ones included (`Pre-extracting subtitles (566/2967)`), so a pass resumed after a restart reads as resumed rather than starting from 1.
+- **Library scan** — `RunFullLibraryWorkflowAsync` queues `QueuePreExtractLibrarySubtitles` as its own step. Queued rather than awaited: the pass parks while anything is transcoding, which must not hold a scan open. Progress counts only what this pass still has to extract (`Pre-extracting subtitles (4/1894)`): tracks already cached are skipped before the count is taken, so a pass resumed after a restart starts again from 1 against a smaller total.
 - **Single-file ingest** (`QueueScanNewFile`) and **per-item Analyze** — queue `QueuePreExtractMediaItemSubtitles` right after analysis, which is the point at which the item's subtitle tracks are known.
 - **Backfill** — `POST /api/metadata/subtitles/backfill` (admin) walks every video library and fills whatever is missing, so an existing library is warmed without a rescan. There is a button for it under the same settings card.
 

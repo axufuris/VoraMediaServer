@@ -172,13 +172,13 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
 
         if (pending.Count == 0) return;
 
-        var done = work.Count - pending.Count;
+        var done = 0;
         foreach (var item in pending)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await WaitForIdleTranscodersAsync(cancellationToken);
 
-            _progress.Report($"Pre-extracting subtitles ({++done}/{work.Count})");
+            _progress.Report($"Pre-extracting subtitles ({++done}/{pending.Count})");
 
             try
             {

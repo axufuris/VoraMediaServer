@@ -215,7 +215,7 @@ public class SubtitlePreExtractionTests
     }
 
     [Fact]
-    public async Task A_library_pass_counts_progress_against_every_track_including_ones_already_cached()
+    public async Task A_library_pass_counts_progress_over_the_tracks_it_still_has_to_extract()
     {
         var libraryId = Guid.NewGuid();
         var cachedTrack = Guid.NewGuid();
@@ -230,7 +230,8 @@ public class SubtitlePreExtractionTests
 
         await NewManager(progress).PreExtractForLibraryAsync(libraryId, TestContext.Current.CancellationToken);
 
-        progress.Received(1).Report("Pre-extracting subtitles (2/2)");
+        progress.Received(1).Report("Pre-extracting subtitles (1/1)");
+        progress.DidNotReceive().Report("Pre-extracting subtitles (2/2)");
         await _extractor.DidNotReceive().GetOrExtractWebVttAsync(Arg.Any<SubtitleSource>(), Arg.Any<string>(), PartId, cachedTrack, Arg.Any<CancellationToken>());
     }
 
