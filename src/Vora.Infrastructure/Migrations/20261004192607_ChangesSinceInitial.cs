@@ -84,15 +84,15 @@ BEGIN
         WHERE ""Id"" = 'ebbefd92-4232-4cae-9c5d-2134943b8bf8';
 
         INSERT INTO ""SmartLists"" (""Id"", ""ActiveEndDay"", ""ActiveEndMonth"", ""ActiveStartDay"", ""ActiveStartMonth"", ""CollectionId"", ""DefaultKey"", ""DisplayOrder"", ""FilterRulesJson"", ""LibraryId"", ""MaxItems"", ""ShowOnHomepage"", ""ShowToFriends"", ""SortBy"", ""Source"", ""Title"")
-        VALUES ('1cca6bf0-87a6-4186-82a0-1d1efce4e6b8', NULL, NULL, NULL, NULL, NULL, 'recent-recordings', 10, '{}', NULL, 20, TRUE, TRUE, 0, 5, 'Recent Recordings');
+        VALUES ('1cca6bf0-87a6-4186-82a0-1d1efce4e6b8', NULL, NULL, NULL, NULL, NULL, 'recent-recordings', 7, '{}', NULL, 20, TRUE, TRUE, 0, 5, 'Recent Recordings');
         INSERT INTO ""SmartLists"" (""Id"", ""ActiveEndDay"", ""ActiveEndMonth"", ""ActiveStartDay"", ""ActiveStartMonth"", ""CollectionId"", ""DefaultKey"", ""DisplayOrder"", ""FilterRulesJson"", ""LibraryId"", ""MaxItems"", ""ShowOnHomepage"", ""ShowToFriends"", ""SortBy"", ""Source"", ""Title"")
-        VALUES ('2133070b-8810-4b2e-9514-619a682b04b1', NULL, NULL, NULL, NULL, NULL, 'new-podcast-episodes', 8, '{""unwatchedOnly"":true,""days"":14}', NULL, 20, TRUE, TRUE, 0, 3, 'New Podcast Episodes');
+        VALUES ('2133070b-8810-4b2e-9514-619a682b04b1', NULL, NULL, NULL, NULL, NULL, 'new-podcast-episodes', 9, '{""unwatchedOnly"":true,""days"":14}', NULL, 20, TRUE, TRUE, 0, 3, 'New Podcast Episodes');
         INSERT INTO ""SmartLists"" (""Id"", ""ActiveEndDay"", ""ActiveEndMonth"", ""ActiveStartDay"", ""ActiveStartMonth"", ""CollectionId"", ""DefaultKey"", ""DisplayOrder"", ""FilterRulesJson"", ""LibraryId"", ""MaxItems"", ""ShowOnHomepage"", ""ShowToFriends"", ""SortBy"", ""Source"", ""Title"")
-        VALUES ('666c043f-f0f7-47f8-810b-8b0d5afcaeb9', NULL, NULL, NULL, NULL, NULL, 'recently-added-music', 7, '{}', NULL, 20, TRUE, TRUE, 0, 4, 'Recently Added Music');
+        VALUES ('666c043f-f0f7-47f8-810b-8b0d5afcaeb9', NULL, NULL, NULL, NULL, NULL, 'recently-added-music', 8, '{}', NULL, 20, TRUE, TRUE, 0, 4, 'Recently Added Music');
         INSERT INTO ""SmartLists"" (""Id"", ""ActiveEndDay"", ""ActiveEndMonth"", ""ActiveStartDay"", ""ActiveStartMonth"", ""CollectionId"", ""DefaultKey"", ""DisplayOrder"", ""FilterRulesJson"", ""LibraryId"", ""MaxItems"", ""ShowOnHomepage"", ""ShowToFriends"", ""SortBy"", ""Source"", ""Title"")
         VALUES ('80d62ff0-9b1a-4381-a03a-2595af4b1d9d', NULL, NULL, NULL, NULL, NULL, 'favorite-channels', 6, '{}', NULL, 30, TRUE, TRUE, 6, 1, 'Favorite Channels');
         INSERT INTO ""SmartLists"" (""Id"", ""ActiveEndDay"", ""ActiveEndMonth"", ""ActiveStartDay"", ""ActiveStartMonth"", ""CollectionId"", ""DefaultKey"", ""DisplayOrder"", ""FilterRulesJson"", ""LibraryId"", ""MaxItems"", ""ShowOnHomepage"", ""ShowToFriends"", ""SortBy"", ""Source"", ""Title"")
-        VALUES ('ee067d88-cd48-4382-8b05-1f75b39020eb', NULL, NULL, NULL, NULL, NULL, 'favorite-stations', 9, '{}', NULL, 30, TRUE, TRUE, 6, 2, 'Favorite Radio Stations');
+        VALUES ('ee067d88-cd48-4382-8b05-1f75b39020eb', NULL, NULL, NULL, NULL, NULL, 'favorite-stations', 10, '{}', NULL, 30, TRUE, TRUE, 6, 2, 'Favorite Radio Stations');
 
         CREATE UNIQUE INDEX ""IX_SmartLists_DefaultKey"" ON ""SmartLists"" (""DefaultKey"");
 
@@ -129,26 +129,18 @@ BEGIN
     END IF;
 END $smartlists$;");
 
-            migrationBuilder.CreateTable(
-                name: "PendingTasks",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Sequence = table.Column<long>(type: "bigint", nullable: false),
-                    Kind = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    ArgumentsJson = table.Column<string>(type: "text", nullable: false),
-                    Name = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    QueuedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PendingTasks", x => x.Id);
-                });
+            migrationBuilder.Sql(@"
+CREATE TABLE IF NOT EXISTS ""PendingTasks"" (
+    ""Id"" uuid NOT NULL,
+    ""Sequence"" bigint NOT NULL,
+    ""Kind"" character varying(128) NOT NULL,
+    ""ArgumentsJson"" text NOT NULL,
+    ""Name"" character varying(512) NOT NULL,
+    ""QueuedAt"" timestamp with time zone NOT NULL,
+    CONSTRAINT ""PK_PendingTasks"" PRIMARY KEY (""Id"")
+);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_PendingTasks_Sequence",
-                table: "PendingTasks",
-                column: "Sequence");
+CREATE INDEX IF NOT EXISTS ""IX_PendingTasks_Sequence"" ON ""PendingTasks"" (""Sequence"");");
         }
 
         /// <inheritdoc />

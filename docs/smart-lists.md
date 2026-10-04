@@ -44,7 +44,7 @@ Library entries carry `Type = "Track"` for songs (they were `"Unknown"`), with t
 
 ## Defaults
 
-`SmartListDefaults.All` is the one list of default rows: the six original library rows plus Favorite Channels, Recently Added Music, New Podcast Episodes, Favorite Radio Stations and Recent Recordings. It seeds the table (`HasData`, so the ids are fixed) and stamps each row's `DefaultKey`. Admins can turn any default off or delete it; **Restore default lists** re-adds only the deleted ones, at the end of the order, with their original ids. Editing a default keeps its key.
+`SmartListDefaults.All` is the one list of default rows: the six original library rows plus Favorite Channels, Recent Recordings, Recently Added Music, New Podcast Episodes and Favorite Radio Stations, in that display order. It seeds the table (`HasData`, so the ids are fixed) and stamps each row's `DefaultKey`. Admins can turn any default off or delete it; **Restore default lists** re-adds only the deleted ones, at the end of the order, with their original ids. Editing a default keeps its key.
 
 ## Clients
 

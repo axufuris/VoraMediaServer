@@ -74,18 +74,32 @@ public sealed class LegacyDatabase : IAsyncDisposable
         }
     }
 
-    public const string EarlierCombinedMigration = "20261004151213_ChangesSinceInitial";
+    public const string FirstCombinedMigration = "20261004151213_ChangesSinceInitial";
 
-    public async Task BuildEarlierCombinedStateAsync(CancellationToken cancellationToken)
+    public const string SecondCombinedMigration = "20261004183407_ChangesSinceInitial";
+
+    private const string OldDefaultRowOrder = """
+        UPDATE "SmartLists" SET "DisplayOrder" = 7 WHERE "DefaultKey" = 'recently-added-music';
+        UPDATE "SmartLists" SET "DisplayOrder" = 8 WHERE "DefaultKey" = 'new-podcast-episodes';
+        UPDATE "SmartLists" SET "DisplayOrder" = 9 WHERE "DefaultKey" = 'favorite-stations';
+        UPDATE "SmartLists" SET "DisplayOrder" = 10 WHERE "DefaultKey" = 'recent-recordings';
+        """;
+
+    public async Task BuildEarlierCombinedStateAsync(string migrationId, bool withTaskTable, CancellationToken cancellationToken)
     {
         await using var db = NewContext();
         await db.Database.MigrateAsync(cancellationToken);
-        await db.Database.ExecuteSqlRawAsync("DROP TABLE \"PendingTasks\"", cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(OldDefaultRowOrder, cancellationToken);
+        if (!withTaskTable)
+        {
+            await db.Database.ExecuteSqlRawAsync("DROP TABLE \"PendingTasks\"", cancellationToken);
+        }
+
         await db.Database.ExecuteSqlAsync(
             $"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}",
             cancellationToken);
         await db.Database.ExecuteSqlAsync(
-            $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({EarlierCombinedMigration}, '10.0.8')",
+            $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({migrationId}, '10.0.8')",
             cancellationToken);
     }
 

@@ -46,13 +46,13 @@ public static class SmartListDefaults
             SmartListSource.Library, SmartListSortBy.DateAddedDesc, 20, 5, "{\"mediaTypes\":[\"TvShow\"]}"),
         new("favorite-channels", Guid.Parse("80d62ff0-9b1a-4381-a03a-2595af4b1d9d"), "Favorite Channels",
             SmartListSource.FavoriteChannels, SmartListSortBy.TitleAsc, 30, 6, "{}"),
-        new("recently-added-music", Guid.Parse("666c043f-f0f7-47f8-810b-8b0d5afcaeb9"), "Recently Added Music",
-            SmartListSource.RecentlyAddedMusic, SmartListSortBy.DateAddedDesc, 20, 7, "{}"),
-        new("new-podcast-episodes", Guid.Parse("2133070b-8810-4b2e-9514-619a682b04b1"), "New Podcast Episodes",
-            SmartListSource.NewPodcastEpisodes, SmartListSortBy.DateAddedDesc, 20, 8, "{\"unwatchedOnly\":true,\"days\":14}"),
-        new("favorite-stations", Guid.Parse("ee067d88-cd48-4382-8b05-1f75b39020eb"), "Favorite Radio Stations",
-            SmartListSource.FavoriteStations, SmartListSortBy.TitleAsc, 30, 9, "{}"),
         new("recent-recordings", Guid.Parse("1cca6bf0-87a6-4186-82a0-1d1efce4e6b8"), "Recent Recordings",
-            SmartListSource.RecentRecordings, SmartListSortBy.DateAddedDesc, 20, 10, "{}")
+            SmartListSource.RecentRecordings, SmartListSortBy.DateAddedDesc, 20, 7, "{}"),
+        new("recently-added-music", Guid.Parse("666c043f-f0f7-47f8-810b-8b0d5afcaeb9"), "Recently Added Music",
+            SmartListSource.RecentlyAddedMusic, SmartListSortBy.DateAddedDesc, 20, 8, "{}"),
+        new("new-podcast-episodes", Guid.Parse("2133070b-8810-4b2e-9514-619a682b04b1"), "New Podcast Episodes",
+            SmartListSource.NewPodcastEpisodes, SmartListSortBy.DateAddedDesc, 20, 9, "{\"unwatchedOnly\":true,\"days\":14}"),
+        new("favorite-stations", Guid.Parse("ee067d88-cd48-4382-8b05-1f75b39020eb"), "Favorite Radio Stations",
+            SmartListSource.FavoriteStations, SmartListSortBy.TitleAsc, 30, 10, "{}")
     ];
 }
