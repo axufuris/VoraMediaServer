@@ -74,6 +74,21 @@ public sealed class LegacyDatabase : IAsyncDisposable
         }
     }
 
+    public const string EarlierCombinedMigration = "20261004151213_ChangesSinceInitial";
+
+    public async Task BuildEarlierCombinedStateAsync(CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE \"PendingTasks\"", cancellationToken);
+        await db.Database.ExecuteSqlAsync(
+            $"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}",
+            cancellationToken);
+        await db.Database.ExecuteSqlAsync(
+            $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({EarlierCombinedMigration}, '10.0.8')",
+            cancellationToken);
+    }
+
     public async Task MigrateAsync(CancellationToken cancellationToken)
     {
         await using var db = NewContext();

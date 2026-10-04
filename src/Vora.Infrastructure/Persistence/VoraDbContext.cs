@@ -17,6 +17,7 @@ using Vora.Domain.Entities.Posters;
 using Vora.Domain.Entities.Requests;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.SmartLists;
+using Vora.Domain.Entities.Tasks;
 using Vora.Domain.Entities.Templates;
 using Vora.Domain.Entities.Streaming;
 using Vora.Domain.Entities.Ai;
@@ -99,6 +100,7 @@ public class VoraDbContext : DbContext
     public DbSet<IptvEpgSource> IptvEpgSources { get; set; }
     public DbSet<IptvChannel> IptvChannels { get; set; }
     public DbSet<ProfileChannelFavorite> ProfileChannelFavorites { get; set; }
+    public DbSet<PendingTask> PendingTasks { get; set; }
     public DbSet<IptvTunerProfile> IptvTunerProfiles { get; set; }
     public DbSet<IptvRecordingSchedule> IptvRecordingSchedules { get; set; }
     public DbSet<IptvRecordingSession> IptvRecordingSessions { get; set; }
@@ -185,6 +187,7 @@ public class VoraDbContext : DbContext
         ConfigurePlaylists(modelBuilder);
 
         ConfigureSmartLists(modelBuilder);
+        ConfigurePendingTasks(modelBuilder);
 
         ConfigureIptv(modelBuilder);
         ConfigurePodcasts(modelBuilder);
@@ -1055,6 +1058,18 @@ public class VoraDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(s => s.CollectionId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigurePendingTasks(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PendingTask>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Kind).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(512);
+            entity.Property(e => e.ArgumentsJson).IsRequired();
+            entity.HasIndex(e => e.Sequence);
         });
     }
 

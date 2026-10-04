@@ -13,7 +13,7 @@ namespace Vora.Application.Tests.Tasks;
 
 public class LibraryRatingsTaskTests
 {
-    private readonly TaskQueueManager _queue = new(Substitute.For<IClientNotifier>());
+    private readonly TaskQueueManager _queue = new(Substitute.For<IClientNotifier>(), Substitute.For<ITaskJournal>());
     private readonly ILibraryRepository _libraries = Substitute.For<ILibraryRepository>();
     private readonly IMusicPopularityRefresher _popularity = Substitute.For<IMusicPopularityRefresher>();
     private readonly IMetadataManager _metadata = Substitute.For<IMetadataManager>();

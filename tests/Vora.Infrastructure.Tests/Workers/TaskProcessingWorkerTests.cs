@@ -117,7 +117,7 @@ public class TaskProcessingWorkerTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_removes_task_even_when_work_item_is_cancelled()
+    public async Task A_task_cut_short_by_the_server_stopping_is_removed_as_interrupted()
     {
         var (worker, queue, _, controlled) = Build();
         using var cts = new CancellationTokenSource();
@@ -142,7 +142,35 @@ public class TaskProcessingWorkerTests
         await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await worker.StopAsync(TestContext.Current.CancellationToken);
 
-        queue.Received(1).RemoveTask(task.Id);
+        queue.Received(1).RemoveTask(task.Id, true);
+    }
+
+    [Fact]
+    public async Task A_task_someone_cancels_is_removed_as_finished_rather_than_interrupted()
+    {
+        var (worker, queue, _, controlled) = Build();
+        using var cts = new CancellationTokenSource();
+        using var cancelledByUser = new CancellationTokenSource();
+        var removed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var task = new QueuedTaskDto
+        {
+            Name = "cancelled by someone",
+            WorkItem = async (ct, sp) =>
+            {
+                await cancelledByUser.CancelAsync();
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+        };
+        queue.GetTaskCancellationToken(task.Id).Returns(cancelledByUser.Token);
+        queue.When(q => q.RemoveTask(task.Id, Arg.Any<bool>())).Do(_ => removed.TrySetResult(true));
+
+        await worker.StartAsync(cts.Token);
+        await controlled.EnqueueAsync(task);
+        await removed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await cts.CancelAsync();
+        await worker.StopAsync(TestContext.Current.CancellationToken);
+
+        queue.Received(1).RemoveTask(task.Id, false);
     }
 
     [Fact]

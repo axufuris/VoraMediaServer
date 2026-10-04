@@ -181,7 +181,8 @@ public class TaskProcessingWorker : BackgroundService
         }
         finally
         {
-            _taskQueue.RemoveTask(task.Id);
+            var stoppedByServer = stoppingToken.IsCancellationRequested && !taskToken.Value.IsCancellationRequested;
+            _taskQueue.RemoveTask(task.Id, interrupted: stoppedByServer);
         }
     }
 }
