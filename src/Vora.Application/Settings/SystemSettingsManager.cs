@@ -17,6 +17,8 @@ public interface ISystemSettingsManager
     Task UpdatePluginSettingsAsync(string pluginId, Dictionary<string, string> settings);
     Task<FeatureFlagsVM> GetFeatureFlagsAsync();
     Task UpdateFeatureFlagsAsync(UpdateFeatureFlagsRequest request);
+    Task<SetupGuideVM> GetSetupGuideAsync();
+    Task<SetupGuideVM> UpdateSetupGuideAsync(SetupGuideVM request);
 }
 
 public class SystemSettingsManager : ISystemSettingsManager
@@ -268,6 +270,23 @@ public class SystemSettingsManager : ISystemSettingsManager
             as Vora.Application.Subtitles.ISubtitleSearchManager;
 
         return manager != null && await manager.IsAvailableAsync();
+    }
+
+    public async Task<SetupGuideVM> GetSetupGuideAsync()
+    {
+        var settings = await _settingsRepo.GetSettingsAsync();
+        return SetupGuideVM.From(settings.SetupGuideStatus, settings.SetupGuideStep, settings.SetupGuideContent);
+    }
+
+    public async Task<SetupGuideVM> UpdateSetupGuideAsync(SetupGuideVM request)
+    {
+        var settings = await _settingsRepo.GetSettingsForUpdateAsync();
+        if (Enum.IsDefined(request.Status)) settings.SetupGuideStatus = request.Status;
+        var step = request.Step?.Trim();
+        settings.SetupGuideStep = string.IsNullOrEmpty(step) ? null : step[..Math.Min(step.Length, SetupGuideVM.MaxStepLength)];
+        settings.SetupGuideContent = request.ToContent();
+        await _settingsRepo.SaveChangesAsync();
+        return SetupGuideVM.From(settings.SetupGuideStatus, settings.SetupGuideStep, settings.SetupGuideContent);
     }
 
     public async Task UpdateFeatureFlagsAsync(UpdateFeatureFlagsRequest request)

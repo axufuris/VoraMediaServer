@@ -64,6 +64,7 @@ const AdminMusicHistoryPage = lazy(() => import('./pages/Admin/MusicHistoryPage'
 const AdminLogsPage = lazy(() => import('./pages/Admin/LogsPage'));
 const AdminBackupsPage = lazy(() => import('./pages/Admin/BackupsPage'));
 const AdminLibraryMigrationPage = lazy(() => import('./pages/Admin/LibraryMigrationPage'));
+const AdminSetupGuidePage = lazy(() => import('./pages/Admin/SetupGuide/SetupGuidePage'));
 const ClientSettingsPage = lazy(() => import('./pages/Client/SettingsPage'));
 const MusicPage = lazy(() => import('./pages/Client/Audio/MusicPage'));
 const PodcastsPage = lazy(() => import('./pages/Client/Audio/PodcastsPage'));
@@ -236,6 +237,7 @@ export default function App() {
                         <Route path="logs" element={<AdminLogsPage />} />
                         <Route path="backups" element={<AdminBackupsPage />} />
                         <Route path="library-migration" element={<AdminLibraryMigrationPage />} />
+                        <Route path="setup" element={<AdminSetupGuidePage />} />
 
                         <Route path="server/:serverId" element={<ServerContextWrapper />}>
                             <Route index element={<AdminDashboardPage />} />
@@ -268,6 +270,7 @@ export default function App() {
                             <Route path="logs" element={<AdminLogsPage />} />
                             <Route path="backups" element={<AdminBackupsPage />} />
                             <Route path="library-migration" element={<AdminLibraryMigrationPage />} />
+                            <Route path="setup" element={<AdminSetupGuidePage />} />
                         </Route>
                     </Route>
 

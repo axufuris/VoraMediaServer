@@ -55,7 +55,6 @@ export interface ServerSettings {
     transcoderThrottleBuffer: number;
     tonemappingAlgorithm: string;
     streamingProfile: number;
-    cacheSizeLimitMb: number;
     enableDailyMixes: boolean;
     dailyMixSchedule: string;
     dailyMixCount: number;

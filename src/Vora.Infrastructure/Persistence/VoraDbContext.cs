@@ -1274,6 +1274,7 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.FolderWatcherProviderId).HasMaxLength(64);
             entity.Property(e => e.LocalMediaScannerProviderId).HasMaxLength(64);
             entity.Property(e => e.TranscoderTempDirectory).HasMaxLength(1024);
+            entity.Property(e => e.SetupGuideStep).HasMaxLength(64);
             entity.Property(e => e.HardwareTranscodingDevice).HasMaxLength(32);
             entity.Property(e => e.MetadataLanguage).HasMaxLength(16);
             entity.Property(e => e.TonemappingAlgorithm).HasMaxLength(32);

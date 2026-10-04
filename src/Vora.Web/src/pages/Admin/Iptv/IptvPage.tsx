@@ -12,43 +12,7 @@ import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../../components/Admin/Primitives/HealthBadge';
 import { COUNTRY_OPTIONS } from '../../../utils/countries';
 import { useDialog } from '../../../dialogs';
-
-interface FreePlaylist {
-    name: string;
-    m3u: string;
-    supportsWeb: boolean;
-    maxConnections: number;
-    defaultKind: IptvChannelKind;
-}
-
-interface FreeEpgSource {
-    name: string;
-    xml: string;
-}
-
-const FREE_PLAYLISTS: FreePlaylist[] = [
-    // TV — Kitchen-sink fallback (1351 channels, low EPG coverage).
-    { name: "US — IPTV Org (full country)", m3u: "https://iptv-org.github.io/iptv/countries/us.m3u", supportsWeb: true, maxConnections: 0, defaultKind: "Tv" },
-    // TV — Greece — iptv-org country playlist (pairs with GreekTVApp + epgshare01 GR1 EPGs).
-    { name: "Greece — IPTV Org", m3u: "https://iptv-org.github.io/iptv/countries/gr.m3u", supportsWeb: true, maxConnections: 0, defaultKind: "Tv" },
-    { name: "Greece — Free-Greek-IPTV", m3u: "https://raw.githubusercontent.com/free-greek-iptv/greek-iptv/master/android.m3u", supportsWeb: true, maxConnections: 0, defaultKind: "Tv" },
-    // Radio — Radio Browser's live API. Endpoints generate up-to-date M3Us; hidebroken=true filters dead streams.
-    { name: "Radio — Top 100 Worldwide (Radio Browser)", m3u: "https://de1.api.radio-browser.info/m3u/stations/topclick/100", supportsWeb: true, maxConnections: 0, defaultKind: "Radio" },
-    { name: "Radio — Top 200 Most Voted (Radio Browser)", m3u: "https://de1.api.radio-browser.info/m3u/stations/topvote/200", supportsWeb: true, maxConnections: 0, defaultKind: "Radio" },
-    { name: "Radio — US Top 100 (Radio Browser)", m3u: "https://de1.api.radio-browser.info/m3u/stations/bycountrycodeexact/US?limit=100&order=clickcount&reverse=true&hidebroken=true", supportsWeb: true, maxConnections: 0, defaultKind: "Radio" },
-    { name: "Radio — News (Radio Browser)", m3u: "https://de1.api.radio-browser.info/m3u/stations/bytag/news?limit=100&order=clickcount&reverse=true&hidebroken=true", supportsWeb: true, maxConnections: 0, defaultKind: "Radio" },
-    { name: "Radio — Classical (Radio Browser)", m3u: "https://de1.api.radio-browser.info/m3u/stations/bytag/classical?limit=100&order=clickcount&reverse=true&hidebroken=true", supportsWeb: true, maxConnections: 0, defaultKind: "Radio" },
-    { name: "Radio — Jazz (Radio Browser)", m3u: "https://de1.api.radio-browser.info/m3u/stations/bytag/jazz?limit=100&order=clickcount&reverse=true&hidebroken=true", supportsWeb: true, maxConnections: 0, defaultKind: "Radio" }
-];
-
-const FREE_EPG_SOURCES: FreeEpgSource[] = [
-    // US — Broadcast / cable EPG (best fallback for iptv-org US channels).
-    { name: "US — IPTV-EPG.org Guide", xml: "https://iptv-epg.org/files/epg-us.xml" },
-    // Greece EPGs.
-    { name: "Greece — GreekTVApp EPG", xml: "https://ext.greektv.app/epg/epg.xml.gz" },
-    { name: "Greece — EPG Share GR1", xml: "https://epgshare01.online/epgshare01/epg_ripper_GR1.xml.gz" },
-    { name: "Greece — IPTV-EPG.org Guide", xml: "https://iptv-epg.org/files/epg-gr.xml" }
-];
+import { FREE_EPG_SOURCES, FREE_PLAYLISTS } from '../../../utils/iptvPresets';
 
 interface IptvPageProps {
     kind: IptvChannelKind;

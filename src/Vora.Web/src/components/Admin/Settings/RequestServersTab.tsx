@@ -5,6 +5,7 @@ import { useDialog } from '../../../dialogs';
 import EntityCard from '../Primitives/EntityCard';
 import HealthBadge from '../Primitives/HealthBadge';
 import EmptyState from '../Primitives/EmptyState';
+import { MINIMUM_AVAILABILITY_HINT, SEARCH_ON_ADD_HINT } from './requestServerText';
 
 interface RequestServersTabProps {
     serverId?: string;
@@ -174,7 +175,7 @@ export default function RequestServersTab({ serverId, showModal }: RequestServer
             <div className="pt-2">
                 <div className="flex items-end justify-between mb-4">
                     <p className="text-sm text-[var(--vora-text-muted)]">
-                        Connect Radarr or Sonarr to process user watchlist requests automatically.
+                        Connect Radarr or Sonarr to process user watchlist requests automatically. Either can also feed the Release Calendar with its upcoming releases.
                     </p>
                     <button type="button" onClick={handleAddRequestServer} className="vora-button-primary text-sm">
                         Add server
@@ -423,17 +424,21 @@ export default function RequestServersTab({ serverId, showModal }: RequestServer
                                     <option value="released">Released</option>
                                     <option value="preDB">PreDB</option>
                                 </select>
+                                <p className="mt-1.5 max-w-xl text-xs text-[var(--vora-text-muted)]">{MINIMUM_AVAILABILITY_HINT}</p>
                             </div>
                         )}
 
-                        <label className="flex items-center gap-3 cursor-pointer group select-none pt-2">
+                        <label className="flex items-start gap-3 cursor-pointer group select-none pt-2">
                             <input
                                 type="checkbox"
                                 checked={(dynamicSettings.searchOnAdd as boolean) ?? true}
                                 onChange={e => setDynamicSettings({ ...dynamicSettings, searchOnAdd: e.target.checked })}
-                                className="w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer"
+                                className="w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer mt-0.5"
                             />
-                            <span className="text-sm text-[var(--vora-text-primary)]">Enable automatic search</span>
+                            <span className="min-w-0">
+                                <span className="block text-sm text-[var(--vora-text-primary)]">Enable automatic search</span>
+                                <span className="block text-xs text-[var(--vora-text-muted)]">{SEARCH_ON_ADD_HINT(editingRequestServer.providerId === 'sonarr_requester' ? 'Sonarr' : 'Radarr')}</span>
+                            </span>
                         </label>
                     </div>
                 </section>

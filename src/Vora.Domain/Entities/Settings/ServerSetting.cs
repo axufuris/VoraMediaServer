@@ -7,6 +7,10 @@ public class ServerSetting
     public string Id { get; set; } = "GLOBAL_SETTINGS";
     public string ServerName { get; set; } = "Vora Server";
 
+    public SetupGuideStatus SetupGuideStatus { get; set; } = SetupGuideStatus.NotStarted;
+    public string? SetupGuideStep { get; set; }
+    public SetupGuideContent SetupGuideContent { get; set; } = SetupGuideContent.MoviesAndShows | SetupGuideContent.Music;
+
     public RegistrationMode RegistrationMode { get; set; } = RegistrationMode.SecretWord;
 
     // Which clock every scheduled time on this server is read against, as an
@@ -41,8 +45,8 @@ public class ServerSetting
     public bool AnalyzeUseHardwareDecode { get; set; } = true;
 
     // When thumbnail generation runs automatically. Mirrors RunDetections for
-    // analysis: OnSchedule (default) keeps the nightly pass, OnAddition generates
-    // right after a scan adds files, Never disables both (manual Regenerate only).
+    // analysis: Never (default) leaves it to a manual Regenerate, OnSchedule runs
+    // the nightly pass, OnAddition generates right after a scan adds files.
     public DetectionTrigger VideoThumbnailGeneration { get; set; } = DetectionTrigger.Never;
 
     public TimeSpan VideoThumbnailScheduleTime { get; set; } = new(4, 0, 0);

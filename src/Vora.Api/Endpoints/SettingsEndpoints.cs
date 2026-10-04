@@ -38,6 +38,14 @@ public static class SettingsEndpoints
         group.MapPut("/features", UpdateFeatureFlagsAsync)
             .Produces(StatusCodes.Status204NoContent);
 
+        group.MapGet("/setup-guide", GetSetupGuideAsync)
+            .WithName("GetSetupGuide")
+            .Produces<SetupGuideVM>(StatusCodes.Status200OK);
+        group.MapPut("/setup-guide", UpdateSetupGuideAsync)
+            .WithName("UpdateSetupGuide")
+            .Produces<SetupGuideVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest);
+
         routes.MapGet("/api/server/features", GetFeatureFlagsAsync)
             .WithTags("Settings")
             .RequireAuthorization()
@@ -96,6 +104,18 @@ public static class SettingsEndpoints
     {
         await manager.UpdateFeatureFlagsAsync(request);
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> GetSetupGuideAsync(ISystemSettingsManager manager) =>
+        Results.Ok(await manager.GetSetupGuideAsync());
+
+    private static async Task<IResult> UpdateSetupGuideAsync([FromBody] SetupGuideVM request, ISystemSettingsManager manager)
+    {
+        if (!Enum.IsDefined(request.Status))
+        {
+            return Results.Problem("Unknown setup guide status.", statusCode: StatusCodes.Status400BadRequest);
+        }
+        return Results.Ok(await manager.UpdateSetupGuideAsync(request));
     }
 
     private static IResult GetHardwareDevices(IHardwareCapabilityService hardware)

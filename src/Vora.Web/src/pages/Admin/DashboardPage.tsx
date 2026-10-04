@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import SetupGuideBanner from '../../components/Admin/SetupGuide/SetupGuideBanner';
 import { streamingAdminService, type NowPlayingSession, type SystemStats } from '../../api/Streaming/streamingAdminService';
 import { adminNotificationService, type AdminNotificationVM } from '../../api/System/adminNotificationService';
 import { libraryService, type LibrarySummary } from '../../api/Media/libraryService';
@@ -306,6 +307,7 @@ export default function DashboardPage() {
             />
 
             <div className="p-8 space-y-8 max-w-[1400px] mx-auto">
+                <SetupGuideBanner serverId={serverId} />
                 {/* Hero stat row */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard

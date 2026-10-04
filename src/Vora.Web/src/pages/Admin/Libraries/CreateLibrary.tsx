@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { libraryAdminService, type CreateLibraryRequest } from '../../../api/Media/libraryAdminService';
 import { libraryTypeToName } from '../../../utils/libraryTypes';
 import { pluginAdminService, type PluginOptionVM } from '../../../api/System/pluginAdminService';
+import { systemSettingsAdminService } from '../../../api/System/systemSettingsAdminService';
+import { PROVIDER_PREFERENCES, keepOrPick } from '../../../utils/libraryProviderDefaults';
 import { useDialog } from '../../../dialogs';
 import IconSelect, { type IconSelectOption } from '../../../components/Common/IconSelect';
 import { renderNavIcon } from '../../../layouts/parts/navIcons';
@@ -85,8 +87,31 @@ export default function CreateLibrary() {
             setProviders(meta);
             setRatingProviders(ratings);
             setArtworkProviders(artwork);
+            setLibrary(prev => {
+                const preferences = PROVIDER_PREFERENCES[prev.type];
+                if (!preferences) return prev;
+                const rating1 = keepOrPick(prev.thirdPartyRating1ProviderId ?? '', ratings, preferences.rating1);
+                return {
+                    ...prev,
+                    metadataProviderId: keepOrPick(prev.metadataProviderId ?? '', meta, preferences.metadata) || prev.metadataProviderId,
+                    thirdPartyRating1ProviderId: rating1,
+                    thirdPartyRating2ProviderId: keepOrPick(prev.thirdPartyRating2ProviderId ?? '', ratings, preferences.rating2, rating1),
+                    artworkProviderId: keepOrPick(prev.artworkProviderId ?? '', artwork, preferences.artwork),
+                };
+            });
         }).catch(console.error);
     }, [serverId, libraryTypeName]);
+
+    useEffect(() => {
+        systemSettingsAdminService.getServerSettings(serverId)
+            .then(settings => setLibrary(prev => ({
+                ...prev,
+                enableVideoPreviewThumbnails: settings.videoThumbnailGeneration > 0,
+                enableIntroDetection: settings.runDetections > 0,
+                enableCreditsDetection: settings.runDetections > 0,
+            })))
+            .catch(() => { });
+    }, [serverId]);
 
     const handleChange = <K extends keyof CreateLibraryRequest>(field: K, value: CreateLibraryRequest[K]) => {
         setLibrary({ ...library, [field]: value });

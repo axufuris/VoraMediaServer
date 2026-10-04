@@ -2,25 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { systemSettingsAdminService, type ServerSettings } from '../../../api/System/systemSettingsAdminService';
 import { libraryAdminService } from '../../../api/Media/libraryAdminService';
 import FolderPathInput from '../FolderBrowser/FolderPathInput';
-
-// A short list rather than the full IANA database: these cover where people
-// actually run a home server, and a wrong-but-plausible pick from 400 entries
-// is worse than a short list plus the TZ variable for anywhere else.
-const SCHEDULE_TIME_ZONES = [
-    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix',
-    'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu',
-    'America/Toronto', 'America/Vancouver', 'America/Sao_Paulo', 'America/Mexico_City',
-    'Europe/London', 'Europe/Dublin', 'Europe/Lisbon', 'Europe/Madrid', 'Europe/Paris',
-    'Europe/Amsterdam', 'Europe/Brussels', 'Europe/Berlin', 'Europe/Zurich', 'Europe/Rome',
-    'Europe/Stockholm', 'Europe/Oslo', 'Europe/Copenhagen', 'Europe/Helsinki',
-    'Europe/Warsaw', 'Europe/Prague', 'Europe/Athens', 'Europe/Bucharest',
-    'Europe/Kyiv', 'Europe/Moscow', 'Europe/Istanbul',
-    'Asia/Jerusalem', 'Asia/Dubai', 'Asia/Karachi', 'Asia/Kolkata', 'Asia/Bangkok',
-    'Asia/Singapore', 'Asia/Hong_Kong', 'Asia/Shanghai', 'Asia/Tokyo', 'Asia/Seoul',
-    'Australia/Perth', 'Australia/Adelaide', 'Australia/Brisbane', 'Australia/Sydney',
-    'Pacific/Auckland', 'Africa/Johannesburg', 'Africa/Lagos', 'Africa/Cairo', 'UTC',
-];
-
+import { METADATA_LANGUAGES, SCHEDULE_TIME_ZONES } from '../../../utils/serverSettingOptions';
 
 interface CoreSettingsTabProps {
     serverId?: string;
@@ -186,31 +168,7 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                     onChange={e => setServerSettings({ ...serverSettings, metadataLanguage: e.target.value })}
                     className="vora-input w-56 cursor-pointer"
                 >
-                    <option value="eng">English</option>
-                    <option value="spa">Spanish (Español)</option>
-                    <option value="fra">French (Français)</option>
-                    <option value="deu">German (Deutsch)</option>
-                    <option value="ita">Italian (Italiano)</option>
-                    <option value="por">Portuguese (Português)</option>
-                    <option value="nld">Dutch (Nederlands)</option>
-                    <option value="swe">Swedish (Svenska)</option>
-                    <option value="dan">Danish (Dansk)</option>
-                    <option value="nor">Norwegian (Norsk)</option>
-                    <option value="fin">Finnish (Suomi)</option>
-                    <option value="pol">Polish (Polski)</option>
-                    <option value="ces">Czech (Čeština)</option>
-                    <option value="ell">Greek (Ελληνικά)</option>
-                    <option value="hun">Hungarian (Magyar)</option>
-                    <option value="tur">Turkish (Türkçe)</option>
-                    <option value="rus">Russian (Русский)</option>
-                    <option value="ukr">Ukrainian (Українська)</option>
-                    <option value="ara">Arabic (العربية)</option>
-                    <option value="heb">Hebrew (עברית)</option>
-                    <option value="hin">Hindi (हिन्दी)</option>
-                    <option value="tha">Thai (ไทย)</option>
-                    <option value="jpn">Japanese (日本語)</option>
-                    <option value="kor">Korean (한국어)</option>
-                    <option value="zho">Chinese (中文)</option>
+                    {METADATA_LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
                 </select>
                 <FieldHint>Language used when fetching titles and descriptions from metadata providers (TMDB, TVDB). Titles fall back to their original language when no translation exists. Applies to newly scanned or refreshed items.</FieldHint>
             </SettingsCard>
@@ -398,21 +356,6 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
             </SettingsCard>
             </>)}
 
-            {subTab === 'general' && (<>
-            <SettingsCard title="In-Memory Cache">
-                <FieldLabel>Cache Size Limit (MB)</FieldLabel>
-                <input
-                    type="number"
-                    min={64}
-                    step={64}
-                    value={serverSettings.cacheSizeLimitMb ?? 10240}
-                    onChange={e => setServerSettings({ ...serverSettings, cacheSizeLimitMb: parseInt(e.target.value, 10) || 10240 })}
-                    className="vora-input max-w-xs"
-                    placeholder="10240"
-                />
-                <FieldHint>Maximum size of Vora's in-memory cache (recommendations, device flags, etc.). Default 10240 MB. Changes take effect after restart.</FieldHint>
-            </SettingsCard>
-            </>)}
 
             {subTab === 'scanning' && (<>
             <SettingsCard title="Schedule Time Zone">
