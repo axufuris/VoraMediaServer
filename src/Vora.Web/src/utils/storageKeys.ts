@@ -12,6 +12,8 @@ export const StorageKeys = {
     musicSubTab: 'music_sub_tab',
     nowPlayingLyrics: 'now_playing_lyrics',
     nowPlayingSynth: 'now_playing_synth',
+    nowPlayingSynthStyle: 'now_playing_synth_style',
+    nowPlayingSynthColors: 'now_playing_synth_colors',
 } as const;
 
 export const SessionKeys = {
