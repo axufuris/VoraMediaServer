@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import NowPlayingFullscreen from './NowPlayingFullscreen';
 import { PlayerContext, PlayerTimeContext, type PlayableMedia, type PlayerContextType } from '../../contexts/usePlayer';
@@ -103,6 +103,7 @@ const renderScreen = (value: PlayerContextType) => render(
 describe('music now playing', () => {
     beforeEach(() => {
         getTrackLyrics.mockReset();
+        getTrackInfo.mockResolvedValue(null);
         localStorage.clear();
     });
 
@@ -328,6 +329,106 @@ Line two`, syncedLyrics: null, isSynced: false, providerName: 'Genius', sourceUr
             expect(synth.compareDocumentPosition(lyrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
             expect(synth.className).toContain('flex-[3]');
             expect(lyrics.className).toContain('flex-[2]');
+        });
+    });
+
+    describe('song details beside the cover while a panel is open', () => {
+        const info: TrackInfoVM = {
+            id: track.id,
+            quality: { format: 'FLAC', sampleRate: 96000, bitrate: null, lossless: true, hiRes: true, label: 'Hi-Res · FLAC 96 kHz' },
+            moods: ['upbeat'],
+            energy: 'High',
+            themes: [],
+            goodFor: [],
+            isInstrumental: false,
+        };
+        const withLyrics: LyricsVM = { plainLyrics: 'Line one', syncedLyrics: null, isSynced: false, providerName: 'LRClib', sourceUrl: null };
+
+        it('keeps the quality and mood on screen with lyrics and the synth both on', async () => {
+            localStorage.setItem('now_playing_lyrics', 'true');
+            localStorage.setItem('now_playing_synth', 'true');
+            getTrackLyrics.mockResolvedValue(withLyrics);
+            getTrackInfo.mockResolvedValue(info);
+            renderScreen(player({ currentMedia: { ...track, posterUrl: 'https://example.test/cover.jpg' } }));
+
+            const bar = await screen.findByTestId('now-playing-song-bar');
+            expect(bar).toHaveTextContent('Carousel');
+            expect(await screen.findByTestId('now-playing-track-info')).toHaveTextContent('Hi-Res · FLAC 96 kHz');
+            expect(screen.getByTestId('now-playing-track-info')).toHaveTextContent('Upbeat · High energy');
+            expect(bar.querySelector('img')).toHaveAttribute('alt', 'Carousel');
+        });
+
+        it('leaves the cover to the ring when the ring style is on', async () => {
+            localStorage.setItem('now_playing_synth', 'true');
+            localStorage.setItem('now_playing_synth_style', 'ring');
+            getTrackLyrics.mockResolvedValue(null);
+            renderScreen(player({ currentMedia: { ...track, posterUrl: 'https://example.test/cover.jpg' } }));
+
+            const bar = await screen.findByTestId('now-playing-song-bar');
+            expect(bar.querySelector('img')).toBeNull();
+            expect(screen.getByTestId('synth-visualizer')).toHaveAttribute('data-synth-style', 'ring');
+        });
+
+        it('shows the big cover again with both panels closed', () => {
+            getTrackLyrics.mockResolvedValue(null);
+            renderScreen(player());
+
+            expect(screen.queryByTestId('now-playing-song-bar')).not.toBeInTheDocument();
+        });
+    });
+
+    describe('synth style menu', () => {
+        it('picks a style, turns the synth on and remembers the choice', async () => {
+            getTrackLyrics.mockResolvedValue(null);
+            const first = renderScreen(player());
+
+            fireEvent.click(screen.getByRole('button', { name: 'Synth style' }));
+            fireEvent.click(within(screen.getByRole('dialog', { name: 'Synth style' })).getByRole('button', { name: /Waves/ }));
+
+            expect(screen.getByTestId('synth-visualizer')).toHaveAttribute('data-synth-style', 'waves');
+            expect(localStorage.getItem('now_playing_synth_style')).toBe('waves');
+            expect(localStorage.getItem('now_playing_synth')).toBe('true');
+            first.unmount();
+
+            renderScreen(player());
+            expect(screen.getByTestId('synth-visualizer')).toHaveAttribute('data-synth-style', 'waves');
+        });
+
+        it('remembers the colour choice', () => {
+            getTrackLyrics.mockResolvedValue(null);
+            renderScreen(player());
+
+            fireEvent.click(screen.getByRole('button', { name: 'Synth style' }));
+            const menu = screen.getByRole('dialog', { name: 'Synth style' });
+            expect(within(menu).getByRole('button', { name: 'From album art' })).toHaveAttribute('aria-pressed', 'true');
+            fireEvent.click(within(menu).getByRole('button', { name: 'Theme accent' }));
+
+            expect(localStorage.getItem('now_playing_synth_colors')).toBe('theme');
+            expect(within(menu).getByRole('button', { name: 'Theme accent' })).toHaveAttribute('aria-pressed', 'true');
+        });
+
+        it('closes on Escape without minimizing the player', () => {
+            getTrackLyrics.mockResolvedValue(null);
+            const value = player();
+            renderScreen(value);
+
+            fireEvent.click(screen.getByRole('button', { name: 'Synth style' }));
+            const menu = screen.getByRole('dialog', { name: 'Synth style' });
+            fireEvent.keyDown(within(menu).getByRole('button', { name: /Bars/ }), { key: 'Escape' });
+
+            expect(screen.queryByRole('dialog', { name: 'Synth style' })).not.toBeInTheDocument();
+            expect(value.setFullscreen).not.toHaveBeenCalled();
+            expect(screen.getByRole('button', { name: 'Synth style' })).toHaveFocus();
+        });
+
+        it('closes when the audio settings open', () => {
+            getTrackLyrics.mockResolvedValue(null);
+            renderScreen(player());
+
+            fireEvent.click(screen.getByRole('button', { name: 'Synth style' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Audio' }));
+
+            expect(screen.queryByRole('dialog', { name: 'Synth style' })).not.toBeInTheDocument();
         });
     });
 });

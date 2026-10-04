@@ -1,4 +1,4 @@
-export const SYNTH_BANDS = 48;
+export const SYNTH_BANDS = 40;
 
 const MIN_HZ = 40;
 const MAX_HZ = 16000;

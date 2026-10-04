@@ -14,8 +14,14 @@ import { lyricsScrollTop } from '../../utils/lyricsScroll';
 import AddToPlaylistModal from '../Collections/AddToPlaylistModal';
 import { useDialog } from '../../dialogs';
 import { playlistService } from '../../api/Collections/playlistService';
-import { nowPlayingViewStore } from '../../utils/nowPlayingView';
+import { nowPlayingViewStore, type SynthColors, type SynthStyle } from '../../utils/nowPlayingView';
 import SynthVisualizer from './NowPlaying/SynthVisualizer';
+import SynthStyleMenu from './NowPlaying/SynthStyleMenu';
+import { NowPlayingSongBar } from './NowPlaying/NowPlayingSongBar';
+import { useCoverArt } from './NowPlaying/useCoverArt';
+
+const SYNTH_MENU_ID = 'now-playing-synth-style';
+const LYRICS_FADE = 'linear-gradient(180deg, transparent 0%, black 14%, black 82%, transparent 100%)';
 
 export default function NowPlayingFullscreen() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -35,6 +41,17 @@ export default function NowPlayingFullscreen() {
     const [synthOn, setSynthOnState] = useState(nowPlayingViewStore.synth);
     const setLyricsWanted = (on: boolean) => { nowPlayingViewStore.setLyrics(on); setLyricsWantedState(on); };
     const setSynthOn = (on: boolean) => { nowPlayingViewStore.setSynth(on); setSynthOnState(on); };
+    const [synthStyle, setSynthStyleState] = useState<SynthStyle>(nowPlayingViewStore.synthStyle);
+    const [synthColors, setSynthColorsState] = useState<SynthColors>(nowPlayingViewStore.synthColors);
+    const [synthMenuOpen, setSynthMenuOpen] = useState(false);
+    const synthMenuButtonRef = useRef<HTMLButtonElement>(null);
+    const chooseSynthStyle = (style: SynthStyle) => { nowPlayingViewStore.setSynthStyle(style); setSynthStyleState(style); setSynthOn(true); };
+    const chooseSynthColors = (colors: SynthColors) => { nowPlayingViewStore.setSynthColors(colors); setSynthColorsState(colors); setSynthOn(true); };
+    const closeSynthMenu = useCallback(() => {
+        setSynthMenuOpen(false);
+        synthMenuButtonRef.current?.focus();
+    }, []);
+    const coverArt = useCoverArt(currentMedia?.posterUrl, isFullscreen && synthOn && currentMedia?.playbackContextType === 'Music');
     const [queueOpen, setQueueOpen] = useState(false);
     const dialog = useDialog();
     const queuedSongIds = useMemo(() => queue.filter(item => item.playbackContextType === 'Music').map(item => item.id), [queue]);
@@ -83,6 +100,18 @@ export default function NowPlayingFullscreen() {
         setStationSaved(false);
         setStationName(radioLabel ?? '');
     }, [radioSeed, radioLabel]);
+
+    useEffect(() => {
+        if (!synthMenuOpen) return;
+        const closeOnOutside = (e: PointerEvent) => {
+            const target = e.target instanceof Node ? e.target : null;
+            if (!target) return;
+            if (document.getElementById(SYNTH_MENU_ID)?.contains(target) || synthMenuButtonRef.current?.contains(target)) return;
+            setSynthMenuOpen(false);
+        };
+        document.addEventListener('pointerdown', closeOnOutside);
+        return () => document.removeEventListener('pointerdown', closeOnOutside);
+    }, [synthMenuOpen]);
 
     const handleSaveStation = async () => {
         if (!radioSeed) return;
@@ -215,6 +244,14 @@ export default function NowPlayingFullscreen() {
         </svg>
     );
 
+    const panelsOpen = synthOn || lyricsOpen;
+    const trackDetails = trackInfo && trackInfo.id === currentMedia.id && (
+        <>
+            <AudioQualityChip quality={trackInfo.quality} />
+            <SongFeel moods={trackInfo.moods} energy={trackInfo.energy} isInstrumental={trackInfo.isInstrumental} />
+        </>
+    );
+
     const posterFallback = <svg width="96" height="96" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>;
 
     return (
@@ -295,6 +332,20 @@ export default function NowPlayingFullscreen() {
                                     onClick={() => setSynthOn(!synthOn)}
                                     icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="4" y1="10" x2="4" y2="14" /><line x1="8" y1="6" x2="8" y2="18" /><line x1="12" y1="3" x2="12" y2="21" /><line x1="16" y1="8" x2="16" y2="16" /><line x1="20" y1="11" x2="20" y2="13" /></svg>}
                                 />
+                                <button
+                                    ref={synthMenuButtonRef}
+                                    type="button"
+                                    aria-label="Synth style"
+                                    title="Choose the visualizer style and colours"
+                                    aria-haspopup="dialog"
+                                    aria-expanded={synthMenuOpen}
+                                    aria-controls={SYNTH_MENU_ID}
+                                    data-active={synthMenuOpen}
+                                    onClick={() => { setSynthMenuOpen(v => !v); setAudioSettingsOpen(false); }}
+                                    className="vora-pill -ml-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
+                                </button>
                                 <NowPlayingPill
                                     label="Queue"
                                     title={queueOpen ? 'Hide queue' : 'Show queue'}
@@ -307,13 +358,23 @@ export default function NowPlayingFullscreen() {
                                     title="Audio settings"
                                     active={audioSettingsOpen}
                                     controls="now-playing-audio-settings"
-                                    onClick={() => setAudioSettingsOpen(v => !v)}
+                                    onClick={() => { setAudioSettingsOpen(v => !v); setSynthMenuOpen(false); }}
                                     icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></svg>}
                                 />
                                 <NowPlayingVolume value={volume} onChange={setVolume} />
                             </>
                         }
                     />
+                    {synthMenuOpen && (
+                        <SynthStyleMenu
+                            id={SYNTH_MENU_ID}
+                            style={synthStyle}
+                            colors={synthColors}
+                            onStyle={chooseSynthStyle}
+                            onColors={chooseSynthColors}
+                            onClose={closeSynthMenu}
+                        />
+                    )}
                     {audioSettingsOpen && (
                         <div
                             id="now-playing-audio-settings"
@@ -448,25 +509,44 @@ export default function NowPlayingFullscreen() {
             }
         >
             <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center px-8 pb-4">
-                <NowPlayingArtwork
-                    artworkKey={currentMedia.id}
-                    posterUrl={posterUrl}
-                    title={currentMedia.title}
-                    subtitle={currentMedia.subtitle}
-                    size={synthOn ? 'mini' : lyricsOpen ? 'compact' : 'full'}
-                    fallbackIcon={posterFallback}
-                />
-
-                {!lyricsOpen && trackInfo && trackInfo.id === currentMedia.id && (
-                    <div className="mt-3 flex flex-col items-center gap-1.5 text-center" data-testid="now-playing-track-info">
-                        <AudioQualityChip quality={trackInfo.quality} />
-                        <SongFeel moods={trackInfo.moods} energy={trackInfo.energy} isInstrumental={trackInfo.isInstrumental} />
-                    </div>
+                {panelsOpen ? (
+                    <NowPlayingSongBar
+                        posterUrl={posterUrl}
+                        title={currentMedia.title}
+                        subtitle={currentMedia.subtitle}
+                        showArt={!(synthOn && synthStyle === 'ring')}
+                        fallbackIcon={posterFallback}
+                        details={trackDetails && (
+                            <div className="flex flex-col items-start gap-1.5 text-left" data-testid="now-playing-track-info">
+                                {trackDetails}
+                            </div>
+                        )}
+                    />
+                ) : (
+                    <>
+                        <NowPlayingArtwork
+                            artworkKey={currentMedia.id}
+                            posterUrl={posterUrl}
+                            title={currentMedia.title}
+                            subtitle={currentMedia.subtitle}
+                            fallbackIcon={posterFallback}
+                        />
+                        {trackDetails && (
+                            <div className="mt-3 flex flex-col items-center gap-1.5 text-center" data-testid="now-playing-track-info">
+                                {trackDetails}
+                            </div>
+                        )}
+                    </>
                 )}
 
                 {synthOn && (
-                    <div data-testid="synth-panel" className={`mt-4 min-h-[120px] w-full max-w-[960px] ${lyricsOpen ? 'flex-[3]' : 'flex-1'}`}>
-                        <SynthVisualizer getAnalyser={getAudioAnalyser} />
+                    <div data-testid="synth-panel" className={`mt-4 min-h-[140px] w-full max-w-[1180px] ${lyricsOpen ? 'flex-[3]' : 'flex-1'}`}>
+                        <SynthVisualizer
+                            getAnalyser={getAudioAnalyser}
+                            style={synthStyle}
+                            palette={synthColors === 'art' ? coverArt.palette : null}
+                            cover={coverArt.image}
+                        />
                     </div>
                 )}
 
@@ -477,6 +557,7 @@ export default function NowPlayingFullscreen() {
                         aria-label="Lyrics"
                         tabIndex={plainLyricsOpen ? 0 : undefined}
                         className={`min-h-0 w-full max-w-[640px] overflow-y-auto px-4 ${synthOn ? 'mt-2 min-h-[96px] flex-[2]' : 'mt-6 flex-1'}`}
+                        style={synthOn ? { maskImage: LYRICS_FADE, WebkitMaskImage: LYRICS_FADE } : undefined}
                     >
                         {lyricsLoading ? (
                             <div className="py-16 text-center text-sm" style={{ color: 'var(--vora-text-muted)' }}>Loading lyrics…</div>
