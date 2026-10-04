@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261004183407_ChangesSinceInitial")]
+    [Migration("20261004192607_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -3365,9 +3365,22 @@ namespace Vora.Infrastructure.Migrations
                         },
                         new
                         {
+                            Id = new Guid("1cca6bf0-87a6-4186-82a0-1d1efce4e6b8"),
+                            DefaultKey = "recent-recordings",
+                            DisplayOrder = 7,
+                            FilterRulesJson = "{}",
+                            MaxItems = 20,
+                            ShowOnHomepage = true,
+                            ShowToFriends = true,
+                            SortBy = 0,
+                            Source = 5,
+                            Title = "Recent Recordings"
+                        },
+                        new
+                        {
                             Id = new Guid("666c043f-f0f7-47f8-810b-8b0d5afcaeb9"),
                             DefaultKey = "recently-added-music",
-                            DisplayOrder = 7,
+                            DisplayOrder = 8,
                             FilterRulesJson = "{}",
                             MaxItems = 20,
                             ShowOnHomepage = true,
@@ -3380,7 +3393,7 @@ namespace Vora.Infrastructure.Migrations
                         {
                             Id = new Guid("2133070b-8810-4b2e-9514-619a682b04b1"),
                             DefaultKey = "new-podcast-episodes",
-                            DisplayOrder = 8,
+                            DisplayOrder = 9,
                             FilterRulesJson = "{\"unwatchedOnly\":true,\"days\":14}",
                             MaxItems = 20,
                             ShowOnHomepage = true,
@@ -3393,7 +3406,7 @@ namespace Vora.Infrastructure.Migrations
                         {
                             Id = new Guid("ee067d88-cd48-4382-8b05-1f75b39020eb"),
                             DefaultKey = "favorite-stations",
-                            DisplayOrder = 9,
+                            DisplayOrder = 10,
                             FilterRulesJson = "{}",
                             MaxItems = 30,
                             ShowOnHomepage = true,
@@ -3401,19 +3414,6 @@ namespace Vora.Infrastructure.Migrations
                             SortBy = 6,
                             Source = 2,
                             Title = "Favorite Radio Stations"
-                        },
-                        new
-                        {
-                            Id = new Guid("1cca6bf0-87a6-4186-82a0-1d1efce4e6b8"),
-                            DefaultKey = "recent-recordings",
-                            DisplayOrder = 10,
-                            FilterRulesJson = "{}",
-                            MaxItems = 20,
-                            ShowOnHomepage = true,
-                            ShowToFriends = true,
-                            SortBy = 0,
-                            Source = 5,
-                            Title = "Recent Recordings"
                         });
                 });
 

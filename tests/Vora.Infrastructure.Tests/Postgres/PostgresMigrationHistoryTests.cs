@@ -1,9 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Vora.Application.SmartLists;
 using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.SmartLists;
+using Vora.Domain.Entities.Tasks;
 using Vora.Domain.Entities.Users;
 using Vora.Domain.Enums;
+using Vora.Infrastructure.Persistence;
 
 namespace Vora.Infrastructure.Tests.Postgres;
 
@@ -31,13 +34,17 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         (await after.ProfileChannelFavorites.CountAsync(cancellationToken)).Should().Be(0);
     }
 
+    private static async Task<List<(Guid Id, int Order, string? Key)>> SmartListOrderAsync(VoraDbContext db, CancellationToken cancellationToken) =>
+        (await db.Set<SmartList>().AsNoTracking().ToListAsync(cancellationToken))
+            .Select(l => (l.Id, l.DisplayOrder, l.DefaultKey)).OrderBy(l => l.Id).ToList();
+
     [Fact]
-    public async Task A_database_on_the_earlier_combined_migration_only_gains_the_task_table()
+    public async Task A_database_on_the_first_combined_migration_only_gains_the_task_table()
     {
         Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var legacy = new LegacyDatabase();
-        await legacy.BuildEarlierCombinedStateAsync(cancellationToken);
+        await legacy.BuildEarlierCombinedStateAsync(LegacyDatabase.FirstCombinedMigration, withTaskTable: false, cancellationToken);
 
         var user = new User { Email = "parent@example.com", DisplayName = "Parent" };
         var profile = new UserProfile { Id = Guid.NewGuid(), Name = "Kid", UserId = user.Id };
@@ -49,19 +56,44 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
             await before.SaveChangesAsync(cancellationToken);
             await before.Database.ExecuteSqlRawAsync("UPDATE \"SmartLists\" SET \"DisplayOrder\" = 0 WHERE \"DefaultKey\" = 'favorite-channels'", cancellationToken);
             (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
-            listsBefore = (await before.Set<SmartList>().AsNoTracking().ToListAsync(cancellationToken))
-                .Select(l => (l.Id, l.DisplayOrder, l.DefaultKey)).OrderBy(l => l.Id).ToList();
+            listsBefore = await SmartListOrderAsync(before, cancellationToken);
         }
 
         await legacy.MigrateAsync(cancellationToken);
 
         await using var after = legacy.NewContext();
         (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
-        (await after.Set<SmartList>().AsNoTracking().ToListAsync(cancellationToken))
-            .Select(l => (l.Id, l.DisplayOrder, l.DefaultKey)).OrderBy(l => l.Id).ToList()
-            .Should().Equal(listsBefore);
+        (await SmartListOrderAsync(after, cancellationToken)).Should().Equal(listsBefore);
         (await after.ProfileChannelFavorites.CountAsync(cancellationToken)).Should().Be(1);
         (await after.PendingTasks.CountAsync(cancellationToken)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_database_on_the_second_combined_migration_keeps_its_row_order_and_saved_tasks()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        await legacy.BuildEarlierCombinedStateAsync(LegacyDatabase.SecondCombinedMigration, withTaskTable: true, cancellationToken);
+
+        var saved = new PendingTask { Id = Guid.NewGuid(), Sequence = 1, Kind = "QueueScanLibrary", Name = "Scan Library: Movies", QueuedAt = DateTime.UtcNow };
+        List<(Guid Id, int Order, string? Key)> listsBefore;
+        await using (var before = legacy.NewContext())
+        {
+            before.PendingTasks.Add(saved);
+            await before.SaveChangesAsync(cancellationToken);
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            listsBefore = await SmartListOrderAsync(before, cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var listsAfter = await SmartListOrderAsync(after, cancellationToken);
+        listsAfter.Should().Equal(listsBefore);
+        listsAfter.Single(l => l.Key == "recent-recordings").Order.Should().Be(10);
+        (await after.PendingTasks.AsNoTracking().Select(t => t.Id).ToListAsync(cancellationToken)).Should().Equal(saved.Id);
     }
 
     [Fact]
@@ -96,5 +128,18 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
 
         settings.Id.Should().Be("GLOBAL_SETTINGS");
         settings.AiPlaylistMatchWindow.Should().Be(0.04);
+    }
+
+    [Fact]
+    public async Task A_new_server_lists_the_default_rows_in_the_default_order()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        await using var db = database.NewContext();
+
+        var lists = (await db.Set<SmartList>().AsNoTracking().ToListAsync(TestContext.Current.CancellationToken))
+            .OrderBy(l => l.DisplayOrder)
+            .Select(l => (l.DefaultKey, l.DisplayOrder));
+
+        lists.Should().Equal(SmartListDefaults.All.Select(d => ((string?)d.Key, d.DisplayOrder)));
     }
 }
