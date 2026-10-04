@@ -166,9 +166,19 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
 
         if (work.Count == 0) return;
 
-        var pending = work
+        var uncached = work
             .Where(w => !_extractor.HasValidCachedWebVtt(root, w.Target.MediaPartId, w.Track.Id, SourceFor(w.Target, w.Track, w.Ordinal)))
             .ToList();
+
+        var pending = uncached
+            .Where(w => !_extractor.HasFailedInBackground(root, w.Target.MediaPartId, w.Track.Id, SourceFor(w.Target, w.Track, w.Ordinal)))
+            .ToList();
+
+        if (pending.Count < uncached.Count)
+        {
+            _logger.LogInformation("Skipping {Count} subtitle track(s) that could not be extracted on an earlier pass; each is tried again once its file changes.",
+                uncached.Count - pending.Count);
+        }
 
         if (pending.Count == 0) return;
 
@@ -182,7 +192,7 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
 
             try
             {
-                var produced = await _extractor.GetOrExtractWebVttAsync(
+                var produced = await _extractor.ExtractInBackgroundAsync(
                     SourceFor(item.Target, item.Track, item.Ordinal), root,
                     item.Target.MediaPartId, item.Track.Id, cancellationToken);
 

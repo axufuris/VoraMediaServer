@@ -64,7 +64,7 @@ public class SubtitlePreExtractionTests
     private static SubtitleTrackTargetDto Image(Guid id, int streamIndex) =>
         new() { Id = id, StreamIndex = streamIndex, Codec = "hdmv_pgs_subtitle" };
 
-    private Task NothingExtracted() => _extractor.DidNotReceive().GetOrExtractWebVttAsync(
+    private Task NothingExtracted() => _extractor.DidNotReceive().ExtractInBackgroundAsync(
         Arg.Any<SubtitleSource>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
 
     [Fact]
@@ -74,7 +74,7 @@ public class SubtitlePreExtractionTests
 
         await NewManager().PreExtractForItemAsync(ItemId, TestContext.Current.CancellationToken);
 
-        await _extractor.Received(1).GetOrExtractWebVttAsync(
+        await _extractor.Received(1).ExtractInBackgroundAsync(
             SubtitleSource.Embedded("/media/movie.mkv", 3, 0), TempDir, PartId, TextTrackId, Arg.Any<CancellationToken>());
     }
 
@@ -149,7 +149,7 @@ public class SubtitlePreExtractionTests
 
         await NewManager().PreExtractForItemAsync(ItemId, TestContext.Current.CancellationToken);
 
-        await _extractor.Received(1).GetOrExtractWebVttAsync(
+        await _extractor.Received(1).ExtractInBackgroundAsync(
             Arg.Is<SubtitleSource>(s => s.StreamIndex == 3 && s.Ordinal == 1), Arg.Any<string>(), Arg.Any<Guid>(), TextTrackId, Arg.Any<CancellationToken>());
     }
 
@@ -232,7 +232,28 @@ public class SubtitlePreExtractionTests
 
         progress.Received(1).Report("Pre-extracting subtitles (1/1)");
         progress.DidNotReceive().Report("Pre-extracting subtitles (2/2)");
-        await _extractor.DidNotReceive().GetOrExtractWebVttAsync(Arg.Any<SubtitleSource>(), Arg.Any<string>(), PartId, cachedTrack, Arg.Any<CancellationToken>());
+        await _extractor.DidNotReceive().ExtractInBackgroundAsync(Arg.Any<SubtitleSource>(), Arg.Any<string>(), PartId, cachedTrack, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_track_that_failed_on_an_earlier_pass_is_skipped_and_left_out_of_the_count()
+    {
+        var libraryId = Guid.NewGuid();
+        var failedTrack = Guid.NewGuid();
+        Arrange(tracks: Text(TextTrackId, 3));
+        _media.GetSubtitleExtractionTargetsForLibraryAsync(libraryId).Returns(new List<SubtitleExtractionTargetDto>
+        {
+            new() { MediaItemId = ItemId, MediaPartId = PartId, FilePath = "/media/movie.mkv", Tracks = new List<SubtitleTrackTargetDto> { Text(failedTrack, 2), Text(TextTrackId, 3) } }
+        });
+        _extractor.HasFailedInBackground(TempDir, PartId, failedTrack, Arg.Any<SubtitleSource>()).Returns(true);
+        _media.GetAllMediaPartIdsAsync().Returns(new HashSet<Guid> { PartId });
+        var progress = Substitute.For<Vora.Plugins.Interfaces.ITaskProgressReporter>();
+
+        await NewManager(progress).PreExtractForLibraryAsync(libraryId, TestContext.Current.CancellationToken);
+
+        progress.Received(1).Report("Pre-extracting subtitles (1/1)");
+        await _extractor.DidNotReceive().ExtractInBackgroundAsync(Arg.Any<SubtitleSource>(), Arg.Any<string>(), PartId, failedTrack, Arg.Any<CancellationToken>());
+        await _extractor.Received(1).ExtractInBackgroundAsync(Arg.Any<SubtitleSource>(), Arg.Any<string>(), PartId, TextTrackId, Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -10,6 +10,9 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
     public const string CacheDirectoryName = "subcache";
 
     private static readonly TimeSpan ExtractionTimeout = TimeSpan.FromSeconds(180);
+    private static readonly TimeSpan MaxBackgroundTimeout = TimeSpan.FromHours(2);
+    private const long BackgroundMinBytesPerSecond = 20L * 1024 * 1024;
+    private const string FailureExtension = ".failed";
 
     private readonly Dictionary<string, KeyedGate> _perKeyLocks = new(StringComparer.Ordinal);
     private readonly ILogger<FFmpegSubtitleExtractionService> _logger;
@@ -28,6 +31,20 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
     public static string TrackFilePattern(Guid mediaPartId, Guid subtitleTrackId) => $"{mediaPartId}_{subtitleTrackId}_*.vtt";
 
     public static string PartFilePattern(Guid mediaPartId) => $"{mediaPartId}_*.vtt";
+
+    public static string FailureFileName(Guid mediaPartId, Guid subtitleTrackId, string fingerprint) =>
+        $"{mediaPartId}_{subtitleTrackId}_{fingerprint}{FailureExtension}";
+
+    public static string TrackFailurePattern(Guid mediaPartId, Guid subtitleTrackId) => $"{mediaPartId}_{subtitleTrackId}_*{FailureExtension}";
+
+    public static string PartFailurePattern(Guid mediaPartId) => $"{mediaPartId}_*{FailureExtension}";
+
+    // Pulling one subtitle stream out of a container means demuxing all of it,
+    // so the time it takes follows the file's size. A big 4K remux on a busy
+    // disk routinely needs more than the three minutes an on-demand request can
+    // wait; a background pass has no one waiting and is allowed the time.
+    public static TimeSpan BackgroundTimeout(long sizeBytes) =>
+        TimeSpan.FromSeconds(Math.Clamp(sizeBytes / BackgroundMinBytesPerSecond, ExtractionTimeout.TotalSeconds, MaxBackgroundTimeout.TotalSeconds));
 
     public static string CachePath(string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, string fingerprint) =>
         Path.Combine(CacheDirectory(transcodeTempDirectory), WebVttFileName(mediaPartId, subtitleTrackId, fingerprint));
@@ -111,7 +128,23 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         return fingerprint != null && IsUsable(CachePath(transcodeTempDirectory, mediaPartId, subtitleTrackId, fingerprint));
     }
 
-    public async Task<string?> GetOrExtractWebVttAsync(SubtitleSource source, string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, CancellationToken cancellationToken = default)
+    // A failure is remembered under the same fingerprint as the cache entry it
+    // could not produce, so replacing or re-tagging the file clears it.
+    public bool HasFailedInBackground(string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, SubtitleSource source)
+    {
+        if (string.IsNullOrWhiteSpace(transcodeTempDirectory)) return false;
+
+        var fingerprint = FingerprintForSource(source.ContentPath, source.StreamIndex);
+        return fingerprint != null && File.Exists(FailurePath(transcodeTempDirectory, mediaPartId, subtitleTrackId, fingerprint));
+    }
+
+    public Task<string?> GetOrExtractWebVttAsync(SubtitleSource source, string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, CancellationToken cancellationToken = default) =>
+        GetOrExtractAsync(source, transcodeTempDirectory, mediaPartId, subtitleTrackId, inBackground: false, cancellationToken);
+
+    public Task<string?> ExtractInBackgroundAsync(SubtitleSource source, string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, CancellationToken cancellationToken = default) =>
+        GetOrExtractAsync(source, transcodeTempDirectory, mediaPartId, subtitleTrackId, inBackground: true, cancellationToken);
+
+    private async Task<string?> GetOrExtractAsync(SubtitleSource source, string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, bool inBackground, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(source.ContentPath) || !File.Exists(source.ContentPath)) return null;
         if (string.IsNullOrWhiteSpace(transcodeTempDirectory)) return null;
@@ -127,15 +160,55 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         try
         {
             if (IsUsable(cachePath)) return cachePath;
-
-            var produced = await ExtractWebVttAsync(source, cachePath, mediaPartId, subtitleTrackId, cancellationToken);
-            if (produced != null) RemoveSuperseded(transcodeTempDirectory, mediaPartId, subtitleTrackId, keepFileName: Path.GetFileName(produced));
+            var timeout = inBackground ? BackgroundTimeout(SourceSize(source)) : ExtractionTimeout;
+            var produced = await ExtractWebVttAsync(source, cachePath, mediaPartId, subtitleTrackId, timeout, cancellationToken);
+            if (produced != null)
+            {
+                RemoveSuperseded(transcodeTempDirectory, mediaPartId, subtitleTrackId, keepFileName: Path.GetFileName(produced));
+                DeleteMatching(transcodeTempDirectory, TrackFailurePattern(mediaPartId, subtitleTrackId), keepFileName: null);
+            }
+            else if (inBackground && !cancellationToken.IsCancellationRequested)
+            {
+                RecordFailure(transcodeTempDirectory, mediaPartId, subtitleTrackId, fingerprint, timeout);
+            }
             return produced;
         }
         finally
         {
             gate.Semaphore.Release();
             ReleaseGate(cachePath, gate);
+        }
+    }
+
+    private static string FailurePath(string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, string fingerprint) =>
+        Path.Combine(CacheDirectory(transcodeTempDirectory), FailureFileName(mediaPartId, subtitleTrackId, fingerprint));
+
+    private static long SourceSize(SubtitleSource source)
+    {
+        try
+        {
+            return new FileInfo(source.VideoFilePath).Length;
+        }
+        catch (Exception)
+        {
+            return 0;
+        }
+    }
+
+    private void RecordFailure(string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, string fingerprint, TimeSpan timeout)
+    {
+        var path = FailurePath(transcodeTempDirectory, mediaPartId, subtitleTrackId, fingerprint);
+        try
+        {
+            Directory.CreateDirectory(CacheDirectory(transcodeTempDirectory));
+            File.WriteAllText(path, $"Background extraction failed (limit {timeout.TotalMinutes:0} min) at {DateTime.UtcNow:O}.");
+            DeleteMatching(transcodeTempDirectory, TrackFailurePattern(mediaPartId, subtitleTrackId), keepFileName: Path.GetFileName(path));
+            _logger.LogWarning("Subtitle track {TrackId} of part {PartId} could not be extracted; background passes skip it until the file changes.",
+                subtitleTrackId, mediaPartId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not record the failed subtitle extraction at {Path}.", path);
         }
     }
 
@@ -182,7 +255,7 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         Directory.CreateDirectory(directory);
 
         var stagingPath = Path.Combine(directory, $"{Guid.NewGuid():N}.vtt.tmp");
-        var attempt = await ConvertExternalAsync(sourceFilePath, stagingPath, cancellationToken);
+        var attempt = await ConvertExternalAsync(sourceFilePath, stagingPath, ExtractionTimeout, cancellationToken);
 
         if (!attempt.Succeeded)
         {
@@ -203,8 +276,11 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         }
     }
 
-    public void PurgePart(string transcodeTempDirectory, Guid mediaPartId) =>
+    public void PurgePart(string transcodeTempDirectory, Guid mediaPartId)
+    {
         DeleteMatching(transcodeTempDirectory, PartFilePattern(mediaPartId), keepFileName: null);
+        DeleteMatching(transcodeTempDirectory, PartFailurePattern(mediaPartId), keepFileName: null);
+    }
 
     public IReadOnlyCollection<Guid> ListCachedPartIds(string transcodeTempDirectory)
     {
@@ -216,6 +292,7 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         try
         {
             return Directory.EnumerateFiles(directory, "*.vtt")
+                .Concat(Directory.EnumerateFiles(directory, "*" + FailureExtension))
                 .Select(f => Path.GetFileNameWithoutExtension(f))
                 .Select(name => name.Split('_') is [var partId, _, _] && Guid.TryParse(partId, out var id) ? id : (Guid?)null)
                 .Where(id => id.HasValue)
@@ -254,7 +331,10 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         }
     }
 
-    public async Task<string?> ExtractWebVttAsync(SubtitleSource source, string cachePath, Guid mediaPartId, Guid subtitleTrackId, CancellationToken cancellationToken = default)
+    public Task<string?> ExtractWebVttAsync(SubtitleSource source, string cachePath, Guid mediaPartId, Guid subtitleTrackId, CancellationToken cancellationToken = default) =>
+        ExtractWebVttAsync(source, cachePath, mediaPartId, subtitleTrackId, ExtractionTimeout, cancellationToken);
+
+    private async Task<string?> ExtractWebVttAsync(SubtitleSource source, string cachePath, Guid mediaPartId, Guid subtitleTrackId, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var cacheDirectory = Path.GetDirectoryName(cachePath);
         if (string.IsNullOrEmpty(cacheDirectory)) return null;
@@ -267,8 +347,8 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
 
         var startedAt = Stopwatch.GetTimestamp();
         var attempt = source.IsExternal
-            ? await ConvertExternalAsync(source.ContentPath, stagingPath, cancellationToken)
-            : await ExtractEmbeddedAsync(source, stagingPath, cancellationToken);
+            ? await ConvertExternalAsync(source.ContentPath, stagingPath, timeout, cancellationToken)
+            : await ExtractEmbeddedAsync(source, stagingPath, timeout, cancellationToken);
 
         if (!attempt.Succeeded)
         {
@@ -294,11 +374,11 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         return cachePath;
     }
 
-    private async Task<ExtractionAttempt> ExtractEmbeddedAsync(SubtitleSource source, string stagingPath, CancellationToken cancellationToken)
+    private async Task<ExtractionAttempt> ExtractEmbeddedAsync(SubtitleSource source, string stagingPath, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var attempt = await RunFfmpegAsync(
             BuildArguments(source.VideoFilePath, AbsoluteMap(source.StreamIndex), stagingPath),
-            source.VideoFilePath, stagingPath, cancellationToken);
+            source.VideoFilePath, stagingPath, timeout, cancellationToken);
 
         if (attempt.ShouldRetry && source.Ordinal >= 0)
         {
@@ -307,7 +387,7 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
 
             attempt = await RunFfmpegAsync(
                 BuildArguments(source.VideoFilePath, SubtitleRelativeMap(source.Ordinal), stagingPath),
-                source.VideoFilePath, stagingPath, cancellationToken);
+                source.VideoFilePath, stagingPath, timeout, cancellationToken);
         }
 
         return attempt;
@@ -315,7 +395,7 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
 
     // A sidecar is already a subtitle file: there is no stream to select, so the
     // work is a format conversion, and a .vtt needs not even that.
-    private async Task<ExtractionAttempt> ConvertExternalAsync(string externalFilePath, string stagingPath, CancellationToken cancellationToken)
+    private async Task<ExtractionAttempt> ConvertExternalAsync(string externalFilePath, string stagingPath, TimeSpan timeout, CancellationToken cancellationToken)
     {
         if (IsAlreadyWebVtt(externalFilePath))
         {
@@ -334,7 +414,7 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
 
         var attempt = await RunFfmpegAsync(
             BuildExternalArguments(externalFilePath, stagingPath, characterEncoding: null),
-            externalFilePath, stagingPath, cancellationToken);
+            externalFilePath, stagingPath, timeout, cancellationToken);
 
         // FFmpeg assumes UTF-8 and gives up on a subtitle file that is not. Legacy
         // .srt files are routinely Windows-1252, so a failed first pass is retried
@@ -345,13 +425,13 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
 
             attempt = await RunFfmpegAsync(
                 BuildExternalArguments(externalFilePath, stagingPath, LegacySubtitleEncoding),
-                externalFilePath, stagingPath, cancellationToken);
+                externalFilePath, stagingPath, timeout, cancellationToken);
         }
 
         return attempt;
     }
 
-    private async Task<ExtractionAttempt> RunFfmpegAsync(IReadOnlyList<string> arguments, string sourceFilePath, string outputPath, CancellationToken cancellationToken)
+    private async Task<ExtractionAttempt> RunFfmpegAsync(IReadOnlyList<string> arguments, string sourceFilePath, string outputPath, TimeSpan limit, CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -369,7 +449,7 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
             sourceFilePath, string.Join(" ", startInfo.ArgumentList));
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(ExtractionTimeout);
+        timeout.CancelAfter(limit);
 
         try
         {
@@ -384,8 +464,14 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
             catch (OperationCanceledException)
             {
                 try { process.Kill(entireProcessTree: true); } catch { }
-                _logger.LogWarning("Subtitle extraction timed out after {Timeout}s for {Source}.",
-                    ExtractionTimeout.TotalSeconds, sourceFilePath);
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    _logger.LogInformation("Subtitle extraction was cancelled for {Source}.", sourceFilePath);
+                }
+                else
+                {
+                    _logger.LogWarning("Subtitle extraction timed out after {Timeout}s for {Source}.", limit.TotalSeconds, sourceFilePath);
+                }
                 return ExtractionAttempt.DidNotRun;
             }
 
