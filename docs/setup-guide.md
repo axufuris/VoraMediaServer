@@ -4,7 +4,7 @@ A first-run walkthrough for server admins at `/admin/setup` (and `/admin/server/
 
 ## State
 
-Three columns on `ServerSetting` (migration `AddSetupGuide`):
+Three columns on `ServerSetting` (added by `ChangesSinceInitial`, which absorbed the original `AddSetupGuide`):
 
 | Field | Meaning |
 | --- | --- |
@@ -14,7 +14,7 @@ Three columns on `ServerSetting` (migration `AddSetupGuide`):
 
 `GET` / `PUT /api/settings/setup-guide` (admin only) read and write all three as `SetupGuideVM` (`status`, `step`, and one boolean per content kind). The PUT validates the status, trims the step and cuts it to 64 characters. It lives on its own endpoint because the big `PUT /api/settings/server` overwrites every field it carries.
 
-The migration marks the guide `Skipped` on servers that already have an admin user (`WHERE EXISTS (SELECT 1 FROM "Users" WHERE "IsAdmin")`), so running servers such as QA are not nagged. A brand-new database has no admin yet and keeps `NotStarted`. `PostgresSetupGuideMigrationTests` covers both.
+When it adds the columns, the migration marks the guide `Skipped` on servers that already have an admin user (`WHERE EXISTS (SELECT 1 FROM "Users" WHERE "IsAdmin")`), so running servers such as QA are not nagged. A brand-new database has no admin yet and keeps `NotStarted`. `PostgresSetupGuideMigrationTests` covers both.
 
 ## When it opens
 

@@ -84,7 +84,7 @@ The clients keep using the prefs endpoints they already had; `IChannelFavoritesM
 - **A PUT without the favorites field leaves favorites alone**, so a screen that only edits providers or hidden channels can't wipe them. The web Providers settings tab relies on this.
 - A change fires `ChannelFavoritesUpdated` (profile group) so the guide and the Home favorites rows on other devices refresh.
 
-The `AddSmartListSourcesAndChannelFavorites` migration copied every device's `favoriteChannels` (union per profile, matched case-insensitively to TV channels) and every profile/device `favoriteIds` into the table; unparseable JSON is skipped rather than failing the migration.
+The `ChangesSinceInitial` migration copies every device's `favoriteChannels` (union per profile, matched case-insensitively to TV channels) and every profile/device `favoriteIds` into the table; unparseable JSON is skipped rather than failing the migration.
 
 The rest of the guide state stays **per device** in `ProfileDeviceSetting.IptvPrefsJson`: enabled providers, hidden channels, region and resolution filters, "Hide empty channels". That is what disappears if the `ClientDevice` row gets orphaned because the `X-Vora-Device-Id` header isn't matched correctly — see `docs/auth-and-devices.md`. The web guide reads the server copy first and only falls back to its `iptv_prefs_*` localStorage cache when the server can't be reached.
 

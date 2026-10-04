@@ -14,8 +14,8 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261004063246_AddSmartListSourcesAndChannelFavorites")]
-    partial class AddSmartListSourcesAndChannelFavorites
+    [Migration("20261004151213_ChangesSinceInitial")]
+    partial class ChangesSinceInitial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

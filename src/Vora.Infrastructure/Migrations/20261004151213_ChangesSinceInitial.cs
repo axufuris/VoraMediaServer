@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -8,11 +9,35 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Vora.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddSmartListSourcesAndChannelFavorites : Migration
+    public partial class ChangesSinceInitial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(@"
+ALTER TABLE ""MediaItems"" ADD COLUMN IF NOT EXISTS ""Energy"" integer;
+ALTER TABLE ""MediaItems"" ADD COLUMN IF NOT EXISTS ""GoodFor"" text[];
+ALTER TABLE ""MediaItems"" ADD COLUMN IF NOT EXISTS ""IsInstrumental"" boolean;
+ALTER TABLE ""MediaItems"" ADD COLUMN IF NOT EXISTS ""Moods"" text[];
+ALTER TABLE ""MediaItems"" ADD COLUMN IF NOT EXISTS ""ProfiledAt"" timestamp with time zone;
+ALTER TABLE ""MediaItems"" ADD COLUMN IF NOT EXISTS ""Themes"" text[];
+ALTER TABLE ""MediaItemEmbeddings"" ADD COLUMN IF NOT EXISTS ""Model"" character varying(64);
+ALTER TABLE ""MediaItemEmbeddings"" ADD COLUMN IF NOT EXISTS ""SourceHash"" character varying(64);
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""AiPlaylistMatchWindow"" double precision NOT NULL DEFAULT 0.04;");
+
+            migrationBuilder.Sql(@"
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'ServerSettings' AND column_name = 'SetupGuideStatus') THEN
+        ALTER TABLE ""ServerSettings"" ADD COLUMN ""SetupGuideContent"" integer NOT NULL DEFAULT 3;
+        ALTER TABLE ""ServerSettings"" ADD COLUMN ""SetupGuideStatus"" integer NOT NULL DEFAULT 0;
+        ALTER TABLE ""ServerSettings"" ADD COLUMN ""SetupGuideStep"" character varying(64);
+        UPDATE ""ServerSettings"" SET ""SetupGuideStatus"" = 2 WHERE EXISTS (SELECT 1 FROM ""Users"" WHERE ""IsAdmin"");
+    END IF;
+END $$;");
+
             migrationBuilder.AddColumn<string>(
                 name: "DefaultKey",
                 table: "SmartLists",
@@ -202,6 +227,54 @@ ON CONFLICT DO NOTHING;");
             migrationBuilder.DropColumn(
                 name: "Source",
                 table: "SmartLists");
+
+            migrationBuilder.DropColumn(
+                name: "AiPlaylistMatchWindow",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "SetupGuideContent",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "SetupGuideStatus",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "SetupGuideStep",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "Energy",
+                table: "MediaItems");
+
+            migrationBuilder.DropColumn(
+                name: "GoodFor",
+                table: "MediaItems");
+
+            migrationBuilder.DropColumn(
+                name: "IsInstrumental",
+                table: "MediaItems");
+
+            migrationBuilder.DropColumn(
+                name: "Moods",
+                table: "MediaItems");
+
+            migrationBuilder.DropColumn(
+                name: "ProfiledAt",
+                table: "MediaItems");
+
+            migrationBuilder.DropColumn(
+                name: "Themes",
+                table: "MediaItems");
+
+            migrationBuilder.DropColumn(
+                name: "Model",
+                table: "MediaItemEmbeddings");
+
+            migrationBuilder.DropColumn(
+                name: "SourceHash",
+                table: "MediaItemEmbeddings");
         }
     }
 }

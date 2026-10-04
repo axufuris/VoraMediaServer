@@ -1,36 +1,13 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
-using Npgsql;
 using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Entities.SmartLists;
 using Vora.Domain.Entities.Users;
 using Vora.Domain.Enums;
-using Vora.Infrastructure.Persistence;
 
 namespace Vora.Infrastructure.Tests.Postgres;
 
-public sealed class PostgresChannelFavoritesMigrationTests : IAsyncLifetime
+public sealed class PostgresChannelFavoritesMigrationTests
 {
-    private const string BeforeSmartListSources = "20261004030256_AddSetupGuide";
-
-    private readonly string _name = "vora_test_" + Guid.NewGuid().ToString("N");
-    private string _connectionString = string.Empty;
-
-    public ValueTask InitializeAsync()
-    {
-        if (PostgresDatabase.IsConfigured)
-        {
-            _connectionString = new NpgsqlConnectionStringBuilder(PostgresDatabase.ServerConnection) { Database = _name }.ConnectionString;
-        }
-        return ValueTask.CompletedTask;
-    }
-
-    private VoraDbContext NewContext() =>
-        new(new DbContextOptionsBuilder<VoraDbContext>()
-            .UseNpgsql(_connectionString, npgsql => npgsql.UseVector())
-            .Options);
-
     [Fact]
     public async Task Favorites_saved_per_device_and_per_profile_move_onto_the_profile()
     {
@@ -46,9 +23,10 @@ public sealed class PostgresChannelFavoritesMigrationTests : IAsyncLifetime
         var profile = new UserProfile { Id = Guid.NewGuid(), Name = "Kid", UserId = user.Id, RadioPrefsJson = $"{{\"favoriteIds\":[\"{jazz.Id.ToString().ToUpperInvariant()}\"]}}" };
         var otherProfile = new UserProfile { Id = Guid.NewGuid(), Name = "Broken prefs", UserId = user.Id, RadioPrefsJson = "{not json" };
 
-        await using (var before = NewContext())
+        await using var legacy = new LegacyDatabase();
+        await legacy.BuildQaStateAsync(withSetupGuide: false, cancellationToken);
+        await using (var before = legacy.NewContext())
         {
-            await before.GetService<IMigrator>().MigrateAsync(BeforeSmartListSources, cancellationToken);
             before.AddRange(user, playlist, radioList, cnn, bbc, jazz, profile, otherProfile);
             before.AddRange(
                 new ProfileDeviceSetting { ProfileId = profile.Id, DeviceId = "tv", IptvPrefsJson = "{\"favoriteChannels\":[\"CNN.US\"],\"hideEmpty\":true}" },
@@ -60,10 +38,11 @@ public sealed class PostgresChannelFavoritesMigrationTests : IAsyncLifetime
             await before.Database.ExecuteSqlAsync(
                 $"INSERT INTO \"SmartLists\" (\"Id\", \"Title\", \"FilterRulesJson\", \"SortBy\", \"MaxItems\", \"DisplayOrder\", \"ShowOnHomepage\", \"ShowToFriends\") VALUES ({holidayId}, 'Holiday Movies', {noRules}, 0, 20, 8, true, true)",
                 cancellationToken);
-            await before.GetService<IMigrator>().MigrateAsync(null, cancellationToken);
         }
 
-        await using var after = NewContext();
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
         var favorites = await after.ProfileChannelFavorites.AsNoTracking().ToListAsync(cancellationToken);
 
         favorites.Where(f => f.ProfileId == profile.Id && f.PlaylistId == playlist.Id).Select(f => f.ExternalChannelId)
@@ -75,16 +54,5 @@ public sealed class PostgresChannelFavoritesMigrationTests : IAsyncLifetime
         var lists = await after.Set<SmartList>().AsNoTracking().ToListAsync(cancellationToken);
         lists.Where(l => l.Source != SmartListSource.Library).Select(l => l.DisplayOrder).Should().OnlyContain(order => order > 8);
         lists.Where(l => l.DefaultKey != null).Should().HaveCount(11);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (!PostgresDatabase.IsConfigured) return;
-
-        NpgsqlConnection.ClearAllPools();
-        await using var admin = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(PostgresDatabase.ServerConnection) { Database = "postgres" }.ConnectionString);
-        await admin.OpenAsync();
-        await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_name}\" WITH (FORCE)", admin);
-        await drop.ExecuteNonQueryAsync();
     }
 }
