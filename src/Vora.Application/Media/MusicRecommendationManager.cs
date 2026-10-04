@@ -527,7 +527,9 @@ public class MusicRecommendationManager : IMusicRecommendationManager
         AlbumId = t.AlbumId,
         AlbumTitle = t.Album?.Title,
         AlbumArtworkUrl = AlbumCoverArt.For(t.Album),
-        IsLiked = false
+        IsLiked = false,
+        GlobalListeners = t.GlobalListeners,
+        GlobalPlays = t.GlobalPlays
     };
 
     private sealed class GenreCluster

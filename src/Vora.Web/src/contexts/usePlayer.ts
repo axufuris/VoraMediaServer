@@ -86,6 +86,7 @@ export interface PlayerContextType {
     radioSeed: RadioSeed | null;
     radioLabel: string | null;
     startRadio: (seed: RadioSeed, label: string, items: PlayableMedia[]) => void;
+    getAudioAnalyser: () => AnalyserNode | null;
 }
 
 export interface PlayerTimeContextType {

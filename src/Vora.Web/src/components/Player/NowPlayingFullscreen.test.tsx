@@ -17,6 +17,7 @@ vi.mock('../../dialogs', () => ({
 
 // jsdom has no scrollTo on elements; the synced-lyrics auto-scroll calls it.
 Element.prototype.scrollTo = vi.fn();
+HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as unknown as HTMLCanvasElement['getContext'];
 
 vi.mock('../../api/Collections/playlistService', () => ({
     playlistService: {
@@ -83,6 +84,7 @@ const player = (overrides: Partial<PlayerContextType> = {}): PlayerContextType =
     radioSeed: null,
     radioLabel: null,
     startRadio: vi.fn(),
+    getAudioAnalyser: () => null,
     ...overrides,
 });
 
@@ -101,6 +103,7 @@ const renderScreen = (value: PlayerContextType) => render(
 describe('music now playing', () => {
     beforeEach(() => {
         getTrackLyrics.mockReset();
+        localStorage.clear();
     });
 
     it('renders nothing unless it is open for music', () => {
@@ -267,5 +270,64 @@ Line two`, syncedLyrics: null, isSynced: false, providerName: 'Genius', sourceUr
         expect(info).toHaveTextContent('Hi-Res · FLAC 96 kHz');
         expect(info).toHaveTextContent('Euphoric · Upbeat · High energy');
         expect(getTrackInfo).toHaveBeenCalledWith(track.id, undefined);
+    });
+
+    describe('lyrics and synth stay as the listener left them', () => {
+        const withLyrics: LyricsVM = { plainLyrics: 'I talk to you every now and then', syncedLyrics: null, isSynced: false, providerName: 'LRClib', sourceUrl: null };
+
+        it('remembers lyrics turned on after the screen closes and opens again', async () => {
+            getTrackLyrics.mockResolvedValue(withLyrics);
+            const first = renderScreen(player());
+
+            fireEvent.click(await screen.findByRole('button', { name: 'Lyrics' }));
+            expect(await screen.findByTestId('lyrics-panel')).toBeInTheDocument();
+            expect(localStorage.getItem('now_playing_lyrics')).toBe('true');
+            first.unmount();
+
+            renderScreen(player());
+
+            expect(await screen.findByTestId('lyrics-panel')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Lyrics' })).toHaveAttribute('aria-pressed', 'true');
+        });
+
+        it('remembers lyrics turned off too', async () => {
+            localStorage.setItem('now_playing_lyrics', 'true');
+            getTrackLyrics.mockResolvedValue(withLyrics);
+            renderScreen(player());
+
+            fireEvent.click(await screen.findByRole('button', { name: 'Lyrics' }));
+
+            await waitFor(() => expect(screen.queryByTestId('lyrics-panel')).not.toBeInTheDocument());
+            expect(localStorage.getItem('now_playing_lyrics')).toBe('false');
+        });
+
+        it('turns the synth on and keeps it on', async () => {
+            getTrackLyrics.mockResolvedValue(null);
+            const first = renderScreen(player());
+
+            fireEvent.click(screen.getByRole('button', { name: 'Synth' }));
+
+            expect(screen.getByTestId('synth-panel')).toBeInTheDocument();
+            expect(screen.getByRole('img', { name: 'Music visualizer' })).toBeInTheDocument();
+            expect(localStorage.getItem('now_playing_synth')).toBe('true');
+            first.unmount();
+
+            renderScreen(player());
+            expect(screen.getByTestId('synth-panel')).toBeInTheDocument();
+        });
+
+        it('puts the lyrics in a smaller panel under the synth when both are on', async () => {
+            localStorage.setItem('now_playing_lyrics', 'true');
+            localStorage.setItem('now_playing_synth', 'true');
+            getTrackLyrics.mockResolvedValue(withLyrics);
+            renderScreen(player());
+
+            const lyrics = await screen.findByTestId('lyrics-panel');
+            const synth = screen.getByTestId('synth-panel');
+
+            expect(synth.compareDocumentPosition(lyrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+            expect(synth.className).toContain('flex-[3]');
+            expect(lyrics.className).toContain('flex-[2]');
+        });
     });
 });
