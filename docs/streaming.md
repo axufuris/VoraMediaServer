@@ -123,7 +123,8 @@ An external **image** subtitle (`.sub`/`.idx`) has no text to convert and can on
 - The ordinal **must** be counted in stream order. FFmpeg numbers `0:s:N` by ascending stream index, while `part.SubtitleTracks` arrives in whatever order EF materialised it. Taking the ordinal from the unsorted collection puts the retry on a different track than the user picked — the same wrong-track bug the fallback exists to fix.
 - **`-vn -an -dn`** so nothing but the subtitle reaches the output. `-map` already selects it; these stop FFmpeg auto-selecting anything else on the way past.
 - **Written to a unique `.tmp` in the cache directory and `File.Move`d into place** only on success, so a half-written file is never at the served name and a failed run leaves no zero-byte entry behind.
-- Capped at **180 seconds**. Extraction is I/O-bound — FFmpeg reads the whole container to collect interleaved subtitle packets, so a large remux is slow even though the output is a few KB.
+- Capped at **180 seconds** on demand. Extraction is I/O-bound — FFmpeg reads the whole container to collect interleaved subtitle packets, so a large remux is slow even though the output is a few KB. **Background pre-extraction** (`ExtractInBackgroundAsync`) gets `BackgroundTimeout(size)` instead: the file size at 20 MB/s, never under 180 s or over 2 h, because 4K remuxes on a busy disk routinely overran three minutes and failed on every pass.
+- A background extraction that still fails writes `{part}_{track}_{fingerprint}.failed` beside the cache. Later passes skip that track (`HasFailedInBackground`, logged as a count) until the fingerprint changes, i.e. the file is replaced, re-tagged or re-probed. A cancelled run writes nothing. The on-demand route ignores the marker and tries anyway; a success deletes it. `PurgePart` and the orphan sweep handle `.failed` files like `.vtt` ones.
 - Logged at Information on both ends: start (source, part, track, stream index) and finish (elapsed ms, output bytes, cache path), plus the full argument list of each attempt.
 
 ### Sidecar subtitle files
@@ -150,7 +151,7 @@ An external track's cached VTT is fingerprinted against the **sidecar**, not the
 
 `ISubtitlePreExtractionManager` is its own job with its own triggers, deliberately not chained to the thumbnail step:
 
-- **Library scan** — `RunFullLibraryWorkflowAsync` queues `QueuePreExtractLibrarySubtitles` as its own step. Queued rather than awaited: the pass parks while anything is transcoding, which must not hold a scan open. Progress counts every extractable track in the library, already-cached ones included (`Pre-extracting subtitles (566/2967)`), so a pass resumed after a restart reads as resumed rather than starting from 1.
+- **Library scan** — `RunFullLibraryWorkflowAsync` queues `QueuePreExtractLibrarySubtitles` as its own step. Queued rather than awaited: the pass parks while anything is transcoding, which must not hold a scan open. Progress counts only what this pass still has to extract (`Pre-extracting subtitles (4/1894)`): tracks already cached are skipped before the count is taken, so a pass resumed after a restart starts again from 1 against a smaller total.
 - **Single-file ingest** (`QueueScanNewFile`) and **per-item Analyze** — queue `QueuePreExtractMediaItemSubtitles` right after analysis, which is the point at which the item's subtitle tracks are known.
 - **Backfill** — `POST /api/metadata/subtitles/backfill` (admin) walks every video library and fills whatever is missing, so an existing library is warmed without a rescan. There is a button for it under the same settings card.
 

@@ -249,6 +249,73 @@ public class FFmpegSubtitleExtractionTests : IDisposable
         NewService().ListCachedPartIds(_root).Should().BeEquivalentTo(new[] { PartId, otherPart });
     }
 
+    [Theory]
+    [InlineData(500L * 1024 * 1024, 180)]
+    [InlineData(60L * 1024 * 1024 * 1024, 3072)]
+    [InlineData(400L * 1024 * 1024 * 1024, 7200)]
+    public void A_background_extraction_gets_time_in_proportion_to_the_file(long sizeBytes, int expectedSeconds)
+    {
+        FFmpegSubtitleExtractionService.BackgroundTimeout(sizeBytes).Should().Be(TimeSpan.FromSeconds(expectedSeconds));
+    }
+
+    [Fact]
+    public async Task A_failed_background_extraction_is_remembered_until_the_file_changes()
+    {
+        var service = NewService();
+        var source = WriteSource();
+        var subtitle = SubtitleSource.Embedded(source, 3, 1);
+
+        var produced = await service.ExtractInBackgroundAsync(subtitle, _root, PartId, TrackId, TestContext.Current.CancellationToken);
+
+        produced.Should().BeNull();
+        service.HasFailedInBackground(_root, PartId, TrackId, subtitle).Should().BeTrue();
+
+        File.SetLastWriteTimeUtc(source, Mtime.AddMinutes(5));
+        service.HasFailedInBackground(_root, PartId, TrackId, subtitle).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_failed_on_demand_extraction_is_not_remembered()
+    {
+        var service = NewService();
+        var subtitle = SubtitleSource.Embedded(WriteSource(), 3, 1);
+
+        await service.GetOrExtractWebVttAsync(subtitle, _root, PartId, TrackId, TestContext.Current.CancellationToken);
+
+        service.HasFailedInBackground(_root, PartId, TrackId, subtitle).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_cancelled_background_extraction_is_not_remembered_as_a_failure()
+    {
+        var service = NewService();
+        var subtitle = SubtitleSource.Embedded(WriteSource(), 3, 1);
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        var act = () => service.ExtractInBackgroundAsync(subtitle, _root, PartId, TrackId, cancelled.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        service.HasFailedInBackground(_root, PartId, TrackId, subtitle).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Purging_a_part_also_forgets_its_failures_and_the_sweep_finds_them()
+    {
+        var dir = FFmpegSubtitleExtractionService.CacheDirectory(_root);
+        Directory.CreateDirectory(dir);
+        var orphan = Guid.NewGuid();
+        File.WriteAllText(Path.Combine(dir, FFmpegSubtitleExtractionService.FailureFileName(PartId, TrackId, "aaaaaaaaaaaaaaaa")), "failed");
+        File.WriteAllText(Path.Combine(dir, FFmpegSubtitleExtractionService.FailureFileName(orphan, TrackId, "bbbbbbbbbbbbbbbb")), "failed");
+        var service = NewService();
+
+        service.ListCachedPartIds(_root).Should().BeEquivalentTo(new[] { PartId, orphan });
+
+        service.PurgePart(_root, PartId);
+
+        service.ListCachedPartIds(_root).Should().BeEquivalentTo(new[] { orphan });
+    }
+
     [Fact]
     public void Listing_an_absent_cache_directory_yields_nothing()
     {
