@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import SidebarV2 from './SidebarV2';
 import TopAppBar from './TopAppBar';
 import SearchPalette from './SearchPalette';
+import SetupGuidePrompt from '../SetupGuide/SetupGuidePrompt';
 
 export default function AdminShell() {
     const [isPaletteOpen, setIsPaletteOpen] = useState(false);
@@ -70,6 +71,7 @@ export default function AdminShell() {
                 </main>
             </div>
             <SearchPalette isOpen={isPaletteOpen} onClose={closePalette} />
+            <SetupGuidePrompt />
         </div>
     );
 }

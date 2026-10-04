@@ -9,7 +9,7 @@ using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Recommendations.Providers;
 
-public class OpenAiRecommendationProvider : IRecommendationProvider
+public class OpenAiRecommendationProvider : IRecommendationProvider, IPluginConnectionTest
 {
     private static readonly List<string> ChatModels = new() { "gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "gpt-5-nano", "gpt-5-mini", "gpt-5" };
 
@@ -32,6 +32,31 @@ public class OpenAiRecommendationProvider : IRecommendationProvider
         _settings = settings;
         _httpClient = httpClient;
         _cache = cache;
+    }
+
+    public async Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    {
+        if (!settings.TryGetValue("api_key", out var key) || string.IsNullOrWhiteSpace(key))
+        {
+            return PluginConnectionTestResult.Fail("Enter an API key first.");
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.openai.com/v1/models");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key.Trim());
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            return PluginConnectionTestResult.Ok("OpenAI accepted the API key.");
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            return PluginConnectionTestResult.Fail("OpenAI rejected the API key.");
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        {
+            return PluginConnectionTestResult.Fail("OpenAI accepted the key but refused the request: check that the account has billing set up and credit left.");
+        }
+        return PluginConnectionTestResult.Fail($"Unexpected response from OpenAI (HTTP {(int)response.StatusCode}).");
     }
 
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions()

@@ -117,7 +117,7 @@ export default function ProfileSelectionPage() {
             if (isFreshSetup) {
                 sessionStorage.removeItem(SessionKeys.freshServerSetup);
                 if (fullUser.isAdmin) {
-                    navigate('/admin/settings');
+                    navigate('/admin/setup');
                     return;
                 }
             }

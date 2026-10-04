@@ -20,6 +20,7 @@ export const SessionKeys = {
     musicNavState: 'music_nav_state',
     musicNavProfile: 'music_nav_profile',
     freshServerSetup: 'fresh_server_setup',
+    setupGuidePrompted: (serverKey: string) => `setup_guide_prompted_${serverKey}`,
 } as const;
 
 interface JwtPayload {

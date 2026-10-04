@@ -9,8 +9,8 @@ public class ServerSettingsVM
     public string ScheduleTimeZone { get; set; } = string.Empty;
     public bool EnableNightlyScan { get; set; }
     public string NightlyScanTime { get; set; } = "02:00";
-    public List<string> ScanIgnoredFolders { get; set; } = new();
-    public int RegistrationMode { get; set; }
+    public List<string> ScanIgnoredFolders { get; set; } = new() { ".recycle" };
+    public int RegistrationMode { get; set; } = 2;
     public int RunDetections { get; set; }
     public string DetectionScheduleTime { get; set; } = "03:00";
     public int SilenceThresholdOffsetDb { get; set; } = -12;
@@ -21,13 +21,13 @@ public class ServerSettingsVM
     public int EpisodeIntroClusterMinAgreementPct { get; set; } = 70;
     public int AnalyzeConcurrency { get; set; } = 2;
     public bool AnalyzeUseHardwareDecode { get; set; } = true;
-    public int VideoThumbnailGeneration { get; set; } = 2;
+    public int VideoThumbnailGeneration { get; set; } = 0;
     public string VideoThumbnailScheduleTime { get; set; } = "04:00";
     public string IptvHealthCheckTime { get; set; } = "04:30";
     public int VideoThumbnailIntervalSeconds { get; set; } = 10;
-    public int VideoThumbnailWidth { get; set; } = 320;
-    public int VideoThumbnailHeight { get; set; } = 180;
-    public int VideoThumbnailJpegQuality { get; set; } = 5;
+    public int VideoThumbnailWidth { get; set; } = 160;
+    public int VideoThumbnailHeight { get; set; } = 90;
+    public int VideoThumbnailJpegQuality { get; set; } = 9;
     public int VideoThumbnailSpriteColumns { get; set; } = 10;
     public int VideoThumbnailConcurrency { get; set; } = 2;
     public bool VideoThumbnailUseHardwareDecode { get; set; } = true;
@@ -38,27 +38,27 @@ public class ServerSettingsVM
     public string SubtitleSearchProviderId { get; set; } = string.Empty;
     public bool EnableTrashAutoPurge { get; set; } = true;
     public int MissingMediaRetentionDays { get; set; } = 30;
-    public bool ResolveMovieTvdbIds { get; set; }
+    public bool ResolveMovieTvdbIds { get; set; } = true;
     public string MetadataLanguage { get; set; } = "eng";
     public bool AutoEnableSubtitlesForForeignAudio { get; set; }
-    public int InternetUploadSpeedMbps { get; set; }
+    public int InternetUploadSpeedMbps { get; set; } = 1000;
     public int MaxRemoteStreamBitrateMbps { get; set; }
     public int TranscodeQuality { get; set; }
     public string TranscoderTempDirectory { get; set; } = "/transcode";
-    public int BackgroundX264Preset { get; set; }
-    public bool EnableHdrToneMapping { get; set; }
+    public int BackgroundX264Preset { get; set; } = 2;
+    public bool EnableHdrToneMapping { get; set; } = true;
     public bool DisableVideoTranscoding { get; set; }
-    public bool UseHardwareAcceleration { get; set; }
-    public bool UseHardwareEncoding { get; set; }
-    public int EnableHevcEncoding { get; set; }
-    public bool EnableHevcOptimization { get; set; }
-    public int MaxGpuTranscodes { get; set; }
+    public bool UseHardwareAcceleration { get; set; } = true;
+    public bool UseHardwareEncoding { get; set; } = true;
+    public int EnableHevcEncoding { get; set; } = 1;
+    public bool EnableHevcOptimization { get; set; } = true;
+    public int MaxGpuTranscodes { get; set; } = 2;
     public int MaxCpuTranscodes { get; set; }
     public int MaxBackgroundTranscodes { get; set; }
     public string HardwareTranscodingDevice { get; set; } = "Auto";
-    public int TranscoderThrottleBuffer { get; set; }
-    public string TonemappingAlgorithm { get; set; } = string.Empty;
-    public int StreamingProfile { get; set; } = 0;
+    public int TranscoderThrottleBuffer { get; set; } = 60;
+    public string TonemappingAlgorithm { get; set; } = "hable";
+    public int StreamingProfile { get; set; } = 1;
 
     public bool EnableDailyMixes { get; set; } = true;
     public string DailyMixSchedule { get; set; } = "Daily3am";

@@ -53,7 +53,7 @@ public class OmdbImdbRatingsProvider : IRatingsProvider, IPluginConnectionTest
                 Type = "password",
                 Required = true,
                 Placeholder = "Paste your OMDb API key",
-                Description = "OMDb API key. Request a free key at https://www.omdbapi.com/apikey.aspx (1,000 daily requests on the free tier). Click the activation link in the confirmation email before using the key. Paid tiers are available for higher quotas. This single key is shared by the OMDb IMDb, Rotten Tomatoes, and Metacritic ratings providers."
+                Description = "OMDb API key. Request a free key at https://www.omdbapi.com/apikey.aspx (1,000 daily requests on the free tier). Click the activation link in the confirmation email before using the key. Paid tiers are available for higher quotas. This single key is shared by the OMDb IMDb, Rotten Tomatoes, and Metacritic ratings providers. On the free tier a large library takes a while to fill in: Vora stops for the day when the 1,000 lookups run out and picks up the rest on later library scans (the nightly scan, if it is on), so expect a few days before every title has its scores."
             }
         };
     }

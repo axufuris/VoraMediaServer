@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { systemSettingsAdminService } from '../../api/System/systemSettingsAdminService';
 import { apiClient } from '../../api/client';
 
@@ -9,6 +9,7 @@ import RemoteAccessTab from '../../components/Admin/Settings/RemoteAccessTab';
 import EmailTab from '../../components/Admin/Settings/EmailTab';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import FeatureTabs from '../../components/Admin/Features/FeatureTabs';
+import { resolveAdminPath } from '../../components/Admin/Shell/adminNavData';
 
 type SettingsTabKey = 'core' | 'remote' | 'email' | 'requests';
 
@@ -47,6 +48,7 @@ export default function SettingsPage() {
             <PageHeader
                 title="System Settings"
                 description="Server name, transcoder behavior, remote access, and request providers."
+                actions={<Link to={resolveAdminPath('/admin/setup', serverId)} className="vora-button-secondary text-sm">Run setup guide</Link>}
             />
 
             <div className="px-8 pt-2 pb-10 max-w-6xl mx-auto">
