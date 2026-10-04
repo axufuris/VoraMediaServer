@@ -34,4 +34,6 @@ public class QueuedTaskDto
     public Guid? MediaItemId { get; set; }
 
     public Action? OnCancelled { get; set; }
+
+    public TaskRecipe? Recipe { get; set; }
 }

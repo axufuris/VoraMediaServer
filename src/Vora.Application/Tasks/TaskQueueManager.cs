@@ -32,6 +32,7 @@ public interface ITaskQueueManager
     void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, Guid? libraryId = null);
     void QueueScanNewFile(Guid libraryId, string filePath);
     void QueueLibraryPostScan(Guid libraryId, string? libraryName = null, bool forceOverride = false);
+    void QueueLibraryAnalysis(Guid libraryId, string? libraryName, LibraryAnalysisReason reason);
     void QueueScanNewMusicFile(Guid libraryId, string filePath);
     void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, Guid? libraryId = null);
     void QueueRefreshMatchedMediaItem(Guid mediaItemId, Guid libraryId, bool isTvShow);
@@ -59,7 +60,7 @@ public interface ITaskQueueManager
     IAsyncEnumerable<QueuedTaskDto> DequeueAsync(CancellationToken cancellationToken);
     void MarkTaskAsRunning(Guid taskId);
     void ReportProgress(string? detail);
-    void RemoveTask(Guid taskId);
+    void RemoveTask(Guid taskId, bool interrupted = false);
     IEnumerable<QueuedTaskVM> GetAllTasks();
     QueuedTaskPageVM GetTaskPage(int skip, int take);
     void QueueGenerateAiEmbeddings();
@@ -68,6 +69,7 @@ public interface ITaskQueueManager
     void QueueIptvEpgSync();
     void QueueIptvHealthCheck(Guid playlistId, string? playlistName = null);
     void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false);
+    void QueueLibraryThumbnails(Guid libraryId, string? libraryName, LibraryThumbnailReason reason);
     Task WaitForLibraryTasksToStopAsync(Guid libraryId, IReadOnlyCollection<Guid>? mediaItemIds = null, CancellationToken cancellationToken = default);
     void QueueRemoveLibraryVideoThumbnails(Guid libraryId, string? libraryName = null);
     void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
@@ -105,9 +107,12 @@ public class TaskQueueManager : ITaskQueueManager
     private static readonly TimeSpan LibraryStopPollInterval = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan LibraryStopTimeout = TimeSpan.FromMinutes(5);
 
-    public TaskQueueManager(IClientNotifier notifier)
+    private readonly ITaskJournal _journal;
+
+    public TaskQueueManager(IClientNotifier notifier, ITaskJournal journal)
     {
         _notifier = notifier;
+        _journal = journal;
     }
 
     public void QueueLibraryAdded(Guid libraryId, string? libraryName = null, bool forceOverride = false)
@@ -117,7 +122,7 @@ public class TaskQueueManager : ITaskQueueManager
             libraryName == null ? LibraryLabel(libraryId, "Auto-Ingest Library: {0}") : null,
             resourceKey: LibraryKey(libraryId),
             dedupeKey: forceOverride ? LibraryForcedScanKey(libraryId) : LibraryScanKey(libraryId),
-            libraryId: libraryId);
+            libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueLibraryAdded), new { libraryId, libraryName, forceOverride }));
     }
 
     public void QueueLibraryUpdated(Guid libraryId, string? libraryName = null, bool forceOverride = false)
@@ -128,7 +133,7 @@ public class TaskQueueManager : ITaskQueueManager
             resourceKey: LibraryKey(libraryId),
             dedupeKey: forceOverride ? LibraryForcedScanKey(libraryId) : LibraryScanKey(libraryId),
             rerunIfRunning: true,
-            libraryId: libraryId);
+            libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueLibraryUpdated), new { libraryId, libraryName, forceOverride }));
     }
 
     public void QueueScanLibrary(Guid libraryId, string? libraryName = null, bool forceOverride = false)
@@ -138,7 +143,7 @@ public class TaskQueueManager : ITaskQueueManager
             libraryName == null ? LibraryLabel(libraryId, "Scan Library: {0}") : null,
             dedupeKey: forceOverride ? LibraryForcedScanKey(libraryId) : LibraryScanKey(libraryId),
             resourceKey: LibraryKey(libraryId),
-            libraryId: libraryId);
+            libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueScanLibrary), new { libraryId, libraryName, forceOverride }));
     }
 
     public void QueueDeleteLibrary(Guid libraryId, string? libraryName = null)
@@ -151,13 +156,13 @@ public class TaskQueueManager : ITaskQueueManager
         // delete cancels itself.
         CancelTasksForLibrary(libraryId);
 
-        EnqueueTask($"Delete Library: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
+        Enqueue($"Delete Library: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
             {
                 var manager = sp.GetRequiredService<Vora.Application.Libraries.ILibraryManager>();
                 await manager.DeleteLibraryAsync(libraryId, ct);
             },
             libraryName == null ? LibraryLabel(libraryId, "Delete Library: {0}") : null,
-            resourceKey: LibraryKey(libraryId));
+            resourceKey: LibraryKey(libraryId), recipe: TaskRecipe.Of(nameof(QueueDeleteLibrary), new { libraryId, libraryName }));
     }
 
     public void QueueRefreshLibraryMetadata(Guid libraryId, string? libraryName = null, bool forceOverride = false)
@@ -178,7 +183,7 @@ public class TaskQueueManager : ITaskQueueManager
             await sp.GetRequiredService<IMusicManager>().RefreshLibraryArtworkFromProvidersAsync(libraryId, forceOverride, ct);
 
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
-        }, resourceKey: LibraryKey(libraryId), libraryId: libraryId);
+        }, resourceKey: LibraryKey(libraryId), libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueRefreshLibraryMetadata), new { libraryId, libraryName, forceOverride }));
     }
 
     public void QueueLibraryPostScan(Guid libraryId, string? libraryName = null, bool forceOverride = false) =>
@@ -194,7 +199,7 @@ public class TaskQueueManager : ITaskQueueManager
             dedupeKey: LibraryAnalyzeKey(libraryId),
             rerunIfRunning: true,
             libraryId: libraryId,
-            onCancelled: () => _analysisReasons.TryRemove(libraryId, out _));
+            onCancelled: () => _analysisReasons.TryRemove(libraryId, out _), recipe: TaskRecipe.Of(nameof(QueueLibraryAnalysis), new { libraryId, libraryName, reason = (int)reason }), mergeRecipe: existing => existing.WithNumber("reason", existing.Number("reason") | (int)reason));
     }
 
     public LibraryAnalysisReason TakeAnalysisReasons(Guid libraryId) =>
@@ -242,7 +247,7 @@ public class TaskQueueManager : ITaskQueueManager
         mediaItemName == null ? MediaLabel(mediaItemId, "Scan Media Item: {0}") : null,
         resourceKey: libraryId.HasValue ? LibraryKey(libraryId.Value) : null,
         libraryId: libraryId,
-        mediaItemId: mediaItemId);
+        mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueueScanMediaItem), new { mediaItemId, mediaItemName, forceOverride, libraryId }));
     }
 
     public void QueueScanNewMusicFile(Guid libraryId, string filePath)
@@ -251,7 +256,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var libraryManager = sp.GetRequiredService<ILibraryManager>();
             await libraryManager.TriggerMusicFileScanAsync(libraryId, filePath, ct);
-        }, resourceKey: LibraryKey(libraryId), libraryId: libraryId);
+        }, resourceKey: LibraryKey(libraryId), libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueScanNewMusicFile), new { libraryId, filePath }));
     }
 
     public void QueueScanNewFile(Guid libraryId, string filePath)
@@ -313,7 +318,7 @@ public class TaskQueueManager : ITaskQueueManager
             }
 
             await QueueAdditionThumbnailsIfWantedAsync(sp, libraryId, null);
-        }, resourceKey: LibraryKey(libraryId), libraryId: libraryId);
+        }, resourceKey: LibraryKey(libraryId), libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueScanNewFile), new { libraryId, filePath }));
     }
 
     public void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, Guid? libraryId = null)
@@ -333,7 +338,7 @@ public class TaskQueueManager : ITaskQueueManager
         mediaItemName == null ? MediaLabel(mediaItemId, "Refresh Metadata for Media Item: {0}") : null,
         resourceKey: libraryId.HasValue ? LibraryKey(libraryId.Value) : null,
         libraryId: libraryId,
-        mediaItemId: mediaItemId);
+        mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueueRefreshMediaItemMetadata), new { mediaItemId, mediaItemName, forceOverride, libraryId }));
     }
 
     public void QueueRefreshMatchedMediaItem(Guid mediaItemId, Guid libraryId, bool isTvShow)
@@ -353,7 +358,7 @@ public class TaskQueueManager : ITaskQueueManager
                 var dedupeManager = sp.GetRequiredService<IMediaDedupeManager>();
                 await dedupeManager.MergeDuplicateTvShowsAsync(libraryId, ct);
             }
-        }, resourceKey: LibraryKey(libraryId), libraryId: libraryId, mediaItemId: mediaItemId);
+        }, resourceKey: LibraryKey(libraryId), libraryId: libraryId, mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueueRefreshMatchedMediaItem), new { mediaItemId, libraryId, isTvShow }));
     }
 
     public void QueueAnalyzeMediaItemContent(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
@@ -363,7 +368,7 @@ public class TaskQueueManager : ITaskQueueManager
             var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, cancellationToken: ct);
             sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractMediaItemSubtitles(mediaItemId, mediaItemName);
-        }, mediaItemName == null ? MediaLabel(mediaItemId, "Analyze Media Item: {0}") : null, mediaItemId: mediaItemId);
+        }, mediaItemName == null ? MediaLabel(mediaItemId, "Analyze Media Item: {0}") : null, mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueueAnalyzeMediaItemContent), new { mediaItemId, mediaItemName, forceOverride }));
     }
 
     public void QueueArtworkProviderSwap(Guid libraryId, string libraryName)
@@ -378,7 +383,7 @@ public class TaskQueueManager : ITaskQueueManager
             await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, forceOverride: true, cancellationToken: ct);
 
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
-        }, libraryId: libraryId);
+        }, libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueArtworkProviderSwap), new { libraryId, libraryName }));
     }
 
     public void QueueRefreshLibraryRatings(Guid libraryId, bool forceOverride = false)
@@ -398,7 +403,7 @@ public class TaskQueueManager : ITaskQueueManager
             await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, null, forceOverride, ct);
 
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
-        }, RatingsLabel(libraryId), resourceKey: LibraryKey(libraryId), libraryId: libraryId);
+        }, RatingsLabel(libraryId), resourceKey: LibraryKey(libraryId), libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueRefreshLibraryRatings), new { libraryId, forceOverride }));
     }
 
     public void QueueRefreshMediaItemArtwork(Guid mediaItemId, bool forceOverride = false, Guid? libraryId = null)
@@ -414,81 +419,81 @@ public class TaskQueueManager : ITaskQueueManager
         }, MediaLabel(mediaItemId, "Refresh Artwork for Media Item: {0}"),
         resourceKey: libraryId.HasValue ? LibraryKey(libraryId.Value) : null,
         libraryId: libraryId,
-        mediaItemId: mediaItemId);
+        mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueueRefreshMediaItemArtwork), new { mediaItemId, forceOverride, libraryId }));
     }
 
     public void QueueRefreshArtistArtwork(Guid artistId, string? artistName = null, bool forceOverride = false)
     {
         var label = !string.IsNullOrWhiteSpace(artistName) ? artistName : artistId.ToString();
-        EnqueueTask($"Refresh Artwork for Artist: {label}", async (ct, sp) =>
+        Enqueue($"Refresh Artwork for Artist: {label}", async (ct, sp) =>
         {
             var musicManager = sp.GetRequiredService<IMusicManager>();
             await musicManager.RefreshArtistArtworkFromProvidersAsync(artistId, forceOverride, ct);
-        });
+        }, recipe: TaskRecipe.Of(nameof(QueueRefreshArtistArtwork), new { artistId, artistName, forceOverride }));
     }
 
     public void QueueRefreshAlbumArtwork(Guid albumId, string? albumName = null, bool forceOverride = false)
     {
         var label = !string.IsNullOrWhiteSpace(albumName) ? albumName : albumId.ToString();
-        EnqueueTask($"Refresh Artwork for Album: {label}", async (ct, sp) =>
+        Enqueue($"Refresh Artwork for Album: {label}", async (ct, sp) =>
         {
             var musicManager = sp.GetRequiredService<IMusicManager>();
             await musicManager.RefreshAlbumArtworkFromProvidersAsync(albumId, forceOverride, ct);
-        });
+        }, recipe: TaskRecipe.Of(nameof(QueueRefreshAlbumArtwork), new { albumId, albumName, forceOverride }));
     }
 
     public void QueueRefreshAllActorMetadata()
     {
-        EnqueueTask("Refresh All Actor Metadata", async (ct, sp) =>
+        Enqueue("Refresh All Actor Metadata", async (ct, sp) =>
         {
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             await metadataManager.TriggerActorMetadataRefreshAsync(ct);
-        });
+        }, recipe: TaskRecipe.Of(nameof(QueueRefreshAllActorMetadata)));
     }
 
     public void QueueResolveTvdbIds()
     {
-        EnqueueTask("Resolve TVDB Ids", async (ct, sp) =>
+        Enqueue("Resolve TVDB Ids", async (ct, sp) =>
         {
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             await metadataManager.TriggerMediaTvdbResolutionAsync(ct);
-        });
+        }, recipe: TaskRecipe.Of(nameof(QueueResolveTvdbIds)));
     }
 
     public void QueueMergeDuplicateShows()
     {
-        EnqueueTask("Merge Duplicate TV Shows", async (ct, sp) =>
+        Enqueue("Merge Duplicate TV Shows", async (ct, sp) =>
         {
             var dedupeManager = sp.GetRequiredService<Vora.Application.Media.IMediaDedupeManager>();
             await dedupeManager.MergeDuplicateTvShowsAsync(cancellationToken: ct);
-        });
+        }, recipe: TaskRecipe.Of(nameof(QueueMergeDuplicateShows)));
     }
 
     public void QueueRemoveOrphanedMedia(string filePath)
     {
-        EnqueueTask($"Auto-Cleanup: {Path.GetFileName(filePath)}", async (ct, sp) =>
+        Enqueue($"Auto-Cleanup: {Path.GetFileName(filePath)}", async (ct, sp) =>
         {
             var mediaRepo = sp.GetRequiredService<IMediaRepository>();
             await mediaRepo.MarkMediaMissingByFilePathAsync(filePath);
-        });
+        }, recipe: TaskRecipe.Of(nameof(QueueRemoveOrphanedMedia), new { filePath }));
     }
 
     public void QueueCollectionChronologySync(Guid collectionId, string title)
     {
-        EnqueueTask($"Chronological Collection Sync: {title}", async (ct, sp) =>
+        Enqueue($"Chronological Collection Sync: {title}", async (ct, sp) =>
         {
             var orderingService = sp.GetRequiredService<CollectionOrderingService>();
             await orderingService.ApplyChronologicalOrderAsync(collectionId, cancellationToken: ct);
-        }, resourceKey: CollectionKey(collectionId));
+        }, resourceKey: CollectionKey(collectionId), recipe: TaskRecipe.Of(nameof(QueueCollectionChronologySync), new { collectionId, title }));
     }
 
     public void QueueCollectionContentSync(Guid collectionId, string title)
     {
-        EnqueueTask($"Content Sync: {title}", async (ct, sp) =>
+        Enqueue($"Content Sync: {title}", async (ct, sp) =>
         {
             var syncService = sp.GetRequiredService<CollectionSyncService>();
             await syncService.SyncCollectionContentAsync(collectionId, ct);
-        }, resourceKey: CollectionKey(collectionId));
+        }, resourceKey: CollectionKey(collectionId), recipe: TaskRecipe.Of(nameof(QueueCollectionContentSync), new { collectionId, title }));
     }
 
     public void QueueGeneratePosterOverlays(Guid mediaItemId)
@@ -500,12 +505,12 @@ public class TaskQueueManager : ITaskQueueManager
 
             var notifier = sp.GetRequiredService<IClientNotifier>();
             await notifier.NotifyMediaItemUpdatedAsync(mediaItemId);
-        }, MediaLabel(mediaItemId, "Generate Poster Overlays: {0}"), mediaItemId: mediaItemId);
+        }, MediaLabel(mediaItemId, "Generate Poster Overlays: {0}"), mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueueGeneratePosterOverlays), new { mediaItemId }));
     }
 
     public void QueueFullCollectionSync(Guid collectionId, string title, bool hasContentSync, bool hasChronologySort)
     {
-        EnqueueTask($"Sync Collection: {title}", async (ct, sp) =>
+        Enqueue($"Sync Collection: {title}", async (ct, sp) =>
         {
             if (hasContentSync)
             {
@@ -518,22 +523,22 @@ public class TaskQueueManager : ITaskQueueManager
                 var orderingService = sp.GetRequiredService<CollectionOrderingService>();
                 await orderingService.ApplyChronologicalOrderAsync(collectionId, cancellationToken: ct);
             }
-        }, resourceKey: CollectionKey(collectionId));
+        }, resourceKey: CollectionKey(collectionId), recipe: TaskRecipe.Of(nameof(QueueFullCollectionSync), new { collectionId, title, hasContentSync, hasChronologySort }));
     }
 
     public void QueueReevaluateCollectionOrder(Guid collectionId)
     {
-        EnqueueTask("Reevaluate Collection Order", async (ct, sp) =>
+        Enqueue("Reevaluate Collection Order", async (ct, sp) =>
         {
             var orderingService = sp.GetRequiredService<CollectionOrderingService>();
             await orderingService.ReevaluateOrderOnItemAddedAsync(collectionId, ct);
-        }, resourceKey: CollectionKey(collectionId));
+        }, resourceKey: CollectionKey(collectionId), recipe: TaskRecipe.Of(nameof(QueueReevaluateCollectionOrder), new { collectionId }));
     }
 
     public Guid EnqueueTask(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null, string? dedupeKey = null, bool rerunIfRunning = false) =>
         Enqueue(name, workItem, nameResolver, resourceKey, dedupeKey, rerunIfRunning);
 
-    private Guid Enqueue(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null, string? dedupeKey = null, bool rerunIfRunning = false, Guid? libraryId = null, Action? onCancelled = null, Guid? mediaItemId = null)
+    private Guid Enqueue(string name, Func<CancellationToken, IServiceProvider, Task> workItem, Func<IServiceProvider, Task<string?>>? nameResolver = null, string? resourceKey = null, string? dedupeKey = null, bool rerunIfRunning = false, Guid? libraryId = null, Action? onCancelled = null, Guid? mediaItemId = null, TaskRecipe? recipe = null, Func<TaskRecipe, TaskRecipe>? mergeRecipe = null)
     {
         // Don't enqueue a duplicate of an operation that's already queued or
         // running (e.g. the daily thumbnail schedule firing over a manual run).
@@ -548,7 +553,8 @@ public class TaskQueueManager : ITaskQueueManager
             DedupeKey = dedupeKey,
             LibraryId = libraryId,
             MediaItemId = mediaItemId,
-            OnCancelled = onCancelled
+            OnCancelled = onCancelled,
+            Recipe = recipe
         };
 
         if (dedupeKey != null)
@@ -557,6 +563,11 @@ public class TaskQueueManager : ITaskQueueManager
             if (existing != null)
             {
                 if (rerunIfRunning && existing.Status == RunningStatus) existing.FollowUp = task;
+                if (mergeRecipe != null && existing.Recipe != null)
+                {
+                    existing.Recipe = mergeRecipe(existing.Recipe);
+                    _journal.Record(existing.Id, existing.Name, existing.Recipe);
+                }
                 return existing.Id;
             }
         }
@@ -564,6 +575,7 @@ public class TaskQueueManager : ITaskQueueManager
 
         _taskTokens.TryAdd(task.Id, cts);
         _taskStates.TryAdd(task.Id, task);
+        if (recipe != null) _journal.Record(task.Id, name, recipe);
 
         _queue.Writer.TryWrite(task);
 
@@ -721,7 +733,7 @@ public class TaskQueueManager : ITaskQueueManager
         return _queue.Reader.ReadAllAsync(cancellationToken);
     }
 
-    public void RemoveTask(Guid taskId)
+    public void RemoveTask(Guid taskId, bool interrupted = false)
     {
         // No _runningTaskId to clear — _currentTaskId is AsyncLocal and lives only
         // on the finished task's own async flow, so it goes away with it.
@@ -733,9 +745,11 @@ public class TaskQueueManager : ITaskQueueManager
         }
         if (_taskStates.TryRemove(taskId, out var removed))
         {
+            if (interrupted) return;
+            if (removed.Recipe != null) _journal.Complete(taskId);
             if (removed.FollowUp is { } followUp && !cancelled && removed.Status != CancellingStatus)
             {
-                Enqueue(followUp.Name, followUp.WorkItem, followUp.NameResolver, followUp.ResourceKey, followUp.DedupeKey, rerunIfRunning: true, followUp.LibraryId, followUp.OnCancelled, followUp.MediaItemId);
+                Enqueue(followUp.Name, followUp.WorkItem, followUp.NameResolver, followUp.ResourceKey, followUp.DedupeKey, rerunIfRunning: true, followUp.LibraryId, followUp.OnCancelled, followUp.MediaItemId, followUp.Recipe);
             }
             _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
         }
@@ -778,7 +792,7 @@ public class TaskQueueManager : ITaskQueueManager
 
     public void QueueGenerateAiEmbeddings()
     {
-        EnqueueTask("Generate AI Embeddings", async (ct, sp) =>
+        Enqueue("Generate AI Embeddings", async (ct, sp) =>
         {
             var embeddingService = sp.GetRequiredService<IMediaEmbeddingService>();
             int processed;
@@ -787,7 +801,7 @@ public class TaskQueueManager : ITaskQueueManager
             {
                 processed = await embeddingService.ProcessMissingEmbeddingsAsync(AiEmbeddingsBatchSize, ct);
             } while (processed == AiEmbeddingsBatchSize && !ct.IsCancellationRequested);
-        }, dedupeKey: "ai-embeddings");
+        }, dedupeKey: "ai-embeddings", recipe: TaskRecipe.Of(nameof(QueueGenerateAiEmbeddings)));
     }
 
     public void QueueGenerateLibraryPosterOverlays(Guid libraryId, string? libraryName = null)
@@ -813,21 +827,21 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<IPosterOverlayManager>();
             await manager.RunLibraryOverlaySyncAsync(libraryId, ct);
-        }, nameResolver, resourceKey: OverlaySyncKey, libraryId: libraryId == Guid.Empty ? null : libraryId);
+        }, nameResolver, resourceKey: OverlaySyncKey, libraryId: libraryId == Guid.Empty ? null : libraryId, recipe: TaskRecipe.Of(nameof(QueueGenerateLibraryPosterOverlays), new { libraryId, libraryName }));
     }
 
     public void QueueOverlayOrphanSweep()
     {
-        EnqueueTask("Sweep Orphaned Poster Overlays", async (ct, sp) =>
+        Enqueue("Sweep Orphaned Poster Overlays", async (ct, sp) =>
         {
             var manager = sp.GetRequiredService<IPosterOverlayManager>();
             await manager.SweepOrphanedOverlayFilesAsync(ct);
-        }, resourceKey: OverlaySyncKey);
+        }, resourceKey: OverlaySyncKey, recipe: TaskRecipe.Of(nameof(QueueOverlayOrphanSweep)));
     }
 
     public void QueueIptvEpgSync()
     {
-        EnqueueTask("IPTV EPG Sync", async (ct, sp) =>
+        Enqueue("IPTV EPG Sync", async (ct, sp) =>
         {
             var epgService = sp.GetRequiredService<IIptvEpgService>();
             var dvrManager = sp.GetRequiredService<IDvrManager>();
@@ -835,7 +849,7 @@ public class TaskQueueManager : ITaskQueueManager
             await epgService.SyncEpgDataAsync(ct);
 
             await dvrManager.ProcessSchedulesIntoSessionsAsync(ct);
-        });
+        }, recipe: TaskRecipe.Of(nameof(QueueIptvEpgSync)));
     }
 
     public void QueueIptvHealthCheck(Guid playlistId, string? playlistName = null)
@@ -844,20 +858,22 @@ public class TaskQueueManager : ITaskQueueManager
             ? "Health-check IPTV channels"
             : $"Health-check channels: {playlistName}";
 
-        EnqueueTask(label, async (ct, sp) =>
+        Enqueue(label, async (ct, sp) =>
         {
             var service = sp.GetRequiredService<Vora.Application.Iptv.IIptvHealthCheckService>();
             await service.CheckPlaylistAsync(playlistId, ct);
-        }, resourceKey: $"iptv-health:{playlistId}");
+        }, resourceKey: $"iptv-health:{playlistId}", recipe: TaskRecipe.Of(nameof(QueueIptvHealthCheck), new { playlistId, playlistName }));
     }
 
-    public void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false)
-    {
-        var reason = forceOverride ? LibraryThumbnailReason.Force
+    public void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false) =>
+        QueueLibraryThumbnails(libraryId, libraryName,
+            forceOverride ? LibraryThumbnailReason.Force
             : isScheduleTrigger ? LibraryThumbnailReason.Schedule
             : isAdditionTrigger ? LibraryThumbnailReason.Addition
-            : LibraryThumbnailReason.Manual;
+            : LibraryThumbnailReason.Manual);
 
+    public void QueueLibraryThumbnails(Guid libraryId, string? libraryName, LibraryThumbnailReason reason)
+    {
         _thumbnailReasons.AddOrUpdate(libraryId, reason, (_, existing) => existing | reason);
         Enqueue($"Generate Video Thumbnails: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
             RunLibraryThumbnailsAsync(sp, libraryId, TakeThumbnailReasons(libraryId), ct),
@@ -866,7 +882,7 @@ public class TaskQueueManager : ITaskQueueManager
             dedupeKey: LibraryThumbnailsKey(libraryId),
             rerunIfRunning: true,
             libraryId: libraryId,
-            onCancelled: () => _thumbnailReasons.TryRemove(libraryId, out _));
+            onCancelled: () => _thumbnailReasons.TryRemove(libraryId, out _), recipe: TaskRecipe.Of(nameof(QueueLibraryThumbnails), new { libraryId, libraryName, reason = (int)reason }), mergeRecipe: existing => existing.WithNumber("reason", existing.Number("reason") | (int)reason));
     }
 
     internal static async Task RunLibraryThumbnailsAsync(IServiceProvider sp, Guid libraryId, LibraryThumbnailReason reasons, CancellationToken ct)
@@ -920,7 +936,7 @@ public class TaskQueueManager : ITaskQueueManager
         libraryName == null ? LibraryLabel(libraryId, "Remove Video Thumbnails: {0}") : null,
         resourceKey: LibraryMaintenanceKey(libraryId),
         dedupeKey: $"library-thumbnails-remove:{libraryId}",
-        libraryId: libraryId);
+        libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueRemoveLibraryVideoThumbnails), new { libraryId, libraryName }));
     }
 
     public void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
@@ -929,7 +945,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
             await manager.TriggerMediaItemThumbnailGenerationAsync(mediaItemId, forceOverride: forceOverride, cancellationToken: ct);
-        }, mediaItemId: mediaItemId);
+        }, mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueueGenerateMediaItemVideoThumbnails), new { mediaItemId, mediaItemName, forceOverride }));
     }
 
     // Every subtitle job shares one resource key, so the whole feature runs at
@@ -944,7 +960,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<Vora.Application.Subtitles.ISubtitlePreExtractionManager>();
             await manager.PreExtractForItemAsync(mediaItemId, ct);
-        }, resourceKey: SubtitleExtractionKey, dedupeKey: $"pre-extract-subs:item:{mediaItemId}", mediaItemId: mediaItemId);
+        }, resourceKey: SubtitleExtractionKey, dedupeKey: $"pre-extract-subs:item:{mediaItemId}", mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueuePreExtractMediaItemSubtitles), new { mediaItemId, mediaItemName }));
     }
 
     public void QueuePreExtractLibrarySubtitles(Guid libraryId, string? libraryName = null)
@@ -953,7 +969,7 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<Vora.Application.Subtitles.ISubtitlePreExtractionManager>();
             await manager.PreExtractForLibraryAsync(libraryId, ct);
-        }, resourceKey: SubtitleExtractionKey, dedupeKey: $"pre-extract-subs:library:{libraryId}", libraryId: libraryId);
+        }, resourceKey: SubtitleExtractionKey, dedupeKey: $"pre-extract-subs:library:{libraryId}", libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueuePreExtractLibrarySubtitles), new { libraryId, libraryName }));
     }
 
     // Deduplicated because it is queued by a daily schedule and could otherwise
@@ -961,11 +977,11 @@ public class TaskQueueManager : ITaskQueueManager
     // it takes no library key and does not wait on a scan.
     public void QueueRefreshMusicPopularity()
     {
-        EnqueueTask("Refresh Music Popularity", async (ct, sp) =>
+        Enqueue("Refresh Music Popularity", async (ct, sp) =>
         {
             var refresher = sp.GetRequiredService<IMusicPopularityRefresher>();
             await refresher.RefreshDueArtistsAsync(ct);
-        }, dedupeKey: "music-popularity-refresh");
+        }, dedupeKey: "music-popularity-refresh", recipe: TaskRecipe.Of(nameof(QueueRefreshMusicPopularity)));
     }
 
     // Embeds any new songs first, since a playlist can only be made from songs
@@ -973,7 +989,7 @@ public class TaskQueueManager : ITaskQueueManager
     // or for every eligible profile when an admin forces it.
     public void QueueGenerateAiPlaylists(bool force = false)
     {
-        EnqueueTask("Make AI Playlists", async (ct, sp) =>
+        Enqueue("Make AI Playlists", async (ct, sp) =>
         {
             try
             {
@@ -985,36 +1001,36 @@ public class TaskQueueManager : ITaskQueueManager
                 sp.GetService<ILogger<TaskQueueManager>>()?.LogWarning(ex, "Preparing new songs for AI playlists failed; making this week's playlists from the songs already prepared.");
             }
             await sp.GetRequiredService<Vora.Application.Media.Ai.IAiPlaylistService>().GenerateWeeklyForDueProfilesAsync(force, ct);
-        }, resourceKey: MusicAiKey, dedupeKey: "music-ai-playlists");
+        }, resourceKey: MusicAiKey, dedupeKey: "music-ai-playlists", recipe: TaskRecipe.Of(nameof(QueueGenerateAiPlaylists), new { force }));
     }
 
     public void QueuePrepareMusicForAiPlaylists()
     {
-        EnqueueTask("Prepare Music for AI Playlists", async (ct, sp) =>
+        Enqueue("Prepare Music for AI Playlists", async (ct, sp) =>
             await sp.GetRequiredService<Vora.Application.Media.Ai.IMusicEmbeddingService>().PrepareTracksAsync(ct),
             resourceKey: MusicAiKey,
             dedupeKey: "music-ai-prepare",
-            rerunIfRunning: true);
+            rerunIfRunning: true, recipe: TaskRecipe.Of(nameof(QueuePrepareMusicForAiPlaylists)));
     }
 
     // Deduplicated for the same reason as the popularity refresh, and likewise
     // network-bound, so it holds no library key.
     public void QueueRateMusicContent()
     {
-        EnqueueTask("Rate Music Clean / Explicit", async (ct, sp) =>
+        Enqueue("Rate Music Clean / Explicit", async (ct, sp) =>
         {
             var refresher = sp.GetRequiredService<IMusicContentRatingRefresher>();
             await refresher.RateDueAlbumsAsync(ct);
-        }, dedupeKey: "music-content-rating");
+        }, dedupeKey: "music-content-rating", recipe: TaskRecipe.Of(nameof(QueueRateMusicContent)));
     }
 
     public void QueueSubtitleBackfill()
     {
-        EnqueueTask("Pre-extract Subtitles: whole library backfill", async (ct, sp) =>
+        Enqueue("Pre-extract Subtitles: whole library backfill", async (ct, sp) =>
         {
             var manager = sp.GetRequiredService<Vora.Application.Subtitles.ISubtitlePreExtractionManager>();
             await manager.BackfillAsync(ct);
-        }, resourceKey: SubtitleExtractionKey, dedupeKey: "pre-extract-subs:backfill");
+        }, resourceKey: SubtitleExtractionKey, dedupeKey: "pre-extract-subs:backfill", recipe: TaskRecipe.Of(nameof(QueueSubtitleBackfill)));
     }
 
     private static async Task RunFullLibraryWorkflowAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, CancellationToken ct = default)

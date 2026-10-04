@@ -9,7 +9,7 @@ namespace Vora.Application.Tests.Tasks;
 
 public class LibraryTaskLifecycleTests
 {
-    private readonly TaskQueueManager _queue = new(Substitute.For<IClientNotifier>());
+    private readonly TaskQueueManager _queue = new(Substitute.For<IClientNotifier>(), Substitute.For<ITaskJournal>());
     private readonly Guid _movies = Guid.NewGuid();
 
     private Guid IdOf(string name) => _queue.GetAllTasks().Single(t => t.Name == name).Id;

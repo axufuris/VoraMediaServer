@@ -507,6 +507,9 @@ public static class ServiceRegistrationExtensions
         services.AddHostedService<RecommendationRefreshWorker>();
         services.AddHostedService<ScheduledJobWorker>();
         services.AddHostedService<StartupWatcherService>();
+        services.AddSingleton<TaskJournal>();
+        services.AddSingleton<Vora.Application.Tasks.ITaskJournal>(sp => sp.GetRequiredService<TaskJournal>());
+        services.AddHostedService(sp => sp.GetRequiredService<TaskJournal>());
         services.AddHostedService<TaskProcessingWorker>();
         services.AddHostedService<TimeshiftJanitorWorker>();
         services.AddHostedService<TranscodeJanitorWorker>();

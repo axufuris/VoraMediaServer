@@ -7,7 +7,7 @@ namespace Vora.Application.Tests.Tasks;
 
 public class AiTaskResilienceTests
 {
-    private readonly TaskQueueManager _queue = new(Substitute.For<IClientNotifier>());
+    private readonly TaskQueueManager _queue = new(Substitute.For<IClientNotifier>(), Substitute.For<ITaskJournal>());
 
     private async Task<Vora.Application.Tasks.Dtos.QueuedTaskDto> Next()
     {

@@ -3552,6 +3552,39 @@ namespace Vora.Infrastructure.Migrations
                     b.ToTable("StreamSessions");
                 });
 
+            modelBuilder.Entity("Vora.Domain.Entities.Tasks.PendingTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ArgumentsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime>("QueuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Sequence");
+
+                    b.ToTable("PendingTasks");
+                });
+
             modelBuilder.Entity("Vora.Domain.Entities.Templates.ClientTemplateSchedule", b =>
                 {
                     b.Property<Guid>("Id")

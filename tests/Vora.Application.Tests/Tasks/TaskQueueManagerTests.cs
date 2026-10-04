@@ -11,7 +11,7 @@ public class TaskQueueManagerTests
     public TaskQueueManagerTests()
     {
         _notifier = Substitute.For<IClientNotifier>();
-        _queue = new TaskQueueManager(_notifier);
+        _queue = new TaskQueueManager(_notifier, Substitute.For<ITaskJournal>());
     }
 
     [Fact]

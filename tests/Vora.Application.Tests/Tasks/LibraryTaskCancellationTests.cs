@@ -9,7 +9,7 @@ namespace Vora.Application.Tests.Tasks;
 // run to completion first.
 public class LibraryTaskCancellationTests
 {
-    private readonly TaskQueueManager _queue = new(Substitute.For<IClientNotifier>());
+    private readonly TaskQueueManager _queue = new(Substitute.For<IClientNotifier>(), Substitute.For<ITaskJournal>());
 
     private static string LibraryKey(Guid libraryId) => $"library:{libraryId}";
 
