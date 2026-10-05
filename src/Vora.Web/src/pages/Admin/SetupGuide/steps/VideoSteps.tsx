@@ -173,10 +173,19 @@ export function RequestsStep({ serverId }: SetupStepProps) {
     );
 }
 
-export function SubtitlesStep({ plugins, onPluginsChanged, serverId }: SetupStepProps) {
+export function SubtitlesStep({ plugins, onPluginsChanged, serverId, settings, onSettings }: SetupStepProps) {
     return (
         <>
             <StepHeading eyebrow="Movies & TV" title="Subtitles" lead="Vora already uses subtitles inside your files and next to them. OpenSubtitles finds them for videos that have none." />
+            <SetupCard>
+                <SwitchRow
+                    id="setup-subtitles-prepare"
+                    label="Get subtitles ready after each scan"
+                    description="Copies the text subtitles out of new videos in the background, so they appear the moment someone turns them on. Big files take a while to read; your files aren't changed."
+                    checked={settings.preExtractSubtitlesOnScan}
+                    onChange={on => onSettings({ preExtractSubtitlesOnScan: on })}
+                />
+            </SetupCard>
             <SetupPluginCard pluginId="opensubtitles_search" title="OpenSubtitles" subtitle="Download subtitles that aren't in your files" fieldKeys={PLUGIN_FIELDS.openSubtitles} plugin={findPlugin(plugins, 'opensubtitles_search')} serverId={serverId} onChanged={onPluginsChanged} />
         </>
     );

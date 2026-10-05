@@ -17,6 +17,8 @@ export interface SetupStepProps {
     discoverRows: DiscoveryRowConfig[];
     onDiscoverRows: (rows: DiscoveryRowConfig[]) => void;
     hardwareDevices: string[];
+    emailWanted: boolean;
+    onEmailWanted: (wanted: boolean) => void;
     goTo: (id: SetupStepId) => void;
 }
 

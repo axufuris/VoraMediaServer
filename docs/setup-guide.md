@@ -21,23 +21,29 @@ When it adds the columns, the migration marks the guide `Skipped` on servers tha
 - **First sign-in.** `ProfileSelectionPage` sends a freshly claimed server's admin to `/admin/setup` (it used to send them to System Settings). Opening the guide moves `NotStarted` to `InProgress`.
 - **Pop-up.** `SetupGuidePrompt`, mounted in `AdminShell`, asks once per browser session per server when the status is `NotStarted` or `InProgress`: **Start setup / Continue setup**, **Not now** (until the next session), **Skip setup** (for good). Opening the guide counts as being asked, so leaving the guide midway does not bring the pop-up straight back. The key is the sessionStorage `setup_guide_prompted_<serverId|local>` (`components/Admin/SetupGuide/setupGuideSession.ts`).
 - **Dashboard.** `SetupGuideBanner` shows "Set up your server" / "Finish setting up Vora" while the guide is unfinished, and nothing after.
-- **System Settings.** A **Run setup guide** button in the page header, always. There is deliberately no sidebar entry.
+- **System Settings.** A **Setup guide** card at the top of the page, above the tabs, with **Run setup guide**, always. It replaced a small page-header button that was easy to miss. There is deliberately no sidebar entry.
 
 Re-running a finished or skipped guide keeps its status: every step is open from the rail, and the header button reads **Close guide** instead of **Skip setup**.
 
 ## Steps
 
-`pages/Admin/SetupGuide/setupSteps.ts` builds the list from the content answers and whether Discover has rows:
+`pages/Admin/SetupGuide/setupSteps.ts` builds the list from the content answers, whether Discover has rows, and whether email is needed (`SetupStepOptions`):
 
 | Group | Steps | Saves to |
 | --- | --- | --- |
 | Basics | Welcome, Your server, Playback, What you'll add | `PUT /settings/server` (name, `metadataLanguage`, `scheduleTimeZone`, `streamingProfile`, hardware acceleration + encoding, device); content answers go to the guide and switch Live TV / radio / podcasts on or off in `PUT /settings/features` |
-| Movies & TV | Metadata, Artwork, Ratings, Skip intro & credits, Preview thumbnails, Requests, Subtitles, Discover | plugin settings; `runDetections`, `detectionScheduleTime`, `analyzeUseHardwareDecode`, `videoThumbnail*`; request servers; `PUT /discovery/config` + the Discover flag |
+| Access | Remote access, Sign-ups, Email | `PUT /remote-access` (`isEnabled`, `externalUrl`, manual port); `PUT /settings/registration-mode`; `PUT /email/settings` |
+| Movies & TV | Metadata, Artwork, Ratings, Skip intro & credits, Preview thumbnails, Requests, Subtitles, Discover | plugin settings; `runDetections`, `detectionScheduleTime`, `analyzeUseHardwareDecode`, `videoThumbnail*`, `preExtractSubtitlesOnScan`; request servers; `PUT /discovery/config` + the Discover flag |
 | Live TV & radio | Live TV, Internet radio | feature flags, `POST /iptv/admin/playlists` (kind Tv / Radio), `POST /iptv/admin/epg-sources`, the DVR flag |
 | Podcasts | Podcasts | feature flag, `GET /podcasts/search`, `POST /podcasts/admin/catalog` |
 | Music | Last.fm, Lyrics | plugin settings |
-| AI | AI features, then Done | OpenAI plugin settings, `enableAiMusicPlaylists` |
+| AI | AI features | OpenAI plugin settings, `enableAiMusicPlaylists` |
+| Backups | Backups, then Done | `PUT /admin/backups/settings` (`autoBackupEnabled`, cadence, time, how many to keep) |
 
+- **Remote access** offers Only at home, Reverse proxy or tunnel, and Open a port. A proxy or tunnel address is normalized by `publicUrl.ts` (trimmed, `https://` assumed, a dotted host required) and saved as `externalUrl`, which makes the server check that address and skip UPnP. **Save and check** saves it straight away and reports whether the server could reach it.
+- **Sign-ups** saves through `PUT /settings/registration-mode`, because the full settings PUT leaves `RegistrationMode` alone. Picking **Email invitation** (mode 3, `EMAIL_INVITATION_MODE`) adds the Email step; any other mode offers **Set up email too**, which starts on when email is already enabled.
+- **Email** reuses System Settings' `EmailProviderGuide` and `SmtpConnectionFields` (see `docs/email.md`). It turns email on by default when no server is saved, prefills **Public base URL** from the remote access address when that is blank, and refuses to continue while email is on without an SMTP server or From address. **Save and send test** saves before sending.
+- **Backups** exists because scheduled backups are off by default. It shows where backups are written so the admin can check that folder is on a mounted volume.
 - **Discover** appears only when `GET /discovery/config` returns rows, i.e. once a Discover provider has a key: TMDB (`tmdb_discovery`, using the TMDB key) or MyAnimeList (`mal_discovery`, using the `mal_artwork` client id, offered on the Artwork step). Rows are re-read after any plugin save.
 - Intro detection and thumbnails sit under Movies & TV because they only apply to video. Both steps say the first run on a large library takes a while.
 - The OMDb card and the plugin's own description both explain that the free key's 1,000 daily lookups mean a large library takes a few days to get every score; ratings are picked up again on later library scans.
@@ -49,6 +55,7 @@ Each step saves when the admin presses **Save and continue**, **Back** or a rail
 - The page tracks dirty server settings, feature flags and Discover rows and sends them whole (`ServerSettings` and `FeatureFlagsVM` are always loaded first, because those PUTs replace every field).
 - Cards register a saver through `SetupSaverContext` / `useStepSaver` (`setupSaver.ts`). On navigation the page runs every registered saver first, so a key typed but not saved, or a Radarr connection tested but not saved, is not lost.
 - **Skip this step** moves on without saving. Basics steps cannot be skipped.
+- A saver can throw `StepValidationError` (`setupSaver.ts`); the page shows its message in the footer instead of the generic save error and stays on the step.
 - The step id is written to the guide on every move.
 
 ## Building blocks

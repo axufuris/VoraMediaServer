@@ -7,6 +7,9 @@ import type { ServerSettings, PluginSettingField } from '../../../api/System/sys
 import { DEFAULT_FEATURE_FLAGS, type FeatureFlagsVM } from '../../../api/System/featureFlagsService';
 import type { PluginVM } from '../../../api/System/pluginAdminService';
 import type { DiscoveryRowConfig } from '../../../api/Discovery/discoveryService';
+import type { EmailSettings } from '../../../api/System/emailAdminService';
+import type { RemoteAccessStatus, UpdateRemoteAccessRequest } from '../../../api/System/remoteAccessService';
+import type { BackupSettingsVM } from '../../../api/System/backupsService';
 
 const mocks = vi.hoisted(() => ({
     getGuide: vi.fn(),
@@ -21,6 +24,14 @@ const mocks = vi.hoisted(() => ({
     getPlugins: vi.fn(),
     getAdminConfigs: vi.fn(),
     updateAdminConfigs: vi.fn(),
+    updateRegistrationMode: vi.fn(),
+    getEmailSettings: vi.fn(),
+    updateEmailSettings: vi.fn(),
+    sendTestEmail: vi.fn(),
+    getRemoteStatus: vi.fn(),
+    updateRemote: vi.fn(),
+    getBackupSettings: vi.fn(),
+    updateBackupSettings: vi.fn(),
     confirm: vi.fn(),
 }));
 
@@ -33,8 +44,12 @@ vi.mock('../../../api/System/systemSettingsAdminService', () => ({
         getPluginSettings: mocks.getPluginSettings,
         updatePluginSettings: mocks.updatePluginSettings,
         testPluginConnection: mocks.testPluginConnection,
+        updateRegistrationMode: mocks.updateRegistrationMode,
     },
 }));
+vi.mock('../../../api/System/emailAdminService', () => ({ emailAdminService: { getSettings: mocks.getEmailSettings, updateSettings: mocks.updateEmailSettings, sendTest: mocks.sendTestEmail } }));
+vi.mock('../../../api/System/remoteAccessService', () => ({ remoteAccessService: { getRemoteAccessStatus: mocks.getRemoteStatus, updateRemoteAccess: mocks.updateRemote } }));
+vi.mock('../../../api/System/backupsService', () => ({ backupsService: { getSettings: mocks.getBackupSettings, updateSettings: mocks.updateBackupSettings } }));
 vi.mock('../../../api/System/featureFlagsService', async importOriginal => ({
     ...(await importOriginal<typeof import('../../../api/System/featureFlagsService')>()),
     featureFlagsService: { getFeatureFlags: mocks.getFeatureFlags, updateFeatureFlags: mocks.updateFeatureFlags },
@@ -48,7 +63,13 @@ const guide = (overrides: Partial<SetupGuideVM> = {}): SetupGuideVM => ({
     status: 'InProgress', step: 'welcome', moviesAndShows: true, music: true, liveTv: false, internetRadio: false, podcasts: false, ...overrides,
 });
 
-const settings = { serverName: 'Vora QA', metadataLanguage: 'eng', scheduleTimeZone: '', streamingProfile: 1, useHardwareAcceleration: true, useHardwareEncoding: true, hardwareTranscodingDevice: 'Auto', runDetections: 0, detectionScheduleTime: '03:00', analyzeUseHardwareDecode: true, videoThumbnailGeneration: 0, videoThumbnailScheduleTime: '04:00', videoThumbnailUseHardwareDecode: true, enableAiMusicPlaylists: false } as ServerSettings;
+const settings = { serverName: 'Vora QA', metadataLanguage: 'eng', scheduleTimeZone: '', streamingProfile: 1, useHardwareAcceleration: true, useHardwareEncoding: true, hardwareTranscodingDevice: 'Auto', runDetections: 0, detectionScheduleTime: '03:00', analyzeUseHardwareDecode: true, videoThumbnailGeneration: 0, videoThumbnailScheduleTime: '04:00', videoThumbnailUseHardwareDecode: true, enableAiMusicPlaylists: false, registrationMode: 2, preExtractSubtitlesOnScan: true } as ServerSettings;
+
+const email: EmailSettings = { emailEnabled: false, smtpHost: null, smtpPort: 587, smtpUseStartTls: true, smtpUseImplicitSsl: false, smtpUsername: null, smtpPasswordIsSet: false, smtpFromAddress: null, smtpFromDisplayName: null, emailPublicBaseUrl: null };
+
+const remote: RemoteAccessStatus = { isEnabled: false, upnpSupported: false, localIp: '192.168.1.20', localPort: 8080, publicIp: '203.0.113.5', publicPort: 32080, manuallySpecifyPort: false, externalUrl: null, reachable: false, accessUrl: '', errorMessage: '' };
+
+const backups: BackupSettingsVM = { autoBackupEnabled: false, cadence: 'Daily', hour: 3, minute: 0, dayOfWeek: 'Sunday', dayOfMonth: 1, maxToKeep: 10, effectiveDirectory: '/app/data/backups', availableSections: [] };
 
 const plugin = (id: string, requiresConfiguration = true): PluginVM => ({
     id, name: id, version: '1', description: '', isSystemPlugin: true, type: 'Metadata', hasSettings: true, isAiPlugin: false, isEnabled: true, requiresConfiguration, supportsConnectionTest: true,
@@ -82,6 +103,13 @@ describe('SetupGuidePage', () => {
         mocks.getPluginSettings.mockImplementation((id: string) => Promise.resolve(
             id === 'tvdb_metadata' ? [field('api_key', 'TVDB API Key'), field('subscriber_pin', 'TVDB Subscriber PIN')] : [field('api_key', `${id} key`)]
         ));
+        mocks.updateRegistrationMode.mockResolvedValue(undefined);
+        mocks.getEmailSettings.mockResolvedValue({ ...email });
+        mocks.updateEmailSettings.mockResolvedValue(undefined);
+        mocks.getRemoteStatus.mockResolvedValue({ ...remote });
+        mocks.updateRemote.mockImplementation((request: UpdateRemoteAccessRequest) => Promise.resolve({ ...remote, ...request, reachable: true }));
+        mocks.getBackupSettings.mockResolvedValue({ ...backups });
+        mocks.updateBackupSettings.mockImplementation((saved: BackupSettingsVM) => Promise.resolve(saved));
     });
 
     it('starts a new guide, shows what the server has now, and saves each step', async () => {
@@ -122,7 +150,7 @@ describe('SetupGuidePage', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
         await waitFor(() => expect(mocks.updateFeatureFlags).toHaveBeenCalledWith(expect.objectContaining<Partial<FeatureFlagsVM>>({ liveTvEnabled: true }), undefined));
-        expect(mocks.saveGuide).toHaveBeenLastCalledWith(expect.objectContaining({ liveTv: true, music: false, step: 'metadata' }), undefined);
+        expect(mocks.saveGuide).toHaveBeenLastCalledWith(expect.objectContaining({ liveTv: true, music: false, step: 'remote' }), undefined);
     });
 
     it('saves a key that was typed but not saved when the admin moves on', async () => {
@@ -182,6 +210,111 @@ describe('SetupGuidePage', () => {
 
         expect(await screen.findByText('Add library page')).toBeInTheDocument();
         expect(mocks.saveGuide).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'Completed', step: 'done' }), undefined);
+    });
+
+    it('saves the address of a reverse proxy as the remote access URL', async () => {
+        mocks.getGuide.mockResolvedValue(guide({ step: 'remote' }));
+        renderGuide();
+
+        fireEvent.click(await screen.findByRole('radio', { name: /Reverse proxy or tunnel/ }));
+        fireEvent.change(screen.getByLabelText('Public address'), { target: { value: 'vora.example.com/' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+
+        await waitFor(() => expect(mocks.updateRemote).toHaveBeenCalledWith(expect.objectContaining({ isEnabled: true, externalUrl: 'https://vora.example.com' }), undefined));
+        expect(await screen.findByRole('heading', { name: 'Sign-ups' })).toBeInTheDocument();
+    });
+
+    it("stays on remote access when the address can't be used", async () => {
+        mocks.getGuide.mockResolvedValue(guide({ step: 'remote' }));
+        renderGuide();
+
+        fireEvent.click(await screen.findByRole('radio', { name: /Reverse proxy or tunnel/ }));
+        fireEvent.change(screen.getByLabelText('Public address'), { target: { value: 'not a url' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('Enter the full web address');
+        expect(mocks.updateRemote).not.toHaveBeenCalled();
+        expect(screen.getByRole('heading', { name: 'Remote access' })).toBeInTheDocument();
+    });
+
+    it('adds the email step for invitations and saves the sign-up mode', async () => {
+        mocks.getGuide.mockResolvedValue(guide({ step: 'signup' }));
+        renderGuide();
+
+        await screen.findByRole('heading', { name: 'Sign-ups' });
+        const rail = screen.getByRole('complementary', { name: 'Setup steps' });
+        expect(rail).not.toHaveTextContent('Email');
+
+        fireEvent.click(screen.getByRole('radio', { name: /Email invitation/ }));
+        expect(rail).toHaveTextContent('Email');
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+
+        await waitFor(() => expect(mocks.updateRegistrationMode).toHaveBeenCalledWith(3, undefined));
+        expect(await screen.findByRole('heading', { name: 'Email' })).toBeInTheDocument();
+    });
+
+    it('offers the email step with the other sign-up modes too', async () => {
+        mocks.getGuide.mockResolvedValue(guide({ step: 'signup' }));
+        renderGuide();
+
+        fireEvent.click(await screen.findByRole('switch', { name: 'Set up email too' }));
+
+        expect(screen.getByRole('complementary', { name: 'Setup steps' })).toHaveTextContent('Email');
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+        expect(await screen.findByRole('heading', { name: 'Email' })).toBeInTheDocument();
+        expect(mocks.updateRegistrationMode).not.toHaveBeenCalled();
+    });
+
+    it("fills in the provider's server and saves email with the public address from remote access", async () => {
+        mocks.getGuide.mockResolvedValue(guide({ step: 'email' }));
+        mocks.getServerSettings.mockResolvedValue({ ...settings, registrationMode: 3 });
+        mocks.getRemoteStatus.mockResolvedValue({ ...remote, isEnabled: true, externalUrl: 'https://vora.example.com' });
+        renderGuide();
+
+        expect(await screen.findByLabelText('Public base URL')).toHaveValue('https://vora.example.com');
+        fireEvent.click(screen.getByRole('button', { name: 'Gmail' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Fill in server settings' }));
+        expect(screen.getByLabelText('SMTP server')).toHaveValue('smtp.gmail.com');
+        fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'vora@example.com' } });
+        fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'example-password' } });
+        fireEvent.change(screen.getByLabelText('From address'), { target: { value: 'vora@example.com' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+
+        await waitFor(() => expect(mocks.updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({
+            emailEnabled: true,
+            smtpHost: 'smtp.gmail.com',
+            smtpPort: 587,
+            smtpUseStartTls: true,
+            smtpUseImplicitSsl: false,
+            smtpUsername: 'vora@example.com',
+            newSmtpPassword: 'example-password',
+            smtpFromAddress: 'vora@example.com',
+            emailPublicBaseUrl: 'https://vora.example.com',
+        }), undefined));
+    });
+
+    it('needs an SMTP server before moving on with email turned on', async () => {
+        mocks.getGuide.mockResolvedValue(guide({ step: 'email' }));
+        mocks.getServerSettings.mockResolvedValue({ ...settings, registrationMode: 3 });
+        renderGuide();
+
+        fireEvent.change(await screen.findByLabelText('From address'), { target: { value: 'me@example.com' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent("Enter your email provider's SMTP server");
+        expect(mocks.updateEmailSettings).not.toHaveBeenCalled();
+    });
+
+    it('turns on scheduled backups', async () => {
+        mocks.getGuide.mockResolvedValue(guide({ step: 'backups' }));
+        renderGuide();
+
+        fireEvent.click(await screen.findByRole('switch', { name: 'Back up automatically' }));
+        fireEvent.change(screen.getByLabelText('At'), { target: { value: '02:30' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+
+        await waitFor(() => expect(mocks.updateBackupSettings).toHaveBeenCalledWith(expect.objectContaining({ autoBackupEnabled: true, cadence: 'Daily', hour: 2, minute: 30 }), undefined));
+        expect(await screen.findByRole('heading', { name: 'The groundwork is set' })).toBeInTheDocument();
     });
 
     it('remembers this session so the pop-up does not follow the admin out of the guide', async () => {

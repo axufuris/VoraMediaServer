@@ -2,10 +2,11 @@ import type { SetupGuideVM } from '../../../api/System/setupGuideService';
 
 export type SetupStepId =
     | 'welcome' | 'server' | 'playback' | 'content'
+    | 'remote' | 'signup' | 'email'
     | 'metadata' | 'artwork' | 'ratings' | 'detection' | 'thumbnails' | 'requests' | 'subtitles' | 'discover'
     | 'livetv' | 'radio' | 'podcasts'
     | 'lastfm' | 'lyrics'
-    | 'ai' | 'done';
+    | 'ai' | 'backups' | 'done';
 
 export interface SetupStep {
     id: SetupStepId;
@@ -15,21 +16,31 @@ export interface SetupStep {
 
 export type SetupContent = Pick<SetupGuideVM, 'moviesAndShows' | 'music' | 'liveTv' | 'internetRadio' | 'podcasts'>;
 
+export const EMAIL_INVITATION_MODE = 3;
+
+export interface SetupStepOptions {
+    discover: boolean;
+    email: boolean;
+}
+
 const ALL_IDS: readonly SetupStepId[] = [
-    'welcome', 'server', 'playback', 'content', 'metadata', 'artwork', 'ratings', 'detection', 'thumbnails', 'requests',
-    'subtitles', 'discover', 'livetv', 'radio', 'podcasts', 'lastfm', 'lyrics', 'ai', 'done',
+    'welcome', 'server', 'playback', 'content', 'remote', 'signup', 'email', 'metadata', 'artwork', 'ratings', 'detection', 'thumbnails', 'requests',
+    'subtitles', 'discover', 'livetv', 'radio', 'podcasts', 'lastfm', 'lyrics', 'ai', 'backups', 'done',
 ];
 
 export const isSetupStepId = (value: string | null | undefined): value is SetupStepId =>
     !!value && (ALL_IDS as readonly string[]).includes(value);
 
-export function buildSetupSteps(content: SetupContent, discoverAvailable: boolean): SetupStep[] {
+export function buildSetupSteps(content: SetupContent, options: SetupStepOptions): SetupStep[] {
     const steps: SetupStep[] = [
         { id: 'welcome', group: '', title: 'Welcome' },
         { id: 'server', group: 'Basics', title: 'Your server' },
         { id: 'playback', group: 'Basics', title: 'Playback' },
         { id: 'content', group: 'Basics', title: "What you'll add" },
+        { id: 'remote', group: 'Access', title: 'Remote access' },
+        { id: 'signup', group: 'Access', title: 'Sign-ups' },
     ];
+    if (options.email) steps.push({ id: 'email', group: 'Access', title: 'Email' });
     if (content.moviesAndShows) {
         steps.push(
             { id: 'metadata', group: 'Movies & TV', title: 'Metadata' },
@@ -40,7 +51,7 @@ export function buildSetupSteps(content: SetupContent, discoverAvailable: boolea
             { id: 'requests', group: 'Movies & TV', title: 'Requests' },
             { id: 'subtitles', group: 'Movies & TV', title: 'Subtitles' },
         );
-        if (discoverAvailable) steps.push({ id: 'discover', group: 'Movies & TV', title: 'Discover' });
+        if (options.discover) steps.push({ id: 'discover', group: 'Movies & TV', title: 'Discover' });
     }
     if (content.liveTv) steps.push({ id: 'livetv', group: 'Live TV & radio', title: 'Live TV' });
     if (content.internetRadio) steps.push({ id: 'radio', group: 'Live TV & radio', title: 'Internet radio' });
@@ -51,7 +62,11 @@ export function buildSetupSteps(content: SetupContent, discoverAvailable: boolea
             { id: 'lyrics', group: 'Music', title: 'Lyrics' },
         );
     }
-    steps.push({ id: 'ai', group: 'AI', title: 'AI features' }, { id: 'done', group: '', title: 'Done' });
+    steps.push(
+        { id: 'ai', group: 'AI', title: 'AI features' },
+        { id: 'backups', group: 'Backups', title: 'Backups' },
+        { id: 'done', group: '', title: 'Done' },
+    );
     return steps;
 }
 
@@ -63,6 +78,7 @@ export function nearestStep(steps: SetupStep[], wanted: SetupStepId): SetupStepI
 }
 
 export const SKIPPABLE_STEPS: readonly SetupStepId[] = [
+    'remote', 'signup', 'email',
     'metadata', 'artwork', 'ratings', 'detection', 'thumbnails', 'requests', 'subtitles', 'discover',
-    'livetv', 'radio', 'podcasts', 'lastfm', 'lyrics', 'ai',
+    'livetv', 'radio', 'podcasts', 'lastfm', 'lyrics', 'ai', 'backups',
 ];
