@@ -217,12 +217,16 @@ public static class ServiceRegistrationExtensions
             Directory = dpDir
         });
 
+        services.AddSingleton(TimeProvider.System);
         services.AddSingleton<Vora.Application.Backups.IBackupSettingsStore, Vora.Application.Backups.BackupSettingsStore>();
+        services.AddSingleton<Vora.Application.Backups.IBackupSizeEstimator, Vora.Application.Backups.BackupSizeEstimator>();
         services.AddSingleton<Vora.Application.Backups.IBackupManager, Vora.Application.Backups.BackupManager>();
         services.AddScoped<Vora.Application.Backups.IBackupTransactionFactory, Vora.Infrastructure.Backups.EfBackupTransactionFactory>();
+        services.AddScoped<Vora.Infrastructure.Backups.BackupReferenceMapper>();
 
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ServerSettingsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.PluginSettingsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.WebhooksBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection>(sp =>
             new Vora.Infrastructure.Backups.Sections.DataProtectionKeysBackupSection(
                 sp.GetRequiredService<Vora.Infrastructure.Backups.Sections.DataProtectionKeysBackupOptions>()));
@@ -231,6 +235,10 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.EmailTemplatesBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.OverlayTemplatesBackupSection>();
 
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.UsersAndProfilesBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.DevicesBackupSection>();
+
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.CollectionsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.SmartListsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.DedupeRulesBackupSection>();
 
@@ -242,12 +250,17 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.DiscoveryRowsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.RequestServersBackupSection>();
 
-        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.UsersAndProfilesBackupSection>();
-        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.DevicesBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.WatchHistoryBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.RatingsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.PlaylistsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.WatchlistsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.StationsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.MediaRequestsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ExternalConnectionsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ChannelFavoritesBackupSection>();
+
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.PodcastShowsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.PodcastListeningBackupSection>();
 
         services.AddHostedService<BackupScheduleWorker>();
         return services;

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.Backups;
+using Vora.Domain.Entities.Notifications;
 using Vora.Domain.Entities.Settings;
 using Vora.Infrastructure.Persistence;
 
@@ -24,6 +25,15 @@ public sealed class PluginSettingsBackupSection : EntityTableBackupSection<Plugi
     protected override DbSet<PluginSettingValue> Set(VoraDbContext db) => db.PluginSettings;
 }
 
+public sealed class WebhooksBackupSection : EntityTableBackupSection<WebhookConfig>
+{
+    public WebhooksBackupSection(VoraDbContext db) : base(db) { }
+    public override string Key => "settings.webhooks";
+    public override string DisplayName => "Webhooks";
+    public override BackupSectionGroup Group => BackupSectionGroup.Settings;
+    protected override DbSet<WebhookConfig> Set(VoraDbContext db) => db.WebhookConfigs;
+}
+
 public sealed class DataProtectionKeysBackupSection : IBackupSection
 {
     private readonly string _keysDirectory;
@@ -37,6 +47,7 @@ public sealed class DataProtectionKeysBackupSection : IBackupSection
     public string DisplayName => "DataProtection Keys";
     public BackupSectionGroup Group => BackupSectionGroup.Security;
     public bool RequiresExplicitConfirm => true;
+    public bool CanGrowLarge => false;
     public string? DestructiveWarning =>
         "Contains the keys that decrypt the saved SMTP password. Restoring replaces all keys on this server; existing encrypted values may no longer decrypt unless the matching keys are also imported.";
 

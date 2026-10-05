@@ -16,17 +16,20 @@ public sealed class BackupManager : IBackupManager
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IBackupSettingsStore _settingsStore;
+    private readonly IBackupSizeEstimator _sizeEstimator;
     private readonly BackupManagerOptions _options;
     private readonly ILogger<BackupManager> _logger;
 
     public BackupManager(
         IServiceScopeFactory scopeFactory,
         IBackupSettingsStore settingsStore,
+        IBackupSizeEstimator sizeEstimator,
         BackupManagerOptions options,
         ILogger<BackupManager> logger)
     {
         _scopeFactory = scopeFactory;
         _settingsStore = settingsStore;
+        _sizeEstimator = sizeEstimator;
         _options = options;
         _logger = logger;
     }
@@ -51,8 +54,35 @@ public sealed class BackupManager : IBackupManager
             DisplayName = s.DisplayName,
             Group = s.Group.ToString(),
             RequiresExplicitConfirm = s.RequiresExplicitConfirm,
+            CanGrowLarge = s.CanGrowLarge,
             DestructiveWarning = s.DestructiveWarning
         }).ToList();
+    }
+
+    public async Task<BackupSettingsVM> GetSettingsAsync(CancellationToken ct = default)
+    {
+        var settings = await _settingsStore.GetAsync(ct);
+        return await ToSettingsVMAsync(settings, ct);
+    }
+
+    public async Task<BackupSettingsVM> UpdateSettingsAsync(BackupSettingsVM request, CancellationToken ct = default)
+    {
+        var existing = await _settingsStore.GetAsync(ct);
+        var sections = await GetAvailableSectionsAsync(ct);
+        var updated = BackupSettingsMapper.FromVM(request, existing, sections.Select(s => s.Key));
+        await _settingsStore.SaveAsync(updated, ct);
+        return await ToSettingsVMAsync(updated, ct);
+    }
+
+    public Task<BackupSizeEstimateVM> EstimateSectionSizesAsync(bool refresh, CancellationToken ct = default) =>
+        _sizeEstimator.EstimateAsync(refresh, ct);
+
+    private async Task<BackupSettingsVM> ToSettingsVMAsync(BackupSettings settings, CancellationToken ct)
+    {
+        var directory = await GetEffectiveDirectoryAsync(ct);
+        var sections = await GetAvailableSectionsAsync(ct);
+        var zone = await _settingsStore.GetScheduleTimeZoneAsync(ct);
+        return BackupSettingsMapper.ToVM(settings, directory, sections, zone, DateTime.UtcNow);
     }
 
     public async Task<BackupSummaryVM> CreateBackupAsync(string reason, CancellationToken ct = default)
@@ -80,11 +110,7 @@ public sealed class BackupManager : IBackupManager
             var sections = scope.ServiceProvider.GetServices<IBackupSection>().ToList();
 
             var configuredSettings = await _settingsStore.GetAsync(ct);
-            if (configuredSettings.IncludedSectionKeys is { Count: > 0 } included)
-            {
-                var allow = included.ToHashSet(StringComparer.OrdinalIgnoreCase);
-                sections = sections.Where(s => allow.Contains(s.Key)).ToList();
-            }
+            sections = sections.Where(s => BackupSectionSelection.IsIncluded(configuredSettings, s.Key)).ToList();
 
             foreach (var section in sections)
             {
@@ -101,7 +127,8 @@ public sealed class BackupManager : IBackupManager
                         Group = section.Group.ToString(),
                         RequiresExplicitConfirm = section.RequiresExplicitConfirm,
                         DestructiveWarning = section.DestructiveWarning,
-                        SizeBytes = size
+                        SizeBytes = size,
+                        ItemCount = writer.GetSectionRowCount()
                     });
                     manifest.TotalSizeBytes += size;
                 }
@@ -343,6 +370,7 @@ public sealed class BackupManager : IBackupManager
 
         if (result.Success)
         {
+            _sizeEstimator.Invalidate();
             var notifier = scope.ServiceProvider.GetService<IClientNotifier>();
             if (notifier != null)
             {

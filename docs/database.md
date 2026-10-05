@@ -57,7 +57,7 @@ These are easy to overflow accidentally — note the limit when sending data fro
 | `ServerSetting.SmtpFromDisplayName` | display name in From header | 128 |
 | `ServerSetting.SmtpPasswordCiphertext` | DataProtection-encrypted SMTP password | `text` |
 | `ServerSetting.EmailPublicBaseUrl` | base URL for absolute links in emails | 512 |
-| `ServerSetting.BackupConfigurationJson` | JSON-serialized `BackupSettings` (cadence, retention, included section keys, last-run timestamp). See `docs/backups.md` | `text` |
+| `ServerSetting.BackupConfigurationJson` | JSON-serialized `BackupSettings` (cadence, retention, excluded section keys, last-run timestamp; a legacy included-keys list is converted on read). See `docs/backups.md` | `text` |
 | `ServerSetting.EnableTrashAutoPurge` | when true, items soft-deleted longer than `MissingMediaRetentionDays` are permanently purged by the nightly maintenance task. See `docs/scanning-and-tasks.md` | (bool) |
 | `ServerSetting.MissingMediaRetentionDays` | days a soft-deleted (trashed) item is kept before auto-purge is eligible | (int) |
 | `ServerSetting.ResolveMovieTvdbIds` | when true, the nightly metadata pass resolves missing `TvdbId`s for movies **and** shows; admins can also trigger a one-time pass. See `docs/scanning-and-tasks.md` | (bool) |

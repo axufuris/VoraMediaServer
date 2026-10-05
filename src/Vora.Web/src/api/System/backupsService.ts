@@ -39,7 +39,21 @@ export interface AvailableSectionVM {
     displayName: string;
     group: string;
     requiresExplicitConfirm: boolean;
+    canGrowLarge: boolean;
     destructiveWarning?: string | null;
+}
+
+export interface BackupSectionEstimateVM {
+    key: string;
+    estimatedBytes: number;
+    rowCount: number;
+    failed: boolean;
+}
+
+export interface BackupSizeEstimateVM {
+    estimatedAtUtc: string;
+    overheadBytes: number;
+    sections: BackupSectionEstimateVM[];
 }
 
 export interface BackupSettingsVM {
@@ -54,6 +68,7 @@ export interface BackupSettingsVM {
     effectiveDirectory: string;
     lastSuccessfulRunUtc?: string | null;
     nextScheduledRunUtc?: string | null;
+    scheduleTimeZone?: string | null;
     includedSectionKeys?: string[] | null;
     availableSections: AvailableSectionVM[];
 }
@@ -91,6 +106,14 @@ export const backupsService = {
 
     getSections: async (serverId?: string): Promise<AvailableSectionVM[]> => {
         const response = await apiClient.get<AvailableSectionVM[]>('/admin/backups/sections', { serverId });
+        return response.data;
+    },
+
+    getSizeEstimate: async (refresh: boolean, serverId?: string): Promise<BackupSizeEstimateVM> => {
+        const response = await apiClient.get<BackupSizeEstimateVM>('/admin/backups/sections/estimate', {
+            serverId,
+            params: { refresh }
+        });
         return response.data;
     },
 

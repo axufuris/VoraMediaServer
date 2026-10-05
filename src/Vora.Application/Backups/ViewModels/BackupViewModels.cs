@@ -47,6 +47,7 @@ public sealed class BackupSettingsVM
     public string EffectiveDirectory { get; set; } = string.Empty;
     public DateTime? LastSuccessfulRunUtc { get; set; }
     public DateTime? NextScheduledRunUtc { get; set; }
+    public string ScheduleTimeZone { get; set; } = string.Empty;
     public List<string>? IncludedSectionKeys { get; set; }
     public List<AvailableSectionVM> AvailableSections { get; set; } = new();
 }
@@ -85,5 +86,21 @@ public sealed class AvailableSectionVM
     public string DisplayName { get; set; } = string.Empty;
     public string Group { get; set; } = string.Empty;
     public bool RequiresExplicitConfirm { get; set; }
+    public bool CanGrowLarge { get; set; }
     public string? DestructiveWarning { get; set; }
+}
+
+public sealed class BackupSizeEstimateVM
+{
+    public DateTime EstimatedAtUtc { get; set; }
+    public long OverheadBytes { get; set; }
+    public List<BackupSectionEstimateVM> Sections { get; set; } = new();
+}
+
+public sealed class BackupSectionEstimateVM
+{
+    public string Key { get; set; } = string.Empty;
+    public long EstimatedBytes { get; set; }
+    public int RowCount { get; set; }
+    public bool Failed { get; set; }
 }

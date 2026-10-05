@@ -12,5 +12,8 @@ public interface IBackupManager
     Task<Stream> OpenBackupStreamAsync(string fileName, CancellationToken ct = default);
     Task<BackupSummaryVM> UploadBackupAsync(Stream input, string suggestedFileName, CancellationToken ct = default);
     Task<List<AvailableSectionVM>> GetAvailableSectionsAsync(CancellationToken ct = default);
+    Task<BackupSettingsVM> GetSettingsAsync(CancellationToken ct = default);
+    Task<BackupSettingsVM> UpdateSettingsAsync(BackupSettingsVM request, CancellationToken ct = default);
+    Task<BackupSizeEstimateVM> EstimateSectionSizesAsync(bool refresh, CancellationToken ct = default);
     Task<string> GetEffectiveDirectoryAsync(CancellationToken ct = default);
 }
