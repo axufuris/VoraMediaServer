@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Streaming;
+using Vora.Application.Subtitles;
 
 namespace Vora.Infrastructure.Transcoding;
 
@@ -80,6 +81,19 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
 
     public const string LegacySubtitleEncoding = "CP1252";
 
+    private const int LoggedErrorChars = 2000;
+
+    private static readonly string[] QuietFfmpeg = ["-hide_banner", "-loglevel", "warning"];
+
+    public static bool InputCouldNotBeOpened(string ffmpegError) =>
+        ffmpegError.Contains("Error opening input", StringComparison.Ordinal);
+
+    public static string ErrorForLog(string ffmpegError)
+    {
+        var trimmed = ffmpegError.Trim();
+        return trimmed.Length <= LoggedErrorChars ? trimmed : "…" + trimmed[^LoggedErrorChars..];
+    }
+
     public static bool IsAlreadyWebVtt(string filePath) =>
         string.Equals(Path.GetExtension(filePath), ".vtt", StringComparison.OrdinalIgnoreCase);
 
@@ -87,7 +101,7 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
     // and nothing to disable.
     public static List<string> BuildExternalArguments(string externalFilePath, string outputPath, string? characterEncoding)
     {
-        var args = new List<string> { "-y" };
+        var args = new List<string>(QuietFfmpeg) { "-y" };
         if (!string.IsNullOrWhiteSpace(characterEncoding))
         {
             args.Add("-sub_charenc");
@@ -99,6 +113,7 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
 
     public static List<string> BuildArguments(string sourceFilePath, string mapSpecifier, string outputPath) =>
     [
+        .. QuietFfmpeg,
         "-y",
         "-i", sourceFilePath,
         "-vn", "-an", "-dn",
@@ -397,6 +412,12 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
     // work is a format conversion, and a .vtt needs not even that.
     private async Task<ExtractionAttempt> ConvertExternalAsync(string externalFilePath, string stagingPath, TimeSpan timeout, CancellationToken cancellationToken)
     {
+        if (!SubtitleFileContent.HasText(externalFilePath))
+        {
+            _logger.LogWarning("Sidecar subtitle {Path} is empty, so there is nothing to convert. Replace or delete the file.", externalFilePath);
+            return ExtractionAttempt.Unreadable;
+        }
+
         if (IsAlreadyWebVtt(externalFilePath))
         {
             try
@@ -479,9 +500,10 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
 
             if (process.ExitCode != 0 || bytes == 0)
             {
+                var error = await stderr;
                 _logger.LogWarning("Subtitle extraction failed for {Source} (exit {ExitCode}, {Bytes} bytes): {Error}",
-                    sourceFilePath, process.ExitCode, bytes, await stderr);
-                return new ExtractionAttempt(true, process.ExitCode, 0);
+                    sourceFilePath, process.ExitCode, bytes, ErrorForLog(error));
+                return new ExtractionAttempt(true, process.ExitCode, 0, InputCouldNotBeOpened(error));
             }
 
             return new ExtractionAttempt(true, 0, bytes);
@@ -504,11 +526,12 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         }
     }
 
-    private readonly record struct ExtractionAttempt(bool Ran, int ExitCode, long OutputBytes)
+    private readonly record struct ExtractionAttempt(bool Ran, int ExitCode, long OutputBytes, bool InputUnreadable = false)
     {
         public static ExtractionAttempt DidNotRun => new(false, -1, 0);
+        public static ExtractionAttempt Unreadable => new(true, 1, 0, true);
 
         public bool Succeeded => Ran && ExitCode == 0 && OutputBytes > 0;
-        public bool ShouldRetry => Ran && ExitCode != 0;
+        public bool ShouldRetry => Ran && ExitCode != 0 && !InputUnreadable;
     }
 }

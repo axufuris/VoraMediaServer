@@ -192,14 +192,14 @@ public class SubtitlePreExtractionManager : ISubtitlePreExtractionManager
 
             try
             {
+                var source = SourceFor(item.Target, item.Track, item.Ordinal);
                 var produced = await _extractor.ExtractInBackgroundAsync(
-                    SourceFor(item.Target, item.Track, item.Ordinal), root,
-                    item.Target.MediaPartId, item.Track.Id, cancellationToken);
+                    source, root, item.Target.MediaPartId, item.Track.Id, cancellationToken);
 
-                if (produced == null)
+                if (produced == null && !cancellationToken.IsCancellationRequested)
                 {
                     _logger.LogWarning("Subtitle pre-extraction produced nothing for part {PartId} track {TrackId} ({FilePath}).",
-                        item.Target.MediaPartId, item.Track.Id, item.Target.FilePath);
+                        item.Target.MediaPartId, item.Track.Id, source.ContentPath);
                 }
             }
             catch (OperationCanceledException)
