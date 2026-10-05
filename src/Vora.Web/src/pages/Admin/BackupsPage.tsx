@@ -6,26 +6,23 @@ import {
     type BackupManifestVM,
     type BackupSettingsVM,
     type BackupCadence,
+    type BackupSizeEstimateVM,
     type DayOfWeekName,
-    type RestoreBackupResult,
-    type AvailableSectionVM
+    type RestoreBackupResult
 } from '../../api/System/backupsService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { useDialog } from '../../dialogs';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import EmptyState from '../../components/Admin/Primitives/EmptyState';
+import BackupSectionPicker from '../../components/Admin/Backups/BackupSectionPicker';
+import RestoreResultView from '../../components/Admin/Backups/RestoreResultView';
+import { formatBackupSize, formatRowCount, groupBackupSections } from '../../components/Admin/Backups/backupSections';
 
 type TabId = 'backups' | 'settings';
 
 const CADENCE_OPTIONS: BackupCadence[] = ['Off', 'Daily', 'Weekly', 'Monthly'];
 const DAYS: DayOfWeekName[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-    return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
-}
+const DATA_PROTECTION_SECTION = 'settings.data-protection';
 
 function formatDate(iso: string | null | undefined): string {
     if (!iso) return '—';
@@ -99,6 +96,9 @@ function BackupsTab({ serverId }: { serverId?: string }) {
 
     useSignalREvent<string>('BackupCreated', useCallback(() => { reload(); }, [reload]));
     useSignalREvent<{ fileName: string; sectionKeys: string[] }>('BackupRestored', useCallback(() => { reload(); }, [reload]));
+
+    const closeRestore = useCallback(() => setRestoreTarget(null), []);
+    const finishRestore = useCallback(() => { setRestoreTarget(null); reload(); }, [reload]);
 
     const handleCreate = async () => {
         setBusy(true);
@@ -219,8 +219,8 @@ function BackupsTab({ serverId }: { serverId?: string }) {
                 <RestoreDrawer
                     fileName={restoreTarget}
                     serverId={serverId}
-                    onClose={() => setRestoreTarget(null)}
-                    onDone={() => { setRestoreTarget(null); reload(); }}
+                    onClose={closeRestore}
+                    onDone={finishRestore}
                 />
             )}
         </>
@@ -241,7 +241,7 @@ function BackupRow({ item, onRestore, onDownload, onDelete }: BackupRowProps) {
                 <div className="font-mono text-sm text-[var(--vora-text-primary)] truncate">{item.fileName}</div>
                 <div className="text-xs text-[var(--vora-text-muted)] mt-1 flex flex-wrap gap-3">
                     <span>{formatDate(item.createdAtUtc)}</span>
-                    <span>{formatBytes(item.fileSizeBytes)}</span>
+                    <span>{formatBackupSize(item.fileSizeBytes)}</span>
                     <span>{item.sectionCount} section{item.sectionCount === 1 ? '' : 's'}</span>
                     <span className="px-1.5 py-0.5 rounded bg-[var(--vora-bg-sunken)]">{item.reason}</span>
                     {!item.manifestReadable && (
@@ -296,14 +296,11 @@ function RestoreDrawer({ fileName, serverId, onClose, onDone }: RestoreDrawerPro
         })();
     }, [fileName, serverId, dialog, onClose]);
 
-    const grouped = useMemo(() => {
-        if (!manifest) return {};
-        const out: Record<string, typeof manifest.sections> = {};
-        manifest.sections.forEach(s => {
-            if (!out[s.group]) out[s.group] = [];
-            out[s.group].push(s);
-        });
-        return out;
+    const grouped = useMemo(() => (manifest ? groupBackupSections(manifest.sections) : []), [manifest]);
+    const sectionNames = useMemo(() => {
+        const names: Record<string, string> = {};
+        manifest?.sections.forEach(s => { names[s.key] = s.displayName; });
+        return names;
     }, [manifest]);
 
     const chosenCount = Object.values(selected).filter(Boolean).length;
@@ -325,9 +322,6 @@ function RestoreDrawer({ fileName, serverId, onClose, onDone }: RestoreDrawerPro
                 serverId
             );
             setResult(res);
-            if (res.success) {
-                setTimeout(onDone, 1500);
-            }
         } catch (err: unknown) {
             const e = err as { response?: { data?: { detail?: string } } };
             await dialog.alert(e.response?.data?.detail || 'Restore failed.');
@@ -359,16 +353,19 @@ function RestoreDrawer({ fileName, serverId, onClose, onDone }: RestoreDrawerPro
                     {loading || !manifest ? (
                         <div className="vora-skeleton h-40" />
                     ) : result ? (
-                        <RestoreResultView result={result} />
+                        <RestoreResultView result={result} sectionNames={sectionNames} />
                     ) : (
                         <>
                             <div className="text-xs text-[var(--vora-text-secondary)]">
-                                Created {formatDate(manifest.createdAtUtc)} · Vora {manifest.voraServerVersion} · {formatBytes(manifest.totalSizeBytes)} · {manifest.sections.length} sections
+                                Created {formatDate(manifest.createdAtUtc)} · Vora {manifest.voraServerVersion} · {formatBackupSize(manifest.totalSizeBytes)} uncompressed · {manifest.sections.length} sections
                             </div>
+                            <p className="text-xs text-[var(--vora-text-muted)]">
+                                Rows that point at a title, song, profile or device this server doesn't have are matched to this server's copy when possible and skipped otherwise. On a rebuilt server, scan the libraries before restoring watch history, ratings or playlists.
+                            </p>
 
-                            {Object.entries(grouped).map(([group, sections]) => (
+                            {grouped.map(({ group, label, sections }) => (
                                 <div key={group}>
-                                    <div className="text-xs font-semibold text-[var(--vora-text-muted)] uppercase tracking-wide mb-2">{group}</div>
+                                    <div className="text-xs font-semibold text-[var(--vora-text-muted)] uppercase tracking-wide mb-2">{label}</div>
                                     <div className="space-y-2">
                                         {sections.map(s => (
                                             <label
@@ -388,7 +385,9 @@ function RestoreDrawer({ fileName, serverId, onClose, onDone }: RestoreDrawerPro
                                                     />
                                                     <div className="flex-1 min-w-0">
                                                         <div className="text-sm font-semibold text-[var(--vora-text-primary)]">{s.displayName}</div>
-                                                        <div className="text-[11px] text-[var(--vora-text-muted)] font-mono">{s.key} · {formatBytes(s.sizeBytes)}</div>
+                                                        <div className="text-[11px] text-[var(--vora-text-muted)] font-mono">
+                                                            {s.key} · {formatBackupSize(s.sizeBytes)}{s.itemCount != null ? ` · ${formatRowCount(s.itemCount)}` : ''}
+                                                        </div>
                                                         {s.destructiveWarning && (
                                                             <div className="mt-2 text-[11px] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)]/40 p-2 rounded">
                                                                 <span className="font-semibold">Destructive — </span>{s.destructiveWarning}
@@ -444,6 +443,13 @@ function RestoreDrawer({ fileName, serverId, onClose, onDone }: RestoreDrawerPro
                     )}
                 </div>
 
+                {result && (
+                    <div className="p-5 border-t border-[var(--vora-border-subtle)] flex justify-end">
+                        <button type="button" onClick={result.success ? onDone : onClose} className="vora-button-primary text-xs">
+                            {result.success ? 'Done' : 'Close'}
+                        </button>
+                    </div>
+                )}
                 {!result && (
                     <div className="p-5 border-t border-[var(--vora-border-subtle)] flex items-center justify-between">
                         <div className="text-xs text-[var(--vora-text-muted)]">
@@ -467,35 +473,30 @@ function RestoreDrawer({ fileName, serverId, onClose, onDone }: RestoreDrawerPro
     );
 }
 
-function RestoreResultView({ result }: { result: RestoreBackupResult }) {
-    return (
-        <div className="space-y-3">
-            <div className={`p-3 rounded-[var(--vora-radius-md)] text-sm font-semibold ${
-                result.success
-                    ? 'bg-[var(--vora-info-soft)] text-[var(--vora-info-text)]'
-                    : 'bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)]'
-            }`}>
-                {result.success ? 'Restore completed successfully.' : `Restore failed: ${result.error || 'see section results'}`}
-            </div>
-            <div className="space-y-1">
-                {result.sections.map(s => (
-                    <div key={s.key} className="text-xs flex items-center justify-between bg-[var(--vora-bg-sunken)] px-3 py-2 rounded">
-                        <span className="font-mono">{s.key}</span>
-                        <span className={s.restored ? 'text-[var(--vora-info-text)]' : 'text-[var(--vora-danger-text)]'}>
-                            {s.restored ? `${s.rowsImported} imported` : s.error || 'failed'}
-                        </span>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
 function SettingsTab({ serverId }: { serverId?: string }) {
     const dialog = useDialog();
     const [settings, setSettings] = useState<BackupSettingsVM | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [estimate, setEstimate] = useState<BackupSizeEstimateVM | null>(null);
+    const [estimating, setEstimating] = useState(true);
+    const [estimateFailed, setEstimateFailed] = useState(false);
+
+    const loadEstimate = useCallback(async (refresh: boolean) => {
+        setEstimating(true);
+        setEstimateFailed(false);
+        try {
+            setEstimate(await backupsService.getSizeEstimate(refresh, serverId));
+        } catch (err) {
+            console.error('Failed to estimate backup size', err);
+            setEstimateFailed(true);
+        } finally {
+            setEstimating(false);
+        }
+    }, [serverId]);
+
+    useEffect(() => { loadEstimate(false); }, [loadEstimate]);
+    useSignalREvent<{ fileName: string; sectionKeys: string[] }>('BackupRestored', useCallback(() => { loadEstimate(false); }, [loadEstimate]));
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -530,6 +531,9 @@ function SettingsTab({ serverId }: { serverId?: string }) {
         setSettings(prev => prev ? { ...prev, [key]: value } : prev);
     };
 
+    const nothingSelected = settings.includedSectionKeys?.length === 0;
+    const includesKeys = settings.includedSectionKeys == null || settings.includedSectionKeys.includes(DATA_PROTECTION_SECTION);
+
     return (
         <div className="space-y-5">
             <div className="vora-card p-5 flex flex-wrap items-center justify-between gap-4">
@@ -551,8 +555,16 @@ function SettingsTab({ serverId }: { serverId?: string }) {
                     <div className="text-xs text-[var(--vora-text-muted)] text-right">
                         <div><span className="text-[var(--vora-text-secondary)]">Last:</span> {formatDate(settings.lastSuccessfulRunUtc)}</div>
                         <div><span className="text-[var(--vora-text-secondary)]">Next:</span> {formatDate(settings.nextScheduledRunUtc)}</div>
+                        {nothingSelected && (
+                            <div className="text-[var(--vora-warning-text)]">Pick at least one section to save.</div>
+                        )}
                     </div>
-                    <button type="button" onClick={save} disabled={saving} className="vora-button-primary text-xs">
+                    <button
+                        type="button"
+                        onClick={save}
+                        disabled={saving || nothingSelected}
+                        className="vora-button-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                         {saving ? 'Saving…' : 'Save Settings'}
                     </button>
                 </div>
@@ -575,8 +587,11 @@ function SettingsTab({ serverId }: { serverId?: string }) {
 
                     {settings.cadence !== 'Off' && (
                         <div className="grid grid-cols-2 gap-3">
+                            <p className="col-span-2 text-xs text-[var(--vora-text-muted)]">
+                                Times follow the server time zone{settings.scheduleTimeZone ? ` (${settings.scheduleTimeZone})` : ''}, set in System Settings.
+                            </p>
                             <div>
-                                <label className="block text-xs font-semibold text-[var(--vora-text-muted)] uppercase tracking-wide mb-1">Hour (local)</label>
+                                <label className="block text-xs font-semibold text-[var(--vora-text-muted)] uppercase tracking-wide mb-1">Hour</label>
                                 <input type="number" min={0} max={23} value={settings.hour} onChange={e => update('hour', Math.max(0, Math.min(23, Number(e.target.value))))} className="vora-input text-sm w-full" />
                             </div>
                             <div>
@@ -627,105 +642,24 @@ function SettingsTab({ serverId }: { serverId?: string }) {
                         </p>
                     </div>
 
-                    <div className="text-xs bg-[var(--vora-warning-soft)]/40 text-[var(--vora-warning-text)] p-3 rounded-[var(--vora-radius-md)]">
-                        Backup files include DataProtection keys, which decrypt your stored SMTP password. Store backup files like passwords.
-                    </div>
+                    {includesKeys && (
+                        <div className="text-xs bg-[var(--vora-warning-soft)]/40 text-[var(--vora-warning-text)] p-3 rounded-[var(--vora-radius-md)]">
+                            Backup files include DataProtection keys, which decrypt your stored SMTP password. Store backup files like passwords.
+                        </div>
+                    )}
                 </div>
 
                 <div className="lg:col-span-3 vora-card p-5">
-                    <SectionPicker
+                    <BackupSectionPicker
                         available={settings.availableSections}
                         includedKeys={settings.includedSectionKeys}
                         onChange={keys => update('includedSectionKeys', keys)}
+                        estimate={estimate}
+                        estimating={estimating}
+                        estimateFailed={estimateFailed}
+                        onReestimate={() => loadEstimate(true)}
                     />
                 </div>
-            </div>
-        </div>
-    );
-}
-
-interface SectionPickerProps {
-    available: AvailableSectionVM[];
-    includedKeys: string[] | null | undefined;
-    onChange: (keys: string[] | null) => void;
-}
-
-function SectionPicker({ available, includedKeys, onChange }: SectionPickerProps) {
-    const allKeys = useMemo(() => available.map(s => s.key), [available]);
-    const isAll = includedKeys === null || includedKeys === undefined;
-    const includedSet = useMemo(() => new Set(isAll ? allKeys : includedKeys), [isAll, includedKeys, allKeys]);
-
-    const grouped = useMemo(() => {
-        const out: Record<string, AvailableSectionVM[]> = {};
-        available.forEach(s => {
-            if (!out[s.group]) out[s.group] = [];
-            out[s.group].push(s);
-        });
-        return out;
-    }, [available]);
-
-    const toggle = (key: string) => {
-        const next = new Set(includedSet);
-        if (next.has(key)) next.delete(key); else next.add(key);
-        if (next.size === allKeys.length) {
-            onChange(null);
-        } else {
-            onChange(allKeys.filter(k => next.has(k)));
-        }
-    };
-
-    const selectAll = () => onChange(null);
-    const selectNone = () => onChange([]);
-
-    const selectedCount = includedSet.size;
-    const totalCount = allKeys.length;
-
-    return (
-        <div>
-            <div className="flex items-center justify-between mb-1">
-                <div>
-                    <div className="text-xs font-semibold text-[var(--vora-text-muted)] uppercase tracking-wide">
-                        Sections to include
-                    </div>
-                    <p className="text-xs text-[var(--vora-text-muted)] mt-0.5">
-                        Unchecked sections are skipped by both scheduled and manual backups (e.g. skip Watch History to keep backups small).
-                    </p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-[11px] text-[var(--vora-text-muted)] tabular-nums">{selectedCount}/{totalCount}</span>
-                    <div className="flex gap-2 text-[11px]">
-                        <button type="button" onClick={selectAll} className="text-[var(--vora-accent-text)] hover:underline cursor-pointer">All</button>
-                        <span className="text-[var(--vora-text-muted)]">·</span>
-                        <button type="button" onClick={selectNone} className="text-[var(--vora-accent-text)] hover:underline cursor-pointer">None</button>
-                    </div>
-                </div>
-            </div>
-            <div className="mt-3 space-y-4">
-                {Object.entries(grouped).map(([group, sections]) => (
-                    <div key={group}>
-                        <div className="text-[11px] font-semibold text-[var(--vora-text-muted)] uppercase tracking-wide mb-2 pb-1 border-b border-[var(--vora-border-subtle)]">{group}</div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-2">
-                            {sections.map(s => (
-                                <label key={s.key} className="flex items-start gap-2 cursor-pointer text-sm text-[var(--vora-text-primary)] py-1">
-                                    <input
-                                        type="checkbox"
-                                        checked={includedSet.has(s.key)}
-                                        onChange={() => toggle(s.key)}
-                                        className="mt-0.5 shrink-0"
-                                    />
-                                    <span className="min-w-0">
-                                        <span>{s.displayName}</span>
-                                        {s.requiresExplicitConfirm && (
-                                            <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-[var(--vora-warning-soft)] text-[var(--vora-warning-text)] align-middle">
-                                                large
-                                            </span>
-                                        )}
-                                    </span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                ))}
             </div>
         </div>
     );

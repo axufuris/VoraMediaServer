@@ -4,9 +4,8 @@ namespace Vora.Application.Backups;
 
 public static class BackupSettingsMapper
 {
-    public static BackupSettingsVM ToVM(BackupSettings s, string effectiveDirectory, List<AvailableSectionVM> available)
+    public static BackupSettingsVM ToVM(BackupSettings s, string effectiveDirectory, List<AvailableSectionVM> available, TimeZoneInfo scheduleZone, DateTime nowUtc)
     {
-        var nextRunUtc = BackupScheduleEvaluator.GetNextRunUtc(s, s.LastSuccessfulRunUtc ?? DateTime.MinValue);
         return new BackupSettingsVM
         {
             AutoBackupEnabled = s.AutoBackupEnabled,
@@ -19,20 +18,15 @@ public static class BackupSettingsMapper
             OverrideDirectory = s.OverrideDirectory,
             EffectiveDirectory = effectiveDirectory,
             LastSuccessfulRunUtc = s.LastSuccessfulRunUtc,
-            NextScheduledRunUtc = nextRunUtc,
-            IncludedSectionKeys = s.IncludedSectionKeys,
+            NextScheduledRunUtc = BackupScheduleEvaluator.GetDisplayedNextRunUtc(s, nowUtc, scheduleZone),
+            ScheduleTimeZone = scheduleZone.Id,
+            IncludedSectionKeys = BackupSectionSelection.IncludedKeys(s, available.Select(a => a.Key)),
             AvailableSections = available
         };
     }
 
-    public static BackupSettings FromVM(BackupSettingsVM vm, BackupSettings existing)
+    public static BackupSettings FromVM(BackupSettingsVM vm, BackupSettings existing, IEnumerable<string> availableKeys)
     {
-        var included = vm.IncludedSectionKeys;
-        if (included != null && included.Count == 0)
-        {
-            included = null;
-        }
-
         return new BackupSettings
         {
             AutoBackupEnabled = vm.AutoBackupEnabled,
@@ -44,7 +38,7 @@ public static class BackupSettingsMapper
             MaxToKeep = Math.Max(1, vm.MaxToKeep),
             OverrideDirectory = string.IsNullOrWhiteSpace(vm.OverrideDirectory) ? null : vm.OverrideDirectory,
             LastSuccessfulRunUtc = existing.LastSuccessfulRunUtc,
-            IncludedSectionKeys = included
+            ExcludedSectionKeys = BackupSectionSelection.ExcludedKeys(vm.IncludedSectionKeys, availableKeys)
         };
     }
 }

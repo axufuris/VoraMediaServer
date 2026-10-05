@@ -22,4 +22,16 @@ public sealed class RequestServersBackupSection : EntityTableBackupSection<Reque
     public override string DisplayName => "Request Servers (Radarr/Sonarr)";
     public override BackupSectionGroup Group => BackupSectionGroup.Discovery;
     protected override DbSet<RequestServer> Set(VoraDbContext db) => db.RequestServers;
+
+    protected override async Task ReleaseReferencesAsync(List<RequestServer> removed, CancellationToken ct)
+    {
+        var removedIds = removed.Select(s => s.Id).ToList();
+        var assigned = await Db.MediaRequests
+            .Where(r => r.AssignedServerId != null && removedIds.Contains(r.AssignedServerId.Value))
+            .ToListAsync(ct);
+        foreach (var request in assigned)
+        {
+            request.AssignedServerId = null;
+        }
+    }
 }

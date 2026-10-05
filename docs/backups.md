@@ -1,6 +1,6 @@
 # Backup & restore
 
-Vora can create configuration snapshots (and user-data snapshots) as zip files on disk, restore them selectively, and run automatically on a schedule. The system is built on a pluggable section model so adding a new slice of state to the backup is a one-file change.
+Vora writes configuration and user-data snapshots as zip files on disk, restores them selectively, runs them on a schedule, and estimates how big a backup will be before you take one. Every slice of state is a pluggable section, so adding one is a one-file change plus a registration.
 
 ## Sections
 
@@ -11,59 +11,102 @@ public interface IBackupSection
 {
     string Key { get; }                       // "settings.server"
     string DisplayName { get; }               // "Server Settings"
-    BackupSectionGroup Group { get; }         // Settings | Templates | Library | Iptv | Discovery | Security | UserData
-    bool RequiresExplicitConfirm { get; }
+    BackupSectionGroup Group { get; }         // Settings | Templates | Library | Iptv | Discovery | Security | UserData | Podcasts
+    bool RequiresExplicitConfirm { get; }     // user data: unticked by default in the restore drawer
+    bool CanGrowLarge { get; }                // drives the "large" chip in the Settings picker
     string? DestructiveWarning { get; }
     Task WriteAsync(IBackupWriter writer, CancellationToken ct);
     Task<BackupSectionImportResult> ReadAsync(IBackupReader reader, CancellationToken ct);
 }
 ```
 
-Concrete implementations live in `Vora.Infrastructure/Backups/Sections/` (because they touch `VoraDbContext`). A shared `EntityTableBackupSection<TEntity>` base in the same folder covers the common "dump a DbSet to JSON" pattern — most sections are 5–10 lines.
+Implementations live in `Vora.Infrastructure/Backups/Sections/`. `EntityTableBackupSection<TEntity>` covers "dump one DbSet": override `PrepareRowsAsync` to remap or skip rows on restore, `WriteReferencesAsync` to record identities, `ReplaceScope` to restore only part of a table, and `ReleaseReferencesAsync` to clear `NO ACTION` foreign keys before rows are removed.
 
-Currently in the box: server settings, plugin settings, DataProtection keys (filesystem, not DB), email templates, client template schedules, overlay templates, smart lists, dedupe rules, IPTV playlists / EPG sources / tuner profiles / recording schedules, discovery row configs, request servers, and the user-data group (users + profiles + access schedules, devices + per-device settings, watch history, ratings, external connections, Live TV & radio favorites). The favorites section skips rows whose profile or playlist isn't on the server it restores to, and reports how many it skipped.
+| Key | Restores |
+| --- | --- |
+| `settings.server`, `settings.plugins`, `settings.webhooks` | `ServerSettings`, `PluginSettings`, `WebhookConfigs` |
+| `settings.data-protection` | DataProtection key XML files (filesystem, not DB) |
+| `templates.client-schedules`, `templates.email`, `templates.overlay` | template schedules, email overrides, overlay templates |
+| `users.profiles` | `Users`, `UserProfiles`, `ProfileAccessSchedules` |
+| `users.devices` | `ClientDevices`, `ProfileDeviceSettings` |
+| `library.collections` | admin-made `Collections` (`SystemGenerated = false`) and their `CollectionItems` |
+| `library.smart-lists` | `SmartLists` (home rows) |
+| `library.dedupe-rules` | `MediaDedupeSettings`, `MediaDedupeIgnoredGroups` |
+| `iptv.playlists`, `iptv.epg-sources`, `iptv.tuner-profiles`, `iptv.recording-schedules` | the IPTV/DVR configuration tables |
+| `discovery.rows`, `discovery.request-servers` | `DiscoveryRowConfigs`, `RequestServers` |
+| `users.watch-history` (large) | `UserMediaStates`, `StreamSessions`, `TrackPlayHistory`, `PreservedUserMediaData` (Media Trash archive) |
+| `users.ratings` | `UserMediaRatings`, `UserAlbumRatings`, `UserArtistRatings`, `TrackLikes` |
+| `users.playlists` | `Playlists`, `PlaylistItems`, `SmartPlaylists` |
+| `users.watchlists`, `users.stations` | `UserWatchlistItems`, music `Stations` |
+| `users.requests` | `MediaRequests`, `MediaRequestUsers` |
+| `users.external-connections`, `users.channel-favorites` | `UserProviderConnections`, `ProfileChannelFavorites` |
+| `podcasts.shows` | every `PodcastShow` (catalog flag + every show a profile follows) |
+| `podcasts.listening` | `PodcastSubscriptions`, `PodcastEpisodeProfileStates` |
 
-User-data sections set `RequiresExplicitConfirm = true` and carry a `DestructiveWarning`. Restore UI uses these flags to surface warnings and keep destructive sections unchecked by default.
+**Restore order is registration order.** `AddVoraBackups` registers sections so that a section comes after every section its rows point at: users and devices first, then collections before smart lists, IPTV playlists before tuner profiles / schedules / favorites, request servers before requests, the podcast catalog before listening. `BackupSectionsTests` in `Vora.Api.Tests` pins that order — add a pair there when a new section references another.
+
+### What is deliberately not backed up
+
+- **Media libraries and everything a scan rebuilds** — `MediaLibraries`, media items, parts/tracks, artwork, cast, genres, extras, scan-created collections. Point a rebuilt server at the same folders and scan. This includes metadata edits, locked fields and hand-edited markers, which live on the media rows.
+- **Derived data** — embeddings, song profiles, generated mixes, similar artists and tags, silence/black-frame analysis, audio fingerprints, detected markers, scrub-bar thumbnails, the resized artwork cache. Vora recomputes them.
+- **Logs and history the server writes for itself** — email delivery log, AI usage, system metrics, admin notifications.
+- **Secrets that should not outlive a server** — refresh tokens, registration / invitation / password-reset / email-change tickets.
+- **Short-lived state** — `PendingTasks` (the task queue), IPTV channels (re-synced from the playlist), DVR `IptvRecordingSessions` and the recorded files, podcast episodes (re-fetched from each feed).
+- **Files outside the database** — uploaded artwork and playlist covers under `StoragePaths:CustomArtwork`, downloaded subtitles, thumbnails. Back up the data volume for those.
+
+## Restoring onto a rebuilt server
+
+After a rebuild every media item, track, album, artist, library and IPTV channel has a new id. Sections that point at them write `<section>/identities.json` beside their rows (`BackupIdentityFile`, built by `BackupReferenceMapper`), listing a stable identity for every referenced id:
+
+- **Video** — `ContentIdentity.Compute` (the Media Trash key, from the shared `SelectContentIdentitySource` projection that `MediaRepository` also uses), then one key per provider id on its own, then a normalized title + year (series title + year + numbers for seasons and episodes).
+- **Tracks / albums / artists** — the album or artist MusicBrainz id when present, then a `MusicNameKey`-normalized name key (artist + album + disc + track number + title; artist + title; name).
+- **Libraries** — type + name. **Collections** — TMDB / IMDb / TVDB id, then title. **IPTV channels** — playlist id + external channel id.
+
+Each identity also records its library's name. On restore `BackupReferenceResolver` handles each referenced id: keep it if that row exists here; otherwise try the keys strongest-first against this server's live items (copies in the library with the same name win a tie); otherwise the row is **skipped**. Rows whose profile, user, device, IPTV playlist or podcast is missing are skipped too. After remapping, rows that collide on a table's unique key (e.g. two copies of a film mapping to one) keep the newest. Each section reports `RowsSkipped` plus a plain-English warning per reason (`BackupSkipTally`), e.g. "37 watch-history rows were skipped because their item isn't on this server…"; the restore drawer lists them per section.
+
+Backups written before identities existed still restore: with no `identities.json` the resolver only keeps rows whose ids exist. A file a section didn't write in an older backup (e.g. Media Trash data, ignored duplicates) leaves that table alone rather than emptying it.
+
+Limits worth knowing:
+
+- **Scan first.** Rows for items this server doesn't have yet are skipped, not parked. On a rebuilt server: restore users and settings, scan the libraries, then restore watch history, ratings, playlists, collections and the like (or simply restore those sections again after the scan).
+- **IPTV recording schedules** need the playlist's channels, which arrive on the playlist's first refresh. Restore the schedules again after it.
+- **Podcast progress** maps by the show's feed URL and the episode's feed GUID (then enclosure URL). When the episode isn't fetched yet, a placeholder `PodcastEpisode` is written from the backed-up details; the next feed refresh fills it in by GUID.
+- **Library access lists** (`AllowedLibraryIds` on accounts and profiles) are remapped by library name; an id that can't be matched is kept as-is, so a restricted profile stays restricted rather than opening up.
+- **Title-only matches** are a last resort for items without provider ids; smart-playlist and smart-list rule JSON is restored as written (ids inside rules are not remapped).
+
+Rows are written by `BackupTableSync.ReplaceAsync`: rows not in the backup are deleted, rows in both are updated in place, new rows are added. Updating in place matters because deletes cascade — the old delete-everything-then-insert wiped every profile's history whenever **User Accounts & Profiles** was restored on its own. Before removing a profile or request server, the section clears the `NO ACTION` references to it (`StreamSessions.UserProfileId`, `MediaRequests.AssignedServerId`).
 
 ## Manager
 
-`Vora.Application/Backups/BackupManager.cs` orchestrates create/list/restore/delete/upload. On create it opens a single DI scope, resolves all `IBackupSection` registrations, writes a `manifest.json` plus per-section files into a zip under `StoragePaths:Backups`, self-tests the zip by reading the manifest back, then prunes older zips down to `MaxToKeep`.
+`Vora.Application/Backups/BackupManager.cs` orchestrates create/list/restore/delete/upload and settings. On create it opens one DI scope, resolves the included sections, writes `manifest.json` (per-section uncompressed size and row count) plus the section files into a zip under `StoragePaths:Backups`, self-tests it, then prunes down to `MaxToKeep`.
 
-Restore is **atomic**. The manager resolves `IBackupTransactionFactory` (implemented in `Vora.Infrastructure/Backups/EfBackupTransactionFactory.cs`) and opens a single EF Core transaction up front. All section providers share the same scoped `VoraDbContext`, so their `SaveChangesAsync` calls enrol in the transaction. Any section failure marks every prior `RestoreSectionResult` as `Restored = false` with a "Rolled back because a later section failed." warning and rolls back. On success, the manager commits and emits a SignalR `BackupRestored` broadcast.
+Restore is **atomic**: one EF transaction from `IBackupTransactionFactory` (`EfBackupTransactionFactory`) covers every selected section on the shared scoped `VoraDbContext`. Any section failure marks earlier results `Restored = false` ("Rolled back because a later section failed.") and rolls back. On success the manager commits, invalidates the size estimate and broadcasts `BackupRestored`. The DataProtection-keys section writes files and is **not** covered by the transaction — an accepted limitation; it is unticked by default.
 
-The DataProtection-keys section writes XML files to `StoragePaths:DataProtection` and is **not** covered by the DB transaction. If DB restore rolls back after the key files were already written, the disk state diverges. This is an accepted limitation; the DP keys section is normally unchecked by default.
+## Size estimate
+
+`BackupSizeEstimator` (`IBackupSizeEstimator`, singleton) runs every section's `WriteAsync` against `CompressedSizeBackupWriter`, which serializes with the same `BackupJson.Options` as `ZipBackupWriter`, deflates each entry into a byte-counting stream and adds the zip header bytes per entry. The result is the compressed size per section, its row count and the fixed overhead (manifest + end of archive); the Settings tab adds up the ticked sections. A section that throws is reported as `Failed` instead of failing the estimate. Results are cached for five minutes (`refresh=true` bypasses; a restore invalidates). `BackupSizeEstimatorTests` checks the estimate lands within 2% of a real zip.
 
 ## Endpoints
 
-`Vora.Api/Endpoints/BackupEndpoints.cs` under `/api/admin/backups` (`AdminOnly`): list, create, sections, settings (get/put), per-file manifest preview, restore, download (zip), delete, multipart upload. Restore body carries `sectionKeys: string[]` plus an `acknowledgeAdminLoss: bool` that the manager checks when the **Users & Profiles** section is selected — if the calling admin's account id isn't in the incoming snapshot, the restore is refused unless this flag is true.
+`Vora.Api/Endpoints/BackupEndpoints.cs` under `/api/admin/backups` (`AdminOnly`): list, create, `sections`, `sections/estimate?refresh=` (`EstimateBackupSectionSizes`), settings (get/put), per-file manifest, restore, download, delete, multipart upload. The restore body carries `sectionKeys` and `acknowledgeAdminLoss`, which the manager requires when **User Accounts & Profiles** is selected and the calling admin isn't in the snapshot.
 
 ## Scheduling + retention
 
-`BackupSettings` (stored as JSON on `ServerSetting.BackupConfigurationJson`):
+`BackupSettings` (JSON on `ServerSetting.BackupConfigurationJson`): `AutoBackupEnabled`, `Cadence` (`Off` / `Daily` / `Weekly` / `Monthly`), `Hour` / `Minute`, `DayOfWeek`, `DayOfMonth` (1–28), `MaxToKeep`, `OverrideDirectory`, `LastSuccessfulRunUtc`, `ExcludedSectionKeys`.
 
-- `AutoBackupEnabled` — master toggle.
-- `Cadence` — `Off` / `Daily` / `Weekly` / `Monthly`.
-- `Hour` / `Minute` (local time), `DayOfWeek`, `DayOfMonth` (1–28 to avoid month-end edges).
-- `MaxToKeep` — older backups beyond this count are auto-pruned after each successful create.
-- `OverrideDirectory` — opt-in path override, must be inside the container's filesystem (typically another mounted volume).
-- `IncludedSectionKeys` — `null` means "all sections", otherwise only listed keys are included in scheduled and manual creates. The Settings tab UI surfaces a grouped picker so admins can omit e.g. **Watch History** to keep backups small.
-- `LastSuccessfulRunUtc` — bookkeeping the schedule worker reads on each tick.
-
-`BackupScheduleWorker` (a `BackgroundService` independent of `ScheduledJobWorker`) ticks every five minutes and calls `BackupScheduleEvaluator.GetNextRunUtc` to decide whether to fire.
+- **Times follow the server time zone** (`ServerSetting.ScheduleTimeZone`, resolved by `ScheduleClock` like every other scheduled job), not the container clock. `BackupScheduleEvaluator.GetNextRunUtc(settings, afterUtc, zone)` works in the zone's wall time: a time skipped by a spring-forward change runs when the clock jumps, a repeated fall-back hour runs once. `BackupScheduleWorker` ticks every five minutes and calls `IsDue`; the settings VM's `nextScheduledRunUtc` comes from `GetDisplayedNextRunUtc` (now when a run is overdue or the schedule never ran) and `scheduleTimeZone` names the zone.
+- **Sections are excluded, not included.** `ExcludedSectionKeys` (null = everything) means a section added in a later release is backed up by default. A legacy `IncludedSectionKeys` list is converted on read against the sections that existed when it was saved (`BackupSectionSelection`). The API still speaks `includedSectionKeys` (null = all); an empty list saves as "all", so the page refuses to save with nothing ticked.
 
 ## Real-time events
 
-- `BackupCreated` — broadcast to the `admins` group after a successful create. Payload: file name.
-- `BackupRestored` — broadcast after a successful restore. Payload: `{ fileName, sectionKeys: string[] }`.
-
-Both are wired through `IClientNotifier` (`Vora.Application/Analysis/IClientNotifier.cs`) following the convention in `docs/realtime.md`.
+`BackupCreated` (file name) and `BackupRestored` (`{ fileName, sectionKeys }`) go to the `admins` group through `IClientNotifier` (see `docs/realtime.md`). The Settings tab re-fetches the size estimate on `BackupRestored`.
 
 ## Admin Backups page
 
-`Vora.Web/src/pages/Admin/BackupsPage.tsx`. Two tabs:
+`Vora.Web/src/pages/Admin/BackupsPage.tsx` with pieces in `components/Admin/Backups/` (`BackupSectionPicker`, `RestoreResultView`, `backupSections.ts` for group order/labels, size formatting and totals).
 
-- **Backups** — list of zips with timestamp/size/section-count/"manual" vs "auto" chip and per-row Restore/Download/Delete. Toolbar has Create Backup Now + Upload Backup. The Restore drawer loads the manifest, groups sections by `BackupSectionGroup`, renders destructive warnings per section, requires typed `restore` confirmation, and additionally requires the admin-loss acknowledgment when **Users & Profiles** is selected. Live updates via `useSignalREvent('BackupCreated' | 'BackupRestored')`.
-- **Settings** — Two-column layout (`grid-cols-5`, 2/5 schedule + 3/5 sections-picker). Schedule card holds the toggle, cadence + time + day-of-week / day-of-month, retention, optional override directory, and the DataProtection warning callout. Section picker card lists every available section grouped, with quick All / None links and a small `selected/total` counter; sections flagged destructive carry a `large` chip so admins can spot user-data sections at a glance.
+- **Backups** — zips with time, size, section count, reason, and Restore / Download / Delete. The Restore drawer groups the manifest's sections (Settings, Security, Templates, Library, Live TV & DVR, Discovery & Requests, Podcasts, User data), shows each section's size and row count, warns per destructive section, requires typed `restore` and, for **User Accounts & Profiles**, the admin-loss acknowledgment. The result view lists rows restored and skipped per section with every warning, and stays open until the admin clicks Done.
+- **Settings** — schedule (with the server time zone named), retention, override directory, a DataProtection caution when that section is ticked, and the section picker: each section's estimated size, a `large` chip for `CanGrowLarge` sections (Watch History), a live "Estimated backup size: about … MB" total for the ticked boxes, Re-estimate, and a note that it is an estimate of the zip that grows with the library.
 
 ## Storage path
 
@@ -71,7 +114,6 @@ Both are wired through `IClientNotifier` (`Vora.Application/Analysis/IClientNoti
 
 ## Things to be careful about
 
-- **DataProtection keys are secrets.** Backups including the DP keys section contain the keys that decrypt the saved SMTP password. Store backup files like passwords. The UI surfaces a one-line caution on the Settings tab; the section itself sets `RequiresExplicitConfirm` so it stays unchecked by default on restore. **With the DP-keys section left out (the default), the SMTP password ciphertext in a backup is undecryptable without the live key volume**, so default backups carry no usable secrets — only opt-in DP-key backups do. If you need portable backups that include the keys, treat the archive as a credential (encrypt it at rest yourself; archive-level passphrase encryption is not built in). The download/restore endpoints are `AdminOnly`.
-- **Watch history can be huge.** On long-lived servers `StreamSession` dwarfs everything else. Skip it from `IncludedSectionKeys` if you only want config snapshots — the Settings UI flags it with a `large` chip.
-- **Admins are gated against locking themselves out.** Restoring **Users & Profiles** without the calling admin's account id in the snapshot returns an error unless `acknowledgeAdminLoss=true` is set in the restore body. The frontend exposes this as a separate checkbox you must tick in the Restore drawer.
-- **Adding a new section.** Implement `IBackupSection` in `Vora.Infrastructure/Backups/Sections/`, register it as a scoped `IBackupSection` in `AddVoraBackups` (`ServiceRegistrationExtensions.cs`). That's it — the manager will include it in creates automatically and the Settings UI will pick it up from `GET /api/admin/backups/sections`.
+- **DataProtection keys are secrets.** A backup with that section decrypts the saved SMTP password; without it the ciphertext is useless. Treat such archives as credentials (no archive-level encryption is built in).
+- **Watch history can be huge.** `StreamSession` dwarfs everything on long-lived servers; the size estimate shows how much it costs.
+- **Adding a section.** Implement `IBackupSection` (usually via `EntityTableBackupSection<T>`), register it in `AddVoraBackups` after the sections it references, and if its rows point at media, libraries, collections or channels, record identities through `BackupReferenceMapper` and resolve them on restore. The manager, estimate and Settings picker pick it up automatically.

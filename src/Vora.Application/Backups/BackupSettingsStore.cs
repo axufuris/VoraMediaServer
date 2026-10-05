@@ -18,18 +18,9 @@ public sealed class BackupSettingsStore : IBackupSettingsStore
         await using var scope = _scopeFactory.CreateAsyncScope();
         var repo = scope.ServiceProvider.GetRequiredService<ISystemSettingsRepository>();
         var settings = await repo.GetSettingsAsync();
-        if (string.IsNullOrWhiteSpace(settings.BackupConfigurationJson))
-        {
-            return new BackupSettings();
-        }
-        try
-        {
-            return JsonSerializer.Deserialize<BackupSettings>(settings.BackupConfigurationJson) ?? new BackupSettings();
-        }
-        catch
-        {
-            return new BackupSettings();
-        }
+        var backupSettings = Deserialize(settings.BackupConfigurationJson);
+        BackupSectionSelection.UpgradeLegacyInclusionList(backupSettings);
+        return backupSettings;
     }
 
     public async Task SaveAsync(BackupSettings settings, CancellationToken ct = default)
@@ -39,5 +30,26 @@ public sealed class BackupSettingsStore : IBackupSettingsStore
         var entity = await repo.GetSettingsForUpdateAsync();
         entity.BackupConfigurationJson = JsonSerializer.Serialize(settings);
         await repo.SaveChangesAsync();
+    }
+
+    public async Task<TimeZoneInfo> GetScheduleTimeZoneAsync(CancellationToken ct = default)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var repo = scope.ServiceProvider.GetRequiredService<ISystemSettingsRepository>();
+        var settings = await repo.GetSettingsAsync();
+        return ScheduleClock.Resolve(settings.ScheduleTimeZone);
+    }
+
+    private static BackupSettings Deserialize(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new BackupSettings();
+        try
+        {
+            return JsonSerializer.Deserialize<BackupSettings>(json) ?? new BackupSettings();
+        }
+        catch (JsonException)
+        {
+            return new BackupSettings();
+        }
     }
 }

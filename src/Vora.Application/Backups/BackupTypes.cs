@@ -8,7 +8,8 @@ public enum BackupSectionGroup
     Iptv,
     Discovery,
     Security,
-    UserData
+    UserData,
+    Podcasts
 }
 
 public enum BackupCadence
@@ -38,4 +39,5 @@ public sealed class BackupSettings
     public string? OverrideDirectory { get; set; }
     public DateTime? LastSuccessfulRunUtc { get; set; }
     public List<string>? IncludedSectionKeys { get; set; }
+    public List<string>? ExcludedSectionKeys { get; set; }
 }

@@ -18,6 +18,9 @@ public static class BackupEndpoints
         group.MapPost("/", CreateAsync).Produces<BackupSummaryVM>(StatusCodes.Status200OK);
 
         group.MapGet("/sections", ListSectionsAsync).Produces<List<AvailableSectionVM>>(StatusCodes.Status200OK);
+        group.MapGet("/sections/estimate", EstimateSectionSizesAsync)
+            .WithName("EstimateBackupSectionSizes")
+            .Produces<BackupSizeEstimateVM>(StatusCodes.Status200OK);
 
         group.MapGet("/settings", GetSettingsAsync).Produces<BackupSettingsVM>(StatusCodes.Status200OK);
         group.MapPut("/settings", UpdateSettingsAsync).Produces<BackupSettingsVM>(StatusCodes.Status200OK);
@@ -42,7 +45,7 @@ public static class BackupEndpoints
 
     private static async Task<IResult> CreateAsync([FromBody] CreateBackupRequest? body, IBackupManager manager)
     {
-        var reason = string.IsNullOrWhiteSpace(body?.Reason) ? "manual" : body!.Reason;
+        var reason = string.IsNullOrWhiteSpace(body?.Reason) ? "manual" : body.Reason;
         try
         {
             var summary = await manager.CreateBackupAsync(reason);
@@ -60,22 +63,22 @@ public static class BackupEndpoints
         return Results.Ok(sections);
     }
 
-    private static async Task<IResult> GetSettingsAsync(IBackupSettingsStore store, IBackupManager manager)
+    private static async Task<IResult> EstimateSectionSizesAsync(IBackupManager manager, CancellationToken ct, bool refresh = false)
     {
-        var settings = await store.GetAsync();
-        var dir = await manager.GetEffectiveDirectoryAsync();
-        var sections = await manager.GetAvailableSectionsAsync();
-        return Results.Ok(BackupSettingsMapper.ToVM(settings, dir, sections));
+        var estimate = await manager.EstimateSectionSizesAsync(refresh, ct);
+        return Results.Ok(estimate);
     }
 
-    private static async Task<IResult> UpdateSettingsAsync([FromBody] BackupSettingsVM body, IBackupSettingsStore store, IBackupManager manager)
+    private static async Task<IResult> GetSettingsAsync(IBackupManager manager)
     {
-        var existing = await store.GetAsync();
-        var updated = BackupSettingsMapper.FromVM(body, existing);
-        await store.SaveAsync(updated);
-        var dir = await manager.GetEffectiveDirectoryAsync();
-        var sections = await manager.GetAvailableSectionsAsync();
-        return Results.Ok(BackupSettingsMapper.ToVM(updated, dir, sections));
+        var settings = await manager.GetSettingsAsync();
+        return Results.Ok(settings);
+    }
+
+    private static async Task<IResult> UpdateSettingsAsync([FromBody] BackupSettingsVM body, IBackupManager manager)
+    {
+        var settings = await manager.UpdateSettingsAsync(body);
+        return Results.Ok(settings);
     }
 
     private static async Task<IResult> GetManifestAsync(string fileName, IBackupManager manager)

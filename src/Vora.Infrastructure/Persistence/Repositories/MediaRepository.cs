@@ -1188,41 +1188,13 @@ public partial class MediaRepository : IMediaRepository
 
     private async Task<string?> GetContentKeyAsync(Guid id)
     {
-        var info = await _context.MediaItems
+        var source = await _context.MediaItems
             .AsNoTracking()
             .Where(m => m.Id == id)
-            .Select(m => new
-            {
-                Type = m is Movie ? "movie"
-                    : m is TvShow ? "show"
-                    : m is Season ? "season"
-                    : m is Episode ? "episode"
-                    : "other",
-                m.TmdbId,
-                m.ImdbId,
-                m.TvdbId,
-                SeasonNumber = m is Season ? ((Season)m).SeasonNumber
-                    : m is Episode ? ((Episode)m).Season.SeasonNumber
-                    : (int?)null,
-                EpisodeNumber = m is Episode ? ((Episode)m).EpisodeNumber : (int?)null,
-                SeriesTmdbId = m is Season ? ((Season)m).TvShow.TmdbId
-                    : m is Episode ? ((Episode)m).Season.TvShow.TmdbId
-                    : null,
-                SeriesImdbId = m is Season ? ((Season)m).TvShow.ImdbId
-                    : m is Episode ? ((Episode)m).Season.TvShow.ImdbId
-                    : null,
-                SeriesTvdbId = m is Season ? ((Season)m).TvShow.TvdbId
-                    : m is Episode ? ((Episode)m).Season.TvShow.TvdbId
-                    : null
-            })
+            .SelectContentIdentitySource()
             .FirstOrDefaultAsync();
 
-        if (info == null) return null;
-
-        return ContentIdentity.Compute(
-            info.Type, info.TmdbId, info.ImdbId, info.TvdbId,
-            info.SeasonNumber, info.EpisodeNumber,
-            info.SeriesTmdbId, info.SeriesImdbId, info.SeriesTvdbId);
+        return source == null ? null : ContentIdentity.Compute(source);
     }
 
     private async Task ArchiveUserDataForItemAsync(Guid id)

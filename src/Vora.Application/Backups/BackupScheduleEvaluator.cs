@@ -2,56 +2,74 @@ namespace Vora.Application.Backups;
 
 public static class BackupScheduleEvaluator
 {
-    public static DateTime? GetNextRunUtc(BackupSettings settings, DateTime nowUtc)
+    private static readonly TimeSpan GapStep = TimeSpan.FromMinutes(1);
+
+    public static DateTime? GetNextRunUtc(BackupSettings settings, DateTime afterUtc, TimeZoneInfo zone)
     {
-        if (!settings.AutoBackupEnabled || settings.Cadence == BackupCadence.Off) return null;
+        if (!IsScheduled(settings)) return null;
 
-        var localNow = nowUtc.ToLocalTime();
-        var todayAt = new DateTime(localNow.Year, localNow.Month, localNow.Day, settings.Hour, settings.Minute, 0, DateTimeKind.Local);
+        var after = DateTime.SpecifyKind(afterUtc, DateTimeKind.Utc);
+        var localAfter = TimeZoneInfo.ConvertTimeFromUtc(after, zone);
 
-        DateTime nextLocal = settings.Cadence switch
+        var candidate = FirstCandidate(settings, localAfter);
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            BackupCadence.Daily => NextDaily(todayAt, localNow),
-            BackupCadence.Weekly => NextWeekly(todayAt, localNow, settings.DayOfWeek),
-            BackupCadence.Monthly => NextMonthly(localNow, settings),
+            var candidateUtc = ToUtc(candidate, zone);
+            if (candidateUtc > after) return candidateUtc;
+            candidate = Advance(settings, candidate);
+        }
+
+        return ToUtc(candidate, zone);
+    }
+
+    public static DateTime? GetDisplayedNextRunUtc(BackupSettings settings, DateTime nowUtc, TimeZoneInfo zone)
+    {
+        if (!IsScheduled(settings)) return null;
+        if (settings.LastSuccessfulRunUtc == null) return nowUtc;
+
+        var next = GetNextRunUtc(settings, settings.LastSuccessfulRunUtc.Value, zone);
+        return next == null || next.Value < nowUtc ? nowUtc : next;
+    }
+
+    public static bool IsDue(BackupSettings settings, DateTime nowUtc, TimeZoneInfo zone)
+    {
+        if (!IsScheduled(settings)) return false;
+        if (settings.LastSuccessfulRunUtc == null) return true;
+
+        var next = GetNextRunUtc(settings, settings.LastSuccessfulRunUtc.Value, zone);
+        return next != null && nowUtc >= next.Value;
+    }
+
+    private static bool IsScheduled(BackupSettings settings) =>
+        settings.AutoBackupEnabled && settings.Cadence != BackupCadence.Off;
+
+    private static DateTime FirstCandidate(BackupSettings settings, DateTime localAfter)
+    {
+        var todayAt = new DateTime(localAfter.Year, localAfter.Month, localAfter.Day, Math.Clamp(settings.Hour, 0, 23), Math.Clamp(settings.Minute, 0, 59), 0, DateTimeKind.Unspecified);
+
+        return settings.Cadence switch
+        {
+            BackupCadence.Weekly => todayAt.AddDays(((int)settings.DayOfWeek - (int)localAfter.DayOfWeek + 7) % 7),
+            BackupCadence.Monthly => new DateTime(localAfter.Year, localAfter.Month, Math.Clamp(settings.DayOfMonth, 1, 28), todayAt.Hour, todayAt.Minute, 0, DateTimeKind.Unspecified),
             _ => todayAt
         };
-
-        return nextLocal.ToUniversalTime();
     }
 
-    public static bool IsDue(BackupSettings settings, DateTime nowUtc)
+    private static DateTime Advance(BackupSettings settings, DateTime candidate) => settings.Cadence switch
     {
-        if (!settings.AutoBackupEnabled || settings.Cadence == BackupCadence.Off) return false;
+        BackupCadence.Weekly => candidate.AddDays(7),
+        BackupCadence.Monthly => candidate.AddMonths(1),
+        _ => candidate.AddDays(1)
+    };
 
-        var next = GetNextRunUtc(settings, settings.LastSuccessfulRunUtc ?? DateTime.MinValue);
-        if (next == null) return false;
-
-        if (settings.LastSuccessfulRunUtc == null) return true;
-        return nowUtc >= next.Value;
-    }
-
-    private static DateTime NextDaily(DateTime todayAt, DateTime localNow)
+    private static DateTime ToUtc(DateTime localWallTime, TimeZoneInfo zone)
     {
-        return todayAt > localNow ? todayAt : todayAt.AddDays(1);
-    }
-
-    private static DateTime NextWeekly(DateTime todayAt, DateTime localNow, DayOfWeek targetDow)
-    {
-        var daysUntil = ((int)targetDow - (int)localNow.DayOfWeek + 7) % 7;
-        var candidate = todayAt.AddDays(daysUntil);
-        if (candidate <= localNow) candidate = candidate.AddDays(7);
-        return candidate;
-    }
-
-    private static DateTime NextMonthly(DateTime localNow, BackupSettings settings)
-    {
-        var day = Math.Clamp(settings.DayOfMonth, 1, 28);
-        var candidate = new DateTime(localNow.Year, localNow.Month, day, settings.Hour, settings.Minute, 0, DateTimeKind.Local);
-        if (candidate <= localNow)
+        var wallTime = localWallTime;
+        while (zone.IsInvalidTime(wallTime))
         {
-            candidate = candidate.AddMonths(1);
+            wallTime = wallTime.Add(GapStep);
         }
-        return candidate;
+
+        return TimeZoneInfo.ConvertTimeToUtc(wallTime, zone);
     }
 }

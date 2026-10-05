@@ -6,13 +6,8 @@ namespace Vora.Application.Backups;
 public sealed class ZipBackupWriter : IBackupWriter, IDisposable
 {
     private readonly ZipArchive _archive;
-    private string _currentSection = string.Empty;
     private long _currentSectionBytes;
-    private static readonly JsonSerializerOptions JsonOpts = new()
-    {
-        WriteIndented = false,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-    };
+    private int _currentSectionRows;
 
     public ZipBackupWriter(Stream output)
     {
@@ -21,21 +16,24 @@ public sealed class ZipBackupWriter : IBackupWriter, IDisposable
 
     public void BeginSection(string sectionKey)
     {
-        _currentSection = sectionKey;
         _currentSectionBytes = 0;
+        _currentSectionRows = 0;
     }
 
-    public void EndSection() => _currentSection = string.Empty;
+    public void EndSection() { }
 
     public Task<long> GetSectionSizeAsync(CancellationToken ct) => Task.FromResult(_currentSectionBytes);
+
+    public int GetSectionRowCount() => _currentSectionRows;
 
     public async Task WriteJsonAsync<T>(string path, T payload, CancellationToken ct)
     {
         var entry = _archive.CreateEntry(path, CompressionLevel.Optimal);
         await using var stream = entry.Open();
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOpts);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, BackupJson.Options);
         await stream.WriteAsync(bytes, ct);
         _currentSectionBytes += bytes.Length;
+        _currentSectionRows += BackupJson.CountRows(path, payload);
     }
 
     public async Task WriteBytesAsync(string path, byte[] payload, CancellationToken ct)
@@ -50,10 +48,7 @@ public sealed class ZipBackupWriter : IBackupWriter, IDisposable
     {
         var entry = _archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
         await using var stream = entry.Open();
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, BackupJson.ManifestOptions);
         await stream.WriteAsync(bytes, ct);
     }
 

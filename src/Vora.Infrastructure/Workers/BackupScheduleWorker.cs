@@ -55,12 +55,11 @@ public sealed class BackupScheduleWorker : BackgroundService
         var settings = await settingsStore.GetAsync(ct);
         if (!settings.AutoBackupEnabled || settings.Cadence == BackupCadence.Off) return;
 
-        var nowUtc = DateTime.UtcNow;
-        var nextRun = BackupScheduleEvaluator.GetNextRunUtc(settings, settings.LastSuccessfulRunUtc ?? DateTime.MinValue);
-        if (nextRun == null) return;
-        if (nowUtc < nextRun.Value) return;
+        var zone = await settingsStore.GetScheduleTimeZoneAsync(ct);
+        if (!BackupScheduleEvaluator.IsDue(settings, DateTime.UtcNow, zone)) return;
 
-        _logger.LogInformation("Auto-backup is due (scheduled {Next:O}); creating backup.", nextRun.Value);
+        _logger.LogInformation("Auto-backup is due ({Cadence} at {Hour:00}:{Minute:00} {Zone}); creating backup.",
+            settings.Cadence, settings.Hour, settings.Minute, zone.Id);
         try
         {
             var summary = await manager.CreateBackupAsync("auto", ct);
