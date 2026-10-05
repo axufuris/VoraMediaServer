@@ -5,25 +5,29 @@ import { systemSettingsAdminService, type ServerSettings } from '../../../api/Sy
 import { featureFlagsService, type FeatureFlagsVM } from '../../../api/System/featureFlagsService';
 import { pluginAdminService, type PluginVM } from '../../../api/System/pluginAdminService';
 import { discoveryService, type DiscoveryRowConfig } from '../../../api/Discovery/discoveryService';
+import { emailAdminService } from '../../../api/System/emailAdminService';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import { resolveAdminPath } from '../../../components/Admin/Shell/adminNavData';
 import { useDialog } from '../../../dialogs';
 import { rememberPromptedThisSession } from '../../../components/Admin/SetupGuide/setupGuideSession';
-import { SetupSaverContext, type RegisterStepSaver, type StepSaver } from './setupSaver';
+import { SetupSaverContext, StepValidationError, type RegisterStepSaver, type StepSaver } from './setupSaver';
 import type { SetupStepProps } from './setupContext';
-import { SKIPPABLE_STEPS, buildSetupSteps, isSetupStepId, nearestStep, type SetupContent, type SetupStepId } from './setupSteps';
+import { EMAIL_INVITATION_MODE, SKIPPABLE_STEPS, buildSetupSteps, isSetupStepId, nearestStep, type SetupContent, type SetupStepId } from './setupSteps';
 import { StatusMessage } from './SetupParts';
 import { ContentStep, PlaybackStep, ServerStep, WelcomeStep } from './steps/BasicsSteps';
 import { ArtworkStep, DetectionStep, DiscoverStep, MetadataStep, RatingsStep, RequestsStep, SubtitlesStep, ThumbnailsStep } from './steps/VideoSteps';
 import { LiveTvStep, PodcastsStep, RadioStep } from './steps/LiveSteps';
 import { AiStep, DoneStep, LastFmStep, LyricsStep } from './steps/MusicAndFinishSteps';
+import { EmailStep, RemoteAccessStep, SignUpStep } from './steps/AccessSteps';
+import { BackupsStep } from './steps/BackupsStep';
 
 const STEP_COMPONENTS: Record<SetupStepId, ComponentType<SetupStepProps>> = {
     welcome: WelcomeStep, server: ServerStep, playback: PlaybackStep, content: ContentStep,
+    remote: RemoteAccessStep, signup: SignUpStep, email: EmailStep,
     metadata: MetadataStep, artwork: ArtworkStep, ratings: RatingsStep, detection: DetectionStep, thumbnails: ThumbnailsStep,
     requests: RequestsStep, subtitles: SubtitlesStep, discover: DiscoverStep,
     livetv: LiveTvStep, radio: RadioStep, podcasts: PodcastsStep,
-    lastfm: LastFmStep, lyrics: LyricsStep, ai: AiStep, done: DoneStep,
+    lastfm: LastFmStep, lyrics: LyricsStep, ai: AiStep, backups: BackupsStep, done: DoneStep,
 };
 
 const byOrder = (rows: DiscoveryRowConfig[]) => [...rows].sort((a, b) => a.orderIndex - b.orderIndex);
@@ -44,6 +48,7 @@ export default function SetupGuidePage() {
     const [plugins, setPlugins] = useState<PluginVM[]>([]);
     const [discoverRows, setDiscoverRows] = useState<DiscoveryRowConfig[]>([]);
     const [hardwareDevices, setHardwareDevices] = useState<string[]>([]);
+    const [emailWanted, setEmailWanted] = useState(false);
     const [stepId, setStepId] = useState<SetupStepId>('welcome');
     const [reached, setReached] = useState(0);
     const [busy, setBusy] = useState(false);
@@ -71,9 +76,10 @@ export default function SetupGuidePage() {
             pluginAdminService.getPlugins(serverId),
             discoveryService.getAdminConfigs(serverId).catch(() => [] as DiscoveryRowConfig[]),
             systemSettingsAdminService.getHardwareDevices(serverId).catch(() => ['Auto']),
-        ]).then(async ([loadedGuide, loadedSettings, loadedFeatures, loadedPlugins, rows, devices]) => {
+            emailAdminService.getSettings(serverId).then(email => email.emailEnabled).catch(() => false),
+        ]).then(async ([loadedGuide, loadedSettings, loadedFeatures, loadedPlugins, rows, devices, emailOn]) => {
             if (cancelled) return;
-            const steps = buildSetupSteps(contentOf(loadedGuide), rows.length > 0);
+            const steps = buildSetupSteps(contentOf(loadedGuide), { discover: rows.length > 0, email: emailOn || loadedSettings.registrationMode === EMAIL_INVITATION_MODE });
             const finished = loadedGuide.status === 'Completed' || loadedGuide.status === 'Skipped';
             const resumeAt = loadedGuide.status === 'InProgress' && isSetupStepId(loadedGuide.step) ? nearestStep(steps, loadedGuide.step) : 'welcome';
             setSettings(loadedSettings);
@@ -81,6 +87,7 @@ export default function SetupGuidePage() {
             setPlugins(loadedPlugins);
             setDiscoverRows(byOrder(rows));
             setHardwareDevices(devices);
+            setEmailWanted(emailOn);
             setStepId(resumeAt);
             setReached(finished ? steps.length - 1 : Math.max(0, steps.findIndex(s => s.id === resumeAt)));
             const started = loadedGuide.status === 'NotStarted'
@@ -92,7 +99,8 @@ export default function SetupGuidePage() {
     }, [serverId]);
 
     const content = useMemo<SetupContent>(() => guide ? contentOf(guide) : { moviesAndShows: true, music: true, liveTv: false, internetRadio: false, podcasts: false }, [guide]);
-    const steps = useMemo(() => buildSetupSteps(content, discoverRows.length > 0), [content, discoverRows.length]);
+    const emailStep = emailWanted || settings?.registrationMode === EMAIL_INVITATION_MODE;
+    const steps = useMemo(() => buildSetupSteps(content, { discover: discoverRows.length > 0, email: emailStep }), [content, discoverRows.length, emailStep]);
     const index = Math.max(0, steps.findIndex(s => s.id === stepId));
     const current = steps[index];
     const finished = guide?.status === 'Completed' || guide?.status === 'Skipped';
@@ -159,8 +167,8 @@ export default function SetupGuidePage() {
             setRailOpen(false);
             setReached(r => Math.max(r, steps.findIndex(s => s.id === target)));
             topRef.current?.scrollIntoView({ block: 'start' });
-        } catch {
-            setError("Couldn't save this step. Check the server is reachable and try again.");
+        } catch (err) {
+            setError(err instanceof StepValidationError ? err.message : "Couldn't save this step. Check the server is reachable and try again.");
         } finally {
             setBusy(false);
         }
@@ -192,8 +200,8 @@ export default function SetupGuidePage() {
             await saveAll();
             await persist({ status: 'Completed', step: 'done' });
             navigate(resolveAdminPath('/admin/libraries/new', serverId));
-        } catch {
-            setError("Couldn't finish the guide. Try again.");
+        } catch (err) {
+            setError(err instanceof StepValidationError ? err.message : "Couldn't finish the guide. Try again.");
             setBusy(false);
         }
     };
@@ -293,6 +301,8 @@ export default function SetupGuidePage() {
                             discoverRows={discoverRows}
                             onDiscoverRows={onDiscoverRows}
                             hardwareDevices={hardwareDevices}
+                            emailWanted={emailWanted}
+                            onEmailWanted={setEmailWanted}
                             goTo={id => { void goTo(id); }}
                         />
                     </SetupSaverContext.Provider>

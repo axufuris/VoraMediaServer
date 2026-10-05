@@ -9,19 +9,13 @@ import {
     type EmailTemplateSummary,
 } from '../../../api/System/emailAdminService';
 import EditEmailTemplateModal from './EditEmailTemplateModal';
+import EmailProviderGuide from './Email/EmailProviderGuide';
+import SmtpConnectionFields from './Email/SmtpConnectionFields';
+import { guessEmailProvider } from './Email/emailProviders';
+import { EMPTY_PASSWORD_DRAFT, tlsModeFromSettings, toEmailUpdate, type SmtpPasswordDraft, type TlsMode } from './Email/smtpSettings';
 
 interface EmailTabProps {
     serverId?: string;
-}
-
-type TlsMode = 'startTls' | 'implicitSsl' | 'none';
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-    return <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">{children}</label>;
-}
-
-function FieldHint({ children }: { children: React.ReactNode }) {
-    return <p className="text-xs text-[var(--vora-text-muted)] mt-2">{children}</p>;
 }
 
 function SettingsCard({ title, description, children, headingControl }: { title: string, description?: string, children: React.ReactNode, headingControl?: React.ReactNode }) {
@@ -49,12 +43,6 @@ function StatusPill({ status }: { status: EmailDeliveryStatus }) {
     return <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded ${styles[status]}`}>{status}</span>;
 }
 
-function tlsModeFromSettings(settings: EmailSettings): TlsMode {
-    if (settings.smtpUseImplicitSsl) return 'implicitSsl';
-    if (settings.smtpUseStartTls) return 'startTls';
-    return 'none';
-}
-
 function formatTimestamp(value: string | null): string {
     if (!value) return '';
     try {
@@ -69,9 +57,7 @@ export default function EmailTab({ serverId }: EmailTabProps) {
 
     const [settings, setSettings] = useState<EmailSettings | null>(null);
     const [tlsMode, setTlsMode] = useState<TlsMode>('startTls');
-    const [newPassword, setNewPassword] = useState('');
-    const [clearPassword, setClearPassword] = useState(false);
-    const [editingPassword, setEditingPassword] = useState(false);
+    const [password, setPassword] = useState<SmtpPasswordDraft>(EMPTY_PASSWORD_DRAFT);
     const [isSaving, setIsSaving] = useState(false);
 
     const [testAddress, setTestAddress] = useState('');
@@ -89,9 +75,7 @@ export default function EmailTab({ serverId }: EmailTabProps) {
             const data = await emailAdminService.getSettings(serverId);
             setSettings(data);
             setTlsMode(tlsModeFromSettings(data));
-            setNewPassword('');
-            setClearPassword(false);
-            setEditingPassword(false);
+            setPassword(EMPTY_PASSWORD_DRAFT);
         } catch {
             await dialog.alert({ title: 'Error', message: 'Failed to load email settings.' });
         }
@@ -129,19 +113,7 @@ export default function EmailTab({ serverId }: EmailTabProps) {
         if (!settings) return;
         setIsSaving(true);
         try {
-            await emailAdminService.updateSettings({
-                emailEnabled: settings.emailEnabled,
-                smtpHost: settings.smtpHost,
-                smtpPort: settings.smtpPort,
-                smtpUseStartTls: tlsMode === 'startTls',
-                smtpUseImplicitSsl: tlsMode === 'implicitSsl',
-                smtpUsername: settings.smtpUsername,
-                newSmtpPassword: clearPassword ? null : (newPassword.length > 0 ? newPassword : null),
-                clearSmtpPassword: clearPassword,
-                smtpFromAddress: settings.smtpFromAddress,
-                smtpFromDisplayName: settings.smtpFromDisplayName,
-                emailPublicBaseUrl: settings.emailPublicBaseUrl,
-            }, serverId);
+            await emailAdminService.updateSettings(toEmailUpdate(settings, tlsMode, password), serverId);
             await loadSettings();
             await dialog.alert({ title: 'Saved', message: 'Email settings updated.', tone: 'success' });
         } catch {
@@ -169,14 +141,9 @@ export default function EmailTab({ serverId }: EmailTabProps) {
         }
     };
 
-    const updateField = <K extends keyof EmailSettings>(key: K, value: EmailSettings[K]) => {
-        if (!settings) return;
-        setSettings({ ...settings, [key]: value });
-    };
+    const patchSettings = (patch: Partial<EmailSettings>) => setSettings(current => current ? { ...current, ...patch } : current);
 
     if (!settings) return <div className="vora-skeleton h-32 mt-6" />;
-
-    const passwordIsSet = settings.smtpPasswordIsSet;
 
     return (
         <div className="space-y-6 pt-2">
@@ -188,7 +155,7 @@ export default function EmailTab({ serverId }: EmailTabProps) {
                         <input
                             type="checkbox"
                             checked={settings.emailEnabled}
-                            onChange={e => updateField('emailEnabled', e.target.checked)}
+                            onChange={e => patchSettings({ emailEnabled: e.target.checked })}
                             className="w-4 h-4 mt-1 accent-[var(--vora-accent-500)] cursor-pointer"
                             aria-label="Enable email"
                         />
@@ -199,131 +166,26 @@ export default function EmailTab({ serverId }: EmailTabProps) {
                     </p>
                 </SettingsCard>
 
-                <SettingsCard title="SMTP connection">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="md:col-span-2">
-                            <FieldLabel>SMTP Host</FieldLabel>
-                            <input
-                                type="text"
-                                value={settings.smtpHost ?? ''}
-                                onChange={e => updateField('smtpHost', e.target.value || null)}
-                                placeholder="smtp.gmail.com"
-                                className="vora-input"
-                            />
-                        </div>
-                        <div>
-                            <FieldLabel>Port</FieldLabel>
-                            <input
-                                type="number"
-                                min={1}
-                                max={65535}
-                                value={settings.smtpPort}
-                                onChange={e => updateField('smtpPort', parseInt(e.target.value, 10) || 587)}
-                                className="vora-input"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="mt-5">
-                        <FieldLabel>Connection security</FieldLabel>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            {([
-                                { value: 'startTls' as TlsMode, label: 'STARTTLS (typically port 587)' },
-                                { value: 'implicitSsl' as TlsMode, label: 'Implicit SSL (typically port 465)' },
-                                { value: 'none' as TlsMode, label: 'None (not recommended)' },
-                            ]).map(opt => (
-                                <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="tlsMode"
-                                        value={opt.value}
-                                        checked={tlsMode === opt.value}
-                                        onChange={() => setTlsMode(opt.value)}
-                                        className="accent-[var(--vora-accent-500)] cursor-pointer"
-                                    />
-                                    <span className="text-sm text-[var(--vora-text-primary)]">{opt.label}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <FieldLabel>Username</FieldLabel>
-                            <input
-                                type="text"
-                                value={settings.smtpUsername ?? ''}
-                                onChange={e => updateField('smtpUsername', e.target.value || null)}
-                                placeholder="username@example.com"
-                                className="vora-input"
-                                autoComplete="off"
-                            />
-                        </div>
-                        <div>
-                            <FieldLabel>Password</FieldLabel>
-                            {clearPassword ? (
-                                <div className="flex items-center gap-3 h-[38px]">
-                                    <span className="text-sm text-[var(--vora-danger-text)]">Will be cleared on save.</span>
-                                    <button type="button" onClick={() => setClearPassword(false)} className="text-xs text-[var(--vora-accent-text)] hover:underline cursor-pointer">Undo</button>
-                                </div>
-                            ) : passwordIsSet && !editingPassword ? (
-                                <div className="flex items-center gap-3 h-[38px]">
-                                    <span className="text-sm text-[var(--vora-text-secondary)]">A password is saved.</span>
-                                    <button type="button" onClick={() => setEditingPassword(true)} className="text-xs text-[var(--vora-accent-text)] hover:underline cursor-pointer">Change</button>
-                                    <button type="button" onClick={() => setClearPassword(true)} className="text-xs text-[var(--vora-danger-text)] hover:underline cursor-pointer">Clear</button>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="password"
-                                        value={newPassword}
-                                        onChange={e => setNewPassword(e.target.value)}
-                                        placeholder={passwordIsSet ? 'New password' : 'App password or SMTP password'}
-                                        className="vora-input flex-1"
-                                        autoComplete="new-password"
-                                    />
-                                    {passwordIsSet && (
-                                        <button type="button" onClick={() => { setEditingPassword(false); setNewPassword(''); }} className="text-xs text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] cursor-pointer">Cancel</button>
-                                    )}
-                                </div>
-                            )}
-                            <FieldHint>Encrypted at rest using the server's data-protection keys.</FieldHint>
-                        </div>
-                    </div>
-
-                    <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <FieldLabel>From address</FieldLabel>
-                            <input
-                                type="email"
-                                value={settings.smtpFromAddress ?? ''}
-                                onChange={e => updateField('smtpFromAddress', e.target.value || null)}
-                                placeholder="noreply@example.com"
-                                className="vora-input"
-                            />
-                        </div>
-                        <div>
-                            <FieldLabel>From display name</FieldLabel>
-                            <input
-                                type="text"
-                                value={settings.smtpFromDisplayName ?? ''}
-                                onChange={e => updateField('smtpFromDisplayName', e.target.value || null)}
-                                placeholder="Vora Server"
-                                className="vora-input"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="mt-5">
-                        <FieldLabel>Public base URL</FieldLabel>
-                        <input
-                            type="url"
-                            value={settings.emailPublicBaseUrl ?? ''}
-                            onChange={e => updateField('emailPublicBaseUrl', e.target.value || null)}
-                            placeholder="https://vora.example.com"
-                            className="vora-input"
+                <SettingsCard title="SMTP connection" description="The outgoing mail server Vora signs in to. Pick your provider for its settings and how to get a password for Vora.">
+                    <div className="flex flex-col gap-6">
+                        <EmailProviderGuide
+                            initialProviderId={guessEmailProvider(settings.smtpHost)}
+                            onApply={smtp => {
+                                patchSettings({ smtpHost: smtp.host, smtpPort: smtp.port });
+                                setTlsMode(smtp.security);
+                            }}
                         />
-                        <FieldHint>Used to build absolute links in emails (e.g. password reset, invite). Leave blank to fall back to the request origin where available.</FieldHint>
+                        <div className="border-t border-[var(--vora-border-subtle)] pt-6">
+                            <SmtpConnectionFields
+                                idPrefix="email-tab"
+                                settings={settings}
+                                onChange={patchSettings}
+                                tlsMode={tlsMode}
+                                onTlsMode={setTlsMode}
+                                password={password}
+                                onPassword={patch => setPassword(current => ({ ...current, ...patch }))}
+                            />
+                        </div>
                     </div>
                 </SettingsCard>
 

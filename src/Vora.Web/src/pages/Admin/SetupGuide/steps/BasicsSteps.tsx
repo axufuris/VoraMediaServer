@@ -11,8 +11,9 @@ export function WelcomeStep({ settings }: SetupStepProps) {
         ['Your server', 'Name, language and time zone'],
         ['Playback', 'How Vora converts video for each device'],
         ["What you'll add", 'Movies, shows, music, Live TV, radio and podcasts'],
+        ['Access', 'Reaching Vora from outside, who can sign up, and email'],
         ['Plugins', 'The services that fetch posters, details and ratings'],
-        ['Extras', 'Requests, subtitles, lyrics and AI, if you want them'],
+        ['Extras', 'Requests, subtitles, lyrics, AI and backups'],
     ];
     return (
         <div className="grid items-center gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
@@ -24,7 +25,7 @@ export function WelcomeStep({ settings }: SetupStepProps) {
                 />
                 <p className="flex items-center gap-2 text-[13px] text-[var(--vora-text-secondary)]">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-                    About 10 minutes. You can leave and come back; your progress is saved.
+                    About 15 minutes. You can leave and come back; your progress is saved.
                 </p>
             </div>
             <ul className="grid gap-2">

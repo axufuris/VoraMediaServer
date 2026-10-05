@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { systemSettingsAdminService } from '../../../../api/System/systemSettingsAdminService';
+import { remoteAccessService } from '../../../../api/System/remoteAccessService';
+import { emailAdminService } from '../../../../api/System/emailAdminService';
+import { backupsService } from '../../../../api/System/backupsService';
 import HealthBadge from '../../../../components/Admin/Primitives/HealthBadge';
 import { PLUGIN_FIELDS, findPlugin, hasKeySaved, type SetupStepProps } from '../setupContext';
 import SetupPluginCard from '../SetupPluginCard';
@@ -68,46 +71,73 @@ export function AiStep({ plugins, onPluginsChanged, serverId, content, settings,
 
 type Summary = 'set' | 'skipped' | 'off';
 
+interface DoneRow {
+    title: string;
+    state: Summary;
+    label?: string;
+}
+
+interface AccessSummary {
+    remote: boolean;
+    email: boolean;
+    backups: boolean;
+}
+
+const SIGN_UP_LABELS: Record<number, string> = { 0: 'Only you', 1: 'Open', 2: 'PIN', 3: 'Invitations' };
+
 export function DoneStep({ plugins, settings, features, content, discoverRows, serverId }: SetupStepProps) {
     const [aiKey, setAiKey] = useState(false);
+    const [access, setAccess] = useState<AccessSummary>({ remote: false, email: false, backups: false });
     useEffect(() => {
         systemSettingsAdminService.getPluginSettings('openai_recommendations', serverId)
             .then(fields => setAiKey(!!fields.find(f => f.key === 'api_key')?.value?.trim()))
             .catch(() => setAiKey(false));
+        Promise.all([
+            remoteAccessService.getRemoteAccessStatus(serverId).then(r => r.isEnabled).catch(() => false),
+            emailAdminService.getSettings(serverId).then(e => e.emailEnabled && !!e.smtpHost?.trim()).catch(() => false),
+            backupsService.getSettings(serverId).then(b => b.autoBackupEnabled).catch(() => false),
+        ]).then(([remote, email, backups]) => setAccess({ remote, email, backups }));
     }, [serverId]);
 
     const key = (id: string): Summary => hasKeySaved(plugins, id) ? 'set' : 'skipped';
     const either = (...ids: string[]): Summary => ids.some(id => hasKeySaved(plugins, id)) ? 'set' : 'skipped';
-    const rows: [string, Summary][] = [['Your server', 'set'], ['Playback', 'set']];
+    const on = (value: boolean): Summary => value ? 'set' : 'off';
+    const rows: DoneRow[] = [
+        { title: 'Your server', state: 'set' },
+        { title: 'Playback', state: 'set' },
+        { title: 'Remote access', state: on(access.remote) },
+        { title: 'Sign-ups', state: 'set', label: SIGN_UP_LABELS[settings.registrationMode] ?? 'Set' },
+        { title: 'Email', state: on(access.email) },
+    ];
     if (content.moviesAndShows) {
         rows.push(
-            ['Metadata', either('tmdb_metadata', 'tvdb_metadata')],
-            ['Artwork', either('fanart_artwork', 'tmdb_metadata', 'tvdb_metadata')],
-            ['Ratings', either('omdb_imdb', 'tmdb_metadata')],
-            ['Skip intro & credits', settings.runDetections > 0 ? 'set' : 'off'],
-            ['Preview thumbnails', settings.videoThumbnailGeneration > 0 ? 'set' : 'off'],
-            ['Subtitles', key('opensubtitles_search')],
+            { title: 'Metadata', state: either('tmdb_metadata', 'tvdb_metadata') },
+            { title: 'Artwork', state: either('fanart_artwork', 'tmdb_metadata', 'tvdb_metadata') },
+            { title: 'Ratings', state: either('omdb_imdb', 'tmdb_metadata') },
+            { title: 'Skip intro & credits', state: on(settings.runDetections > 0) },
+            { title: 'Preview thumbnails', state: on(settings.videoThumbnailGeneration > 0) },
+            { title: 'Subtitles', state: key('opensubtitles_search') },
         );
-        if (discoverRows.length > 0) rows.push(['Discover', features.discoverEnabled ? 'set' : 'off']);
+        if (discoverRows.length > 0) rows.push({ title: 'Discover', state: on(features.discoverEnabled) });
     }
-    if (content.liveTv) rows.push(['Live TV', features.liveTvEnabled ? 'set' : 'off']);
-    if (content.internetRadio) rows.push(['Internet radio', features.internetRadioEnabled ? 'set' : 'off']);
-    if (content.podcasts) rows.push(['Podcasts', features.podcasts ? 'set' : 'off']);
-    if (content.music) rows.push(['Last.fm', key('lastfm_listening')], ['Lyrics', 'set']);
-    rows.push(['AI features', aiKey ? 'set' : 'skipped']);
+    if (content.liveTv) rows.push({ title: 'Live TV', state: on(features.liveTvEnabled) });
+    if (content.internetRadio) rows.push({ title: 'Internet radio', state: on(features.internetRadioEnabled) });
+    if (content.podcasts) rows.push({ title: 'Podcasts', state: on(features.podcasts) });
+    if (content.music) rows.push({ title: 'Last.fm', state: key('lastfm_listening') }, { title: 'Lyrics', state: 'set' });
+    rows.push({ title: 'AI features', state: aiKey ? 'set' : 'skipped' }, { title: 'Backups', state: on(access.backups) });
 
-    const badge = (s: Summary) => s === 'set'
-        ? <HealthBadge tone="ok">Set up</HealthBadge>
-        : <HealthBadge tone="neutral" showDot={false}>{s === 'off' ? 'Off' : 'Skipped'}</HealthBadge>;
+    const badge = (row: DoneRow) => row.state === 'set'
+        ? <HealthBadge tone="ok">{row.label ?? 'Set up'}</HealthBadge>
+        : <HealthBadge tone="neutral" showDot={false}>{row.state === 'off' ? 'Off' : 'Skipped'}</HealthBadge>;
 
     return (
         <>
             <StepHeading eyebrow="All set" title="The groundwork is set" lead="Your server is configured. The last step is adding your libraries: the folders where your movies, shows and music live. Vora scans them and uses everything you just set up." />
             <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {rows.map(([title, state]) => (
-                    <li key={title} className="flex min-w-0 items-center justify-between gap-2.5 rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-surface)] px-3 py-2.5">
-                        <b className="truncate font-semibold text-[var(--vora-text-primary)]">{title}</b>
-                        {badge(state)}
+                {rows.map(row => (
+                    <li key={row.title} className="flex min-w-0 items-center justify-between gap-2.5 rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-surface)] px-3 py-2.5">
+                        <b className="truncate font-semibold text-[var(--vora-text-primary)]">{row.title}</b>
+                        {badge(row)}
                     </li>
                 ))}
             </ul>

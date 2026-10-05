@@ -47,11 +47,20 @@ export default function SettingsPage() {
         <div data-vora-page="">
             <PageHeader
                 title="System Settings"
-                description="Server name, transcoder behavior, remote access, and request providers."
-                actions={<Link to={resolveAdminPath('/admin/setup', serverId)} className="vora-button-secondary text-sm">Run setup guide</Link>}
+                description="Server name, transcoder behavior, remote access, email, and request providers."
             />
 
             <div className="px-8 pt-2 pb-10 max-w-6xl mx-auto">
+                <section aria-labelledby="setup-guide-card-heading" className="vora-card mb-6 flex flex-wrap items-center justify-between gap-4 p-5">
+                    <div className="min-w-0">
+                        <h2 id="setup-guide-card-heading" className="text-base font-semibold text-[var(--vora-text-primary)]">Setup guide</h2>
+                        <p className="mt-0.5 max-w-2xl text-sm text-[var(--vora-text-muted)]">
+                            Walk through the main settings one step at a time: playback, remote access, sign-ups and email, plugins, AI and backups. Each step shows what the server has now.
+                        </p>
+                    </div>
+                    <Link to={resolveAdminPath('/admin/setup', serverId)} className="vora-button-secondary shrink-0 text-sm">Run setup guide</Link>
+                </section>
+
                 <FeatureTabs
                     tabs={[
                         { key: 'core', label: 'Core' },
