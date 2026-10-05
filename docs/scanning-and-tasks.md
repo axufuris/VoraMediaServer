@@ -196,5 +196,5 @@ A movie or show whose folder carries no usable external id (no tag, or an empty 
 - **Duplicates:** if another live item of the same kind in the library already has that id, the item takes that item's ids and, for shows, `MergeDuplicateTvShowsAsync` folds the two together immediately. The response's `mediaItemId` is whichever show survived (the merge keeps the one with more episodes), and the client navigates there. Movies are not merged.
 - **Refresh:** `QueueRefreshMatchedMediaItem` runs a forced metadata, artwork and ratings refresh on the survivor, then — for shows — the duplicate merge again, since the refresh can fill in the TMDB/IMDb ids the merge groups by.
 
-Vora never renames folders to fix a match: the media library is read-only (see `StoragePathsOptions` and `docs/streaming.md`), and paths belong to whatever manages the files. The match lives in the database.
+Vora never renames folders to fix a match: the media library is read-only (see `StoragePathsOptions` and `docs/subtitles.md`), and paths belong to whatever manages the files. The match lives in the database.
 

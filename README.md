@@ -357,7 +357,9 @@ On startup it detects any new EF Core migrations and applies them
 automatically before serving traffic; your `/app/data` volume and the
 Postgres data directory persist across upgrades. If a migration fails,
 the container exits without serving traffic — check the logs, fix the
-issue, and restart.
+issue, and restart. Background tasks that were queued or running when the
+container stopped (a library scan, a subtitle pass, thumbnails) are queued
+again on startup instead of being lost.
 
 ## Bootstrapping plugin API keys from environment variables
 
@@ -617,20 +619,32 @@ Project documentation lives under [`docs/`](docs/). Highlights:
   app structure and conventions
 - [`docs/database.md`](docs/database.md) — schema, migrations, vector
   extension
+- [`docs/setup-guide.md`](docs/setup-guide.md) — the first-run Setup
+  Guide for server admins
 - [`docs/scanning-and-tasks.md`](docs/scanning-and-tasks.md) — media
   ingest, background tasks, parallel per-unit scan+enrich, exclude
   filters, and Media Trash
+- [`docs/task-resume.md`](docs/task-resume.md) — how queued and
+  interrupted tasks resume after a restart
+- [`docs/backups.md`](docs/backups.md) — scheduled backups and atomic
+  restore
 - [`docs/artwork-image-cache.md`](docs/artwork-image-cache.md) — resized
   artwork cache and poster overlay badges
 - [`docs/auth-and-devices.md`](docs/auth-and-devices.md) — auth flow and
   device tracking
-- [`docs/streaming.md`](docs/streaming.md) — playback decision, HLS
-  session output, how subtitles reach the player, and the Find
-  Subtitles provider plugin
+- [`docs/streaming.md`](docs/streaming.md) — playback decision and HLS
+  session output
+- [`docs/subtitles.md`](docs/subtitles.md) — how subtitles reach the
+  player, the extraction cache, and the Find Subtitles provider plugin
 - [`docs/iptv-and-dvr.md`](docs/iptv-and-dvr.md) — IPTV, EPG, and DVR
   architecture
 - [`docs/music-and-audio.md`](docs/music-and-audio.md) — music subsystem
+- [`docs/ai-playlists.md`](docs/ai-playlists.md) — AI music playlists
+  built from the library's own songs, and what they cost
 - [`docs/playlists.md`](docs/playlists.md) — manual and smart playlists
+- [`docs/smart-lists.md`](docs/smart-lists.md) — home-screen rows and
+  their sources (library rules, favourite channels and stations, podcasts,
+  albums, recordings)
 - [`docs/collections.md`](docs/collections.md) — collection content
   sync, the AI List (franchise/universe) provider, and AI chronological
   ordering
