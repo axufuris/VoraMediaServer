@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Streaming;
 using Vora.Infrastructure.Transcoding;
@@ -422,5 +423,58 @@ public class FFmpegSubtitleExtractionTests : IDisposable
     {
         FFmpegSubtitleExtractionService.AbsoluteMap(3).Should().Be("0:3");
         FFmpegSubtitleExtractionService.SubtitleRelativeMap(1).Should().Be("0:s:1");
+    }
+
+    [Fact]
+    public async Task An_empty_sidecar_is_not_handed_to_ffmpeg_and_is_remembered()
+    {
+        var logger = new RecordingLogger();
+        var service = new FFmpegSubtitleExtractionService(logger);
+        var video = WriteSource();
+        var sidecar = Path.Combine(_root, "movie.en.srt");
+        File.WriteAllBytes(sidecar, []);
+        var subtitle = SubtitleSource.External(video, sidecar);
+
+        var produced = await service.ExtractInBackgroundAsync(subtitle, _root, PartId, TrackId, TestContext.Current.CancellationToken);
+
+        produced.Should().BeNull();
+        service.HasFailedInBackground(_root, PartId, TrackId, subtitle).Should().BeTrue();
+        logger.Messages.Should().ContainSingle(m => m.Contains("is empty"));
+        logger.Messages.Should().NotContain(m => m.Contains("ffmpeg"));
+    }
+
+    [Fact]
+    public void An_input_ffmpeg_could_not_open_is_recognised()
+    {
+        FFmpegSubtitleExtractionService.InputCouldNotBeOpened("[in#0 @ 0x55b4c51146c0] Error opening input: Invalid data found when processing input").Should().BeTrue();
+        FFmpegSubtitleExtractionService.InputCouldNotBeOpened("Invalid UTF-8 in decoded subtitles text; maybe missing -sub_charenc option").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Long_ffmpeg_output_is_logged_from_its_end()
+    {
+        var logged = FFmpegSubtitleExtractionService.ErrorForLog(new string('x', 5000) + "Error opening input files");
+
+        logged.Length.Should().BeLessThanOrEqualTo(2001);
+        logged.Should().EndWith("Error opening input files");
+    }
+
+    [Fact]
+    public void Ffmpeg_runs_without_its_banner()
+    {
+        FFmpegSubtitleExtractionService.BuildArguments("/media/movie.mkv", "0:3", "/out.vtt")[0].Should().Be("-hide_banner");
+        FFmpegSubtitleExtractionService.BuildExternalArguments("/media/Movie.en.srt", "/out.vtt", "CP1252")[0].Should().Be("-hide_banner");
+    }
+
+    private sealed class RecordingLogger : ILogger<FFmpegSubtitleExtractionService>
+    {
+        public List<string> Messages { get; } = new();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Messages.Add(formatter(state, exception));
     }
 }

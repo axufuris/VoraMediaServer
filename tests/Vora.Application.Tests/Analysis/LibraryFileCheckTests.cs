@@ -63,6 +63,13 @@ public sealed class LibraryFileCheckTests : IDisposable
         return path;
     }
 
+    private string WriteSubtitle(string name, string content = "1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
+    {
+        var path = Path.Combine(_folder, name);
+        File.WriteAllText(path, content);
+        return path;
+    }
+
     private PartFileStateDto Part(string path, long? size, bool analyzed = true, params string[] sidecars) => new()
     {
         PartId = Guid.NewGuid(),
@@ -132,7 +139,7 @@ public sealed class LibraryFileCheckTests : IDisposable
     public async Task A_new_sidecar_is_picked_up_without_analyzing_the_video()
     {
         var video = Write("Pilot.mkv", 10);
-        var sidecar = Write("Pilot.en.srt", 1);
+        var sidecar = WriteSubtitle("Pilot.en.srt");
         var part = Part(video, size: 10);
         Library(part);
 
@@ -159,12 +166,38 @@ public sealed class LibraryFileCheckTests : IDisposable
     public async Task Sidecars_already_known_are_left_alone()
     {
         var video = Write("Pilot.mkv", 10);
-        var sidecar = Write("Pilot.en.srt", 1);
-        Write("Episode 2.en.srt", 1);
+        var sidecar = WriteSubtitle("Pilot.en.srt");
+        WriteSubtitle("Episode 2.en.srt");
         Library(Part(video, size: 10, sidecars: sidecar));
 
         await Analyze();
 
         await _media.DidNotReceiveWithAnyArgs().SyncExternalSubtitleTracksAsync(default, default!);
+    }
+
+    [Fact]
+    public async Task An_empty_sidecar_is_not_offered_as_a_subtitle()
+    {
+        var video = Write("Pilot.mkv", 10);
+        WriteSubtitle("Pilot.en.srt", string.Empty);
+        var part = Part(video, size: 10);
+        Library(part);
+
+        await Analyze();
+
+        await _media.DidNotReceiveWithAnyArgs().SyncExternalSubtitleTracksAsync(default, default!);
+    }
+
+    [Fact]
+    public async Task A_known_sidecar_that_is_only_blank_lines_is_dropped()
+    {
+        var video = Write("Pilot.mkv", 10);
+        var sidecar = WriteSubtitle("Pilot.en.srt", "\uFEFF\r\n\r\n  \r\n");
+        var part = Part(video, size: 10, sidecars: sidecar);
+        Library(part);
+
+        await Analyze();
+
+        await _media.Received(1).SyncExternalSubtitleTracksAsync(part.PartId, Arg.Is<List<MediaSubtitleTrack>>(tracks => tracks.Count == 0));
     }
 }

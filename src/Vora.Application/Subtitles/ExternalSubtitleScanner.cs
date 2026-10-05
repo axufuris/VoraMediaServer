@@ -41,7 +41,13 @@ public class ExternalSubtitleScanner : IExternalSubtitleScanner
         var matches = new List<ExternalSubtitleFile>();
         foreach (var path in subtitleFilePaths.Where(ExternalSubtitleNaming.IsSubtitleExtension))
         {
-            if (ExternalSubtitleNaming.TryParse(videoFileName, path) is { } match) matches.Add(match);
+            if (ExternalSubtitleNaming.TryParse(videoFileName, path) is not { } match) continue;
+            if (!SubtitleFileContent.HasText(path))
+            {
+                _logger.LogInformation("Ignoring the sidecar subtitle {Path}: the file is empty. Replace or delete it.", path);
+                continue;
+            }
+            matches.Add(match);
         }
         return matches.OrderBy(match => match.FilePath, StringComparer.OrdinalIgnoreCase).ToList();
     }

@@ -61,11 +61,11 @@ Concurrent misses for the same key are serialized by a per-key `SemaphoreSlim`, 
 ### The FFmpeg call
 
 ```
-ffmpeg -y -i <source> -vn -an -dn -map 0:<streamIndex> -c:s webvtt -f webvtt <output>   # embedded
-ffmpeg -y [-sub_charenc CP1252] -i <sidecar> -c:s webvtt -f webvtt <output>             # external
+ffmpeg -hide_banner -loglevel warning -y -i <source> -vn -an -dn -map 0:<streamIndex> -c:s webvtt -f webvtt <output>   # embedded
+ffmpeg -hide_banner -loglevel warning -y [-sub_charenc CP1252] -i <sidecar> -c:s webvtt -f webvtt <output>             # external
 ```
 
-A **`.vtt` sidecar is copied**, not converted. Any other sidecar is converted with no `-map` — it has one stream and that stream is the subtitle. FFmpeg assumes UTF-8 and gives up on anything else, which legacy `.srt` files routinely are, so a failed first pass is retried as `CP1252` rather than leaving the track permanently unusable. The first pass deliberately names **no** encoding: guessing one for a file that is already UTF-8 corrupts it.
+A **`.vtt` sidecar is copied**, not converted. Any other sidecar is converted with no `-map` — it has one stream and that stream is the subtitle. FFmpeg assumes UTF-8 and gives up on anything else, which legacy `.srt` files routinely are, so a failed first pass is retried as `CP1252` rather than leaving the track permanently unusable. The first pass deliberately names **no** encoding: guessing one for a file that is already UTF-8 corrupts it. Neither the encoding retry nor the embedded `0:s:N` retry runs when FFmpeg could not open the input at all (`Error opening input`, `InputCouldNotBeOpened`): no option fixes a file it cannot read. A sidecar with no text (zero bytes, or only byte-order marks, blank lines and padding: `SubtitleFileContent.HasText`) is never handed to FFmpeg; it fails at once with one "is empty" warning and gets the usual `.failed` marker. Failure warnings carry FFmpeg's own error lines, not its banner, cut to the last 2,000 characters.
 
 An external **image** subtitle (`.sub`/`.idx`) has no text to convert and can only be burned in. `PlaybackDecisionVM.SelectedSubtitleExternalPath` carries the path so `-vf subtitles=` points at the sidecar; without it the filter would be handed the video and burn in the wrong track, or none.
 
@@ -89,7 +89,7 @@ The separator **must** be a literal dot: `Movie (2026) Part 2.en.srt` must not a
 
 Three things follow from external tracks existing that are easy to get wrong:
 
-- **Discovery runs before the probe-skip guard.** Dropping a `.srt` beside an unchanged video changes nothing ffprobe can see, so a pass gated on "did the file change" would never find it. A library analysis therefore starts with one folder pass (`CheckLibraryFilesOnDiskAsync`): one listing per folder, sidecars matched to each part with `IExternalSubtitleScanner.Match`, and `SyncExternalSubtitleTracksAsync` called only for parts whose sidecar set differs. Single-item analysis still discovers per part.
+- **Discovery runs before the probe-skip guard.** Dropping a `.srt` beside an unchanged video changes nothing ffprobe can see, so a pass gated on "did the file change" would never find it. A library analysis therefore starts with one folder pass (`CheckLibraryFilesOnDiskAsync`): one listing per folder, sidecars matched to each part with `IExternalSubtitleScanner.Match`, and `SyncExternalSubtitleTracksAsync` called only for parts whose sidecar set differs. Single-item analysis still discovers per part. `Match` leaves out a sidecar with no text (logged as ignored), so an empty `.srt` is never offered in the player, and one that was known before is dropped on the next pass.
 - **Reconciliation is split.** `SyncMediaTracksAsync` matches embedded tracks by `StreamIndex` and now filters to `ExternalFilePath == null`; sidecars reconcile by path in `SyncExternalSubtitleTracksAsync`. Left together, an ffprobe pass would delete every sidecar — and throw first, since sidecars all share the default stream index.
 - **The `0:s:N` ordinal counts container streams only.** External rows are excluded before indexing, in both the endpoint and the pre-extraction pass; counting them shifts every embedded ordinal after them.
 
