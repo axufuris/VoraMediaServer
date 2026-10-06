@@ -32,34 +32,44 @@ export function ScrubThumbnail({ hoverPercent, duration, barRect, cue, spriteUrl
                 left: clamped,
                 top: tileTop,
                 width,
-                height: height + 22,
+                height,
                 pointerEvents: 'none',
                 zIndex: 250
             }}
         >
             <div
                 style={{
+                    position: 'relative',
                     width,
                     height,
                     backgroundImage: `url(${spriteUrl})`,
                     backgroundPosition: `-${cue.x}px -${cue.y}px`,
                     backgroundRepeat: 'no-repeat',
                     backgroundSize: 'auto',
-                    border: '2px solid rgba(255, 255, 255, 0.6)',
+                    border: '2px solid color-mix(in srgb, var(--vora-text-primary) 60%, transparent)',
                     borderRadius: 4,
-                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)'
-                }}
-            />
-            <div
-                style={{
-                    marginTop: 4,
-                    textAlign: 'center',
-                    color: '#fafafa',
-                    fontSize: 12,
-                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.8)'
+                    boxShadow: 'var(--vora-shadow-lg)'
                 }}
             >
-                {stamp}
+                <span
+                    data-testid="scrub-thumbnail-time"
+                    style={{
+                        position: 'absolute',
+                        bottom: 6,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        padding: '1px 8px',
+                        borderRadius: 999,
+                        background: 'color-mix(in srgb, var(--vora-bg-canvas) 80%, transparent)',
+                        color: 'var(--vora-text-primary)',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        fontVariantNumeric: 'tabular-nums',
+                        lineHeight: '18px'
+                    }}
+                >
+                    {stamp}
+                </span>
             </div>
         </div>
     );
