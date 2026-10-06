@@ -22,6 +22,12 @@ A row whose feature is off is dropped from `GET /api/smartlists/active` for ever
 All sources share `Title`, `SortBy`, `MaxItems` (clamped 1–100 by `SmartListManager`), `ShowOnHomepage`, `ShowToFriends` (off = admins only) and the optional yearly window `ActiveStart/EndMonth/Day` (December → January wraps; an impossible date drops the window on save rather than breaking `/active`). The rest of the options reuse `FilterRulesJson` (`SmartListRulesDto`):
 
 - **Library**: `mediaTypes`, `decade`, `genreIds`, `contentRating`, `unwatchedOnly`, plus `LibraryId` to read from one library. Every `SmartListSortBy` applies; `TitleAsc` sorts by sort title.
+  - A show appears at most once. `DateAddedDesc` sorts by `LastContentAddedAt ?? AddedAt`, so a new episode lifts its season and its show as well. When a list mixes more than one of shows, seasons and episodes and is sorted by date added, `RecentlyAddedTv.OnePerShow` keeps one tile per show:
+    - **the show** when the show itself is new (added within two days of its latest content) or its new episodes span several seasons;
+    - **the episode** when exactly one episode is new;
+    - **the season** when several episodes of one season are new.
+
+    Only episodes added within two days of the show's latest content count as new. A list with one TV level keeps one episode per show (the first unwatched), and a shows-only list still lifts a show when it gets a new episode.
 - **Favorites**: sort `TitleAsc` (name), `DateAddedDesc` (recently favorited) or `Random`. The same channel in two playlists shows once.
 - **Podcasts**: `unwatchedOnly` (only episodes the profile hasn't finished) and `days` (published within). Always newest first.
 - **Music**: `LibraryId` (one music library) and sort `DateAddedDesc` → recently added, `ReleaseDateDesc` → newest year, `TopRated` → most popular (Last.fm), `TitleAsc` → artist A–Z.

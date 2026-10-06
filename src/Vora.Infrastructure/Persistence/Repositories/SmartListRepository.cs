@@ -44,35 +44,20 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         query = ApplyMostWatchedFilter(query, sortBy, profileId);
         query = ApplySortOrder(query, sortBy, profileId);
 
-        // A show should appear at most once in a list row. When the list surfaces
-        // episodes, collapse each show to a single episode — the first unwatched
-        // one (by season/episode), or its earliest if all are watched. Specials
-        // (season 0) only count when they are all the show has in the pool;
-        // ordered by number they always came first. Only the top of the sorted
-        // pool is inspected so this stays cheap on large TV libraries;
-        // non-episode items pass through untouched.
-        if (rules?.MediaTypes != null && rules.MediaTypes.Contains("Episode"))
+        var poolSize = Math.Max(maxItems * 10, 100);
+        if (sortBy == SmartListSortBy.DateAddedDesc && TvLevelCount(rules) > 1)
         {
-            var poolSize = Math.Max(maxItems * 10, 100);
-            var episodePool = await query
-                .Where(m => m is Episode)
-                .Take(poolSize)
-                .Select(m => new
-                {
-                    m.Id,
-                    ShowId = ((Episode)m).Season.TvShowId,
-                    Season = ((Episode)m).Season.SeasonNumber,
-                    Episode = ((Episode)m).EpisodeNumber,
-                    Played = profileId.HasValue && context.Set<UserMediaState>()
-                        .Any(s => s.ProfileId == profileId.Value && s.MediaItemId == m.Id && s.IsPlayed)
-                })
-                .ToListAsync();
-
+            var tvPool = await LoadTvPoolAsync(query, poolSize, profileId);
+            var keptTvIds = RecentlyAddedTv.OnePerShow(tvPool);
+            var droppedTvIds = tvPool.Select(c => c.Id).Where(id => !keptTvIds.Contains(id)).ToList();
+            query = query.Where(m => !droppedTvIds.Contains(m.Id));
+        }
+        else if (rules?.MediaTypes != null && rules.MediaTypes.Contains("Episode"))
+        {
+            var episodePool = await LoadTvPoolAsync(query.Where(m => m is Episode), poolSize, profileId);
             var keptEpisodeIds = episodePool
                 .GroupBy(e => e.ShowId)
-                .Select(g => EpisodeSequence.PreferRegular(g, e => e.Season))
-                .Select(pool => (pool.Where(e => !e.Played).OrderBy(e => e.Season).ThenBy(e => e.Episode).FirstOrDefault()
-                                 ?? pool.OrderBy(e => e.Season).ThenBy(e => e.Episode).First()).Id)
+                .Select(g => RecentlyAddedTv.PickEpisode(g.ToList()).Id)
                 .ToHashSet();
 
             query = query.Where(m => !(m is Episode) || keptEpisodeIds.Contains(m.Id));
@@ -85,6 +70,42 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
 
         await AttachTrackArtworkAsync(items);
         return items;
+    }
+
+    private static int TvLevelCount(SmartListRulesDto? rules) =>
+        rules?.MediaTypes == null ? 0 : new[] { "TvShow", "Season", "Episode" }.Count(rules.MediaTypes.Contains);
+
+    private async Task<List<TvCandidate>> LoadTvPoolAsync(IQueryable<MediaItem> query, int poolSize, Guid? profileId)
+    {
+        var rows = await query
+            .Where(MediaCapabilities.IsPartOfATvShow)
+            .Take(poolSize)
+            .Select(m => new
+            {
+                m.Id,
+                IsShow = m is TvShow,
+                IsSeason = m is Season,
+                ShowId = m is TvShow ? m.Id : m is Season ? ((Season)m).TvShowId : ((Episode)m).Season.TvShowId,
+                SeasonId = m is Season ? m.Id : m is Episode ? ((Episode)m).SeasonId : (Guid?)null,
+                SeasonNumber = m is Season ? ((Season)m).SeasonNumber : m is Episode ? ((Episode)m).Season.SeasonNumber : 0,
+                EpisodeNumber = m is Episode ? ((Episode)m).EpisodeNumber : 0,
+                m.AddedAt,
+                m.LastContentAddedAt,
+                Played = profileId.HasValue && context.Set<UserMediaState>()
+                    .Any(s => s.ProfileId == profileId.Value && s.MediaItemId == m.Id && s.IsPlayed)
+            })
+            .ToListAsync();
+
+        return rows.Select(r => new TvCandidate(
+            r.Id,
+            r.IsShow ? TvLevel.Show : r.IsSeason ? TvLevel.Season : TvLevel.Episode,
+            r.ShowId,
+            r.SeasonId,
+            r.SeasonNumber,
+            r.EpisodeNumber,
+            r.AddedAt,
+            r.LastContentAddedAt,
+            r.Played)).ToList();
     }
 
     private async Task AttachTrackArtworkAsync(List<LibraryItemVM> items)
