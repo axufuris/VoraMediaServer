@@ -465,7 +465,9 @@ public partial class MediaRepository : IMediaRepository
                 LockedFields = m.LockedFields,
                 MarkersAnalyzedAt = m.MarkersAnalyzedAt,
                 EnableIntroDetection = m.Library.EnableIntroDetection,
-                EnableCreditsDetection = m.Library.EnableCreditsDetection
+                EnableCreditsDetection = m.Library.EnableCreditsDetection,
+                CreditsScenesNeedRedetection = (m.HasMidCreditsStinger || m.HasPostCreditsStinger)
+                    && m.MarkersAnalyzedAt < Vora.Application.Analysis.MarkerAssembler.CreditsSceneRulesChangedAt
             })
             .FirstOrDefaultAsync();
     }
@@ -488,7 +490,9 @@ public partial class MediaRepository : IMediaRepository
     {
         var movies = await _context.Set<Movie>()
             .AsNoTracking()
-            .Where(m => m.LibraryId == libraryId && m.MissingSince == null && m.MarkersAnalyzedAt == null)
+            .Where(m => m.LibraryId == libraryId && m.MissingSince == null
+                && (m.MarkersAnalyzedAt == null
+                    || ((m.HasMidCreditsStinger || m.HasPostCreditsStinger) && m.MarkersAnalyzedAt < Vora.Application.Analysis.MarkerAssembler.CreditsSceneRulesChangedAt)))
             .Select(m => new { m.Id, m.LockedFields })
             .ToListAsync();
 

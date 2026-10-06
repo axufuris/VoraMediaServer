@@ -45,7 +45,7 @@ Markers emitted:
 
 - **Intro** — `[0, jointGap.End]` for the first joint gap inside the first 8 minutes.
 - **Credits** — `[jointGap.Start, Duration]` for the first joint gap whose start is ≥ 60% of `Duration`.
-- **CreditsScene** — between consecutive joint gaps inside the credits region, where the gap-to-gap shot is ≥ 8 s and starts > 3 s after credits begin. Capped at `(HasMidCreditsStinger ? 1 : 0) + (HasPostCreditsStinger ? 1 : 0)`. If TMDB says zero stingers, all detected candidates are discarded as false positives.
+- **CreditsScene** — a stretch between consecutive joint gaps inside the credits region that is ≥ 8 s, starts > 3 s after credits begin, is **at most 5 minutes**, and covers **no more than half** of the credits. The length limits keep out the credits crawl: it plays over music, so it has no silent gaps inside it and used to become one 7–20 minute "scene" (52 of QA's 127 scenes, e.g. Spider-Man: Brand New Day). TMDB's flags pick among the candidates: a **mid-credits** scene is the **first** candidate, a **post-credits** scene the **last**, both give first and last; no flags, no scenes. Movies with a stinger flag whose markers were assembled before `MarkerAssembler.CreditsSceneRulesChangedAt` are detected again once by the next non-forced pass (`GetMarkerDetectionTargetIdsAsync`, `MarkerDetectionGateDto.CreditsScenesNeedRedetection`); locked markers are left alone. Limit: stylised "main-on-end" titles right after the credits start are themselves a short stretch, so a mid-credits flag can still land on them.
 
 ## Marker assembly (TV)
 

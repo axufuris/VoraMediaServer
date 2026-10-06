@@ -386,35 +386,71 @@ public class MarkerAssemblerTests
         starts.Should().BeInAscendingOrder();
     }
 
-    [Fact]
-    public void Detects_credits_scenes_for_movies_when_stingers_expected()
+    private static MarkerAssemblerInput CreditsWithGaps(double durationSec, bool mid, bool post, params double[] gapStarts) => new()
     {
-        // 100-min movie. Credits start at 4800s. A "scene" lives BETWEEN two joint gaps:
-        // gap[0].End (4810) -> gap[1].Start (5000). Length = 190s > MinStingerLength (8s).
-        var result = _assembler.Assemble(new MarkerAssemblerInput
+        Duration = TimeSpan.FromSeconds(durationSec),
+        IsEpisode = false,
+        ExpectsMidCreditsStinger = mid,
+        ExpectsPostCreditsStinger = post,
+        SilenceIntervals = gapStarts.Select(s => Interval(s, s + 10)).ToList(),
+        BlackIntervals = gapStarts.Select(s => Interval(s, s + 10)).ToList()
+    };
+
+    private List<(double Start, double End)> Scenes(MarkerAssemblerInput input) =>
+        _assembler.Assemble(input)
+            .Where(m => m.Type == MarkerType.CreditsScene)
+            .OrderBy(m => m.Order)
+            .Select(m => (m.Start.TotalSeconds, m.End.TotalSeconds))
+            .ToList();
+
+    [Fact]
+    public void An_after_credits_scene_is_the_last_scene_in_the_credits()
+    {
+        Scenes(CreditsWithGaps(6000, mid: false, post: true, 4800, 5000, 5100))
+            .Should().Equal((5010, 5100));
+    }
+
+    [Fact]
+    public void A_mid_credits_scene_is_the_first_scene_in_the_credits()
+    {
+        Scenes(CreditsWithGaps(6000, mid: true, post: false, 4800, 5000, 5100))
+            .Should().Equal((4810, 5000));
+    }
+
+    [Fact]
+    public void A_movie_with_both_gets_the_first_and_the_last()
+    {
+        Scenes(CreditsWithGaps(6000, mid: true, post: true, 4800, 4900, 5000, 5100))
+            .Should().Equal((4810, 4900), (5010, 5100));
+    }
+
+    [Fact]
+    public void The_credits_crawl_between_two_gaps_is_not_taken_for_the_after_credits_scene()
+    {
+        var input = new MarkerAssemblerInput
         {
-            Duration = TimeSpan.FromMinutes(100),
+            Duration = TimeSpan.FromSeconds(8700.6),
             IsEpisode = false,
             ExpectsPostCreditsStinger = true,
-            SilenceIntervals = new List<DetectedInterval>
-            {
-                Interval(4800, 4810),  // credits start
-                Interval(5000, 5010),  // gap before/after the scene
-                Interval(5100, 5110)
-            },
-            BlackIntervals = new List<DetectedInterval>
-            {
-                Interval(4800, 4810),
-                Interval(5000, 5010),
-                Interval(5100, 5110)
-            }
-        });
+            SilenceIntervals = new List<DetectedInterval> { Interval(8128.5, 8133), Interval(8240, 8242.2), Interval(8659.2, 8662.5), Interval(8690.2, 8700.6) },
+            BlackIntervals = new List<DetectedInterval> { Interval(8128.5, 8133.2), Interval(8239.9, 8246.5), Interval(8660.8, 8662.5), Interval(8688.8, 8700.6) }
+        };
 
-        var stingers = result.Where(m => m.Type == MarkerType.CreditsScene).ToList();
-        stingers.Should().HaveCountGreaterThanOrEqualTo(1);
-        stingers[0].Order.Should().Be(1);
-        stingers[0].Start.Should().Be(TimeSpan.FromSeconds(4810));
-        stingers[0].End.Should().Be(TimeSpan.FromSeconds(5000));
+        Scenes(input).Should().Equal((8662.5, 8690.2));
+    }
+
+    [Fact]
+    public void A_stretch_longer_than_five_minutes_is_never_a_scene()
+    {
+        Scenes(CreditsWithGaps(9000, mid: true, post: true, 7300, 7700))
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_stretch_covering_most_of_the_credits_is_never_a_scene()
+    {
+        Scenes(CreditsWithGaps(5600, mid: false, post: true, 5300, 5480))
+            .Should().BeEmpty();
     }
 
     [Fact]

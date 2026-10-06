@@ -38,6 +38,9 @@ public class MarkerAssembler : IMarkerAssembler
     private static readonly TimeSpan EpisodeRecapWindow = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan CreditsRollMinLength = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MinStingerLength = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan MaxStingerLength = TimeSpan.FromMinutes(5);
+    private const double MaxStingerShareOfCredits = 0.5;
+    public static readonly DateTime CreditsSceneRulesChangedAt = new(2026, 10, 6, 12, 0, 0, DateTimeKind.Utc);
     private static readonly TimeSpan BoundaryProximity = TimeSpan.FromSeconds(3);
     // A real title sequence / "previously on" runs longer than this. A shorter
     // black+silence blip at the very start is a studio-logo ident (HBO, etc.), not
@@ -94,17 +97,12 @@ public class MarkerAssembler : IMarkerAssembler
 
             if (!input.IsEpisode)
             {
-                var expectedStingers = (input.ExpectsMidCreditsStinger ? 1 : 0) + (input.ExpectsPostCreditsStinger ? 1 : 0);
-                if (expectedStingers > 0)
+                var candidates = FindCreditsScenes(jointGaps, creditsRollStart.Value, input.Duration).ToList();
+                var stingers = PickCreditsScenes(candidates, input.ExpectsMidCreditsStinger, input.ExpectsPostCreditsStinger);
+                for (var i = 0; i < stingers.Count; i++)
                 {
-                    var stingers = FindCreditsScenes(jointGaps, creditsRollStart.Value, input.Duration)
-                        .Take(expectedStingers)
-                        .ToList();
-                    for (var i = 0; i < stingers.Count; i++)
-                    {
-                        stingers[i].Order = i + 1;
-                        markers.Add(stingers[i]);
-                    }
+                    stingers[i].Order = i + 1;
+                    markers.Add(stingers[i]);
                 }
             }
             else
@@ -246,13 +244,13 @@ public class MarkerAssembler : IMarkerAssembler
             .Where(g => g.Start >= creditsStart && g.End <= duration)
             .OrderBy(g => g.Start)
             .ToList();
+        var creditsLength = duration - creditsStart;
 
         for (var i = 0; i < gapsInCredits.Count - 1; i++)
         {
             var sceneStart = gapsInCredits[i].End;
             var sceneEnd = gapsInCredits[i + 1].Start;
-            if (sceneEnd - sceneStart < MinStingerLength) continue;
-            if (sceneStart <= creditsStart + BoundaryProximity) continue;
+            if (!CouldBeACreditsScene(sceneStart, sceneEnd, creditsStart, creditsLength)) continue;
 
             yield return new DetectedMarker
             {
@@ -261,6 +259,24 @@ public class MarkerAssembler : IMarkerAssembler
                 End = sceneEnd
             };
         }
+    }
+
+    private static bool CouldBeACreditsScene(TimeSpan start, TimeSpan end, TimeSpan creditsStart, TimeSpan creditsLength)
+    {
+        var length = end - start;
+        return length >= MinStingerLength
+            && start > creditsStart + BoundaryProximity
+            && length <= MaxStingerLength
+            && length.TotalSeconds <= creditsLength.TotalSeconds * MaxStingerShareOfCredits;
+    }
+
+    private static List<DetectedMarker> PickCreditsScenes(List<DetectedMarker> candidates, bool expectsMid, bool expectsPost)
+    {
+        if (candidates.Count == 0) return [];
+        if (expectsMid && expectsPost) return candidates.Count == 1 ? [candidates[0]] : [candidates[0], candidates[^1]];
+        if (expectsPost) return [candidates[^1]];
+        if (expectsMid) return [candidates[0]];
+        return [];
     }
 
     private static DetectedMarker? FindEpisodePreview(List<DetectedInterval> jointGaps, TimeSpan creditsStart, TimeSpan duration)

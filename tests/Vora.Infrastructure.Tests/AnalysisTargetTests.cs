@@ -153,4 +153,22 @@ public class AnalysisTargetTests
         saved.VideoThumbnailSpriteVersion.Should().BeNull();
         (await Repo().GetFileAnalysisTargetIdsAsync(movies)).Should().Equal(movie.Id);
     }
+
+    [Fact]
+    public async Task Movies_with_credits_scenes_analyzed_under_the_old_rules_are_detected_again_once()
+    {
+        var movies = Library(LibraryType.Movie);
+        var before = Vora.Application.Analysis.MarkerAssembler.CreditsSceneRulesChangedAt.AddDays(-1);
+        var after = Vora.Application.Analysis.MarkerAssembler.CreditsSceneRulesChangedAt.AddHours(1);
+        var stale = AddMovie(movies, "Spider-Man", analyzedAt: before, markersAt: before);
+        stale.HasPostCreditsStinger = true;
+        var redone = AddMovie(movies, "Thor", analyzedAt: after, markersAt: after);
+        redone.HasMidCreditsStinger = true;
+        AddMovie(movies, "No Stinger", analyzedAt: before, markersAt: before);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        (await Repo().GetMarkerDetectionTargetIdsAsync(movies)).Should().Equal(stale.Id);
+        (await Repo().GetMarkerDetectionGateAsync(stale.Id))?.CreditsScenesNeedRedetection.Should().BeTrue();
+        (await Repo().GetMarkerDetectionGateAsync(redone.Id))?.CreditsScenesNeedRedetection.Should().BeFalse();
+    }
 }
