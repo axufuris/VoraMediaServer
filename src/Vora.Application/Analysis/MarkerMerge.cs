@@ -5,7 +5,7 @@ namespace Vora.Application.Analysis;
 // Resolves the final marker set from the three detection tiers by precedence:
 // chapters (authoritative) > audio-fingerprint (intro only) > silence/black.
 // Each single-instance marker type takes the highest-priority tier that produced
-// it; CreditsScene markers (movies) only ever come from silence/black.
+// it; CreditsScene markers come from named chapters when there are any.
 public static class MarkerMerge
 {
     public static List<DetectedMarker> Resolve(
@@ -27,7 +27,8 @@ public static class MarkerMerge
             if (marker != null) result.Add(marker);
         }
 
-        result.AddRange(silenceBlackMarkers.Where(m => m.Type == MarkerType.CreditsScene));
+        var chapterScenes = chapterMarkers.Where(m => m.Type == MarkerType.CreditsScene).ToList();
+        result.AddRange(chapterScenes.Count > 0 ? chapterScenes : silenceBlackMarkers.Where(m => m.Type == MarkerType.CreditsScene));
 
         return result.OrderBy(m => m.Start).ToList();
     }

@@ -21,6 +21,8 @@ public class SilenceDetectionParameters
     // only the tail (credits/preview). Ignored on a single full-file pass.
     public bool SkipHeadWindow { get; set; }
 
+    public bool SamplePictureInTail { get; set; }
+
     // Decode on the GPU (NVDEC via -hwaccel) when the server has hardware
     // acceleration enabled — 10-bit HEVC (~all of a modern library) decodes far
     // faster there. Frames still land in system memory for the CPU black/silence

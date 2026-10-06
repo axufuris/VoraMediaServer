@@ -143,6 +143,52 @@ public class ChapterMarkerMapperTests
     }
 
     [Fact]
+    public void Named_mid_and_post_credits_chapters_become_ordered_credits_scenes()
+    {
+        var result = Map(new[]
+        {
+            Chapter("Chapter 1", 0, 5000),
+            Chapter("End Credits", 6000, 6100),
+            Chapter("Mid-Credits Scene", 6100, 6160),
+            Chapter("Credits", 6160, 6500),
+            Chapter("Post-Credits Scene", 6500, 6560)
+        }, durationSec: 6600, isEpisode: false);
+
+        result.Markers.Where(m => m.Type == MarkerType.CreditsScene)
+            .Select(m => (m.Start.TotalSeconds, m.Order))
+            .Should().Equal((6100, 1), (6500, 2));
+        result.Markers.Should().ContainSingle(m => m.Type == MarkerType.Credits)
+            .Which.Start.Should().Be(TimeSpan.FromSeconds(6000));
+        result.Covers(detectIntro: false, detectCredits: true, expectsCreditsScenes: true).Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_credits_chapter_alone_does_not_cover_a_movie_that_expects_a_credits_scene()
+    {
+        var result = Map(new[]
+        {
+            Chapter("Chapter 1", 0, 6000),
+            Chapter("End Credits", 6000, 6600)
+        }, durationSec: 6600, isEpisode: false);
+
+        result.Covers(detectIntro: false, detectCredits: true).Should().BeTrue();
+        result.Covers(detectIntro: false, detectCredits: true, expectsCreditsScenes: true).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Every_chapter_break_is_kept_as_a_boundary_even_when_unnamed()
+    {
+        var result = Map(new[]
+        {
+            Chapter("Chapter 1", 0, 300),
+            Chapter("Chapter 2", 300, 900),
+            Chapter("Chapter 3", 900, 1400)
+        }, durationSec: 1400);
+
+        result.ChapterStarts.Should().Equal(TimeSpan.FromSeconds(300), TimeSpan.FromSeconds(900));
+    }
+
+    [Fact]
     public void Degenerate_chapters_are_skipped()
     {
         var result = Map(new[]

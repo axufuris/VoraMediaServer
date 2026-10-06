@@ -8,15 +8,18 @@ public class ChapterMarkerResult
     public required List<DetectedMarker> Markers { get; init; }
     public bool CoversIntro { get; init; }
     public bool CoversCredits { get; init; }
+    public bool CoversCreditsScenes { get; init; }
+    public List<TimeSpan> ChapterStarts { get; init; } = new();
 
     // The chapter layer only supersedes silence/black detection when it can cover
     // every marker type the library still wants. A partial cover (intro chapter but
     // no credits chapter) falls through to a full decode rather than persisting
     // half the markers and skipping the rest.
-    public bool Covers(bool detectIntro, bool detectCredits) =>
+    public bool Covers(bool detectIntro, bool detectCredits, bool expectsCreditsScenes = false) =>
         Markers.Count > 0
         && (!detectIntro || CoversIntro)
-        && (!detectCredits || CoversCredits);
+        && (!detectCredits || CoversCredits)
+        && (!detectCredits || !expectsCreditsScenes || CoversCreditsScenes);
 }
 
 public static class ChapterMarkerMapper
@@ -27,6 +30,7 @@ public static class ChapterMarkerMapper
     private static readonly string[] RecapTitles = { "recap", "previously" };
     private static readonly string[] IntroTitles = { "intro", "opening", "main title", "title sequence", "op credit" };
     private static readonly string[] PreviewTitles = { "preview", "next time", "next episode", "next on", "sneak peek" };
+    private static readonly string[] CreditsSceneTitles = { "post-credit", "post credit", "postcredit", "mid-credit", "mid credit", "midcredit", "after-credit", "after credit", "stinger", "credits scene", "credit scene" };
     private static readonly string[] CreditsTitles = { "credit", "ending", "outro", "closing", "end title", "end card" };
 
     public static ChapterMarkerResult Map(
@@ -42,6 +46,12 @@ public static class ChapterMarkerMapper
         {
             return new ChapterMarkerResult { Markers = markers };
         }
+
+        var chapterStarts = chapters
+            .Select(c => c.Start)
+            .Where(s => s > TimeSpan.Zero && s < duration)
+            .OrderBy(s => s)
+            .ToList();
 
         var creditsMinStart = TimeSpan.FromSeconds(duration.TotalSeconds * CreditsSearchStartFraction);
 
@@ -68,12 +78,20 @@ public static class ChapterMarkerMapper
                 case MarkerType.Preview when detectPreview && isEpisode && start >= creditsMinStart:
                     markers.Add(new DetectedMarker { Type = MarkerType.Preview, Start = start, End = end });
                     break;
+                case MarkerType.CreditsScene when detectCredits && !isEpisode && start >= creditsMinStart:
+                    markers.Add(new DetectedMarker { Type = MarkerType.CreditsScene, Start = start, End = end });
+                    break;
             }
         }
 
+        var scenes = markers.Where(m => m.Type == MarkerType.CreditsScene).OrderBy(m => m.Start).ToList();
+        for (var i = 0; i < scenes.Count; i++) scenes[i].Order = i + 1;
+
         var deduped = markers
+            .Where(m => m.Type != MarkerType.CreditsScene)
             .GroupBy(m => m.Type)
             .Select(g => g.OrderBy(m => m.Start).First())
+            .Concat(scenes)
             .OrderBy(m => m.Start)
             .ToList();
 
@@ -81,7 +99,9 @@ public static class ChapterMarkerMapper
         {
             Markers = deduped,
             CoversIntro = deduped.Any(m => m.Type == MarkerType.Intro),
-            CoversCredits = deduped.Any(m => m.Type == MarkerType.Credits)
+            CoversCredits = deduped.Any(m => m.Type == MarkerType.Credits),
+            CoversCreditsScenes = scenes.Count > 0,
+            ChapterStarts = chapterStarts
         };
     }
 
@@ -96,6 +116,7 @@ public static class ChapterMarkerMapper
         if (ContainsAny(t, RecapTitles)) return MarkerType.Recap;
         if (ContainsAny(t, IntroTitles)) return MarkerType.Intro;
         if (ContainsAny(t, PreviewTitles)) return MarkerType.Preview;
+        if (ContainsAny(t, CreditsSceneTitles)) return MarkerType.CreditsScene;
         if (ContainsAny(t, CreditsTitles)) return MarkerType.Credits;
         return null;
     }

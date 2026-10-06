@@ -513,6 +513,175 @@ public class MarkerAssemblerTests
         stingers.Select(s => s.Order).Should().BeEquivalentTo(stingers.Select((_, i) => i + 1));
     }
 
+    private enum Look
+    {
+        Scene,
+        Crawl,
+        Black,
+        DarkGrey,
+        BrightGrey
+    }
+
+    private static List<PictureSample> Pictures(params (double From, double To, Look Look)[] spans) =>
+        spans.SelectMany(span => Enumerable.Range((int)span.From, (int)(span.To - span.From)).Select(t => span.Look switch
+        {
+            Look.Crawl => Sample(t, saturation: 0.5, low: 16, mean: 26, peak: 230),
+            Look.Black => Sample(t, saturation: 0, low: 16, mean: 16, peak: 20),
+            Look.DarkGrey => Sample(t, saturation: 1.5, low: 16, mean: 35, peak: 200),
+            Look.BrightGrey => Sample(t, saturation: 0.8, low: 16, mean: 80, peak: 235),
+            _ => Sample(t, saturation: 9, low: 20, mean: 70, peak: 220)
+        })).ToList();
+
+    private static PictureSample Sample(int second, double saturation, double low, double mean, double peak) => new()
+    {
+        Time = TimeSpan.FromSeconds(second),
+        Saturation = saturation,
+        LowLuma = low,
+        MeanLuma = mean,
+        PeakLuma = peak
+    };
+
+    private static MarkerAssemblerInput AntManShape(List<TimeSpan>? chapterStarts = null) => new()
+    {
+        Duration = TimeSpan.FromSeconds(7000),
+        IsEpisode = false,
+        ExpectsMidCreditsStinger = true,
+        ExpectsPostCreditsStinger = true,
+        SilenceIntervals = new List<DetectedInterval> { Interval(6000, 6003) },
+        BlackIntervals = new List<DetectedInterval>
+        {
+            Interval(6000, 6003), Interval(6500, 6503), Interval(6530, 6531), Interval(6560, 6563),
+            Interval(6620, 6650), Interval(6950, 6952), Interval(6990, 7000)
+        },
+        PictureSamples = Pictures((4200, 6620, Look.Scene), (6620, 6650, Look.Black), (6650, 6950, Look.Crawl),
+            (6950, 6952, Look.Black), (6952, 6990, Look.Scene), (6990, 7000, Look.Black)),
+        ChapterStarts = chapterStarts ?? new List<TimeSpan>()
+    };
+
+    private static double CreditsStart(List<DetectedMarker> markers) =>
+        markers.Single(m => m.Type == MarkerType.Credits).Start.TotalSeconds;
+
+    [Fact]
+    public void Credits_start_at_the_titles_before_the_crawl_not_at_a_fade_late_in_the_movie()
+    {
+        var withoutPictures = AntManShape();
+        withoutPictures.PictureSamples.Clear();
+
+        CreditsStart(_assembler.Assemble(withoutPictures)).Should().Be(6000);
+        CreditsStart(_assembler.Assemble(AntManShape())).Should().Be(6500);
+    }
+
+    [Fact]
+    public void A_chapter_break_before_the_crawl_marks_where_the_titles_begin()
+    {
+        var input = AntManShape(new List<TimeSpan> { TimeSpan.FromSeconds(6490) });
+
+        CreditsStart(_assembler.Assemble(input)).Should().Be(6490);
+    }
+
+    [Fact]
+    public void A_brief_fade_in_the_last_scene_is_not_where_the_credits_start()
+    {
+        var input = new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(10950),
+            IsEpisode = false,
+            SilenceIntervals = new List<DetectedInterval>(),
+            BlackIntervals = new List<DetectedInterval> { Interval(10373, 10374.1), Interval(10483.7, 10521.7) },
+            PictureSamples = Pictures((6600, 10483, Look.Scene), (10483, 10522, Look.Black), (10522, 10950, Look.Crawl))
+        };
+
+        CreditsStart(_assembler.Assemble(input)).Should().Be(10483.7);
+    }
+
+    [Fact]
+    public void A_scene_right_before_the_crawl_and_one_after_it_are_the_credits_scenes()
+    {
+        Scenes(AntManShape()).Should().Equal((6563, 6620), (6952, 6990));
+    }
+
+    [Fact]
+    public void The_crawl_is_never_a_scene_and_a_scene_split_by_a_fade_stays_whole()
+    {
+        var input = new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(6500),
+            IsEpisode = false,
+            ExpectsPostCreditsStinger = true,
+            SilenceIntervals = new List<DetectedInterval>(),
+            BlackIntervals = new List<DetectedInterval>
+            {
+                Interval(5500, 5510), Interval(6050, 6053), Interval(6150, 6170),
+                Interval(6410, 6413), Interval(6440, 6444), Interval(6490, 6500)
+            },
+            PictureSamples = Pictures((3900, 6150, Look.Scene), (6150, 6170, Look.Black), (6170, 6410, Look.Crawl),
+                (6410, 6413, Look.Black), (6413, 6490, Look.Scene), (6490, 6500, Look.Black))
+        };
+
+        CreditsStart(_assembler.Assemble(input)).Should().Be(6050);
+        Scenes(input).Should().Equal((6413, 6490));
+    }
+
+    [Fact]
+    public void Black_and_white_scenes_are_not_taken_for_the_crawl()
+    {
+        var input = new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(6000),
+            IsEpisode = false,
+            SilenceIntervals = new List<DetectedInterval>(),
+            BlackIntervals = new List<DetectedInterval> { Interval(5300, 5302), Interval(5700, 5702) },
+            PictureSamples = Pictures((3600, 5300, Look.BrightGrey), (5302, 5700, Look.BrightGrey), (5702, 6000, Look.Crawl))
+        };
+
+        CreditsStart(_assembler.Assemble(input)).Should().Be(5700);
+    }
+
+    [Fact]
+    public void A_movie_that_already_looks_like_credits_falls_back_to_black_frames()
+    {
+        var input = new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(6000),
+            IsEpisode = false,
+            SilenceIntervals = new List<DetectedInterval>(),
+            BlackIntervals = new List<DetectedInterval> { Interval(4900, 4905) },
+            PictureSamples = Pictures((3600, 5400, Look.DarkGrey), (5400, 6000, Look.Crawl))
+        };
+
+        CreditsStart(_assembler.Assemble(input)).Should().Be(4900);
+    }
+
+    [Fact]
+    public void A_dark_grey_scene_followed_by_more_movie_does_not_open_the_credits()
+    {
+        var input = new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(6000),
+            IsEpisode = false,
+            SilenceIntervals = new List<DetectedInterval>(),
+            BlackIntervals = new List<DetectedInterval> { Interval(5400, 5405) },
+            PictureSamples = Pictures((3600, 4900, Look.Scene), (4900, 4960, Look.DarkGrey), (4960, 6000, Look.Scene))
+        };
+
+        CreditsStart(_assembler.Assemble(input)).Should().Be(5400);
+    }
+
+    [Fact]
+    public void Episodes_keep_the_black_frame_credits_even_with_picture_samples()
+    {
+        var input = new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(2640),
+            IsEpisode = true,
+            SilenceIntervals = new List<DetectedInterval>(),
+            BlackIntervals = new List<DetectedInterval> { Interval(2400, 2405), Interval(2558, 2560) },
+            PictureSamples = Pictures((1584, 2558, Look.Scene), (2558, 2560, Look.Black), (2560, 2640, Look.Crawl))
+        };
+
+        CreditsStart(_assembler.Assemble(input)).Should().Be(2400);
+    }
+
     [Fact]
     public void Joint_gap_calculation_only_emits_overlap_of_silence_and_black()
     {

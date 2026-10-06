@@ -81,6 +81,19 @@ public class MarkerMergeTests
     }
 
     [Fact]
+    public void Named_chapter_scenes_replace_the_detected_scenes()
+    {
+        var chapters = new List<DetectedMarker> { M(MarkerType.CreditsScene, 6100, 6160), M(MarkerType.CreditsScene, 6500, 6560) };
+        var sb = new List<DetectedMarker> { M(MarkerType.Credits, 6000, 6600), M(MarkerType.CreditsScene, 6300, 6340) };
+
+        var result = MarkerMerge.Resolve(chapters, fingerprintIntro: null, sb, detectIntro: true);
+
+        result.Where(m => m.Type == MarkerType.CreditsScene).Select(m => m.Start.TotalSeconds)
+            .Should().Equal(6100, 6500);
+        result.Should().ContainSingle(m => m.Type == MarkerType.Credits);
+    }
+
+    [Fact]
     public void Output_is_ordered_by_start()
     {
         var sb = new List<DetectedMarker>

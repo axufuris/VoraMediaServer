@@ -155,20 +155,21 @@ public class AnalysisTargetTests
     }
 
     [Fact]
-    public async Task Movies_with_credits_scenes_analyzed_under_the_old_rules_are_detected_again_once()
+    public async Task Movies_analyzed_under_the_old_credits_rules_are_detected_again_once()
     {
         var movies = Library(LibraryType.Movie);
-        var before = Vora.Application.Analysis.MarkerAssembler.CreditsSceneRulesChangedAt.AddDays(-1);
-        var after = Vora.Application.Analysis.MarkerAssembler.CreditsSceneRulesChangedAt.AddHours(1);
+        var before = Vora.Application.Analysis.MarkerAssembler.MovieCreditsRulesChangedAt.AddDays(-1);
+        var after = Vora.Application.Analysis.MarkerAssembler.MovieCreditsRulesChangedAt.AddHours(1);
         var stale = AddMovie(movies, "Spider-Man", analyzedAt: before, markersAt: before);
         stale.HasPostCreditsStinger = true;
         var redone = AddMovie(movies, "Thor", analyzedAt: after, markersAt: after);
         redone.HasMidCreditsStinger = true;
-        AddMovie(movies, "No Stinger", analyzedAt: before, markersAt: before);
+        var noStinger = AddMovie(movies, "Jurassic World", analyzedAt: before, markersAt: before);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        (await Repo().GetMarkerDetectionTargetIdsAsync(movies)).Should().Equal(stale.Id);
-        (await Repo().GetMarkerDetectionGateAsync(stale.Id))?.CreditsScenesNeedRedetection.Should().BeTrue();
-        (await Repo().GetMarkerDetectionGateAsync(redone.Id))?.CreditsScenesNeedRedetection.Should().BeFalse();
+        (await Repo().GetMarkerDetectionTargetIdsAsync(movies)).Should().BeEquivalentTo(new[] { stale.Id, noStinger.Id });
+        (await Repo().GetMarkerDetectionGateAsync(stale.Id))?.MarkersPredateMovieCreditsRules.Should().BeTrue();
+        (await Repo().GetMarkerDetectionGateAsync(noStinger.Id))?.MarkersPredateMovieCreditsRules.Should().BeTrue();
+        (await Repo().GetMarkerDetectionGateAsync(redone.Id))?.MarkersPredateMovieCreditsRules.Should().BeFalse();
     }
 }

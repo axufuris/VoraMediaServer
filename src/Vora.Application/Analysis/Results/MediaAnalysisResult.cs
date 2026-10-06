@@ -8,6 +8,7 @@ public class MediaAnalysisResult
 
     public List<DetectedInterval> SilenceIntervals { get; set; } = new();
     public List<DetectedInterval> BlackIntervals { get; set; } = new();
+    public List<PictureSample> PictureSamples { get; set; } = new();
 
     public List<AudioTrackInfo> AudioTracks { get; set; } = new();
 
@@ -20,6 +21,15 @@ public class DetectedInterval
     public TimeSpan Start { get; set; }
     public TimeSpan End { get; set; }
     public TimeSpan Duration => End - Start;
+}
+
+public class PictureSample
+{
+    public TimeSpan Time { get; init; }
+    public double Saturation { get; init; }
+    public double LowLuma { get; init; }
+    public double MeanLuma { get; init; }
+    public double PeakLuma { get; init; }
 }
 
 public class AudioTrackInfo
