@@ -182,6 +182,58 @@ public class MediaAnalyzerManagerDetectionTests
     }
 
     [Fact]
+    public async Task Movies_sample_the_picture_in_the_tail_and_hand_it_to_the_assembler()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/a.mkv", TimeSpan.FromMinutes(90), meanDb: -20);
+        var samples = new List<PictureSample> { new() { Time = TimeSpan.FromSeconds(5000), Saturation = 0.5, LowLuma = 16, MeanLuma = 25, PeakLuma = 230 } };
+        _analyzer.AnalyzeSilenceDetectionsAsync("/m/a.mkv", Arg.Any<SilenceDetectionParameters>(), Arg.Any<CancellationToken>())
+            .Returns(new MediaAnalysisResult { PictureSamples = samples });
+        _analyzer.ReadChaptersAsync("/m/a.mkv", Arg.Any<CancellationToken>()).Returns(new List<MediaChapter>
+        {
+            new() { Title = "Chapter 1", Start = TimeSpan.Zero, End = TimeSpan.FromSeconds(4900) },
+            new() { Title = "Chapter 2", Start = TimeSpan.FromSeconds(4900), End = TimeSpan.FromMinutes(90) }
+        });
+
+        await _manager.AnalyzeMediaItemMarkersAsync(id, isEpisode: false, forceOverride: true, fingerprintIntro: null, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/a.mkv",
+            Arg.Is<SilenceDetectionParameters>(p => p.SamplePictureInTail), Arg.Any<CancellationToken>());
+        _assembler.Received(1).Assemble(Arg.Is<MarkerAssemblerInput>(i =>
+            i.PictureSamples == samples && i.ChapterStarts.SequenceEqual(new[] { TimeSpan.FromSeconds(4900) })));
+    }
+
+    [Fact]
+    public async Task Episodes_do_not_sample_the_picture()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/ep.mkv", TimeSpan.FromMinutes(45), meanDb: -20);
+
+        await _manager.AnalyzeMediaItemMarkersAsync(id, isEpisode: true, forceOverride: true, fingerprintIntro: null, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/ep.mkv",
+            Arg.Is<SilenceDetectionParameters>(p => !p.SamplePictureInTail), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_credits_chapter_does_not_stop_the_search_for_an_expected_credits_scene()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/a.mkv", TimeSpan.FromMinutes(90), meanDb: -20);
+        _media.GetSilenceDetectionInputsAsync(id).Returns(new SilenceDetectionInputsDto
+        { FilePaths = new List<string> { "/m/a.mkv" }, Duration = TimeSpan.FromMinutes(90), HasPostCreditsStinger = true });
+        _analyzer.ReadChaptersAsync("/m/a.mkv", Arg.Any<CancellationToken>()).Returns(new List<MediaChapter>
+        {
+            new() { Title = "Intro", Start = TimeSpan.Zero, End = TimeSpan.FromSeconds(60) },
+            new() { Title = "End Credits", Start = TimeSpan.FromMinutes(82), End = TimeSpan.FromMinutes(90) }
+        });
+
+        await _manager.AnalyzeMediaItemMarkersAsync(id, isEpisode: false, forceOverride: true, fingerprintIntro: null, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/a.mkv", Arg.Any<SilenceDetectionParameters>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task RunMediaItemSilenceDetectionAsync_reanalyzes_already_analyzed_item_when_forced()
     {
         var id = Guid.NewGuid();

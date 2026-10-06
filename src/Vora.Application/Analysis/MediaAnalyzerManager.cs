@@ -570,7 +570,8 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // Tier 2 (season-relative audio fingerprinting) slots in here in a later build.
         var chapters = await _analyzerService.ReadChaptersAsync(primaryPath, cancellationToken) ?? new List<MediaChapter>();
         var chapterResult = ChapterMarkerMapper.Map(chapters, duration.Value, isEpisode, detectIntro, detectCredits, detectPreview: true);
-        if (chapterResult.Covers(detectIntro, detectCredits))
+        var expectsCreditsScenes = !isEpisode && (inputs.HasMidCreditsStinger || inputs.HasPostCreditsStinger);
+        if (chapterResult.Covers(detectIntro, detectCredits, expectsCreditsScenes))
         {
             cancellationToken.ThrowIfCancellationRequested();
             _logger.LogInformation("Detected markers for {MediaItemId} from {Count} embedded chapter(s); skipped silence/black decode.", mediaItemId, chapterResult.Markers.Count);
@@ -601,6 +602,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             HeadWindowEndSeconds = headEnd,
             TailWindowStartSeconds = tailStart,
             SkipHeadWindow = useFingerprintIntro,
+            SamplePictureInTail = !isEpisode,
             UseHardwareDecode = settings.UseHardwareAcceleration && settings.AnalyzeUseHardwareDecode,
             HardwareDevice = settings.HardwareTranscodingDevice
         };
@@ -620,7 +622,9 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             ExpectsPostCreditsStinger = inputs.HasPostCreditsStinger,
             IsEpisode = isEpisode,
             DetectIntro = detectIntro && !useFingerprintIntro,
-            DetectCredits = detectCredits
+            DetectCredits = detectCredits,
+            PictureSamples = detection.PictureSamples,
+            ChapterStarts = chapterResult.ChapterStarts
         });
 
         // Precedence: chapters (already resolved above when they fully covered) win

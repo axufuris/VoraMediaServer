@@ -24,6 +24,14 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
     private static readonly Regex BlackStartRegex = new(@"black_start[:=]\s*(?<Time>\d+(\.\d+)?)", RegexOptions.Compiled);
     private static readonly Regex BlackEndRegex = new(@"black_end[:=]\s*(?<Time>\d+(\.\d+)?)", RegexOptions.Compiled);
     private static readonly Regex MeanVolumeRegex = new(@"mean_volume:\s*(?<Db>-?\d+(\.\d+)?)\s*dB", RegexOptions.Compiled);
+    private static readonly Regex PictureFrameRegex = new(@"pts_time:(?<Time>-?\d+(\.\d+)?)", RegexOptions.Compiled);
+    private static readonly Regex PictureStatRegex = new(@"lavfi\.signalstats\.(?<Key>SATAVG|YLOW|YAVG|YMAX)=(?<Value>-?\d+(\.\d+)?)", RegexOptions.Compiled);
+    private static readonly string PictureSampleFilter =
+        $",fps=1,scale=-2:{BlackDetectHeight},format=yuv420p,signalstats,"
+        + "metadata=mode=print:key=lavfi.signalstats.SATAVG,"
+        + "metadata=mode=print:key=lavfi.signalstats.YLOW,"
+        + "metadata=mode=print:key=lavfi.signalstats.YAVG,"
+        + "metadata=mode=print:key=lavfi.signalstats.YMAX";
 
     private readonly ILogger<FFmpegAnalyzerService> _logger;
 
@@ -611,7 +619,8 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
                 "Running windowed silence+black detection on {FilePath} ({Head}, tail {TailStart}s–end; threshold {Threshold} dB / {SilenceMin}s, black {BlackMin}s).",
                 filePath, parameters.SkipHeadWindow ? "head skipped" : $"head 0–{headEnd}s", tailStart, parameters.NoiseThresholdDb, parameters.MinSilenceDurationSec, parameters.MinBlackFrameDurationSec);
 
-            var tail = await RunDetectionPassAsync(filePath, parameters, seekSeconds: tailStart, limitSeconds: null, cancellationToken);
+            var tail = await RunDetectionPassAsync(filePath, parameters, seekSeconds: tailStart, limitSeconds: null, parameters.SamplePictureInTail, cancellationToken);
+            result.PictureSamples = tail.Pictures;
 
             if (parameters.SkipHeadWindow)
             {
@@ -620,7 +629,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             }
             else
             {
-                var head = await RunDetectionPassAsync(filePath, parameters, seekSeconds: null, limitSeconds: headEnd, cancellationToken);
+                var head = await RunDetectionPassAsync(filePath, parameters, seekSeconds: null, limitSeconds: headEnd, samplePicture: false, cancellationToken);
                 result.SilenceIntervals = head.Silence.Concat(tail.Silence).ToList();
                 result.BlackIntervals = head.Black.Concat(tail.Black).ToList();
             }
@@ -631,24 +640,25 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
                 "Running full-file silence+black detection on {FilePath} (threshold {Threshold} dB / {SilenceMin}s, black {BlackMin}s).",
                 filePath, parameters.NoiseThresholdDb, parameters.MinSilenceDurationSec, parameters.MinBlackFrameDurationSec);
 
-            var full = await RunDetectionPassAsync(filePath, parameters, seekSeconds: null, limitSeconds: null, cancellationToken);
+            var full = await RunDetectionPassAsync(filePath, parameters, seekSeconds: null, limitSeconds: null, parameters.SamplePictureInTail, cancellationToken);
             result.SilenceIntervals = full.Silence;
             result.BlackIntervals = full.Black;
+            result.PictureSamples = full.Pictures;
         }
 
         _logger.LogInformation(
-            "Detection complete: {SilenceCount} silence interval(s), {BlackCount} black interval(s).",
-            result.SilenceIntervals.Count, result.BlackIntervals.Count);
+            "Detection complete: {SilenceCount} silence interval(s), {BlackCount} black interval(s), {PictureCount} picture sample(s).",
+            result.SilenceIntervals.Count, result.BlackIntervals.Count, result.PictureSamples.Count);
     }
 
     // Runs one ffmpeg silence+black pass over an optional [seekSeconds, +limitSeconds]
     // slice and returns the zipped intervals with absolute timestamps. Input seeking
     // (-ss before -i) is what actually skips the decode; -copyts keeps the reported
     // times on the file's own timeline.
-    private async Task<(List<DetectedInterval> Silence, List<DetectedInterval> Black)> RunDetectionPassAsync(
-        string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, CancellationToken cancellationToken)
+    private async Task<(List<DetectedInterval> Silence, List<DetectedInterval> Black, List<PictureSample> Pictures)> RunDetectionPassAsync(
+        string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, bool samplePicture, CancellationToken cancellationToken)
     {
-        var (ok, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, parameters.UseHardwareDecode, cancellationToken);
+        var (ok, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, parameters.UseHardwareDecode, samplePicture, cancellationToken);
 
         // The hardware path forces CUDA/NVDEC, so a codec/profile it can't handle
         // (or a box without an NVIDIA GPU) errors the pass — retry in pure software
@@ -656,19 +666,21 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         if (!ok && parameters.UseHardwareDecode && !cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning("Hardware-accelerated detection pass failed for {Input}; retrying in software.", filePath);
-            (_, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, useHardware: false, cancellationToken);
+            (_, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, useHardware: false, samplePicture, cancellationToken);
         }
 
         return result;
     }
 
-    private async Task<(bool Ok, (List<DetectedInterval> Silence, List<DetectedInterval> Black) Result)> RunDetectionProcessAsync(
-        string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, bool useHardware, CancellationToken cancellationToken)
+    private async Task<(bool Ok, (List<DetectedInterval> Silence, List<DetectedInterval> Black, List<PictureSample> Pictures) Result)> RunDetectionProcessAsync(
+        string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, bool useHardware, bool samplePicture, CancellationToken cancellationToken)
     {
         var silenceStarts = new List<double>();
         var silenceEnds = new List<double>();
         var blackStarts = new List<double>();
         var blackEnds = new List<double>();
+        var pictureReadings = new SortedDictionary<double, Dictionary<string, double>>();
+        double? pictureTime = null;
 
         var noiseArg = parameters.NoiseThresholdDb.ToString(CultureInfo.InvariantCulture);
         var silenceMin = parameters.MinSilenceDurationSec.ToString(CultureInfo.InvariantCulture);
@@ -712,7 +724,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         }
         processInfo.ArgumentList.Add("-af");
         processInfo.ArgumentList.Add($"silencedetect=noise={noiseArg}dB:d={silenceMin}");
-        var blackFilter = $"blackdetect=d={blackMin}:pix_th=0.10";
+        var blackFilter = $"blackdetect=d={blackMin}:pix_th=0.10" + (samplePicture ? PictureSampleFilter : "");
         processInfo.ArgumentList.Add("-vf");
         processInfo.ArgumentList.Add(useHardware
             ? $"scale_cuda=-2:{BlackDetectHeight}:format=nv12,hwdownload,format=nv12,{blackFilter}"
@@ -742,6 +754,8 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             var bEnd = BlackEndRegex.Match(e.Data);
             if (bEnd.Success && double.TryParse(bEnd.Groups["Time"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var bEndSec))
                 blackEnds.Add(Math.Max(0, bEndSec));
+
+            if (samplePicture) ReadPictureLine(e.Data, pictureReadings, ref pictureTime);
         };
 
         process.Start();
@@ -749,7 +763,53 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         var exited = await process.WaitForExitWithTimeoutAsync(ProcessTimeout, _logger, cancellationToken);
         var ok = exited && process.ExitCode == 0;
 
-        return (ok, (ZipIntervals(silenceStarts, silenceEnds), ZipIntervals(blackStarts, blackEnds)));
+        return (ok, (ZipIntervals(silenceStarts, silenceEnds), ZipIntervals(blackStarts, blackEnds), ToPictureSamples(pictureReadings)));
+    }
+
+    internal static void ReadPictureLine(string line, SortedDictionary<double, Dictionary<string, double>> readings, ref double? frameTime)
+    {
+        var frame = PictureFrameRegex.Match(line);
+        if (frame.Success && double.TryParse(frame.Groups["Time"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var frameSec))
+        {
+            frameTime = frameSec;
+            return;
+        }
+
+        var stat = PictureStatRegex.Match(line);
+        if (!stat.Success || frameTime is not double time) return;
+        if (!double.TryParse(stat.Groups["Value"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var value)) return;
+
+        if (!readings.TryGetValue(time, out var reading))
+        {
+            reading = new Dictionary<string, double>();
+            readings[time] = reading;
+        }
+        reading[stat.Groups["Key"].Value] = value;
+    }
+
+    internal static List<PictureSample> ToPictureSamples(SortedDictionary<double, Dictionary<string, double>> readings)
+    {
+        var samples = new List<PictureSample>();
+        foreach (var (time, reading) in readings)
+        {
+            if (!reading.TryGetValue("SATAVG", out var saturation)
+                || !reading.TryGetValue("YLOW", out var lowLuma)
+                || !reading.TryGetValue("YAVG", out var meanLuma)
+                || !reading.TryGetValue("YMAX", out var peakLuma))
+            {
+                continue;
+            }
+
+            samples.Add(new PictureSample
+            {
+                Time = TimeSpan.FromSeconds(Math.Max(0, time)),
+                Saturation = saturation,
+                LowLuma = lowLuma,
+                MeanLuma = meanLuma,
+                PeakLuma = peakLuma
+            });
+        }
+        return samples;
     }
 
     private static List<DetectedInterval> ZipIntervals(List<double> starts, List<double> ends)

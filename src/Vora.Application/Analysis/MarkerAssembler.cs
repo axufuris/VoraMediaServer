@@ -21,6 +21,8 @@ public class MarkerAssemblerInput
     public bool IsEpisode { get; init; }
     public bool DetectIntro { get; init; } = true;
     public bool DetectCredits { get; init; } = true;
+    public List<PictureSample> PictureSamples { get; init; } = new();
+    public List<TimeSpan> ChapterStarts { get; init; } = new();
 }
 
 public interface IMarkerAssembler
@@ -38,6 +40,25 @@ public class MarkerAssembler : IMarkerAssembler
     private static readonly TimeSpan EpisodeRecapWindow = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan CreditsRollMinLength = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MinStingerLength = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan MaxStingerLength = TimeSpan.FromMinutes(5);
+    private const double MaxStingerShareOfCredits = 0.5;
+    private const double CrawlMaxSaturation = 1.5;
+    private const double CrawlMinPeakLuma = 140;
+    private const double CrawlMaxLowLuma = 24;
+    private const double CrawlMaxMeanLuma = 50;
+    private const double BlackMaxPeakLuma = 40;
+    private static readonly TimeSpan CrawlOpeningWindow = TimeSpan.FromSeconds(30);
+    private const int CrawlOpeningMinSamples = 10;
+    private const double CrawlOpeningShare = 0.75;
+    private const double CrawlToEndMaxPictureShare = 0.4;
+    private const int MovieBeforeCrawlMinSamples = 60;
+    private const double MovieBeforeCrawlMaxCrawlShare = 0.2;
+    private static readonly TimeSpan PictureSampleInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan CrawlLeadInSlack = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan MaxTitleSequenceLength = TimeSpan.FromSeconds(135);
+    private static readonly TimeSpan MinFadeOutLength = TimeSpan.FromSeconds(2);
+    private const double SceneMinPictureShare = 0.65;
+    private static readonly TimeSpan SceneJoinGap = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan BoundaryProximity = TimeSpan.FromSeconds(3);
     // A real title sequence / "previously on" runs longer than this. A shorter
     // black+silence blip at the very start is a studio-logo ident (HBO, etc.), not
@@ -82,7 +103,8 @@ public class MarkerAssembler : IMarkerAssembler
             if (recapMarker != null) markers.Add(recapMarker);
         }
 
-        var creditsRollStart = input.DetectCredits ? FindCreditsRollStart(input) : null;
+        var crawl = input.DetectCredits && !input.IsEpisode ? FindCreditsCrawl(input) : null;
+        var creditsRollStart = crawl?.CreditsStart ?? (input.DetectCredits ? FindCreditsRollStart(input) : null);
         if (creditsRollStart != null)
         {
             markers.Add(new DetectedMarker
@@ -94,17 +116,14 @@ public class MarkerAssembler : IMarkerAssembler
 
             if (!input.IsEpisode)
             {
-                var expectedStingers = (input.ExpectsMidCreditsStinger ? 1 : 0) + (input.ExpectsPostCreditsStinger ? 1 : 0);
-                if (expectedStingers > 0)
+                var candidates = crawl != null
+                    ? FindCreditsScenesAroundCrawl(input, crawl)
+                    : FindCreditsScenes(jointGaps, creditsRollStart.Value, input.Duration).ToList();
+                var stingers = PickCreditsScenes(candidates, input.ExpectsMidCreditsStinger, input.ExpectsPostCreditsStinger);
+                for (var i = 0; i < stingers.Count; i++)
                 {
-                    var stingers = FindCreditsScenes(jointGaps, creditsRollStart.Value, input.Duration)
-                        .Take(expectedStingers)
-                        .ToList();
-                    for (var i = 0; i < stingers.Count; i++)
-                    {
-                        stingers[i].Order = i + 1;
-                        markers.Add(stingers[i]);
-                    }
+                    stingers[i].Order = i + 1;
+                    markers.Add(stingers[i]);
                 }
             }
             else
@@ -223,6 +242,179 @@ public class MarkerAssembler : IMarkerAssembler
         return creditsStart.Start;
     }
 
+    private static CreditsCrawl? FindCreditsCrawl(MarkerAssemblerInput input)
+    {
+        var minStart = TimeSpan.FromSeconds(input.Duration.TotalSeconds * CreditsSearchStartFraction);
+        var maxTail = TimeSpan.FromSeconds(input.Duration.TotalSeconds * MaxCreditsRollFraction);
+        var samples = input.PictureSamples
+            .Where(s => s.Time >= minStart && s.Time <= input.Duration)
+            .OrderBy(s => s.Time)
+            .ToList();
+        var shots = samples.Select(Classify).ToList();
+
+        var picturesFromHere = new int[shots.Count + 1];
+        for (var i = shots.Count - 1; i >= 0; i--)
+        {
+            picturesFromHere[i] = picturesFromHere[i + 1] + (shots[i] == Shot.Picture ? 1 : 0);
+        }
+
+        for (var i = 0; i < shots.Count; i++)
+        {
+            if (shots[i] != Shot.Crawl || input.Duration - samples[i].Time > maxTail) continue;
+            if (!OpensACrawl(samples, shots, i)) continue;
+            if (picturesFromHere[i] > (shots.Count - i) * CrawlToEndMaxPictureShare) continue;
+
+            var crawlStart = StartOfBlackLeadingInto(samples[i].Time, input.BlackIntervals);
+            var creditsStart = StartOfTitleSequence(crawlStart, minStart, input);
+            if (MovieLooksLikeCredits(samples, shots, creditsStart)) return null;
+
+            return new CreditsCrawl(creditsStart, crawlStart);
+        }
+
+        return null;
+    }
+
+    private static Shot Classify(PictureSample sample)
+    {
+        if (sample.PeakLuma < BlackMaxPeakLuma) return Shot.Black;
+
+        return sample.Saturation <= CrawlMaxSaturation
+            && sample.PeakLuma >= CrawlMinPeakLuma
+            && sample.LowLuma <= CrawlMaxLowLuma
+            && sample.MeanLuma <= CrawlMaxMeanLuma
+                ? Shot.Crawl
+                : Shot.Picture;
+    }
+
+    private static bool OpensACrawl(List<PictureSample> samples, List<Shot> shots, int first)
+    {
+        int crawl = 0, picture = 0;
+        var windowEnd = samples[first].Time + CrawlOpeningWindow;
+        for (var i = first; i < samples.Count && samples[i].Time < windowEnd; i++)
+        {
+            if (shots[i] == Shot.Crawl) crawl++;
+            else if (shots[i] == Shot.Picture) picture++;
+        }
+
+        return crawl >= CrawlOpeningMinSamples && crawl >= (crawl + picture) * CrawlOpeningShare;
+    }
+
+    private static TimeSpan StartOfBlackLeadingInto(TimeSpan crawlStart, List<DetectedInterval> blackIntervals)
+    {
+        var start = crawlStart;
+        foreach (var black in blackIntervals)
+        {
+            if (black.Start <= crawlStart + PictureSampleInterval
+                && black.End >= crawlStart - CrawlLeadInSlack
+                && black.Start < start)
+            {
+                start = black.Start;
+            }
+        }
+        return start;
+    }
+
+    private static TimeSpan StartOfTitleSequence(TimeSpan crawlStart, TimeSpan minStart, MarkerAssemblerInput input)
+    {
+        var earliest = crawlStart - MaxTitleSequenceLength;
+        if (earliest < minStart) earliest = minStart;
+
+        return input.BlackIntervals
+            .Where(b => b.Duration >= MinFadeOutLength)
+            .Select(b => b.Start)
+            .Concat(input.ChapterStarts)
+            .Where(t => t >= earliest && t < crawlStart)
+            .DefaultIfEmpty(crawlStart)
+            .Min();
+    }
+
+    private static bool MovieLooksLikeCredits(List<PictureSample> samples, List<Shot> shots, TimeSpan creditsStart)
+    {
+        int crawl = 0, picture = 0;
+        for (var i = 0; i < samples.Count && samples[i].Time < creditsStart; i++)
+        {
+            if (shots[i] == Shot.Crawl) crawl++;
+            else if (shots[i] == Shot.Picture) picture++;
+        }
+
+        return crawl + picture >= MovieBeforeCrawlMinSamples
+            && crawl > (crawl + picture) * MovieBeforeCrawlMaxCrawlShare;
+    }
+
+    private static List<DetectedMarker> FindCreditsScenesAroundCrawl(MarkerAssemblerInput input, CreditsCrawl crawl)
+    {
+        var cuts = input.BlackIntervals
+            .Where(b => b.End > crawl.CreditsStart && b.Start < input.Duration)
+            .Select(b => (b.Start, b.End))
+            .Concat(input.ChapterStarts
+                .Where(c => c > crawl.CreditsStart && c < input.Duration)
+                .Select(c => (Start: c, End: c)))
+            .OrderBy(c => c.Start)
+            .ToList();
+
+        var segments = new List<CreditsSegment>();
+        var from = crawl.CreditsStart;
+        foreach (var (start, end) in cuts)
+        {
+            if (start > from) segments.Add(MeasureSegment(from, start, input.PictureSamples));
+            if (end > from) from = end;
+        }
+        if (input.Duration > from) segments.Add(MeasureSegment(from, input.Duration, input.PictureSamples));
+
+        var merged = new List<CreditsSegment>();
+        foreach (var segment in segments.Where(s => s.Samples > 0))
+        {
+            if (merged.Count > 0 && JoinsPreviousScene(merged[^1], segment, crawl.CrawlStart))
+            {
+                var previous = merged[^1];
+                merged[^1] = new CreditsSegment(previous.Start, segment.End, previous.Samples + segment.Samples, previous.Pictures + segment.Pictures);
+                continue;
+            }
+            merged.Add(segment);
+        }
+
+        var creditsLength = input.Duration - crawl.CreditsStart;
+        return merged
+            .Skip(1)
+            .Where(s => s.IsScene
+                && s.End >= crawl.CrawlStart - CrawlLeadInSlack
+                && CouldBeACreditsScene(s.Start, s.End, crawl.CreditsStart, creditsLength))
+            .Select(s => new DetectedMarker { Type = MarkerType.CreditsScene, Start = s.Start, End = s.End })
+            .ToList();
+    }
+
+    private static CreditsSegment MeasureSegment(TimeSpan start, TimeSpan end, List<PictureSample> samples)
+    {
+        int count = 0, pictures = 0;
+        foreach (var sample in samples)
+        {
+            if (sample.Time <= start || sample.Time >= end) continue;
+            count++;
+            if (Classify(sample) == Shot.Picture) pictures++;
+        }
+        return new CreditsSegment(start, end, count, pictures);
+    }
+
+    private static bool JoinsPreviousScene(CreditsSegment previous, CreditsSegment next, TimeSpan crawlStart) =>
+        previous.Start > crawlStart
+        && previous.IsScene
+        && next.IsScene
+        && next.Start - previous.End <= SceneJoinGap;
+
+    private enum Shot
+    {
+        Black,
+        Crawl,
+        Picture
+    }
+
+    private sealed record CreditsCrawl(TimeSpan CreditsStart, TimeSpan CrawlStart);
+
+    private sealed record CreditsSegment(TimeSpan Start, TimeSpan End, int Samples, int Pictures)
+    {
+        public bool IsScene => Samples > 0 && Pictures >= Samples * SceneMinPictureShare;
+    }
+
     private static List<DetectedInterval> MergeCloseIntervals(List<DetectedInterval> sorted, TimeSpan maxGap)
     {
         var merged = new List<DetectedInterval>();
@@ -246,13 +438,13 @@ public class MarkerAssembler : IMarkerAssembler
             .Where(g => g.Start >= creditsStart && g.End <= duration)
             .OrderBy(g => g.Start)
             .ToList();
+        var creditsLength = duration - creditsStart;
 
         for (var i = 0; i < gapsInCredits.Count - 1; i++)
         {
             var sceneStart = gapsInCredits[i].End;
             var sceneEnd = gapsInCredits[i + 1].Start;
-            if (sceneEnd - sceneStart < MinStingerLength) continue;
-            if (sceneStart <= creditsStart + BoundaryProximity) continue;
+            if (!CouldBeACreditsScene(sceneStart, sceneEnd, creditsStart, creditsLength)) continue;
 
             yield return new DetectedMarker
             {
@@ -261,6 +453,24 @@ public class MarkerAssembler : IMarkerAssembler
                 End = sceneEnd
             };
         }
+    }
+
+    private static bool CouldBeACreditsScene(TimeSpan start, TimeSpan end, TimeSpan creditsStart, TimeSpan creditsLength)
+    {
+        var length = end - start;
+        return length >= MinStingerLength
+            && start > creditsStart + BoundaryProximity
+            && length <= MaxStingerLength
+            && length.TotalSeconds <= creditsLength.TotalSeconds * MaxStingerShareOfCredits;
+    }
+
+    private static List<DetectedMarker> PickCreditsScenes(List<DetectedMarker> candidates, bool expectsMid, bool expectsPost)
+    {
+        if (candidates.Count == 0) return [];
+        if (expectsMid && expectsPost) return candidates.Count == 1 ? [candidates[0]] : [candidates[0], candidates[^1]];
+        if (expectsPost) return [candidates[^1]];
+        if (expectsMid) return [candidates[0]];
+        return [];
     }
 
     private static DetectedMarker? FindEpisodePreview(List<DetectedInterval> jointGaps, TimeSpan creditsStart, TimeSpan duration)
