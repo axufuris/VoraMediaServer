@@ -137,8 +137,11 @@ export default function DetailHero({
     const isStill = posterShape === 'still';
 
     return (
-        <header className="relative" style={{ minHeight: '22rem' }}>
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-0 w-full md:w-[70%] lg:w-[64%]">
+        <header className="relative grid" style={{ minHeight: '22rem' }}>
+            <div
+                data-testid="hero-backdrop"
+                className="pointer-events-none absolute right-0 top-0 z-0 aspect-video w-full lg:w-[min(64%,calc(70vh*16/9))]"
+            >
                 <CinematicBackdrop
                     src={backdropSrc}
                     intensity="detail"
@@ -149,8 +152,14 @@ export default function DetailHero({
                 />
             </div>
 
-            <div className="relative z-10 px-12 pb-6 pt-6">
-                <div className={`grid gap-8 md:items-center ${isStill ? 'md:grid-cols-[20rem_1fr]' : 'md:grid-cols-[12.5rem_1fr]'}`}>
+            <div
+                data-testid="hero-backdrop-spacer"
+                aria-hidden="true"
+                className="col-start-1 row-start-1 lg:pt-[min(36%,70vh)]"
+            />
+
+            <div className={`relative z-10 col-start-1 row-start-1 flex flex-col justify-center px-12 pb-6 pt-6 ${techChips ? 'lg:pb-16' : ''}`}>
+                <div className={`grid gap-8 lg:items-center ${isStill ? 'lg:grid-cols-[16rem_1fr] xl:grid-cols-[20rem_1fr]' : 'lg:grid-cols-[12.5rem_1fr]'}`}>
                     <div className="shrink-0">
                         <div
                             className={`relative overflow-hidden ${isStill ? 'aspect-video' : 'aspect-[2/3]'}`}

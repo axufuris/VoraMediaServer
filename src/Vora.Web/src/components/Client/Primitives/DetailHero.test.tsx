@@ -115,8 +115,8 @@ describe('DetailHero', () => {
     it('centres the poster against the text beside it', () => {
         const { container } = render(<DetailHero title="House of the Dragon" posterSrc="https://example.test/poster.jpg" />);
 
-        const grid = container.querySelector('div[class*="md:grid-cols-"]');
-        expect(grid?.className).toContain('md:items-center');
+        const grid = container.querySelector('div[class*="lg:grid-cols-"]');
+        expect(grid?.className).toContain('lg:items-center');
     });
 
     it('draws the title treatment in place of the text when the item has one', () => {
@@ -158,11 +158,60 @@ describe('DetailHero', () => {
     });
 });
 
+describe('DetailHero backdrop', () => {
+    it('keeps the artwork in a 16:9 box anchored top-right instead of stretching it to the text', () => {
+        render(<DetailHero title="Scrubs" backdropSrc="https://example.test/backdrop.jpg" />);
+
+        const backdrop = screen.getByTestId('hero-backdrop');
+        expect(backdrop.className).toContain('aspect-video');
+        expect(backdrop.className).toContain('top-0');
+        expect(backdrop.className).not.toContain('inset-y-0');
+    });
+
+    it('holds the hero open to the backdrop height, which is its 16:9 share of the width', () => {
+        render(<DetailHero title="Scrubs" backdropSrc="https://example.test/backdrop.jpg" />);
+
+        const backdrop = screen.getByTestId('hero-backdrop').className;
+        const spacer = screen.getByTestId('hero-backdrop-spacer').className;
+
+        expect(backdrop).toContain('lg:w-[min(64%,calc(70vh*16/9))]');
+        expect(spacer).toContain('lg:pt-[min(36%,70vh)]');
+    });
+
+    it('stacks the poster over the text until the page is wide enough for both side by side', () => {
+        const { container } = render(<DetailHero title="Scrubs" posterShape="still" posterSrc="https://example.test/still.jpg" />);
+
+        const grid = container.querySelector('div[class*="grid-cols-"]');
+
+        expect(grid?.className).not.toMatch(/(^|\s)md:grid-cols-/);
+        expect(grid?.className).toContain('lg:grid-cols-[16rem_1fr]');
+        expect(grid?.className).toContain('xl:grid-cols-[20rem_1fr]');
+    });
+
+    it('shares one grid cell between the spacer and the content so the content centres against the artwork', () => {
+        render(<DetailHero title="Scrubs" backdropSrc="https://example.test/backdrop.jpg" />);
+
+        const spacer = screen.getByTestId('hero-backdrop-spacer');
+        const content = screen.getByRole('heading', { level: 1 }).closest('div.flex');
+
+        expect(spacer.className).toContain('col-start-1 row-start-1');
+        expect(content?.className).toContain('col-start-1 row-start-1');
+        expect(content?.className).toContain('justify-center');
+    });
+});
+
 describe('DetailHero tech chips', () => {
     it('renders the chips in their own corner group', () => {
         render(<DetailHero title="Idiots" techChips={<span>1080p</span>} />);
 
         expect(screen.getByTestId('hero-tech-chips')).toHaveTextContent('1080p');
+    });
+
+    it('keeps room under the text for the corner chips so they never sit on the overview', () => {
+        render(<DetailHero title="Idiots" techChips={<span>1080p</span>} />);
+
+        const content = screen.getByRole('heading', { level: 1 }).closest('div.flex');
+        expect(content?.className).toContain('lg:pb-16');
     });
 
     it('renders no group when there are none', () => {
