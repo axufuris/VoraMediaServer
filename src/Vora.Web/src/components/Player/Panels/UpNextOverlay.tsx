@@ -1,4 +1,6 @@
 import type { UpNextItemVM, UpNextResultVM } from '../../../api/Media/mediaService';
+import MediaCard from '../../Client/Primitives/MediaCard';
+import MediaRow from '../../Client/Primitives/MediaRow';
 
 interface CurrentMediaSummary {
     title: string;
@@ -75,34 +77,17 @@ export default function UpNextOverlay({ currentMedia, upNextData, onPlayNext, on
                 )}
 
                 {upNextData?.relatedLists.map(list => (
-                    <div key={list.title} className="mb-10">
-                        <h3 className="m-0 mb-4 text-xl font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{list.title}</h3>
-                        <div className="flex gap-4 overflow-x-auto pb-4">
-                            {list.items.map(item => (
-                                <div
-                                    key={item.id}
-                                    onClick={() => onPlayNext(item)}
-                                    className={`group shrink-0 cursor-pointer ${item.type === 'Episode' ? 'w-56' : 'w-36'}`}
-                                >
-                                    <div
-                                        className={`${item.type === 'Episode' ? 'aspect-video' : 'aspect-[2/3]'} relative mb-2 overflow-hidden transition-all`}
-                                        style={{
-                                            background: 'var(--vora-bg-surface)',
-                                            border: '1px solid var(--vora-border-subtle)',
-                                            borderRadius: 'var(--vora-radius-md)',
-                                            boxShadow: 'var(--vora-shadow-md)',
-                                        }}
-                                    >
-                                        {item.posterUrl ? <img src={item.posterUrl} className="h-full w-full object-cover" /> : null}
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                                            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" style={{ color: 'var(--vora-accent-500)' }}><polygon points="5 3 19 12 5 21 5 3" /></svg>
-                                        </div>
-                                    </div>
-                                    <h4 className="m-0 truncate text-sm font-medium" style={{ color: 'var(--vora-text-primary)' }}>{item.title}</h4>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <MediaRow key={list.title} title={list.title} variant="section" className="mb-6">
+                        {list.items.map(item => (
+                            <MediaCard
+                                key={item.id}
+                                item={item}
+                                imageUrl={item.posterUrl}
+                                shape={item.type === 'Episode' ? 'still' : 'poster'}
+                                onClick={() => { void onPlayNext(item); }}
+                            />
+                        ))}
+                    </MediaRow>
                 ))}
             </div>
 
