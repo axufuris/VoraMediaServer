@@ -42,7 +42,6 @@ public class MarkerAssembler : IMarkerAssembler
     private static readonly TimeSpan MinStingerLength = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan MaxStingerLength = TimeSpan.FromMinutes(5);
     private const double MaxStingerShareOfCredits = 0.5;
-    public static readonly DateTime MovieCreditsRulesChangedAt = new(2026, 10, 6, 16, 0, 0, DateTimeKind.Utc);
     private const double CrawlMaxSaturation = 1.5;
     private const double CrawlMinPeakLuma = 140;
     private const double CrawlMaxLowLuma = 24;

@@ -182,24 +182,6 @@ public class MediaAnalyzerManagerDetectionTests
     }
 
     [Fact]
-    public async Task A_movie_analyzed_before_the_credits_rules_changed_is_detected_again()
-    {
-        var id = Guid.NewGuid();
-        StubMovieReady(id, "/m/a.mkv", TimeSpan.FromMinutes(90), meanDb: -20);
-        _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
-        {
-            MarkersAnalyzedAt = MarkerAssembler.MovieCreditsRulesChangedAt.AddDays(-1),
-            MarkersPredateMovieCreditsRules = true,
-            EnableIntroDetection = true,
-            EnableCreditsDetection = true
-        });
-
-        await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: false, cancellationToken: TestContext.Current.CancellationToken);
-
-        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/m/a.mkv", Arg.Any<SilenceDetectionParameters>(), TestContext.Current.CancellationToken);
-    }
-
-    [Fact]
     public async Task Movies_sample_the_picture_in_the_tail_and_hand_it_to_the_assembler()
     {
         var id = Guid.NewGuid();
