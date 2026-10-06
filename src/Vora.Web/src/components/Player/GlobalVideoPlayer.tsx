@@ -22,7 +22,7 @@ import { useVideoThumbnails } from '../../hooks/useVideoThumbnails';
 import { isImageSubtitleCodec, isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
 import { placeCues } from '../../utils/subtitleCuePlacement';
 import { useFeatureFlags } from '../../hooks/useFeatureFlags';
-import { ScrubThumbnail } from './VideoScrubThumbnails';
+import { ScrubPreview } from './VideoScrubThumbnails';
 import { seasonEpisodeLabel } from '../../utils/seasonLabel';
 import { safeMediaUrl } from '../../utils/safeUrl';
 
@@ -660,17 +660,15 @@ export default function GlobalVideoPlayer() {
                 />
             )}
 
-            {thumbnails.available && (
-                <ScrubThumbnail
-                    hoverPercent={hoverPercent}
-                    duration={duration}
-                    barRect={hoverBarRect}
-                    cue={hoverCue}
-                    spriteUrl={thumbnails.spriteUrl}
-                    width={thumbnails.width}
-                    height={thumbnails.height}
-                />
-            )}
+            <ScrubPreview
+                hoverPercent={hoverPercent}
+                duration={duration}
+                barRect={hoverBarRect}
+                cue={thumbnails.available ? hoverCue : null}
+                spriteUrl={thumbnails.spriteUrl}
+                width={thumbnails.width}
+                height={thumbnails.height}
+            />
 
             {isMinimized && (
                 <div className="z-10 flex h-full w-full flex-1 items-center justify-between px-6">
