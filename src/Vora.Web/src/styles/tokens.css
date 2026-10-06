@@ -386,6 +386,50 @@
     color: var(--vora-accent-text);
 }
 
+[data-vora-client] .vora-split-pill {
+    display: inline-flex;
+    align-items: stretch;
+    overflow: hidden;
+    color: var(--vora-text-secondary);
+    border: 1px solid var(--vora-border-subtle);
+    transition: background-color var(--vora-duration-fast) var(--vora-ease-out),
+                border-color var(--vora-duration-fast) var(--vora-ease-out),
+                color var(--vora-duration-fast) var(--vora-ease-out);
+}
+
+[data-vora-client] .vora-split-pill[data-active="true"],
+[data-vora-client] .vora-split-pill:has(> button:hover),
+[data-vora-client] .vora-split-pill:has(> button:focus-visible),
+[data-vora-client] .vora-split-pill:has(> button[aria-expanded="true"]) {
+    border-color: var(--vora-accent-soft-hover);
+    color: var(--vora-accent-text);
+}
+
+[data-vora-client] .vora-split-pill[data-active="true"] {
+    background: var(--vora-accent-soft);
+}
+
+[data-vora-client] .vora-split-pill > button {
+    background: transparent;
+    color: inherit;
+    outline: none;
+    transition: background-color var(--vora-duration-fast) var(--vora-ease-out);
+}
+
+[data-vora-client] .vora-split-pill > button:hover,
+[data-vora-client] .vora-split-pill > button:focus-visible,
+[data-vora-client] .vora-split-pill > button[aria-expanded="true"] {
+    background: var(--vora-accent-soft);
+}
+
+[data-vora-client] .vora-split-pill-divider {
+    align-self: center;
+    width: 1px;
+    height: 1.1rem;
+    background: currentColor;
+    opacity: 0.35;
+}
+
 [data-vora-client] .vora-guide-row:hover {
     background: rgba(255, 255, 255, 0.025);
 }

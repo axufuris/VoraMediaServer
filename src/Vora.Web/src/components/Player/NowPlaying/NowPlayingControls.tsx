@@ -44,6 +44,51 @@ export function NowPlayingPill({ label, icon, active, onClick, title, controls, 
     );
 }
 
+interface NowPlayingSplitPillProps {
+    label: string;
+    icon: ReactNode;
+    active: boolean;
+    onClick: () => void;
+    title?: string;
+    menuLabel: string;
+    menuTitle?: string;
+    menuOpen: boolean;
+    menuControls: string;
+    onMenu: () => void;
+    menuRef?: Ref<HTMLButtonElement>;
+}
+
+export function NowPlayingSplitPill({ label, icon, active, onClick, title, menuLabel, menuTitle, menuOpen, menuControls, onMenu, menuRef }: NowPlayingSplitPillProps) {
+    return (
+        <div role="group" aria-label={label} data-active={active} className="vora-split-pill h-9 rounded-full text-sm font-medium">
+            <button
+                type="button"
+                onClick={onClick}
+                title={title ?? label}
+                aria-pressed={active}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-l-full pl-3.5 pr-2.5"
+            >
+                {icon}
+                {label}
+            </button>
+            <span className="vora-split-pill-divider" aria-hidden="true" />
+            <button
+                ref={menuRef}
+                type="button"
+                onClick={onMenu}
+                aria-label={menuLabel}
+                title={menuTitle ?? menuLabel}
+                aria-haspopup="dialog"
+                aria-expanded={menuOpen}
+                aria-controls={menuControls}
+                className="inline-flex w-8 cursor-pointer items-center justify-center rounded-r-full pr-0.5"
+            >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
+            </button>
+        </div>
+    );
+}
+
 interface NowPlayingIconButtonProps {
     label: string;
     onClick: () => void;
