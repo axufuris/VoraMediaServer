@@ -457,6 +457,33 @@ public class AiPlaylistServiceTests
         used.Should().HaveCount(7);
     }
 
+    [Fact]
+    public void A_song_the_library_has_twice_is_picked_once_as_its_better_copy()
+    {
+        var mp3 = new AiTrackCandidate(Guid.NewGuid(), "The Chainsmokers", null, 0.40, "High", 175, "mp3", 44100, 320);
+        var other = new AiTrackCandidate(Guid.NewGuid(), "Daft Punk", null, 0.41, "High Fidelity", 330, "mp3", 44100, 320);
+        var flac = new AiTrackCandidate(Guid.NewGuid(), "The Chainsmokers", null, 0.42, "High", 175, "flac", 44100, 959);
+        var used = new HashSet<Guid>();
+
+        var pick = AiPlaylistService.PickVaried(new[] { mp3, other, flac }, 10, used);
+
+        pick.Tracks.Select(t => t.TrackId).Should().Equal(flac.TrackId, other.TrackId);
+        pick.Copies.Should().Be(1);
+        used.Should().Contain(new[] { mp3.TrackId, flac.TrackId });
+    }
+
+    [Fact]
+    public void A_song_another_playlist_used_is_skipped_whichever_copy_it_used()
+    {
+        var mp3 = new AiTrackCandidate(Guid.NewGuid(), "The Chainsmokers", null, 0.40, "High", 175, "mp3", 44100, 320);
+        var flac = new AiTrackCandidate(Guid.NewGuid(), "The Chainsmokers", null, 0.42, "High", 175, "flac", 44100, 959);
+        var other = new AiTrackCandidate(Guid.NewGuid(), "Daft Punk", null, 0.43, "Musique", 270, "mp3", 44100, 320);
+
+        var pick = AiPlaylistService.PickVaried(new[] { mp3, flac, other }, 10, new HashSet<Guid> { mp3.TrackId });
+
+        pick.Tracks.Select(t => t.TrackId).Should().Equal(other.TrackId);
+    }
+
     private static List<AiTrackCandidate> At(params double[] distances) =>
         distances.Select((d, i) => new AiTrackCandidate(Guid.NewGuid(), $"artist{i % 10}", null, d)).ToList();
 

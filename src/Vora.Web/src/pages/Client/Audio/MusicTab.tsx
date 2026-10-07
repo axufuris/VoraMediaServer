@@ -601,7 +601,7 @@ export default function MusicTab() {
             id: track.id,
             title: track.title,
             subtitle: track.artist ?? '',
-            posterUrl: currentMix?.artworkUrl,
+            posterUrl: track.albumArtworkUrl ?? currentMix?.artworkUrl,
             streamUrl: musicService.getTrackStreamUrl(track.id, baseUrl, audioQualityStore.get()),
             serverId: server?.id,
             container: 'audio',

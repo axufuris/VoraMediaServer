@@ -56,25 +56,37 @@ public class MusicRecommendationManagerHelpersTests
         MusicRecommendationManager.ProfileHasFewPlays(new List<ArtistPlayScore>(), minPlays: 1).Should().BeTrue();
     }
 
-    // ---------- DedupeById ----------
+    // ---------- DedupeBySong ----------
 
     [Fact]
-    public void DedupeById_preserves_first_occurrence_order()
+    public void DedupeBySong_preserves_first_occurrence_order()
     {
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
         var id3 = Guid.NewGuid();
         var input = new List<Track> { Trk(id1), Trk(id2), Trk(id1), Trk(id3), Trk(id2) };
 
-        var deduped = MusicRecommendationManager.DedupeById(input);
+        var deduped = MusicRecommendationManager.DedupeBySong(input);
 
         deduped.Select(t => t.Id).Should().Equal(id1, id2, id3);
     }
 
     [Fact]
-    public void DedupeById_returns_empty_list_for_empty_input()
+    public void DedupeBySong_returns_empty_list_for_empty_input()
     {
-        MusicRecommendationManager.DedupeById(new List<Track>()).Should().BeEmpty();
+        MusicRecommendationManager.DedupeBySong(new List<Track>()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DedupeBySong_keeps_one_copy_of_a_song_the_library_has_twice_and_takes_the_lossless_one()
+    {
+        var single = new Track { Id = Guid.NewGuid(), Title = "High", Artist = "The Chainsmokers", DurationSeconds = 175, AudioCodec = "mp3", Bitrate = 320 };
+        var other = new Track { Id = Guid.NewGuid(), Title = "Rap God", Artist = "Eminem", DurationSeconds = 363, AudioCodec = "mp3", Bitrate = 320 };
+        var album = new Track { Id = Guid.NewGuid(), Title = "High", Artist = "The Chainsmokers", DurationSeconds = 175, AudioCodec = "flac", SampleRate = 44100, Bitrate = 959 };
+
+        var deduped = MusicRecommendationManager.DedupeBySong(new List<Track> { single, other, album });
+
+        deduped.Select(t => t.Id).Should().Equal(album.Id, other.Id);
     }
 
     // ---------- InterleaveForVariety ----------

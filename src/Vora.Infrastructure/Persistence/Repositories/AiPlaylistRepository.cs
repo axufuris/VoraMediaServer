@@ -65,12 +65,19 @@ public class AiPlaylistRepository : IAiPlaylistRepository
                      : t.Album.ArtworkUrl != null && t.Album.ArtworkUrl.Trim() != string.Empty
                          ? t.Album.ArtworkUrl
                          : t.Album.Artist.ArtworkUrl,
-                 Distance = e.Embedding!.CosineDistance(target)
+                 Distance = e.Embedding!.CosineDistance(target),
+                 t.Title,
+                 t.DurationSeconds,
+                 t.AudioCodec,
+                 t.SampleRate,
+                 t.Bitrate
              })
             .Take(take)
             .ToListAsync());
 
-        return rows.Select(r => new AiTrackCandidate(r.Id, r.Artist ?? string.Empty, r.Art, r.Distance)).ToList();
+        return rows
+            .Select(r => new AiTrackCandidate(r.Id, r.Artist ?? string.Empty, r.Art, r.Distance, r.Title, r.DurationSeconds, r.AudioCodec, r.SampleRate, r.Bitrate))
+            .ToList();
     }
 
     public async Task<List<TrackForOrdering>> GetTracksForOrderingAsync(IReadOnlyCollection<Guid> trackIds)

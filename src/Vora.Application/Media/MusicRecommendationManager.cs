@@ -178,6 +178,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
             ContentRating = t.ContentRating,
             ContentRatingSource = MusicContentRating.SourceOf(t),
             AlbumId = t.AlbumId,
+            AlbumArtworkUrl = AlbumCoverArt.For(t.Album),
             IsLiked = likedIds.Contains(t.Id),
             GlobalListeners = t.GlobalListeners,
             GlobalPlays = t.GlobalPlays,
@@ -380,21 +381,17 @@ public class MusicRecommendationManager : IMusicRecommendationManager
             }
         }
 
-        candidates = DedupeById(candidates);
+        candidates = DedupeBySong(candidates);
         var interleaved = InterleaveForVariety(candidates, maxConsecutiveSameArtist: 1, maxPerArtist: 3);
         return interleaved.Take(targetSize).Select(t => t.Id).ToList();
     }
 
-    internal static List<Track> DedupeById(List<Track> tracks)
-    {
-        var seen = new HashSet<Guid>();
-        var output = new List<Track>(tracks.Count);
-        foreach (var t in tracks)
-        {
-            if (seen.Add(t.Id)) output.Add(t);
-        }
-        return output;
-    }
+    internal static List<Track> DedupeBySong(List<Track> tracks) =>
+        SameSong.Group(
+                tracks.DistinctBy(t => t.Id),
+                t => new SongFacts(t.Artist ?? t.Album?.Artist?.Name, t.Title, t.DurationSeconds, t.AudioCodec, t.SampleRate, t.Bitrate))
+            .Select(s => s.Best)
+            .ToList();
 
     internal static List<Track> InterleaveForVariety(List<Track> input, int maxConsecutiveSameArtist, int maxPerArtist)
     {
@@ -629,7 +626,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
             }
         }
 
-        var deduped = DedupeById(candidates);
+        var deduped = DedupeBySong(candidates);
         var interleaved = InterleaveForVariety(deduped, maxConsecutiveSameArtist: 1, maxPerArtist: 3);
         var final = interleaved.Take(size).ToList();
 
@@ -1088,7 +1085,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
 
         if (candidates.Count == 0) return;
 
-        var deduped = DedupeById(candidates);
+        var deduped = DedupeBySong(candidates);
         var interleaved = InterleaveForVariety(deduped, 1, 3).Take(settings.DailyMixSize).ToList();
         var artwork = AlbumCoverArt.FirstFor(interleaved);
 
@@ -1165,7 +1162,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
 
             if (candidates.Count == 0) continue;
 
-            var interleaved = InterleaveForVariety(DedupeById(candidates), 1, 3).Take(settings.DailyMixSize).ToList();
+            var interleaved = InterleaveForVariety(DedupeBySong(candidates), 1, 3).Take(settings.DailyMixSize).ToList();
             var artwork = AlbumCoverArt.FirstFor(interleaved);
             var trackIds = interleaved.Select(t => t.Id).ToList();
 
@@ -1230,7 +1227,7 @@ public class MusicRecommendationManager : IMusicRecommendationManager
             return;
         }
 
-        var deduped = DedupeById(candidates);
+        var deduped = DedupeBySong(candidates);
         var interleaved = InterleaveForVariety(deduped, 1, 3).Take(Math.Max(20, settings.DailyMixSize)).ToList();
         var trackIds = interleaved.Select(t => t.Id).ToList();
         var artwork = AlbumCoverArt.FirstFor(interleaved);
