@@ -140,7 +140,7 @@ export default function DetailHero({
         <header className="relative grid" style={{ minHeight: '22rem' }}>
             <div
                 data-testid="hero-backdrop"
-                className="pointer-events-none absolute right-0 top-0 z-0 aspect-video w-full lg:w-[min(64%,calc(70vh*16/9))]"
+                className="pointer-events-none absolute right-0 top-0 z-0 aspect-video w-full lg:w-[min(64%,calc(60vh*16/9),calc(40rem*16/9))]"
             >
                 <CinematicBackdrop
                     src={backdropSrc}
@@ -155,7 +155,7 @@ export default function DetailHero({
             <div
                 data-testid="hero-backdrop-spacer"
                 aria-hidden="true"
-                className="col-start-1 row-start-1 lg:pt-[min(36%,70vh)]"
+                className="col-start-1 row-start-1 lg:pt-[min(36%,60vh,40rem)]"
             />
 
             <div className={`relative z-10 col-start-1 row-start-1 flex flex-col justify-center px-12 pb-6 pt-6 ${techChips ? 'lg:pb-16' : ''}`}>

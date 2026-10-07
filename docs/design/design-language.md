@@ -95,7 +95,7 @@ Two new responsibilities, both handled by a new `CinematicBackdrop` primitive:
 
 1. **Page backdrop** — large image (1920×1080+ ideally) behind or beside a page's header section. Two masking modes:
    - `mask="scrim"` (default) — full-bleed, with gradient scrims painted *over* the artwork so overlaid text stays legible. Used by the collection, actor and playlist pages.
-   - `mask="edge"` — the artwork itself dissolves at its left and bottom edges, so it can sit *beside* content instead of under it and melt into the page rather than ending on a hard seam. This is what `DetailHero` uses: the backdrop keeps its 16:9 shape in the top right of the header (64% of the width on wide layouts, capped at 70% of the window height) and the header is held open to its height, so the image is never cropped to fit the text. Implemented as two nested one-axis CSS masks rather than `mask-composite`, which is still uneven across engines.
+   - `mask="edge"` — the artwork itself dissolves at its left and bottom edges, so it can sit *beside* content instead of under it and melt into the page rather than ending on a hard seam. This is what `DetailHero` uses: the backdrop keeps its 16:9 shape in the top right of the header (64% of the width on wide layouts, capped at 60% of the window height and 40rem) and the header is held open to its height, so the image is never cropped to fit the text. Implemented as two nested one-axis CSS masks rather than `mask-composite`, which is still uneven across engines.
 2. **Template canvas image** — already supported in `ThemeManifest.backgrounds.canvas`. Renders behind the whole app at low opacity (0.06–0.12) with an optional tint. Holiday templates lean on this hard.
 
 The `CinematicBackdrop` API:
