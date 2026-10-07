@@ -307,9 +307,8 @@ public class PosterOverlayManager : IPosterOverlayManager
         }
 
         var fetchUrl = UpgradeArtworkUrlForOverlay(urlOrPath);
-
-        var uri = new Uri(fetchUrl);
-        var safeName = string.Concat(uri.AbsolutePath.Where(c => char.IsLetterOrDigit(c) || c == '.' || c == '-'));
+        var safeName = OriginalArtworkCacheFileName(urlOrPath);
+        if (safeName == null) return string.Empty;
         var localPath = Path.Combine(_originalArtworkCacheDir, safeName);
 
         if (File.Exists(localPath)) return localPath;
@@ -327,6 +326,14 @@ public class PosterOverlayManager : IPosterOverlayManager
             _logger.LogError(ex, "Failed to download artwork from {Url}.", fetchUrl);
             return string.Empty;
         }
+    }
+
+    public static string? OriginalArtworkCacheFileName(string url)
+    {
+        if (!url.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return null;
+        if (!Uri.TryCreate(UpgradeArtworkUrlForOverlay(url), UriKind.Absolute, out var uri)) return null;
+        var name = string.Concat(uri.AbsolutePath.Where(c => char.IsLetterOrDigit(c) || c == '.' || c == '-'));
+        return name.Length == 0 ? null : name;
     }
 
     private static string UpgradeArtworkUrlForOverlay(string url)

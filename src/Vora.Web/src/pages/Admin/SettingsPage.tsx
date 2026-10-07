@@ -7,18 +7,19 @@ import RequestServersTab from '../../components/Admin/Settings/RequestServersTab
 import CoreSettingsTab from '../../components/Admin/Settings/CoreSettingsTab';
 import RemoteAccessTab from '../../components/Admin/Settings/RemoteAccessTab';
 import EmailTab from '../../components/Admin/Settings/EmailTab';
+import StorageTab from '../../components/Admin/Settings/StorageTab';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import FeatureTabs from '../../components/Admin/Features/FeatureTabs';
 import { resolveAdminPath } from '../../components/Admin/Shell/adminNavData';
 
-type SettingsTabKey = 'core' | 'remote' | 'email' | 'requests';
+type SettingsTabKey = 'core' | 'remote' | 'email' | 'requests' | 'storage';
 
 export default function SettingsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const storageKey = `admin_settings_tab_${serverId || 'global'}`;
     const [activeTab, setActiveTab] = useState<SettingsTabKey>(() => {
         const saved = localStorage.getItem(storageKey);
-        return (saved === 'core' || saved === 'remote' || saved === 'email' || saved === 'requests') ? saved : 'core';
+        return (saved === 'core' || saved === 'remote' || saved === 'email' || saved === 'requests' || saved === 'storage') ? saved : 'core';
     });
     const [scanners, setScanners] = useState<{ id: string, name: string }[]>([]);
     const [hardwareDevices, setHardwareDevices] = useState<string[]>([]);
@@ -47,7 +48,7 @@ export default function SettingsPage() {
         <div data-vora-page="">
             <PageHeader
                 title="System Settings"
-                description="Server name, transcoder behavior, remote access, email, and request providers."
+                description="Server name, transcoder behavior, remote access, email, request providers and storage clean-up."
             />
 
             <div className="px-8 pt-2 pb-10 max-w-6xl mx-auto">
@@ -67,6 +68,7 @@ export default function SettingsPage() {
                         { key: 'remote', label: 'Remote Access' },
                         { key: 'email', label: 'Email' },
                         { key: 'requests', label: 'Request Servers' },
+                        { key: 'storage', label: 'Storage' },
                     ]}
                     activeKey={activeTab}
                     onChange={k => setActiveTab(k as SettingsTabKey)}
@@ -83,6 +85,9 @@ export default function SettingsPage() {
                 )}
                 {activeTab === 'requests' && (
                     <RequestServersTab serverId={serverId} showModal={showModal} />
+                )}
+                {activeTab === 'storage' && (
+                    <StorageTab serverId={serverId} />
                 )}
             </div>
 

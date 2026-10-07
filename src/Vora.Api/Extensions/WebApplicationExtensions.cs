@@ -115,6 +115,7 @@ public static class WebApplicationExtensions
         app.MapActorEndpoints();
         app.MapAdminEndpoints();
         app.MapBackupEndpoints();
+        app.MapMaintenanceEndpoints();
         app.MapAdminNotificationEndpoints();
         app.MapArtworkEndpoints();
         app.MapAuthEndpoints();

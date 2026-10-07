@@ -363,6 +363,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMediaArtworkRepository, MediaArtworkRepository>();
         services.AddScoped<IMediaDedupeRepository, MediaDedupeRepository>();
         services.AddScoped<IMediaRepository, MediaRepository>();
+        services.AddScoped<Vora.Application.Maintenance.IStorageReferenceRepository, StorageReferenceRepository>();
         services.AddScoped<IMusicRepository, MusicRepository>();
         services.AddScoped<Vora.Plugins.Interfaces.IMusicBrainzIdCache, Vora.Application.Media.MusicBrainzIdCache>();
         services.AddScoped<IMusicRecommendationRepository, MusicRecommendationRepository>();
@@ -395,6 +396,7 @@ public static class ServiceRegistrationExtensions
     {
         services.AddScoped<IActorManager, ActorManager>();
         services.AddScoped<IAdminNotificationManager, AdminNotificationManager>();
+        services.AddScoped<Vora.Application.Maintenance.IUnusedFileManager, Vora.Application.Maintenance.UnusedFileManager>();
         services.AddScoped<IAiStatsManager, AiStatsManager>();
         services.AddScoped<IAuthManager, AuthManager>();
         services.AddScoped<IJwtSecurityStampValidator, JwtSecurityStampValidator>();

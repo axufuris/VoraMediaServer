@@ -297,6 +297,8 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         DeleteMatching(transcodeTempDirectory, PartFailurePattern(mediaPartId), keepFileName: null);
     }
 
+    public string GetCacheDirectory(string transcodeTempDirectory) => CacheDirectory(transcodeTempDirectory);
+
     public IReadOnlyCollection<Guid> ListCachedPartIds(string transcodeTempDirectory)
     {
         if (string.IsNullOrWhiteSpace(transcodeTempDirectory)) return Array.Empty<Guid>();

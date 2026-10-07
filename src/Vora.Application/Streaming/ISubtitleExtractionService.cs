@@ -9,4 +9,5 @@ public interface ISubtitleExtractionService
     Task<bool> ConvertToWebVttAsync(string sourceFilePath, string destinationPath, CancellationToken cancellationToken = default);
     void PurgePart(string transcodeTempDirectory, Guid mediaPartId);
     IReadOnlyCollection<Guid> ListCachedPartIds(string transcodeTempDirectory);
+    string GetCacheDirectory(string transcodeTempDirectory);
 }
