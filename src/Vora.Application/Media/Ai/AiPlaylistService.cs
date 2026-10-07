@@ -363,28 +363,29 @@ public class AiPlaylistService : IAiPlaylistService
     // further pass lets every artist in once more.
     public static AiPick PickVaried(IReadOnlyList<AiTrackCandidate> candidates, int count, HashSet<Guid> used)
     {
+        var songs = SameSong.Group(candidates, c => c.Song);
         var perArtist = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var picked = new SortedDictionary<int, AiTrackCandidate>();
         var cap = MaxPerArtist;
 
         while (true)
         {
-            for (var i = 0; i < candidates.Count && picked.Count < count; i++)
+            for (var i = 0; i < songs.Count && picked.Count < count; i++)
             {
-                var c = candidates[i];
-                if (used.Contains(c.TrackId)) continue;
-                perArtist.TryGetValue(c.ArtistKey, out var n);
+                var song = songs[i];
+                if (song.All.Any(c => used.Contains(c.TrackId))) continue;
+                perArtist.TryGetValue(song.Best.ArtistKey, out var n);
                 if (n >= cap) continue;
-                perArtist[c.ArtistKey] = n + 1;
-                used.Add(c.TrackId);
-                picked[i] = c;
+                perArtist[song.Best.ArtistKey] = n + 1;
+                foreach (var copy in song.All) used.Add(copy.TrackId);
+                picked[i] = song.Best;
             }
 
-            if (picked.Count >= count || candidates.All(c => used.Contains(c.TrackId))) break;
+            if (picked.Count >= count || songs.All(s => s.All.Any(c => used.Contains(c.TrackId)))) break;
             cap++;
         }
 
-        return new AiPick(picked.Values.ToList(), perArtist.Count == 0 ? 0 : perArtist.Values.Max());
+        return new AiPick(picked.Values.ToList(), perArtist.Count == 0 ? 0 : perArtist.Values.Max(), candidates.Count - songs.Count);
     }
 
     private void LogSpread(string label, int wanted, double window, double limit, IReadOnlyList<AiTrackCandidate> candidates, IReadOnlyList<AiTrackCandidate> matches, AiPick pick)
@@ -396,10 +397,10 @@ public class AiPlaylistService : IAiPlaylistService
         }
 
         _logger.LogInformation(
-            "AI playlist {Label}: asked for {Wanted} songs. {Candidates} candidates, distance nearest {Nearest:F3}, 10th {Tenth:F3}, median {Median:F3}, furthest {Furthest:F3}. {Matches} within {Limit:F3} (10th + window {Window:F2}) from {Artists} artists. Picked {Picked}, up to {PerArtist} per artist.",
+            "AI playlist {Label}: asked for {Wanted} songs. {Candidates} candidates, distance nearest {Nearest:F3}, 10th {Tenth:F3}, median {Median:F3}, furthest {Furthest:F3}. {Matches} within {Limit:F3} (10th + window {Window:F2}) from {Artists} artists, {Copies} of them second copies of a song. Picked {Picked}, up to {PerArtist} per artist.",
             LogValue.SingleLine(label), wanted, candidates.Count,
             candidates[0].Distance, candidates[Math.Min(9, candidates.Count - 1)].Distance, candidates[candidates.Count / 2].Distance, candidates[^1].Distance,
-            matches.Count, limit, window, matches.Select(m => m.ArtistKey).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            matches.Count, limit, window, matches.Select(m => m.ArtistKey).Distinct(StringComparer.OrdinalIgnoreCase).Count(), pick.Copies,
             pick.Tracks.Count, pick.PerArtist);
     }
 
@@ -427,11 +428,14 @@ public class AiPlaylistService : IAiPlaylistService
             var t = step / (float)(BridgeLength - 1);
             var point = Blend(from, 1 - t, to, t);
             var nearest = await _repository.FindNearestTracksAsync(point, access, new AiTrackFilter(Exclude: used), 8);
-            var next = nearest.FirstOrDefault(c => !used.Contains(c.TrackId) && perArtist.GetValueOrDefault(c.ArtistKey) < MaxPerArtist);
+            var next = SameSong.Group(nearest, c => c.Song).FirstOrDefault(s =>
+                s.All.All(c => !used.Contains(c.TrackId))
+                && !path.Any(p => SameSong.Same(p.Song, s.Best.Song))
+                && perArtist.GetValueOrDefault(s.Best.ArtistKey) < MaxPerArtist);
             if (next == null) continue;
-            used.Add(next.TrackId);
-            perArtist[next.ArtistKey] = perArtist.GetValueOrDefault(next.ArtistKey) + 1;
-            path.Add(next);
+            foreach (var copy in next.All) used.Add(copy.TrackId);
+            perArtist[next.Best.ArtistKey] = perArtist.GetValueOrDefault(next.Best.ArtistKey) + 1;
+            path.Add(next.Best);
         }
         return path;
     }
@@ -682,7 +686,7 @@ public class AiPlaylistService : IAiPlaylistService
     };
 }
 
-public sealed record AiPick(List<AiTrackCandidate> Tracks, int PerArtist);
+public sealed record AiPick(List<AiTrackCandidate> Tracks, int PerArtist, int Copies = 0);
 
 public class AiPlaylistsVM
 {

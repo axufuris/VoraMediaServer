@@ -32,7 +32,19 @@ public sealed record PlayedVector(float[] Vector, int Plays);
 
 public sealed record TrackForOrdering(Guid TrackId, string Title, string? Artist, Vora.Domain.Enums.TrackEnergy? Energy, List<string>? Moods);
 
-public sealed record AiTrackCandidate(Guid TrackId, string ArtistKey, string? ArtworkUrl, double Distance = 0);
+public sealed record AiTrackCandidate(
+    Guid TrackId,
+    string ArtistKey,
+    string? ArtworkUrl,
+    double Distance = 0,
+    string? Title = null,
+    int? DurationSeconds = null,
+    string? AudioCodec = null,
+    int? SampleRate = null,
+    int? Bitrate = null)
+{
+    public SongFacts Song => new(ArtistKey, Title, DurationSeconds, AudioCodec, SampleRate, Bitrate);
+}
 
 public sealed record AiTrackFilter(int? YearFrom = null, int? YearTo = null, IReadOnlyCollection<Guid>? Exclude = null)
 {

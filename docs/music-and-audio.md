@@ -48,7 +48,7 @@ Gates: profiles with `< 3 distinct artists` or `< 50 plays` are skipped (recomme
 
 **`RecommendationRefreshWorker`** background service ticks daily; runs `RefreshAllActiveProfilesAsync` (daily mixes) and `RefreshWeeklyMixesForAllAsync` (Discover, Mood, Release Radar) on the weekly cadence stored in `ServerSetting`.
 
-Surfaced through `/api/music/recommendations/mixes`, rendered in the Music tab "Made for You" + "Moods" + "Release Radar" rows.
+Surfaced through `/api/music/recommendations/mixes`, rendered in the Music tab "Made for You" + "Moods" + "Release Radar" rows. Every generator passes its songs through `DedupeBySong`, so a song the library holds twice (a single and its album, a remaster, a FLAC beside an MP3) is in a mix once, as its best copy — see **Same song** in `docs/ai-playlists.md`. A mix's tracks carry `AlbumArtworkUrl` (`AlbumCoverArt.For`), and a queued mix song uses it, so the queue and Now Playing show each song's own cover rather than the mix's.
 
 ## Stations + radio
 

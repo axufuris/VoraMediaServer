@@ -76,6 +76,7 @@ export interface TrackVM {
     contentRating?: string;
     contentRatingSource?: MusicContentRatingSource;
     albumId?: string;
+    albumArtworkUrl?: string | null;
     isLiked: boolean;
     serverAdminRating?: number;
     globalListeners?: number | null;

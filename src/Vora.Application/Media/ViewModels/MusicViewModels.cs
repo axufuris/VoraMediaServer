@@ -77,6 +77,7 @@ public class TrackVM
     public string? ContentRating { get; set; }
     public MusicContentRatingSource ContentRatingSource { get; set; }
     public Guid? AlbumId { get; set; }
+    public string? AlbumArtworkUrl { get; set; }
     public bool IsLiked { get; set; }
     public decimal? ServerAdminRating { get; set; }
     public long? GlobalListeners { get; set; }
