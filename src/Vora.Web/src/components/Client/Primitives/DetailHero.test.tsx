@@ -174,8 +174,8 @@ describe('DetailHero backdrop', () => {
         const backdrop = screen.getByTestId('hero-backdrop').className;
         const spacer = screen.getByTestId('hero-backdrop-spacer').className;
 
-        expect(backdrop).toContain('lg:w-[min(64%,calc(70vh*16/9))]');
-        expect(spacer).toContain('lg:pt-[min(36%,70vh)]');
+        expect(backdrop).toContain('lg:w-[min(64%,calc(60vh*16/9),calc(40rem*16/9))]');
+        expect(spacer).toContain('lg:pt-[min(36%,60vh,40rem)]');
     });
 
     it('stacks the poster over the text until the page is wide enough for both side by side', () => {
