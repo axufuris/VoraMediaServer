@@ -1,11 +1,7 @@
-<?xml version="1.0"?>
-<Profile>
-  <Author>axufuris</Author>
-  <Repo>Vora Templates</Repo>
-  <Language>en_US</Language>
-  <Vendor>Vora</Vendor>
-  <Support>https://github.com/axufuris/VoraMediaServer/discussions/categories/q-a</Support>
-  <Project>https://getvora.net</Project>
-  <Description>Community Applications templates for Vora - a self-hosted media server for movies, TV, music, and IPTV with DVR, and its required pgvector PostgreSQL backend.</Description>
+<?xml version="1.0" encoding="utf-8"?>
+<CommunityApplications>
+  <Profile>Vora Templates — Community Applications templates for Vora, a self-hosted media server for movies, TV, music, and IPTV with DVR and AI-assisted discovery, with cinematic clients for Android, Android TV, Fire TV, Roku, and the web. This repository provides the Vora Media Server container. Vora requires a PostgreSQL database with the pgvector extension, available as the pgvector app already in Community Applications. Support is handled through GitHub Discussions (Q&amp;A) and Issues on the project repository.</Profile>
   <Icon>https://getvora.net/vora-icon-512.png</Icon>
-</Profile>
+  <WebPage>https://getvora.net</WebPage>
+  <Forum>https://github.com/axufuris/VoraMediaServer/discussions/categories/q-a</Forum>
+</CommunityApplications>

@@ -113,7 +113,7 @@ docker run -d \
   -v /mnt/media/shows:/media/shows:ro \
   -v /mnt/media/music:/media/music:ro \
   --link vora-postgres \
-  ghcr.io/axufuris/vora-media-server:qa
+  ghcr.io/axufuris/vora-media-server:latest
 ```
 
 Vora is now reachable at `http://<host>:8080`. The first profile you
@@ -183,7 +183,7 @@ services:
       - /srv/vora/postgres-data:/var/lib/postgresql/data
 
   vora:
-    image: ghcr.io/axufuris/vora-media-server:qa
+    image: ghcr.io/axufuris/vora-media-server:latest
     container_name: vora
     restart: unless-stopped
     depends_on:
@@ -285,7 +285,7 @@ Apply, then wait for the container to go green in the Docker tab.
 | Field | Value |
 | --- | --- |
 | Name | `vora` |
-| Repository | `ghcr.io/axufuris/vora-media-server:qa` |
+| Repository | `ghcr.io/axufuris/vora-media-server:latest` |
 | Network Type | `vora` (same custom bridge as Postgres) |
 | Restart Policy | `unless-stopped` |
 | Port: container `8080` | host `8080` (or any free port) |
@@ -583,21 +583,22 @@ published to GHCR as
 `ghcr.io/axufuris/vora-media-server:<version>`.
 
 - **Stable releases** — `1.2.3`, plus the rolling `1.2`, `1` and `latest` tags.
-- **Pre-releases** — `0.1.0-beta.1` and friends. A GitHub release marked as a
+- **Pre-releases** — `1.1.0-beta.1` and friends. A GitHub release marked as a
   pre-release never moves `latest` or the rolling tags, so `latest` always
   points at the newest stable build. Pin the exact tag to run a beta.
 - **QA builds** — every push to `main` publishes `:qa` and `:qa-<short-sha>`.
   Not for production.
 
-While Vora is on `0.x`, breaking changes (schema, endpoints, plugin contracts)
-can land in a minor bump. Read the release notes before upgrading.
+From 1.0, breaking changes (schema, endpoints, plugin contracts) only land in a
+major release; minor releases add features and patch releases fix bugs. Read
+the release notes before upgrading.
 
 The running server reports its own build at `GET /api/system/version`, and the
 admin sidebar shows it at the bottom. Include that version in any bug report.
 
 ### Cutting a release (maintainers)
 
-1. Tag the commit: `git tag v0.1.0-beta.1 && git push origin v0.1.0-beta.1`.
+1. Tag the commit: `git tag v1.0.0 && git push origin v1.0.0`.
 2. Publish a GitHub release for that tag, ticking **Set as a pre-release** for
    anything that isn't stable.
 3. `deploy-prod.yml` then runs the test suite, builds the image with the tag
