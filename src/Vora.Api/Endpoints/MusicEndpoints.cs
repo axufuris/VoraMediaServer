@@ -8,6 +8,7 @@ using Vora.Application.Media;
 using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
 using Vora.Application.Search.ViewModels;
+using Vora.Application.Settings;
 using Vora.Application.Streaming;
 using Vora.Application.Tasks;
 using Vora.Plugins.Dtos;
@@ -952,14 +953,16 @@ public static class MusicEndpoints
 
         var token = signer.Sign(StreamTokenScope, trackId.ToString(), StreamTokenTtl);
         var qualityParam = !string.IsNullOrWhiteSpace(quality) ? $"&quality={Uri.EscapeDataString(quality)}" : string.Empty;
-        var transcoding = ResolveAudioBitrate(quality) > 0;
+        var bitrate = ResolveAudioBitrate(quality);
+        var transcoding = bitrate > 0;
         var container = transcoding ? TranscodedContainer : DirectContainer(path);
 
         return Results.Ok(new MusicStreamUrlResponse
         {
             Url = $"/api/music/tracks/{trackId}/stream?t={token}{qualityParam}",
             Container = container,
-            ContentType = transcoding ? audioTranscodeService.ResolveContentType(container) : AudioContentType(container)
+            ContentType = transcoding ? audioTranscodeService.ResolveContentType(container) : AudioContentType(container),
+            Quality = transcoding ? AudioQuality.For(TranscodedContainer, null, bitrate) : null
         });
     }
 
@@ -991,7 +994,7 @@ public static class MusicEndpoints
         _ => string.Empty
     };
 
-    private static async Task<IResult> StreamTrackAsync(Guid trackId, [FromQuery] string? t, [FromQuery] string? quality, IMusicManager manager, IAudioTranscodeService audioTranscodeService, IStreamingTokenSigner signer, HttpContext httpContext)
+    private static async Task<IResult> StreamTrackAsync(Guid trackId, [FromQuery] string? t, [FromQuery] string? quality, IMusicManager manager, IAudioTranscodeService audioTranscodeService, IStreamingTokenSigner signer, ISystemSettingsRepository settingsRepository, HttpContext httpContext)
     {
         if (string.IsNullOrEmpty(t) || !signer.TryVerify(t, StreamTokenScope, out var payload) || payload != trackId.ToString())
         {
@@ -1002,15 +1005,13 @@ public static class MusicEndpoints
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return Results.NotFound();
 
         var bitrate = ResolveAudioBitrate(quality);
-        if (bitrate <= 0)
-        {
-            return Results.File(path, AudioContentType(DirectContainer(path)), enableRangeProcessing: true);
-        }
+        var transcoded = bitrate > 0
+            ? await audioTranscodeService.GetTranscodedFileAsync(trackId, path, bitrate, TranscodedContainer, StreamManager.ResolveTempDirectory(await settingsRepository.GetSettingsAsync()), httpContext.RequestAborted)
+            : null;
 
-        const string targetCodec = TranscodedContainer;
-        var contentType = audioTranscodeService.ResolveContentType(targetCodec);
-        var ct = httpContext.RequestAborted;
-        return Results.Stream(output => audioTranscodeService.WriteTranscodedAudioAsync(path, bitrate, targetCodec, output, ct), contentType: contentType);
+        return transcoded == null
+            ? Results.File(path, AudioContentType(DirectContainer(path)), enableRangeProcessing: true)
+            : Results.File(transcoded, audioTranscodeService.ResolveContentType(TranscodedContainer), enableRangeProcessing: true);
     }
 
     private static int ResolveAudioBitrate(string? quality)

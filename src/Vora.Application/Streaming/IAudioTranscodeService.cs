@@ -4,5 +4,5 @@ public interface IAudioTranscodeService
 {
     string ResolveContentType(string targetCodec);
 
-    Task WriteTranscodedAudioAsync(string sourceFilePath, int bitrateKbps, string targetCodec, Stream output, CancellationToken cancellationToken);
+    Task<string?> GetTranscodedFileAsync(Guid trackId, string sourceFilePath, int bitrateKbps, string targetCodec, string transcodeTempDirectory, CancellationToken cancellationToken);
 }

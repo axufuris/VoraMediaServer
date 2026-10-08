@@ -1,15 +1,18 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { PlayerProvider } from './PlayerContext';
 import { usePlayer, type PlayableMedia } from './usePlayer';
+import type { AudioQualityVM } from '../api/Music/musicService';
 
 const resolved = () => Promise.resolve(undefined);
 
+const stream = vi.hoisted(() => ({ quality: null as AudioQualityVM | null }));
+
 vi.mock('../api/Music/musicService', () => ({
     musicService: new Proxy({}, {
-        get: (_target, prop) => prop === 'resolveTrackStreamUrl'
-            ? () => Promise.resolve('https://example.test/track.mp3')
+        get: (_target, prop) => prop === 'resolveTrackStream'
+            ? () => Promise.resolve({ url: 'https://example.test/track.mp3', quality: stream.quality })
             : resolved,
     }),
 }));
@@ -130,5 +133,33 @@ describe('other media', () => {
         act(() => result.current.playMedia({ id: 'station', title: 'KEXP', streamUrl: 'https://example.test/live', playbackContextType: 'LiveRadio' }));
 
         await waitFor(() => expect(result.current.isFullscreen).toBe(false));
+    });
+});
+
+describe('stream quality', () => {
+    const mp3: AudioQualityVM = { format: 'MP3', bitrate: 192, lossless: false, hiRes: false, label: 'MP3 · 192 kbps' };
+
+    afterEach(() => { stream.quality = null; });
+
+    it('carries the quality the server streams', async () => {
+        stream.quality = mp3;
+        const { result } = renderHook(() => usePlayer(), { wrapper });
+
+        act(() => result.current.playQueue(album, 0));
+
+        await waitFor(() => expect(result.current.currentMedia?.streamQuality?.label).toBe('MP3 · 192 kbps'));
+    });
+
+    it('switches the playing track when the quality changes', async () => {
+        const { result } = renderHook(() => usePlayer(), { wrapper });
+        act(() => result.current.playQueue(album, 0));
+        await waitFor(() => expect(result.current.currentMedia?.streamUrl).toBe('https://example.test/track.mp3'));
+        expect(result.current.currentMedia?.streamQuality).toBeNull();
+
+        stream.quality = mp3;
+        act(() => { window.dispatchEvent(new CustomEvent('audio-quality-changed')); });
+
+        await waitFor(() => expect(result.current.currentMedia?.streamQuality?.label).toBe('MP3 · 192 kbps'));
+        expect(result.current.currentMedia?.id).toBe('1');
     });
 });

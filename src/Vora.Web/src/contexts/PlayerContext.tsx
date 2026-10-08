@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { streamingService } from '../api/Streaming/streamingService';
 import { useSignalREvent } from '../hooks/useSignalREvent';
-import { musicService, type RadioSeed } from '../api/Music/musicService';
+import { musicService, type AudioQualityVM, type RadioSeed } from '../api/Music/musicService';
 import { serverVault } from '../utils/serverVault';
 import { audioQualityStore, crossfadeStore, eqPresetStore, EQ_PRESETS } from '../utils/audioQuality';
 import { StorageKeys } from '../utils/storageKeys';
@@ -141,7 +141,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
     const preloadedUrlRef = useRef<string | null>(null);
-    const preloadedTrackUrlRef = useRef<{ id: string; url: string } | null>(null);
+    const preloadedTrackUrlRef = useRef<{ id: string; url: string; quality: AudioQualityVM | null } | null>(null);
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -290,23 +290,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             const trackId = media.id;
             const server = media.serverId ? serverVault.getServer(media.serverId) : serverVault.getActiveServer();
             const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
-            const video = videoRef.current;
-            const resumeAt = video?.currentTime ?? 0;
-            musicService.resolveTrackStreamUrl(trackId, baseUrl, audioQualityStore.get(), media.serverId)
-                .then((newUrl) => {
+            const resumeAt = videoRef.current?.currentTime ?? 0;
+            preloadedUrlRef.current = null;
+            preloadedTrackUrlRef.current = null;
+            musicService.resolveTrackStream(trackId, baseUrl, audioQualityStore.get(), media.serverId)
+                .then((stream) => {
                     if (currentMediaRef.current?.id !== trackId) return;
-                    const newItem = { ...item, streamUrl: newUrl };
+                    const newItem = { ...item, streamUrl: stream.url, streamQuality: stream.quality };
                     const updatedQueue = [...queueRef.current];
                     updatedQueue[idx] = newItem;
                     setQueue(updatedQueue);
                     queueRef.current = updatedQueue;
-                    setCurrentMedia(newItem);
-                    setTimeout(() => {
-                        const v = videoRef.current;
-                        if (v && resumeAt > 0) {
-                            try { v.currentTime = resumeAt; } catch { /* ignore */ }
-                        }
-                    }, 200);
+                    setCurrentMedia(resumeAt > 0 ? { ...newItem, startPosition: resumeAt } : newItem);
                 })
                 .catch(() => { /* ignore */ });
         };
@@ -337,11 +332,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         preloadedUrlRef.current = nextItem.id;
         const server = nextItem.serverId ? serverVault.getServer(nextItem.serverId) : serverVault.getActiveServer();
         const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
-        musicService.resolveTrackStreamUrl(nextItem.id, baseUrl, audioQualityStore.get(), nextItem.serverId)
-            .then((url) => {
-                const safeUrl = safeMediaUrl(url);
+        musicService.resolveTrackStream(nextItem.id, baseUrl, audioQualityStore.get(), nextItem.serverId)
+            .then((stream) => {
+                const safeUrl = safeMediaUrl(stream.url);
                 if (preloadedUrlRef.current !== nextItem.id || !safeUrl) return;
-                preloadedTrackUrlRef.current = { id: nextItem.id, url: safeUrl };
+                preloadedTrackUrlRef.current = { id: nextItem.id, url: safeUrl, quality: stream.quality };
                 try {
                     el.src = safeUrl;
                     el.load();
@@ -363,15 +358,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             const preloaded = preloadedTrackUrlRef.current;
             if (preloaded && preloaded.id === media.id) {
                 preloadedTrackUrlRef.current = null;
-                setCurrentMedia({ ...media, streamUrl: preloaded.url });
+                setCurrentMedia({ ...media, streamUrl: preloaded.url, streamQuality: preloaded.quality });
                 return;
             }
             setCurrentMedia({ ...media, streamUrl: '' });
             const server = media.serverId ? serverVault.getServer(media.serverId) : serverVault.getActiveServer();
             const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
-            musicService.resolveTrackStreamUrl(media.id, baseUrl, audioQualityStore.get(), media.serverId)
-                .then((url) => {
-                    setCurrentMedia((cur) => (cur && cur.id === media.id ? { ...cur, streamUrl: url } : cur));
+            musicService.resolveTrackStream(media.id, baseUrl, audioQualityStore.get(), media.serverId)
+                .then((stream) => {
+                    setCurrentMedia((cur) => (cur && cur.id === media.id ? { ...cur, streamUrl: stream.url, streamQuality: stream.quality } : cur));
                 })
                 .catch(() => { /* ignore */ });
             return;

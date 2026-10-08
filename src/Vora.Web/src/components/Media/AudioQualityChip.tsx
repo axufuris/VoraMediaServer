@@ -2,10 +2,13 @@ import type { AudioQualityVM } from '../../api/Music/musicService';
 
 interface AudioQualityChipProps {
     quality?: AudioQualityVM | null;
+    convertedFrom?: AudioQualityVM | null;
 }
 
-export default function AudioQualityChip({ quality }: AudioQualityChipProps) {
+export default function AudioQualityChip({ quality, convertedFrom }: AudioQualityChipProps) {
     if (!quality?.label) return null;
+
+    const kind = quality.hiRes ? 'High-resolution lossless audio' : quality.lossless ? 'Lossless audio' : 'Compressed audio';
 
     return (
         <span
@@ -14,7 +17,7 @@ export default function AudioQualityChip({ quality }: AudioQualityChipProps) {
                 borderColor: quality.hiRes ? 'var(--vora-accent-500)' : 'var(--vora-border-subtle)',
                 color: quality.hiRes ? 'var(--vora-accent-text)' : 'var(--vora-text-secondary)',
             }}
-            title={quality.hiRes ? 'High-resolution lossless audio' : quality.lossless ? 'Lossless audio' : 'Compressed audio'}
+            title={convertedFrom?.label ? `${kind}, converted from ${convertedFrom.label}` : kind}
         >
             {quality.label}
         </span>
