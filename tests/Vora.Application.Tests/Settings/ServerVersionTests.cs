@@ -49,6 +49,6 @@ public class ServerVersionTests
         var version = ServerVersion.Read(typeof(ServerVersion).Assembly);
 
         version.Version.Should().NotBe("unknown");
-        version.Version.Should().StartWith("0.");
+        version.Version.Should().MatchRegex(@"^\d+\.\d+\.\d+");
     }
 }
