@@ -113,7 +113,7 @@ docker run -d \
   -v /mnt/media/shows:/media/shows:ro \
   -v /mnt/media/music:/media/music:ro \
   --link vora-postgres \
-  ghcr.io/axufuris/vora-media-server:qa
+  ghcr.io/axufuris/vora-media-server:latest
 ```
 
 Vora is now reachable at `http://<host>:8080`. The first profile you
@@ -183,7 +183,7 @@ services:
       - /srv/vora/postgres-data:/var/lib/postgresql/data
 
   vora:
-    image: ghcr.io/axufuris/vora-media-server:qa
+    image: ghcr.io/axufuris/vora-media-server:latest
     container_name: vora
     restart: unless-stopped
     depends_on:
@@ -285,7 +285,7 @@ Apply, then wait for the container to go green in the Docker tab.
 | Field | Value |
 | --- | --- |
 | Name | `vora` |
-| Repository | `ghcr.io/axufuris/vora-media-server:qa` |
+| Repository | `ghcr.io/axufuris/vora-media-server:latest` |
 | Network Type | `vora` (same custom bridge as Postgres) |
 | Restart Policy | `unless-stopped` |
 | Port: container `8080` | host `8080` (or any free port) |

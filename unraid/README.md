@@ -2,14 +2,16 @@
 
 These templates let Unraid users install Vora from **Apps** (Community Applications).
 
-- `../ca_profile.xml` — repo profile (author, support, icon) read by Community Applications. Kept at the repo root.
+- `../ca_profile.xml` — repo profile (description, support, icon) read by Community Applications. Kept at the repo root.
 - `vora.xml` — the Vora media server container.
-- `vora-postgres.xml` — the required PostgreSQL + pgvector database.
 
 ## Requirements for users
-Vora needs a PostgreSQL database with the `pgvector` extension. Install **vora-postgres**
-first, and put both containers on the same user-defined Docker network (create one under
-**Settings → Docker → Add network**, e.g. `vora`) so Vora can reach Postgres by name.
+Vora needs a PostgreSQL database with the `pgvector` extension. From **Apps**, install the
+existing **pgvector** application, name its container `vora-postgres`, and set a database,
+user, and password for Vora. Put the pgvector container and Vora on the same user-defined
+Docker network (create one under **Settings → Docker → Add network**, e.g. `vora`) so Vora
+can reach Postgres by container name. If you name the pgvector container something other than
+`vora-postgres`, update the **Database Connection** host in the Vora template to match.
 
 ## Submitting to Community Applications
 1. Ensure a `:latest` image tag exists (cut a production GitHub release).
