@@ -8,6 +8,7 @@ using Vora.Application.Artwork;
 using Vora.Application.Collections;
 using Vora.Application.Iptv;
 using Vora.Application.Libraries;
+using Vora.Application.Maintenance;
 using Vora.Application.Media;
 using Vora.Application.Metadata;
 using Vora.Application.Posters;
@@ -66,6 +67,7 @@ public interface ITaskQueueManager
     void QueueGenerateAiEmbeddings();
     void QueueGenerateLibraryPosterOverlays(Guid libraryId, string? libraryName = null);
     void QueueOverlayOrphanSweep();
+    void QueueUnusedFileRemoval();
     void QueueIptvEpgSync();
     void QueueIptvHealthCheck(Guid playlistId, string? playlistName = null);
     void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false);
@@ -839,6 +841,15 @@ public class TaskQueueManager : ITaskQueueManager
         }, resourceKey: OverlaySyncKey, recipe: TaskRecipe.Of(nameof(QueueOverlayOrphanSweep)));
     }
 
+    public void QueueUnusedFileRemoval()
+    {
+        Enqueue("Remove Unused Files", async (ct, sp) =>
+        {
+            var manager = sp.GetRequiredService<IUnusedFileManager>();
+            await manager.RemoveAsync(ct);
+        }, resourceKey: UnusedFilesKey, recipe: TaskRecipe.Of(nameof(QueueUnusedFileRemoval)));
+    }
+
     public void QueueIptvEpgSync()
     {
         Enqueue("IPTV EPG Sync", async (ct, sp) =>
@@ -1327,6 +1338,7 @@ public class TaskQueueManager : ITaskQueueManager
     // and they race writing the same MediaItem rows in parallel DbContexts.
     // The sweep shares the key too so it never deletes a file mid-generation.
     private const string OverlaySyncKey = "poster-overlay-sync";
+    private const string UnusedFilesKey = "unused-files";
 
     private const string MusicAiKey = "music-ai";
 

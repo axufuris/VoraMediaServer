@@ -55,6 +55,7 @@ public class TaskRecipeRoundTripTests
         new(nameof(ITaskQueueManager.QueueGenerateAiEmbeddings), q => q.QueueGenerateAiEmbeddings()),
         new(nameof(ITaskQueueManager.QueueGenerateLibraryPosterOverlays), q => q.QueueGenerateLibraryPosterOverlays(Library, "Movies")),
         new(nameof(ITaskQueueManager.QueueOverlayOrphanSweep), q => q.QueueOverlayOrphanSweep()),
+        new(nameof(ITaskQueueManager.QueueUnusedFileRemoval), q => q.QueueUnusedFileRemoval()),
         new(nameof(ITaskQueueManager.QueueIptvEpgSync), q => q.QueueIptvEpgSync()),
         new(nameof(ITaskQueueManager.QueueIptvHealthCheck), q => q.QueueIptvHealthCheck(Other, "Cable")),
         new(nameof(ITaskQueueManager.QueueGenerateLibraryVideoThumbnails), q => q.QueueGenerateLibraryVideoThumbnails(Library, "Movies", isAdditionTrigger: true),

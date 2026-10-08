@@ -93,6 +93,9 @@ public static class TaskRecipes
             case nameof(ITaskQueueManager.QueueOverlayOrphanSweep):
                 queue.QueueOverlayOrphanSweep();
                 return true;
+            case nameof(ITaskQueueManager.QueueUnusedFileRemoval):
+                queue.QueueUnusedFileRemoval();
+                return true;
             case nameof(ITaskQueueManager.QueueIptvEpgSync):
                 queue.QueueIptvEpgSync();
                 return true;
