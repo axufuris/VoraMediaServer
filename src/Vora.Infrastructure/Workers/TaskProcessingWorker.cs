@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -12,6 +13,7 @@ public class TaskProcessingWorker : BackgroundService
     // parallelize internally (scan/analysis/overlays run several items at once),
     // so a high cap would over-subscribe CPU and providers.
     private const int MaxConcurrency = 3;
+    private const int NamingBatchSize = 100;
 
     private readonly ITaskQueueManager _taskQueue;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -43,6 +45,9 @@ public class TaskProcessingWorker : BackgroundService
 
         void Signal() { try { wakeup.Release(); } catch (ObjectDisposedException) { } }
 
+        var unnamed = Channel.CreateUnbounded<Guid>();
+        var naming = Task.Run(() => NamePendingTasksAsync(unnamed.Reader, stoppingToken), stoppingToken);
+
         // Producer: drain the queue into the pending list and nudge the dispatcher.
         // In production the queue never completes; this loop matters for shutdown
         // and for draining a finite queue (tests).
@@ -53,12 +58,14 @@ public class TaskProcessingWorker : BackgroundService
                 await foreach (var task in _taskQueue.DequeueAsync(stoppingToken))
                 {
                     lock (gate) pending.Add(task);
+                    if (task.NameResolver != null) unnamed.Writer.TryWrite(task.Id);
                     Signal();
                 }
             }
             catch (OperationCanceledException) { }
             finally
             {
+                unnamed.Writer.TryComplete();
                 lock (gate) producerDone = true;
                 Signal();
             }
@@ -125,7 +132,7 @@ public class TaskProcessingWorker : BackgroundService
             // Let in-flight tasks (now cancelled via the linked token) finish so
             // each removes itself from the task list before the worker exits.
             Task[] remaining;
-            lock (gate) remaining = inFlight.ToArray();
+            lock (gate) remaining = inFlight.Append(naming).ToArray();
             try { await Task.WhenAll(remaining); } catch { /* per-task errors already logged */ }
         }
     }
@@ -152,19 +159,8 @@ public class TaskProcessingWorker : BackgroundService
 
             // Resolve a friendly display name (e.g. library/media title) before
             // marking running, so the UI never shows a raw GUID.
-            var resolver = _taskQueue.GetTaskNameResolver(task.Id);
-            if (resolver != null)
-            {
-                try
-                {
-                    var resolved = await resolver(scope.ServiceProvider);
-                    if (!string.IsNullOrWhiteSpace(resolved)) _taskQueue.UpdateTaskName(task.Id, resolved);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Task name resolution failed for {TaskId}", task.Id);
-                }
-            }
+            var resolved = await ResolveNameAsync(task.Id, scope.ServiceProvider);
+            if (resolved != null) _taskQueue.UpdateTaskName(task.Id, resolved);
 
             _logger.LogInformation("Starting Task: {TaskName}", task.Name);
             _taskQueue.MarkTaskAsRunning(task.Id);
@@ -183,6 +179,47 @@ public class TaskProcessingWorker : BackgroundService
         {
             var stoppedByServer = stoppingToken.IsCancellationRequested && !taskToken.Value.IsCancellationRequested;
             _taskQueue.RemoveTask(task.Id, interrupted: stoppedByServer);
+        }
+    }
+
+    private async Task NamePendingTasksAsync(ChannelReader<Guid> unnamed, CancellationToken stoppingToken)
+    {
+        try
+        {
+            while (await unnamed.WaitToReadAsync(stoppingToken))
+            {
+                var names = new Dictionary<Guid, string>();
+                using (var scope = _scopeFactory.CreateScope())
+                {
+                    while (names.Count < NamingBatchSize && unnamed.TryRead(out var taskId))
+                    {
+                        var name = await ResolveNameAsync(taskId, scope.ServiceProvider);
+                        if (name != null) names[taskId] = name;
+                    }
+                }
+
+                if (names.Count > 0) _taskQueue.UpdateTaskNames(names);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task<string?> ResolveNameAsync(Guid taskId, IServiceProvider services)
+    {
+        var resolver = _taskQueue.GetTaskNameResolver(taskId);
+        if (resolver == null) return null;
+
+        try
+        {
+            var resolved = await resolver(services);
+            return string.IsNullOrWhiteSpace(resolved) ? null : resolved;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Task name resolution failed for {TaskId}", taskId);
+            return null;
         }
     }
 }

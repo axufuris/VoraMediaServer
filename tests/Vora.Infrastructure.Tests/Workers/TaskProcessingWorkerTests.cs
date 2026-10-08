@@ -278,4 +278,33 @@ public class TaskProcessingWorkerTests
         maxConcurrent.Should().BeGreaterThan(1, "unrelated tasks should run in parallel");
         completed.Should().Be(total);
     }
+
+    [Fact]
+    public async Task A_task_waiting_behind_another_is_named_before_it_runs()
+    {
+        var (worker, queue, _, controlled) = Build();
+        using var cts = new CancellationTokenSource();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var named = new TaskCompletionSource<IReadOnlyDictionary<Guid, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        queue.When(q => q.UpdateTaskNames(Arg.Any<IReadOnlyDictionary<Guid, string>>()))
+            .Do(call => named.TrySetResult(call.Arg<IReadOnlyDictionary<Guid, string>>()));
+
+        Func<IServiceProvider, Task<string?>> resolver = _ => Task.FromResult<string?>("Pre-extract Subtitles: Heat");
+        var longPass = new QueuedTaskDto { Name = "Pre-extract Subtitles: Shows", ResourceKey = "subtitles", WorkItem = (ct, sp) => release.Task };
+        var waiting = new QueuedTaskDto { Name = "Pre-extract Subtitles: 9f2c", ResourceKey = "subtitles", WorkItem = (ct, sp) => Task.CompletedTask, NameResolver = resolver };
+        queue.GetTaskNameResolver(waiting.Id).Returns(resolver);
+
+        await worker.StartAsync(cts.Token);
+        await controlled.EnqueueAsync(longPass);
+        await controlled.EnqueueAsync(waiting);
+
+        var names = await named.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        names.Should().ContainKey(waiting.Id).WhoseValue.Should().Be("Pre-extract Subtitles: Heat");
+        queue.DidNotReceive().MarkTaskAsRunning(waiting.Id);
+
+        release.SetResult();
+        controlled.Complete();
+        await (worker.ExecuteTask ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await worker.StopAsync(TestContext.Current.CancellationToken);
+    }
 }

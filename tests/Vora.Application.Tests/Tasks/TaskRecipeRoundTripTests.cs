@@ -63,7 +63,7 @@ public class TaskRecipeRoundTripTests
         new(nameof(ITaskQueueManager.QueueLibraryThumbnails), q => q.QueueLibraryThumbnails(Library, "Movies", LibraryThumbnailReason.Force)),
         new(nameof(ITaskQueueManager.QueueRemoveLibraryVideoThumbnails), q => q.QueueRemoveLibraryVideoThumbnails(Library, "Movies")),
         new(nameof(ITaskQueueManager.QueueGenerateMediaItemVideoThumbnails), q => q.QueueGenerateMediaItemVideoThumbnails(Item, "Heat", true)),
-        new(nameof(ITaskQueueManager.QueuePreExtractMediaItemSubtitles), q => q.QueuePreExtractMediaItemSubtitles(Item, "Heat")),
+        new(nameof(ITaskQueueManager.QueuePreExtractMediaItemSubtitles), q => q.QueuePreExtractMediaItemSubtitles(Item, "Heat", Library)),
         new(nameof(ITaskQueueManager.QueuePreExtractLibrarySubtitles), q => q.QueuePreExtractLibrarySubtitles(Library, "Movies")),
         new(nameof(ITaskQueueManager.QueueSubtitleBackfill), q => q.QueueSubtitleBackfill()),
         new(nameof(ITaskQueueManager.QueueRefreshMusicPopularity), q => q.QueueRefreshMusicPopularity()),

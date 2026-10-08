@@ -93,7 +93,7 @@ Rules that make cancel actually work — don't regress these:
 
 ## Task names (no raw GUIDs)
 
-A task can show a friendly name even when the caller didn't pass one. `EnqueueTask(name, workItem, nameResolver?)` stores an optional resolver; the worker runs it (in the task's scope) before marking the task running and calls `UpdateTaskName`. Helpers `LibraryLabel(id, "…: {0}")` and `MediaLabel(id, "…: {0}")` look up the library `Name` / media `Title` by id. Library/media `QueueXxx` methods attach a resolver when no name was supplied (e.g. watcher-triggered scans), so the UI never shows `Scan Library: <guid>`.
+A task can show a friendly name even when the caller didn't pass one. `EnqueueTask(name, workItem, nameResolver?)` stores an optional resolver. **The worker runs it as soon as the task is queued**, not when it starts: its producer hands every task with a resolver to a background naming loop (`NamePendingTasksAsync`, one scope per batch of up to 100), which applies them with `UpdateTaskNames` — one `TasksUpdated` per batch, and the resolver is cleared so it isn't run twice. Resolving only at start left every task waiting behind a long same-key job showing its GUID for hours. The worker still resolves at start for anything the loop hasn't reached. Helpers `LibraryLabel(id, "…: {0}")` and `MediaLabel(id, "…: {0}")` look up the library `Name` / media title by id; `MediaLabel` goes through `MediaTaskTitle`, so an episode reads `Show - S01E02 - Title` and a season `Show - Season 1`. Library/media `QueueXxx` methods attach a resolver when no name was supplied (e.g. watcher-triggered scans), so the UI never shows `Scan Library: <guid>`. A follow-up run (`rerunIfRunning`) takes the finished run's name.
 
 ## Folder watcher → per-file ingest
 
