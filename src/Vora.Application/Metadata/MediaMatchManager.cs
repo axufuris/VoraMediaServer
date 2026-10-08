@@ -22,6 +22,7 @@ public class MediaMatchManager(
     ITaskQueueManager taskQueue,
     ILogger<MediaMatchManager> logger) : IMediaMatchManager
 {
+    public const string MatchLock = "Match";
     private const string TmdbProviderId = "tmdb_metadata";
     private const string TvdbProviderId = "tvdb_metadata";
 
@@ -67,6 +68,7 @@ public class MediaMatchManager(
         item.ImdbId = null;
         item.TvdbId = null;
         MediaMatchIds.Assign(item, source, externalId);
+        item.LockField(MatchLock);
 
         if (existing != null)
         {

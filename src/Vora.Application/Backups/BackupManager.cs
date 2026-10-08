@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Backups.ViewModels;
+using Vora.Application.Watchers;
 
 namespace Vora.Application.Backups;
 
@@ -14,6 +15,8 @@ public sealed class BackupManagerOptions
 
 public sealed class BackupManager : IBackupManager
 {
+    public const string LibraryDefinitionsKey = "library.definitions";
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IBackupSettingsStore _settingsStore;
     private readonly IBackupSizeEstimator _sizeEstimator;
@@ -371,6 +374,11 @@ public sealed class BackupManager : IBackupManager
         if (result.Success)
         {
             _sizeEstimator.Invalidate();
+            if (selected.Any(s => s.Key == LibraryDefinitionsKey))
+            {
+                var watchers = scope.ServiceProvider.GetService<IFolderWatcherService>();
+                if (watchers != null) await watchers.RestartAllWatchersAsync();
+            }
             var notifier = scope.ServiceProvider.GetService<IClientNotifier>();
             if (notifier != null)
             {

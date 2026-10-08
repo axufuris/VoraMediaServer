@@ -46,6 +46,9 @@ public class BackupSectionsTests : IClassFixture<VoraApiTestFactory>
     }
 
     [Theory]
+    [InlineData("library.definitions", "users.profiles")]
+    [InlineData("library.definitions", "library.collections")]
+    [InlineData("library.definitions", "library.media-edits")]
     [InlineData("users.profiles", "users.devices")]
     [InlineData("users.profiles", "iptv.recording-schedules")]
     [InlineData("users.profiles", "users.watch-history")]

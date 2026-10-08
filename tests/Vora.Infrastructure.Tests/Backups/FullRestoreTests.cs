@@ -25,11 +25,13 @@ public sealed class FullRestoreTests
 
     private static List<IBackupSection> SectionsInRestoreOrder(VoraDbContext db, BackupReferenceMapper references) =>
     [
+        new LibraryDefinitionsBackupSection(db),
         new UsersAndProfilesBackupSection(db, references),
         new DevicesBackupSection(db),
         new CollectionsBackupSection(db, references),
         new SmartListsBackupSection(db, references),
         new DedupeRulesBackupSection(db, references),
+        new MediaEditsBackupSection(db, references),
         new IptvPlaylistsBackupSection(db),
         new IptvChannelSettingsBackupSection(db),
         new IptvTunerProfilesBackupSection(db),
@@ -145,6 +147,8 @@ public sealed class FullRestoreTests
         (await check.IptvRecordingSessions.CountAsync(ct)).Should().Be(0);
         (await check.GeneratedMixes.Select(m => m.TrackOrder).SingleAsync(ct)).Should().Equal(target.ParanoidAndroid);
         (await check.CollectionArtwork.CountAsync(ct)).Should().Be(1);
+        (await check.MediaItems.SingleAsync(m => m.Id == target.Matrix, ct)).Title.Should().Be("The Matrix (4K Remaster)");
+        (await check.MediaLibraries.SingleAsync(l => l.Id == target.MoviesLibrary, ct)).EnableCreditsDetection.Should().BeTrue();
 
         var warnings = results.SelectMany(r => r.Warnings).ToList();
         warnings.Should().Contain(w => w.Contains("channel isn't on this server yet"));
@@ -156,6 +160,12 @@ public sealed class FullRestoreTests
     private static async Task SeedEverythingAsync(BackupTestWorld source, CancellationToken ct)
     {
         var db = source.Db;
+
+        var matrix = await db.MediaItems.SingleAsync(m => m.Id == source.Matrix, ct);
+        matrix.Title = "The Matrix (4K Remaster)";
+        matrix.LockedFields = new List<string> { nameof(MediaItem.Title) };
+        var movies = await db.MediaLibraries.SingleAsync(l => l.Id == source.MoviesLibrary, ct);
+        movies.EnableCreditsDetection = true;
 
         db.UserMediaStates.AddRange(
             new UserMediaState { ProfileId = Profile, MediaItemId = source.Matrix, ResumePositionSeconds = 1200 },
