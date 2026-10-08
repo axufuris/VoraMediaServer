@@ -13,6 +13,7 @@ public sealed class CollectionsBackupSection : IBackupSection
 {
     private static readonly BackupRowNoun CollectionNoun = new("collection", "collections");
     private static readonly BackupRowNoun ItemNoun = new("collection entry", "collection entries");
+    private static readonly BackupRowNoun UploadNoun = new("uploaded collection image", "uploaded collection images");
 
     private readonly VoraDbContext _db;
     private readonly BackupReferenceMapper _references;
@@ -29,7 +30,7 @@ public sealed class CollectionsBackupSection : IBackupSection
     public bool RequiresExplicitConfirm => false;
     public bool CanGrowLarge => false;
     public string? DestructiveWarning =>
-        "Replaces the collections an admin created and the titles in them. Collections a library scan creates are left alone.";
+        "Replaces the collections an admin created, the titles in them and the images uploaded for them (the image files themselves aren't in the backup). Collections a library scan creates are left alone.";
 
     public async Task WriteAsync(IBackupWriter writer, CancellationToken ct)
     {
@@ -37,8 +38,11 @@ public sealed class CollectionsBackupSection : IBackupSection
         var collectionIds = collections.Select(c => c.Id).ToList();
         var items = await _db.CollectionItems.AsNoTracking().Where(i => collectionIds.Contains(i.CollectionId)).ToListAsync(ct);
 
+        var uploads = await _db.CollectionArtwork.AsNoTracking().Where(a => a.IsUserUploaded && collectionIds.Contains(a.CollectionId)).ToListAsync(ct);
+
         await writer.WriteJsonAsync($"{Key}/collections.json", collections, ct);
         await writer.WriteJsonAsync($"{Key}/items.json", items, ct);
+        await writer.WriteJsonAsync($"{Key}/uploaded-artwork.json", uploads, ct);
         await _references.WriteIdentitiesAsync(writer, Key, References(collections, items), ct);
     }
 
@@ -95,7 +99,17 @@ public sealed class CollectionsBackupSection : IBackupSection
         await BackupTableSync.ReplaceAsync(_db, _db.Collections.Where(c => !c.SystemGenerated), restoredCollections, ct);
         await BackupTableSync.ReplaceAsync(_db, _db.CollectionItems.Where(i => !i.Collection.SystemGenerated), restoredItems, ct);
 
-        return tally.ToResult(restoredCollections.Count + restoredItems.Count);
+        var uploads = await reader.ReadJsonAsync<List<CollectionArtwork>>($"{Key}/uploaded-artwork.json", ct);
+        var restoredUploads = 0;
+        if (uploads != null)
+        {
+            var restorable = uploads.Where(a => a.IsUserUploaded && restoredIds.Contains(a.CollectionId)).ToList();
+            tally.Skip(UploadNoun, BackupSkipReason.MissingCollection, uploads.Count - restorable.Count);
+            await BackupTableSync.ReplaceAsync(_db, _db.CollectionArtwork.Where(a => a.IsUserUploaded && !a.Collection.SystemGenerated), restorable, ct);
+            restoredUploads = restorable.Count;
+        }
+
+        return tally.ToResult(restoredCollections.Count + restoredItems.Count + restoredUploads);
     }
 
     private static string? RemapExcluded(string? json, BackupReferenceResolver resolver)

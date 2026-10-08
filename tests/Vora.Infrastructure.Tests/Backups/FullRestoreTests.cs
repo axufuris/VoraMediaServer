@@ -11,6 +11,7 @@ using Vora.Domain.Entities.Requests;
 using Vora.Domain.Entities.SmartLists;
 using Vora.Domain.Entities.Streaming;
 using Vora.Domain.Entities.Users;
+using Vora.Domain.Enums;
 using Vora.Infrastructure.Backups;
 using Vora.Infrastructure.Backups.Sections;
 using Vora.Infrastructure.Persistence;
@@ -24,20 +25,25 @@ public sealed class FullRestoreTests
 
     private static List<IBackupSection> SectionsInRestoreOrder(VoraDbContext db, BackupReferenceMapper references) =>
     [
+        new LibraryDefinitionsBackupSection(db),
         new UsersAndProfilesBackupSection(db, references),
         new DevicesBackupSection(db),
         new CollectionsBackupSection(db, references),
         new SmartListsBackupSection(db, references),
         new DedupeRulesBackupSection(db, references),
+        new MediaEditsBackupSection(db, references),
         new IptvPlaylistsBackupSection(db),
+        new IptvChannelSettingsBackupSection(db),
         new IptvTunerProfilesBackupSection(db),
         new IptvRecordingSchedulesBackupSection(db, references),
+        new DvrRecordingsBackupSection(db),
         new RequestServersBackupSection(db),
         new WatchHistoryBackupSection(db, references),
         new RatingsBackupSection(db, references),
         new PlaylistsBackupSection(db, references),
         new WatchlistsBackupSection(db, references),
         new StationsBackupSection(db, references),
+        new AiPlaylistsBackupSection(db, references),
         new MediaRequestsBackupSection(db),
         new ExternalConnectionsBackupSection(db),
         new ChannelFavoritesBackupSection(db),
@@ -138,16 +144,28 @@ public sealed class FullRestoreTests
         (await check.ProfileChannelFavorites.CountAsync(ct)).Should().Be(1);
         (await check.IptvTunerProfiles.CountAsync(ct)).Should().Be(1);
         (await check.IptvRecordingSchedules.CountAsync(ct)).Should().Be(0);
+        (await check.IptvRecordingSessions.CountAsync(ct)).Should().Be(0);
+        (await check.GeneratedMixes.Select(m => m.TrackOrder).SingleAsync(ct)).Should().Equal(target.ParanoidAndroid);
+        (await check.CollectionArtwork.CountAsync(ct)).Should().Be(1);
+        (await check.MediaItems.SingleAsync(m => m.Id == target.Matrix, ct)).Title.Should().Be("The Matrix (4K Remaster)");
+        (await check.MediaLibraries.SingleAsync(l => l.Id == target.MoviesLibrary, ct)).EnableCreditsDetection.Should().BeTrue();
 
         var warnings = results.SelectMany(r => r.Warnings).ToList();
         warnings.Should().Contain(w => w.Contains("channel isn't on this server yet"));
         warnings.Should().Contain(w => w.StartsWith("1 watch-history row was skipped because its item isn't on this server."));
-        results.Sum(r => r.RowsSkipped).Should().Be(2);
+        warnings.Should().Contain(w => w.StartsWith("1 recording was skipped because its recording schedule isn't on this server."));
+        results.Sum(r => r.RowsSkipped).Should().Be(4);
     }
 
     private static async Task SeedEverythingAsync(BackupTestWorld source, CancellationToken ct)
     {
         var db = source.Db;
+
+        var matrix = await db.MediaItems.SingleAsync(m => m.Id == source.Matrix, ct);
+        matrix.Title = "The Matrix (4K Remaster)";
+        matrix.LockedFields = new List<string> { nameof(MediaItem.Title) };
+        var movies = await db.MediaLibraries.SingleAsync(l => l.Id == source.MoviesLibrary, ct);
+        movies.EnableCreditsDetection = true;
 
         db.UserMediaStates.AddRange(
             new UserMediaState { ProfileId = Profile, MediaItemId = source.Matrix, ResumePositionSeconds = 1200 },
@@ -171,17 +189,21 @@ public sealed class FullRestoreTests
 
         var collection = new Collection { Title = "Favourites", LibraryId = source.MoviesLibrary };
         db.Collections.Add(collection);
+        db.CollectionArtwork.Add(new CollectionArtwork { CollectionId = collection.Id, Url = "/api/artwork/custom/coll_favourites_poster.jpg", IsUserUploaded = true, ProviderId = "upload" });
+        db.GeneratedMixes.Add(new GeneratedMix { ProfileId = Profile, Name = "Rainy day", Kind = GeneratedMixKind.Requested, Slot = 1, Prompt = "rainy day songs", TrackOrder = new List<Guid> { source.ParanoidAndroid } });
         db.CollectionItems.Add(new CollectionItem { CollectionId = collection.Id, MediaItemId = source.Matrix, ManuallyAdded = true });
         db.SmartLists.Add(new SmartList { Title = "New movies", LibraryId = source.MoviesLibrary });
         db.MediaDedupeSettings.Add(new MediaDedupeSettings { LibraryId = source.MoviesLibrary });
         db.MediaDedupeIgnoredGroups.Add(new MediaDedupeIgnoredGroup { MediaItemId = source.Matrix, Resolution = "1080p" });
 
         var iptv = new IptvPlaylist { Name = "Freeview" };
-        var channel = new IptvChannel { PlaylistId = iptv.Id, ExternalChannelId = "bbc1.uk", Name = "BBC One", StreamUrl = "http://tv/bbc1" };
+        var channel = new IptvChannel { PlaylistId = iptv.Id, ExternalChannelId = "bbc1.uk", Name = "BBC One", StreamUrl = "http://tv/bbc1", IsHiddenByAdmin = true };
         db.IptvPlaylists.Add(iptv);
         db.IptvChannels.Add(channel);
         db.IptvTunerProfiles.Add(new IptvTunerProfile { PlaylistId = iptv.Id, MaxConcurrentStreams = 2 });
-        db.IptvRecordingSchedules.Add(new IptvRecordingSchedule { Title = "News", UserId = BackupTestWorld.UserId, ProfileId = Profile, ChannelId = channel.Id });
+        var schedule = new IptvRecordingSchedule { Title = "News", UserId = BackupTestWorld.UserId, ProfileId = Profile, ChannelId = channel.Id };
+        db.IptvRecordingSchedules.Add(schedule);
+        db.IptvRecordingSessions.Add(new IptvRecordingSession { Title = "News", ScheduleId = schedule.Id, Status = IptvRecordingSessionStatus.Completed, OutputFilePath = "/recordings/News_20261001_180000.mp4" });
         db.ProfileChannelFavorites.Add(new ProfileChannelFavorite { ProfileId = Profile, PlaylistId = iptv.Id, ExternalChannelId = "bbc1.uk" });
 
         var server = new RequestServer { Name = "Radarr" };

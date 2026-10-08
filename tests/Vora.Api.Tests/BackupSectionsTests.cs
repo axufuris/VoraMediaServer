@@ -46,6 +46,9 @@ public class BackupSectionsTests : IClassFixture<VoraApiTestFactory>
     }
 
     [Theory]
+    [InlineData("library.definitions", "users.profiles")]
+    [InlineData("library.definitions", "library.collections")]
+    [InlineData("library.definitions", "library.media-edits")]
     [InlineData("users.profiles", "users.devices")]
     [InlineData("users.profiles", "iptv.recording-schedules")]
     [InlineData("users.profiles", "users.watch-history")]
@@ -54,6 +57,9 @@ public class BackupSectionsTests : IClassFixture<VoraApiTestFactory>
     [InlineData("users.devices", "users.watch-history")]
     [InlineData("library.collections", "library.smart-lists")]
     [InlineData("iptv.playlists", "iptv.tuner-profiles")]
+    [InlineData("iptv.playlists", "iptv.channel-settings")]
+    [InlineData("iptv.recording-schedules", "iptv.recordings")]
+    [InlineData("users.profiles", "users.ai-playlists")]
     [InlineData("iptv.playlists", "users.channel-favorites")]
     [InlineData("discovery.request-servers", "users.requests")]
     [InlineData("podcasts.shows", "podcasts.listening")]

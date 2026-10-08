@@ -176,6 +176,17 @@ public class MediaMatchManagerTests
     }
 
     [Fact]
+    public async Task Applying_marks_the_item_as_matched_by_hand_so_a_backup_keeps_the_choice()
+    {
+        var show = DuplicateShow();
+        Holds(show);
+
+        await Manager().ApplyAsync(show.Id, new ApplyMediaMatchRequest { Source = "tvdb", ExternalId = "417549" }, TestContext.Current.CancellationToken);
+
+        show.LockedFields.Should().Contain(MediaMatchManager.MatchLock);
+    }
+
+    [Fact]
     public async Task Applying_queues_a_refresh_of_the_matched_item()
     {
         var show = DuplicateShow();

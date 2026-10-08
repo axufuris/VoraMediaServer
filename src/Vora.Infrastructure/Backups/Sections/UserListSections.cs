@@ -230,6 +230,75 @@ public sealed class StationsBackupSection : EntityTableBackupSection<Station>
             .AddRange(BackupItemKind.MediaItem, rows.Select(r => r.SeedTrackId).OfType<Guid>());
 }
 
+public sealed class AiPlaylistsBackupSection : IBackupSection
+{
+    private static readonly BackupRowNoun PlaylistNoun = new("AI playlist", "AI playlists");
+    private static readonly BackupRowNoun SongNoun = new("AI playlist song", "AI playlist songs");
+    private static readonly GeneratedMixKind[] Kinds = { GeneratedMixKind.Requested, GeneratedMixKind.Blend };
+
+    private readonly VoraDbContext _db;
+    private readonly BackupReferenceMapper _references;
+
+    public AiPlaylistsBackupSection(VoraDbContext db, BackupReferenceMapper references)
+    {
+        _db = db;
+        _references = references;
+    }
+
+    public string Key => "users.ai-playlists";
+    public string DisplayName => "AI Playlists";
+    public BackupSectionGroup Group => BackupSectionGroup.UserData;
+    public bool RequiresExplicitConfirm => true;
+    public bool CanGrowLarge => false;
+    public string? DestructiveWarning =>
+        "Replaces every profile's requested AI playlists and Blends. Weekly AI playlists, Bridges and mixes are rebuilt by Vora and aren't in the backup.";
+
+    public async Task WriteAsync(IBackupWriter writer, CancellationToken ct)
+    {
+        var mixes = await _db.GeneratedMixes.AsNoTracking().Where(m => Kinds.Contains(m.Kind)).ToListAsync(ct);
+        await writer.WriteJsonAsync($"{Key}/playlists.json", mixes, ct);
+        await _references.WriteIdentitiesAsync(writer, Key, References(mixes), ct);
+    }
+
+    public async Task<BackupSectionImportResult> ReadAsync(IBackupReader reader, CancellationToken ct)
+    {
+        var mixes = await reader.ReadJsonAsync<List<GeneratedMix>>($"{Key}/playlists.json", ct);
+        if (mixes == null) return new BackupSectionImportResult();
+
+        var tally = new BackupSkipTally();
+        var resolver = await _references.ReadResolverAsync(reader, Key, References(mixes), ct);
+        var profileIds = await _db.UserProfiles.Select(p => p.Id).ToHashSetAsync(ct);
+
+        var restorable = new List<GeneratedMix>();
+        foreach (var mix in mixes.Where(m => Kinds.Contains(m.Kind)))
+        {
+            if (!profileIds.Contains(mix.ProfileId) || (mix.PartnerProfileId is Guid partner && !profileIds.Contains(partner)))
+            {
+                tally.Skip(PlaylistNoun, BackupSkipReason.MissingProfile);
+                continue;
+            }
+
+            var songs = mix.TrackOrder.Select(id => resolver.Resolve(BackupItemKind.MediaItem, id)).ToList();
+            tally.Skip(SongNoun, BackupSkipReason.MissingItem, songs.Count(s => s == null));
+            mix.TrackOrder = songs.OfType<Guid>().Distinct().ToList();
+            if (mix.TrackOrder.Count == 0)
+            {
+                tally.Skip(PlaylistNoun, BackupSkipReason.MissingItem);
+                continue;
+            }
+
+            restorable.Add(mix);
+        }
+
+        restorable = BackupTableSync.KeepOnePer(restorable, m => (m.ProfileId, m.Kind, m.Slot), m => m.GeneratedAt, tally, PlaylistNoun);
+        await BackupTableSync.ReplaceAsync(_db, _db.GeneratedMixes.Where(m => Kinds.Contains(m.Kind)), restorable, ct);
+        return tally.ToResult(restorable.Count);
+    }
+
+    private static BackupItemReferences References(List<GeneratedMix> mixes) =>
+        new BackupItemReferences().AddRange(BackupItemKind.MediaItem, mixes.SelectMany(m => m.TrackOrder));
+}
+
 public sealed class MediaRequestsBackupSection : IBackupSection
 {
     private static readonly BackupRowNoun RequesterNoun = new("requester", "requesters");
