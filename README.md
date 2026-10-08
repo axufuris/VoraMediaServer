@@ -583,21 +583,22 @@ published to GHCR as
 `ghcr.io/axufuris/vora-media-server:<version>`.
 
 - **Stable releases** — `1.2.3`, plus the rolling `1.2`, `1` and `latest` tags.
-- **Pre-releases** — `0.1.0-beta.1` and friends. A GitHub release marked as a
+- **Pre-releases** — `1.1.0-beta.1` and friends. A GitHub release marked as a
   pre-release never moves `latest` or the rolling tags, so `latest` always
   points at the newest stable build. Pin the exact tag to run a beta.
 - **QA builds** — every push to `main` publishes `:qa` and `:qa-<short-sha>`.
   Not for production.
 
-While Vora is on `0.x`, breaking changes (schema, endpoints, plugin contracts)
-can land in a minor bump. Read the release notes before upgrading.
+From 1.0, breaking changes (schema, endpoints, plugin contracts) only land in a
+major release; minor releases add features and patch releases fix bugs. Read
+the release notes before upgrading.
 
 The running server reports its own build at `GET /api/system/version`, and the
 admin sidebar shows it at the bottom. Include that version in any bug report.
 
 ### Cutting a release (maintainers)
 
-1. Tag the commit: `git tag v0.1.0-beta.1 && git push origin v0.1.0-beta.1`.
+1. Tag the commit: `git tag v1.0.0 && git push origin v1.0.0`.
 2. Publish a GitHub release for that tag, ticking **Set as a pre-release** for
    anything that isn't stable.
 3. `deploy-prod.yml` then runs the test suite, builds the image with the tag
