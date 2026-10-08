@@ -29,30 +29,35 @@ Implementations live in `Vora.Infrastructure/Backups/Sections/`. `EntityTableBac
 | `templates.client-schedules`, `templates.email`, `templates.overlay` | template schedules, email overrides, overlay templates |
 | `users.profiles` | `Users`, `UserProfiles`, `ProfileAccessSchedules` |
 | `users.devices` | `ClientDevices`, `ProfileDeviceSettings` |
-| `library.collections` | admin-made `Collections` (`SystemGenerated = false`) and their `CollectionItems` |
+| `library.collections` | admin-made `Collections` (`SystemGenerated = false`), their `CollectionItems` and the images uploaded for them (`CollectionArtwork` with `IsUserUploaded`; the image files are not in the zip) |
 | `library.smart-lists` | `SmartLists` (home rows) |
 | `library.dedupe-rules` | `MediaDedupeSettings`, `MediaDedupeIgnoredGroups` |
 | `iptv.playlists`, `iptv.epg-sources`, `iptv.tuner-profiles`, `iptv.recording-schedules` | the IPTV/DVR configuration tables |
+| `iptv.channel-settings` | the admin's per-channel choices: hidden channels (`IsHiddenByAdmin`) and TV/radio overrides (`Kind` + `KindOverriddenByAdmin`), keyed by playlist id + external channel id and applied onto the channels the playlist has loaded |
+| `iptv.recordings` | finished DVR recordings (`IptvRecordingSessions` with `Status = Completed`): restored only when the schedule is here and the file is still on disk, and added beside the recordings already here rather than replacing them |
 | `discovery.rows`, `discovery.request-servers` | `DiscoveryRowConfigs`, `RequestServers` |
 | `users.watch-history` (large) | `UserMediaStates`, `StreamSessions`, `TrackPlayHistory`, `PreservedUserMediaData` (Media Trash archive) |
 | `users.ratings` | `UserMediaRatings`, `UserAlbumRatings`, `UserArtistRatings`, `TrackLikes` |
 | `users.playlists` | `Playlists`, `PlaylistItems`, `SmartPlaylists` |
 | `users.watchlists`, `users.stations` | `UserWatchlistItems`, music `Stations` |
+| `users.ai-playlists` | AI playlists a profile asked for and Blends (`GeneratedMixes` of kind `Requested` / `Blend`), songs matched by identity; the mixes and weekly AI playlists Vora rebuilds are left alone |
 | `users.requests` | `MediaRequests`, `MediaRequestUsers` |
 | `users.external-connections`, `users.channel-favorites` | `UserProviderConnections`, `ProfileChannelFavorites` |
 | `podcasts.shows` | every `PodcastShow` (catalog flag + every show a profile follows) |
 | `podcasts.listening` | `PodcastSubscriptions`, `PodcastEpisodeProfileStates` |
 
-**Restore order is registration order.** `AddVoraBackups` registers sections so that a section comes after every section its rows point at: users and devices first, then collections before smart lists, IPTV playlists before tuner profiles / schedules / favorites, request servers before requests, the podcast catalog before listening. `BackupSectionsTests` in `Vora.Api.Tests` pins that order — add a pair there when a new section references another.
+**Restore order is registration order.** `AddVoraBackups` registers sections so that a section comes after every section its rows point at: users and devices first, then collections before smart lists, IPTV playlists before channel settings / tuner profiles / schedules / favorites, schedules before recordings, request servers before requests, the podcast catalog before listening. `BackupSectionsTests` in `Vora.Api.Tests` pins that order — add a pair there when a new section references another.
 
 ### What is deliberately not backed up
 
 - **Media libraries and everything a scan rebuilds** — `MediaLibraries`, media items, parts/tracks, artwork, cast, genres, extras, scan-created collections. Point a rebuilt server at the same folders and scan. This includes metadata edits, locked fields and hand-edited markers, which live on the media rows.
-- **Derived data** — embeddings, song profiles, generated mixes, similar artists and tags, silence/black-frame analysis, audio fingerprints, detected markers, scrub-bar thumbnails, the resized artwork cache. Vora recomputes them.
+- **Derived data** — embeddings, song profiles, the mixes and weekly AI playlists Vora generates (requested AI playlists and Blends are backed up), similar artists and tags, silence/black-frame analysis, audio fingerprints, detected markers, scrub-bar thumbnails, the resized artwork cache. Vora recomputes them.
 - **Logs and history the server writes for itself** — email delivery log, AI usage, system metrics, admin notifications.
 - **Secrets that should not outlive a server** — refresh tokens, registration / invitation / password-reset / email-change tickets.
-- **Short-lived state** — `PendingTasks` (the task queue), IPTV channels (re-synced from the playlist), DVR `IptvRecordingSessions` and the recorded files, podcast episodes (re-fetched from each feed).
-- **Files outside the database** — uploaded artwork and playlist covers under `StoragePaths:CustomArtwork`, downloaded subtitles, thumbnails. Back up the data volume for those.
+- **Short-lived state** — `PendingTasks` (the task queue), IPTV channels themselves (re-synced from the playlist; only the admin's choices about them are kept), DVR sessions that haven't finished (re-created from the schedules), podcast episodes (re-fetched from each feed).
+- **Files outside the database** — uploaded artwork, collection images and playlist covers under `StoragePaths:CustomArtwork`, profile pictures, downloaded subtitles, thumbnails, DVR recordings. Back up the data volume for those.
+
+`BackupCoverageTests` (`Vora.Api.Tests`) lists every table in the model either under the section that backs it up or under one of the reasons above, and fails when a table is in neither — a new table has to be given a section or a reason before it ships.
 
 ## Restoring onto a rebuilt server
 
@@ -69,7 +74,7 @@ Backups written before identities existed still restore: with no `identities.jso
 Limits worth knowing:
 
 - **Scan first.** Rows for items this server doesn't have yet are skipped, not parked. On a rebuilt server: restore users and settings, scan the libraries, then restore watch history, ratings, playlists, collections and the like (or simply restore those sections again after the scan).
-- **IPTV recording schedules** need the playlist's channels, which arrive on the playlist's first refresh. Restore the schedules again after it.
+- **IPTV recording schedules and channel settings** need the playlist's channels, which arrive on the playlist's first refresh. Restore them again after it, then **DVR Recordings** (which need their schedule, and their file on disk).
 - **Podcast progress** maps by the show's feed URL and the episode's feed GUID (then enclosure URL). When the episode isn't fetched yet, a placeholder `PodcastEpisode` is written from the backed-up details; the next feed refresh fills it in by GUID.
 - **Library access lists** (`AllowedLibraryIds` on accounts and profiles) are remapped by library name; an id that can't be matched is kept as-is, so a restricted profile stays restricted rather than opening up.
 - **Title-only matches** are a last resort for items without provider ids; smart-playlist and smart-list rule JSON is restored as written (ids inside rules are not remapped).
@@ -116,4 +121,5 @@ Restore is **atomic**: one EF transaction from `IBackupTransactionFactory` (`EfB
 
 - **DataProtection keys are secrets.** A backup with that section decrypts the saved SMTP password; without it the ciphertext is useless. Treat such archives as credentials (no archive-level encryption is built in).
 - **Watch history can be huge.** `StreamSession` dwarfs everything on long-lived servers; the size estimate shows how much it costs.
-- **Adding a section.** Implement `IBackupSection` (usually via `EntityTableBackupSection<T>`), register it in `AddVoraBackups` after the sections it references, and if its rows point at media, libraries, collections or channels, record identities through `BackupReferenceMapper` and resolve them on restore. The manager, estimate and Settings picker pick it up automatically.
+- **Adding a section.** Implement `IBackupSection` (usually via `EntityTableBackupSection<T>`), register it in `AddVoraBackups` after the sections it references, and if its rows point at media, libraries, collections or channels, record identities through `BackupReferenceMapper` and resolve them on restore. Add its tables to `BackupCoverageTests` and its order to `BackupSectionsTests`. The manager, estimate and Settings picker pick it up automatically.
+- **Adding a table** fails `BackupCoverageTests` until it is backed up or given a reason to be left out. Rows a person makes (rather than a scan or Vora) belong in a section.
