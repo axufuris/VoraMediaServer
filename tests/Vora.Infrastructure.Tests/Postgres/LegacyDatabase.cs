@@ -78,6 +78,12 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string SecondCombinedMigration = "20261004183407_ChangesSinceInitial";
 
+    public const string ReleasedMigration = "20261004192607_ChangesSinceInitial";
+
+    private const string ColumnsSinceRelease = """
+        ALTER TABLE "MediaItems" DROP COLUMN "FullyRefreshedAt";
+        """;
+
     private const string OldDefaultRowOrder = """
         UPDATE "SmartLists" SET "DisplayOrder" = 7 WHERE "DefaultKey" = 'recently-added-music';
         UPDATE "SmartLists" SET "DisplayOrder" = 8 WHERE "DefaultKey" = 'new-podcast-episodes';
@@ -90,16 +96,30 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await using var db = NewContext();
         await db.Database.MigrateAsync(cancellationToken);
         await db.Database.ExecuteSqlRawAsync(OldDefaultRowOrder, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceRelease, cancellationToken);
         if (!withTaskTable)
         {
             await db.Database.ExecuteSqlRawAsync("DROP TABLE \"PendingTasks\"", cancellationToken);
         }
 
+        await ReplaceCombinedMigrationAsync(db, migrationId, "10.0.8", cancellationToken);
+    }
+
+    public async Task BuildReleasedStateAsync(CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceRelease, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, ReleasedMigration, "10.0.9", cancellationToken);
+    }
+
+    private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)
+    {
         await db.Database.ExecuteSqlAsync(
             $"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}",
             cancellationToken);
         await db.Database.ExecuteSqlAsync(
-            $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({migrationId}, '10.0.8')",
+            $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({migrationId}, {productVersion})",
             cancellationToken);
     }
 

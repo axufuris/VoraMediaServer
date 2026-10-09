@@ -14,8 +14,8 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261009010518_AddFullyRefreshedAt")]
-    partial class AddFullyRefreshedAt
+    [Migration("20261009020545_ChangesSinceInitial")]
+    partial class ChangesSinceInitial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

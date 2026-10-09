@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.SmartLists;
 using Vora.Domain.Entities.Iptv;
+using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.SmartLists;
 using Vora.Domain.Entities.Tasks;
@@ -22,7 +23,7 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         await using (var before = legacy.NewContext())
         {
             await before.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"AiPlaylistMatchWindow\" = 0.07", cancellationToken);
-            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).First().Should().Be(MigrationHistoryTests.ChangesSinceInitial);
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
         }
 
         await legacy.MigrateAsync(cancellationToken);
@@ -94,6 +95,35 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         listsAfter.Should().Equal(listsBefore);
         listsAfter.Single(l => l.Key == "recent-recordings").Order.Should().Be(10);
         (await after.PendingTasks.AsNoTracking().Select(t => t.Id).ToListAsync(cancellationToken)).Should().Equal(saved.Id);
+    }
+
+    [Fact]
+    public async Task A_database_on_the_1_0_migration_only_gains_the_columns_added_since()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        await legacy.BuildReleasedStateAsync(cancellationToken);
+
+        var saved = new PendingTask { Id = Guid.NewGuid(), Sequence = 1, Kind = "QueueLibraryAnalysis", Name = "Analyze Library: Movies", QueuedAt = DateTime.UtcNow };
+        List<(Guid Id, int Order, string? Key)> listsBefore;
+        await using (var before = legacy.NewContext())
+        {
+            before.PendingTasks.Add(saved);
+            await before.SaveChangesAsync(cancellationToken);
+            await before.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"AiPlaylistMatchWindow\" = 0.07", cancellationToken);
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            listsBefore = await SmartListOrderAsync(before, cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        (await after.Set<MediaItem>().AsNoTracking().Select(m => m.FullyRefreshedAt).ToListAsync(cancellationToken)).Should().BeEmpty();
+        (await after.PendingTasks.AsNoTracking().Select(t => t.Id).ToListAsync(cancellationToken)).Should().Equal(saved.Id);
+        (await SmartListOrderAsync(after, cancellationToken)).Should().Equal(listsBefore);
+        (await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken)).AiPlaylistMatchWindow.Should().Be(0.07);
     }
 
     [Fact]
