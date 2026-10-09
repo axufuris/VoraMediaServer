@@ -24,22 +24,22 @@ namespace Vora.Application.Tasks;
 
 public interface ITaskQueueManager
 {
-    void QueueLibraryAdded(Guid libraryId, string? libraryName = null, bool forceOverride = false);
-    void QueueLibraryUpdated(Guid libraryId, string? libraryName = null, bool forceOverride = false);
-    void QueueScanLibrary(Guid libraryId, string? libraryName = null, bool forceOverride = false);
+    void QueueLibraryAdded(Guid libraryId, string? libraryName = null, bool forceOverride = false, DateTime? since = null);
+    void QueueLibraryUpdated(Guid libraryId, string? libraryName = null, bool forceOverride = false, DateTime? since = null);
+    void QueueScanLibrary(Guid libraryId, string? libraryName = null, bool forceOverride = false, DateTime? since = null);
     void QueueDeleteLibrary(Guid libraryId, string? libraryName = null);
-    void QueueRefreshLibraryMetadata(Guid libraryId, string? libraryName = null, bool forceOverride = false);
+    void QueueRefreshLibraryMetadata(Guid libraryId, string? libraryName = null, bool forceOverride = false, DateTime? since = null);
     void QueueAnalyzeLibraryMediaContent(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false);
     void QueueScanMediaItem(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, Guid? libraryId = null);
     void QueueScanNewFile(Guid libraryId, string filePath);
-    void QueueLibraryPostScan(Guid libraryId, string? libraryName = null, bool forceOverride = false);
-    void QueueLibraryAnalysis(Guid libraryId, string? libraryName, LibraryAnalysisReason reason);
+    void QueueLibraryPostScan(Guid libraryId, string? libraryName = null, bool forceOverride = false, DateTime? since = null);
+    void QueueLibraryAnalysis(Guid libraryId, string? libraryName, LibraryAnalysisReason reason, DateTime? since = null);
     void QueueScanNewMusicFile(Guid libraryId, string filePath);
     void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, Guid? libraryId = null);
     void QueueRefreshMatchedMediaItem(Guid mediaItemId, Guid libraryId, bool isTvShow);
     void QueueAnalyzeMediaItemContent(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueArtworkProviderSwap(Guid libraryId, string libraryName);
-    void QueueRefreshLibraryRatings(Guid libraryId, bool forceOverride = false);
+    void QueueRefreshLibraryRatings(Guid libraryId, bool forceOverride = false, DateTime? since = null);
     void QueueRefreshMediaItemArtwork(Guid mediaItemId, bool forceOverride = false, Guid? libraryId = null);
     void QueueRefreshArtistArtwork(Guid artistId, string? artistName = null, bool forceOverride = false);
     void QueueRefreshAlbumArtwork(Guid albumId, string? albumName = null, bool forceOverride = false);
@@ -71,7 +71,7 @@ public interface ITaskQueueManager
     void QueueIptvEpgSync();
     void QueueIptvHealthCheck(Guid playlistId, string? playlistName = null);
     void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false);
-    void QueueLibraryThumbnails(Guid libraryId, string? libraryName, LibraryThumbnailReason reason);
+    void QueueLibraryThumbnails(Guid libraryId, string? libraryName, LibraryThumbnailReason reason, DateTime? since = null);
     Task WaitForLibraryTasksToStopAsync(Guid libraryId, IReadOnlyCollection<Guid>? mediaItemIds = null, CancellationToken cancellationToken = default);
     void QueueRemoveLibraryVideoThumbnails(Guid libraryId, string? libraryName = null);
     void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
@@ -106,6 +106,8 @@ public class TaskQueueManager : ITaskQueueManager
     private DateTime _lastProgressNotifyUtc = DateTime.MinValue;
     private readonly ConcurrentDictionary<Guid, LibraryAnalysisReason> _analysisReasons = new();
     private readonly ConcurrentDictionary<Guid, LibraryThumbnailReason> _thumbnailReasons = new();
+    private readonly ConcurrentDictionary<Guid, DateTime> _analysisSince = new();
+    private readonly ConcurrentDictionary<Guid, DateTime> _thumbnailSince = new();
     private static readonly TimeSpan LibraryStopPollInterval = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan LibraryStopTimeout = TimeSpan.FromMinutes(5);
 
@@ -117,35 +119,38 @@ public class TaskQueueManager : ITaskQueueManager
         _journal = journal;
     }
 
-    public void QueueLibraryAdded(Guid libraryId, string? libraryName = null, bool forceOverride = false)
+    public void QueueLibraryAdded(Guid libraryId, string? libraryName = null, bool forceOverride = false, DateTime? since = null)
     {
+        var forcedSince = ForcedSince(forceOverride, since);
         Enqueue($"Auto-Ingest Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, ct),
+            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, forcedSince, ct),
             libraryName == null ? LibraryLabel(libraryId, "Auto-Ingest Library: {0}") : null,
             resourceKey: LibraryKey(libraryId),
             dedupeKey: forceOverride ? LibraryForcedScanKey(libraryId) : LibraryScanKey(libraryId),
-            libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueLibraryAdded), new { libraryId, libraryName, forceOverride }));
+            libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueLibraryAdded), new { libraryId, libraryName, forceOverride, since = forcedSince }));
     }
 
-    public void QueueLibraryUpdated(Guid libraryId, string? libraryName = null, bool forceOverride = false)
+    public void QueueLibraryUpdated(Guid libraryId, string? libraryName = null, bool forceOverride = false, DateTime? since = null)
     {
+        var forcedSince = ForcedSince(forceOverride, since);
         Enqueue($"Update Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, ct),
+            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, forcedSince, ct),
             libraryName == null ? LibraryLabel(libraryId, "Update Library: {0}") : null,
             resourceKey: LibraryKey(libraryId),
             dedupeKey: forceOverride ? LibraryForcedScanKey(libraryId) : LibraryScanKey(libraryId),
             rerunIfRunning: true,
-            libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueLibraryUpdated), new { libraryId, libraryName, forceOverride }));
+            libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueLibraryUpdated), new { libraryId, libraryName, forceOverride, since = forcedSince }));
     }
 
-    public void QueueScanLibrary(Guid libraryId, string? libraryName = null, bool forceOverride = false)
+    public void QueueScanLibrary(Guid libraryId, string? libraryName = null, bool forceOverride = false, DateTime? since = null)
     {
+        var forcedSince = ForcedSince(forceOverride, since);
         Enqueue($"Scan Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, ct),
+            RunFullLibraryWorkflowAsync(sp, libraryId, libraryName, forceOverride, forcedSince, ct),
             libraryName == null ? LibraryLabel(libraryId, "Scan Library: {0}") : null,
             dedupeKey: forceOverride ? LibraryForcedScanKey(libraryId) : LibraryScanKey(libraryId),
             resourceKey: LibraryKey(libraryId),
-            libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueScanLibrary), new { libraryId, libraryName, forceOverride }));
+            libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueScanLibrary), new { libraryId, libraryName, forceOverride, since = forcedSince }));
     }
 
     public void QueueDeleteLibrary(Guid libraryId, string? libraryName = null)
@@ -167,41 +172,57 @@ public class TaskQueueManager : ITaskQueueManager
             resourceKey: LibraryKey(libraryId), recipe: TaskRecipe.Of(nameof(QueueDeleteLibrary), new { libraryId, libraryName }));
     }
 
-    public void QueueRefreshLibraryMetadata(Guid libraryId, string? libraryName = null, bool forceOverride = false)
+    public void QueueRefreshLibraryMetadata(Guid libraryId, string? libraryName = null, bool forceOverride = false, DateTime? since = null)
     {
+        var forcedSince = ForcedSince(forceOverride, since);
         Enqueue($"Refresh Metadata for Library: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
         {
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
-            await metadataManager.TriggerLibraryMetadataRefreshAsync(libraryId, forceOverride: forceOverride, cancellationToken: ct);
-            await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, forceOverride: forceOverride, cancellationToken: ct);
-            await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, forceOverride: forceOverride, cancellationToken: ct);
+            if (forcedSince is DateTime refreshedBefore)
+            {
+                await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: true, fullyRefreshedBefore: refreshedBefore, cancellationToken: ct);
+            }
+            else
+            {
+                await metadataManager.TriggerLibraryMetadataRefreshAsync(libraryId, cancellationToken: ct);
+                await metadataManager.TriggerLibraryArtworkRefreshAsync(libraryId, cancellationToken: ct);
+                await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, cancellationToken: ct);
+            }
             await metadataManager.TriggerActorMetadataRefreshAsync(ct);
 
             // Artists and albums are not MediaItems, so none of the calls above
             // touch them. Without this, "Refresh metadata" on a music library did
             // nothing for its artwork at all.
-            await sp.GetRequiredService<IMusicManager>().RefreshLibraryArtworkFromProvidersAsync(libraryId, forceOverride, ct);
+            await sp.GetRequiredService<IMusicManager>().RefreshLibraryArtworkFromProvidersAsync(libraryId, forceOverride, forcedSince, ct);
 
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
-        }, resourceKey: LibraryKey(libraryId), libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueRefreshLibraryMetadata), new { libraryId, libraryName, forceOverride }));
+        }, resourceKey: LibraryKey(libraryId), libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueRefreshLibraryMetadata), new { libraryId, libraryName, forceOverride, since = forcedSince }));
     }
 
-    public void QueueLibraryPostScan(Guid libraryId, string? libraryName = null, bool forceOverride = false) =>
-        QueueLibraryAnalysis(libraryId, libraryName, forceOverride ? LibraryAnalysisReason.Addition | LibraryAnalysisReason.Force : LibraryAnalysisReason.Addition);
+    public void QueueLibraryPostScan(Guid libraryId, string? libraryName = null, bool forceOverride = false, DateTime? since = null) =>
+        QueueLibraryAnalysis(libraryId, libraryName, forceOverride ? LibraryAnalysisReason.Addition | LibraryAnalysisReason.Force : LibraryAnalysisReason.Addition, since);
 
-    public void QueueLibraryAnalysis(Guid libraryId, string? libraryName, LibraryAnalysisReason reason)
+    public void QueueLibraryAnalysis(Guid libraryId, string? libraryName, LibraryAnalysisReason reason, DateTime? since = null)
     {
         _analysisReasons.AddOrUpdate(libraryId, reason, (_, existing) => existing | reason);
+        var forcedSince = ForcedSince(reason.HasFlag(LibraryAnalysisReason.Force), since);
+        if (forcedSince is DateTime forcedAt) _analysisSince.AddOrUpdate(libraryId, forcedAt, (_, existing) => Later(existing, forcedAt));
         Enqueue($"Analyze Library: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunLibraryAnalysisAsync(sp, libraryId, libraryName, TakeAnalysisReasons(libraryId), ct),
+            RunLibraryAnalysisAsync(sp, libraryId, libraryName, TakeAnalysisReasons(libraryId), TakeSince(_analysisSince, libraryId), ct),
             libraryName == null ? LibraryLabel(libraryId, "Analyze Library: {0}") : null,
             resourceKey: LibraryMaintenanceKey(libraryId),
             dedupeKey: LibraryAnalyzeKey(libraryId),
             rerunIfRunning: true,
             libraryId: libraryId,
-            onCancelled: () => _analysisReasons.TryRemove(libraryId, out _), recipe: TaskRecipe.Of(nameof(QueueLibraryAnalysis), new { libraryId, libraryName, reason = (int)reason }), mergeRecipe: existing => existing.WithNumber("reason", existing.Number("reason") | (int)reason));
+            onCancelled: () =>
+            {
+                _analysisReasons.TryRemove(libraryId, out _);
+                _analysisSince.TryRemove(libraryId, out _);
+            },
+            recipe: TaskRecipe.Of(nameof(QueueLibraryAnalysis), new { libraryId, libraryName, reason = (int)reason, since = forcedSince }),
+            mergeRecipe: existing => WithLaterSince(existing.WithNumber("reason", existing.Number("reason") | (int)reason), forcedSince));
     }
 
     public LibraryAnalysisReason TakeAnalysisReasons(Guid libraryId) =>
@@ -215,6 +236,18 @@ public class TaskQueueManager : ITaskQueueManager
 
     private LibraryThumbnailReason TakeThumbnailReasons(Guid libraryId) =>
         _thumbnailReasons.TryRemove(libraryId, out var reasons) ? reasons : LibraryThumbnailReason.None;
+
+    private static DateTime? TakeSince(ConcurrentDictionary<Guid, DateTime> sinceByLibrary, Guid libraryId) =>
+        sinceByLibrary.TryRemove(libraryId, out var since) ? since : null;
+
+    private static DateTime? ForcedSince(bool forced, DateTime? since) => forced ? since ?? DateTime.UtcNow : null;
+
+    private static DateTime Later(DateTime first, DateTime second) => first > second ? first : second;
+
+    private static TaskRecipe WithLaterSince(TaskRecipe recipe, DateTime? since) =>
+        since is DateTime added
+            ? recipe.WithTime("since", recipe.Time("since") is DateTime saved ? Later(saved, added) : added)
+            : recipe;
 
     public void QueueAnalyzeLibraryMediaContent(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false) =>
         QueueLibraryAnalysis(libraryId, libraryName,
@@ -388,24 +421,25 @@ public class TaskQueueManager : ITaskQueueManager
         }, libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueArtworkProviderSwap), new { libraryId, libraryName }));
     }
 
-    public void QueueRefreshLibraryRatings(Guid libraryId, bool forceOverride = false)
+    public void QueueRefreshLibraryRatings(Guid libraryId, bool forceOverride = false, DateTime? since = null)
     {
+        var startedAt = since ?? DateTime.UtcNow;
         Enqueue($"Refresh Ratings for Library: {libraryId}", async (ct, sp) =>
         {
             var libraryType = await sp.GetRequiredService<ILibraryRepository>().GetProjectedByIdAsync(libraryId, l => (LibraryType?)l.Type);
             if (libraryType == LibraryType.Music)
             {
-                await sp.GetRequiredService<IMusicPopularityRefresher>().RefreshLibraryArtistsAsync(libraryId, ct);
+                await sp.GetRequiredService<IMusicPopularityRefresher>().RefreshLibraryArtistsAsync(libraryId, startedAt, ct);
                 return;
             }
 
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
-            await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, null, forceOverride, ct);
+            await metadataManager.TriggerLibraryRatingsRefreshAsync(libraryId, null, forceOverride, forceOverride ? startedAt : null, ct);
 
             await overlayManager.RunLibraryOverlaySyncAsync(libraryId, ct);
-        }, RatingsLabel(libraryId), resourceKey: LibraryKey(libraryId), libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueRefreshLibraryRatings), new { libraryId, forceOverride }));
+        }, RatingsLabel(libraryId), resourceKey: LibraryKey(libraryId), libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueueRefreshLibraryRatings), new { libraryId, forceOverride, since = startedAt }));
     }
 
     public void QueueRefreshMediaItemArtwork(Guid mediaItemId, bool forceOverride = false, Guid? libraryId = null)
@@ -883,27 +917,35 @@ public class TaskQueueManager : ITaskQueueManager
             : isAdditionTrigger ? LibraryThumbnailReason.Addition
             : LibraryThumbnailReason.Manual);
 
-    public void QueueLibraryThumbnails(Guid libraryId, string? libraryName, LibraryThumbnailReason reason)
+    public void QueueLibraryThumbnails(Guid libraryId, string? libraryName, LibraryThumbnailReason reason, DateTime? since = null)
     {
         _thumbnailReasons.AddOrUpdate(libraryId, reason, (_, existing) => existing | reason);
+        var forcedSince = ForcedSince(reason.HasFlag(LibraryThumbnailReason.Force), since);
+        if (forcedSince is DateTime forcedAt) _thumbnailSince.AddOrUpdate(libraryId, forcedAt, (_, existing) => Later(existing, forcedAt));
         Enqueue($"Generate Video Thumbnails: {ResolveDisplayName(libraryId, libraryName)}", (ct, sp) =>
-            RunLibraryThumbnailsAsync(sp, libraryId, TakeThumbnailReasons(libraryId), ct),
+            RunLibraryThumbnailsAsync(sp, libraryId, TakeThumbnailReasons(libraryId), TakeSince(_thumbnailSince, libraryId), ct),
             libraryName == null ? LibraryLabel(libraryId, "Generate Video Thumbnails: {0}") : null,
             resourceKey: LibraryMaintenanceKey(libraryId),
             dedupeKey: LibraryThumbnailsKey(libraryId),
             rerunIfRunning: true,
             libraryId: libraryId,
-            onCancelled: () => _thumbnailReasons.TryRemove(libraryId, out _), recipe: TaskRecipe.Of(nameof(QueueLibraryThumbnails), new { libraryId, libraryName, reason = (int)reason }), mergeRecipe: existing => existing.WithNumber("reason", existing.Number("reason") | (int)reason));
+            onCancelled: () =>
+            {
+                _thumbnailReasons.TryRemove(libraryId, out _);
+                _thumbnailSince.TryRemove(libraryId, out _);
+            },
+            recipe: TaskRecipe.Of(nameof(QueueLibraryThumbnails), new { libraryId, libraryName, reason = (int)reason, since = forcedSince }),
+            mergeRecipe: existing => WithLaterSince(existing.WithNumber("reason", existing.Number("reason") | (int)reason), forcedSince));
     }
 
-    internal static async Task RunLibraryThumbnailsAsync(IServiceProvider sp, Guid libraryId, LibraryThumbnailReason reasons, CancellationToken ct)
+    internal static async Task RunLibraryThumbnailsAsync(IServiceProvider sp, Guid libraryId, LibraryThumbnailReason reasons, DateTime? since, CancellationToken ct)
     {
         if (reasons == LibraryThumbnailReason.None) return;
         var thumbnails = sp.GetRequiredService<Vora.Application.Thumbnails.IVideoThumbnailManager>();
 
         if (reasons.HasFlag(LibraryThumbnailReason.Force))
         {
-            await thumbnails.TriggerLibraryThumbnailGenerationAsync(libraryId, forceOverride: true, cancellationToken: ct);
+            await thumbnails.TriggerLibraryThumbnailGenerationAsync(libraryId, forceOverride: true, generatedBefore: since, cancellationToken: ct);
         }
         else if (reasons.HasFlag(LibraryThumbnailReason.Manual))
         {
@@ -1044,7 +1086,7 @@ public class TaskQueueManager : ITaskQueueManager
         }, resourceKey: SubtitleExtractionKey, dedupeKey: "pre-extract-subs:backfill", recipe: TaskRecipe.Of(nameof(QueueSubtitleBackfill)));
     }
 
-    private static async Task RunFullLibraryWorkflowAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, CancellationToken ct = default)
+    private static async Task RunFullLibraryWorkflowAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, DateTime? since, CancellationToken ct = default)
     {
         var metadataManager = sp.GetRequiredService<IMetadataManager>();
         var libraryManager = sp.GetRequiredService<ILibraryManager>();
@@ -1100,7 +1142,7 @@ public class TaskQueueManager : ITaskQueueManager
                     var unitStopwatch = Stopwatch.StartNew();
                     try
                     {
-                        var unitTask = libraryManager.ScanAndEnrichUnitAsync(libraryId, libraryType.Value, unit.FilePaths, forceOverride, unitCt);
+                        var unitTask = libraryManager.ScanAndEnrichUnitAsync(libraryId, libraryType.Value, unit.FilePaths, forceOverride, since, unitCt);
                         var finished = await Task.WhenAny(unitTask, Task.Delay(unitTimeout, unitCt));
                         if (finished == unitTask)
                         {
@@ -1137,7 +1179,7 @@ public class TaskQueueManager : ITaskQueueManager
             var musicStopwatch = Stopwatch.StartNew();
             await libraryManager.TriggerLibraryFolderAndFileScanAsync(libraryId, ct);
             await metadataManager.TriggerLibraryEnrichmentAsync(libraryId, forceOverride: false, cancellationToken: ct);
-            await sp.GetRequiredService<IMusicManager>().RefreshLibraryArtworkFromProvidersAsync(libraryId, forceOverride, ct);
+            await sp.GetRequiredService<IMusicManager>().RefreshLibraryArtworkFromProvidersAsync(libraryId, forceOverride, since, ct);
             logger?.LogInformation("Scan+enrich (whole-library) for {LibraryId} took {Wall:n1}s.", libraryId, musicStopwatch.Elapsed.TotalSeconds);
         }
 
@@ -1189,14 +1231,14 @@ public class TaskQueueManager : ITaskQueueManager
 
         await RunStepAsync("Refreshing actor metadata…", () => metadataManager.TriggerActorMetadataRefreshAsync(ct));
 
-        sp.GetRequiredService<ITaskQueueManager>().QueueLibraryPostScan(libraryId, libraryVm?.Name ?? libraryName, forceOverride);
+        sp.GetRequiredService<ITaskQueueManager>().QueueLibraryPostScan(libraryId, libraryVm?.Name ?? libraryName, forceOverride, since);
 
         workflowStopwatch.Stop();
         logger?.LogInformation("Full library workflow for {LibraryId} completed in {Wall:n1}s.", libraryId, workflowStopwatch.Elapsed.TotalSeconds);
         progress.Report(null);
     }
 
-    private static async Task RunLibraryAnalysisAsync(IServiceProvider sp, Guid libraryId, string? libraryName, LibraryAnalysisReason reasons, CancellationToken ct = default)
+    private static async Task RunLibraryAnalysisAsync(IServiceProvider sp, Guid libraryId, string? libraryName, LibraryAnalysisReason reasons, DateTime? since, CancellationToken ct = default)
     {
         if (reasons == LibraryAnalysisReason.None) return;
         var afterScan = reasons.HasFlag(LibraryAnalysisReason.Addition);
@@ -1221,7 +1263,8 @@ public class TaskQueueManager : ITaskQueueManager
         // explicit Analyze action (forceOverride) detects regardless of setting.
         if (reasons.HasFlag(LibraryAnalysisReason.Force) || reasons.HasFlag(LibraryAnalysisReason.Manual))
         {
-            await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, forceOverride: reasons.HasFlag(LibraryAnalysisReason.Force), cancellationToken: ct));
+            var forced = reasons.HasFlag(LibraryAnalysisReason.Force);
+            await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, forceOverride: forced, analyzedBefore: forced ? since : null, cancellationToken: ct));
         }
         else
         {

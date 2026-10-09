@@ -11,10 +11,10 @@ namespace Vora.Application.Metadata;
 public interface IMetadataManager
 {
     Task TriggerLibraryMetadataRefreshAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, CancellationToken cancellationToken = default);
-    Task TriggerLibraryEnrichmentAsync(Guid libraryId, bool forceOverride = false, CancellationToken cancellationToken = default);
+    Task TriggerLibraryEnrichmentAsync(Guid libraryId, bool forceOverride = false, DateTime? fullyRefreshedBefore = null, CancellationToken cancellationToken = default);
     Task TriggerActorMetadataRefreshAsync(CancellationToken cancellationToken = default);
     Task TriggerMediaTvdbResolutionAsync(CancellationToken cancellationToken = default);
-    Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false, CancellationToken cancellationToken = default);
+    Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false, DateTime? checkedBefore = null, CancellationToken cancellationToken = default);
     Task TriggerMediaItemArtworkRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default);
     Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default);
     Task TriggerLibraryArtworkRefreshAsync(Guid libraryId, bool forceOverride = false, CancellationToken cancellationToken = default);
@@ -109,13 +109,13 @@ public class MetadataManager : IMetadataManager
         }, cancellationToken);
     }
 
-    public async Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false, CancellationToken cancellationToken = default)
+    public async Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false, DateTime? checkedBefore = null, CancellationToken cancellationToken = default)
     {
         // Non-force runs fetch items still missing any configured rating slot, so
         // re-runs fill in items skipped when the provider's daily quota tripped
         // — instead of re-spending the quota on already-rated items every pass.
         var ids = forceOverride
-            ? await _repository.GetEnrichableMediaIdsAsync(libraryId)
+            ? await _repository.GetEnrichableMediaIdsAsync(libraryId, ratingsCheckedBefore: checkedBefore)
             : await _repository.GetMediaIdsMissingRatingsAsync(libraryId);
 
         await ProcessLibraryItemsAsync(libraryId, ids, "ratings", id => RefreshRatingsAsync(id, forceOverride), cancellationToken);
@@ -132,7 +132,7 @@ public class MetadataManager : IMetadataManager
         await ProcessLibraryItemsAsync(libraryId, ids, "artwork", id => RefreshArtworkAsync(id, forceOverride), cancellationToken);
     }
 
-    public async Task TriggerLibraryEnrichmentAsync(Guid libraryId, bool forceOverride = false, CancellationToken cancellationToken = default)
+    public async Task TriggerLibraryEnrichmentAsync(Guid libraryId, bool forceOverride = false, DateTime? fullyRefreshedBefore = null, CancellationToken cancellationToken = default)
     {
         // Enrich each item fully (metadata → artwork → ratings) before moving to
         // the next, so posters fill in progressively during a first scan instead
@@ -144,7 +144,7 @@ public class MetadataManager : IMetadataManager
 
         if (forceOverride)
         {
-            ordered = (await _repository.GetEnrichableMediaIdsAsync(libraryId)).ToList();
+            ordered = (await _repository.GetEnrichableMediaIdsAsync(libraryId, fullyRefreshedBefore)).ToList();
             metaSet = ordered.ToHashSet();
             artSet = metaSet;
             ratSet = metaSet;
@@ -172,6 +172,7 @@ public class MetadataManager : IMetadataManager
             }
             if (forceOverride || artSet.Contains(id)) await RefreshArtworkAsync(id, forceOverride);
             if (forceOverride || ratSet.Contains(id)) await RefreshRatingsAsync(id, forceOverride);
+            if (forceOverride) await _repository.MarkFullyRefreshedAsync(id);
         }, cancellationToken);
     }
 

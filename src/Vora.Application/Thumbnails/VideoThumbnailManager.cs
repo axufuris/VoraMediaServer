@@ -85,7 +85,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         await RunSingleAsync(mediaItemId, forceOverride, cancellationToken);
     }
 
-    public async Task TriggerLibraryThumbnailGenerationAsync(Guid libraryId, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false, CancellationToken cancellationToken = default)
+    public async Task TriggerLibraryThumbnailGenerationAsync(Guid libraryId, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false, DateTime? generatedBefore = null, CancellationToken cancellationToken = default)
     {
         var (libraryType, enabled) = await GetLibraryThumbnailStateAsync(libraryId);
         if (!libraryType.HasVideoContent()) return;
@@ -107,7 +107,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         }
 
         var version = ComputeSpriteVersion(settings.VideoThumbnailIntervalSeconds, settings.VideoThumbnailWidth, settings.VideoThumbnailHeight, settings.VideoThumbnailJpegQuality, settings.VideoThumbnailSpriteColumns);
-        var ids = await _mediaRepository.GetVideoThumbnailTargetIdsAsync(libraryId, version, includeCompleted: forceOverride);
+        var ids = await _mediaRepository.GetVideoThumbnailTargetIdsAsync(libraryId, version, includeCompleted: forceOverride, generatedBefore: forceOverride ? generatedBefore : null);
         await GenerateManyAsync(ids, forceOverride, cancellationToken);
     }
 

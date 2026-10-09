@@ -7,6 +7,7 @@ using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
+using Vora.Application.Media.Dtos;
 
 namespace Vora.Application.Tests.Analysis;
 
@@ -93,5 +94,60 @@ public class MediaAnalyzerManagerSeasonSkipTests
 
         await _media.DidNotReceiveWithAnyArgs().SeasonHasPendingMarkerWorkAsync(default);
         await _media.Received(1).GetSeasonFingerprintInputsAsync(seasonId);
+    }
+
+    private static readonly DateTime ReanalysisStarted = new(2026, 10, 8, 14, 0, 0, DateTimeKind.Utc);
+
+    private void SetupMovie(Guid movieId, DateTime? markersAnalyzedAt)
+    {
+        _media.GetProjectedAsync(movieId, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns(nameof(Movie));
+        _media.GetMarkerDetectionGateAsync(movieId).Returns(new MarkerDetectionGateDto { MarkersAnalyzedAt = markersAnalyzedAt });
+    }
+
+    [Fact]
+    public async Task A_resumed_re_analysis_skips_a_movie_it_already_redid()
+    {
+        var movieId = Guid.NewGuid();
+        SetupMovie(movieId, ReanalysisStarted.AddMinutes(5));
+
+        await _manager.TriggerMediaItemSilenceDetectionAsync(movieId, forceOverride: true, analyzedBefore: ReanalysisStarted, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _media.DidNotReceive().GetSilenceDetectionInputsAsync(movieId);
+    }
+
+    [Fact]
+    public async Task A_resumed_re_analysis_redoes_a_movie_analyzed_before_it_was_asked_for()
+    {
+        var movieId = Guid.NewGuid();
+        SetupMovie(movieId, ReanalysisStarted.AddDays(-1));
+
+        await _manager.TriggerMediaItemSilenceDetectionAsync(movieId, forceOverride: true, analyzedBefore: ReanalysisStarted, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _media.Received(1).GetSilenceDetectionInputsAsync(movieId);
+    }
+
+    [Fact]
+    public async Task A_resumed_re_analysis_skips_the_fingerprint_pass_of_a_season_it_already_redid()
+    {
+        var seasonId = Guid.NewGuid();
+        SetupSeason(seasonId, hasPendingWork: true);
+        _media.SeasonHasPendingMarkerWorkAsync(seasonId, ReanalysisStarted).Returns(false);
+
+        await _manager.TriggerMediaItemSilenceDetectionAsync(seasonId, forceOverride: true, analyzedBefore: ReanalysisStarted, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _media.DidNotReceive().GetSeasonFingerprintInputsAsync(seasonId);
+        await _media.Received(1).GetMarkersForSeasonAsync(seasonId);
+    }
+
+    [Fact]
+    public async Task A_resumed_re_analysis_of_a_library_only_takes_what_it_has_not_redone()
+    {
+        var libraryId = Guid.NewGuid();
+        _media.GetMarkerDetectionTargetIdsAsync(libraryId, ReanalysisStarted).Returns(new List<Guid>());
+
+        await _manager.TriggerLibrarySilenceDetectionAsync(libraryId, forceOverride: true, analyzedBefore: ReanalysisStarted, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _media.Received(1).GetMarkerDetectionTargetIdsAsync(libraryId, ReanalysisStarted);
+        await _media.DidNotReceive().GetTopLevelMediaItemIdsByLibraryAsync(libraryId);
     }
 }

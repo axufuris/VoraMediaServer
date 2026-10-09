@@ -247,11 +247,11 @@ public class MusicPopularityRefresherTests
         var libraryId = Guid.NewGuid();
         var artist = GivenDue("Luke Bryan", ("Crash My Party", new[] { "Play It Again" }));
         artist.PopularityRefreshedAt = DateTime.UtcNow.AddDays(-1);
-        _repository.GetLibraryArtistsForPopularityRefreshAsync(libraryId)
+        _repository.GetLibraryArtistsForPopularityRefreshAsync(libraryId, Arg.Any<DateTime>())
             .Returns(new List<PopularityRefreshTarget> { new(artist.Id, artist.Name) });
         Answers("Luke Bryan", new ArtistPopularity { Outcome = PopularityLookupOutcome.Found, Listeners = 2_140_000 });
 
-        var refreshed = await Refresher().RefreshLibraryArtistsAsync(libraryId, TestContext.Current.CancellationToken);
+        var refreshed = await Refresher().RefreshLibraryArtistsAsync(libraryId, DateTime.UtcNow, TestContext.Current.CancellationToken);
 
         refreshed.Should().Be(1);
         artist.GlobalListeners.Should().Be(2_140_000);
@@ -261,8 +261,8 @@ public class MusicPopularityRefresherTests
     [Fact]
     public async Task A_library_refresh_with_no_listening_provider_does_nothing()
     {
-        (await Refresher(withProvider: false).RefreshLibraryArtistsAsync(Guid.NewGuid(), TestContext.Current.CancellationToken)).Should().Be(0);
+        (await Refresher(withProvider: false).RefreshLibraryArtistsAsync(Guid.NewGuid(), DateTime.UtcNow, TestContext.Current.CancellationToken)).Should().Be(0);
 
-        await _repository.DidNotReceive().GetLibraryArtistsForPopularityRefreshAsync(Arg.Any<Guid>());
+        await _repository.DidNotReceive().GetLibraryArtistsForPopularityRefreshAsync(Arg.Any<Guid>(), Arg.Any<DateTime>());
     }
 }

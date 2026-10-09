@@ -22,7 +22,7 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         await using (var before = legacy.NewContext())
         {
             await before.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"AiPlaylistMatchWindow\" = 0.07", cancellationToken);
-            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).First().Should().Be(MigrationHistoryTests.ChangesSinceInitial);
         }
 
         await legacy.MigrateAsync(cancellationToken);

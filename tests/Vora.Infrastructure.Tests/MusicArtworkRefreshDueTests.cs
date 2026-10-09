@@ -51,16 +51,19 @@ public class MusicArtworkRefreshDueTests
     }
 
     [Fact]
-    public async Task Forcing_asks_about_every_artist()
+    public async Task Forcing_asks_about_every_artist_not_checked_since_the_refresh_was_asked_for()
     {
         await using var db = NewContext();
-        AddArtist(db, "A", complete: false, checkedAt: DateTime.UtcNow);
-        AddArtist(db, "B", complete: true, checkedAt: DateTime.UtcNow);
+        var started = DateTime.UtcNow.AddHours(-1);
+        var incomplete = AddArtist(db, "A", complete: false, checkedAt: started.AddMinutes(-5));
+        var complete = AddArtist(db, "B", complete: true, checkedAt: started.AddMinutes(-5));
+        var never = AddArtist(db, "C", complete: true, checkedAt: null);
+        AddArtist(db, "D Done This Run", complete: true, checkedAt: started.AddMinutes(10));
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var due = await new MusicRepository(db).GetArtistIdsForArtworkRefreshAsync(_libraryId, force: true, CheckedBefore);
+        var due = await new MusicRepository(db).GetArtistIdsForArtworkRefreshAsync(_libraryId, force: true, started);
 
-        due.Should().HaveCount(2);
+        due.Should().Equal(incomplete.Id, complete.Id, never.Id);
     }
 
     // No provider has album backgrounds, so this is every album in the library.

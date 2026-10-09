@@ -40,7 +40,7 @@ function MarkerCoverageCard({ libraryId, libraryType, serverId }: { libraryId: s
         if (force) {
             const ok = await dialog.confirm({
                 title: 'Re-analyze everything?',
-                message: 'This re-runs marker detection on every item in this library, including ones already analyzed — it discards existing detected markers and can take a long time. Manually locked markers are kept. Continue?',
+                message: 'This re-runs marker detection on every item in this library, including ones already analyzed — it discards existing detected markers and can take a long time. Manually locked markers are kept. If the server restarts, it carries on where it stopped. Continue?',
                 confirmText: 'Re-analyze all',
             });
             if (!ok) return;
@@ -220,7 +220,7 @@ function ThumbnailCoverageCard({ libraryId, libraryType, enabled, serverId }: { 
                 <div className="vora-skeleton h-20" />
             )}
             <p className="text-xs" style={{ color: 'var(--vora-text-muted)' }}>
-                Generation runs daily at the time set in System Settings → Video Preview Thumbnails. Items with locked thumbnails are skipped. "Regenerate missing" fills the gaps (and resumes an interrupted run); "Regenerate all" redoes every item.
+                Generation runs daily at the time set in System Settings → Video Preview Thumbnails. Items with locked thumbnails are skipped. "Regenerate missing" fills the gaps; "Regenerate all" redoes every item. Both carry on where they stopped if the server restarts.
             </p>
         </div>
     );

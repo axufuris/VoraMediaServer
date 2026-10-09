@@ -178,10 +178,10 @@ public class LibraryTaskLifecycleTests
         var (sp, thumbnails, _) = Services();
         var library = Guid.NewGuid();
 
-        await TaskQueueManager.RunLibraryThumbnailsAsync(sp, library, LibraryThumbnailReason.Schedule | LibraryThumbnailReason.Addition, CancellationToken.None);
+        await TaskQueueManager.RunLibraryThumbnailsAsync(sp, library, LibraryThumbnailReason.Schedule | LibraryThumbnailReason.Addition, null, CancellationToken.None);
 
-        await thumbnails.Received(1).TriggerLibraryThumbnailGenerationAsync(library, false, false, true, Arg.Any<CancellationToken>());
-        await thumbnails.Received(1).TriggerLibraryThumbnailGenerationAsync(library, false, true, false, Arg.Any<CancellationToken>());
+        await thumbnails.Received(1).TriggerLibraryThumbnailGenerationAsync(library, false, false, true, null, Arg.Any<CancellationToken>());
+        await thumbnails.Received(1).TriggerLibraryThumbnailGenerationAsync(library, false, true, false, null, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -190,9 +190,9 @@ public class LibraryTaskLifecycleTests
         var (sp, thumbnails, _) = Services();
         var library = Guid.NewGuid();
 
-        await TaskQueueManager.RunLibraryThumbnailsAsync(sp, library, LibraryThumbnailReason.Manual | LibraryThumbnailReason.Addition, CancellationToken.None);
+        await TaskQueueManager.RunLibraryThumbnailsAsync(sp, library, LibraryThumbnailReason.Manual | LibraryThumbnailReason.Addition, null, CancellationToken.None);
 
-        await thumbnails.Received(1).TriggerLibraryThumbnailGenerationAsync(library, false, false, false, Arg.Any<CancellationToken>());
+        await thumbnails.Received(1).TriggerLibraryThumbnailGenerationAsync(library, false, false, false, null, Arg.Any<CancellationToken>());
         await thumbnails.ReceivedWithAnyArgs(1).TriggerLibraryThumbnailGenerationAsync(default, cancellationToken: TestContext.Current.CancellationToken);
     }
 
@@ -202,9 +202,9 @@ public class LibraryTaskLifecycleTests
         var (sp, thumbnails, _) = Services();
         var library = Guid.NewGuid();
 
-        await TaskQueueManager.RunLibraryThumbnailsAsync(sp, library, LibraryThumbnailReason.Force | LibraryThumbnailReason.Manual | LibraryThumbnailReason.Schedule, CancellationToken.None);
+        await TaskQueueManager.RunLibraryThumbnailsAsync(sp, library, LibraryThumbnailReason.Force | LibraryThumbnailReason.Manual | LibraryThumbnailReason.Schedule, null, CancellationToken.None);
 
-        await thumbnails.Received(1).TriggerLibraryThumbnailGenerationAsync(library, true, false, false, Arg.Any<CancellationToken>());
+        await thumbnails.Received(1).TriggerLibraryThumbnailGenerationAsync(library, true, false, false, null, Arg.Any<CancellationToken>());
         await thumbnails.ReceivedWithAnyArgs(1).TriggerLibraryThumbnailGenerationAsync(default, cancellationToken: TestContext.Current.CancellationToken);
     }
 

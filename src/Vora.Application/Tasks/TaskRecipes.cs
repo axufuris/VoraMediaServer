@@ -2,27 +2,30 @@ namespace Vora.Application.Tasks;
 
 public static class TaskRecipes
 {
-    public static bool Restore(ITaskQueueManager queue, TaskRecipe r)
+    public static bool Restore(ITaskQueueManager queue, TaskRecipe r, DateTime? queuedAt = null)
     {
+        DateTime? ForcedSince(bool forced) => forced ? r.Time("since") ?? queuedAt : null;
+
         switch (r.Kind)
         {
             case nameof(ITaskQueueManager.QueueLibraryAdded):
-                queue.QueueLibraryAdded(r.Guid("libraryId"), r.Text("libraryName"), r.Flag("forceOverride"));
+                queue.QueueLibraryAdded(r.Guid("libraryId"), r.Text("libraryName"), r.Flag("forceOverride"), ForcedSince(r.Flag("forceOverride")));
                 return true;
             case nameof(ITaskQueueManager.QueueLibraryUpdated):
-                queue.QueueLibraryUpdated(r.Guid("libraryId"), r.Text("libraryName"), r.Flag("forceOverride"));
+                queue.QueueLibraryUpdated(r.Guid("libraryId"), r.Text("libraryName"), r.Flag("forceOverride"), ForcedSince(r.Flag("forceOverride")));
                 return true;
             case nameof(ITaskQueueManager.QueueScanLibrary):
-                queue.QueueScanLibrary(r.Guid("libraryId"), r.Text("libraryName"), r.Flag("forceOverride"));
+                queue.QueueScanLibrary(r.Guid("libraryId"), r.Text("libraryName"), r.Flag("forceOverride"), ForcedSince(r.Flag("forceOverride")));
                 return true;
             case nameof(ITaskQueueManager.QueueDeleteLibrary):
                 queue.QueueDeleteLibrary(r.Guid("libraryId"), r.Text("libraryName"));
                 return true;
             case nameof(ITaskQueueManager.QueueRefreshLibraryMetadata):
-                queue.QueueRefreshLibraryMetadata(r.Guid("libraryId"), r.Text("libraryName"), r.Flag("forceOverride"));
+                queue.QueueRefreshLibraryMetadata(r.Guid("libraryId"), r.Text("libraryName"), r.Flag("forceOverride"), ForcedSince(r.Flag("forceOverride")));
                 return true;
             case nameof(ITaskQueueManager.QueueLibraryAnalysis):
-                queue.QueueLibraryAnalysis(r.Guid("libraryId"), r.Text("libraryName"), (LibraryAnalysisReason)r.Number("reason"));
+                var analysisReason = (LibraryAnalysisReason)r.Number("reason");
+                queue.QueueLibraryAnalysis(r.Guid("libraryId"), r.Text("libraryName"), analysisReason, ForcedSince(analysisReason.HasFlag(LibraryAnalysisReason.Force)));
                 return true;
             case nameof(ITaskQueueManager.QueueScanMediaItem):
                 queue.QueueScanMediaItem(r.Guid("mediaItemId"), r.Text("mediaItemName"), r.Flag("forceOverride"), r.OptionalGuid("libraryId"));
@@ -46,7 +49,7 @@ public static class TaskRecipes
                 queue.QueueArtworkProviderSwap(r.Guid("libraryId"), r.Text("libraryName") ?? string.Empty);
                 return true;
             case nameof(ITaskQueueManager.QueueRefreshLibraryRatings):
-                queue.QueueRefreshLibraryRatings(r.Guid("libraryId"), r.Flag("forceOverride"));
+                queue.QueueRefreshLibraryRatings(r.Guid("libraryId"), r.Flag("forceOverride"), r.Time("since") ?? queuedAt);
                 return true;
             case nameof(ITaskQueueManager.QueueRefreshMediaItemArtwork):
                 queue.QueueRefreshMediaItemArtwork(r.Guid("mediaItemId"), r.Flag("forceOverride"), r.OptionalGuid("libraryId"));
@@ -103,7 +106,8 @@ public static class TaskRecipes
                 queue.QueueIptvHealthCheck(r.Guid("playlistId"), r.Text("playlistName"));
                 return true;
             case nameof(ITaskQueueManager.QueueLibraryThumbnails):
-                queue.QueueLibraryThumbnails(r.Guid("libraryId"), r.Text("libraryName"), (LibraryThumbnailReason)r.Number("reason"));
+                var thumbnailReason = (LibraryThumbnailReason)r.Number("reason");
+                queue.QueueLibraryThumbnails(r.Guid("libraryId"), r.Text("libraryName"), thumbnailReason, ForcedSince(thumbnailReason.HasFlag(LibraryThumbnailReason.Force)));
                 return true;
             case nameof(ITaskQueueManager.QueueRemoveLibraryVideoThumbnails):
                 queue.QueueRemoveLibraryVideoThumbnails(r.Guid("libraryId"), r.Text("libraryName"));

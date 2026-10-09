@@ -68,7 +68,7 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
             new MusicArtworkResult { Url = "banner.jpg", ProviderName = "t", Kind = MusicArtworkKind.Banner },
             new MusicArtworkResult { Url = "logo.png", ProviderName = "t", Kind = MusicArtworkKind.Logo });
 
-        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, TestContext.Current.CancellationToken);
+        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, forcedSince: null, TestContext.Current.CancellationToken);
 
         artist.ArtworkUrl.Should().Be("existing.jpg");
         artist.BackgroundUrl.Should().Be("bg.jpg");
@@ -79,7 +79,7 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
     [Fact]
     public async Task Asks_the_repository_for_only_the_incomplete_artists_when_not_forced()
     {
-        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, TestContext.Current.CancellationToken);
+        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, forcedSince: null, TestContext.Current.CancellationToken);
 
         await _repository.Received(1).GetArtistIdsForArtworkRefreshAsync(_libraryId, false, Arg.Any<DateTime>());
         await _repository.Received(1).GetAlbumIdsForArtworkRefreshAsync(_libraryId, false, Arg.Any<DateTime>());
@@ -90,7 +90,7 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
     [Fact]
     public async Task Only_items_not_asked_in_the_last_thirty_days_are_asked_again()
     {
-        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, TestContext.Current.CancellationToken);
+        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, forcedSince: null, TestContext.Current.CancellationToken);
 
         var expected = DateTime.UtcNow - MusicManager.ArtworkRetryAfter;
         await _repository.Received(1).GetArtistIdsForArtworkRefreshAsync(_libraryId, false,
@@ -103,7 +103,7 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
     {
         var artist = GivenArtist();
 
-        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, TestContext.Current.CancellationToken);
+        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, forcedSince: null, TestContext.Current.CancellationToken);
 
         artist.ArtworkCheckedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
         await _repository.Received().UpdateArtistAsync(artist);
@@ -116,7 +116,7 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
         _repository.GetAlbumIdsForArtworkRefreshAsync(_libraryId, Arg.Any<bool>(), Arg.Any<DateTime>()).Returns(new List<Guid> { album.Id });
         _repository.GetAlbumForUpdateAsync(album.Id).Returns(album);
 
-        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, TestContext.Current.CancellationToken);
+        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, forcedSince: null, TestContext.Current.CancellationToken);
 
         album.ArtworkCheckedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
         await _repository.Received().UpdateAlbumAsync(album);
@@ -125,7 +125,7 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
     [Fact]
     public async Task Passes_force_through_to_the_target_queries()
     {
-        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: true, TestContext.Current.CancellationToken);
+        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: true, forcedSince: null, TestContext.Current.CancellationToken);
 
         await _repository.Received(1).GetArtistIdsForArtworkRefreshAsync(_libraryId, true, Arg.Any<DateTime>());
         await _repository.Received(1).GetAlbumIdsForArtworkRefreshAsync(_libraryId, true, Arg.Any<DateTime>());
@@ -146,7 +146,7 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
         _provider.SearchArtistArtworkAsync("Fine", Arg.Any<CancellationToken>())
             .Returns(new[] { new MusicArtworkResult { Url = "thumb.jpg", ProviderName = "t", Kind = MusicArtworkKind.Thumb } });
 
-        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, TestContext.Current.CancellationToken);
+        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, forcedSince: null, TestContext.Current.CancellationToken);
 
         ok.ArtworkUrl.Should().Be("thumb.jpg");
     }
@@ -154,7 +154,7 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
     [Fact]
     public async Task Does_nothing_when_every_item_is_already_complete()
     {
-        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, TestContext.Current.CancellationToken);
+        await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, forcedSince: null, TestContext.Current.CancellationToken);
 
         await _provider.DidNotReceive().SearchArtistArtworkAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -166,7 +166,7 @@ public class LibraryMusicArtworkRefreshTests : IDisposable
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        var refresh = async () => await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, cts.Token);
+        var refresh = async () => await _manager.RefreshLibraryArtworkFromProvidersAsync(_libraryId, force: false, forcedSince: null, cts.Token);
 
         await refresh.Should().ThrowAsync<OperationCanceledException>();
     }

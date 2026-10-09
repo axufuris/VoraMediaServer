@@ -49,7 +49,7 @@ public interface IMusicRepository
 
     Task<Artist?> GetArtistForUpdateAsync(Guid artistId);
     Task<List<PopularityRefreshTarget>> GetArtistsDueForPopularityRefreshAsync(DateTime staleBefore, int limit);
-    Task<List<PopularityRefreshTarget>> GetLibraryArtistsForPopularityRefreshAsync(Guid libraryId);
+    Task<List<PopularityRefreshTarget>> GetLibraryArtistsForPopularityRefreshAsync(Guid libraryId, DateTime refreshedBefore);
     Task<Artist?> GetArtistCatalogForUpdateAsync(Guid artistId);
     Task StageArtistTagsAsync(Guid artistId, IReadOnlyList<string> tags);
     Task<List<string>> GetArtistTagNamesAsync(Guid artistId);

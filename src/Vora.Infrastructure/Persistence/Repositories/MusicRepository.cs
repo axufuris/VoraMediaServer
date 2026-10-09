@@ -80,6 +80,10 @@ public class MusicRepository : IMusicRepository
                     || a.ClearLogoUrl == null)
                 && (a.ArtworkCheckedAt == null || a.ArtworkCheckedAt < checkedBefore));
         }
+        else
+        {
+            query = query.Where(a => a.ArtworkCheckedAt == null || a.ArtworkCheckedAt < checkedBefore);
+        }
 
         return await query.OrderBy(a => a.Name).Select(a => a.Id).ToListAsync();
     }
@@ -96,6 +100,10 @@ public class MusicRepository : IMusicRepository
                     || a.BackgroundUrl == null
                     || a.DiscArtUrl == null)
                 && (a.ArtworkCheckedAt == null || a.ArtworkCheckedAt < checkedBefore));
+        }
+        else
+        {
+            query = query.Where(a => a.ArtworkCheckedAt == null || a.ArtworkCheckedAt < checkedBefore);
         }
 
         return await query.OrderBy(a => a.Title).Select(a => a.Id).ToListAsync();
@@ -428,10 +436,10 @@ public class MusicRepository : IMusicRepository
             .Select(a => new PopularityRefreshTarget(a.Id, a.Name))
             .ToListAsync();
 
-    public Task<List<PopularityRefreshTarget>> GetLibraryArtistsForPopularityRefreshAsync(Guid libraryId) =>
+    public Task<List<PopularityRefreshTarget>> GetLibraryArtistsForPopularityRefreshAsync(Guid libraryId, DateTime refreshedBefore) =>
         _context.Artists
             .AsNoTracking()
-            .Where(a => a.LibraryId == libraryId)
+            .Where(a => a.LibraryId == libraryId && (a.PopularityRefreshedAt == null || a.PopularityRefreshedAt < refreshedBefore))
             .OrderBy(a => a.PopularityRefreshedAt.HasValue)
             .ThenBy(a => a.PopularityRefreshedAt)
             .ThenBy(a => a.Name)

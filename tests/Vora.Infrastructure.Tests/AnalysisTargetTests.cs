@@ -153,4 +153,29 @@ public class AnalysisTargetTests
         saved.VideoThumbnailSpriteVersion.Should().BeNull();
         (await Repo().GetFileAnalysisTargetIdsAsync(movies)).Should().Equal(movie.Id);
     }
+
+    [Fact]
+    public async Task A_resumed_re_analysis_targets_what_was_analyzed_before_it_was_asked_for()
+    {
+        var started = new DateTime(2026, 10, 8, 14, 0, 0, DateTimeKind.Utc);
+        var movies = Library(LibraryType.Movie);
+        var before = AddMovie(movies, "Analyzed Last Week", DateTime.UtcNow, markersAt: started.AddDays(-7));
+        var never = AddMovie(movies, "Never Analyzed", DateTime.UtcNow);
+        AddMovie(movies, "Redone This Run", DateTime.UtcNow, markersAt: started.AddMinutes(10));
+        var locked = AddMovie(movies, "Locked", DateTime.UtcNow, markersAt: started.AddDays(-7));
+        locked.LockedFields = new List<string> { "Markers" };
+
+        var shows = Library(LibraryType.TvShow);
+        var (halfDone, halfDoneSeason) = AddShow(shows, "Titus");
+        AddEpisode(shows, halfDoneSeason, 1, markersAt: started.AddMinutes(5));
+        AddEpisode(shows, halfDoneSeason, 2, markersAt: started.AddDays(-7));
+        var (_, doneSeason) = AddShow(shows, "Mythic Quest");
+        AddEpisode(shows, doneSeason, 1, markersAt: started.AddMinutes(1));
+        _db.SaveChanges();
+
+        (await Repo().GetMarkerDetectionTargetIdsAsync(movies, started)).Should().BeEquivalentTo(new[] { before.Id, never.Id });
+        (await Repo().GetMarkerDetectionTargetIdsAsync(shows, started)).Should().Equal(halfDone.Id);
+        (await Repo().SeasonHasPendingMarkerWorkAsync(halfDoneSeason.Id, started)).Should().BeTrue();
+        (await Repo().SeasonHasPendingMarkerWorkAsync(doneSeason.Id, started)).Should().BeFalse();
+    }
 }

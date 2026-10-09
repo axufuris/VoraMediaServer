@@ -9,12 +9,12 @@ public class MigrationHistoryTests
     public const string ChangesSinceInitial = "20261004192607_ChangesSinceInitial";
 
     [Fact]
-    public void The_history_is_initial_then_one_migration_with_everything_since()
+    public void The_history_starts_with_the_two_migrations_1_0_shipped_with()
     {
         using var db = new VoraDbContext(new DbContextOptionsBuilder<VoraDbContext>()
             .UseNpgsql("Host=unused", npgsql => npgsql.UseVector())
             .Options);
 
-        db.Database.GetMigrations().Should().Equal(Initial, ChangesSinceInitial);
+        db.Database.GetMigrations().Take(2).Should().Equal(Initial, ChangesSinceInitial);
     }
 }
