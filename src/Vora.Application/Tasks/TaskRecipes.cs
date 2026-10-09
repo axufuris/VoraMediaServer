@@ -116,7 +116,7 @@ public static class TaskRecipes
                 queue.QueueGenerateMediaItemVideoThumbnails(r.Guid("mediaItemId"), r.Text("mediaItemName"), r.Flag("forceOverride"));
                 return true;
             case nameof(ITaskQueueManager.QueuePreExtractMediaItemSubtitles):
-                queue.QueuePreExtractMediaItemSubtitles(r.Guid("mediaItemId"), r.Text("mediaItemName"));
+                queue.QueuePreExtractMediaItemSubtitles(r.Guid("mediaItemId"), r.Text("mediaItemName"), r.OptionalGuid("libraryId"));
                 return true;
             case nameof(ITaskQueueManager.QueuePreExtractLibrarySubtitles):
                 queue.QueuePreExtractLibrarySubtitles(r.Guid("libraryId"), r.Text("libraryName"));

@@ -104,12 +104,17 @@ An external track's cached VTT is fingerprinted against the **sidecar**, not the
 `ISubtitlePreExtractionManager` is its own job with its own triggers, deliberately not chained to the thumbnail step:
 
 - **Library scan** — `RunFullLibraryWorkflowAsync` queues `QueuePreExtractLibrarySubtitles` as its own step. Queued rather than awaited: the pass parks while anything is transcoding, which must not hold a scan open. Progress counts only what this pass still has to extract (`Pre-extracting subtitles (4/1894)`): tracks already cached are skipped before the count is taken, so a pass resumed after a restart starts again from 1 against a smaller total.
-- **Single-file ingest** (`QueueScanNewFile`) and **per-item Analyze** — queue `QueuePreExtractMediaItemSubtitles` right after analysis, which is the point at which the item's subtitle tracks are known.
+- **Single-file ingest** (`QueueScanNewFile`) and **per-item Analyze** — queue `QueuePreExtractMediaItemSubtitles(itemId, name, libraryId)` right after analysis, which is the point at which the item's subtitle tracks are known.
 - **Backfill** — `POST /api/metadata/subtitles/backfill` (admin) walks every video library and fills whatever is missing, so an existing library is warmed without a rescan. There is a button for it under the same settings card.
 
 Throttling, because each extraction reads a whole container off the media disk:
 
 - **Concurrency 1.** Every subtitle job shares one task-queue `resourceKey`, so no two run at once however many are queued.
+- **Item requests fold into library passes.** A library pass on a large library runs for hours, and every item queued behind it used to sit there as its own pending task. Now:
+  - While any library pass or backfill is queued or running, an item request becomes `QueuePreExtractLibrarySubtitles` for the item's library (or nothing, when a backfill that hasn't started will cover it).
+  - A library pass that hasn't started picks the item up when it takes its list of tracks. A running one took that list when it started, so the request sets `rerunIfRunning`: the pass runs once more when it finishes, cheaply, since everything already extracted is skipped before the count.
+  - Queueing a library pass (or a backfill that hasn't started) drops pending item tasks for that library (or all of them), without one `TasksUpdated` per task.
+  - An item whose library isn't known (a task saved before this change) still queues on its own.
 - **Yields to playback.** Before each file the pass polls `ITranscodeService.GetActiveTranscodeCount()` and waits while anything is transcoding (15s backoff, 30-minute ceiling before it proceeds anyway). This is server-wide rather than per-drive — a transcode can't be mapped back to a library cheaply, so the conservative reading is the one implemented.
 - Honours the task's cancellation token, so a shutdown or an admin cancel stops it between files.
 

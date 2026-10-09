@@ -57,6 +57,7 @@ public interface ITaskQueueManager
     int CancelTasksForLibrary(Guid libraryId);
     CancellationToken? GetTaskCancellationToken(Guid taskId);
     void UpdateTaskName(Guid taskId, string name);
+    void UpdateTaskNames(IReadOnlyDictionary<Guid, string> names);
     Func<IServiceProvider, Task<string?>>? GetTaskNameResolver(Guid taskId);
     IAsyncEnumerable<QueuedTaskDto> DequeueAsync(CancellationToken cancellationToken);
     void MarkTaskAsRunning(Guid taskId);
@@ -75,7 +76,7 @@ public interface ITaskQueueManager
     Task WaitForLibraryTasksToStopAsync(Guid libraryId, IReadOnlyCollection<Guid>? mediaItemIds = null, CancellationToken cancellationToken = default);
     void QueueRemoveLibraryVideoThumbnails(Guid libraryId, string? libraryName = null);
     void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
-    void QueuePreExtractMediaItemSubtitles(Guid mediaItemId, string? mediaItemName = null);
+    void QueuePreExtractMediaItemSubtitles(Guid mediaItemId, string? mediaItemName = null, Guid? libraryId = null);
     void QueuePreExtractLibrarySubtitles(Guid libraryId, string? libraryName = null);
     void QueueSubtitleBackfill();
     void QueueRefreshMusicPopularity();
@@ -313,7 +314,7 @@ public class TaskQueueManager : ITaskQueueManager
             // Analysis has just written this item's subtitle tracks, so the
             // pre-extraction target is known. Queued rather than awaited: it
             // runs on its own throttled key and must not hold up the ingest.
-            sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractMediaItemSubtitles(itemId);
+            sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractMediaItemSubtitles(itemId, libraryId: libraryId);
 
             await metadataManager.TriggerMediaItemMetadataRefreshAsync(itemId, false, ct);
             await metadataManager.TriggerMediaItemArtworkRefreshAsync(itemId, false, ct);
@@ -402,7 +403,8 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var analyzerManager = sp.GetRequiredService<IMediaAnalyzerManager>();
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, cancellationToken: ct);
-            sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractMediaItemSubtitles(mediaItemId, mediaItemName);
+            var libraryId = await sp.GetRequiredService<IMediaRepository>().GetProjectedAsync(mediaItemId, m => (Guid?)m.LibraryId);
+            sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractMediaItemSubtitles(mediaItemId, mediaItemName, libraryId);
         }, mediaItemName == null ? MediaLabel(mediaItemId, "Analyze Media Item: {0}") : null, mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueueAnalyzeMediaItemContent), new { mediaItemId, mediaItemName, forceOverride }));
     }
 
@@ -634,6 +636,21 @@ public class TaskQueueManager : ITaskQueueManager
         }
     }
 
+    public void UpdateTaskNames(IReadOnlyDictionary<Guid, string> names)
+    {
+        var changed = false;
+        foreach (var (taskId, name) in names)
+        {
+            if (!_taskStates.TryGetValue(taskId, out var state)) continue;
+            state.NameResolver = null;
+            if (state.Name == name) continue;
+            state.Name = name;
+            changed = true;
+        }
+
+        if (changed) _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
+    }
+
     private static Func<IServiceProvider, Task<string?>> LibraryLabel(Guid libraryId, string format) =>
         async sp =>
         {
@@ -656,7 +673,7 @@ public class TaskQueueManager : ITaskQueueManager
         async sp =>
         {
             var repo = sp.GetRequiredService<IMediaRepository>();
-            var title = await repo.GetProjectedAsync(mediaItemId, m => m.Title);
+            var title = MediaTaskTitle.Format(await repo.GetProjectedAsync(mediaItemId, MediaTaskTitle.Projection));
             return string.IsNullOrWhiteSpace(title) ? null : string.Format(format, title);
         };
 
@@ -769,7 +786,9 @@ public class TaskQueueManager : ITaskQueueManager
         return _queue.Reader.ReadAllAsync(cancellationToken);
     }
 
-    public void RemoveTask(Guid taskId, bool interrupted = false)
+    public void RemoveTask(Guid taskId, bool interrupted = false) => RemoveTask(taskId, interrupted, notify: true);
+
+    private void RemoveTask(Guid taskId, bool interrupted, bool notify)
     {
         // No _runningTaskId to clear — _currentTaskId is AsyncLocal and lives only
         // on the finished task's own async flow, so it goes away with it.
@@ -785,9 +804,9 @@ public class TaskQueueManager : ITaskQueueManager
             if (removed.Recipe != null) _journal.Complete(taskId);
             if (removed.FollowUp is { } followUp && !cancelled && removed.Status != CancellingStatus)
             {
-                Enqueue(followUp.Name, followUp.WorkItem, followUp.NameResolver, followUp.ResourceKey, followUp.DedupeKey, rerunIfRunning: true, followUp.LibraryId, followUp.OnCancelled, followUp.MediaItemId, followUp.Recipe);
+                Enqueue(followUp.NameResolver == null ? followUp.Name : removed.Name, followUp.WorkItem, followUp.NameResolver, followUp.ResourceKey, followUp.DedupeKey, rerunIfRunning: true, followUp.LibraryId, followUp.OnCancelled, followUp.MediaItemId, followUp.Recipe);
             }
-            _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
+            if (notify) _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
         }
     }
 
@@ -1006,14 +1025,25 @@ public class TaskQueueManager : ITaskQueueManager
     // extraction reads a whole container off the media disk; two at once would
     // fight each other and playback.
     private const string SubtitleExtractionKey = "subtitle-pre-extract";
+    private const string ItemPreExtractionPrefix = "pre-extract-subs:item:";
+    private const string LibraryPreExtractionPrefix = "pre-extract-subs:library:";
+    private const string BackfillPreExtractionKey = "pre-extract-subs:backfill";
 
-    public void QueuePreExtractMediaItemSubtitles(Guid mediaItemId, string? mediaItemName = null)
+    public void QueuePreExtractMediaItemSubtitles(Guid mediaItemId, string? mediaItemName = null, Guid? libraryId = null)
     {
+        if (libraryId is Guid library && IsLibraryWidePreExtractionActive())
+        {
+            if (!IsPending(BackfillPreExtractionKey)) QueuePreExtractLibrarySubtitles(library);
+            return;
+        }
+
         Enqueue($"Pre-extract Subtitles: {ResolveDisplayName(mediaItemId, mediaItemName)}", async (ct, sp) =>
         {
             var manager = sp.GetRequiredService<Vora.Application.Subtitles.ISubtitlePreExtractionManager>();
             await manager.PreExtractForItemAsync(mediaItemId, ct);
-        }, resourceKey: SubtitleExtractionKey, dedupeKey: $"pre-extract-subs:item:{mediaItemId}", mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueuePreExtractMediaItemSubtitles), new { mediaItemId, mediaItemName }));
+        }, mediaItemName == null ? MediaLabel(mediaItemId, "Pre-extract Subtitles: {0}") : null,
+            resourceKey: SubtitleExtractionKey, dedupeKey: ItemPreExtractionPrefix + mediaItemId, libraryId: libraryId, mediaItemId: mediaItemId,
+            recipe: TaskRecipe.Of(nameof(QueuePreExtractMediaItemSubtitles), new { mediaItemId, mediaItemName, libraryId }));
     }
 
     public void QueuePreExtractLibrarySubtitles(Guid libraryId, string? libraryName = null)
@@ -1022,7 +1052,35 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<Vora.Application.Subtitles.ISubtitlePreExtractionManager>();
             await manager.PreExtractForLibraryAsync(libraryId, ct);
-        }, resourceKey: SubtitleExtractionKey, dedupeKey: $"pre-extract-subs:library:{libraryId}", libraryId: libraryId, recipe: TaskRecipe.Of(nameof(QueuePreExtractLibrarySubtitles), new { libraryId, libraryName }));
+        }, libraryName == null ? LibraryLabel(libraryId, "Pre-extract Subtitles: {0}") : null,
+            resourceKey: SubtitleExtractionKey, dedupeKey: LibraryPreExtractionPrefix + libraryId, rerunIfRunning: true, libraryId: libraryId,
+            recipe: TaskRecipe.Of(nameof(QueuePreExtractLibrarySubtitles), new { libraryId, libraryName }));
+        DropPendingItemPreExtractions(libraryId);
+    }
+
+    private bool IsLibraryWidePreExtractionActive() =>
+        _taskStates.Values.Any(t => t.Status != CancellingStatus
+            && (t.DedupeKey == BackfillPreExtractionKey || t.DedupeKey?.StartsWith(LibraryPreExtractionPrefix, StringComparison.Ordinal) == true));
+
+    private bool IsPending(string dedupeKey) =>
+        _taskStates.Values.Any(t => t.DedupeKey == dedupeKey && t.Status == PendingStatus);
+
+    private void DropPendingItemPreExtractions(Guid? libraryId)
+    {
+        var covered = _taskStates.Values
+            .Where(t => t.Status == PendingStatus
+                && t.DedupeKey?.StartsWith(ItemPreExtractionPrefix, StringComparison.Ordinal) == true
+                && (libraryId == null || t.LibraryId == libraryId))
+            .Select(t => t.Id)
+            .ToList();
+
+        foreach (var taskId in covered)
+        {
+            if (_taskTokens.TryGetValue(taskId, out var cts)) cts.Cancel();
+            RemoveTask(taskId, interrupted: false, notify: false);
+        }
+
+        if (covered.Count > 0) _ = Task.Run(() => _notifier.NotifyTasksUpdatedAsync());
     }
 
     // Deduplicated because it is queued by a daily schedule and could otherwise
@@ -1083,7 +1141,8 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<Vora.Application.Subtitles.ISubtitlePreExtractionManager>();
             await manager.BackfillAsync(ct);
-        }, resourceKey: SubtitleExtractionKey, dedupeKey: "pre-extract-subs:backfill", recipe: TaskRecipe.Of(nameof(QueueSubtitleBackfill)));
+        }, resourceKey: SubtitleExtractionKey, dedupeKey: BackfillPreExtractionKey, recipe: TaskRecipe.Of(nameof(QueueSubtitleBackfill)));
+        if (IsPending(BackfillPreExtractionKey)) DropPendingItemPreExtractions(null);
     }
 
     private static async Task RunFullLibraryWorkflowAsync(IServiceProvider sp, Guid libraryId, string? libraryName, bool forceOverride, DateTime? since, CancellationToken ct = default)
