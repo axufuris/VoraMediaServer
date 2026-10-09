@@ -186,4 +186,22 @@ public class EnrichmentTargetTests
 
         targets.Should().Equal(present.Id);
     }
+
+    [Fact]
+    public async Task A_resumed_forced_refresh_takes_what_was_not_refreshed_since_it_was_asked_for()
+    {
+        using var db = NewContext();
+        var started = new DateTime(2026, 10, 8, 14, 0, 0, DateTimeKind.Utc);
+        var libraryId = Guid.NewGuid();
+        db.Set<MediaLibrary>().Add(new MediaLibrary { Id = libraryId, Name = "Movies", Type = LibraryType.Movie, FolderPaths = new List<string> { "/media/movies" } });
+        var never = new Movie { Id = Guid.NewGuid(), Title = "Heat", LibraryId = libraryId };
+        var earlier = new Movie { Id = Guid.NewGuid(), Title = "Alien", LibraryId = libraryId, FullyRefreshedAt = started.AddDays(-30), RatingsCheckedAt = started.AddMinutes(5) };
+        var redone = new Movie { Id = Guid.NewGuid(), Title = "Aliens", LibraryId = libraryId, FullyRefreshedAt = started.AddMinutes(5), RatingsCheckedAt = started.AddDays(-30) };
+        db.Set<Movie>().AddRange(never, earlier, redone);
+        db.SaveChanges();
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+
+        (await repo.GetEnrichableMediaIdsAsync(libraryId, fullyRefreshedBefore: started)).Should().BeEquivalentTo(new[] { never.Id, earlier.Id });
+        (await repo.GetEnrichableMediaIdsAsync(libraryId, ratingsCheckedBefore: started)).Should().BeEquivalentTo(new[] { never.Id, redone.Id });
+    }
 }

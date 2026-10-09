@@ -42,7 +42,7 @@ public interface IMusicManager
     Task<List<MusicArtworkResult>> GetArtistArtworkSuggestionsAsync(Guid artistId, CancellationToken cancellationToken);
 
     Task<string?> RefreshArtistArtworkFromProvidersAsync(Guid artistId, bool force, CancellationToken cancellationToken);
-    Task RefreshLibraryArtworkFromProvidersAsync(Guid libraryId, bool force, CancellationToken cancellationToken);
+    Task RefreshLibraryArtworkFromProvidersAsync(Guid libraryId, bool force, DateTime? forcedSince, CancellationToken cancellationToken);
     Task<string?> RefreshAlbumArtworkFromProvidersAsync(Guid albumId, bool force, CancellationToken cancellationToken);
 
     Task<List<MusicSearchResultVM>> SearchAsync(string query, MusicAccessFilter access, int limit);
@@ -561,9 +561,9 @@ public class MusicManager : IMusicManager
     // already existed. The per-artist refresh only ever ran at the moment an
     // artist was created without embedded art, so an artist whose folder art had
     // filled ArtworkUrl never asked a provider for a background, banner or logo.
-    public async Task RefreshLibraryArtworkFromProvidersAsync(Guid libraryId, bool force, CancellationToken cancellationToken)
+    public async Task RefreshLibraryArtworkFromProvidersAsync(Guid libraryId, bool force, DateTime? forcedSince, CancellationToken cancellationToken)
     {
-        var checkedBefore = DateTime.UtcNow - ArtworkRetryAfter;
+        var checkedBefore = force ? forcedSince ?? DateTime.UtcNow : DateTime.UtcNow - ArtworkRetryAfter;
         var artistIds = await _repository.GetArtistIdsForArtworkRefreshAsync(libraryId, force, checkedBefore);
         var albumIds = await _repository.GetAlbumIdsForArtworkRefreshAsync(libraryId, force, checkedBefore);
 

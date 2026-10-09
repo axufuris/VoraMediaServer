@@ -88,7 +88,7 @@ public class TaskJournal : BackgroundService, ITaskJournal
             Complete(row.Id);
             try
             {
-                if (!TaskRecipes.Restore(queue, TaskRecipe.FromJson(row.Kind, row.ArgumentsJson)))
+                if (!TaskRecipes.Restore(queue, TaskRecipe.FromJson(row.Kind, row.ArgumentsJson), DateTime.SpecifyKind(row.QueuedAt, DateTimeKind.Utc)))
                 {
                     _logger.LogWarning("Not resuming {TaskName}: this version has no task of kind {Kind}.", row.Name, row.Kind);
                 }

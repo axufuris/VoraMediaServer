@@ -339,7 +339,7 @@ public partial class MediaRepository : IMediaRepository
             .ToListAsync();
     }
 
-    public async Task<List<Guid>> GetVideoThumbnailTargetIdsAsync(Guid libraryId, string currentSpriteVersion, bool includeCompleted)
+    public async Task<List<Guid>> GetVideoThumbnailTargetIdsAsync(Guid libraryId, string currentSpriteVersion, bool includeCompleted, DateTime? generatedBefore = null)
     {
         var query = _context.MediaItems
             .AsNoTracking()
@@ -352,6 +352,12 @@ public partial class MediaRepository : IMediaRepository
         if (!includeCompleted)
         {
             query = query.Where(m => m.VideoThumbnailSpriteVersion != currentSpriteVersion);
+        }
+        else if (generatedBefore != null)
+        {
+            query = query.Where(m => m.VideoThumbnailSpriteVersion != currentSpriteVersion
+                || m.LastVideoThumbnailGenerationAt == null
+                || m.LastVideoThumbnailGenerationAt < generatedBefore);
         }
 
         return await query.Select(m => m.Id).ToListAsync();
@@ -470,7 +476,7 @@ public partial class MediaRepository : IMediaRepository
             .FirstOrDefaultAsync();
     }
 
-    public async Task<bool> SeasonHasPendingMarkerWorkAsync(Guid seasonId)
+    public async Task<bool> SeasonHasPendingMarkerWorkAsync(Guid seasonId, DateTime? analyzedBefore = null)
     {
         var rows = await _context.Set<Episode>()
             .AsNoTracking()
@@ -478,23 +484,23 @@ public partial class MediaRepository : IMediaRepository
             .Select(e => new { e.LockedFields, e.MarkersAnalyzedAt })
             .ToListAsync();
 
-        return rows.Any(r => r.MarkersAnalyzedAt == null && !AreMarkersLocked(r.LockedFields));
+        return rows.Any(r => (r.MarkersAnalyzedAt == null || r.MarkersAnalyzedAt < analyzedBefore) && !AreMarkersLocked(r.LockedFields));
     }
 
     private static bool AreMarkersLocked(List<string>? lockedFields) =>
         lockedFields != null && lockedFields.Contains("Markers", StringComparer.OrdinalIgnoreCase);
 
-    public async Task<List<Guid>> GetMarkerDetectionTargetIdsAsync(Guid libraryId)
+    public async Task<List<Guid>> GetMarkerDetectionTargetIdsAsync(Guid libraryId, DateTime? analyzedBefore = null)
     {
         var movies = await _context.Set<Movie>()
             .AsNoTracking()
-            .Where(m => m.LibraryId == libraryId && m.MissingSince == null && m.MarkersAnalyzedAt == null)
+            .Where(m => m.LibraryId == libraryId && m.MissingSince == null && (m.MarkersAnalyzedAt == null || m.MarkersAnalyzedAt < analyzedBefore))
             .Select(m => new { m.Id, m.LockedFields })
             .ToListAsync();
 
         var episodes = await _context.Set<Episode>()
             .AsNoTracking()
-            .Where(e => e.Season.TvShow.LibraryId == libraryId && e.MissingSince == null && e.MarkersAnalyzedAt == null)
+            .Where(e => e.Season.TvShow.LibraryId == libraryId && e.MissingSince == null && (e.MarkersAnalyzedAt == null || e.MarkersAnalyzedAt < analyzedBefore))
             .Select(e => new { ShowId = e.Season.TvShowId, e.LockedFields })
             .ToListAsync();
 
@@ -723,13 +729,30 @@ public partial class MediaRepository : IMediaRepository
 
     // Same exclusion: a track's cover art lives on its Album, so PosterUrl on the
     // track itself is always null and every track looked permanently un-arted.
-    public async Task<IEnumerable<Guid>> GetEnrichableMediaIdsAsync(Guid libraryId) =>
-        await _context.MediaItems
+    public async Task<IEnumerable<Guid>> GetEnrichableMediaIdsAsync(Guid libraryId, DateTime? fullyRefreshedBefore = null, DateTime? ratingsCheckedBefore = null)
+    {
+        var query = _context.MediaItems
             .AsNoTracking()
             .Where(MediaCapabilities.SupportsMetadataEnrichment)
-            .Where(m => m.LibraryId == libraryId && m.MissingSince == null && !(m is Episode) && !(m is Season))
-            .Select(m => m.Id)
-            .ToListAsync();
+            .Where(m => m.LibraryId == libraryId && m.MissingSince == null && !(m is Episode) && !(m is Season));
+
+        if (fullyRefreshedBefore != null)
+        {
+            query = query.Where(m => m.FullyRefreshedAt == null || m.FullyRefreshedAt < fullyRefreshedBefore);
+        }
+
+        if (ratingsCheckedBefore != null)
+        {
+            query = query.Where(m => m.RatingsCheckedAt == null || m.RatingsCheckedAt < ratingsCheckedBefore);
+        }
+
+        return await query.Select(m => m.Id).ToListAsync();
+    }
+
+    public Task MarkFullyRefreshedAsync(Guid mediaItemId) =>
+        _context.MediaItems
+            .Where(m => m.Id == mediaItemId)
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.FullyRefreshedAt, DateTime.UtcNow));
 
     public async Task<IEnumerable<Guid>> GetMediaIdsMissingArtworkAsync(Guid libraryId)
     {

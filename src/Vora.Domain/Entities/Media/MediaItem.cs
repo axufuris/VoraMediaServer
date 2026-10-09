@@ -49,6 +49,7 @@ public abstract class MediaItem : LockableEntity
     public DateTime? LastContentAddedAt { get; set; }
     public DateTime? MissingSince { get; set; }
     public DateTime? LastMetadataRefresh { get; set; }
+    public DateTime? FullyRefreshedAt { get; set; }
     public DateTime? LastOverlayGeneratedAt { get; set; }
     public int? OverlayLayoutVersion { get; set; }
     public DateTime? MarkersAnalyzedAt { get; set; }

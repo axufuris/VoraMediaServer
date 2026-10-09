@@ -15,10 +15,10 @@ public interface IMediaAnalyzerManager
 {
     Task TriggerMediaItemFileAnalysisAsync(Guid mediaItemId, string? name = null, CancellationToken cancellationToken = default);
     Task AnalyzeMediaFileAsync(Guid mediaItemId, CancellationToken cancellationToken = default);
-    Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride, DetectedMarker? fingerprintIntro = null, CancellationToken cancellationToken = default);
+    Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride, DetectedMarker? fingerprintIntro = null, DateTime? analyzedBefore = null, CancellationToken cancellationToken = default);
     Task TriggerLibraryFileAnalysisAsync(Guid libraryId, string? name = null, CancellationToken cancellationToken = default);
-    Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default);
-    Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default);
+    Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, DateTime? analyzedBefore = null, CancellationToken cancellationToken = default);
+    Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, DateTime? analyzedBefore = null, CancellationToken cancellationToken = default);
 }
 
 public class MediaAnalyzerManager : IMediaAnalyzerManager
@@ -158,7 +158,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     private static string ProgressTitle(IReadOnlyDictionary<Guid, string> titles, Guid id) =>
         titles.TryGetValue(id, out var t) && !string.IsNullOrWhiteSpace(t) ? t : "…";
 
-    public async Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default)
+    public async Task TriggerMediaItemSilenceDetectionAsync(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, DateTime? analyzedBefore = null, CancellationToken cancellationToken = default)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
         if (!forceOverride)
@@ -177,20 +177,20 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             foreach (var seasonId in seasonIds)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                await RunSeasonSilenceDetectionAsync(seasonId, settings, forceOverride, cancellationToken);
+                await RunSeasonSilenceDetectionAsync(seasonId, settings, forceOverride, analyzedBefore, cancellationToken);
             }
         }
         else if (itemType == nameof(Season))
         {
-            await RunSeasonSilenceDetectionAsync(mediaItemId, settings, forceOverride, cancellationToken);
+            await RunSeasonSilenceDetectionAsync(mediaItemId, settings, forceOverride, analyzedBefore, cancellationToken);
         }
         else
         {
-            await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode: false, forceOverride, fingerprintIntro: null, cancellationToken);
+            await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode: false, forceOverride, fingerprintIntro: null, analyzedBefore, cancellationToken);
         }
     }
 
-    public async Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default)
+    public async Task TriggerLibrarySilenceDetectionAsync(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isAdditionTrigger = false, bool isScheduleTrigger = false, DateTime? analyzedBefore = null, CancellationToken cancellationToken = default)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
         if (!forceOverride)
@@ -205,9 +205,9 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // skip it — and every season's episodes were then detected twice (once via
         // the show, once via the season). For a large TV library that's tens of
         // thousands of wasted queries before any real work starts.
-        var mediaIds = forceOverride
+        var mediaIds = forceOverride && analyzedBefore == null
             ? await _mediaRepository.GetTopLevelMediaItemIdsByLibraryAsync(libraryId)
-            : await _mediaRepository.GetMarkerDetectionTargetIdsAsync(libraryId);
+            : await _mediaRepository.GetMarkerDetectionTargetIdsAsync(libraryId, forceOverride ? analyzedBefore : null);
         if (mediaIds.Count == 0) return;
 
         // Both marker toggles off → there's nothing to detect. Bail before the
@@ -234,7 +234,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             try
             {
                 _progress.Report($"Detecting intro/credit markers — {ProgressTitle(titles, id)} ({count}/{total})");
-                await TriggerMediaItemSilenceDetectionAsync(id, forceOverride: forceOverride, cancellationToken: cancellationToken);
+                await TriggerMediaItemSilenceDetectionAsync(id, forceOverride: forceOverride, analyzedBefore: analyzedBefore, cancellationToken: cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -426,13 +426,13 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         }
     }
 
-    public async Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride, DetectedMarker? fingerprintIntro = null, CancellationToken cancellationToken = default)
+    public async Task AnalyzeMediaItemMarkersAsync(Guid mediaItemId, bool isEpisode, bool forceOverride, DetectedMarker? fingerprintIntro = null, DateTime? analyzedBefore = null, CancellationToken cancellationToken = default)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
-        await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode, forceOverride, fingerprintIntro, cancellationToken);
+        await RunMediaItemSilenceDetectionAsync(mediaItemId, settings, isEpisode, forceOverride, fingerprintIntro, analyzedBefore, cancellationToken);
     }
 
-    private async Task RunSeasonSilenceDetectionAsync(Guid seasonId, ServerSetting settings, bool forceOverride, CancellationToken cancellationToken = default)
+    private async Task RunSeasonSilenceDetectionAsync(Guid seasonId, ServerSetting settings, bool forceOverride, DateTime? analyzedBefore, CancellationToken cancellationToken = default)
     {
         var episodeIds = await _mediaRepository.GetEpisodeIdsForSeasonAsync(seasonId);
         if (episodeIds.Count == 0) return;
@@ -445,7 +445,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // fan-out. Finalization still runs so a season whose per-episode detection
         // completed but whose clustering was interrupted last time still gets
         // finalized on a later pass.
-        if (forceOverride || await _mediaRepository.SeasonHasPendingMarkerWorkAsync(seasonId))
+        if ((forceOverride && analyzedBefore == null) || await _mediaRepository.SeasonHasPendingMarkerWorkAsync(seasonId, forceOverride ? analyzedBefore : null))
         {
             // Tier 2 — season-relative audio fingerprinting. Runs once up front (it
             // needs every episode together) and yields a per-episode intro marker where
@@ -481,7 +481,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
                         fingerprintIntros.TryGetValue(epId, out var fingerprintIntro);
                         using var scope = _scopeFactory.CreateScope();
                         var analyzer = scope.ServiceProvider.GetRequiredService<IMediaAnalyzerManager>();
-                        await analyzer.AnalyzeMediaItemMarkersAsync(epId, isEpisode: true, forceOverride, fingerprintIntro, ct);
+                        await analyzer.AnalyzeMediaItemMarkersAsync(epId, isEpisode: true, forceOverride, fingerprintIntro, analyzedBefore, ct);
                     }
                     catch (OperationCanceledException)
                     {
@@ -519,7 +519,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         return (headEnd, tailStart);
     }
 
-    private async Task RunMediaItemSilenceDetectionAsync(Guid mediaItemId, ServerSetting settings, bool isEpisode, bool forceOverride, DetectedMarker? fingerprintIntro = null, CancellationToken cancellationToken = default)
+    private async Task RunMediaItemSilenceDetectionAsync(Guid mediaItemId, ServerSetting settings, bool isEpisode, bool forceOverride, DetectedMarker? fingerprintIntro = null, DateTime? analyzedBefore = null, CancellationToken cancellationToken = default)
     {
         // One round-trip for the whole skip decision (lock + already-analyzed +
         // per-library toggles) instead of three sequential queries per item —
@@ -546,6 +546,10 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             detectIntro = gate.EnableIntroDetection;
             detectCredits = gate.EnableCreditsDetection;
             if (!detectIntro && !detectCredits) return;
+        }
+        else if (gate.MarkersAnalyzedAt >= analyzedBefore)
+        {
+            return;
         }
 
         // Paths + duration + stinger flags in one round-trip instead of three.

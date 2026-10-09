@@ -32,8 +32,8 @@ public interface IMediaRepository
     Task<IEnumerable<Guid>> GetAllMediaItemIdsByLibraryAsync(Guid libraryId);
     Task<List<Guid>> GetTopLevelMediaItemIdsByLibraryAsync(Guid libraryId);
     Task<MarkerDetectionGateDto?> GetMarkerDetectionGateAsync(Guid mediaItemId);
-    Task<bool> SeasonHasPendingMarkerWorkAsync(Guid seasonId);
-    Task<List<Guid>> GetMarkerDetectionTargetIdsAsync(Guid libraryId);
+    Task<bool> SeasonHasPendingMarkerWorkAsync(Guid seasonId, DateTime? analyzedBefore = null);
+    Task<List<Guid>> GetMarkerDetectionTargetIdsAsync(Guid libraryId, DateTime? analyzedBefore = null);
     Task<List<Guid>> GetFileAnalysisTargetIdsAsync(Guid libraryId);
     Task<List<PartFileStateDto>> GetLibraryPartFileStatesAsync(Guid libraryId);
     Task MarkPartsChangedOnDiskAsync(IReadOnlyCollection<Guid> partIds);
@@ -50,7 +50,8 @@ public interface IMediaRepository
     Task<MediaItem?> GetForMetadataSyncAsync(Guid id);
     Task<IEnumerable<Guid>> GetMediaIdsMissingMetadataAsync(Guid libraryId);
     Task<IEnumerable<Guid>> GetMediaIdsMissingArtworkAsync(Guid libraryId);
-    Task<IEnumerable<Guid>> GetEnrichableMediaIdsAsync(Guid libraryId);
+    Task<IEnumerable<Guid>> GetEnrichableMediaIdsAsync(Guid libraryId, DateTime? fullyRefreshedBefore = null, DateTime? ratingsCheckedBefore = null);
+    Task MarkFullyRefreshedAsync(Guid mediaItemId);
     Task<IEnumerable<Guid>> GetMediaIdsMissingRatingsAsync(Guid libraryId);
     Task<List<Guid>> GetMediaIdsMissingTvdbIdAsync();
     Task<MediaItem?> GetForBasicUpdateAsync(Guid id);
@@ -62,7 +63,7 @@ public interface IMediaRepository
     Task<(bool MidStinger, bool PostStinger)> GetStingerFlagsAsync(Guid mediaItemId);
     Task<MarkerCoverageVM> GetMarkerCoverageAsync(Guid libraryId);
     Task<(int Total, int WithThumbnails)> GetVideoThumbnailCoverageAsync(Guid libraryId);
-    Task<List<Guid>> GetVideoThumbnailTargetIdsAsync(Guid libraryId, string currentSpriteVersion, bool includeCompleted);
+    Task<List<Guid>> GetVideoThumbnailTargetIdsAsync(Guid libraryId, string currentSpriteVersion, bool includeCompleted, DateTime? generatedBefore = null);
     Task<List<Vora.Application.Subtitles.SubtitleExtractionTargetDto>> GetSubtitleExtractionTargetsForItemAsync(Guid mediaItemId);
     Task<List<Vora.Application.Subtitles.SubtitleExtractionTargetDto>> GetSubtitleExtractionTargetsForLibraryAsync(Guid libraryId);
     Task<HashSet<Guid>> GetAllMediaPartIdsAsync();

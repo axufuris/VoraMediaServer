@@ -44,8 +44,8 @@ public class LibraryRatingsTaskTests
 
         await RunNextAsync();
 
-        await _popularity.Received(1).RefreshLibraryArtistsAsync(music, Arg.Any<CancellationToken>());
-        await _metadata.DidNotReceive().TriggerLibraryRatingsRefreshAsync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        await _popularity.Received(1).RefreshLibraryArtistsAsync(music, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await _metadata.DidNotReceive().TriggerLibraryRatingsRefreshAsync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<DateTime?>(), Arg.Any<CancellationToken>());
         await _overlays.DidNotReceive().RunLibraryOverlaySyncAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
@@ -58,7 +58,7 @@ public class LibraryRatingsTaskTests
 
         await RunNextAsync();
 
-        await _metadata.Received(1).TriggerLibraryRatingsRefreshAsync(movies, null, true, Arg.Any<CancellationToken>());
-        await _popularity.DidNotReceive().RefreshLibraryArtistsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _metadata.Received(1).TriggerLibraryRatingsRefreshAsync(movies, null, true, Arg.Is<DateTime?>(since => since != null), Arg.Any<CancellationToken>());
+        await _popularity.DidNotReceive().RefreshLibraryArtistsAsync(Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
     }
 }

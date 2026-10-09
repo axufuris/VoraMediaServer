@@ -8,7 +8,7 @@ namespace Vora.Application.Media;
 public interface IMusicPopularityRefresher
 {
     Task<int> RefreshDueArtistsAsync(CancellationToken cancellationToken);
-    Task<int> RefreshLibraryArtistsAsync(Guid libraryId, CancellationToken cancellationToken);
+    Task<int> RefreshLibraryArtistsAsync(Guid libraryId, DateTime refreshedBefore, CancellationToken cancellationToken);
 }
 
 // World-wide popularity changes slowly, so it is fetched once and kept, and only
@@ -84,7 +84,7 @@ public class MusicPopularityRefresher : IMusicPopularityRefresher
         return await RefreshAsync(provider, due, cancellationToken);
     }
 
-    public async Task<int> RefreshLibraryArtistsAsync(Guid libraryId, CancellationToken cancellationToken)
+    public async Task<int> RefreshLibraryArtistsAsync(Guid libraryId, DateTime refreshedBefore, CancellationToken cancellationToken)
     {
         var provider = await FirstEnabledProviderAsync();
         if (provider == null)
@@ -93,7 +93,7 @@ public class MusicPopularityRefresher : IMusicPopularityRefresher
             return 0;
         }
 
-        var artists = await _repository.GetLibraryArtistsForPopularityRefreshAsync(libraryId);
+        var artists = await _repository.GetLibraryArtistsForPopularityRefreshAsync(libraryId, refreshedBefore);
         return await RefreshAsync(provider, artists, cancellationToken);
     }
 

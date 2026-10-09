@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Vora.Application.Analysis;
 using Vora.Application.Libraries.Requests;
 using Vora.Application.Libraries.ViewModels;
+using Vora.Application.Media;
 using Vora.Application.Metadata;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
@@ -21,7 +22,7 @@ public interface ILibraryManager
     Task UpdateLibraryAsync(Guid id, UpdateLibraryRequest request);
     Task TriggerLibraryFolderAndFileScanAsync(Guid libraryId, CancellationToken cancellationToken = default);
     Task<List<ScanUnit>> DiscoverScanUnitsAsync(Guid libraryId, CancellationToken cancellationToken = default);
-    Task<Guid?> ScanAndEnrichUnitAsync(Guid libraryId, LibraryType libraryType, IReadOnlyList<string> filePaths, bool forceOverride, CancellationToken cancellationToken = default);
+    Task<Guid?> ScanAndEnrichUnitAsync(Guid libraryId, LibraryType libraryType, IReadOnlyList<string> filePaths, bool forceOverride, DateTime? fullyRefreshedBefore = null, CancellationToken cancellationToken = default);
     Task<ScanFileResult> TriggerFileScanAsync(Guid libraryId, string filePath, CancellationToken cancellationToken = default);
     Task<Guid?> TriggerMusicFileScanAsync(Guid libraryId, string filePath, CancellationToken cancellationToken = default);
     Task DeleteLibraryAsync(Guid id, CancellationToken cancellationToken = default);
@@ -265,7 +266,7 @@ public class LibraryManager : ILibraryManager
         };
     }
 
-    public async Task<Guid?> ScanAndEnrichUnitAsync(Guid libraryId, LibraryType libraryType, IReadOnlyList<string> filePaths, bool forceOverride, CancellationToken cancellationToken = default)
+    public async Task<Guid?> ScanAndEnrichUnitAsync(Guid libraryId, LibraryType libraryType, IReadOnlyList<string> filePaths, bool forceOverride, DateTime? fullyRefreshedBefore = null, CancellationToken cancellationToken = default)
     {
         // One scope for the whole unit: the scanner (which creates the show/
         // seasons/episodes or movie) and the metadata manager (which fills the
@@ -290,10 +291,18 @@ public class LibraryManager : ILibraryManager
         if (itemId == null) return null;
 
         cancellationToken.ThrowIfCancellationRequested();
+        var media = sp.GetRequiredService<IMediaRepository>();
+        if (forceOverride && fullyRefreshedBefore != null
+            && await media.GetProjectedAsync(itemId.Value, m => m.FullyRefreshedAt) >= fullyRefreshedBefore)
+        {
+            return itemId;
+        }
+
         var metadata = sp.GetRequiredService<IMetadataManager>();
         await metadata.TriggerMediaItemMetadataRefreshAsync(itemId.Value, forceOverride, cancellationToken);
         await metadata.TriggerMediaItemArtworkRefreshAsync(itemId.Value, forceOverride, cancellationToken);
         await metadata.TriggerMediaItemRatingsRefreshAsync(itemId.Value, forceOverride, cancellationToken);
+        if (forceOverride) await media.MarkFullyRefreshedAsync(itemId.Value);
         return itemId;
     }
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -48,10 +49,24 @@ public sealed class TaskRecipe
     public int Number(string name) =>
         _arguments[name] is JsonValue value && value.TryGetValue<int>(out var number) ? number : 0;
 
+    public DateTime? Time(string name) =>
+        _arguments[name] is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            && DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var time)
+            ? time
+            : null;
+
     public TaskRecipe WithNumber(string name, int number)
     {
         var copy = (JsonObject)_arguments.DeepClone();
         copy[name] = number;
+        return new(Kind, copy);
+    }
+
+    public TaskRecipe WithTime(string name, DateTime time)
+    {
+        var copy = (JsonObject)_arguments.DeepClone();
+        copy[name] = time.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
         return new(Kind, copy);
     }
 }

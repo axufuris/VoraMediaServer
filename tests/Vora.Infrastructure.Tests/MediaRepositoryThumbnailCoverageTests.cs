@@ -92,4 +92,23 @@ public class MediaRepositoryThumbnailCoverageTests
 
         Assert.Equal(0, total);
     }
+
+    [Fact]
+    public async Task A_resumed_regeneration_takes_what_was_made_before_it_was_asked_for()
+    {
+        using var db = NewContext();
+        var started = new DateTime(2026, 10, 8, 14, 0, 0, DateTimeKind.Utc);
+        var libraryId = Guid.NewGuid();
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+        var earlier = new Movie { Id = Guid.NewGuid(), Title = "Heat", LibraryId = libraryId, VideoThumbnailSpriteVersion = "v2", LastVideoThumbnailGenerationAt = started.AddDays(-1) };
+        var never = new Movie { Id = Guid.NewGuid(), Title = "Alien", LibraryId = libraryId };
+        var oldVersion = new Movie { Id = Guid.NewGuid(), Title = "Aliens", LibraryId = libraryId, VideoThumbnailSpriteVersion = "v1", LastVideoThumbnailGenerationAt = started.AddMinutes(5) };
+        var redone = new Movie { Id = Guid.NewGuid(), Title = "Ronin", LibraryId = libraryId, VideoThumbnailSpriteVersion = "v2", LastVideoThumbnailGenerationAt = started.AddMinutes(5) };
+        db.Set<Movie>().AddRange(earlier, never, oldVersion, redone);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var targets = await repo.GetVideoThumbnailTargetIdsAsync(libraryId, "v2", includeCompleted: true, generatedBefore: started);
+
+        Assert.Equal(new[] { earlier.Id, never.Id, oldVersion.Id }.OrderBy(id => id), targets.OrderBy(id => id));
+    }
 }
