@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { RadioSeed } from '../api/Music/musicService';
+import type { AudioQualityVM, RadioSeed } from '../api/Music/musicService';
 import type { MediaMarker } from '../api/Media/mediaService';
 
 export interface PlayableMedia {
@@ -20,6 +20,7 @@ export interface PlayableMedia {
     // so it doesn't lie about an HDR→SDR or 4K→1080p transcode.
     outputResolution?: string | null;
     outputHdrType?: string | null;
+    streamQuality?: AudioQualityVM | null;
     audioChannels?: number;
     videoTrackId?: string;
     audioTrackId?: string;

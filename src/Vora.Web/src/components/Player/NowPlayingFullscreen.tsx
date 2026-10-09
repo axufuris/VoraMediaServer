@@ -247,7 +247,7 @@ export default function NowPlayingFullscreen() {
     const panelsOpen = synthOn || lyricsOpen;
     const trackDetails = trackInfo && trackInfo.id === currentMedia.id && (
         <>
-            <AudioQualityChip quality={trackInfo.quality} />
+            <AudioQualityChip quality={currentMedia.streamQuality ?? trackInfo.quality} convertedFrom={currentMedia.streamQuality ? trackInfo.quality : null} />
             <SongFeel moods={trackInfo.moods} energy={trackInfo.energy} isInstrumental={trackInfo.isInstrumental} />
         </>
     );
@@ -405,7 +405,7 @@ export default function NowPlayingFullscreen() {
                                         <option value="Low">Low (128 kbps)</option>
                                         <option value="Original">Original (no transcoding)</option>
                                     </select>
-                                    <p className="mt-1.5 text-[10px]" style={{ color: 'var(--vora-text-muted)' }}>Lower for mobile / slow connections. Changes apply to the next track.</p>
+                                    <p className="mt-1.5 text-[10px]" style={{ color: 'var(--vora-text-muted)' }}>Lower for mobile / slow connections. Changes apply right away.</p>
                                 </div>
 
                                 <div>

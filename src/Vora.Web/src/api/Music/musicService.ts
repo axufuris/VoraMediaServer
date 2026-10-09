@@ -2,6 +2,12 @@ import { apiClient, getResponseStatus } from '../client';
 
 export interface MusicStreamUrlResponse {
     url: string;
+    quality?: AudioQualityVM | null;
+}
+
+export interface ResolvedTrackStream {
+    url: string;
+    quality: AudioQualityVM | null;
 }
 
 export interface ArtistVM {
@@ -485,12 +491,12 @@ export const musicService = {
         return `${base}/api/music/tracks/${trackId}/stream${qualityParam}`;
     },
 
-    resolveTrackStreamUrl: async (trackId: string, serverBaseUrl: string, quality?: string, serverId?: string): Promise<string> => {
+    resolveTrackStream: async (trackId: string, serverBaseUrl: string, quality?: string, serverId?: string): Promise<ResolvedTrackStream> => {
         const qualityParam = quality && quality !== 'Auto' && quality !== 'Original' ? `?quality=${encodeURIComponent(quality.toLowerCase())}` : '';
         const response = await apiClient.post<MusicStreamUrlResponse>(`/music/tracks/${trackId}/play${qualityParam}`, null, { serverId });
         const base = serverBaseUrl.endsWith('/') ? serverBaseUrl.slice(0, -1) : serverBaseUrl;
         const url = response.data.url;
-        return url.startsWith('http') ? url : `${base}${url}`;
+        return { url: url.startsWith('http') ? url : `${base}${url}`, quality: response.data.quality ?? null };
     },
 
     updateArtist: async (artistId: string, request: UpdateArtistRequest, serverId?: string): Promise<void> => {

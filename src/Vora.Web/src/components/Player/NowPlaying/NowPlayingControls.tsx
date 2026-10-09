@@ -194,7 +194,7 @@ export function NowPlayingSeekBar({ currentTime, duration, onSeek }: NowPlayingS
             <input
                 type="range"
                 min={0}
-                max={duration || 0}
+                max={Number.isFinite(duration) ? duration : 0}
                 step={0.1}
                 value={currentTime}
                 onChange={e => {
