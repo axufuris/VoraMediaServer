@@ -100,11 +100,15 @@ RUN dotnet restore "src/Vora.Api/Vora.Api.csproj"
 # Copy the entire source tree
 COPY . .
 WORKDIR "/src/src/Vora.Api"
-RUN dotnet build "Vora.Api.csproj" -c Release -o /app/build
+# ImageSharp checks its licence when compiling a Release build. The deploy
+# workflows pass it as a build secret, mounted where Directory.Build.props
+# looks, so it never lands in a layer; a local build uses a gitignored
+# sixlabors.lic at the repo root instead.
+RUN --mount=type=secret,id=sixlabors_license,target=/src/sixlabors.lic     dotnet build "Vora.Api.csproj" -c Release -o /app/build
 
 # Stage 3: publish
 FROM build AS publish
-RUN dotnet publish "Vora.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN --mount=type=secret,id=sixlabors_license,target=/src/sixlabors.lic     dotnet publish "Vora.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # Stage 4: ui-build (React)
 FROM node:20 AS ui-build

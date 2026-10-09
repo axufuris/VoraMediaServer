@@ -34,6 +34,7 @@ jobs:
           --health-retries 12
     env:
       VORA_TEST_POSTGRES: Host=localhost;Port=5432;Username=postgres;Password=postgres
+      SixLaborsLicenseKey: ${{ secrets.SIXLABORS_LICENSE_KEY }}
     steps:
       - uses: actions/checkout@v5
 

@@ -9,4 +9,8 @@
     <Company>Vora</Company>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(SixLaborsLicenseKey)' == '' and '$(SixLaborsLicenseFile)' == '' and Exists('$(MSBuildThisFileDirectory)sixlabors.lic')">
+    <SixLaborsLicenseFile>$(MSBuildThisFileDirectory)sixlabors.lic</SixLaborsLicenseFile>
+  </PropertyGroup>
+
 </Project>

@@ -415,3 +415,7 @@ FodyWeavers.xsd
 
 # Screenshots and scratch output from assistant sessions
 Claude outputs/
+
+# Six Labors licence (ImageSharp). CI and image builds read it from the
+# SIXLABORS_LICENSE_KEY secret; never commit it.
+sixlabors.lic

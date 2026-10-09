@@ -608,6 +608,11 @@ The version comes from the tag, not from a file in the tree: the workflow
 passes it to the build, and `Directory.Build.props` only supplies the fallback
 used by local builds.
 
+Building in Release needs a Six Labors licence for ImageSharp. The workflows
+read it from the `SIXLABORS_LICENSE_KEY` secret; locally, put `sixlabors.lic`
+at the repo root (it is gitignored). See
+[`docs/architecture.md`](docs/architecture.md#six-labors-licence).
+
 ## Documentation
 
 Project documentation lives under [`docs/`](docs/). Highlights:

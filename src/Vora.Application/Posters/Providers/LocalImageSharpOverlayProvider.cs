@@ -224,11 +224,12 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         if (r * 2f > w) r = w / 2f;
         if (r * 2f > h) r = h / 2f;
 
-        var fillColor = Color.FromRgba(0, 0, 0, BackgroundAlphaByte);
+        var fill = Brushes.Solid(Color.FromPixel(new Rgba32(0, 0, 0, BackgroundAlphaByte)));
 
         if (r <= 0f)
         {
-            context.Fill(fillColor, new RectangularPolygon(x, y, w, h));
+            var rectangle = new PathBuilder().AddRectangle(x, y, w, h).Build();
+            context.Paint(canvas => canvas.Fill(fill, rectangle));
             return;
         }
 
@@ -255,7 +256,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
             .CloseFigure()
             .Build();
 
-        context.Fill(fillColor, path);
+        context.Paint(canvas => canvas.Fill(fill, path));
     }
 
     private async Task DrawCompositeRatingsAsync(Image<Rgba32> baseImage, OverlayMediaDto item, OverlayElementDto element, string basePath, CancellationToken cancellationToken = default)
@@ -393,6 +394,6 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        baseImage.Mutate(x => x.DrawText(textOptions, scoreText, Color.White));
+        baseImage.Mutate(x => x.Paint(canvas => canvas.DrawText(textOptions, scoreText, Brushes.Solid(Color.White), null)));
     }
 }

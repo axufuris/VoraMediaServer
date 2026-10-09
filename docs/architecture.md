@@ -117,3 +117,12 @@ This solution is run from Visual Studio 2026 — there is no CLI build to invoke
 The API **always** runs in Docker (FFmpeg lives inside the container). Don't try to run `Vora.Api` natively.
 
 Ports are baked into the project configs — don't override them.
+
+### Six Labors licence
+
+ImageSharp 4 and ImageSharp.Drawing 3 (poster overlays, the resized artwork cache) check a Six Labors licence when they compile: a Debug build only warns, a **Release build fails** without one. The runtime needs nothing.
+
+- **Locally:** keep `sixlabors.lic` at the repo root. It is gitignored. `Directory.Build.props` sets `SixLaborsLicenseFile` to it when present, and a local image build copies it into the build stage only (the final image takes just the publish output).
+- **CI:** the `SIXLABORS_LICENSE_KEY` secret (set for Actions **and** Dependabot) is the `SixLaborsLicenseKey` environment variable of the test jobs. The image builds pass it as the BuildKit secret `sixlabors_license`, which the Dockerfile's build and publish steps mount at `/src/sixlabors.lic`, so it is never written to a layer.
+- **Never commit it.** The licence is the project's: a fork, or a contributor building in Release, needs their own (free Community licences for open-source projects at licensing.sixlabors.com). Pull requests from forks don't get the secret, so their Backend check fails.
+- **Renewing:** replace the file and update both secrets (`gh secret set SIXLABORS_LICENSE_KEY < sixlabors.lic`, and again with `--app dependabot`).
