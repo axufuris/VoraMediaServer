@@ -4,6 +4,7 @@ import FolderBrowserModal from './FolderBrowserModal';
 interface FolderPathInputProps {
     value: string;
     onChange: (value: string) => void;
+    onBrowseSelect?: (path: string) => void;
     onEnter?: () => void;
     placeholder?: string;
     serverId?: string;
@@ -17,6 +18,7 @@ interface FolderPathInputProps {
 export default function FolderPathInput({
     value,
     onChange,
+    onBrowseSelect,
     onEnter,
     placeholder,
     serverId,
@@ -53,7 +55,7 @@ export default function FolderPathInput({
             <FolderBrowserModal
                 isOpen={open}
                 onClose={() => setOpen(false)}
-                onSelect={onChange}
+                onSelect={onBrowseSelect ?? onChange}
                 initialPath={value || undefined}
                 serverId={serverId}
                 title={modalTitle}
