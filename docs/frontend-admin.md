@@ -22,6 +22,8 @@ Prefer these over hand-rolling `bg-[var(--vora-...)]` chains; reach for the `var
 
 **Building an admin page.** Compose with `Primitives/`: `PageHeader` (title + actions strip), `StatCard` / `EntityCard` / `ListCard`, `HealthBadge`, `StatusDot`, `EmptyState`. Group inputs into sections with the `vora-card p-6` surface. The `FeatureTabs` primitive handles tabbed sub-sections inside a page.
 
+**Folder fields** use `FolderBrowser/FolderPathInput`: a path box plus **Browse**, which opens `FolderBrowserModal` on the server's file system. For a single-path setting the picked folder fills the box (`onChange`). A form that collects a list of folders passes `onBrowseSelect`, so a picked folder goes straight into the list and the box stays for typed or pasted paths: the library folders on Create Library and Manage Library do, through the same duplicate check as **Add path**.
+
 ## Admin theme system
 
 `ThemeProvider` from `theme/ThemeProvider.tsx` is mounted inside `BrowserRouter` in `App.tsx` and exposes `useTheme()` with `{ active, builtInThemes, isLoading, isSwitching, setActive }`. Built-in manifests live in `theme/themes/` (`voraDefault.ts`, `voraDark.ts`, `voraOcean.ts`); the schema is in `theme/types.ts`.

@@ -288,14 +288,19 @@ export default function ManageLibrary() {
         setLibrary({ ...library, [field]: value });
     };
 
-    const handleAddPath = () => {
-        if (!newPath.trim()) return;
-        if (library.folderPaths.includes(newPath.trim())) {
+    const addPath = (path: string): boolean => {
+        const trimmed = path.trim();
+        if (!trimmed) return false;
+        if (library.folderPaths.includes(trimmed)) {
             showAlert('Duplicate path', 'This path is already in the library.');
-            return;
+            return false;
         }
-        handleChange('folderPaths', [...library.folderPaths, newPath.trim()]);
-        setNewPath('');
+        handleChange('folderPaths', [...library.folderPaths, trimmed]);
+        return true;
+    };
+
+    const handleAddPath = () => {
+        if (addPath(newPath)) setNewPath('');
     };
 
     const handleRemovePath = (pathToRemove: string) => {
@@ -546,6 +551,7 @@ export default function ManageLibrary() {
                                 <FolderPathInput
                                     value={newPath}
                                     onChange={setNewPath}
+                                    onBrowseSelect={addPath}
                                     onEnter={handleAddPath}
                                     placeholder="Pick or paste a folder (e.g. /media/movies)"
                                     serverId={serverId}

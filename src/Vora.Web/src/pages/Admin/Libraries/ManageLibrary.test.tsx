@@ -27,6 +27,10 @@ vi.mock('../../../api/Media/libraryAdminService', () => ({
     },
 }));
 vi.mock('../../../dialogs', () => ({ useDialog: () => ({ confirm: mocks.confirm, alert: mocks.alert }) }));
+vi.mock('../../../components/Admin/FolderBrowser/FolderBrowserModal', () => ({
+    default: ({ isOpen, onSelect, onClose }: { isOpen: boolean; onSelect: (path: string) => void; onClose: () => void }) =>
+        isOpen ? <button type="button" onClick={() => { onSelect('/media/tv'); onClose(); }}>Select /media/tv</button> : null,
+}));
 
 const library = (type: string): MediaLibrary => ({
     id: 'lib1',
@@ -106,5 +110,39 @@ describe('ManageLibrary metadata buttons', () => {
         await waitFor(() => expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
             message: expect.stringContaining('every artist and album'),
         })));
+    });
+});
+
+describe('ManageLibrary folders', () => {
+    beforeEach(() => {
+        Object.values(mocks).forEach(m => m.mockReset());
+    });
+
+    it('adds a folder picked in the browser straight to the library', async () => {
+        await renderManage();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Select /media/tv' }));
+
+        expect(await screen.findByText('/media/tv')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Pick or paste a folder (e.g. /media/movies)')).toHaveValue('');
+    });
+
+    it('does not add a folder the library already has', async () => {
+        mocks.getLibraryById.mockResolvedValue({ ...library('Movie'), folderPaths: ['/media/tv'] });
+        render(
+            <MemoryRouter initialEntries={['/admin/libraries/lib1/manage']}>
+                <Routes>
+                    <Route path="/admin/libraries/:id/manage" element={<ManageLibrary />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+        await screen.findByRole('button', { name: 'Refresh metadata' });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Select /media/tv' }));
+
+        await waitFor(() => expect(mocks.alert).toHaveBeenCalledWith(expect.objectContaining({ title: 'Duplicate path' })));
+        expect(screen.getAllByText('/media/tv')).toHaveLength(1);
     });
 });
