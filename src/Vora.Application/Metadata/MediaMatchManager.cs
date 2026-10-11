@@ -13,6 +13,7 @@ public interface IMediaMatchManager
 {
     Task<IReadOnlyList<MediaMatchCandidateVM>> SearchAsync(Guid mediaItemId, string? query, int? year, CancellationToken cancellationToken = default);
     Task<MediaMatchResultVM> ApplyAsync(Guid mediaItemId, ApplyMediaMatchRequest request, CancellationToken cancellationToken = default);
+    Task<MediaMatchFilesVM> GetFilesAsync(Guid mediaItemId);
 }
 
 public class MediaMatchManager(
@@ -50,6 +51,34 @@ public class MediaMatchManager(
         }
 
         return candidates.Select(c => ToViewModel(c, provider.ProviderName)).ToList();
+    }
+
+    public async Task<MediaMatchFilesVM> GetFilesAsync(Guid mediaItemId)
+    {
+        var item = await LoadMatchableAsync(mediaItemId);
+        if (item is not TvShow)
+        {
+            return new MediaMatchFilesVM
+            {
+                FileNames = item.MediaParts
+                    .Select(p => MediaMatchFiles.FileName(p.FilePath))
+                    .Where(name => name.Length > 0)
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal)
+                    .ToList()
+            };
+        }
+
+        var episodePaths = await repository.GetEpisodeFilePathsForShowAsync(mediaItemId);
+        return new MediaMatchFilesVM
+        {
+            FolderNames = episodePaths
+                .Select(path => MediaMatchFiles.ShowFolderName(path, item.Library.FolderPaths))
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToList()
+        };
     }
 
     public async Task<MediaMatchResultVM> ApplyAsync(Guid mediaItemId, ApplyMediaMatchRequest request, CancellationToken cancellationToken = default)

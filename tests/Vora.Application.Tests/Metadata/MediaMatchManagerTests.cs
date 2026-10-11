@@ -275,4 +275,36 @@ public class MediaMatchManagerTests
         await _repository.DidNotReceive().UpdateMediaItemAsync(Arg.Any<MediaItem>());
         _taskQueue.DidNotReceive().QueueRefreshMatchedMediaItem(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<bool>());
     }
+
+    [Fact]
+    public async Task A_movie_shows_the_file_name_of_each_version()
+    {
+        var movie = new Movie { Id = DuplicateShowId, Title = "Heat", LibraryId = LibraryId, Library = new MediaLibrary { Name = "Movies" } };
+        movie.MediaParts.Add(new MediaPart { FilePath = "/media/movies/Heat (1995)/Heat (1995) 2160p.mkv" });
+        movie.MediaParts.Add(new MediaPart { FilePath = "/media/movies/Heat (1995)/Heat (1995) 1080p.mkv" });
+        Holds(movie);
+
+        var files = await Manager().GetFilesAsync(movie.Id);
+
+        files.FileNames.Should().Equal("Heat (1995) 1080p.mkv", "Heat (1995) 2160p.mkv");
+        files.FolderNames.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_show_shows_the_folders_its_episodes_live_in()
+    {
+        var show = DuplicateShow();
+        show.Library.FolderPaths = ["/media/tv"];
+        Holds(show);
+        _repository.GetEpisodeFilePathsForShowAsync(show.Id).Returns([
+            "/media/tv/The Walking Dead - Dead City [imdb-]/Season 01/Dead.City.S01E01.mkv",
+            "/media/tv/The Walking Dead - Dead City [imdb-]/Season 01/Dead.City.S01E02.mkv",
+            "/media/tv/The Walking Dead Dead City (2023)/Season 02/Dead.City.S02E01.mkv",
+        ]);
+
+        var files = await Manager().GetFilesAsync(show.Id);
+
+        files.FolderNames.Should().Equal("The Walking Dead - Dead City [imdb-]", "The Walking Dead Dead City (2023)");
+        files.FileNames.Should().BeEmpty();
+    }
 }

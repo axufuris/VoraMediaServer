@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import FixMatchModal from './FixMatchModal';
-import type { MediaMatchCandidate, MediaMatchResult, MediaMatchSource } from '../../api/Media/libraryAdminService';
+import type { MediaMatchCandidate, MediaMatchFiles, MediaMatchResult, MediaMatchSource } from '../../api/Media/libraryAdminService';
 
 const searchMatchCandidates = vi.fn<(mediaItemId: string, query?: string, year?: number, serverId?: string) => Promise<MediaMatchCandidate[]>>();
 const applyMatch = vi.fn<(mediaItemId: string, source: MediaMatchSource, externalId: string, serverId?: string) => Promise<MediaMatchResult>>();
+const getMatchFiles = vi.fn<(mediaItemId: string, serverId?: string) => Promise<MediaMatchFiles>>();
 
 vi.mock('../../api/Media/libraryAdminService', () => ({
     libraryAdminService: {
         searchMatchCandidates: (mediaItemId: string, query?: string, year?: number, serverId?: string) => searchMatchCandidates(mediaItemId, query, year, serverId),
         applyMatch: (mediaItemId: string, source: MediaMatchSource, externalId: string, serverId?: string) => applyMatch(mediaItemId, source, externalId, serverId),
+        getMatchFiles: (mediaItemId: string, serverId?: string) => getMatchFiles(mediaItemId, serverId),
     },
 }));
 
@@ -48,6 +50,8 @@ describe('fix match', () => {
     beforeEach(() => {
         searchMatchCandidates.mockReset();
         applyMatch.mockReset();
+        getMatchFiles.mockReset();
+        getMatchFiles.mockResolvedValue({ fileNames: [], folderNames: [] });
     });
 
     // A blank query lets the server search this item's own title, cleaned of the
@@ -151,5 +155,71 @@ describe('fix match', () => {
         renderModal({ mediaType: 'Movie' });
 
         expect(await screen.findByText(/Pick the movie this really is/)).toBeInTheDocument();
+    });
+});
+
+describe('fix match files on disk', () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>();
+
+    beforeEach(() => {
+        searchMatchCandidates.mockReset();
+        searchMatchCandidates.mockResolvedValue([]);
+        getMatchFiles.mockReset();
+        writeText.mockReset();
+        writeText.mockResolvedValue(undefined);
+        Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    });
+
+    it('shows the file a movie was scanned from', async () => {
+        getMatchFiles.mockResolvedValue({ fileNames: ['The.Matrix.1999.1080p.BluRay.x264.mkv'], folderNames: [] });
+        renderModal({ mediaItemId: 'matrix', mediaType: 'Movie' });
+
+        const files = await screen.findByRole('list', { name: 'File on disk' });
+        expect(files).toHaveTextContent('The.Matrix.1999.1080p.BluRay.x264.mkv');
+        expect(getMatchFiles).toHaveBeenCalledWith('matrix', 'srv1');
+    });
+
+    it('lists every version of a movie', async () => {
+        getMatchFiles.mockResolvedValue({ fileNames: ['Heat (1995) 1080p.mkv', 'Heat (1995) 2160p.mkv'], folderNames: [] });
+        renderModal({ mediaType: 'Movie' });
+
+        expect(await screen.findByText('Heat (1995) 1080p.mkv')).toBeInTheDocument();
+        expect(screen.getByText('Heat (1995) 2160p.mkv')).toBeInTheDocument();
+    });
+
+    it('shows the folder a show was scanned from', async () => {
+        getMatchFiles.mockResolvedValue({ fileNames: [], folderNames: ['The Walking Dead - Dead City [imdb-]'] });
+        renderModal();
+
+        const folders = await screen.findByRole('list', { name: 'Folder on disk' });
+        expect(folders).toHaveTextContent('The Walking Dead - Dead City [imdb-]');
+    });
+
+    it('copies a name to the clipboard', async () => {
+        getMatchFiles.mockResolvedValue({ fileNames: ['The.Matrix.1999.1080p.BluRay.x264.mkv'], folderNames: [] });
+        renderModal({ mediaType: 'Movie' });
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Copy The.Matrix.1999.1080p.BluRay.x264.mkv' }));
+
+        expect(writeText).toHaveBeenCalledWith('The.Matrix.1999.1080p.BluRay.x264.mkv');
+        expect(await screen.findByText('Copied')).toBeInTheDocument();
+    });
+
+    it('leaves the name selectable but offers no copy button where the browser blocks the clipboard', async () => {
+        Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
+        getMatchFiles.mockResolvedValue({ fileNames: ['The.Matrix.1999.1080p.BluRay.x264.mkv'], folderNames: [] });
+        renderModal({ mediaType: 'Movie' });
+
+        expect(await screen.findByText('The.Matrix.1999.1080p.BluRay.x264.mkv')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /^Copy/ })).not.toBeInTheDocument();
+    });
+
+    it('shows nothing extra when the files cannot be read', async () => {
+        getMatchFiles.mockRejectedValue(new Error('offline'));
+        renderModal({ mediaType: 'Movie' });
+
+        await waitFor(() => expect(getMatchFiles).toHaveBeenCalled());
+        expect(screen.queryByRole('list', { name: 'File on disk' })).not.toBeInTheDocument();
     });
 });

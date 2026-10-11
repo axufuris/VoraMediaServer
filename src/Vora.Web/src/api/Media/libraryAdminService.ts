@@ -3,6 +3,11 @@ import type { MediaLibrary } from './libraryService';
 
 export type MediaMatchSource = 'tmdb' | 'tvdb' | 'imdb';
 
+export interface MediaMatchFiles {
+    fileNames: string[];
+    folderNames: string[];
+}
+
 export interface MediaMatchCandidate {
     source: MediaMatchSource;
     externalId: string;
@@ -144,6 +149,11 @@ export const libraryAdminService = {
 
     refreshItemMetadata: async (mediaItemId: string, force: boolean = false, serverId?: string): Promise<void> => {
         await apiClient.post(`/media/${mediaItemId}/metadata?force=${force}`, null, { serverId });
+    },
+
+    getMatchFiles: async (mediaItemId: string, serverId?: string): Promise<MediaMatchFiles> => {
+        const response = await apiClient.get<MediaMatchFiles>(`/media/${mediaItemId}/match/files`, { serverId });
+        return response.data;
     },
 
     searchMatchCandidates: async (mediaItemId: string, query?: string, year?: number, serverId?: string): Promise<MediaMatchCandidate[]> => {

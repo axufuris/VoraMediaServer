@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Modal } from '../Common/Modal';
 import ArtImage from '../Client/Primitives/ArtImage';
-import { libraryAdminService, type MediaMatchCandidate, type MediaMatchResult } from '../../api/Media/libraryAdminService';
+import { libraryAdminService, type MediaMatchCandidate, type MediaMatchFiles, type MediaMatchResult } from '../../api/Media/libraryAdminService';
 import { errorDetail } from '../../utils/apiError';
 
 // Re-identifies a movie or show whose folder carried no usable external id, so
@@ -43,6 +43,8 @@ export default function FixMatchModal({ mediaItemId, mediaType, currentYear, ser
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const [applying, setApplying] = useState(false);
     const [applyError, setApplyError] = useState<string | null>(null);
+    const [files, setFiles] = useState<MediaMatchFiles | null>(null);
+    const [copied, setCopied] = useState<string | null>(null);
 
     const requestKey = `${request.query}|${request.year}|${request.attempt}`;
     const current = response?.key === requestKey ? response : null;
@@ -50,6 +52,32 @@ export default function FixMatchModal({ mediaItemId, mediaType, currentYear, ser
     const candidates = current?.candidates ?? [];
     const selected = candidates.find(c => candidateKey(c) === selectedKey);
     const kindLabel = mediaType === 'TvShow' ? 'show' : 'movie';
+    const onDiskLabel = mediaType === 'TvShow' ? 'Folder' : 'File';
+    const onDiskNames = (mediaType === 'TvShow' ? files?.folderNames : files?.fileNames) ?? [];
+    const canCopy = window.isSecureContext && 'clipboard' in navigator;
+
+    useEffect(() => {
+        let cancelled = false;
+        libraryAdminService.getMatchFiles(mediaItemId, serverId)
+            .then(result => { if (!cancelled) setFiles(result); })
+            .catch(() => { if (!cancelled) setFiles(null); });
+        return () => { cancelled = true; };
+    }, [mediaItemId, serverId]);
+
+    useEffect(() => {
+        if (!copied) return;
+        const timer = window.setTimeout(() => setCopied(null), 2000);
+        return () => window.clearTimeout(timer);
+    }, [copied]);
+
+    const copyName = async (name: string) => {
+        try {
+            await navigator.clipboard.writeText(name);
+            setCopied(name);
+        } catch {
+            setCopied(null);
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -86,6 +114,27 @@ export default function FixMatchModal({ mediaItemId, mediaType, currentYear, ser
                     <p className="mt-1 text-sm" style={{ color: 'var(--vora-text-muted)' }}>
                         Pick the {kindLabel} this really is. Vora stores its id and refreshes the metadata. Search by title, or paste an IMDb or TMDB link.
                     </p>
+
+                    {onDiskNames.length > 0 && (
+                        <ul className="m-0 mt-3 list-none space-y-1.5 p-0" aria-label={`${onDiskLabel} on disk`}>
+                            {onDiskNames.map(name => (
+                                <li key={name} className="flex items-center gap-2">
+                                    <span className="shrink-0 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>{onDiskLabel}</span>
+                                    <code className="min-w-0 flex-1 select-all break-all font-mono text-xs" style={{ color: 'var(--vora-text-secondary)' }}>{name}</code>
+                                    {canCopy && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { void copyName(name); }}
+                                            aria-label={`Copy ${name}`}
+                                            className="vora-button-secondary shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold"
+                                        >
+                                            {copied === name ? 'Copied' : 'Copy'}
+                                        </button>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
 
                     <form onSubmit={submitSearch} className="mt-4 flex flex-col gap-2 sm:flex-row">
                         <input
