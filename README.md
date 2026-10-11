@@ -218,11 +218,19 @@ services:
 Bring it up with `docker compose up -d`. Vora will wait for the
 Postgres container to start, apply migrations, and then begin serving.
 
-### Optional: NVIDIA GPU passthrough
+### Optional: GPU transcoding
 
-If you want hardware-accelerated transcoding, install the NVIDIA
-Container Toolkit on the host and add a `deploy` block to the `vora`
-service:
+Vora can transcode on an NVIDIA, Intel or AMD GPU. Under **System
+Settings → Core → Transcoding**, **Hardware acceleration** starts on
+**Auto**: at startup Vora test-encodes a 2-second clip on each GPU it can
+see (NVIDIA first, then Intel Quick Sync, then VAAPI) and uses the first
+that works. **Test hardware** runs the same check on demand. If a GPU
+can't start a stream, Vora retries that stream on the CPU.
+
+#### NVIDIA
+
+Install the NVIDIA Container Toolkit on the host and add a `deploy`
+block to the `vora` service:
 
 ```yaml
     deploy:
@@ -244,6 +252,24 @@ enabled.** Don't override `NVIDIA_DRIVER_CAPABILITIES` with a narrower
 value (e.g. `utility`) — that omits `libcuda.so.1` and you'll see
 `Could not dynamically load CUDA` / `Cannot load libcuda.so.1` when a
 transcode starts.
+
+#### Intel or AMD
+
+Pass the host's render devices into the `vora` service:
+
+```yaml
+    devices:
+      - /dev/dri:/dev/dri
+```
+
+Nothing else is needed. The image's FFmpeg carries the Intel and AMD
+VA-API drivers, Intel's Quick Sync runtime and the Vulkan drivers, and
+the container's start script adds Vora's user to the group that owns
+the render device, so there are no permissions to fix by hand. If it
+still can't open the device, the container log says so at startup.
+Intel tone-maps HDR on the GPU. AMD does too through Vulkan where the
+card supports it; otherwise it decodes and encodes on the GPU and
+tone-maps on the CPU.
 
 ### Unraid
 
@@ -320,6 +346,10 @@ container log if you want to confirm — you should see
 `Applying N pending database migration(s)`). Once it's up, open
 `http://<unraid-ip>:8080` and create the first profile, which becomes
 the server admin.
+
+For an Intel or AMD GPU on Unraid, set the template's **Intel/AMD GPU**
+field to `/dev/dri` (or add `--device=/dev/dri` to **Extra
+Parameters**).
 
 For NVIDIA GPU transcoding on Unraid, install the **Nvidia-Driver**
 plugin from CA, then on the Vora container template set **Extra

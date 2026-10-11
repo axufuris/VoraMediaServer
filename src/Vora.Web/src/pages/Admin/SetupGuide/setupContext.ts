@@ -1,4 +1,4 @@
-import type { ServerSettings } from '../../../api/System/systemSettingsAdminService';
+import type { HardwareCapabilities, ServerSettings } from '../../../api/System/systemSettingsAdminService';
 import type { FeatureFlagsVM } from '../../../api/System/featureFlagsService';
 import type { PluginVM } from '../../../api/System/pluginAdminService';
 import type { DiscoveryRowConfig } from '../../../api/Discovery/discoveryService';
@@ -16,7 +16,7 @@ export interface SetupStepProps {
     onPluginsChanged: () => void;
     discoverRows: DiscoveryRowConfig[];
     onDiscoverRows: (rows: DiscoveryRowConfig[]) => void;
-    hardwareDevices: string[];
+    hardware: HardwareCapabilities | null;
     emailWanted: boolean;
     onEmailWanted: (wanted: boolean) => void;
     goTo: (id: SetupStepId) => void;

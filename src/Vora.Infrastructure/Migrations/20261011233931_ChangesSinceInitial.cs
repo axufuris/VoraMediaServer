@@ -24,7 +24,8 @@ ALTER TABLE ""MediaItems"" ADD COLUMN IF NOT EXISTS ""Themes"" text[];
 ALTER TABLE ""MediaItems"" ADD COLUMN IF NOT EXISTS ""FullyRefreshedAt"" timestamp with time zone;
 ALTER TABLE ""MediaItemEmbeddings"" ADD COLUMN IF NOT EXISTS ""Model"" character varying(64);
 ALTER TABLE ""MediaItemEmbeddings"" ADD COLUMN IF NOT EXISTS ""SourceHash"" character varying(64);
-ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""AiPlaylistMatchWindow"" double precision NOT NULL DEFAULT 0.04;");
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""AiPlaylistMatchWindow"" double precision NOT NULL DEFAULT 0.04;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""HardwareAccelerationType"" integer NOT NULL DEFAULT 0;");
 
             migrationBuilder.Sql(@"
 DO $$
@@ -192,6 +193,10 @@ CREATE INDEX IF NOT EXISTS ""IX_PendingTasks_Sequence"" ON ""PendingTasks"" (""S
 
             migrationBuilder.DropColumn(
                 name: "AiPlaylistMatchWindow",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "HardwareAccelerationType",
                 table: "ServerSettings");
 
             migrationBuilder.DropColumn(

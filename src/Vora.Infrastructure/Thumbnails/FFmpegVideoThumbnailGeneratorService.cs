@@ -2,7 +2,9 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using Vora.Application.Settings;
 using Vora.Application.Thumbnails;
+using Vora.Infrastructure.Transcoding;
 
 namespace Vora.Infrastructure.Thumbnails;
 
@@ -122,15 +124,12 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
         var filter = string.Create(CultureInfo.InvariantCulture,
             $"fps=1/{parameters.IntervalSeconds},scale={parameters.Width}:{parameters.Height}:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad={parameters.Width}:{parameters.Height}:(ow-iw)/2:(oh-ih)/2:color=black,tile={spriteColumns}x{spriteRows}");
 
-        var (ok, exitCode, stderrTail) = await RunSpriteProcessAsync(parameters, filter, tempSpritePath, parameters.UseHardwareDecode, cancellationToken);
+        var (ok, exitCode, stderrTail) = await RunSpriteProcessAsync(parameters, filter, tempSpritePath, parameters.HardwareDecoder, cancellationToken);
 
-        // Retry in software if the hardware decode pass failed on a codec/profile
-        // NVDEC couldn't handle, so a GPU quirk never blocks a whole library's
-        // thumbnails.
-        if ((!ok || !File.Exists(tempSpritePath)) && parameters.UseHardwareDecode && !cancellationToken.IsCancellationRequested)
+        if ((!ok || !File.Exists(tempSpritePath)) && parameters.HardwareDecoder is not null && !cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning("Hardware-accelerated sprite generation failed for {Input}; retrying in software.", parameters.InputPath);
-            (ok, exitCode, stderrTail) = await RunSpriteProcessAsync(parameters, filter, tempSpritePath, useHardware: false, cancellationToken);
+            (ok, exitCode, stderrTail) = await RunSpriteProcessAsync(parameters, filter, tempSpritePath, hardware: null, cancellationToken);
         }
 
         if (!ok || !File.Exists(tempSpritePath))
@@ -175,7 +174,7 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
     }
 
     private async Task<(bool Ok, int ExitCode, string StderrTail)> RunSpriteProcessAsync(
-        VideoThumbnailGenerationParameters parameters, string filter, string tempSpritePath, bool useHardware, CancellationToken cancellationToken)
+        VideoThumbnailGenerationParameters parameters, string filter, string tempSpritePath, HardwareAccelerator? hardware, CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -185,16 +184,11 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
             CreateNoWindow = true
         };
         startInfo.ArgumentList.Add("-y");
-        // -hwaccel is an input option (must precede -i). We encode the tiles on the
-        // CPU side, so decode on the GPU and let frames download to system RAM.
-        if (useHardware)
+        if (hardware is not null)
         {
-            startInfo.ArgumentList.Add("-hwaccel");
-            startInfo.ArgumentList.Add("auto");
-            if (!string.IsNullOrWhiteSpace(parameters.HardwareDevice) && parameters.HardwareDevice != "Auto")
+            foreach (var argument in HardwareArguments.InitAndDecode(hardware, keepFramesOnGpu: false))
             {
-                startInfo.ArgumentList.Add("-hwaccel_device");
-                startInfo.ArgumentList.Add(parameters.HardwareDevice);
+                startInfo.ArgumentList.Add(argument);
             }
         }
         // Only keyframes are needed. The sprite keeps a single frame per interval, so

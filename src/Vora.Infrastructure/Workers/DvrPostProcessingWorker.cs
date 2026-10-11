@@ -7,8 +7,10 @@ using Vora.Application.Analysis;
 using Vora.Application.Iptv;
 using Vora.Application.Settings;
 using Vora.Domain.Entities.Iptv;
+using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
 using Vora.Infrastructure.Processes;
+using Vora.Infrastructure.Transcoding;
 
 namespace Vora.Infrastructure.Workers;
 
@@ -16,14 +18,15 @@ public class DvrPostProcessingWorker : BackgroundService
 {
     private static readonly TimeSpan FfmpegTimeout = TimeSpan.FromHours(6);
     private static readonly TimeSpan ComskipTimeout = TimeSpan.FromHours(3);
-    private static readonly TimeSpan EncoderProbeTimeout = TimeSpan.FromSeconds(15);
 
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IHardwareCapabilityService _hardware;
     private readonly ILogger<DvrPostProcessingWorker> _logger;
 
-    public DvrPostProcessingWorker(IServiceScopeFactory scopeFactory, ILogger<DvrPostProcessingWorker> logger)
+    public DvrPostProcessingWorker(IServiceScopeFactory scopeFactory, IHardwareCapabilityService hardware, ILogger<DvrPostProcessingWorker> logger)
     {
         _scopeFactory = scopeFactory;
+        _hardware = hardware;
         _logger = logger;
     }
 
@@ -82,8 +85,7 @@ public class DvrPostProcessingWorker : BackgroundService
 
         try
         {
-            string args = await BuildFfmpegArgsAsync(originalPath, newPath, settingsRepo);
-            bool transcodeSuccess = await RunFfmpegTranscodeAsync(args);
+            bool transcodeSuccess = await TranscodeRecordingAsync(originalPath, newPath, settingsRepo);
 
             if (transcodeSuccess && File.Exists(newPath))
             {
@@ -111,14 +113,34 @@ public class DvrPostProcessingWorker : BackgroundService
         }
     }
 
-    private async Task<string> BuildFfmpegArgsAsync(string inputPath, string outputPath, ISystemSettingsRepository settingsRepo)
+    private async Task<bool> TranscodeRecordingAsync(string inputPath, string outputPath, ISystemSettingsRepository settingsRepo)
     {
         var settings = await settingsRepo.GetSettingsAsync();
+        var encoder = !settings.DisableVideoTranscoding && settings.UseHardwareAcceleration && settings.UseHardwareEncoding
+            ? await _hardware.ResolveAsync(settings.HardwareAccelerationType, settings.HardwareTranscodingDevice)
+            : null;
 
         if (settings.DisableVideoTranscoding)
         {
-            _logger.LogInformation($"[DVR Post-Processor] Transcoding disabled. Remuxing to MP4...");
-            return $"-i \"{inputPath}\" -c copy -movflags +faststart -y \"{outputPath}\"";
+            _logger.LogInformation("[DVR Post-Processor] Transcoding disabled. Remuxing to MP4...");
+        }
+        else
+        {
+            _logger.LogInformation("[DVR Post-Processor] Transcoding with {Encoder}.", encoder is null ? "the CPU" : HardwareArguments.Label(encoder.Type));
+        }
+
+        if (await RunFfmpegTranscodeAsync(BuildFfmpegArgs(inputPath, outputPath, settings, encoder))) return true;
+        if (encoder is null) return false;
+
+        _logger.LogWarning("[DVR Post-Processor] {Encoder} encode failed; retrying on the CPU.", HardwareArguments.Label(encoder.Type));
+        return await RunFfmpegTranscodeAsync(BuildFfmpegArgs(inputPath, outputPath, settings, encoder: null));
+    }
+
+    internal static List<string> BuildFfmpegArgs(string inputPath, string outputPath, ServerSetting settings, HardwareAccelerator? encoder)
+    {
+        if (settings.DisableVideoTranscoding)
+        {
+            return ["-i", inputPath, "-c", "copy", "-movflags", "+faststart", "-y", outputPath];
         }
 
         bool useHevc = settings.EnableHevcEncoding > 0;
@@ -135,41 +157,33 @@ public class DvrPostProcessingWorker : BackgroundService
             8 => "veryslow",
             _ => "veryfast"
         };
+        string qsvPreset = preset is "ultrafast" or "superfast" ? "veryfast" : preset;
 
-        string hwDevice = "cpu";
-        if (settings.UseHardwareAcceleration && settings.UseHardwareEncoding)
+        var args = new List<string>();
+        if (encoder is not null) args.AddRange(HardwareArguments.InitDevices(encoder));
+        args.AddRange(["-i", inputPath]);
+        args.AddRange(encoder?.Type switch
         {
-            hwDevice = settings.HardwareTranscodingDevice?.ToLower() ?? "auto";
-            if (hwDevice == "auto")
-            {
-                hwDevice = await ProbeForBestEncoderAsync(useHevc);
-            }
-        }
-
-        string videoEncoder = hwDevice switch
-        {
-            "nvenc" => useHevc ? $"hevc_nvenc -preset p4 -cq 28" : $"h264_nvenc -preset p4 -cq 28",
-            "qsv" => useHevc ? $"hevc_qsv -preset {preset} -global_quality 28" : $"h264_qsv -preset {preset} -global_quality 28",
-            "vaapi" => useHevc ? $"hevc_vaapi -qp 28" : $"h264_vaapi -qp 28",
-            "videotoolbox" => useHevc ? $"hevc_videotoolbox -q:v 60" : $"h264_videotoolbox -q:v 60",
-            "amf" => useHevc ? $"hevc_amf -quality speed -rc vbr_latency" : $"h264_amf -quality speed -rc vbr_latency",
-            _ => useHevc ? $"libx265 -preset {preset} -crf 23" : $"libx264 -preset {preset} -crf 23"
-        };
-
-        _logger.LogInformation($"[DVR Post-Processor] Transcoding using encoder: {hwDevice.ToUpper()} ({videoEncoder})");
-        return $"-i \"{inputPath}\" -c:v {videoEncoder} -c:a aac -b:a 128k -movflags +faststart -y \"{outputPath}\"";
+            HardwareAccelerationType.Nvidia when encoder.Device is { } gpu => ["-c:v", useHevc ? "hevc_nvenc" : "h264_nvenc", "-gpu", gpu, "-preset", "p4", "-cq", "28"],
+            HardwareAccelerationType.Nvidia => ["-c:v", useHevc ? "hevc_nvenc" : "h264_nvenc", "-preset", "p4", "-cq", "28"],
+            HardwareAccelerationType.QuickSync => ["-c:v", useHevc ? "hevc_qsv" : "h264_qsv", "-preset", qsvPreset, "-global_quality", "28"],
+            HardwareAccelerationType.Vaapi => ["-vf", "format=nv12,hwupload", "-c:v", useHevc ? "hevc_vaapi" : "h264_vaapi", "-qp", "28"],
+            _ => ["-c:v", useHevc ? "libx265" : "libx264", "-preset", preset, "-crf", "23"]
+        });
+        args.AddRange(["-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-y", outputPath]);
+        return args;
     }
 
-    private async Task<bool> RunFfmpegTranscodeAsync(string args)
+    private async Task<bool> RunFfmpegTranscodeAsync(IReadOnlyList<string> args)
     {
         var processInfo = new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            Arguments = args,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        foreach (var arg in args) processInfo.ArgumentList.Add(arg);
 
         using var process = Process.Start(processInfo);
         if (process == null) return false;
@@ -180,7 +194,8 @@ public class DvrPostProcessingWorker : BackgroundService
 
         if (process.ExitCode != 0)
         {
-            _logger.LogError($"[DVR Post-Processor] FFmpeg Transcode Failed!\nArguments: {args}\nExit Code: {process.ExitCode}\nFFmpeg Output: {errorOutput}");
+            _logger.LogError("[DVR Post-Processor] FFmpeg Transcode Failed!\nArguments: {Arguments}\nExit Code: {ExitCode}\nFFmpeg Output: {Output}",
+                string.Join(" ", args), process.ExitCode, errorOutput);
             return false;
         }
 
@@ -266,50 +281,5 @@ public class DvrPostProcessingWorker : BackgroundService
             dbSession.FileSizeBytes = fileInfo.Exists ? fileInfo.Length : 0;
             await repo.UpdateSessionAsync(dbSession);
         }
-    }
-
-    private async Task<string> ProbeForBestEncoderAsync(bool useHevc)
-    {
-        try
-        {
-            var processInfo = new ProcessStartInfo
-            {
-                FileName = "ffmpeg",
-                Arguments = "-encoders",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(processInfo);
-            if (process != null)
-            {
-                string output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitWithTimeoutAsync(EncoderProbeTimeout, _logger);
-
-                if (useHevc)
-                {
-                    if (output.Contains("hevc_nvenc")) return "nvenc";
-                    if (output.Contains("hevc_qsv")) return "qsv";
-                    if (output.Contains("hevc_vaapi")) return "vaapi";
-                    if (output.Contains("hevc_videotoolbox")) return "videotoolbox";
-                    if (output.Contains("hevc_amf")) return "amf";
-                }
-                else
-                {
-                    if (output.Contains("h264_nvenc")) return "nvenc";
-                    if (output.Contains("h264_qsv")) return "qsv";
-                    if (output.Contains("h264_vaapi")) return "vaapi";
-                    if (output.Contains("h264_videotoolbox")) return "videotoolbox";
-                    if (output.Contains("h264_amf")) return "amf";
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning($"[DVR Post-Processor] Failed to probe hardware encoders: {ex.Message}");
-        }
-
-        return "cpu";
     }
 }

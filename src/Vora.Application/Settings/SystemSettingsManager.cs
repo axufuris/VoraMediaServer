@@ -152,6 +152,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.DisableVideoTranscoding = request.DisableVideoTranscoding;
         settings.UseHardwareAcceleration = request.UseHardwareAcceleration;
         settings.UseHardwareEncoding = request.UseHardwareEncoding;
+        settings.HardwareAccelerationType = Enum.IsDefined(request.HardwareAccelerationType) ? request.HardwareAccelerationType : HardwareAccelerationType.Auto;
         settings.EnableHevcEncoding = request.EnableHevcEncoding;
         settings.EnableHevcOptimization = request.EnableHevcOptimization;
         settings.MaxGpuTranscodes = request.MaxGpuTranscodes;

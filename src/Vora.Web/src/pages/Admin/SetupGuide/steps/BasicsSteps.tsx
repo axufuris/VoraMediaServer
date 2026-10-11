@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { METADATA_LANGUAGES, SCHEDULE_TIME_ZONES, browserTimeZone } from '../../../../utils/serverSettingOptions';
+import HardwareAccelerationPicker from '../../../../components/Admin/Settings/HardwareAccelerationPicker';
+import { deviceLabel } from '../../../../components/Admin/Settings/hardwareAccelerationText';
 import type { SetupStepProps } from '../setupContext';
 import type { SetupContent } from '../setupSteps';
 import { ChoiceCard, FieldLabel, Hint, RecommendedBadge, SetupCard, StatusMessage, StepHeading, SwitchRow } from '../SetupParts';
@@ -84,8 +86,10 @@ const PROFILES: { value: number; title: string; description: string; recommended
     { value: 2, title: 'Save bandwidth', description: 'Compress more to save upload speed. Good for slow home internet and lots of viewers away from home.' },
 ];
 
-export function PlaybackStep({ settings, onSettings, hardwareDevices }: SetupStepProps) {
-    const gpus = hardwareDevices.filter(d => d !== 'Auto');
+export function PlaybackStep({ serverId, settings, onSettings, hardware }: SetupStepProps) {
+    const gpus = hardware?.devices ?? [];
+    const gpuOn = settings.useHardwareAcceleration && settings.hardwareAccelerationType !== 'Off';
+    const gpuType = settings.hardwareAccelerationType === 'Off' ? 'Auto' : settings.hardwareAccelerationType;
     return (
         <>
             <StepHeading eyebrow="Basics" title="Playback" lead="Some devices can't play every video format, so Vora converts (transcodes) video on the fly. Choose how readily it does that." />
@@ -109,21 +113,24 @@ export function PlaybackStep({ settings, onSettings, hardwareDevices }: SetupSte
                     id="setup-hw"
                     label="Use the graphics card (hardware acceleration)"
                     description="Converting video on a GPU is many times faster and keeps the CPU free. It needs a graphics card passed through to the Vora container."
-                    checked={settings.useHardwareAcceleration}
-                    onChange={on => onSettings({ useHardwareAcceleration: on, useHardwareEncoding: on })}
+                    checked={gpuOn}
+                    onChange={on => onSettings({ useHardwareAcceleration: on, useHardwareEncoding: on, hardwareAccelerationType: on ? gpuType : settings.hardwareAccelerationType })}
                 />
-                {settings.useHardwareAcceleration && (
+                {gpuOn && (
                     <div className="flex flex-col gap-3 border-t border-dashed border-[var(--vora-border-strong)] pt-4">
-                        {gpus.length > 0
-                            ? <StatusMessage tone="ok">{check(13)} Vora can see a graphics device: <span className="font-mono">{gpus.join(', ')}</span></StatusMessage>
-                            : <StatusMessage tone="info">Vora can't see a graphics card in its container. Turn this off unless you've passed one through; Vora falls back to the CPU either way.</StatusMessage>}
-                        <div>
-                            <FieldLabel htmlFor="setup-hw-device">Device</FieldLabel>
-                            <select id="setup-hw-device" className="vora-input max-w-sm cursor-pointer" value={settings.hardwareTranscodingDevice || 'Auto'} onChange={e => onSettings({ hardwareTranscodingDevice: e.target.value })}>
-                                {(hardwareDevices.length ? hardwareDevices : ['Auto']).map(d => <option key={d} value={d}>{d === 'Auto' ? 'Auto (recommended)' : d}</option>)}
-                            </select>
-                            <Hint>Leave on Auto unless the machine has more than one GPU.</Hint>
-                        </div>
+                        {hardware && (gpus.length > 0
+                            ? <StatusMessage tone="ok">{check(13)} Vora can see: <span className="font-mono">{gpus.map(deviceLabel).join(', ')}</span></StatusMessage>
+                            : <StatusMessage tone="info">Vora can't see a graphics card in its container. Turn this off unless you've passed one through; Vora falls back to the CPU either way.</StatusMessage>)}
+                        <HardwareAccelerationPicker
+                            idPrefix="setup-hw"
+                            type={gpuType}
+                            device={settings.hardwareTranscodingDevice || 'Auto'}
+                            hardware={hardware}
+                            allowOff={false}
+                            serverId={serverId}
+                            onChange={(type, device) => onSettings({ hardwareAccelerationType: type, hardwareTranscodingDevice: device })}
+                        />
+                        <Hint>Leave both on Auto unless the machine has more than one GPU. If the GPU can't start a stream, Vora retries it on the CPU.</Hint>
                     </div>
                 )}
             </SetupCard>

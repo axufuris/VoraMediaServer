@@ -110,6 +110,7 @@ public class ServerSetting
     public bool DisableVideoTranscoding { get; set; }
     public bool UseHardwareAcceleration { get; set; } = true;
     public bool UseHardwareEncoding { get; set; } = true;
+    public HardwareAccelerationType HardwareAccelerationType { get; set; } = HardwareAccelerationType.Auto;
     public string HardwareTranscodingDevice { get; set; } = "Auto";
 
     public int TranscodeQuality { get; set; }

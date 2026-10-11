@@ -51,6 +51,11 @@ jobs:
       - name: Build
         run: dotnet build Vora.slnx --no-restore --configuration Release
 
+      # Tests that start a real encode, like the GPU-failure retry, skip
+      # without FFmpeg on PATH.
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: Test
         run: dotnet test Vora.slnx --no-restore --configuration Release --verbosity minimal
 

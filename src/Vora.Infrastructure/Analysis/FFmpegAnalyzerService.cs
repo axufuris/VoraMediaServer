@@ -5,8 +5,10 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Vora.Application.Analysis;
 using Vora.Application.Analysis.Results;
+using Vora.Application.Settings;
 using Vora.Application.Subtitles;
 using Vora.Infrastructure.Processes;
+using Vora.Infrastructure.Transcoding;
 
 namespace Vora.Infrastructure.Analysis;
 
@@ -658,22 +660,19 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
     private async Task<(List<DetectedInterval> Silence, List<DetectedInterval> Black, List<PictureSample> Pictures)> RunDetectionPassAsync(
         string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, bool samplePicture, CancellationToken cancellationToken)
     {
-        var (ok, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, parameters.UseHardwareDecode, samplePicture, cancellationToken);
+        var (ok, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, parameters.HardwareDecoder, samplePicture, cancellationToken);
 
-        // The hardware path forces CUDA/NVDEC, so a codec/profile it can't handle
-        // (or a box without an NVIDIA GPU) errors the pass — retry in pure software
-        // so a GPU quirk never drops an item's markers.
-        if (!ok && parameters.UseHardwareDecode && !cancellationToken.IsCancellationRequested)
+        if (!ok && parameters.HardwareDecoder is not null && !cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning("Hardware-accelerated detection pass failed for {Input}; retrying in software.", filePath);
-            (_, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, useHardware: false, samplePicture, cancellationToken);
+            (_, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, hardware: null, samplePicture, cancellationToken);
         }
 
         return result;
     }
 
     private async Task<(bool Ok, (List<DetectedInterval> Silence, List<DetectedInterval> Black, List<PictureSample> Pictures) Result)> RunDetectionProcessAsync(
-        string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, bool useHardware, bool samplePicture, CancellationToken cancellationToken)
+        string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, HardwareAccelerator? hardware, bool samplePicture, CancellationToken cancellationToken)
     {
         var silenceStarts = new List<double>();
         var silenceEnds = new List<double>();
@@ -693,20 +692,11 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             UseShellExecute = false,
             CreateNoWindow = true
         };
-        // Hardware path: decode on NVDEC, keep frames on the GPU, downscale +
-        // convert to 8-bit there, THEN pull the small frames back for the CPU
-        // blackdetect. This is the win — the CPU was filtering full-res frames.
-        // -hwaccel is an input option and must precede -ss/-i.
-        if (useHardware)
+        if (hardware is not null)
         {
-            processInfo.ArgumentList.Add("-hwaccel");
-            processInfo.ArgumentList.Add("cuda");
-            processInfo.ArgumentList.Add("-hwaccel_output_format");
-            processInfo.ArgumentList.Add("cuda");
-            if (!string.IsNullOrWhiteSpace(parameters.HardwareDevice) && parameters.HardwareDevice != "Auto")
+            foreach (var argument in HardwareArguments.InitAndDecode(hardware, keepFramesOnGpu: true))
             {
-                processInfo.ArgumentList.Add("-hwaccel_device");
-                processInfo.ArgumentList.Add(parameters.HardwareDevice);
+                processInfo.ArgumentList.Add(argument);
             }
         }
         if (seekSeconds.HasValue)
@@ -726,8 +716,8 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         processInfo.ArgumentList.Add($"silencedetect=noise={noiseArg}dB:d={silenceMin}");
         var blackFilter = $"blackdetect=d={blackMin}:pix_th=0.10" + (samplePicture ? PictureSampleFilter : "");
         processInfo.ArgumentList.Add("-vf");
-        processInfo.ArgumentList.Add(useHardware
-            ? $"scale_cuda=-2:{BlackDetectHeight}:format=nv12,hwdownload,format=nv12,{blackFilter}"
+        processInfo.ArgumentList.Add(hardware is not null
+            ? $"{HardwareArguments.DownloadScaled(hardware, BlackDetectHeight)},{blackFilter}"
             : blackFilter);
         processInfo.ArgumentList.Add("-f");
         processInfo.ArgumentList.Add("null");

@@ -24,6 +24,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
     private readonly IMediaRepository _mediaRepository;
     private readonly ILibraryRepository _libraryRepository;
     private readonly ISystemSettingsRepository _settingsRepo;
+    private readonly IHardwareCapabilityService _hardware;
     private readonly IVideoThumbnailStorageService _storage;
     private readonly IVideoThumbnailGeneratorService _generator;
     private readonly IClientNotifier _notifier;
@@ -37,6 +38,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         IMediaRepository mediaRepository,
         ILibraryRepository libraryRepository,
         ISystemSettingsRepository settingsRepo,
+        IHardwareCapabilityService hardware,
         IVideoThumbnailStorageService storage,
         IVideoThumbnailGeneratorService generator,
         IClientNotifier notifier,
@@ -49,6 +51,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         _mediaRepository = mediaRepository;
         _libraryRepository = libraryRepository;
         _settingsRepo = settingsRepo;
+        _hardware = hardware;
         _storage = storage;
         _generator = generator;
         _notifier = notifier;
@@ -292,6 +295,9 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         // whose runtime differs by more than the tolerance — a genuinely different
         // edit — gets its own sprite. Unknown-duration parts each get their own.
         var cuts = GroupPartsIntoCuts(partsWithFiles);
+        var hardwareDecoder = settings.UseHardwareAcceleration && settings.VideoThumbnailUseHardwareDecode
+            ? await _hardware.ResolveAsync(settings.HardwareAccelerationType, settings.HardwareTranscodingDevice, cancellationToken)
+            : null;
 
         var anySuccess = false;
         VideoThumbnailGenerationResult? firstResult = null;
@@ -316,8 +322,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
                         Height = settings.VideoThumbnailHeight,
                         JpegQuality = settings.VideoThumbnailJpegQuality,
                         SpriteColumns = settings.VideoThumbnailSpriteColumns,
-                        UseHardwareDecode = settings.UseHardwareAcceleration && settings.VideoThumbnailUseHardwareDecode,
-                        HardwareDevice = settings.HardwareTranscodingDevice
+                        HardwareDecoder = hardwareDecoder
                     },
                     spritePath,
                     vttPath,

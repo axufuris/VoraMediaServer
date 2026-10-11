@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Vora.Domain.Entities.Settings;
+using Vora.Domain.Enums;
 
 namespace Vora.Application.Settings.ViewModels;
 
@@ -50,6 +51,7 @@ public class ServerSettingsVM
     public bool DisableVideoTranscoding { get; set; }
     public bool UseHardwareAcceleration { get; set; } = true;
     public bool UseHardwareEncoding { get; set; } = true;
+    public HardwareAccelerationType HardwareAccelerationType { get; set; } = HardwareAccelerationType.Auto;
     public int EnableHevcEncoding { get; set; } = 1;
     public bool EnableHevcOptimization { get; set; } = true;
     public int MaxGpuTranscodes { get; set; } = 2;
@@ -134,6 +136,7 @@ public class ServerSettingsVM
             DisableVideoTranscoding = s.DisableVideoTranscoding,
             UseHardwareAcceleration = s.UseHardwareAcceleration,
             UseHardwareEncoding = s.UseHardwareEncoding,
+            HardwareAccelerationType = s.HardwareAccelerationType,
             EnableHevcEncoding = s.EnableHevcEncoding,
             EnableHevcOptimization = s.EnableHevcOptimization,
             MaxGpuTranscodes = s.MaxGpuTranscodes,

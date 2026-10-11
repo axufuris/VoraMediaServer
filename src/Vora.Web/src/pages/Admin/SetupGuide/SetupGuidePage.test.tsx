@@ -40,7 +40,7 @@ vi.mock('../../../api/System/systemSettingsAdminService', () => ({
     systemSettingsAdminService: {
         getServerSettings: mocks.getServerSettings,
         updateServerSettings: mocks.updateServerSettings,
-        getHardwareDevices: () => Promise.resolve(['Auto', '/dev/dri/renderD128']),
+        getHardware: () => Promise.resolve({ devices: [{ id: '/dev/dri/renderD128', name: 'Intel GPU', vendor: 'Intel' }], detected: 'QuickSync', detectedDevice: '/dev/dri/renderD128' }),
         getPluginSettings: mocks.getPluginSettings,
         updatePluginSettings: mocks.updatePluginSettings,
         testPluginConnection: mocks.testPluginConnection,
@@ -63,7 +63,7 @@ const guide = (overrides: Partial<SetupGuideVM> = {}): SetupGuideVM => ({
     status: 'InProgress', step: 'welcome', moviesAndShows: true, music: true, liveTv: false, internetRadio: false, podcasts: false, ...overrides,
 });
 
-const settings = { serverName: 'Vora QA', metadataLanguage: 'eng', scheduleTimeZone: '', streamingProfile: 1, useHardwareAcceleration: true, useHardwareEncoding: true, hardwareTranscodingDevice: 'Auto', runDetections: 0, detectionScheduleTime: '03:00', analyzeUseHardwareDecode: true, videoThumbnailGeneration: 0, videoThumbnailScheduleTime: '04:00', videoThumbnailUseHardwareDecode: true, enableAiMusicPlaylists: false, registrationMode: 2, preExtractSubtitlesOnScan: true } as ServerSettings;
+const settings = { serverName: 'Vora QA', metadataLanguage: 'eng', scheduleTimeZone: '', streamingProfile: 1, useHardwareAcceleration: true, useHardwareEncoding: true, hardwareAccelerationType: 'Auto', hardwareTranscodingDevice: 'Auto', runDetections: 0, detectionScheduleTime: '03:00', analyzeUseHardwareDecode: true, videoThumbnailGeneration: 0, videoThumbnailScheduleTime: '04:00', videoThumbnailUseHardwareDecode: true, enableAiMusicPlaylists: false, registrationMode: 2, preExtractSubtitlesOnScan: true } as ServerSettings;
 
 const email: EmailSettings = { emailEnabled: false, smtpHost: null, smtpPort: 587, smtpUseStartTls: true, smtpUseImplicitSsl: false, smtpUsername: null, smtpPasswordIsSet: false, smtpFromAddress: null, smtpFromDisplayName: null, emailPublicBaseUrl: null };
 

@@ -33,6 +33,11 @@ services:
       - ${MEDIA_MUSIC:-D:\TestServer\Music}:/media/music
       - ${VORA_DATA:-./Vora-data}:/app/data
       - ${VORA_TRANSCODE:-./Vora-transcode}:/transcode
+    # Intel or AMD GPU (Quick Sync / VAAPI): uncomment to pass the render
+    # devices in. Vora finds and tests them at startup; the start script
+    # adds the app's user to the device's group, so nothing else is needed.
+    # devices:
+    #   - /dev/dri:/dev/dri
     deploy:
       resources:
         reservations:

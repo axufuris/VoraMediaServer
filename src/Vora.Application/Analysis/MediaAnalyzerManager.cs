@@ -46,6 +46,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     private readonly IMarkerAssembler _markerAssembler;
     private readonly IAudioIntroDetector _audioIntroDetector;
     private readonly ISystemSettingsRepository _settingsRepo;
+    private readonly IHardwareCapabilityService _hardware;
     private readonly ITaskQueueManager _taskQueueManager;
     private readonly IClientNotifier _notifier;
     private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
@@ -62,6 +63,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         IMarkerAssembler markerAssembler,
         IAudioIntroDetector audioIntroDetector,
         ISystemSettingsRepository settingsRepo,
+        IHardwareCapabilityService hardware,
         Vora.Application.Streaming.ISubtitleExtractionService subtitleExtractor,
         Vora.Application.Subtitles.IExternalSubtitleScanner externalSubtitles,
         ITaskQueueManager taskQueueManager,
@@ -76,6 +78,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         _markerAssembler = markerAssembler;
         _audioIntroDetector = audioIntroDetector;
         _settingsRepo = settingsRepo;
+        _hardware = hardware;
         _subtitleExtractor = subtitleExtractor;
         _externalSubtitles = externalSubtitles;
         _taskQueueManager = taskQueueManager;
@@ -607,8 +610,9 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             TailWindowStartSeconds = tailStart,
             SkipHeadWindow = useFingerprintIntro,
             SamplePictureInTail = !isEpisode,
-            UseHardwareDecode = settings.UseHardwareAcceleration && settings.AnalyzeUseHardwareDecode,
-            HardwareDevice = settings.HardwareTranscodingDevice
+            HardwareDecoder = settings.UseHardwareAcceleration && settings.AnalyzeUseHardwareDecode
+                ? await _hardware.ResolveAsync(settings.HardwareAccelerationType, settings.HardwareTranscodingDevice, cancellationToken)
+                : null
         };
 
         var detection = await _analyzerService.AnalyzeSilenceDetectionsAsync(primaryPath, parameters, cancellationToken);

@@ -169,6 +169,22 @@ public class SystemSettingsManagerTests
         settings.HardwareTranscodingDevice.Should().Be("Auto");
     }
 
+    [Theory]
+    [InlineData(HardwareAccelerationType.QuickSync, HardwareAccelerationType.QuickSync)]
+    [InlineData(HardwareAccelerationType.Off, HardwareAccelerationType.Off)]
+    [InlineData((HardwareAccelerationType)42, HardwareAccelerationType.Auto)]
+    public async Task UpdateServerSettingsAsync_saves_the_hardware_acceleration_choice(HardwareAccelerationType requested, HardwareAccelerationType saved)
+    {
+        var settings = new ServerSetting { HardwareAccelerationType = HardwareAccelerationType.Nvidia };
+        _repo.GetSettingsForUpdateAsync().Returns(settings);
+        var req = ValidRequest();
+        req.HardwareAccelerationType = requested;
+
+        await Build().UpdateServerSettingsAsync(req);
+
+        settings.HardwareAccelerationType.Should().Be(saved);
+    }
+
     [Fact]
     public async Task UpdateServerSettingsAsync_defaults_tonemapping_algorithm_when_blank()
     {

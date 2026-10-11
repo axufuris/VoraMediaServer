@@ -108,7 +108,7 @@ Server-wide (`ServerSetting`):
 - `EpisodeIntroClusterToleranceSec` (int, default 5)
 - `EpisodeIntroClusterMinAgreementPct` (int, default 70)
 - `AnalyzeConcurrency` (int, default 2, clamped 1–16) — how many items an Analyze run decodes at once
-- `AnalyzeUseHardwareDecode` (bool, default `true`) — whether the FFmpeg silence/black passes decode on the GPU. Gated by the global `UseHardwareAcceleration`, so `-hwaccel cuda` is used only when **both** are on. Turn it off to keep analysis on the CPU and leave the GPU for playback transcoding or other apps (e.g. Tdarr).
+- `AnalyzeUseHardwareDecode` (bool, default `true`) — whether the FFmpeg silence/black passes decode on the GPU. Gated by the global `UseHardwareAcceleration`, so the pass decodes on the resolved GPU (CUDA on NVIDIA, VAAPI on Intel and AMD; see `docs/hardware-acceleration.md`) only when **both** are on. Turn it off to keep analysis on the CPU and leave the GPU for playback transcoding or other apps (e.g. Tdarr).
 
 All eight server fields are editable from Admin → Settings → Detection Tuning (the Analysis tab).
 

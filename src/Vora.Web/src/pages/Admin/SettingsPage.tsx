@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { systemSettingsAdminService } from '../../api/System/systemSettingsAdminService';
+import { systemSettingsAdminService, type HardwareCapabilities } from '../../api/System/systemSettingsAdminService';
 import { apiClient } from '../../api/client';
 
 import RequestServersTab from '../../components/Admin/Settings/RequestServersTab';
@@ -22,7 +22,7 @@ export default function SettingsPage() {
         return (saved === 'core' || saved === 'remote' || saved === 'email' || saved === 'requests' || saved === 'storage') ? saved : 'core';
     });
     const [scanners, setScanners] = useState<{ id: string, name: string }[]>([]);
-    const [hardwareDevices, setHardwareDevices] = useState<string[]>([]);
+    const [hardware, setHardware] = useState<HardwareCapabilities | null>(null);
 
     const [modalConfig, setModalConfig] = useState<{ isOpen: boolean, title: string, message: string, isError: boolean }>({ isOpen: false, title: '', message: '', isError: false });
     const showModal = useCallback((title: string, message: string, isError: boolean = false) => {
@@ -35,13 +35,14 @@ export default function SettingsPage() {
     }, [activeTab, storageKey]);
 
     useEffect(() => {
-        Promise.all([
-            apiClient.get<{ id: string, name: string }[]>('/plugins/options?type=LocalScanner', { serverId }).then(res => res.data),
-            systemSettingsAdminService.getHardwareDevices(serverId),
-        ]).then(([scannersData, hardwareData]) => {
-            setScanners(scannersData);
-            setHardwareDevices(hardwareData);
-        }).catch(console.error);
+        let cancelled = false;
+        apiClient.get<{ id: string, name: string }[]>('/plugins/options?type=LocalScanner', { serverId })
+            .then(res => { if (!cancelled) setScanners(res.data); })
+            .catch(console.error);
+        systemSettingsAdminService.getHardware(serverId)
+            .then(data => { if (!cancelled) setHardware(data); })
+            .catch(console.error);
+        return () => { cancelled = true; };
     }, [serverId]);
 
     return (
@@ -75,7 +76,7 @@ export default function SettingsPage() {
                 />
 
                 {activeTab === 'core' && (
-                    <CoreSettingsTab serverId={serverId} scanners={scanners} hardwareDevices={hardwareDevices} showModal={showModal} />
+                    <CoreSettingsTab serverId={serverId} scanners={scanners} hardware={hardware} showModal={showModal} />
                 )}
                 {activeTab === 'remote' && (
                     <RemoteAccessTab serverId={serverId} showModal={showModal} />

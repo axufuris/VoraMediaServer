@@ -50,7 +50,7 @@ public class VideoThumbnailManagerTests
             .Returns(new Dictionary<Guid, string>());
 
         _manager = new VideoThumbnailManager(
-            _media, _library, _settings, _storage, _generator, _notifier,
+            _media, _library, _settings, Substitute.For<Vora.Application.Settings.IHardwareCapabilityService>(), _storage, _generator, _notifier,
             Substitute.For<Vora.Application.Notifications.IAdminNotificationManager>(),
             new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
             Substitute.For<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(),

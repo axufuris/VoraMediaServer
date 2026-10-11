@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
-import { systemSettingsAdminService, type ServerSettings } from '../../../api/System/systemSettingsAdminService';
+import { systemSettingsAdminService, type HardwareCapabilities, type ServerSettings } from '../../../api/System/systemSettingsAdminService';
 import { libraryAdminService } from '../../../api/Media/libraryAdminService';
 import FolderPathInput from '../FolderBrowser/FolderPathInput';
+import HardwareAccelerationPicker from './HardwareAccelerationPicker';
 import { METADATA_LANGUAGES, SCHEDULE_TIME_ZONES } from '../../../utils/serverSettingOptions';
 
 interface CoreSettingsTabProps {
     serverId?: string;
     scanners: { id: string, name: string }[];
-    hardwareDevices: string[];
+    hardware: HardwareCapabilities | null;
     showModal: (title: string, message: string, isError?: boolean) => void;
 }
 
@@ -31,21 +32,22 @@ function FieldHint({ children }: { children: React.ReactNode }) {
     return <p className="text-xs text-[var(--vora-text-muted)] mt-2">{children}</p>;
 }
 
-function Checkbox({ checked, onChange, label }: { checked: boolean, onChange: (v: boolean) => void, label: string }) {
+function Checkbox({ checked, onChange, label, disabled = false }: { checked: boolean, onChange: (v: boolean) => void, label: string, disabled?: boolean }) {
     return (
-        <label className="flex items-center gap-3 cursor-pointer group select-none">
+        <label className={`flex items-center gap-3 group select-none ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
             <input
                 type="checkbox"
                 checked={checked}
+                disabled={disabled}
                 onChange={e => onChange(e.target.checked)}
-                className="w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer"
+                className="w-4 h-4 accent-[var(--vora-accent-500)] cursor-pointer disabled:cursor-not-allowed"
             />
             <span className="text-sm text-[var(--vora-text-primary)] group-hover:text-[var(--vora-text-secondary)] transition-colors">{label}</span>
         </label>
     );
 }
 
-export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, showModal }: CoreSettingsTabProps) {
+export default function CoreSettingsTab({ serverId, scanners, hardware, showModal }: CoreSettingsTabProps) {
     const [serverSettings, setServerSettings] = useState<ServerSettings | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [subtitleBackfillQueued, setSubtitleBackfillQueued] = useState(false);
@@ -248,18 +250,33 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-[var(--vora-border-subtle)]">
-                        <div>
-                            <FieldLabel>Hardware Device</FieldLabel>
-                            <select
-                                value={serverSettings.hardwareTranscodingDevice}
-                                onChange={e => setServerSettings({ ...serverSettings, hardwareTranscodingDevice: e.target.value })}
-                                className="vora-input cursor-pointer"
-                            >
-                                {hardwareDevices.map(device => <option key={device} value={device}>{device}</option>)}
-                            </select>
-                            <FieldHint>Pick which GPU FFmpeg should use. Leave on Auto unless you have multiple GPUs.</FieldHint>
+                    <div className="space-y-4 pt-4 border-t border-[var(--vora-border-subtle)]">
+                        <HardwareAccelerationPicker
+                            idPrefix="core-hw"
+                            type={serverSettings.hardwareAccelerationType}
+                            device={serverSettings.hardwareTranscodingDevice || 'Auto'}
+                            hardware={hardware}
+                            serverId={serverId}
+                            onChange={(type, device) => setServerSettings({ ...serverSettings, hardwareAccelerationType: type, hardwareTranscodingDevice: device })}
+                        />
+                        <div className="flex flex-wrap gap-x-6 gap-y-3">
+                            <Checkbox
+                                checked={serverSettings.useHardwareAcceleration}
+                                disabled={serverSettings.hardwareAccelerationType === 'Off'}
+                                onChange={v => setServerSettings({ ...serverSettings, useHardwareAcceleration: v })}
+                                label="Hardware decoding"
+                            />
+                            <Checkbox
+                                checked={serverSettings.useHardwareEncoding}
+                                disabled={serverSettings.hardwareAccelerationType === 'Off'}
+                                onChange={v => setServerSettings({ ...serverSettings, useHardwareEncoding: v })}
+                                label="Hardware encoding"
+                            />
                         </div>
+                        <FieldHint>Auto tests NVIDIA, then Intel Quick Sync, then VAAPI, and uses the first that works. If the GPU can't start a stream, Vora retries it on the CPU.</FieldHint>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <FieldLabel>Max GPU Transcodes</FieldLabel>
                             <select
@@ -336,16 +353,6 @@ export default function CoreSettingsTab({ serverId, scanners, hardwareDevices, s
                                 <option value="mobius">Mobius</option>
                             </select>
                         </div>
-                        <Checkbox
-                            checked={serverSettings.useHardwareAcceleration}
-                            onChange={v => setServerSettings({ ...serverSettings, useHardwareAcceleration: v })}
-                            label="Use hardware acceleration when available"
-                        />
-                        <Checkbox
-                            checked={serverSettings.useHardwareEncoding}
-                            onChange={v => setServerSettings({ ...serverSettings, useHardwareEncoding: v })}
-                            label="Use hardware-accelerated video encoding"
-                        />
                         <Checkbox
                             checked={serverSettings.enableHevcOptimization}
                             onChange={v => setServerSettings({ ...serverSettings, enableHevcOptimization: v })}

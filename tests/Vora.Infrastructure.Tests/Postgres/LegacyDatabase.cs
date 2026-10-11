@@ -80,9 +80,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string ReleasedMigration = "20261004192607_ChangesSinceInitial";
 
+    public const string SecondReleaseMigration = "20261009020545_ChangesSinceInitial";
+
+    private const string ColumnsSinceSecondRelease = """
+        ALTER TABLE "ServerSettings" DROP COLUMN "HardwareAccelerationType";
+        """;
+
     private const string ColumnsSinceRelease = """
         ALTER TABLE "MediaItems" DROP COLUMN "FullyRefreshedAt";
-        """;
+        """ + ColumnsSinceSecondRelease;
 
     private const string OldDefaultRowOrder = """
         UPDATE "SmartLists" SET "DisplayOrder" = 7 WHERE "DefaultKey" = 'recently-added-music';
@@ -111,6 +117,14 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await db.Database.MigrateAsync(cancellationToken);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceRelease, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, ReleasedMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildSecondReleaseStateAsync(CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceSecondRelease, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, SecondReleaseMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

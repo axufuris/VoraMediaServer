@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { setupGuideService, type SetupGuideVM } from '../../../api/System/setupGuideService';
-import { systemSettingsAdminService, type ServerSettings } from '../../../api/System/systemSettingsAdminService';
+import { systemSettingsAdminService, type HardwareCapabilities, type ServerSettings } from '../../../api/System/systemSettingsAdminService';
 import { featureFlagsService, type FeatureFlagsVM } from '../../../api/System/featureFlagsService';
 import { pluginAdminService, type PluginVM } from '../../../api/System/pluginAdminService';
 import { discoveryService, type DiscoveryRowConfig } from '../../../api/Discovery/discoveryService';
@@ -47,7 +47,7 @@ export default function SetupGuidePage() {
     const [features, setFeatures] = useState<FeatureFlagsVM | null>(null);
     const [plugins, setPlugins] = useState<PluginVM[]>([]);
     const [discoverRows, setDiscoverRows] = useState<DiscoveryRowConfig[]>([]);
-    const [hardwareDevices, setHardwareDevices] = useState<string[]>([]);
+    const [hardware, setHardware] = useState<HardwareCapabilities | null>(null);
     const [emailWanted, setEmailWanted] = useState(false);
     const [stepId, setStepId] = useState<SetupStepId>('welcome');
     const [reached, setReached] = useState(0);
@@ -69,15 +69,22 @@ export default function SetupGuidePage() {
 
     useEffect(() => {
         let cancelled = false;
+        systemSettingsAdminService.getHardware(serverId)
+            .then(data => { if (!cancelled) setHardware(data); })
+            .catch(() => { if (!cancelled) setHardware(null); });
+        return () => { cancelled = true; };
+    }, [serverId]);
+
+    useEffect(() => {
+        let cancelled = false;
         Promise.all([
             setupGuideService.get(serverId),
             systemSettingsAdminService.getServerSettings(serverId),
             featureFlagsService.getFeatureFlags(serverId),
             pluginAdminService.getPlugins(serverId),
             discoveryService.getAdminConfigs(serverId).catch(() => [] as DiscoveryRowConfig[]),
-            systemSettingsAdminService.getHardwareDevices(serverId).catch(() => ['Auto']),
             emailAdminService.getSettings(serverId).then(email => email.emailEnabled).catch(() => false),
-        ]).then(async ([loadedGuide, loadedSettings, loadedFeatures, loadedPlugins, rows, devices, emailOn]) => {
+        ]).then(async ([loadedGuide, loadedSettings, loadedFeatures, loadedPlugins, rows, emailOn]) => {
             if (cancelled) return;
             const steps = buildSetupSteps(contentOf(loadedGuide), { discover: rows.length > 0, email: emailOn || loadedSettings.registrationMode === EMAIL_INVITATION_MODE });
             const finished = loadedGuide.status === 'Completed' || loadedGuide.status === 'Skipped';
@@ -86,7 +93,6 @@ export default function SetupGuidePage() {
             setFeatures(loadedFeatures);
             setPlugins(loadedPlugins);
             setDiscoverRows(byOrder(rows));
-            setHardwareDevices(devices);
             setEmailWanted(emailOn);
             setStepId(resumeAt);
             setReached(finished ? steps.length - 1 : Math.max(0, steps.findIndex(s => s.id === resumeAt)));
@@ -300,7 +306,7 @@ export default function SetupGuidePage() {
                             onPluginsChanged={onPluginsChanged}
                             discoverRows={discoverRows}
                             onDiscoverRows={onDiscoverRows}
-                            hardwareDevices={hardwareDevices}
+                            hardware={hardware}
                             emailWanted={emailWanted}
                             onEmailWanted={setEmailWanted}
                             goTo={id => { void goTo(id); }}

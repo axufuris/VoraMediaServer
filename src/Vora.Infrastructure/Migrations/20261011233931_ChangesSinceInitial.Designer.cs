@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261009020545_ChangesSinceInitial")]
+    [Migration("20261011233931_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -3007,6 +3007,9 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<int>("HardwareAccelerationType")
+                        .HasColumnType("integer");
 
                     b.Property<string>("HardwareTranscodingDevice")
                         .IsRequired()
