@@ -69,6 +69,12 @@ public static class MediaEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        adminGroup.MapGet("/{id:guid}/match/files", GetMatchFilesAsync)
+            .WithName("GetMediaMatchFiles")
+            .Produces<MediaMatchFilesVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         adminGroup.MapPost("/{id:guid}/match", ApplyMatchAsync)
             .WithName("ApplyMediaMatch")
             .Produces<MediaMatchResultVM>(StatusCodes.Status202Accepted)
@@ -239,6 +245,12 @@ public static class MediaEndpoints
     {
         var candidates = await matchManager.SearchAsync(id, query, year, cancellationToken);
         return Results.Ok(candidates);
+    }
+
+    private static async Task<IResult> GetMatchFilesAsync(Guid id, IMediaMatchManager matchManager)
+    {
+        var files = await matchManager.GetFilesAsync(id);
+        return Results.Ok(files);
     }
 
     private static async Task<IResult> ApplyMatchAsync(Guid id, ApplyMediaMatchRequest request, IMediaMatchManager matchManager, CancellationToken cancellationToken)
