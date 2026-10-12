@@ -78,6 +78,7 @@ public class MediaDedupeRepository : IMediaDedupeRepository
             .ToListAsync();
 
         var dropSeasons = await _context.Set<Season>()
+            .AsSplitQuery()
             .Where(s => s.TvShowId == dropId)
             .Include(s => s.Episodes).ThenInclude(e => e.MediaParts)
             .ToListAsync();

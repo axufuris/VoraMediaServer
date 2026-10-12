@@ -57,7 +57,9 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
             .AsNoTracking()
             .Where(MediaCapabilities.IsBrowsableTitle)
             .Where(m => !context.MediaItemEmbeddings.Any(e => e.MediaItemId == m.Id))
+            .OrderBy(m => m.Id)
             .Take(batchSize)
+            .AsSplitQuery()
             .Select(MediaItemForEmbeddingDto.Projection)
             .ToListAsync();
 

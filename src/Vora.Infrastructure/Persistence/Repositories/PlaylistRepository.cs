@@ -22,7 +22,7 @@ public class PlaylistRepository : IPlaylistRepository
     // see - a mosaic built from every item would put a restricted film's poster
     // in the header while the film itself was hidden.
     private static IQueryable<PlaylistSummaryVM> Summaries(IQueryable<Playlist> playlists, IQueryable<Guid> visible, Guid viewerProfileId) =>
-        playlists.Select(p => new PlaylistSummaryVM
+        playlists.AsSplitQuery().Select(p => new PlaylistSummaryVM
         {
             Id = p.Id,
             Name = p.Name,
