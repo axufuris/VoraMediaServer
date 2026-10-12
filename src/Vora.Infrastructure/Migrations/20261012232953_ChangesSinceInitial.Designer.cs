@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261011233931_ChangesSinceInitial")]
+    [Migration("20261012232953_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -3470,6 +3470,10 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
                     b.Property<bool>("IsPaused")
                         .HasColumnType("boolean");
 
@@ -3478,6 +3482,10 @@ namespace Vora.Infrastructure.Migrations
 
                     b.Property<DateTime>("LastPingAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<Guid>("MediaItemId")
                         .HasColumnType("uuid");

@@ -104,7 +104,7 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                 ClientName = s.ClientDevice.ClientName,
                 DeviceName = s.ClientDevice.DeviceName,
                 DeviceType = s.ClientDevice.DeviceType,
-                IpAddress = s.ClientDevice.LastIpAddress,
+                IpAddress = s.IpAddress ?? s.ClientDevice.LastIpAddress,
                 DeviceId = s.ClientDevice.DeviceId,
 
                 Strategy = s.Strategy,

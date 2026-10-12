@@ -9,8 +9,6 @@ namespace Vora.Api.Middleware;
 
 public class DeviceTrackingMiddleware
 {
-    public const string GeoLookupHttpClientName = "GeoLookup";
-
     private const string DeviceIdHeader = "X-Vora-Device-Id";
     private const string ClientNameHeader = "X-Vora-Client";
     private const string DeviceNameHeader = "X-Vora-Device";
@@ -101,7 +99,7 @@ public class DeviceTrackingMiddleware
 
             using var scope = serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<VoraDbContext>();
-            var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
+            var locations = scope.ServiceProvider.GetRequiredService<IClientLocationResolver>();
 
             var existingDevice = await dbContext.ClientDevices.FirstOrDefaultAsync(d => d.DeviceId == deviceId);
             var ip = ResolveClientIp(context);
@@ -121,7 +119,7 @@ public class DeviceTrackingMiddleware
             // address to change.
             if (ipChanged || ClientAddress.NeedsLookup(device.Location))
             {
-                device.Location = await ResolveLocationAsync(httpClientFactory, ip, device.Location);
+                device.Location = await locations.ResolveAsync(ip, device.Location);
             }
 
             await dbContext.SaveChangesAsync();
@@ -185,39 +183,5 @@ public class DeviceTrackingMiddleware
         return (newDevice, true);
     }
 
-    private static string ResolveClientIp(HttpContext context)
-    {
-        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "Unknown IP";
-
-        if (ip.StartsWith("::ffff:"))
-        {
-            ip = ip[7..];
-        }
-
-        return ip;
-    }
-
-    private static async Task<string> ResolveLocationAsync(IHttpClientFactory httpClientFactory, string ip, string? fallback)
-    {
-        if (ClientAddress.IsLocal(ip))
-        {
-            return ClientAddress.LocalNetwork;
-        }
-        if (ClientAddress.IsVpn(ip))
-        {
-            return ClientAddress.Vpn;
-        }
-
-        try
-        {
-            var client = httpClientFactory.CreateClient(GeoLookupHttpClientName);
-            var location = ClientAddress.ParseLocation(await client.GetStringAsync(ClientAddress.LookupUrl(ip)));
-            if (location != null) return location;
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
-        {
-        }
-
-        return fallback is { } kept && !ClientAddress.NeedsLookup(kept) ? kept : ClientAddress.UnknownLocation;
-    }
+    private static string ResolveClientIp(HttpContext context) => context.GetClientAddress() ?? "Unknown IP";
 }

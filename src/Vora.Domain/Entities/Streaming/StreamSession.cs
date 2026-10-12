@@ -65,4 +65,7 @@ public class StreamSession
 
     public Guid ClientDeviceId { get; set; }
     public virtual ClientDevice ClientDevice { get; set; } = null!;
+
+    public string? IpAddress { get; set; }
+    public string? Location { get; set; }
 }
