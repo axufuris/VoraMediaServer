@@ -154,6 +154,11 @@ Allowed image sources:
 could escape a CSS `url("…")` context (`"`, `(`, `)`, `\`, newlines) are
 rejected by the runtime sanitizer.
 
+An SVG data URI that points at a gradient or filter contains `url(#id)`.
+Percent-encode those parentheses (`url%28%23id%29`) or the whole image is
+rejected with a console warning. `theme/builtInBackgrounds.test.ts` checks
+every built-in theme and template background against the sanitizer.
+
 Vora serves your assets from `/api/admin/themes/<theme-id>/assets/<file>`.
 That endpoint enforces path-traversal protection — any request that resolves
 outside your bundle's `assets/` folder returns 404.

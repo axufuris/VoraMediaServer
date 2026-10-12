@@ -14,6 +14,7 @@ import { Modal } from '../../../components/Common/Modal';
 import { parseServerDate, serverTimeMs } from '../../../utils/serverTime';
 import { dvrTabFor, formatAiredAt, type DvrTabKey } from '../../../utils/dvrDisplay';
 import { recordingPlayable } from '../../../utils/playables';
+import { secureImageUrl } from '../../../utils/secureImageUrl';
 
 interface SeriesPromptState {
     title: string;
@@ -109,7 +110,7 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
                 title,
                 sessions: groupSessions,
                 targetStart: new Date(targetTime),
-                channelLogo: groupSessions[0]?.schedule?.channel?.logoUrl,
+                channelLogo: secureImageUrl(groupSessions[0]?.schedule?.channel?.logoUrl),
                 channelName: groupSessions[0]?.schedule?.channel?.name,
             };
         }).sort((a, b) => activeTab === 'Upcoming'

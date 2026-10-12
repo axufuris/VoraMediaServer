@@ -41,6 +41,8 @@ The endpoint (`Vora.Api/Endpoints/ArtworkEndpoints.cs`) is `AllowAnonymous` — 
 
 Frontend: use the `thumbUrl(src, width, kind)` helper (`src/Vora.Web/src/utils/thumbnails.ts`) to build the URL — don't hand-write `/api/artwork/thumb` query strings in components.
 
+**Images the cache can't fetch** — channel and station logos, podcast artwork — come from hosts outside the allowlist, so the browser loads them directly (`MediaCard`'s `uncachedImage`). Many are stored as `http://`. Pass them through `secureImageUrl(url)` (`utils/secureImageUrl.ts`) wherever one becomes an `<img src>` or a player `posterUrl`: on an HTTPS page it asks for the image over HTTPS, which is what the browser would do anyway but without a mixed-content warning per image; on an HTTP page it leaves the URL alone. A host with no HTTPS still shows no logo on an HTTPS page.
+
 ### Orphan cleanup
 
 When a source image stops being referenced — poster/backdrop changed, item deleted, overlay replaced — its cached resizes must be evicted so the cap isn't wasted on dead entries. `IArtworkThumbnailService.RemoveThumbnailsForSource(src)` deletes every width bucket for that source. Current callers:

@@ -6,6 +6,7 @@ import HealthBadge from '../../../components/Admin/Primitives/HealthBadge';
 import { COUNTRY_OPTIONS } from '../../../utils/countries';
 import { FREE_EPG_SOURCES, FREE_PLAYLISTS } from '../../../utils/iptvPresets';
 import { CardHeading, CheckRow, FieldLabel, Hint, SetupCard, StatusMessage } from './SetupParts';
+import { secureImageUrl } from '../../../utils/secureImageUrl';
 
 const looksLikeUrl = (value: string) => /^(https?|feed):/i.test(value.trim());
 
@@ -273,7 +274,7 @@ export function SetupPodcastCatalogCard({ catalog, serverId, onChanged }: { cata
                         return (
                             <li key={r.feedUrl} className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 border-t border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] px-3 py-2.5 first:border-t-0">
                                 <div className="h-11 w-11 overflow-hidden rounded-[var(--vora-radius-md)] bg-[var(--vora-bg-raised)]">
-                                    {r.artworkUrl && <img src={r.artworkUrl} alt="" className="h-full w-full object-cover" />}
+                                    {r.artworkUrl && <img src={secureImageUrl(r.artworkUrl)} alt="" className="h-full w-full object-cover" />}
                                 </div>
                                 <div className="min-w-0">
                                     <div className="truncate font-semibold text-[var(--vora-text-primary)]">{r.title}</div>

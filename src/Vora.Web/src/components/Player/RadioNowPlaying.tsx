@@ -4,6 +4,7 @@ import type { IptvChannelVM } from '../../api/Iptv/iptvAdminService';
 import { NowPlayingShell } from './NowPlaying/NowPlayingShell';
 import { NowPlayingArtwork } from './NowPlaying/NowPlayingArtwork';
 import { NowPlayingControlRow, NowPlayingIconButton, NowPlayingPill, NowPlayingPlayButton, NowPlayingVolume } from './NowPlaying/NowPlayingControls';
+import { secureImageUrl } from '../../utils/secureImageUrl';
 
 // Live radio's full screen, built from the same pieces as the music screen.
 // There is no seek bar and no skip back/forward: a live stream has no position
@@ -133,7 +134,7 @@ export default function RadioNowPlaying({
                                         className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded"
                                         style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
                                     >
-                                        {item.logoUrl ? <img src={item.logoUrl} alt="" className="h-full w-full object-contain" /> : null}
+                                        {item.logoUrl ? <img src={secureImageUrl(item.logoUrl)} alt="" className="h-full w-full object-contain" /> : null}
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="truncate text-sm font-medium" style={{ color: isCurrent ? 'var(--vora-accent-text)' : 'var(--vora-text-primary)' }}>{item.name}</div>

@@ -14,6 +14,7 @@ import { useGuideData } from './hooks/useGuideData';
 import { useGuideVirtualization } from './hooks/useGuideVirtualization';
 import GuideRow, { type CleanedProgram } from './components/GuideRow';
 import { serverTimeMs } from '../../../utils/serverTime';
+import { secureImageUrl } from '../../../utils/secureImageUrl';
 
 export interface LiveTvGuideProps {
     isEmbedded?: boolean;
@@ -312,7 +313,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
 
     const handlePlayChannel = (channel: IptvChannelVM, program?: IptvProgramDto) => {
         if (onPlayChannel) { onPlayChannel(channel, program); return; }
-        playMedia({ id: channel.id, title: channel.name, subtitle: program ? program.title : 'Live TV', posterUrl: channel.logoUrl, streamUrl: channel.streamUrl, serverId: serverId ?? undefined, container: 'hls', playbackContextType: 'LiveTv' });
+        playMedia({ id: channel.id, title: channel.name, subtitle: program ? program.title : 'Live TV', posterUrl: secureImageUrl(channel.logoUrl), streamUrl: channel.streamUrl, serverId: serverId ?? undefined, container: 'hls', playbackContextType: 'LiveTv' });
     };
 
     const handleScheduleRecording = async (channel: IptvChannelVM, program: IptvProgramDto, isSeries: boolean, keepMaxEpisodes: number = 0) => {
@@ -560,7 +561,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                                 style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
                             >
                                 {hoveredProgram.channel.logoUrl ? (
-                                    <img src={hoveredProgram.channel.logoUrl} alt="" className="max-h-[80%] max-w-[80%] object-contain" />
+                                    <img src={secureImageUrl(hoveredProgram.channel.logoUrl)} alt="" className="max-h-[80%] max-w-[80%] object-contain" />
                                 ) : (
                                     <span className="text-[10px]" style={{ color: 'var(--vora-text-disabled)' }}>No logo</span>
                                 )}

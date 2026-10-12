@@ -7,6 +7,7 @@ import { usePlayer } from '../../../contexts/usePlayer';
 import { useDialog } from '../../../dialogs';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { calendarDaysBetween, parseServerDate } from '../../../utils/serverTime';
+import { secureImageUrl } from '../../../utils/secureImageUrl';
 
 const SELECTED_SUB_STORAGE_KEY = 'podcast_selected_sub';
 const VIEW_MODE_STORAGE_KEY = 'podcast_view_mode';
@@ -341,7 +342,7 @@ export default function PodcastsTab() {
             id: episode.id,
             title: episode.title,
             subtitle: selectedSub.title,
-            posterUrl: episode.artworkUrl || selectedSub.artworkUrl,
+            posterUrl: secureImageUrl(episode.artworkUrl || selectedSub.artworkUrl),
             streamUrl: episode.audioUrl,
             serverId: serverId ?? serverVault.getActiveServerId() ?? undefined,
             container: 'audio',
@@ -356,7 +357,7 @@ export default function PodcastsTab() {
             id: episode.id,
             title: episode.title,
             subtitle: episode.showTitle,
-            posterUrl: episode.artworkUrl || episode.showArtworkUrl,
+            posterUrl: secureImageUrl(episode.artworkUrl || episode.showArtworkUrl),
             streamUrl: episode.audioUrl,
             serverId: serverId ?? serverVault.getActiveServerId() ?? undefined,
             container: 'audio',
@@ -462,7 +463,7 @@ export default function PodcastsTab() {
                                         >
                                             <div className="w-12 h-12 rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
                                                 {result.artworkUrl
-                                                    ? <img src={result.artworkUrl} alt={result.title} className="max-w-full max-h-full object-cover" />
+                                                    ? <img src={secureImageUrl(result.artworkUrl)} alt={result.title} className="max-w-full max-h-full object-cover" />
                                                     : <svg className="w-6 h-6 text-[var(--vora-text-disabled)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a9 9 0 00-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2a7 7 0 1114 0v2h-4v8h3c1.66 0 3-1.34 3-3v-7a9 9 0 00-9-9z" /></svg>}
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -549,7 +550,7 @@ export default function PodcastsTab() {
                                     >
                                         <div className="w-14 h-14 rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
                                             {ep.showArtworkUrl || ep.artworkUrl
-                                                ? <img src={ep.artworkUrl || ep.showArtworkUrl} alt={ep.showTitle} className="max-w-full max-h-full object-cover" />
+                                                ? <img src={secureImageUrl(ep.artworkUrl || ep.showArtworkUrl)} alt={ep.showTitle} className="max-w-full max-h-full object-cover" />
                                                 : <svg className="w-6 h-6 text-[var(--vora-text-disabled)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a9 9 0 00-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2a7 7 0 1114 0v2h-4v8h3c1.66 0 3-1.34 3-3v-7a9 9 0 00-9-9z" /></svg>}
                                         </div>
                                         {ep.isPlayed ? (
@@ -611,7 +612,7 @@ export default function PodcastsTab() {
                                         >
                                             <div className="w-14 h-14 rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
                                                 {item.artworkUrl
-                                                    ? <img src={item.artworkUrl} alt={item.title} className="max-w-full max-h-full object-cover" />
+                                                    ? <img src={secureImageUrl(item.artworkUrl)} alt={item.title} className="max-w-full max-h-full object-cover" />
                                                     : <svg className="w-7 h-7 text-[var(--vora-text-disabled)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a9 9 0 00-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2a7 7 0 1114 0v2h-4v8h3c1.66 0 3-1.34 3-3v-7a9 9 0 00-9-9z" /></svg>}
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -704,7 +705,7 @@ export default function PodcastsTab() {
                             >
                                 <div className="w-12 h-12 rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
                                     {sub.artworkUrl
-                                        ? <img src={sub.artworkUrl} alt={sub.title} className="max-w-full max-h-full object-cover" />
+                                        ? <img src={secureImageUrl(sub.artworkUrl)} alt={sub.title} className="max-w-full max-h-full object-cover" />
                                         : <svg className="w-6 h-6 text-[var(--vora-text-disabled)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a9 9 0 00-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2a7 7 0 1114 0v2h-4v8h3c1.66 0 3-1.34 3-3v-7a9 9 0 00-9-9z" /></svg>}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -728,7 +729,7 @@ export default function PodcastsTab() {
                                 <div className="flex items-start gap-4 mb-6 pb-6 border-b border-[var(--vora-border-subtle)]">
                                     <div className="w-24 h-24 rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
                                         {selectedSub.artworkUrl
-                                            ? <img src={selectedSub.artworkUrl} alt={selectedSub.title} className="max-w-full max-h-full object-cover" />
+                                            ? <img src={secureImageUrl(selectedSub.artworkUrl)} alt={selectedSub.title} className="max-w-full max-h-full object-cover" />
                                             : <svg className="w-12 h-12 text-[var(--vora-text-disabled)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a9 9 0 00-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2a7 7 0 1114 0v2h-4v8h3c1.66 0 3-1.34 3-3v-7a9 9 0 00-9-9z" /></svg>}
                                     </div>
                                     <div className="flex-1">

@@ -1,7 +1,7 @@
 import type { ThemeManifest } from '../types';
 
 const velvetCanvasSvg =
-    "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%201600%201000'%3E%3Cdefs%3E%3CradialGradient%20id%3D'g'%20cx%3D'0.5'%20cy%3D'0.2'%20r%3D'0.85'%3E%3Cstop%20offset%3D'0%25'%20stop-color%3D'%23b91c1c'%20stop-opacity%3D'0.35'%2F%3E%3Cstop%20offset%3D'70%25'%20stop-color%3D'%231a0a0e'%20stop-opacity%3D'0'%2F%3E%3C%2FradialGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D'1600'%20height%3D'1000'%20fill%3D'%231a0a0e'%2F%3E%3Crect%20width%3D'1600'%20height%3D'1000'%20fill%3D'url(%23g)'%2F%3E%3C%2Fsvg%3E";
+    "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%201600%201000'%3E%3Cdefs%3E%3CradialGradient%20id%3D'g'%20cx%3D'0.5'%20cy%3D'0.2'%20r%3D'0.85'%3E%3Cstop%20offset%3D'0%25'%20stop-color%3D'%23b91c1c'%20stop-opacity%3D'0.35'%2F%3E%3Cstop%20offset%3D'70%25'%20stop-color%3D'%231a0a0e'%20stop-opacity%3D'0'%2F%3E%3C%2FradialGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D'1600'%20height%3D'1000'%20fill%3D'%231a0a0e'%2F%3E%3Crect%20width%3D'1600'%20height%3D'1000'%20fill%3D'url%28%23g%29'%2F%3E%3C%2Fsvg%3E";
 
 export const voraVelvet: ThemeManifest = {
     id: 'vora-velvet',

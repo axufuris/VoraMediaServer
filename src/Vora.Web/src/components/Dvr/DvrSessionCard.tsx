@@ -1,5 +1,6 @@
 import type { IptvRecordingSessionVM } from '../../api/Iptv/dvrService';
 import { dvrStatusClasses, dvrStatusLabel, isDvrPlayable, isDvrProcessing } from '../../utils/dvrDisplay';
+import { secureImageUrl } from '../../utils/secureImageUrl';
 
 interface DvrSessionCardProps {
     session: IptvRecordingSessionVM;
@@ -25,7 +26,7 @@ export default function DvrSessionCard({
             <div className="p-4 border-b border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)]/80 flex items-start gap-4">
                 <div className="w-16 h-12 bg-[var(--vora-bg-raised)] rounded flex items-center justify-center shrink-0 border border-[var(--vora-border-subtle)] p-1">
                     {session.schedule?.channel?.logoUrl ? (
-                        <img src={session.schedule.channel.logoUrl} className="max-w-full max-h-full object-contain" />
+                        <img src={secureImageUrl(session.schedule.channel.logoUrl)} className="max-w-full max-h-full object-contain" />
                     ) : (
                         <span className="text-[10px] text-[var(--vora-text-muted)] font-bold">No Logo</span>
                     )}

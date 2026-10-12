@@ -12,6 +12,7 @@ import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../util
 import { PlayPauseButton, SkipButton, VolumeControl, MaximizeButton, CloseButton } from './Controls/PlayerButtons';
 import RadioNowPlaying from './RadioNowPlaying';
 import PodcastNowPlaying from './PodcastNowPlaying';
+import { secureImageUrl } from '../../utils/secureImageUrl';
 
 export default function LiveRadioPlayer() {
     const { currentMedia, isPlaying, isMinimized, volume, togglePlayPause, setMinimized, closePlayer, setVolume, videoRef, playMedia, skipForward, skipBackward, seek, nextTrack, previousTrack, hasNext, hasPrevious, setFullscreen, isFullscreen } = usePlayer();
@@ -304,7 +305,7 @@ export default function LiveRadioPlayer() {
             id: channel.id,
             title: channel.name,
             subtitle: channel.groupTitle || 'Live Radio',
-            posterUrl: channel.logoUrl,
+            posterUrl: secureImageUrl(channel.logoUrl),
             streamUrl: channel.streamUrl,
             container: 'hls',
             playbackContextType: 'LiveRadio'
