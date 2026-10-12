@@ -40,11 +40,18 @@ public static class StreamingAdminEndpoints
         [FromQuery] int pageSize,
         [FromQuery] string? search,
         [FromQuery] Guid? profileId,
+        [FromQuery] string? libraryIds,
+        [FromQuery] string? streams,
         IStreamManager streamManager)
     {
-        var result = await streamManager.GetGroupedHistoryAsync(page, pageSize, search ?? string.Empty, profileId);
+        var libraries = SplitCsv(libraryIds).Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty).Where(id => id != Guid.Empty).ToList();
+        var deliveries = SplitCsv(streams).Select(s => Enum.TryParse<HistoryDelivery>(s, ignoreCase: true, out var delivery) ? delivery : (HistoryDelivery?)null).OfType<HistoryDelivery>().ToList();
+        var result = await streamManager.GetGroupedHistoryAsync(page, pageSize, search ?? string.Empty, profileId, libraries, deliveries);
         return Results.Ok(new StreamHistoryPageVM { Data = result.Data, Total = result.Total });
     }
+
+    private static string[] SplitCsv(string? csv) =>
+        string.IsNullOrWhiteSpace(csv) ? [] : csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private static async Task<IResult> GetSystemStatsAsync(IStreamManager streamManager, ISystemMetricRepository metricRepo)
     {

@@ -45,10 +45,28 @@ export interface HistorySessionDto {
     subSessions?: HistorySessionDto[];
 }
 
+export type HistoryDelivery = 'DirectPlay' | 'DirectStream' | 'Transcode';
+
+export interface HistoryQuery {
+    page: number;
+    pageSize: number;
+    search: string;
+    profileId?: string;
+    libraryIds?: string[];
+    deliveries?: HistoryDelivery[];
+}
+
 export const historyService = {
-    getHistory: async (page: number, pageSize: number, search: string, profileId?: string, serverId?: string): Promise<{ data: HistorySessionDto[], total: number }> => {
+    getHistory: async (query: HistoryQuery, serverId?: string): Promise<{ data: HistorySessionDto[], total: number }> => {
         const response = await apiClient.get<{ data: HistorySessionDto[], total: number }>('/streaming/admin/history', {
-            params: { page, pageSize, search, profileId: profileId || undefined },
+            params: {
+                page: query.page,
+                pageSize: query.pageSize,
+                search: query.search,
+                profileId: query.profileId || undefined,
+                libraryIds: query.libraryIds?.join(',') || undefined,
+                streams: query.deliveries?.join(',') || undefined,
+            },
             serverId
         });
         return response.data;

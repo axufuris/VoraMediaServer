@@ -17,7 +17,7 @@ public interface IStreamManager
     Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
     Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
     Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null);
-    Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search, Guid? profileId = null);
+    Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search, Guid? profileId = null, IReadOnlyCollection<Guid>? libraryIds = null, IReadOnlyCollection<HistoryDelivery>? deliveries = null);
     Task PingSessionAsync(Guid sessionId, double currentPosition, double duration, bool isPaused);
     Task<List<NowPlayingSessionDto>> GetNowPlayingSessionsAsync();
     Task StopSessionAsync(Guid sessionId);
@@ -243,7 +243,7 @@ public class StreamManager : IStreamManager
         return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}");
     }
 
-    public async Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search, Guid? profileId = null)
+    public async Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search, Guid? profileId = null, IReadOnlyCollection<Guid>? libraryIds = null, IReadOnlyCollection<HistoryDelivery>? deliveries = null)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
         var query = new StreamHistoryQuery(
@@ -251,7 +251,9 @@ public class StreamManager : IStreamManager
             Math.Clamp(pageSize, 1, 200),
             search,
             profileId,
-            ScheduleClock.Resolve(settings.ScheduleTimeZone));
+            ScheduleClock.Resolve(settings.ScheduleTimeZone),
+            libraryIds ?? [],
+            deliveries ?? []);
         return await _repository.GetGroupedHistoryAsync(query);
     }
 

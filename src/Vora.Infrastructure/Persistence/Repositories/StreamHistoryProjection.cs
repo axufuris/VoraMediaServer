@@ -21,30 +21,44 @@ internal static class StreamHistoryProjection
     public static async Task<(List<HistorySessionDto> Data, int Total)> LoadAsync(VoraDbContext context, StreamHistoryQuery query)
     {
         var zoneId = PostgresZoneId(query.TimeZone);
-        var baseQuery = BuildHistoryBaseQuery(context, query.Search, query.ProfileId);
+        var baseQuery = BuildHistoryBaseQuery(context, query);
 
-        var keysQuery = baseQuery
-            .Select(s => new HistoryGroupKey
+        var groupsQuery = baseQuery
+            .GroupBy(s => new
             {
                 Date = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(s.StartedAt, zoneId).Date,
                 ProfileId = s.UserProfileId,
                 DeviceId = s.ClientDevice != null ? s.ClientDevice.DeviceId : null,
-                MediaItemId = s.MediaItemId
+                s.MediaItemId
             })
-            .Distinct();
+            .Select(g => new
+            {
+                g.Key.Date,
+                g.Key.ProfileId,
+                g.Key.DeviceId,
+                g.Key.MediaItemId,
+                Latest = g.Max(s => s.StartedAt)
+            });
 
-        var totalCount = await keysQuery.CountAsync();
+        var totalCount = await groupsQuery.CountAsync();
 
-        var pagedKeys = await keysQuery
-            .OrderByDescending(k => k.Date)
+        var pagedGroups = await groupsQuery
+            .OrderByDescending(g => g.Latest)
+            .ThenBy(g => g.MediaItemId)
+            .ThenBy(g => g.ProfileId)
+            .ThenBy(g => g.DeviceId)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToListAsync();
 
-        if (pagedKeys.Count == 0)
+        if (pagedGroups.Count == 0)
         {
-            return (new List<HistorySessionDto>(), 0);
+            return (new List<HistorySessionDto>(), totalCount);
         }
+
+        var pagedKeys = pagedGroups
+            .Select(g => new HistoryGroupKey { Date = g.Date, ProfileId = g.ProfileId, DeviceId = g.DeviceId, MediaItemId = g.MediaItemId })
+            .ToList();
 
         var rawData = await LoadRawSessionDataAsync(baseQuery, pagedKeys, query.TimeZone);
 
@@ -79,28 +93,49 @@ internal static class StreamHistoryProjection
                 DeviceId = s.ClientDevice?.DeviceId,
                 MediaItemId = s.MediaItemId
             })
-            .Select(g => BuildHistoryDto(g.OrderByDescending(x => x.StartedAt).ToList(), showInfo))
-            .OrderByDescending(x => DateTime.Parse(x.StartedAt))
+            .Select(g => g.OrderByDescending(x => x.StartedAt).ToList())
+            .OrderByDescending(sessions => sessions[0].StartedAt)
+            .ThenBy(sessions => sessions[0].MediaItemId)
+            .Select(sessions => BuildHistoryDto(sessions, showInfo))
             .ToList();
 
         return (grouped, totalCount);
     }
 
-    private static IQueryable<StreamSession> BuildHistoryBaseQuery(VoraDbContext context, string search, Guid? profileId)
+    private static readonly string[] DirectStreamStrategies = ["Copy", "Remux", "DirectStream"];
+
+    private static IQueryable<StreamSession> BuildHistoryBaseQuery(VoraDbContext context, StreamHistoryQuery filter)
     {
         var query = context.StreamSessions.AsNoTracking();
 
-        if (profileId.HasValue)
+        if (filter.ProfileId is { } profileId)
         {
-            query = query.Where(s => s.UserProfileId == profileId.Value);
+            query = query.Where(s => s.UserProfileId == profileId);
         }
 
-        if (string.IsNullOrWhiteSpace(search))
+        if (filter.LibraryIds.Count > 0)
+        {
+            var libraryIds = filter.LibraryIds.ToList();
+            query = query.Where(s => libraryIds.Contains(s.MediaItem.LibraryId));
+        }
+
+        if (filter.Deliveries.Count > 0)
+        {
+            var directPlay = filter.Deliveries.Contains(HistoryDelivery.DirectPlay);
+            var directStream = filter.Deliveries.Contains(HistoryDelivery.DirectStream);
+            var transcode = filter.Deliveries.Contains(HistoryDelivery.Transcode);
+            query = query.Where(s =>
+                (directPlay && s.Strategy == "DirectPlay")
+                || (directStream && DirectStreamStrategies.Contains(s.Strategy))
+                || (transcode && s.Strategy == "Transcode"));
+        }
+
+        if (string.IsNullOrWhiteSpace(filter.Search))
         {
             return query;
         }
 
-        var searchPattern = $"%{search}%";
+        var searchPattern = $"%{filter.Search}%";
         return query.Where(s =>
             EF.Functions.ILike(s.MediaItem.Title, searchPattern)
             || (s.ClientDevice != null && EF.Functions.ILike(s.ClientDevice.DeviceName, searchPattern))

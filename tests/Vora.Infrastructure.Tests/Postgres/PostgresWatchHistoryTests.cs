@@ -18,11 +18,12 @@ public class PostgresWatchHistoryTests(PostgresDatabase database) : IClassFixtur
         public Guid MovieId { get; } = Guid.NewGuid();
         public Guid AdminProfileId { get; } = Guid.NewGuid();
         public Guid KidsProfileId { get; } = Guid.NewGuid();
+        public Guid LibraryId { get; } = Guid.NewGuid();
         private string Tag => MovieId.ToString("N")[..8];
 
         public async Task SeedAsync(VoraDbContext db)
         {
-            var library = new MediaLibrary { Name = "Movies " + MovieId.ToString("N")[..6], Type = LibraryType.Movie, FolderPaths = new List<string> { "/movies" } };
+            var library = new MediaLibrary { Id = LibraryId, Name = "Movies " + MovieId.ToString("N")[..6], Type = LibraryType.Movie, FolderPaths = new List<string> { "/movies" } };
             var movie = new Movie { Id = MovieId, Title = $"Spider-Man: Brand New Day {Tag}", LibraryId = library.Id };
             var part = new MediaPart { FilePath = "/movies/spider-man.mkv", MediaItemId = movie.Id, Duration = TimeSpan.FromSeconds(8700) };
             var account = new User { Email = $"{MovieId:N}@example.com", DisplayName = "Andy" };
@@ -31,14 +32,14 @@ public class PostgresWatchHistoryTests(PostgresDatabase database) : IClassFixtur
             var device = new ClientDevice { DeviceId = "web-" + MovieId.ToString("N")[..6], ClientName = "Vora Web", DeviceName = "Web Browser", LastIpAddress = "192.168.0.1" };
             db.AddRange(library, movie, part, account, admin, kids, device);
 
-            StreamSession Session(Guid profileId, DateTime startedUtc, double minutes, double pausedSeconds, double start, double end) => new()
+            StreamSession Session(Guid profileId, DateTime startedUtc, double minutes, double pausedSeconds, double start, double end, string strategy = "DirectPlay") => new()
             {
                 MediaItemId = movie.Id,
                 MediaPartId = part.Id,
                 UserId = account.Id,
                 UserProfileId = profileId,
                 ClientDeviceId = device.Id,
-                Strategy = "DirectPlay",
+                Strategy = strategy,
                 VideoStrategy = "DirectPlay",
                 AudioStrategy = "DirectPlay",
                 SubtitleStrategy = "None",
@@ -53,12 +54,14 @@ public class PostgresWatchHistoryTests(PostgresDatabase database) : IClassFixtur
             db.AddRange(
                 Session(AdminProfileId, new DateTime(2026, 10, 6, 3, 16, 54, DateTimeKind.Utc), 158.5, 1314, 0, 8699),
                 Session(AdminProfileId, new DateTime(2026, 10, 6, 15, 58, 27, DateTimeKind.Utc), 2.5, 136, 0, 6),
-                Session(KidsProfileId, new DateTime(2026, 10, 6, 16, 4, 56, DateTimeKind.Utc), 2.5, 9, 0, 4288));
+                Session(KidsProfileId, new DateTime(2026, 10, 6, 16, 4, 56, DateTimeKind.Utc), 2.5, 9, 0, 4288, "Transcode"));
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        public Task<(List<Application.Streaming.Dtos.HistorySessionDto> Data, int Total)> HistoryAsync(VoraDbContext db, TimeZoneInfo zone, Guid? profileId = null) =>
-            new StreamRepository(db).GetGroupedHistoryAsync(new StreamHistoryQuery(1, 25, Tag, profileId, zone));
+        public Task<(List<Application.Streaming.Dtos.HistorySessionDto> Data, int Total)> HistoryAsync(
+            VoraDbContext db, TimeZoneInfo zone, Guid? profileId = null, int page = 1, int pageSize = 25,
+            IReadOnlyCollection<Guid>? libraryIds = null, IReadOnlyCollection<HistoryDelivery>? deliveries = null) =>
+            new StreamRepository(db).GetGroupedHistoryAsync(new StreamHistoryQuery(page, pageSize, Tag, profileId, zone, libraryIds ?? [], deliveries ?? []));
     }
 
     [Fact]
@@ -118,5 +121,48 @@ public class PostgresWatchHistoryTests(PostgresDatabase database) : IClassFixtur
 
         var (everyone, _) = await world.HistoryAsync(db, Chicago);
         everyone.Select(r => r.UserName).Should().BeEquivalentTo(["AX Media Server", "AX Media Server", "Kids"]);
+    }
+
+    [Fact]
+    public async Task Pages_hold_the_most_recent_rows_first_and_report_the_full_total()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        await using var db = database.NewContext();
+        var world = new World();
+        await world.SeedAsync(db);
+
+        var (first, firstTotal) = await world.HistoryAsync(db, Chicago, page: 1, pageSize: 2);
+        var (second, secondTotal) = await world.HistoryAsync(db, Chicago, page: 2, pageSize: 2);
+        var (beyond, beyondTotal) = await world.HistoryAsync(db, Chicago, page: 3, pageSize: 2);
+
+        firstTotal.Should().Be(3);
+        secondTotal.Should().Be(3);
+        beyondTotal.Should().Be(3);
+        first.Select(r => (r.UserName, r.StartedAt[..16])).Should().Equal(("Kids", "2026-10-06T16:04"), ("AX Media Server", "2026-10-06T15:58"));
+        second.Select(r => (r.UserName, r.StartedAt[..16])).Should().Equal(("AX Media Server", "2026-10-06T03:16"));
+        beyond.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task How_a_title_was_played_and_which_library_it_is_in_are_filtered_before_paging()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        await using var db = database.NewContext();
+        var world = new World();
+        await world.SeedAsync(db);
+
+        var (transcodes, transcodeTotal) = await world.HistoryAsync(db, Chicago, deliveries: [HistoryDelivery.Transcode]);
+        var (direct, directTotal) = await world.HistoryAsync(db, Chicago, deliveries: [HistoryDelivery.DirectPlay, HistoryDelivery.DirectStream]);
+        var (otherLibrary, otherTotal) = await world.HistoryAsync(db, Chicago, libraryIds: [Guid.NewGuid()]);
+        var (ownLibrary, ownTotal) = await world.HistoryAsync(db, Chicago, libraryIds: [world.LibraryId]);
+
+        transcodeTotal.Should().Be(1);
+        transcodes.Single().UserName.Should().Be("Kids");
+        directTotal.Should().Be(2);
+        direct.Should().OnlyContain(r => r.UserName == "AX Media Server");
+        otherTotal.Should().Be(0);
+        otherLibrary.Should().BeEmpty();
+        ownTotal.Should().Be(3);
+        ownLibrary.Should().HaveCount(3);
     }
 }
