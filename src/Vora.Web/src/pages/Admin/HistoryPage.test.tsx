@@ -125,4 +125,29 @@ describe('HistoryPage', () => {
         expect(await screen.findByText('No matching history found.')).toBeInTheDocument();
         expect(mocks.getHistory.mock.calls.length).toBe(calls + 2);
     });
+
+    it('leads an episode with its show, with the episode number and title beneath', async () => {
+        mocks.getHistory.mockResolvedValue({
+            data: [{ ...row('Andy', 'Andy'), id: 'ep', title: 'Ooze', showTitle: 'Haunted Hotel', seasonNumber: 2, episodeNumber: 1, mediaType: 'TvShow' }],
+            total: 1,
+        });
+
+        render(<MemoryRouter><HistoryPage /></MemoryRouter>);
+
+        const show = await screen.findByText('Haunted Hotel');
+        const episode = screen.getByText('S02E01 · Ooze');
+        expect(show.compareDocumentPosition(episode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('puts the location under the address', async () => {
+        mocks.getHistory.mockResolvedValue({
+            data: [{ ...row('Andy', 'Andy'), ipAddress: '67.199.253.6', location: 'Salt Lake City, UT, US' }],
+            total: 1,
+        });
+
+        render(<MemoryRouter><HistoryPage /></MemoryRouter>);
+
+        const address = await screen.findByText('67.199.253.6');
+        expect(within(address.parentElement as HTMLElement).getByText('Salt Lake City, UT, US')).toBeInTheDocument();
+    });
 });

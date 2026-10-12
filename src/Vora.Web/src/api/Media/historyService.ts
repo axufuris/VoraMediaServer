@@ -6,6 +6,7 @@ export interface HistorySessionDto {
     userName: string;
     accountName?: string;
     ipAddress: string;
+    location?: string | null;
     platform: string;
     product: string;
     player: string;
