@@ -36,6 +36,7 @@ import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
 import { audioChipLabel, heroFactsLine, pickChipAudioTrack, resolutionChipLabel, subtitleChipLabel } from '../../../utils/heroQualityChips';
 import { formatDate, serverTimeMs, yearOf } from '../../../utils/serverTime';
 import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
+import { errorDetail, isMissingOrForbidden } from '../../../utils/apiError';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -65,6 +66,7 @@ export default function MediaDetailsPage() {
 
     const [media, setMedia] = useState<MediaItem | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadFailure, setLoadFailure] = useState<string | null>(null);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
@@ -154,11 +156,14 @@ export default function MediaDetailsPage() {
             .then(data => {
                 if (isMounted) {
                     setMedia(data);
+                    setLoadFailure(null);
                     setLoading(false);
                 }
             })
-            .catch(() => {
-                if (isMounted) setLoading(false);
+            .catch((error: unknown) => {
+                if (!isMounted) return;
+                setLoadFailure(isMissingOrForbidden(error) ? null : errorDetail(error, "The server couldn't load this title"));
+                setLoading(false);
             });
 
         return () => { isMounted = false; };
@@ -457,7 +462,9 @@ export default function MediaDetailsPage() {
         );
     }
     if (!media) {
-        return (
+        return loadFailure ? (
+            <EmptyState title="Couldn't load this title" description={loadFailure} />
+        ) : (
             <EmptyState
                 title="Media not found"
                 description="This title doesn't exist or you don't have access to it."

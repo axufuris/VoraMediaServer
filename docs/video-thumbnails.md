@@ -4,7 +4,11 @@ Scrub-bar preview thumbnails for the video player, analogous to Plex's hover thu
 
 ## Storage
 
-Configured via `StoragePaths:VideoThumbnails` (env var `StoragePaths__VideoThumbnails`). Defaults to `<AppContext.BaseDirectory>/video-thumbnails`; in Docker it lives at `/app/data/video-thumbnails` under the existing `./Vora-data:/app/data` volume so the cache survives container rebuilds. **No new Docker volume is required.**
+Configured via `StoragePaths:VideoThumbnails` (env var `StoragePaths__VideoThumbnails`); in Docker it lives at `/app/data/video-thumbnails` under the existing `./Vora-data:/app/data` volume so the cache survives container rebuilds. **No new Docker volume is required.**
+
+**Unset is a normal case**, because the README's install examples did not list this path. `StorageRoots.VideoThumbnails` then puts the folder beside the storage paths that are configured (`StorageRoots.DataFolder`, the parent of `CustomArtwork` and its siblings), and only falls back to `<AppContext.BaseDirectory>/video-thumbnails` when nothing is configured or that folder already exists. In Docker the app folder is `/app`, which the server's user cannot write to. `StorageRoots.Logs`, `Backups` and `DataProtection` resolve the same way.
+
+`VideoThumbnailStorageService` is a constructor dependency of `MediaManager`, so its constructor **must not throw**: when it did, an unwritable folder took every media details and library page down with it. It now logs an error and thumbnail generation fails on its own. The global exception handler also answers a file-system "permission denied" (`UnauthorizedAccessException` wrapping an `IOException`) with 500, not the 403 it gives a caller who is not allowed, so the web app reports a server error instead of "you don't have access".
 
 Per-item directory, sharded by the first two hex chars of the GUID, with **one sprite set per cut** stored under the owning ("source") part's id:
 

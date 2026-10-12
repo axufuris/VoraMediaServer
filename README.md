@@ -107,7 +107,12 @@ docker run -d \
   -e StoragePaths__EpgCache=/app/data/iptv/epg_cache \
   -e StoragePaths__IptvDvr=/app/data/iptv/dvr \
   -e StoragePaths__UserImages=/app/data/users \
-  -e StoragePaths__Plugins=/app/data/plugins   -e StoragePaths__Subtitles=/app/data/subtitles \
+  -e StoragePaths__Plugins=/app/data/plugins \
+  -e StoragePaths__Subtitles=/app/data/subtitles \
+  -e StoragePaths__VideoThumbnails=/app/data/video-thumbnails \
+  -e StoragePaths__Logs=/app/data/logs \
+  -e StoragePaths__Backups=/app/data/backups \
+  -e StoragePaths__DataProtection=/app/data/dp-keys \
   -v /srv/vora/data:/app/data \
   -v /mnt/media/movies:/media/movies:ro \
   -v /mnt/media/shows:/media/shows:ro \
@@ -149,9 +154,14 @@ Key environment variables:
   → Scanning → Schedule Time Zone**, which overrides it.
 - `StoragePaths__*` — locations inside the container for
   user-uploaded artwork, the original-artwork download cache, the IPTV
-  EPG cache, DVR recordings, user profile images, and uploaded
-  plugins. Keep them all under one mounted volume so a single backup
-  covers everything. Transcoder scratch (HLS segments, IPTV timeshift)
+  EPG cache, DVR recordings, user profile images, uploaded plugins,
+  downloaded subtitles, scrub-bar thumbnails, log files, backups and
+  the keys that protect the saved SMTP password. Keep them all under
+  one mounted volume so a single backup covers everything. The app's
+  own folder (`/app`) is not writable, so a path must never point
+  there. If thumbnails, logs, backups or the keys are left out, Vora
+  puts them in the same folder as the paths you did set. Transcoder
+  scratch (HLS segments, IPTV timeshift)
   lives under `/transcode` and is configured separately through the
   admin UI — that path should be a fast local disk or tmpfs.
   The server also writes a **resized-artwork cache** under
@@ -207,6 +217,10 @@ services:
       StoragePaths__UserImages: /app/data/users
       StoragePaths__Plugins: /app/data/plugins
       StoragePaths__Subtitles: /app/data/subtitles
+      StoragePaths__VideoThumbnails: /app/data/video-thumbnails
+      StoragePaths__Logs: /app/data/logs
+      StoragePaths__Backups: /app/data/backups
+      StoragePaths__DataProtection: /app/data/dp-keys
     volumes:
       - /srv/vora/data:/app/data
       - /srv/vora/transcode:/transcode
@@ -331,6 +345,10 @@ Apply, then wait for the container to go green in the Docker tab.
 | Variable: `StoragePaths__UserImages` | `/app/data/users` |
 | Variable: `StoragePaths__Plugins` | `/app/data/plugins` |
 | Variable: `StoragePaths__Subtitles` | `/app/data/subtitles` |
+| Variable: `StoragePaths__VideoThumbnails` | `/app/data/video-thumbnails` |
+| Variable: `StoragePaths__Logs` | `/app/data/logs` |
+| Variable: `StoragePaths__Backups` | `/app/data/backups` |
+| Variable: `StoragePaths__DataProtection` | `/app/data/dp-keys` |
 | Path: `/transcode` | `/mnt/user/appdata/vora-transcode` (or a fast scratch disk) |
 
 `PUID=99` / `PGID=100` are Unraid's `nobody:users`, which own
@@ -521,6 +539,10 @@ provider keys:
       StoragePaths__UserImages: /app/data/users
       StoragePaths__Plugins: /app/data/plugins
       StoragePaths__Subtitles: /app/data/subtitles
+      StoragePaths__VideoThumbnails: /app/data/video-thumbnails
+      StoragePaths__Logs: /app/data/logs
+      StoragePaths__Backups: /app/data/backups
+      StoragePaths__DataProtection: /app/data/dp-keys
 
       # Metadata + artwork
       Vora__PluginSettings__tmdb_metadata__api_key: "YOUR_TMDB_API_KEY"

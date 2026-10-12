@@ -118,7 +118,7 @@ public sealed partial class UnusedFileManager : IUnusedFileManager
         {
             artworkRoot, profileRoot, _videoThumbnails.RootDirectory, subtitleRoot, originalRoot, pluginRoot, backupRoot, recordingRoot,
             StreamManager.ResolveTempDirectory(settings), StorageRoots.AudioFingerprints(_paths),
-            _paths.Logs, _paths.DataProtection, _paths.EpgCache, _paths.Metadata
+            StorageRoots.Logs(_paths), StorageRoots.DataProtection(_paths), _paths.EpgCache, _paths.Metadata
         };
 
         var groups = new List<UnusedGroup>();

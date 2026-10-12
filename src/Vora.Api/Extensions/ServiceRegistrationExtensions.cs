@@ -194,18 +194,10 @@ public static class ServiceRegistrationExtensions
     {
         var storagePaths = ReadStoragePaths(configuration);
 
-        var backupsDir = storagePaths.Backups;
-        if (string.IsNullOrWhiteSpace(backupsDir))
-        {
-            backupsDir = Path.Combine(AppContext.BaseDirectory, "backups");
-        }
+        var backupsDir = Vora.Application.Settings.StorageRoots.Backups(storagePaths);
         Directory.CreateDirectory(backupsDir);
 
-        var dpDir = storagePaths.DataProtection;
-        if (string.IsNullOrWhiteSpace(dpDir))
-        {
-            dpDir = Path.Combine(AppContext.BaseDirectory, "DataProtectionKeys");
-        }
+        var dpDir = Vora.Application.Settings.StorageRoots.DataProtection(storagePaths);
 
         services.AddSingleton(new Vora.Application.Backups.BackupManagerOptions
         {
@@ -274,10 +266,7 @@ public static class ServiceRegistrationExtensions
     private static WebApplicationBuilder AddVoraLogging(this WebApplicationBuilder builder)
     {
         var storagePaths = ReadStoragePaths(builder.Configuration);
-        var configuredLogDir = storagePaths.Logs;
-        var logDir = !string.IsNullOrWhiteSpace(configuredLogDir)
-            ? configuredLogDir
-            : Path.Combine(AppContext.BaseDirectory, "logs");
+        var logDir = Vora.Application.Settings.StorageRoots.Logs(storagePaths);
         Directory.CreateDirectory(logDir);
 
         var bufferCapacity = builder.Configuration.GetValue<int?>("Logging:Vora:BufferCapacity") ?? 10_000;
@@ -639,10 +628,7 @@ public static class ServiceRegistrationExtensions
     private static IServiceCollection AddVoraEmail(this IServiceCollection services, IConfiguration configuration)
     {
         var storagePaths = ReadStoragePaths(configuration);
-        var configuredKeyPath = storagePaths.DataProtection;
-        var keyPath = !string.IsNullOrWhiteSpace(configuredKeyPath)
-            ? configuredKeyPath
-            : Path.Combine(AppContext.BaseDirectory, "DataProtectionKeys");
+        var keyPath = Vora.Application.Settings.StorageRoots.DataProtection(storagePaths);
 
         Directory.CreateDirectory(keyPath);
 

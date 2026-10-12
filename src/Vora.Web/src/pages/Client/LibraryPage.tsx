@@ -15,6 +15,7 @@ import LetterRail from '../../components/Client/Primitives/LetterRail';
 import { StorageKeys } from '../../utils/storageKeys';
 import { recentlyAddedTime } from '../../utils/recentlyAdded';
 import { yearOf } from '../../utils/serverTime';
+import { errorDetail, isMissingOrForbidden } from '../../utils/apiError';
 import LibraryCollectionGrid from '../../components/Collections/LibraryCollectionGrid';
 
 type LibraryTabKey = 'library' | 'collections' | 'recommendations';
@@ -419,6 +420,7 @@ export default function LibraryPage() {
     const visibleCollections = useMemo(() => collections.filter(c => !c.hiddenReason), [collections]);
     const [library, setLibrary] = useState<MediaLibrary | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadFailure, setLoadFailure] = useState<string | null>(null);
 
     const [providers, setProviders] = useState<string[]>([]);
     const [loadingProviders, setLoadingProviders] = useState(false);
@@ -465,6 +467,7 @@ export default function LibraryPage() {
             ]);
 
             setLibrary(libData);
+            setLoadFailure(null);
             setCollections(collectionData);
 
             const sorted = [...mediaData].sort((a, b) => {
@@ -475,6 +478,7 @@ export default function LibraryPage() {
             setItems(sorted);
         } catch (error) {
             console.error(error);
+            setLoadFailure(isMissingOrForbidden(error) ? null : errorDetail(error, "The server couldn't load this library"));
         } finally {
             if (!silent) setLoading(false);
         }
@@ -694,7 +698,9 @@ export default function LibraryPage() {
         );
     }
     if (!library) {
-        return (
+        return loadFailure ? (
+            <EmptyState title="Couldn't load this library" description={loadFailure} />
+        ) : (
             <EmptyState
                 title="Library not found"
                 description="The library you tried to open doesn't exist or you don't have access to it."

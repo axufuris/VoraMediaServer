@@ -29,6 +29,12 @@ export function errorDetail(error: unknown, fallback: string): string {
     return reason ? `${fallback}: ${reason}` : fallback;
 }
 
+export function isMissingOrForbidden(error: unknown): boolean {
+    if (!axios.isAxiosError(error)) return false;
+    const status = error.response?.status;
+    return status === 404 || status === 403;
+}
+
 export function resolveReason(error: unknown): string | undefined {
     if (axios.isAxiosError(error)) {
         const data: unknown = error.response?.data;

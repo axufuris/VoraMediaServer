@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { AxiosError, AxiosHeaders } from 'axios';
-import { errorDetail, resolveReason } from './apiError';
+import { errorDetail, isMissingOrForbidden, resolveReason } from './apiError';
 
 // Adding a collection poster by URL failed with a fixed "Failed to add URL"
 // while the server had answered 400 with the exact reason in ProblemDetails.
@@ -71,5 +71,21 @@ describe('building the message shown to the viewer', () => {
 
     it('does not append an empty reason as a dangling colon', () => {
         expect(errorDetail(undefined, 'Failed to add URL')).toBe('Failed to add URL');
+    });
+});
+
+describe('telling a missing page from a failed one', () => {
+    it('treats 404 and 403 as missing or not allowed', () => {
+        expect(isMissingOrForbidden(problem({ title: 'Not found' }, 404))).toBe(true);
+        expect(isMissingOrForbidden(problem({ title: 'Forbidden' }, 403))).toBe(true);
+    });
+
+    it('treats a server error as a failure', () => {
+        expect(isMissingOrForbidden(problem({ title: 'Internal server error' }, 500))).toBe(false);
+    });
+
+    it('treats a request that never got an answer as a failure', () => {
+        expect(isMissingOrForbidden(new AxiosError('Network Error', 'ERR_NETWORK'))).toBe(false);
+        expect(isMissingOrForbidden(new Error('boom'))).toBe(false);
     });
 });

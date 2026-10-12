@@ -13,11 +13,17 @@ public class VideoThumbnailStorageService : IVideoThumbnailStorageService
     public VideoThumbnailStorageService(IOptions<StoragePathsOptions> storagePaths, ILogger<VideoThumbnailStorageService> logger)
     {
         _logger = logger;
-        var configured = storagePaths.Value.VideoThumbnails;
-        RootDirectory = !string.IsNullOrWhiteSpace(configured)
-            ? configured
-            : Path.Combine(AppContext.BaseDirectory, "video-thumbnails");
-        Directory.CreateDirectory(RootDirectory);
+        RootDirectory = StorageRoots.VideoThumbnails(storagePaths.Value);
+        try
+        {
+            Directory.CreateDirectory(RootDirectory);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogError(ex,
+                "The video thumbnails folder {Path} can't be created, so scrub-bar thumbnails won't be generated. Set StoragePaths__VideoThumbnails to a folder the server can write to.",
+                RootDirectory);
+        }
     }
 
     public string GetItemDirectory(Guid mediaItemId)
