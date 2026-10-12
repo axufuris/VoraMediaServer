@@ -222,6 +222,48 @@ public partial class MediaRepository : IMediaRepository
             .FirstOrDefaultAsync();
     }
 
+    public async Task<int> SetEpisodeEndNumbersAsync(Guid libraryId, IReadOnlyDictionary<string, int> lastEpisodeByFile)
+    {
+        if (lastEpisodeByFile.Count == 0) return 0;
+
+        var paths = lastEpisodeByFile.Keys.ToList();
+        var parts = await _context.MediaParts
+            .AsNoTracking()
+            .Where(p => p.MediaItemId != null && paths.Contains(p.FilePath) && p.MediaItem != null && p.MediaItem.LibraryId == libraryId)
+            .Select(p => new { p.FilePath, p.MediaItemId })
+            .ToListAsync();
+
+        var lastByEpisode = parts
+            .GroupBy(p => p.MediaItemId.GetValueOrDefault())
+            .ToDictionary(g => g.Key, g => g.Max(p => lastEpisodeByFile[p.FilePath]));
+        var episodeIds = lastByEpisode.Keys.ToList();
+
+        var episodes = await _context.Set<Episode>()
+            .Where(e => episodeIds.Contains(e.Id))
+            .ToListAsync();
+
+        var updated = 0;
+        foreach (var episode in episodes)
+        {
+            var last = lastByEpisode[episode.Id];
+            if (last <= episode.EpisodeNumber || episode.EndEpisodeNumber == last) continue;
+            episode.EndEpisodeNumber = last;
+            updated++;
+        }
+
+        if (updated > 0) await _context.SaveChangesAsync();
+        return updated;
+    }
+
+    public async Task WidenEpisodeRangeAsync(Guid episodeId, int endEpisodeNumber)
+    {
+        var episode = await _context.Set<Episode>().FirstOrDefaultAsync(e => e.Id == episodeId);
+        if (episode == null || endEpisodeNumber <= episode.EpisodeNumber || episode.EndEpisodeNumber >= endEpisodeNumber) return;
+
+        episode.EndEpisodeNumber = endEpisodeNumber;
+        await _context.SaveChangesAsync();
+    }
+
     public async Task<HashSet<string>> GetExistingLibraryPathsAsync(Guid libraryId)
     {
         var existingPaths = await _context.MediaParts

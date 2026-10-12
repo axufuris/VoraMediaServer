@@ -84,6 +84,15 @@ public class MediaIngestionService : IMediaIngestionService
     public Task<HashSet<string>> GetExistingLibraryPathsAsync(LibraryHandle library) =>
         _repository.GetExistingLibraryPathsAsync(library.Value);
 
+    public async Task SetEpisodeRangesAsync(LibraryHandle library, IReadOnlyDictionary<string, int> lastEpisodeByFile)
+    {
+        var updated = await _repository.SetEpisodeEndNumbersAsync(library.Value, lastEpisodeByFile);
+        if (updated > 0)
+        {
+            _logger.LogInformation("Recorded the episode range of {Count} multi-episode file(s) in library {LibraryId}.", updated, library.Value);
+        }
+    }
+
     public Task<List<string>> GetLibraryItemFilePathsAsync(LibraryHandle library) =>
         _repository.GetLibraryItemFilePathsAsync(library.Value);
 
@@ -206,7 +215,14 @@ public class MediaIngestionService : IMediaIngestionService
         var libraryId = library.Value;
         var seasonId = season.Value;
         var episodeId = await _repository.GetEpisodeIdByNumberAsync(seasonId, episodeNumber);
-        if (episodeId.HasValue) return new MediaItemHandle(episodeId.Value);
+        if (episodeId.HasValue)
+        {
+            if (endEpisodeNumber > episodeNumber)
+            {
+                await _repository.WidenEpisodeRangeAsync(episodeId.Value, endEpisodeNumber.Value);
+            }
+            return new MediaItemHandle(episodeId.Value);
+        }
 
         var episode = new Episode
         {

@@ -290,6 +290,41 @@ public class LibraryManagerTests
     }
 
     [Fact]
+    public async Task A_new_tv_library_gets_the_pattern_that_reads_multi_episode_files()
+    {
+        Domain.Entities.Library.MediaLibrary? saved = null;
+        _repo.CreateLibraryAsync(Arg.Do<Domain.Entities.Library.MediaLibrary>(l => saved = l)).Returns(Guid.NewGuid());
+
+        await _manager.CreateLibraryAsync(new CreateLibraryRequest { Name = "Shows", Type = LibraryType.TvShow });
+
+        saved?.ScannerRegex.Should().Be(Vora.Plugins.Providers.Local.LocalScannerPatterns.TvEpisode);
+    }
+
+    [Fact]
+    public async Task Saving_a_tv_library_that_kept_an_old_default_pattern_moves_it_to_the_current_one()
+    {
+        const string oldDefault = @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*(?<Absolute>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$";
+        var library = new Domain.Entities.Library.MediaLibrary { Id = Guid.NewGuid(), Name = "Shows", Type = LibraryType.TvShow, ScannerRegex = oldDefault, FolderPaths = new List<string> { "/media/tv" } };
+        _repo.GetForUpdateAsync(library.Id).Returns(library);
+
+        await _manager.UpdateLibraryAsync(library.Id, new UpdateLibraryRequest { Name = "Shows", FolderPaths = new List<string> { "/media/tv" }, ScannerRegex = oldDefault });
+
+        library.ScannerRegex.Should().Be(Vora.Plugins.Providers.Local.LocalScannerPatterns.TvEpisode);
+    }
+
+    [Fact]
+    public async Task A_tv_librarys_own_pattern_is_kept()
+    {
+        const string custom = @"(?<Season>\d+)x(?<Episode>\d+) - (?<EpisodeTitle>.*)";
+        var library = new Domain.Entities.Library.MediaLibrary { Id = Guid.NewGuid(), Name = "Shows", Type = LibraryType.TvShow, FolderPaths = new List<string> { "/media/tv" } };
+        _repo.GetForUpdateAsync(library.Id).Returns(library);
+
+        await _manager.UpdateLibraryAsync(library.Id, new UpdateLibraryRequest { Name = "Shows", FolderPaths = new List<string> { "/media/tv" }, ScannerRegex = custom });
+
+        library.ScannerRegex.Should().Be(custom);
+    }
+
+    [Fact]
     public async Task Libraries_are_listed_alphabetically_whatever_order_they_were_added_in()
     {
         _repo.GetAllProjectedAsync(Arg.Any<System.Linq.Expressions.Expression<Func<Vora.Domain.Entities.Library.MediaLibrary, Vora.Application.Libraries.ViewModels.LibrarySummaryVM>>>(), true, Arg.Any<List<Guid>>())

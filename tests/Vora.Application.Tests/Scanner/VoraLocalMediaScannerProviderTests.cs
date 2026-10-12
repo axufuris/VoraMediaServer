@@ -425,6 +425,83 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
             Arg.Any<string?>());
     }
 
+    [Theory]
+    [InlineData("Ghosts (US) (2021) - S05E09-E10 - Its a Wonderful Christmas Carol [HDTV-720p][AAC 2.0][x264]-NGP.mkv", 9, 10, "Its a Wonderful Christmas Carol")]
+    [InlineData("Red vs. Blue (2003) - S01E01-E19 - Why Are We Here [Bluray-1080p][AC3 5.1][x264]-none.mkv", 1, 19, "Why Are We Here")]
+    [InlineData("Lost (2004) - S06E17 - E18 - The End.mkv", 17, 18, "The End")]
+    [InlineData("Lost (2004) - S06E17E18 - The End.mkv", 17, 18, "The End")]
+    [InlineData("Red vs. Blue (2003) - S02E01-E02-E03 - Everything Old Is New Again.mkv", 1, 3, "Everything Old Is New Again")]
+    public async Task ScanTvShowLibrary_records_the_episode_range_of_a_multi_episode_file(string fileName, int first, int last, string title)
+    {
+        TouchFile(Path.Combine("Some Show (2020)", "Season 01", fileName));
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).EnsureEpisodeAsync(
+            Arg.Any<LibraryHandle>(),
+            Arg.Any<SeasonHandle>(),
+            first,
+            title,
+            Arg.Any<DateOnly?>(),
+            Arg.Any<string?>(),
+            last);
+    }
+
+    [Fact]
+    public async Task ScanTvShowLibrary_still_reads_an_absolute_number_as_part_of_the_name_not_the_title()
+    {
+        TouchFile(Path.Combine("One Piece (1999)", "Season 01", "One Piece (1999) - S01E01 - 001 - I'm Luffy.mkv"));
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).EnsureEpisodeAsync(
+            Arg.Any<LibraryHandle>(),
+            Arg.Any<SeasonHandle>(),
+            1,
+            "I'm Luffy",
+            Arg.Any<DateOnly?>(),
+            Arg.Any<string?>(),
+            null);
+    }
+
+    [Fact]
+    public async Task ScanTvShowLibrary_treats_the_pattern_older_libraries_saved_as_the_current_default()
+    {
+        _ingestion.GetLibraryDetailsAsync(Arg.Any<LibraryHandle>())
+            .Returns(Task.FromResult<(List<string> FolderPaths, string? ScannerRegex, List<string> ExcludeFilters)>((new List<string> { _tempRoot }, RetiredTvPattern, new List<string>())));
+        TouchFile(Path.Combine("Ghosts (US) (2021)", "Season 05", "Ghosts (US) (2021) - S05E09-E10 - Its a Wonderful Christmas Carol.mkv"));
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).EnsureEpisodeAsync(
+            Arg.Any<LibraryHandle>(),
+            Arg.Any<SeasonHandle>(),
+            9,
+            "Its a Wonderful Christmas Carol",
+            Arg.Any<DateOnly?>(),
+            Arg.Any<string?>(),
+            10);
+    }
+
+    [Fact]
+    public async Task ScanTvShowLibrary_records_ranges_for_files_it_already_knows()
+    {
+        var doubleEpisode = Path.Combine(_tempRoot, "Ghosts (US) (2021)", "Season 05", "Ghosts (US) (2021) - S05E09-E10 - Its a Wonderful Christmas Carol.mkv");
+        var singleEpisode = Path.Combine(_tempRoot, "Ghosts (US) (2021)", "Season 05", "Ghosts (US) (2021) - S05E11 - The Christmas Spirit.mkv");
+        var extra = Path.Combine(_tempRoot, "Ghosts (US) (2021)", "Season 05", "Ghosts (US) (2021) - S05E09-E10 - Its a Wonderful Christmas Carol-trailer.mkv");
+        var elsewhere = Path.Combine(Path.GetTempPath(), "other-library", "Show - S01E01-E02 - Pilot.mkv");
+        _ingestion.GetExistingLibraryPathsAsync(Arg.Any<LibraryHandle>())
+            .Returns(new HashSet<string> { doubleEpisode, singleEpisode, extra, elsewhere });
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).SetEpisodeRangesAsync(
+            Arg.Any<LibraryHandle>(),
+            Arg.Is<IReadOnlyDictionary<string, int>>(ranges => ranges.Count == 1 && ranges[doubleEpisode] == 10));
+    }
+
+    private const string RetiredTvPattern = @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*(?<Absolute>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$";
+
     [Fact]
     public async Task ScanTvShowLibrary_extracts_air_date_episode_naming()
     {
