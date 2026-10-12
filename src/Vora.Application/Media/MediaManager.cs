@@ -80,7 +80,7 @@ public class MediaManager : IMediaManager
 
     public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
     {
-        var vm = await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
+        var vm = HideCoverImageTracks(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated));
 
         if (vm == null || !profileId.HasValue) return vm;
 
@@ -98,8 +98,19 @@ public class MediaManager : IMediaManager
         return groupedItems;
     }
 
-    public Task<MediaDetailsVM?> GetMediaItemAsync(Guid id) =>
-        _repository.GetProjectedAsync(id, MediaDetailsVM.Projection);
+    public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id) =>
+        HideCoverImageTracks(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection));
+
+    private static MediaDetailsVM? HideCoverImageTracks(MediaDetailsVM? details)
+    {
+        if (details == null) return null;
+
+        foreach (var part in details.MediaParts)
+        {
+            part.VideoTracks = CoverImageTracks.Without(part.VideoTracks, track => track.Codec);
+        }
+        return details;
+    }
 
     public async Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId)
     {

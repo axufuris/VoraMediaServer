@@ -310,7 +310,7 @@ public class MediaDedupeManager : IMediaDedupeManager
 
     private DedupeItemVM MapAndScoreVideoPart(MediaPart part, MediaDedupeSettings settings)
     {
-        var video = part.VideoTracks.FirstOrDefault();
+        var video = CoverImageTracks.MainVideoTrack(part.VideoTracks);
         long score = 0;
 
         var res = part.Resolution?.ToLowerInvariant() ?? string.Empty;

@@ -242,7 +242,7 @@ public class PosterOverlayManager : IPosterOverlayManager
             .OrderByDescending(p => ParseResolutionHeight(p.Resolution))
             .ThenBy(p => p.Id)
             .FirstOrDefault();
-        var bestVideoTrack = bestPart?.VideoTracks?.FirstOrDefault();
+        var bestVideoTrack = CoverImageTracks.MainVideoTrack(bestPart?.VideoTracks);
 
         // The audio badge advertises the best audio the title has, across every
         // part (a lossless/Atmos track on a 1080p file still counts even if the

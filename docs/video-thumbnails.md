@@ -75,6 +75,17 @@ ffmpeg -y [<GPU decode flags>] -skip_frame nokey -i <input>
 - **GPU decode flags** (`-hwaccel cuda` on NVIDIA, `-init_hw_device vaapi=…` + `-hwaccel vaapi` on Intel and AMD, from `HardwareArguments.InitAndDecode`) are added only when the global `UseHardwareAcceleration` **and** the per-feature `VideoThumbnailUseHardwareDecode` toggle are both on, and only for the GPU the hardware setting resolves to (`docs/hardware-acceleration.md`). If a GPU decode pass fails on a codec or profile the GPU can't handle, the service retries the same command in software so one quirky file never blocks the library.
 - **`libwebp`** output is ~25–35% smaller than JPEG at equal quality. The stored quality is an FFmpeg qscale (2 = best … 31 = worst) mapped to libwebp's 0–100 scale, so the one admin setting keeps its meaning. `-f image2` pins the muxer because the temp file uses a `.webp.tmp` suffix during atomic write and FFmpeg's extension autodetect chokes on `.tmp`. The sprite-version seed is `v2-webp|…`, so flipping to WebP invalidated old JPEG sprites automatically; a stale `sprite.jpg` left by an older generation is deleted after a successful WebP run.
 
+### Cover images
+
+A file can carry its poster as an extra video stream: a Matroska attachment (ffprobe flags it `attached_pic`), or a real one-frame `mjpeg`/`png` track, which is what a remux from MP4 leaves behind. Left to itself, FFmpeg decodes the video stream with the most pixels (the default flag is worth 5,000,000), so a 2000×3000 cover track beats a 720p episode. The `fps` filter then emits no frame, FFmpeg exits 0 without writing a file, and the item raised "Video preview thumbnails failed" on every pass.
+
+Two helpers keep covers out:
+
+- **`CoverImageStreams`** (`Vora.Infrastructure/Analysis`) reads ffprobe's stream list. A video stream is a cover when it is an attached picture, or when it uses a still-image codec and the file also has moving video. `ProbeIgnoreArgumentsAsync` turns the covers into `-discard:<index> all` input options, placed before `-i`. The sprite pass, the fallback still (`ExtractFrameAsync`) and the marker detection pass (`AnalyzeSilenceDetectionsAsync`) all add them. It is `-discard`, not `-map`, because that leaves FFmpeg's audio selection alone, which the detection pass relies on.
+- **The file probe** (`RunFFprobeAsync`) does not record covers as `MediaVideoTrack` rows. Rows written before that stay until the file is probed again, so anything choosing or listing video tracks goes through **`CoverImageTracks`** (`Vora.Application/Media`): `Without` for a list, `MainVideoTrack` for the one to describe. The playback decision, the media details response, dedupe scoring and poster overlay badges use it.
+
+A file whose only video stream is Motion JPEG is still a video. `CoverImageVideoFileTests` builds a 720p file with a larger cover track using real FFmpeg and runs the sprite, still, probe and black-frame paths against it.
+
 ### Failure handling
 
 A per-item ffmpeg failure never aborts the batch — `GenerateManyAsync` runs items in parallel scopes and `RunSingleAsync` catches the exception, logs it, and moves on (cancellation is rethrown, not swallowed). Two things make a broken source visible instead of silent:

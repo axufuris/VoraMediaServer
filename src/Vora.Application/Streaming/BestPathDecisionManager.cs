@@ -1,4 +1,5 @@
-﻿using Vora.Application.Settings;
+﻿using Vora.Application.Media;
+using Vora.Application.Settings;
 using Vora.Application.Streaming.Dtos;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.Users;
@@ -42,7 +43,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         {
             var videoTracksToEvaluate = requestedVideoId.HasValue
                 ? part.VideoTracks.Where(v => v.Id == requestedVideoId.Value).ToList()
-                : part.VideoTracks;
+                : CoverImageTracks.Without(part.VideoTracks, track => track.Codec);
 
             var videoTrack = videoTracksToEvaluate.FirstOrDefault(t => t.IsDefault) ?? videoTracksToEvaluate.FirstOrDefault();
             if (videoTrack == null) continue;
