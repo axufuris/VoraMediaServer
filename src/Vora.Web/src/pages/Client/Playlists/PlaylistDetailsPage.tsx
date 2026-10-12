@@ -437,11 +437,11 @@ export default function PlaylistDetailsPage() {
                 <CinematicBackdrop src={selectedItem?.backgroundUrl} intensity="detail" parallax transitionKey={selectedItem?.id} />
             </div>
 
-            <div className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-12 pt-8">
+            <div className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-12 max-md:px-4 pt-8">
                 <SavedCopyBanner />
 
-                <div className="flex flex-col md:flex-row gap-10 mb-16">
-                    <div className="w-64 shrink-0 relative">
+                <div className="flex flex-col md:flex-row gap-10 mb-16 max-md:gap-5 max-md:mb-10">
+                    <div className="w-64 shrink-0 relative max-md:w-36">
                         <div className={`${selectedItem?.type === 'Track' ? 'aspect-square' : 'aspect-[2/3]'} rounded-lg overflow-hidden shadow-2xl border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] relative`}>
                             {(selectedItem?.type === 'Track' ? selectedItem.albumArtworkUrl : selectedItem?.posterUrl) ? (
                                 <img src={selectedItem?.type === 'Track' ? selectedItem.albumArtworkUrl : selectedItem?.posterUrl} alt="" className="w-full h-full object-cover" />
@@ -463,8 +463,8 @@ export default function PlaylistDetailsPage() {
                     </div>
 
                     <div className="flex-1 pt-0">
-                        <div className="flex items-center justify-between mb-1">
-                            <h2 className="text-xl font-bold text-[var(--vora-accent-500)] tracking-wider uppercase flex items-center gap-3">
+                        <div className="flex items-center justify-between mb-1 max-md:flex-wrap max-md:gap-2">
+                            <h2 className="text-xl font-bold text-[var(--vora-accent-500)] tracking-wider uppercase flex items-center gap-3 max-md:flex-wrap max-md:gap-x-2 max-md:gap-y-0 max-md:text-lg">
                                 {playlist.name}
                                 <span className="text-[var(--vora-text-muted)] text-sm font-medium tracking-normal normal-case">
                                     ({playlist.items.length} items {totalDurationFormatted ? `• ${totalDurationFormatted}` : ''})
@@ -478,23 +478,23 @@ export default function PlaylistDetailsPage() {
                             <p className="text-[var(--vora-text-muted)] text-sm mb-4 max-w-3xl">{playlist.description}</p>
                         )}
 
-                        <h1 className="text-[2.75rem] leading-tight font-bold text-[var(--vora-text-primary)] drop-shadow-lg mb-1">
+                        <h1 className="text-[2.75rem] leading-tight font-bold text-[var(--vora-text-primary)] drop-shadow-lg mb-1 max-md:text-3xl">
                             {selectedItem?.type === 'Episode' || selectedItem?.type === 'Season'
                                 ? selectedItem.tvShowTitle
                                 : selectedItem?.title || "Empty Playlist"}
                         </h1>
 
                         {(selectedItem?.type === 'Episode' || selectedItem?.type === 'Season') && (
-                            <h2 className="text-2xl font-bold text-[var(--vora-text-secondary)] mb-5">{selectedItem.title}</h2>
+                            <h2 className="text-2xl font-bold text-[var(--vora-text-secondary)] mb-5 max-md:text-xl">{selectedItem.title}</h2>
                         )}
 
                         {selectedItem?.type === 'Track' && (
-                            <h2 className="text-2xl font-bold text-[var(--vora-text-secondary)] mb-5">
+                            <h2 className="text-2xl font-bold text-[var(--vora-text-secondary)] mb-5 max-md:text-xl">
                                 {selectedItem.artistName ? `${selectedItem.artistName}${selectedItem.albumTitle ? ` — ${selectedItem.albumTitle}` : ''}` : selectedItem.albumTitle}
                             </h2>
                         )}
 
-                        <div className="flex items-center gap-3 text-sm font-medium text-[var(--vora-text-muted)] mb-8">
+                        <div className="flex items-center gap-3 text-sm font-medium text-[var(--vora-text-muted)] mb-8 max-md:mb-5 max-md:flex-wrap">
                             {selectedItem?.type === 'Episode' && <span>Season {selectedItem.seasonNumber} &nbsp;&nbsp; Episode {selectedItem.episodeNumber}</span>}
                             {selectedItem?.releaseYear && <span>{selectedItem.releaseYear}</span>}
                             {selectedItem?.type === 'Track' && selectedItem.durationSeconds ? (
@@ -535,7 +535,7 @@ export default function PlaylistDetailsPage() {
                 </div>
 
                 <div>
-                    <h2 className="text-2xl font-bold mb-6 text-[var(--vora-text-primary)] border-b border-[var(--vora-border-subtle)] pb-2">Up Next ({playlist.items.length})</h2>
+                    <h2 className="text-2xl font-bold mb-6 text-[var(--vora-text-primary)] border-b border-[var(--vora-border-subtle)] pb-2 max-md:text-xl max-md:mb-4">Up Next ({playlist.items.length})</h2>
                     <div className="space-y-3">
                         {playlist.items.map((item, index) => (
                             <div
@@ -545,10 +545,10 @@ export default function PlaylistDetailsPage() {
                                 onDragOver={canEdit ? handleDragOver : undefined}
                                 onDrop={canEdit ? (e) => handleDrop(e, index) : undefined}
                                 onClick={() => setSelectedItem(item)}
-                                className={`flex items-center gap-4 p-3 rounded-lg border transition-all cursor-pointer ${draggedIndex === index ? 'opacity-50' : 'opacity-100'} ${item.isPlayed ? 'opacity-60 grayscale-[40%]' : ''} ${selectedItem?.id === item.id ? 'bg-[var(--vora-bg-sunken)] border-[var(--vora-accent-500)]' : 'bg-[var(--vora-bg-raised)]/50 border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-subtle)]'}`}
+                                className={`flex items-center gap-4 p-3 rounded-lg border transition-all cursor-pointer max-md:gap-3 max-md:p-2 ${draggedIndex === index ? 'opacity-50' : 'opacity-100'} ${item.isPlayed ? 'opacity-60 grayscale-[40%]' : ''} ${selectedItem?.id === item.id ? 'bg-[var(--vora-bg-sunken)] border-[var(--vora-accent-500)]' : 'bg-[var(--vora-bg-raised)]/50 border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-subtle)]'}`}
                             >
                                 {canEdit && (
-                                    <div className="text-[var(--vora-text-muted)] px-2 cursor-grab" title="Drag to reorder">
+                                    <div className="text-[var(--vora-text-muted)] px-2 cursor-grab max-md:hidden" title="Drag to reorder">
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
                                     </div>
                                 )}
@@ -559,7 +559,7 @@ export default function PlaylistDetailsPage() {
                                             : <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-muted)]"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg></div>}
                                     </div>
                                 ) : (
-                                    <div className="w-16 h-24 shrink-0 bg-[var(--vora-bg-sunken)] rounded overflow-hidden relative">
+                                    <div className="w-16 h-24 shrink-0 bg-[var(--vora-bg-sunken)] rounded overflow-hidden relative max-md:w-12 max-md:h-[4.5rem]">
                                         {item.posterUrl ? <img src={item.posterUrl} className="w-full h-full object-cover" /> : null}
                                         {item.isPlayed && (
                                             <div className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5">
@@ -573,12 +573,12 @@ export default function PlaylistDetailsPage() {
                                         )}
                                     </div>
                                 )}
-                                <div className="flex-1 flex flex-col justify-center">
-                                    <h4 className={`flex items-center gap-2 font-bold text-lg ${selectedItem?.id === item.id ? 'text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-secondary)]'}`}>
+                                <div className="flex-1 flex flex-col justify-center max-md:min-w-0">
+                                    <h4 className={`flex items-center gap-2 font-bold text-lg max-md:text-base ${selectedItem?.id === item.id ? 'text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-secondary)]'}`}>
                                         {item.type === 'Episode' ? `${item.episodeNumber}. ${item.title}` : item.title}
                                         {item.type === 'Track' && <ContentRatingBadge rating={item.contentRating} />}
                                     </h4>
-                                    <div className="flex items-center gap-3 text-sm text-[var(--vora-text-muted)] font-medium">
+                                    <div className="flex items-center gap-3 text-sm text-[var(--vora-text-muted)] font-medium max-md:flex-wrap max-md:gap-x-2 max-md:gap-y-0 max-md:text-xs">
                                         {item.type === 'Track' ? (
                                             <span>
                                                 {item.artistName ? `${item.artistName}${item.albumTitle ? ` — ${item.albumTitle}` : ''}` : (item.albumTitle ?? 'Track')}

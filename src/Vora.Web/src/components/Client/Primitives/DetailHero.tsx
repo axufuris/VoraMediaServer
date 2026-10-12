@@ -158,9 +158,9 @@ export default function DetailHero({
                 className="col-start-1 row-start-1 lg:pt-[min(36%,60vh,40rem)]"
             />
 
-            <div className={`relative z-10 col-start-1 row-start-1 flex flex-col justify-center px-12 pb-6 pt-6 ${techChips ? 'lg:pb-16' : ''}`}>
-                <div className={`grid gap-8 lg:items-center ${isStill ? 'lg:grid-cols-[16rem_1fr] xl:grid-cols-[20rem_1fr]' : 'lg:grid-cols-[12.5rem_1fr]'}`}>
-                    <div className="shrink-0">
+            <div className={`relative z-10 col-start-1 row-start-1 flex flex-col justify-center px-12 max-md:px-4 pb-6 pt-6 ${techChips ? 'lg:pb-16' : ''}`}>
+                <div className={`grid gap-8 max-md:gap-5 lg:items-center ${isStill ? 'lg:grid-cols-[16rem_1fr] xl:grid-cols-[20rem_1fr]' : 'lg:grid-cols-[12.5rem_1fr]'}`}>
+                    <div className={`shrink-0 ${isStill ? 'max-md:w-60' : 'max-md:w-28'}`}>
                         <div
                             className={`relative overflow-hidden ${isStill ? 'aspect-video' : 'aspect-[2/3]'}`}
                             style={{

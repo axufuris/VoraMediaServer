@@ -152,7 +152,7 @@ export default function SmartListsPage() {
                 }
             />
 
-            <div className="mx-auto max-w-6xl px-8 pb-10 pt-6">
+            <div className="mx-auto max-w-6xl px-8 max-md:px-4 pb-10 pt-6">
                 {lists.length === 0 ? (
                     <div className="vora-card">
                         <EmptyState
@@ -164,7 +164,7 @@ export default function SmartListsPage() {
                     </div>
                 ) : (
                     <div className="vora-card overflow-x-auto">
-                        <table className="w-full text-left">
+                        <table className="w-full text-left max-md:min-w-[40rem]">
                             <thead className="border-b border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] text-[11px] uppercase tracking-wider text-[var(--vora-text-muted)]">
                                 <tr>
                                     <th className="w-10" />

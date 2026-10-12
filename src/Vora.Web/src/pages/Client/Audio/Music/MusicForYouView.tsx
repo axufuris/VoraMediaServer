@@ -93,7 +93,7 @@ export default function MusicForYouView({
 }: MusicForYouViewProps) {
     if (isLoading) {
         return (
-            <div className="space-y-8 px-8" aria-busy="true">
+            <div className="space-y-8 px-8 max-md:px-4" aria-busy="true">
                 <div className="vora-skeleton h-14" />
                 <div className="vora-skeleton h-40" />
                 <div className="vora-skeleton h-40" />
@@ -161,7 +161,7 @@ export default function MusicForYouView({
                 </MediaRow>
             )}
 
-            <section className="px-8" aria-label="Your library">
+            <section className="px-8 max-md:px-4" aria-label="Your library">
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <Shortcut
                         label="Liked Songs"

@@ -210,7 +210,7 @@ export default function CreateLibrary() {
                 }
             />
 
-            <div className="px-8 pb-10 max-w-5xl mx-auto pt-6">
+            <div className="px-8 max-md:px-4 pb-10 max-w-5xl mx-auto pt-6">
                 <div className="vora-card p-6 space-y-6">
                     <SectionHeading>General</SectionHeading>
 

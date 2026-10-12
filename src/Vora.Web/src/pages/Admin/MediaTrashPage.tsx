@@ -86,7 +86,7 @@ export default function MediaTrashPage() {
                 description="Items whose files went missing are held here instead of being deleted, so watch progress and ratings survive. If the file returns, the item is restored automatically on the next scan."
             />
 
-            <div className="px-8 pb-10 max-w-5xl mx-auto pt-6">
+            <div className="px-8 max-md:px-4 pb-10 max-w-5xl mx-auto pt-6">
                 {loading ? (
                     <div className="vora-skeleton h-48" />
                 ) : items.length === 0 ? (
@@ -100,7 +100,7 @@ export default function MediaTrashPage() {
                 ) : (
                     <div className="space-y-2">
                         {items.map(item => (
-                            <div key={item.id} className="vora-card p-3 flex items-center gap-4">
+                            <div key={item.id} className="vora-card p-3 flex items-center gap-4 max-md:flex-wrap max-md:gap-3">
                                 <div className="w-12 h-[72px] shrink-0 overflow-hidden rounded-[var(--vora-radius-sm)]" style={{ background: 'var(--vora-bg-sunken)' }}>
                                     {item.posterUrl && (
                                         <img src={thumbUrl(item.posterUrl, 200)} alt={item.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
@@ -118,7 +118,7 @@ export default function MediaTrashPage() {
                                         {item.seriesTitle ? `${item.seriesTitle} · ` : ''}{item.libraryName ?? 'Unknown library'} · missing {formatMissingSince(item.missingSince)}
                                     </p>
                                 </div>
-                                <div className="flex gap-2 shrink-0">
+                                <div className="flex gap-2 shrink-0 max-md:basis-full max-md:justify-end">
                                     <button
                                         type="button"
                                         disabled={busyId === item.id}

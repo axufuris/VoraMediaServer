@@ -213,7 +213,7 @@ export default function LogsPage() {
     };
 
     const actions = (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-md:flex-wrap">
             <button
                 type="button"
                 onClick={() => setShowLevelsPanel(true)}
@@ -251,7 +251,7 @@ export default function LogsPage() {
     );
 
     return (
-        <div data-vora-page="" className="flex flex-col" style={{ height: '100%' }}>
+        <div data-vora-page="" className="flex h-full flex-col max-md:h-auto">
             <PageHeader
                 title="Server Logs"
                 description="Live view of server-side logs. Filter by level, category, time, or text — pause to investigate a row, resume to keep tailing."
@@ -277,8 +277,8 @@ export default function LogsPage() {
                 loading={loading}
             />
 
-            <div className="px-8 pb-4 pt-2 relative flex-1 min-h-0 flex flex-col">
-                <div className="vora-card overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="px-8 max-md:px-4 pb-4 pt-2 relative flex-1 min-h-0 flex flex-col">
+                <div className="vora-card overflow-hidden flex flex-col flex-1 min-h-0 max-md:h-[75dvh] max-md:flex-none">
                     <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)]">
                         <div className="text-xs text-[var(--vora-text-secondary)]">
                             Showing <span className="font-semibold text-[var(--vora-text-primary)]">{entries.length}</span> of <span className="font-semibold text-[var(--vora-text-primary)]">{totalMatched}</span> matched entries
@@ -360,7 +360,7 @@ interface FilterBarProps {
 
 function FilterBar(props: FilterBarProps) {
     return (
-        <div className="px-8 pt-4 pb-3">
+        <div className="px-8 max-md:px-4 pt-4 pb-3">
             <div className="vora-card p-4 flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-semibold text-[var(--vora-text-muted)] uppercase tracking-wide mr-1">Level</span>

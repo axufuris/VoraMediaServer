@@ -155,7 +155,7 @@ export default function MusicHistoryPage() {
                 }
             />
 
-            <div className="p-8 max-w-[1400px] mx-auto space-y-6">
+            <div className="p-8 max-md:p-4 max-w-[1400px] mx-auto space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard
                         label="Total Plays"

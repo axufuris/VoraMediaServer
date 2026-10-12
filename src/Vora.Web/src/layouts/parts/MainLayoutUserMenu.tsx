@@ -4,6 +4,8 @@ interface MainLayoutUserMenuProps {
     profileName: string;
     isProfileMenuOpen: boolean;
     isServerAdmin: boolean;
+    isPhoneNavOpen: boolean;
+    onOpenPhoneNav: () => void;
     onToggleMenu: () => void;
     onCloseMenu: () => void;
     onManageServers: () => void;
@@ -19,6 +21,8 @@ export default function MainLayoutUserMenu({
     profileName,
     isProfileMenuOpen,
     isServerAdmin,
+    isPhoneNavOpen,
+    onOpenPhoneNav,
     onToggleMenu,
     onCloseMenu,
     onManageServers,
@@ -33,10 +37,23 @@ export default function MainLayoutUserMenu({
 
     return (
         <header
-            className="relative z-[100] flex h-16 w-full shrink-0 items-center justify-between px-8"
+            className="relative z-[100] flex h-16 w-full shrink-0 items-center justify-between px-8 max-md:gap-2 max-md:px-3"
             style={{ background: 'var(--vora-bg-sunken)', borderBottom: '1px solid var(--vora-border-subtle)' }}
         >
-            <div className="mr-8 flex-1">
+            <button
+                type="button"
+                onClick={onOpenPhoneNav}
+                aria-label="Open navigation"
+                aria-expanded={isPhoneNavOpen}
+                className="vora-icon-button flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full md:hidden"
+                style={{ color: 'var(--vora-text-secondary)' }}
+            >
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+
+            <div className="mr-8 flex-1 max-md:mr-0 max-md:min-w-0">
                 <SearchBar />
             </div>
 

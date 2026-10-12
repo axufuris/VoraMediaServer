@@ -157,7 +157,7 @@ export default function SmartPlaylistDetailsPage() {
 
     return (
         <div className="min-h-full pb-16">
-            <div className="mx-auto w-full max-w-6xl px-8 pt-12">
+            <div className="mx-auto w-full max-w-6xl px-8 max-md:px-4 pt-12">
                 <SavedCopyBanner />
                 <div className="mb-8 flex items-end gap-6 pb-6" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>
                     <div className={`w-48 h-48 rounded shadow-2xl flex items-center justify-center bg-gradient-to-br ${heroGradient} flex-shrink-0 relative overflow-hidden`}>

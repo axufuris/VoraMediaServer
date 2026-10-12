@@ -794,7 +794,7 @@ export default function MusicTab() {
                     />
                 )}
             />
-            <div className="px-8">
+            <div className="px-8 max-md:px-4">
                 <MusicServerSwitcher />
                 <Tabs<MusicSubTab>
                     tabs={MUSIC_SUB_TABS}
@@ -805,7 +805,7 @@ export default function MusicTab() {
             </div>
 
             {searchActive && (
-                <div className="px-8">
+                <div className="px-8 max-md:px-4">
                     {isSearching ? (
                         <div className="text-[var(--vora-text-muted)] py-12 text-center">Searching...</div>
                     ) : searchResults.length === 0 ? (
@@ -882,7 +882,7 @@ export default function MusicTab() {
             </div>
 
             {!searchActive && nav.view !== 'root' && (
-                <div className="px-8">
+                <div className="px-8 max-md:px-4">
                 {breadcrumbs}
 
             {nav.view === 'artist' && (

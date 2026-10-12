@@ -144,7 +144,7 @@ function AlbumPages({ sort, serverId, genre, title, padded, sortControl, onOpenA
 
     if (!isLoading && !failed && total === 0) {
         return (
-            <div className={padded ? 'px-8' : undefined}>
+            <div className={padded ? 'px-8 max-md:px-4' : undefined}>
                 <div className="flex justify-end">{sortControl}</div>
                 <EmptyState
                     title="No albums yet"
@@ -155,7 +155,7 @@ function AlbumPages({ sort, serverId, genre, title, padded, sortControl, onOpenA
     }
 
     return (
-        <div className={padded ? 'px-8' : undefined}>
+        <div className={padded ? 'px-8 max-md:px-4' : undefined}>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                 <div>
                     <h2 className="text-2xl font-bold" style={{ color: 'var(--vora-text-primary)' }}>{title}</h2>

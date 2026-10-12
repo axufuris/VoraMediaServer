@@ -101,7 +101,7 @@ export default function DiscoveryViewAllPage() {
         <div className="min-h-full pb-20">
             <PageHeader title={rowName} subtitle="Browse everything in this discovery row." />
 
-            <div className="px-8 pt-2">
+            <div className="px-8 max-md:px-4 pt-2">
                 {rowUnavailable ? (
                     <EmptyState
                         title="This Discovery row is no longer available"

@@ -645,8 +645,8 @@ export default function GlobalVideoPlayer() {
                 ref={videoRef}
                 onClick={() => { if (isMinimized) setMinimized(false); }}
                 className={`absolute bg-black transition-all duration-700 ease-in-out
-                    ${isMinimized ? 'bottom-4 left-6 z-20 h-16 w-16 cursor-pointer rounded-md object-cover shadow-lg hover:ring-2 hover:ring-[var(--vora-accent-500)]' :
-                        isEnding ? 'left-20 top-32 z-20 aspect-video w-96 cursor-pointer rounded-xl object-cover shadow-2xl' :
+                    ${isMinimized ? 'bottom-4 left-6 z-20 h-16 w-16 cursor-pointer rounded-md object-cover shadow-lg hover:ring-2 hover:ring-[var(--vora-accent-500)] max-md:left-3' :
+                        isEnding ? 'left-20 top-32 z-20 aspect-video w-96 cursor-pointer rounded-xl object-cover shadow-2xl max-md:left-4 max-md:top-4 max-md:w-40' :
                             'absolute left-0 top-0 z-0 h-[100vh] w-full object-contain'}`}
                 style={isEnding && !isMinimized ? { border: '1px solid var(--vora-border-strong)' } : undefined}
             />
@@ -671,8 +671,8 @@ export default function GlobalVideoPlayer() {
             />
 
             {isMinimized && (
-                <div className="z-10 flex h-full w-full flex-1 items-center justify-between px-6">
-                    <div className="flex w-1/4 items-center gap-4">
+                <div className="z-10 flex h-full w-full flex-1 items-center justify-between px-6 max-md:gap-2 max-md:px-3">
+                    <div className="flex w-1/4 items-center gap-4 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:gap-3">
                         <div className="h-16 w-16 flex-shrink-0"></div>
                         <div className="flex flex-col overflow-hidden">
                             <span
@@ -686,31 +686,35 @@ export default function GlobalVideoPlayer() {
                         </div>
                     </div>
 
-                    <div className="flex max-w-2xl flex-1 flex-col items-center justify-center px-8">
-                        <div className="mb-2 flex items-center gap-6">
-                            {isEpisode && (
-                                <EpisodeNavButton
-                                    direction="previous"
-                                    size="sm"
-                                    disabled={!upNextData?.previousItem}
-                                    onClick={() => upNextData?.previousItem && handlePlayNext(upNextData.previousItem)}
-                                    title={upNextData?.previousItem ? `Previous: ${upNextData.previousItem.title}` : 'No previous episode'}
-                                />
-                            )}
-                            <SkipButton seconds={10} direction="back" size="sm" onClick={() => skipBackward(10)} />
+                    <div className="flex max-w-2xl flex-1 flex-col items-center justify-center px-8 max-md:flex-none max-md:px-0">
+                        <div className="mb-2 flex items-center gap-6 max-md:mb-0">
+                            <div className="contents max-md:hidden">
+                                {isEpisode && (
+                                    <EpisodeNavButton
+                                        direction="previous"
+                                        size="sm"
+                                        disabled={!upNextData?.previousItem}
+                                        onClick={() => upNextData?.previousItem && handlePlayNext(upNextData.previousItem)}
+                                        title={upNextData?.previousItem ? `Previous: ${upNextData.previousItem.title}` : 'No previous episode'}
+                                    />
+                                )}
+                                <SkipButton seconds={10} direction="back" size="sm" onClick={() => skipBackward(10)} />
+                            </div>
                             <PlayPauseButton isPlaying={isPlaying} onClick={togglePlayPause} size="sm" />
-                            <SkipButton seconds={30} direction="forward" size="sm" onClick={() => skipForward(30)} />
-                            {isEpisode && (
-                                <EpisodeNavButton
-                                    direction="next"
-                                    size="sm"
-                                    disabled={!upNextData?.nextItem}
-                                    onClick={() => upNextData?.nextItem && handlePlayNext(upNextData.nextItem)}
-                                    title={upNextData?.nextItem ? `Next: ${upNextData.nextItem.title}` : 'No next episode'}
-                                />
-                            )}
+                            <div className="contents max-md:hidden">
+                                <SkipButton seconds={30} direction="forward" size="sm" onClick={() => skipForward(30)} />
+                                {isEpisode && (
+                                    <EpisodeNavButton
+                                        direction="next"
+                                        size="sm"
+                                        disabled={!upNextData?.nextItem}
+                                        onClick={() => upNextData?.nextItem && handlePlayNext(upNextData.nextItem)}
+                                        title={upNextData?.nextItem ? `Next: ${upNextData.nextItem.title}` : 'No next episode'}
+                                    />
+                                )}
+                            </div>
                         </div>
-                        <div className="flex w-full items-center gap-3 text-xs font-medium tabular-nums" style={{ color: 'var(--vora-text-muted)' }}>
+                        <div className="flex w-full items-center gap-3 text-xs font-medium tabular-nums max-md:hidden" style={{ color: 'var(--vora-text-muted)' }}>
                             <span>{formatTime(currentTime)}</span>
                             <div
                                 className="group relative h-1.5 flex-1 cursor-pointer rounded-full"
@@ -730,7 +734,7 @@ export default function GlobalVideoPlayer() {
                         </div>
                     </div>
 
-                    <div className="flex w-1/4 items-center justify-end gap-4">
+                    <div className="flex w-1/4 items-center justify-end gap-4 max-md:w-auto max-md:gap-1">
                         <MaximizeButton onClick={() => setMinimized(false)} />
                         <CloseButton onClick={closePlayer} />
                     </div>
@@ -782,19 +786,19 @@ export default function GlobalVideoPlayer() {
                     }}
                 >
 
-                    <div className="flex items-start justify-between p-8">
+                    <div className="flex items-start justify-between p-8 max-md:gap-3 max-md:p-4">
                         <button
                             type="button"
                             onClick={closePlayer}
                             aria-label="Close player"
-                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10"
+                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10 max-md:h-10 max-md:w-10 max-md:shrink-0"
                             style={{ background: 'rgba(20, 20, 28, 0.55)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}
                         >
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
                         </button>
 
                         <div className="flex max-w-3xl flex-col items-center text-center">
-                            <h1 className="m-0 text-2xl font-semibold drop-shadow-lg" style={{ color: '#fafafa', letterSpacing: '-0.01em' }}>{currentMedia.title}</h1>
+                            <h1 className="m-0 text-2xl font-semibold drop-shadow-lg max-md:text-lg" style={{ color: '#fafafa', letterSpacing: '-0.01em' }}>{currentMedia.title}</h1>
                             {currentMedia.subtitle && (
                                 <p className="m-0 mt-1 drop-shadow-md" style={{ color: 'rgba(255, 255, 255, 0.78)' }}>{currentMedia.subtitle}</p>
                             )}
@@ -825,15 +829,15 @@ export default function GlobalVideoPlayer() {
                             onClick={() => setMinimized(true)}
                             aria-label="Minimize to mini-player"
                             title="Minimize to mini-player"
-                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10"
+                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10 max-md:h-10 max-md:w-10 max-md:shrink-0"
                             style={{ background: 'rgba(20, 20, 28, 0.55)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}
                         >
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
                         </button>
                     </div>
 
-                    <div className="mx-auto w-full max-w-screen-2xl p-8 pb-12">
-                        <div className="mb-6 flex items-center gap-4 font-medium tabular-nums" style={{ color: '#fafafa' }}>
+                    <div className="mx-auto w-full max-w-screen-2xl p-8 pb-12 max-md:px-4 max-md:pt-4 max-md:pb-6">
+                        <div className="mb-6 flex items-center gap-4 font-medium tabular-nums max-md:mb-4 max-md:gap-3 max-md:text-sm" style={{ color: '#fafafa' }}>
                             <span>{formatTime(currentTime)}</span>
                             <div
                                 className="group relative h-1.5 flex-1 cursor-pointer rounded-full"
@@ -852,10 +856,10 @@ export default function GlobalVideoPlayer() {
                             <span>{formatTime(duration)}</span>
                         </div>
 
-                        <div className="flex items-center justify-between" style={{ color: '#fafafa' }}>
-                            <div className="flex w-1/3 items-center gap-6"></div>
+                        <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-y-3" style={{ color: '#fafafa' }}>
+                            <div className="flex w-1/3 items-center gap-6 max-md:hidden"></div>
 
-                            <div className="flex w-1/3 items-center justify-center gap-8">
+                            <div className="flex w-1/3 items-center justify-center gap-8 max-md:w-full max-md:gap-6">
                                 {isEpisode && (
                                     <EpisodeNavButton
                                         direction="previous"
@@ -877,7 +881,7 @@ export default function GlobalVideoPlayer() {
                                 )}
                             </div>
 
-                            <div className="flex w-1/3 items-center justify-end gap-5">
+                            <div className="flex w-1/3 items-center justify-end gap-5 max-md:w-full max-md:justify-center max-md:gap-4">
                                 <button
                                     type="button"
                                     onClick={() => setShowInfo(true)}
@@ -903,7 +907,9 @@ export default function GlobalVideoPlayer() {
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z" /></svg>
                                 </button>
 
-                                <VolumeControl value={volume} onChange={setVolume} />
+                                <div className="contents max-md:hidden">
+                                    <VolumeControl value={volume} onChange={setVolume} />
+                                </div>
                                 <FullscreenButton onClick={toggleFullScreen} />
                             </div>
                         </div>

@@ -8,7 +8,8 @@ import { serverVault } from '../../../utils/serverVault';
 import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { useDialog } from '../../../dialogs';
 import GuideProgramModal from '../../../components/Iptv/GuideProgramModal';
-import { ROW_HEIGHT, PX_PER_MINUTE, HOURS_TO_SHOW, CHANNEL_COLUMN_WIDTH, parseDate } from './guideConstants';
+import { ROW_HEIGHT, PX_PER_MINUTE, HOURS_TO_SHOW, CHANNEL_COLUMN_WIDTH, PHONE_CHANNEL_COLUMN_WIDTH, parseDate } from './guideConstants';
+import { useIsPhone } from '../../../hooks/useIsPhone';
 import { useGuideData } from './hooks/useGuideData';
 import { useGuideVirtualization } from './hooks/useGuideVirtualization';
 import GuideRow, { type CleanedProgram } from './components/GuideRow';
@@ -38,6 +39,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
     }, []);
 
     const [containerWidth, setContainerWidth] = useState(0);
+    const channelColumnWidth = useIsPhone() ? PHONE_CHANNEL_COLUMN_WIDTH : CHANNEL_COLUMN_WIDTH;
 
     const timelineStart = useMemo(() => {
         const now = new Date();
@@ -49,10 +51,10 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
 
     const hoursToShow = useMemo(() => {
         if (containerWidth <= 0) return HOURS_TO_SHOW;
-        const availableForTimeline = containerWidth - CHANNEL_COLUMN_WIDTH;
+        const availableForTimeline = containerWidth - channelColumnWidth;
         const neededHours = Math.ceil(availableForTimeline / (PX_PER_MINUTE * 60));
         return Math.max(HOURS_TO_SHOW, neededHours);
-    }, [containerWidth]);
+    }, [containerWidth, channelColumnWidth]);
 
     const { timelineEnd, timeMarkers } = useMemo(() => {
         const end = new Date(timelineStart.getTime() + hoursToShow * 60 * 60 * 1000);
@@ -667,13 +669,13 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                 className="relative flex-1 overflow-auto"
                 style={{ background: 'var(--vora-bg-canvas)' }}
             >
-                <div style={{ width: `${256 + timelineWidth}px`, minHeight: '100%' }}>
+                <div style={{ width: `${channelColumnWidth + timelineWidth}px`, minHeight: '100%' }}>
                     <div
                         className="sticky top-0 z-40 flex h-12"
                         style={{ background: 'var(--vora-bg-surface)', borderBottom: '1px solid var(--vora-border-subtle)' }}
                     >
                         <div
-                            className="sticky left-0 z-50 flex w-64 shrink-0 items-center justify-center text-xs font-semibold uppercase tracking-wider"
+                            className="sticky left-0 z-50 flex w-64 shrink-0 items-center justify-center text-xs font-semibold uppercase tracking-wider max-md:w-[88px] max-md:text-[10px]"
                             style={{ background: 'var(--vora-bg-surface)', borderRight: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-muted)' }}
                         >
                             Channels
@@ -703,7 +705,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                             <div
                                 className="pointer-events-none absolute bottom-0 top-0 z-30 w-0.5"
                                 style={{
-                                    left: `${256 + currentTimelineX}px`,
+                                    left: `${channelColumnWidth + currentTimelineX}px`,
                                     height: `${visibleCount * ROW_HEIGHT}px`,
                                     background: 'var(--vora-danger-500)',
                                     boxShadow: '0 0 12px color-mix(in srgb, var(--vora-danger-500) 70%, transparent)',

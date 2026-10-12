@@ -38,13 +38,13 @@ export default function ServerSwitcher() {
             <button
                 type="button"
                 onClick={() => setOpen(o => !o)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-[var(--vora-radius-md)] hover:bg-[var(--vora-bg-sunken)] transition-colors cursor-pointer text-sm font-semibold text-[var(--vora-text-primary)]"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-[var(--vora-radius-md)] hover:bg-[var(--vora-bg-sunken)] transition-colors cursor-pointer text-sm font-semibold text-[var(--vora-text-primary)] max-md:px-2"
                 title="Switch server"
             >
                 <span className="w-6 h-6 rounded-md bg-[var(--vora-accent-soft)] text-[var(--vora-accent-text)] flex items-center justify-center text-xs font-bold uppercase">
                     {displayName.charAt(0)}
                 </span>
-                <span className="truncate max-w-[160px]">{displayName}</span>
+                <span className="truncate max-w-[160px] max-md:max-w-[6rem]">{displayName}</span>
                 <svg className="w-3.5 h-3.5 text-[var(--vora-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" /></svg>
             </button>
 

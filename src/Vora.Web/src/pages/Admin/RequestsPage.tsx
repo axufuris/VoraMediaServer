@@ -118,7 +118,7 @@ export default function RequestsPage() {
                 description="Manage user media requests and monitor Radarr/Sonarr download status."
             />
 
-            <div className="px-8 pb-10 max-w-7xl mx-auto pt-2">
+            <div className="px-8 max-md:px-4 pb-10 max-w-7xl mx-auto pt-2">
                 <div className="flex gap-2 mb-6">
                             {statusPills.map(pill => {
                                 const count = requests.filter(r => r.status === pill.value).length;

@@ -8,7 +8,7 @@ export default function RadioPage() {
                 title="Radio"
                 subtitle="Live stations by country and genre."
             />
-            <div className="px-8 pt-6">
+            <div className="px-8 max-md:px-4 pt-6">
                 <RadioTab />
             </div>
         </div>

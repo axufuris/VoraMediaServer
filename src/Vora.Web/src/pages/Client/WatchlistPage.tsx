@@ -47,7 +47,7 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
                 />
             )}
 
-            <div className="px-8 pt-2">
+            <div className="px-8 max-md:px-4 pt-2">
                 {isLoading ? (
                     <MediaGrid>
                         {Array.from({ length: 12 }, (_, i) => <div key={i} className="vora-skeleton aspect-[2/3]" />)}

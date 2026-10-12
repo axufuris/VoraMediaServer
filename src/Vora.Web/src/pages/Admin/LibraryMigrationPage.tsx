@@ -357,7 +357,7 @@ export default function LibraryMigrationPage() {
         <div data-vora-page="">
             <PageHeader title="Library Migration" description={subtitle} />
 
-            <div className="px-8 pt-6 pb-10 max-w-4xl mx-auto space-y-4">
+            <div className="px-8 max-md:px-4 pt-6 pb-10 max-w-4xl mx-auto space-y-4">
                 {restoringJob && !activeJob && (
                     <p className="text-sm text-[var(--vora-text-muted)]">Restoring previous migration...</p>
                 )}

@@ -81,8 +81,8 @@ export default function ProfileHistoryPage() {
     const totalPages = Math.ceil(totalItems / pageSize) || 1;
 
     return (
-        <div className="p-8 pt-24 bg-[var(--vora-bg-sunken)] min-h-full text-[var(--vora-text-secondary)] font-sans">
-            <h1 className="text-3xl font-bold text-[var(--vora-text-primary)] mb-8 border-b border-[var(--vora-border-subtle)] pb-4">Play History</h1>
+        <div className="p-8 pt-24 max-md:p-4 max-md:pt-6 bg-[var(--vora-bg-sunken)] min-h-full text-[var(--vora-text-secondary)] font-sans">
+            <h1 className="text-3xl max-md:text-2xl font-bold text-[var(--vora-text-primary)] mb-8 max-md:mb-5 border-b border-[var(--vora-border-subtle)] pb-4">Play History</h1>
 
             {isServerAdmin && userAccount?.profiles && (
                 <div className="mb-6">
@@ -121,13 +121,13 @@ export default function ProfileHistoryPage() {
                     ))}
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 max-md:w-full">
                     <input
                         type="text"
                         placeholder="Search history..."
                         value={search}
                         onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                        className="bg-[var(--vora-bg-surface)] border border-[var(--vora-border-subtle)] rounded-md px-4 py-2 w-64 focus:outline-none focus:border-[var(--vora-accent-500)] text-[var(--vora-text-primary)] text-sm shadow-sm"
+                        className="bg-[var(--vora-bg-surface)] border border-[var(--vora-border-subtle)] rounded-md px-4 py-2 w-64 max-md:w-auto max-md:min-w-0 max-md:flex-1 focus:outline-none focus:border-[var(--vora-accent-500)] text-[var(--vora-text-primary)] text-sm shadow-sm"
                     />
                     <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} className="bg-[var(--vora-bg-surface)] border border-[var(--vora-border-subtle)] rounded-md px-3 py-2 text-sm text-[var(--vora-text-secondary)] focus:outline-none cursor-pointer shadow-sm">
                         <option value={25}>25 / page</option>

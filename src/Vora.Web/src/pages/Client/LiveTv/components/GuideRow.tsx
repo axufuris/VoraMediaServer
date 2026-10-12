@@ -49,7 +49,7 @@ export default function GuideRow({
             <div
                 onClick={() => onPlay(channel, currentProgram)}
                 onMouseEnter={() => onHover(channel, currentProgram || null)}
-                className="vora-guide-channel sticky left-0 z-20 flex w-64 shrink-0 cursor-pointer items-center gap-3 p-3 transition-colors"
+                className="vora-guide-channel sticky left-0 z-20 flex w-64 shrink-0 cursor-pointer items-center gap-3 p-3 transition-colors max-md:w-[88px] max-md:flex-col max-md:justify-center max-md:gap-1 max-md:p-2"
                 style={{
                     background: isCurrentlyPlaying ? 'var(--vora-bg-raised)' : 'var(--vora-bg-surface)',
                     borderLeft: `3px solid ${isCurrentlyPlaying ? 'var(--vora-accent-500)' : 'transparent'}`,
@@ -57,7 +57,7 @@ export default function GuideRow({
                 }}
             >
                 <div
-                    className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full"
+                    className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full max-md:h-10 max-md:w-10"
                     style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
                 >
                     {channel.logoUrl ? (
@@ -74,24 +74,24 @@ export default function GuideRow({
                         </span>
                     )}
                 </div>
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1.5">
+                <div className="min-w-0 flex-1 max-md:w-full max-md:flex-none">
+                    <div className="flex items-center justify-between gap-1.5 max-md:justify-center">
                         <h3
-                            className="m-0 truncate text-sm font-semibold"
+                            className="m-0 truncate text-sm font-semibold max-md:text-[11px]"
                             style={{ color: isCurrentlyPlaying ? 'var(--vora-accent-text)' : 'var(--vora-text-primary)' }}
                         >
                             {channel.name}
                         </h3>
                         {channel.resolution && channel.resolution !== 'Unknown' && (
                             <span
-                                className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold"
+                                className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold max-md:hidden"
                                 style={{ background: 'var(--vora-accent-soft)', color: 'var(--vora-accent-text)' }}
                             >
                                 {channel.resolution}
                             </span>
                         )}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2">
+                    <div className="mt-0.5 flex items-center gap-2 max-md:hidden">
                         {channel.playlistName && (
                             <span
                                 className="shrink-0 truncate rounded px-1 py-0.5 text-[9px] font-medium"

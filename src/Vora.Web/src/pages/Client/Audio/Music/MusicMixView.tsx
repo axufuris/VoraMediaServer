@@ -104,7 +104,7 @@ export default function MusicMixView({
                     {coverLabel && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-[var(--vora-text-primary)] drop-shadow-lg">
                             <div className="text-xs uppercase tracking-widest text-[var(--vora-accent-text)] font-bold">{coverLabel}</div>
-                            <div className="text-lg sm:text-xl font-bold text-center px-2">{currentMix.descriptionTag ?? 'Mix'}</div>
+                            <div className="text-lg sm:text-xl font-bold text-center px-2 max-md:line-clamp-4 max-md:text-sm">{currentMix.descriptionTag ?? 'Mix'}</div>
                         </div>
                     )}
                 </div>

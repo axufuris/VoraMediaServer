@@ -111,7 +111,7 @@ export default function MusicPlaylistView({
                             onDragOver={canEdit ? onDragOver : undefined}
                             onDrop={canEdit ? e => onDrop(e, index) : undefined}
                             onClick={() => onPlay(index, false)}
-                            className={`vora-row-interactive group flex cursor-pointer items-center gap-3 rounded border border-transparent p-2 transition-all ${draggedIndex === index ? 'opacity-50' : ''}`}
+                            className={`vora-row-interactive group flex cursor-pointer items-center gap-3 rounded border border-transparent p-2 transition-all max-md:gap-2 max-md:px-1 ${draggedIndex === index ? 'opacity-50' : ''}`}
                         >
                             <div className="w-6 shrink-0 text-right text-sm tabular-nums text-[var(--vora-text-muted)] group-hover:text-[var(--vora-accent-text)] sm:w-8">
                                 {index + 1}
@@ -155,7 +155,7 @@ export default function MusicPlaylistView({
                                     </>
                                 )}
                             </div>
-                            <div className="w-12 shrink-0 text-right text-xs tabular-nums text-[var(--vora-text-muted)]">{formatDuration(track.durationSeconds)}</div>
+                            <div className="w-12 shrink-0 text-right text-xs tabular-nums text-[var(--vora-text-muted)] max-md:w-9">{formatDuration(track.durationSeconds)}</div>
                             {canEdit && (
                                 <button
                                     type="button"

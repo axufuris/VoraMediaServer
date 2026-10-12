@@ -68,7 +68,7 @@ export default function PodcastNowPlaying({
                 </>
             }
         >
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center px-8 pb-4">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center px-8 pb-4 max-md:px-4">
                 <NowPlayingArtwork
                     artworkKey={episode.id}
                     posterUrl={episode.posterUrl}

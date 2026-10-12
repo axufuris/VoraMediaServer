@@ -96,9 +96,9 @@ function MarkerCoverageCard({ libraryId, libraryType, serverId }: { libraryId: s
 
     return (
         <div className="vora-card p-5 space-y-4">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start max-md:gap-3">
                 <h2 className="text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Marker coverage</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 max-md:flex-wrap">
                     <button
                         type="button"
                         onClick={load}
@@ -189,9 +189,9 @@ function ThumbnailCoverageCard({ libraryId, libraryType, enabled, serverId }: { 
 
     return (
         <div className="vora-card p-5 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between max-md:flex-col max-md:items-start max-md:gap-3">
                 <h2 className="text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Video preview thumbnails</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 max-md:flex-wrap">
                     <button type="button" onClick={load} disabled={loading} className="vora-button-secondary text-xs disabled:opacity-50">
                         {loading ? 'Refreshing…' : 'Refresh'}
                     </button>
@@ -274,7 +274,7 @@ export default function ManageLibrary() {
         return (
             <div data-vora-page="">
                 <PageHeader title="Manage Library" />
-                <div className="p-8 max-w-5xl mx-auto"><div className="vora-skeleton h-64" /></div>
+                <div className="p-8 max-md:p-4 max-w-5xl mx-auto"><div className="vora-skeleton h-64" /></div>
             </div>
         );
     }
@@ -373,7 +373,7 @@ export default function ManageLibrary() {
                 }
             />
 
-            <div className="px-8 pb-10 max-w-5xl mx-auto pt-6 space-y-6">
+            <div className="px-8 max-md:px-4 pb-10 max-w-5xl mx-auto pt-6 space-y-6">
                 <div className="vora-card p-5 flex flex-wrap gap-2">
                     <button
                         type="button"

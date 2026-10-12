@@ -124,7 +124,7 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
         return (
             <div className="min-h-full pb-16">
                 {!embedded && <PageHeader title="My Playlists" subtitle="Curated by you, by us, and by smart rules." />}
-                <div className="px-8">
+                <div className="px-8 max-md:px-4">
                     <div className="vora-skeleton mb-6 h-10 w-64" />
                     <div className="grid grid-cols-2 gap-6 md:grid-cols-4 lg:grid-cols-6">
                         {Array.from({ length: 6 }, (_, i) => <div key={i} className="vora-skeleton aspect-square" />)}
@@ -150,12 +150,12 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
     return (
         <div className="min-h-full pb-16">
             {embedded ? (
-                <div className="flex justify-end px-8 pt-4">{newAction}</div>
+                <div className="flex justify-end px-8 max-md:px-4 pt-4">{newAction}</div>
             ) : (
                 <PageHeader title="My Playlists" subtitle="Curated by you, by us, and by smart rules." actions={newAction} />
             )}
 
-            <div className="px-8">
+            <div className="px-8 max-md:px-4">
                 {/* Whose playlists is the primary split; the media type is a filter
                     within it. In the Music tab the type is already fixed, so only
                     the split shows. */}

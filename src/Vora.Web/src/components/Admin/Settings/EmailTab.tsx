@@ -248,7 +248,7 @@ export default function EmailTab({ serverId }: EmailTabProps) {
                     <p className="text-sm text-[var(--vora-text-muted)]">No email has been sent from this server yet.</p>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
+                        <table className="w-full text-sm max-md:min-w-[36rem]">
                             <thead>
                                 <tr className="text-[10px] font-bold uppercase tracking-wider text-[var(--vora-text-muted)] border-b border-[var(--vora-border-subtle)]">
                                     <th className="text-left py-2 pr-3">Status</th>

@@ -226,7 +226,7 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
 
     if (isLoading) {
         return (
-            <div className="p-10">
+            <div className="p-10 max-md:p-4">
                 <div className="vora-skeleton mb-6 h-10 w-64" />
                 <div className="vora-skeleton mb-6 h-8 w-96" />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -262,10 +262,10 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
             )}
 
             {embedded && backAction && (
-                <div className="px-8 pt-6">{backAction}</div>
+                <div className="px-8 max-md:px-4 pt-6">{backAction}</div>
             )}
 
-            <div className={embedded ? 'px-8 pt-6' : 'px-8'}>
+            <div className={embedded ? 'px-8 max-md:px-4 pt-6' : 'px-8 max-md:px-4'}>
                 <Tabs<DvrTabKey>
                     tabs={[
                         { key: 'Completed', label: 'Completed', badge: tabBadge(counts.Completed) },
@@ -277,7 +277,7 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
                 />
             </div>
 
-            <div className="px-8 pt-6">
+            <div className="px-8 max-md:px-4 pt-6">
                 {filteredSessions.length === 0 ? (
                     <EmptyState
                         title={`No ${activeTab.toLowerCase()} recordings`}

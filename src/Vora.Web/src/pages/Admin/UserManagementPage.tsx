@@ -60,7 +60,7 @@ export default function UserManagementPage() {
         return (
             <div data-vora-page="">
                 <PageHeader title="Users & Access" description="Manage accounts, profiles, and library permissions." />
-                <div className="p-8 max-w-6xl mx-auto">
+                <div className="p-8 max-md:p-4 max-w-6xl mx-auto">
                     <div className="vora-skeleton h-32" />
                 </div>
             </div>
@@ -79,7 +79,7 @@ export default function UserManagementPage() {
                 }
             />
 
-            <div className="p-8 max-w-6xl mx-auto space-y-10">
+            <div className="p-8 max-md:p-4 max-w-6xl mx-auto space-y-10">
                 <SignUpCard serverId={serverId} invitationsPath={serverId ? `/admin/server/${serverId}/invitations` : '/admin/invitations'} />
 
                 <section className="space-y-4">

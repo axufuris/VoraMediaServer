@@ -31,7 +31,7 @@ interface StatCardProps {
 
 export default function StatCard({ label, value, unit, delta, tone = 'default', icon, footer, className }: StatCardProps) {
     return (
-        <div className={`vora-card relative overflow-hidden p-5 ${className ?? ''}`}>
+        <div className={`vora-card relative overflow-hidden p-5 max-md:p-4 ${className ?? ''}`}>
             {tone !== 'default' && (
                 <span className={`absolute left-0 top-0 bottom-0 w-1 ${TONE_RAIL[tone]}`} />
             )}
@@ -40,7 +40,7 @@ export default function StatCard({ label, value, unit, delta, tone = 'default', 
                 {icon && <span className="text-[var(--vora-text-muted)] shrink-0">{icon}</span>}
             </div>
             <div className="flex items-baseline gap-1">
-                <div className={`text-3xl font-semibold tabular-nums leading-none ${TONE_VALUE[tone]}`}>{value}</div>
+                <div className={`text-3xl font-semibold tabular-nums leading-none max-md:text-2xl ${TONE_VALUE[tone]}`}>{value}</div>
                 {unit && <div className="text-sm font-medium text-[var(--vora-text-muted)]">{unit}</div>}
             </div>
             {delta && (

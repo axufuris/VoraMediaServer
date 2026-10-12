@@ -383,7 +383,7 @@ export default function OverlayEditor() {
                 description="Compose badges (resolution, content rating, audio codec, ratings) onto your posters."
             />
 
-            <div className="flex flex-col lg:flex-row gap-6 px-8 pt-4 pb-8 lg:flex-1 lg:min-h-0">
+            <div className="flex flex-col lg:flex-row gap-6 px-8 max-md:px-4 pt-4 pb-8 lg:flex-1 lg:min-h-0">
 
                 <div className="w-full lg:w-80 shrink-0 vora-card p-5 lg:overflow-y-auto flex flex-col">
                     <div className="mb-6">

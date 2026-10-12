@@ -295,7 +295,7 @@ export default function PluginsPage() {
                 }
             />
 
-            <div className="p-8 max-w-5xl mx-auto space-y-8">
+            <div className="p-8 max-md:p-4 max-w-5xl mx-auto space-y-8">
                 {!loading && plugins.length > 0 && (
                     <div className="space-y-3">
                         <div className="relative">

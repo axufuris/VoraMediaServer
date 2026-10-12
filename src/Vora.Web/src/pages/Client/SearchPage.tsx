@@ -122,7 +122,7 @@ export default function SearchPage() {
         <div className="min-h-full pb-16">
             <PageHeader title={`Search results for "${query}"`} subtitle={hasResults ? 'Tap any result to open it.' : undefined} />
 
-            <div className="px-8">
+            <div className="px-8 max-md:px-4">
                 {failedServerCount > 0 && (
                     <div
                         className="mb-6 rounded-md px-3 py-2 text-xs font-medium"

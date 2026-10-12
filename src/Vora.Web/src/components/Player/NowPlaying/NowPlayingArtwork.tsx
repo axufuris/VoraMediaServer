@@ -13,10 +13,10 @@ interface NowPlayingArtworkProps {
 export function NowPlayingArtwork({ artworkKey, posterUrl, title, subtitle, meta, fallbackIcon, fit = 'cover' }: NowPlayingArtworkProps) {
     return (
         <>
-            <div className="flex flex-1 shrink-0 items-end pb-6">
+            <div className="flex flex-1 shrink-0 items-end pb-6 max-md:pb-4">
                 <div
                     key={artworkKey}
-                    className="aspect-square w-[min(420px,55vh)] overflow-hidden"
+                    className="aspect-square w-[min(420px,55vh)] overflow-hidden max-md:w-[min(calc(100vw-2rem),40vh)]"
                     style={{
                         borderRadius: 'var(--vora-radius-lg)',
                         boxShadow: 'var(--vora-shadow-overlay)',
@@ -34,9 +34,9 @@ export function NowPlayingArtwork({ artworkKey, posterUrl, title, subtitle, meta
                 </div>
             </div>
 
-            <div className="mt-5 w-full max-w-[640px] shrink-0 text-center">
+            <div className="mt-5 w-full max-w-[640px] shrink-0 text-center max-md:mt-2">
                 <h1
-                    className="m-0 truncate text-3xl font-semibold"
+                    className="m-0 truncate text-3xl font-semibold max-md:text-2xl"
                     style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}
                     title={title}
                 >

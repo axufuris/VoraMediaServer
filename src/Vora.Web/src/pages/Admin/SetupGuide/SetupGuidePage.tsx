@@ -248,7 +248,7 @@ export default function SetupGuidePage() {
                 description={current.group ? `${current.group} · ${current.title}` : current.title}
                 actions={<button type="button" onClick={skipSetup} className="vora-button-secondary !px-3 !py-1.5 text-xs">{finished ? 'Close guide' : 'Skip setup'}</button>}
             />
-            <div className="mx-auto grid w-full max-w-6xl flex-1 gap-7 px-4 pt-6 pb-8 md:px-8 lg:grid-cols-[240px_minmax(0,1fr)]">
+            <div className="mx-auto grid w-full max-w-6xl flex-1 gap-7 px-4 pt-6 pb-8 md:px-8 lg:grid-cols-[240px_minmax(0,1fr)] max-md:content-start">
                 <aside className="flex flex-col gap-3 self-start lg:sticky lg:top-24" aria-label="Setup steps">
                     <div className="flex items-center justify-between gap-2">
                         <span className="text-xs text-[var(--vora-text-muted)]">Step <b className="tabular-nums text-[var(--vora-text-secondary)]">{index + 1}</b> of <b className="tabular-nums text-[var(--vora-text-secondary)]">{steps.length}</b></span>

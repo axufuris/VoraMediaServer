@@ -57,6 +57,34 @@ const getEventTheme = (mediaType: string): EventTheme => {
     }
 };
 
+const eventKindLabel = (ev: CalendarEventVM): string => ev.mediaType === 'Movie'
+    ? (ev.releaseType === 'Theatrical' ? 'Theatrical' : 'Digital')
+    : (ev.airTime ? formatTime(ev.releaseDate) : 'TV');
+
+function AgendaEvent({ ev, onEventClick }: { ev: CalendarEventVM; onEventClick: (ev: CalendarEventVM) => void }) {
+    const theme = getEventTheme(ev.mediaType);
+    return (
+        <button
+            type="button"
+            onClick={() => onEventClick(ev)}
+            className="flex w-full cursor-pointer items-center gap-3 rounded-lg p-3 text-left transition-colors"
+            style={{ background: theme.background, border: `1px solid ${theme.border}` }}
+        >
+            <span className="w-24 shrink-0 text-xs font-bold uppercase max-md:w-20" style={{ color: theme.text }}>
+                {eventKindLabel(ev)}
+            </span>
+            <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{ev.title}</span>
+                {ev.subTitle && <span className="block truncate text-xs" style={{ color: 'var(--vora-text-muted)' }}>{ev.subTitle}</span>}
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5">
+                {ev.isWatchlisted && <span className="h-2 w-2 rounded-full" title="On Watchlist" style={{ background: 'var(--vora-info-500)' }} />}
+                {ev.isInLibrary && <span className="h-2 w-2 rounded-full" title="In Library" style={{ background: 'var(--vora-success-500)' }} />}
+            </span>
+        </button>
+    );
+}
+
 function DayAgenda({ day, events, onEventClick }: {
     day: Date | undefined;
     events: CalendarEventVM[];
@@ -74,30 +102,54 @@ function DayAgenda({ day, events, onEventClick }: {
 
     return (
         <div className="flex-1 space-y-2 overflow-y-auto p-4" style={{ background: 'var(--vora-bg-canvas)' }}>
-            {events.map(ev => {
-                const theme = getEventTheme(ev.mediaType);
+            {events.map(ev => <AgendaEvent key={ev.id} ev={ev} onEventClick={onEventClick} />)}
+        </div>
+    );
+}
+
+function RangeAgenda({ days, eventsOn, emptyLabel, onEventClick }: {
+    days: Date[];
+    eventsOn: (day: Date) => CalendarEventVM[];
+    emptyLabel: string;
+    onEventClick: (ev: CalendarEventVM) => void;
+}) {
+    if (days.length === 0) {
+        return (
+            <div className="p-10 text-center text-sm" style={{ color: 'var(--vora-text-muted)' }}>
+                {emptyLabel}
+            </div>
+        );
+    }
+
+    const today = new Date().toDateString();
+
+    return (
+        <div style={{ background: 'var(--vora-bg-canvas)' }}>
+            {days.map((day, idx) => {
+                const isToday = day.toDateString() === today;
+                const dayEvents = eventsOn(day);
                 return (
-                    <button
-                        key={ev.id}
-                        type="button"
-                        onClick={() => onEventClick(ev)}
-                        className="flex w-full cursor-pointer items-center gap-3 rounded-lg p-3 text-left transition-colors"
-                        style={{ background: theme.background, border: `1px solid ${theme.border}` }}
+                    <section
+                        key={day.toDateString()}
+                        aria-label={day.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                        className="p-3"
+                        style={idx > 0 ? { borderTop: '1px solid var(--vora-border-subtle)' } : undefined}
                     >
-                        <span className="w-24 shrink-0 text-xs font-bold uppercase" style={{ color: theme.text }}>
-                            {ev.mediaType === 'Movie'
-                                ? (ev.releaseType === 'Theatrical' ? 'Theatrical' : 'Digital')
-                                : (ev.airTime ? formatTime(ev.releaseDate) : 'TV')}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{ev.title}</span>
-                            {ev.subTitle && <span className="block truncate text-xs" style={{ color: 'var(--vora-text-muted)' }}>{ev.subTitle}</span>}
-                        </span>
-                        <span className="flex shrink-0 items-center gap-1.5">
-                            {ev.isWatchlisted && <span className="h-2 w-2 rounded-full" title="On Watchlist" style={{ background: 'var(--vora-info-500)' }} />}
-                            {ev.isInLibrary && <span className="h-2 w-2 rounded-full" title="In Library" style={{ background: 'var(--vora-success-500)' }} />}
-                        </span>
-                    </button>
+                        <h3
+                            className="m-0 mb-2 text-xs font-semibold uppercase tracking-widest"
+                            style={{ color: isToday ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)' }}
+                        >
+                            {day.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                            {isToday && ' · Today'}
+                        </h3>
+                        {dayEvents.length === 0 ? (
+                            <p className="m-0 text-sm" style={{ color: 'var(--vora-text-disabled)' }}>Nothing releases.</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {dayEvents.map(ev => <AgendaEvent key={ev.id} ev={ev} onEventClick={onEventClick} />)}
+                            </div>
+                        )}
+                    </section>
                 );
             })}
         </div>
@@ -162,6 +214,10 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
         ? events.filter(e => isSameLocalDay(parseServerDate(e.releaseDate), day))
         : [];
 
+    const agendaDays = viewMode === 'month'
+        ? daysInGrid.filter(day => day.getMonth() === currentDate.getMonth() && eventsOn(day).length > 0)
+        : daysInGrid;
+
     const viewToggle = (
         <div
             className="flex items-center gap-1 rounded-full p-1"
@@ -191,7 +247,7 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
 
     const rangeControls = (
         <div
-            className="flex items-center gap-2 rounded-full p-1.5"
+            className="flex items-center gap-2 rounded-full p-1.5 max-md:w-full max-md:justify-between"
             style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)' }}
         >
             <button
@@ -211,7 +267,7 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
             >
                 Today
             </button>
-            <h2 className="m-0 w-44 text-center text-sm font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{rangeLabel}</h2>
+            <h2 className="m-0 w-44 text-center text-sm font-semibold max-md:w-auto max-md:min-w-0 max-md:flex-1" style={{ color: 'var(--vora-text-primary)' }}>{rangeLabel}</h2>
             <button
                 type="button"
                 onClick={handleNext}
@@ -232,9 +288,9 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
     );
 
     return (
-        <div className="flex h-full min-h-0 flex-col pb-6">
+        <div className="flex h-full min-h-0 flex-col pb-6 max-md:h-auto">
             {embedded ? (
-                <div className="flex justify-end px-8 pt-4">
+                <div className="flex justify-end px-8 max-md:px-4 pt-4">
                     {navAction}
                 </div>
             ) : (
@@ -245,10 +301,10 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
                 />
             )}
 
-            <div className="relative flex min-h-0 flex-1 flex-col px-8">
+            <div className="relative flex min-h-0 flex-1 flex-col px-8 max-md:px-4">
                 {isLoading && (
                     <div
-                        className="pointer-events-none absolute inset-x-8 inset-y-0 z-10 flex items-center justify-center rounded-2xl text-sm font-semibold backdrop-blur-sm"
+                        className="pointer-events-none absolute inset-x-8 inset-y-0 z-10 max-md:inset-x-4 flex items-center justify-center rounded-2xl text-sm font-semibold backdrop-blur-sm"
                         style={{ background: 'color-mix(in srgb, var(--vora-bg-canvas) 50%, transparent)', color: 'var(--vora-accent-text)' }}
                     >
                         Loading events…
@@ -256,7 +312,7 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
                 )}
 
                 <div
-                    className="flex min-h-[500px] flex-1 flex-col overflow-hidden rounded-2xl"
+                    className="flex min-h-[500px] flex-1 flex-col overflow-hidden rounded-2xl max-md:min-h-0 max-md:flex-none"
                     style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)' }}
                 >
                     {viewMode === 'day' ? (
@@ -266,84 +322,92 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
                             onEventClick={handleEventClick}
                         />
                     ) : (<>
-                    <div
-                        className="grid shrink-0 grid-cols-7 gap-px"
-                        style={{ background: 'var(--vora-border-subtle)', borderBottom: '1px solid var(--vora-border-subtle)' }}
-                    >
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                            <div
-                                key={day}
-                                className="py-2 text-center text-xs font-semibold uppercase tracking-widest"
-                                style={{ background: 'var(--vora-bg-canvas)', color: 'var(--vora-text-muted)' }}
-                            >
-                                {day}
-                            </div>
-                        ))}
+                    <div className="md:hidden">
+                        <RangeAgenda
+                            days={agendaDays}
+                            eventsOn={eventsOn}
+                            emptyLabel="Nothing releases this month."
+                            onEventClick={handleEventClick}
+                        />
                     </div>
-
-                    <div
-                        className="grid min-h-0 flex-1 grid-cols-7 gap-px"
-                        style={{ background: 'var(--vora-border-subtle)', gridTemplateRows: `repeat(${daysInGrid.length / 7}, minmax(0, 1fr))` }}
-                    >
-                        {daysInGrid.map((day, idx) => {
-                            const isCurrentMonth = viewMode === 'week' || day.getMonth() === currentDate.getMonth();
-                            const isToday = new Date().toDateString() === day.toDateString();
-                            const dayEvents = eventsOn(day);
-
-                            return (
+                    <div className="contents max-md:hidden">
+                        <div
+                            className="grid shrink-0 grid-cols-7 gap-px"
+                            style={{ background: 'var(--vora-border-subtle)', borderBottom: '1px solid var(--vora-border-subtle)' }}
+                        >
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                                 <div
-                                    key={idx}
-                                    className="flex min-h-0 flex-col p-2 transition-colors"
-                                    style={{
-                                        background: isCurrentMonth ? 'var(--vora-bg-canvas)' : 'color-mix(in srgb, var(--vora-bg-canvas) 65%, transparent)',
-                                        opacity: isCurrentMonth ? 1 : 0.5,
-                                    }}
+                                    key={day}
+                                    className="py-2 text-center text-xs font-semibold uppercase tracking-widest"
+                                    style={{ background: 'var(--vora-bg-canvas)', color: 'var(--vora-text-muted)' }}
                                 >
-                                    <div className="mb-1 flex shrink-0 items-start justify-between">
-                                        <span
-                                            className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold"
-                                            style={isToday
-                                                ? { background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', boxShadow: '0 0 0 2px var(--vora-accent-soft)' }
-                                                : { color: 'var(--vora-text-muted)' }}
-                                        >
-                                            {day.getDate()}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex-1 space-y-1.5 overflow-y-auto pr-0.5">
-                                        {dayEvents.map(ev => {
-                                            const theme = getEventTheme(ev.mediaType);
-                                            return (
-                                                <button
-                                                    key={ev.id}
-                                                    type="button"
-                                                    onClick={() => handleEventClick(ev)}
-                                                    className="block w-full cursor-pointer rounded-md p-1.5 text-left transition-all hover:scale-[1.02]"
-                                                    style={{
-                                                        background: theme.background,
-                                                        border: `1px solid ${theme.border}`,
-                                                    }}
-                                                >
-                                                    <div className="mb-0.5 flex items-center justify-between gap-1">
-                                                        <span className="truncate text-[10px] font-bold uppercase" style={{ color: theme.text }}>
-                                                            {ev.mediaType === 'Movie'
-                                                                ? (ev.releaseType === 'Theatrical' ? 'Theatrical' : 'Digital')
-                                                                : (ev.airTime ? formatTime(ev.releaseDate) : 'TV')}
-                                                        </span>
-                                                        <div className="flex shrink-0 items-center gap-1">
-                                                            {ev.isWatchlisted && <span className="h-1.5 w-1.5 rounded-full" title="On Watchlist" style={{ background: 'var(--vora-info-500)' }} />}
-                                                            {ev.isInLibrary && <span className="h-1.5 w-1.5 rounded-full" title="In Library" style={{ background: 'var(--vora-success-500)' }} />}
-                                                        </div>
-                                                    </div>
-                                                    <div className="truncate text-xs font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{ev.title}</div>
-                                                    {ev.subTitle && <div className="truncate text-[10px]" style={{ color: 'var(--vora-text-muted)' }}>{ev.subTitle}</div>}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                    {day}
                                 </div>
-                            );
-                        })}
+                            ))}
+                        </div>
+
+                        <div
+                            className="grid min-h-0 flex-1 grid-cols-7 gap-px"
+                            style={{ background: 'var(--vora-border-subtle)', gridTemplateRows: `repeat(${daysInGrid.length / 7}, minmax(0, 1fr))` }}
+                        >
+                            {daysInGrid.map((day, idx) => {
+                                const isCurrentMonth = viewMode === 'week' || day.getMonth() === currentDate.getMonth();
+                                const isToday = new Date().toDateString() === day.toDateString();
+                                const dayEvents = eventsOn(day);
+
+                                return (
+                                    <div
+                                        key={idx}
+                                        className="flex min-h-0 flex-col p-2 transition-colors"
+                                        style={{
+                                            background: isCurrentMonth ? 'var(--vora-bg-canvas)' : 'color-mix(in srgb, var(--vora-bg-canvas) 65%, transparent)',
+                                            opacity: isCurrentMonth ? 1 : 0.5,
+                                        }}
+                                    >
+                                        <div className="mb-1 flex shrink-0 items-start justify-between">
+                                            <span
+                                                className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold"
+                                                style={isToday
+                                                    ? { background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', boxShadow: '0 0 0 2px var(--vora-accent-soft)' }
+                                                    : { color: 'var(--vora-text-muted)' }}
+                                            >
+                                                {day.getDate()}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex-1 space-y-1.5 overflow-y-auto pr-0.5">
+                                            {dayEvents.map(ev => {
+                                                const theme = getEventTheme(ev.mediaType);
+                                                return (
+                                                    <button
+                                                        key={ev.id}
+                                                        type="button"
+                                                        onClick={() => handleEventClick(ev)}
+                                                        className="block w-full cursor-pointer rounded-md p-1.5 text-left transition-all hover:scale-[1.02]"
+                                                        style={{
+                                                            background: theme.background,
+                                                            border: `1px solid ${theme.border}`,
+                                                        }}
+                                                    >
+                                                        <div className="mb-0.5 flex items-center justify-between gap-1">
+                                                            <span className="truncate text-[10px] font-bold uppercase" style={{ color: theme.text }}>
+                                                                {eventKindLabel(ev)}
+                                                            </span>
+                                                            <div className="flex shrink-0 items-center gap-1">
+                                                                {ev.isWatchlisted && <span className="h-1.5 w-1.5 rounded-full" title="On Watchlist" style={{ background: 'var(--vora-info-500)' }} />}
+                                                                {ev.isInLibrary && <span className="h-1.5 w-1.5 rounded-full" title="In Library" style={{ background: 'var(--vora-success-500)' }} />}
+                                                            </div>
+                                                        </div>
+                                                        <div className="truncate text-xs font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{ev.title}</div>
+                                                        {ev.subTitle && <div className="truncate text-[10px]" style={{ color: 'var(--vora-text-muted)' }}>{ev.subTitle}</div>}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                     </>)}
                 </div>

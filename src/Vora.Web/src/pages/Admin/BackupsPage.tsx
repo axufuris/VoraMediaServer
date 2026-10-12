@@ -40,14 +40,14 @@ export default function BackupsPage() {
                 description="Create configuration snapshots, schedule automatic backups, and restore from a backup file. Configuration backups stay small; user-data sections can be large and are flagged accordingly."
             />
 
-            <div className="px-8 pt-2 max-w-7xl mx-auto">
+            <div className="px-8 max-md:px-4 pt-2 max-w-7xl mx-auto">
                 <div className="flex gap-2 border-b border-[var(--vora-border-subtle)] mb-2">
                     <TabButton id="backups" activeTab={activeTab} setActiveTab={setActiveTab}>Backups</TabButton>
                     <TabButton id="settings" activeTab={activeTab} setActiveTab={setActiveTab}>Settings</TabButton>
                 </div>
             </div>
 
-            <div className="px-8 pb-10 max-w-7xl mx-auto pt-6">
+            <div className="px-8 max-md:px-4 pb-10 max-w-7xl mx-auto pt-6">
                 {activeTab === 'backups' && <BackupsTab serverId={serverId} />}
                 {activeTab === 'settings' && <SettingsTab serverId={serverId} />}
             </div>
@@ -237,7 +237,7 @@ interface BackupRowProps {
 function BackupRow({ item, onRestore, onDownload, onDelete }: BackupRowProps) {
     return (
         <div className="vora-card p-4 flex flex-wrap items-center gap-3 justify-between">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 max-md:basis-full">
                 <div className="font-mono text-sm text-[var(--vora-text-primary)] truncate">{item.fileName}</div>
                 <div className="text-xs text-[var(--vora-text-muted)] mt-1 flex flex-wrap gap-3">
                     <span>{formatDate(item.createdAtUtc)}</span>

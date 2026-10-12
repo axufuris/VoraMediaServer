@@ -401,7 +401,7 @@ export default function LiveTvPlayer() {
                 onPlaying={() => setIsVideoLoading(false)}
                 onCanPlay={() => setIsVideoLoading(false)}
                 className={`bg-black transition-all duration-500 ease-in-out
-                    ${isMinimized ? 'absolute bottom-4 left-6 z-20 h-16 w-16 cursor-pointer rounded-md object-cover shadow-lg hover:ring-2 hover:ring-[var(--vora-accent-500)]'
+                    ${isMinimized ? 'absolute bottom-4 left-6 z-20 h-16 w-16 cursor-pointer rounded-md object-cover shadow-lg hover:ring-2 hover:ring-[var(--vora-accent-500)] max-md:left-3'
                         : showOverlayGuide ? 'absolute left-0 top-0 z-[9001] h-[40vh] w-1/2 object-contain shadow-2xl lg:w-[40%]'
                             : 'absolute left-0 top-0 z-0 h-[100vh] w-full object-contain'}`}
             />
@@ -418,8 +418,8 @@ export default function LiveTvPlayer() {
             )}
 
             {isMinimized && (
-                <div className="z-10 flex h-full w-full flex-1 items-center justify-between px-6">
-                    <div className="flex w-1/4 items-center gap-4 pl-24">
+                <div className="z-10 flex h-full w-full flex-1 items-center justify-between px-6 max-md:gap-2 max-md:px-3">
+                    <div className="flex w-1/4 items-center gap-4 pl-24 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:pl-[4.75rem]">
                         <div className="flex flex-col overflow-hidden">
                             <span
                                 className="cursor-pointer truncate font-semibold hover:underline"
@@ -434,8 +434,8 @@ export default function LiveTvPlayer() {
                         </div>
                     </div>
 
-                    <div className="flex max-w-2xl flex-1 flex-col items-center justify-center px-8">
-                        <div className="mb-2 flex items-center gap-4">
+                    <div className="flex max-w-2xl flex-1 flex-col items-center justify-center px-8 max-md:flex-none max-md:px-0">
+                        <div className="mb-2 flex items-center gap-4 max-md:mb-0 max-md:gap-3">
                             <button
                                 type="button"
                                 onClick={() => handleChannelChange('prev')}
@@ -445,9 +445,9 @@ export default function LiveTvPlayer() {
                             >
                                 <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
                             </button>
-                            {canTimeshift && <SkipButton seconds={10} direction="back" size="sm" onClick={() => skipBackward(10)} />}
+                            {canTimeshift && <div className="contents max-md:hidden"><SkipButton seconds={10} direction="back" size="sm" onClick={() => skipBackward(10)} /></div>}
                             <PlayPauseButton isPlaying={isPlaying} onClick={togglePlayPause} size="sm" />
-                            {canTimeshift && <SkipButton seconds={30} direction="forward" size="sm" onClick={() => skipForward(30)} />}
+                            {canTimeshift && <div className="contents max-md:hidden"><SkipButton seconds={30} direction="forward" size="sm" onClick={() => skipForward(30)} /></div>}
                             <button
                                 type="button"
                                 onClick={() => handleChannelChange('next')}
@@ -458,7 +458,7 @@ export default function LiveTvPlayer() {
                                 <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
                             </button>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 max-md:hidden">
                             <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: 'var(--vora-danger-500)' }} />
                             <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--vora-danger-text)' }}>Live</span>
 
@@ -473,7 +473,7 @@ export default function LiveTvPlayer() {
                         </div>
                     </div>
 
-                    <div className="flex w-1/4 items-center justify-end gap-4">
+                    <div className="flex w-1/4 items-center justify-end gap-4 max-md:w-auto max-md:gap-1">
                         <MaximizeButton onClick={() => setMinimized(false)} />
                         <CloseButton onClick={closePlayer} />
                     </div>
@@ -490,20 +490,20 @@ export default function LiveTvPlayer() {
                     }}
                 >
 
-                    <div className="pointer-events-auto flex items-start justify-between p-8">
+                    <div className="pointer-events-auto flex items-start justify-between p-8 max-md:gap-3 max-md:p-4">
                         <button
                             type="button"
                             onClick={closePlayer}
                             aria-label="Close player"
-                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10"
+                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10 max-md:h-10 max-md:w-10 max-md:shrink-0"
                             style={{ background: 'rgba(20, 20, 28, 0.55)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}
                         >
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
                         </button>
 
                         <div className="flex flex-col items-center text-center">
-                            <h1 className="m-0 text-2xl font-semibold drop-shadow-lg" style={{ color: '#fafafa', letterSpacing: '-0.01em' }}>{currentMedia.title}</h1>
-                            <p className="m-0 mt-1 text-lg drop-shadow-md" style={{ color: 'rgba(255, 255, 255, 0.82)' }}>{activeProgram?.title || currentMedia.subtitle}</p>
+                            <h1 className="m-0 text-2xl font-semibold drop-shadow-lg max-md:text-lg" style={{ color: '#fafafa', letterSpacing: '-0.01em' }}>{currentMedia.title}</h1>
+                            <p className="m-0 mt-1 text-lg drop-shadow-md max-md:text-base" style={{ color: 'rgba(255, 255, 255, 0.82)' }}>{activeProgram?.title || currentMedia.subtitle}</p>
                             <div className="mt-2 inline-flex items-center gap-2">
                                 <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: 'var(--vora-danger-500)' }} />
                                 <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--vora-danger-text)' }}>Live</span>
@@ -515,7 +515,7 @@ export default function LiveTvPlayer() {
                             onClick={() => setMinimized(true)}
                             aria-label="Minimize to mini-player"
                             title="Minimize to mini-player"
-                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10"
+                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10 max-md:h-10 max-md:w-10 max-md:shrink-0"
                             style={{ background: 'rgba(20, 20, 28, 0.55)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}
                         >
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
@@ -525,10 +525,10 @@ export default function LiveTvPlayer() {
                     {/* BOTTOM CONTROLS & SCRUBBER */}
                     <div className="relative w-full pointer-events-auto">
 
-                        <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between p-8 pb-12" style={{ color: '#fafafa' }}>
-                            <div className="flex w-1/3 items-center gap-6"></div>
+                        <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between p-8 pb-12 max-md:flex-wrap max-md:gap-y-4 max-md:px-4 max-md:pt-4 max-md:pb-6" style={{ color: '#fafafa' }}>
+                            <div className="flex w-1/3 items-center gap-6 max-md:hidden"></div>
 
-                            <div className="flex w-1/3 items-center justify-center gap-6">
+                            <div className="flex w-1/3 items-center justify-center gap-6 max-md:w-full max-md:gap-4">
                                 <button
                                     type="button"
                                     onClick={() => handleChannelChange('prev')}
@@ -550,7 +550,7 @@ export default function LiveTvPlayer() {
                                 </button>
                             </div>
 
-                            <div className="flex w-1/3 items-center justify-end gap-3">
+                            <div className="flex w-1/3 items-center justify-end gap-3 max-md:w-full max-md:flex-wrap max-md:justify-center">
                                 {canRecord && isActivelyRecording ? (
                                     <div
                                         className="inline-flex cursor-default items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wider backdrop-blur-md"
@@ -609,7 +609,9 @@ export default function LiveTvPlayer() {
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
                                 </button>
 
-                                <VolumeControl value={volume} onChange={setVolume} />
+                                <div className="contents max-md:hidden">
+                                    <VolumeControl value={volume} onChange={setVolume} />
+                                </div>
 
                                 <FullscreenButton onClick={toggleFullScreen} />
                             </div>

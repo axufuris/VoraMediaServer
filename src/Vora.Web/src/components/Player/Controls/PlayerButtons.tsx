@@ -18,7 +18,7 @@ export function PlayPauseButton({ isPlaying, onClick, size = 'lg', tone = 'accen
             type="button"
             onClick={onClick}
             aria-label={isPlaying ? 'Pause' : 'Play'}
-            className="flex cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105"
+            className="flex cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105 max-md:shrink-0"
             style={{
                 width: dimension,
                 height: dimension,

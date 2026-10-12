@@ -339,7 +339,7 @@ export default function AdminTemplateSchedulesPage() {
                 actions={headerActions}
             />
 
-            <div className="px-8 pt-6">
+            <div className="px-8 max-md:px-4 pt-6">
                 <section className="mb-8">
                     <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Default template</h2>
                     <p className="m-0 mb-4 text-sm" style={{ color: 'var(--vora-text-muted)' }}>

@@ -76,7 +76,7 @@ export default function TaskDashboard() {
                 }
             />
 
-            <div className="p-8 max-w-5xl mx-auto">
+            <div className="p-8 max-md:p-4 max-w-5xl mx-auto">
                 {total === 0 ? (
                     <div className="vora-card">
                         <EmptyState
@@ -86,8 +86,8 @@ export default function TaskDashboard() {
                         />
                     </div>
                 ) : (
-                    <div className="vora-card overflow-hidden">
-                        <table className="w-full text-left table-fixed">
+                    <div className="vora-card overflow-hidden max-md:overflow-x-auto">
+                        <table className="w-full text-left table-fixed max-md:min-w-[36rem]">
                             <thead>
                                 <tr className="bg-[var(--vora-bg-sunken)] border-b border-[var(--vora-border-subtle)] text-xs uppercase tracking-wider text-[var(--vora-text-muted)]">
                                     <th className="px-5 py-3 font-semibold w-32">Status</th>

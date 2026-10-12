@@ -300,7 +300,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
     if (isLoading) return (
         <div data-vora-page="">
             <PageHeader title={pageTitle} />
-            <div className="px-8 max-w-[1400px] mx-auto"><div className="vora-skeleton h-64" /></div>
+            <div className="px-8 max-md:px-4 max-w-[1400px] mx-auto"><div className="vora-skeleton h-64" /></div>
         </div>
     );
 
@@ -311,7 +311,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                 description={isRadio ? 'Add radio playlists and configure providers.' : 'Manage IPTV playlists and electronic program guide (EPG) sources.'}
             />
 
-            <div className="px-8 pt-6 pb-10 max-w-[1400px] mx-auto">
+            <div className="px-8 max-md:px-4 pt-6 pb-10 max-w-[1400px] mx-auto">
                 <FeatureToggle
                     featureKey={isRadio ? 'internetRadio' : 'liveTv'}
                     label={`Enable ${pageTitle}`}
@@ -484,7 +484,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                         </button>
                     </div>
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
+                        <table className="w-full text-left max-md:min-w-[40rem]">
                             <thead className="bg-[var(--vora-bg-sunken)] border-b border-[var(--vora-border-subtle)] text-[11px] uppercase tracking-wider text-[var(--vora-text-muted)]">
                                 <tr>
                                     <th className="px-4 py-3 font-semibold w-1/4">Name</th>
@@ -626,7 +626,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                         </div>
                     </div>
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
+                        <table className="w-full text-left max-md:min-w-[40rem]">
                             <thead className="bg-[var(--vora-bg-sunken)] border-b border-[var(--vora-border-subtle)] text-[11px] uppercase tracking-wider text-[var(--vora-text-muted)]">
                                 <tr>
                                     <th className="px-4 py-3 font-semibold w-1/4">Name</th>

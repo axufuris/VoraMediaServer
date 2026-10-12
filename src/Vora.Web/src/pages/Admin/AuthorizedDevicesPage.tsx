@@ -94,7 +94,7 @@ export default function AuthorizedDevicesPage() {
                 }
             />
 
-            <div className="p-8 max-w-7xl mx-auto">
+            <div className="p-8 max-md:p-4 max-w-7xl mx-auto">
                 {loading ? (
                     <div className="vora-skeleton h-64" />
                 ) : devices.length === 0 ? (

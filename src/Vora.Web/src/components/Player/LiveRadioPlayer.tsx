@@ -345,10 +345,10 @@ export default function LiveRadioPlayer() {
             <video ref={videoRef} autoPlay playsInline className="hidden" />
 
             {!hiddenForFullscreen && (showBar ? (
-                <div className="flex h-full w-full items-center justify-between px-6">
-                    <div className="flex min-w-0 flex-1 items-center gap-4">
+                <div className="flex h-full w-full items-center justify-between px-6 max-md:gap-2 max-md:px-3">
+                    <div className="flex min-w-0 flex-1 items-center gap-4 max-md:gap-3">
                         <div
-                            className="flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md transition-all hover:ring-2"
+                            className="flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md transition-all hover:ring-2 max-md:h-12 max-md:w-12"
                             onClick={expandPlayer}
                             title={isMusic ? 'Open Now Playing' : 'Expand player'}
                             style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
@@ -371,13 +371,13 @@ export default function LiveRadioPlayer() {
                         </div>
                     </div>
 
-                    <div className="mx-8 flex items-center gap-4">
+                    <div className="mx-8 flex items-center gap-4 max-md:mx-0 max-md:gap-3">
                         {!isAudioOnDemand && (
                             <button
                                 type="button"
                                 onClick={() => handleChannelChange('prev')}
                                 title="Previous station"
-                                className="cursor-pointer transition-colors"
+                                className="cursor-pointer transition-colors max-md:hidden"
                                 style={{ color: 'var(--vora-text-muted)' }}
                             >
                                 <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
@@ -389,15 +389,15 @@ export default function LiveRadioPlayer() {
                                 onClick={previousTrack}
                                 disabled={!hasPrevious && currentTime <= 3}
                                 title="Previous track"
-                                className="cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-30"
+                                className="cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-30 max-md:hidden"
                                 style={{ color: 'var(--vora-text-muted)' }}
                             >
                                 <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
                             </button>
                         )}
-                        {isAudioOnDemand && <SkipButton seconds={10} direction="back" size="sm" onClick={() => skipBackward(10)} />}
+                        {isAudioOnDemand && <div className="contents max-md:hidden"><SkipButton seconds={10} direction="back" size="sm" onClick={() => skipBackward(10)} /></div>}
                         <PlayPauseButton isPlaying={isPlaying} onClick={togglePlayPause} size="sm" />
-                        {isAudioOnDemand && <SkipButton seconds={30} direction="forward" size="sm" onClick={() => skipForward(30)} />}
+                        {isAudioOnDemand && <div className="contents max-md:hidden"><SkipButton seconds={30} direction="forward" size="sm" onClick={() => skipForward(30)} /></div>}
                         {!isAudioOnDemand && (
                             <button
                                 type="button"
@@ -422,15 +422,17 @@ export default function LiveRadioPlayer() {
                             </button>
                         )}
                         {!isAudioOnDemand && (
-                            <div className="ml-2 flex items-center gap-2">
+                            <div className="ml-2 flex items-center gap-2 max-md:hidden">
                                 <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: 'var(--vora-accent-500)' }} />
                                 <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--vora-accent-text)' }}>On air</span>
                             </div>
                         )}
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <VolumeControl value={volume} onChange={setVolume} />
+                    <div className="flex items-center gap-3 max-md:gap-1">
+                        <div className="contents max-md:hidden">
+                            <VolumeControl value={volume} onChange={setVolume} />
+                        </div>
                         <MaximizeButton onClick={expandPlayer} />
                         <CloseButton onClick={closePlayer} />
                     </div>

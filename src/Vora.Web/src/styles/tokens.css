@@ -146,6 +146,29 @@
 }
 
 /*
+ * Phones. Everything at 48rem and wider keeps the values above; below it the
+ * page gutter narrows and cards are sized from the screen width, so a grid
+ * fits three posters (four small tiles) across on any phone and a row shows
+ * the edge of the next card.
+ */
+@media (width < 48rem) {
+    :root {
+        --vora-card-w-xs: clamp(4.25rem, calc((100vw - 5.25rem) / 4), 5.5rem);
+        --vora-card-w-sm: 5.75rem;
+        --vora-card-w-md: clamp(5.5rem, calc((100vw - 5rem) / 3), 7rem);
+        --vora-card-w-lg: 8rem;
+        --vora-card-min-w: 5.5rem;
+        --vora-card-min-w-xs: 4.25rem;
+        --vora-card-gap: 0.75rem;
+        --vora-card-title-size: 0.8125rem;
+        --vora-person-w: 5.75rem;
+        --vora-person-w-sm: 4.75rem;
+        --vora-video-w: 13rem;
+        --vora-row-gutter: 1rem;
+    }
+}
+
+/*
  * Admin-shell scope: any element under [data-vora-admin] inherits the typography
  * baseline. Page bodies on the client side stay untouched until we templatize
  * the client too.

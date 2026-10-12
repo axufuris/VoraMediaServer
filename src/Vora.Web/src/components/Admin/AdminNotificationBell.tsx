@@ -129,7 +129,7 @@ export default function AdminNotificationBell() {
                 </button>
 
                 {isOpen && (
-                    <div className="absolute right-0 top-full mt-1 w-[380px] max-w-[90vw] vora-card shadow-[var(--vora-shadow-lg)] z-50 overflow-hidden">
+                    <div className="absolute right-0 top-full mt-1 w-[380px] max-w-[90vw] vora-card shadow-[var(--vora-shadow-lg)] z-50 overflow-hidden max-md:fixed max-md:inset-x-2 max-md:top-14 max-md:w-auto max-md:max-w-none">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--vora-border-subtle)]">
                             <h3 className="text-sm font-semibold text-[var(--vora-text-primary)]">Notifications</h3>
                             {items.some(n => !n.isRead) && (
@@ -163,7 +163,7 @@ export default function AdminNotificationBell() {
                 )}
             </div>
 
-            <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none">
+            <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none max-md:bottom-4 max-md:left-4 max-md:right-4">
                 {toasts.map((t, i) => {
                     const cls = severityClasses(t.severity);
                     return (

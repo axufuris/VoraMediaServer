@@ -167,10 +167,10 @@ export default function CollectionDetailsPage() {
                 <CinematicBackdrop src={collection.backdropUrl || collection.posterUrl} intensity="detail" parallax transitionKey={collection.id} />
             </div>
 
-            <div className="relative z-10 w-full flex-1 px-12 pt-8">
+            <div className="relative z-10 w-full flex-1 px-12 max-md:px-4 pt-8">
 
-                <div className="flex flex-col md:flex-row gap-10 mb-16">
-                    <div className="w-64 shrink-0">
+                <div className="flex flex-col md:flex-row gap-10 mb-16 max-md:gap-5 max-md:mb-10">
+                    <div className="w-64 shrink-0 max-md:w-36">
                         <div className="aspect-[2/3] rounded-lg overflow-hidden shadow-2xl border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)]">
                             {collection.posterUrl ? (
                                 <img src={collection.posterUrl} alt={collection.title} className="w-full h-full object-cover" />
@@ -180,9 +180,9 @@ export default function CollectionDetailsPage() {
                         </div>
                     </div>
 
-                    <div className="flex-1 pt-4">
-                        <div className="flex items-center gap-4 mb-4">
-                            <h1 className="text-5xl font-bold text-[var(--vora-text-primary)] drop-shadow-lg">{collection.title}</h1>
+                    <div className="flex-1 pt-4 max-md:pt-0">
+                        <div className="flex items-center gap-4 mb-4 max-md:flex-wrap max-md:gap-3">
+                            <h1 className="text-5xl max-md:text-3xl font-bold text-[var(--vora-text-primary)] drop-shadow-lg">{collection.title}</h1>
 
                             {isAdmin && (
                                 <div className="flex gap-2">
@@ -224,15 +224,15 @@ export default function CollectionDetailsPage() {
                             )}
                         </div>
 
-                        <p className="text-lg text-[var(--vora-text-secondary)] leading-relaxed max-w-4xl shadow-sm">
+                        <p className="text-lg max-md:text-base text-[var(--vora-text-secondary)] leading-relaxed max-w-4xl shadow-sm">
                             {collection.description || "No description available."}
                         </p>
                     </div>
                 </div>
 
                 <div>
-                    <div className="flex items-center justify-between gap-4 mb-6 border-b border-[var(--vora-border-subtle)] pb-2">
-                        <h2 className="text-2xl font-bold text-[var(--vora-text-primary)]">
+                    <div className="flex items-center justify-between gap-4 mb-6 border-b border-[var(--vora-border-subtle)] pb-2 max-md:flex-wrap max-md:gap-2">
+                        <h2 className="text-2xl max-md:text-xl font-bold text-[var(--vora-text-primary)]">
                             Items in Collection ({collection.itemCount})
                         </h2>
 

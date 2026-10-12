@@ -202,7 +202,7 @@ export default function DiscoveryDetailsPage() {
                     overview={details.overview}
                 />
 
-                <div className="px-12 pb-16">
+                <div className="px-12 max-md:px-4 pb-16">
                     <div className="mt-8">
                         <CastRow
                             cast={details.cast.map((actor, idx) => {

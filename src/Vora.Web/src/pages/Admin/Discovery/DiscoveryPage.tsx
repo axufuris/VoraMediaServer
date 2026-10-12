@@ -65,7 +65,7 @@ export default function DiscoveryPage() {
                 description="Curate the dynamic rows that appear on the client Discover page."
             />
 
-            <div className="px-8 pt-6 pb-10 max-w-6xl mx-auto">
+            <div className="px-8 max-md:px-4 pt-6 pb-10 max-w-6xl mx-auto">
                 <FeatureToggle
                     featureKey="discover"
                     label="Enable Discover"

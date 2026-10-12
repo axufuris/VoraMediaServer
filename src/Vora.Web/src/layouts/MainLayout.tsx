@@ -9,6 +9,7 @@ import { deviceService } from '../api/Users/deviceService';
 import { usePlayer } from '../contexts/usePlayer';
 import { serverVault } from '../utils/serverVault';
 import ServerManagerModal from '../components/Layout/ServerManagerModal';
+import PhoneNavDrawer from '../components/Layout/PhoneNavDrawer';
 import LiveTvPlayer from '../components/Player/LiveTvPlayer';
 import LiveRadioPlayer from '../components/Player/LiveRadioPlayer';
 import NowPlayingFullscreen from '../components/Player/NowPlayingFullscreen';
@@ -103,6 +104,8 @@ export default function MainLayout() {
     const [showUnpinned, setShowUnpinned] = useState(false);
 
     const [isServerManagerOpen, setIsServerManagerOpen] = useState(false);
+    const [isPhoneNavOpen, setIsPhoneNavOpen] = useState(false);
+    const closePhoneNav = useCallback(() => setIsPhoneNavOpen(false), []);
 
     const flags = useFeatureFlags();
 
@@ -337,7 +340,7 @@ export default function MainLayout() {
     return (
         <div
             data-vora-client=""
-            className={`flex h-screen overflow-hidden transition-all duration-300 ${currentMedia && isMinimized ? 'pb-24' : ''}`}
+            className={`flex h-screen overflow-hidden max-md:h-dvh transition-all duration-300 ${currentMedia && isMinimized ? 'pb-24' : ''}`}
             style={{ background: 'var(--vora-bg-canvas)', color: 'var(--vora-text-primary)' }}
         >
 
@@ -347,23 +350,27 @@ export default function MainLayout() {
                 onServerAdded={loadNav}
             />
 
-            <MainLayoutSidebar
-                navItems={gatedNavItems}
-                pinnedItems={pinnedItems}
-                unpinnedItems={unpinnedItems}
-                isEditingNav={isEditingNav}
-                showUnpinned={showUnpinned}
-                onToggleEditNav={setIsEditingNav}
-                onToggleShowUnpinned={() => setShowUnpinned(!showUnpinned)}
-                onMoveItem={moveItem}
-                onTogglePin={togglePin}
-            />
+            <PhoneNavDrawer open={isPhoneNavOpen} onClose={closePhoneNav}>
+                <MainLayoutSidebar
+                    navItems={gatedNavItems}
+                    pinnedItems={pinnedItems}
+                    unpinnedItems={unpinnedItems}
+                    isEditingNav={isEditingNav}
+                    showUnpinned={showUnpinned}
+                    onToggleEditNav={setIsEditingNav}
+                    onToggleShowUnpinned={() => setShowUnpinned(!showUnpinned)}
+                    onMoveItem={moveItem}
+                    onTogglePin={togglePin}
+                />
+            </PhoneNavDrawer>
 
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                 <MainLayoutUserMenu
                     profileName={profileName}
                     isProfileMenuOpen={isProfileMenuOpen}
                     isServerAdmin={isServerAdmin}
+                    isPhoneNavOpen={isPhoneNavOpen}
+                    onOpenPhoneNav={() => setIsPhoneNavOpen(true)}
                     onToggleMenu={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
                     onCloseMenu={() => setIsProfileMenuOpen(false)}
                     onManageServers={() => { setIsProfileMenuOpen(false); setIsServerManagerOpen(true); }}
