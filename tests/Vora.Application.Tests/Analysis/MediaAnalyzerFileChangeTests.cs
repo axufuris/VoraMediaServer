@@ -29,6 +29,7 @@ public sealed class MediaAnalyzerFileChangeTests : IDisposable
             Substitute.For<IMarkerAssembler>(),
             new AudioIntroDetector(new AudioFingerprintComparer()),
             settings,
+            Substitute.For<Vora.Application.Settings.IHardwareCapabilityService>(),
             Substitute.For<Vora.Application.Streaming.ISubtitleExtractionService>(),
             Substitute.For<Vora.Application.Subtitles.IExternalSubtitleScanner>(),
             Substitute.For<ITaskQueueManager>(),

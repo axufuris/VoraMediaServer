@@ -1,4 +1,5 @@
 using Vora.Application.Analysis.Results;
+using Vora.Application.Settings;
 
 namespace Vora.Application.Analysis;
 
@@ -23,12 +24,7 @@ public class SilenceDetectionParameters
 
     public bool SamplePictureInTail { get; set; }
 
-    // Decode on the GPU (NVDEC via -hwaccel) when the server has hardware
-    // acceleration enabled — 10-bit HEVC (~all of a modern library) decodes far
-    // faster there. Frames still land in system memory for the CPU black/silence
-    // filters; on any hardware failure the pass retries in software.
-    public bool UseHardwareDecode { get; set; }
-    public string? HardwareDevice { get; set; }
+    public HardwareAccelerator? HardwareDecoder { get; set; }
 }
 
 public interface IMediaAnalyzerService

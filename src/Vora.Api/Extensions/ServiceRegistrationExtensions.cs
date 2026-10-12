@@ -523,6 +523,7 @@ public static class ServiceRegistrationExtensions
         services.AddHostedService<DvrStorageMonitorWorker>();
         services.AddHostedService<DvrWorker>();
         services.AddHostedService<EmailDispatchWorker>();
+        services.AddHostedService<HardwareDetectionWorker>();
         services.AddHostedService<PodcastFeedRefreshWorker>();
         services.AddHostedService<RecommendationRefreshWorker>();
         services.AddHostedService<ScheduledJobWorker>();

@@ -3005,6 +3005,9 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<int>("HardwareAccelerationType")
+                        .HasColumnType("integer");
+
                     b.Property<string>("HardwareTranscodingDevice")
                         .IsRequired()
                         .HasMaxLength(32)

@@ -52,6 +52,7 @@ public class MediaAnalyzerManagerDetectionTests
             _media, _analyzer, _assembler,
             new AudioIntroDetector(new AudioFingerprintComparer()),
             _settings,
+            Substitute.For<Vora.Application.Settings.IHardwareCapabilityService>(),
             Substitute.For<Vora.Application.Streaming.ISubtitleExtractionService>(),
             Substitute.For<Vora.Application.Subtitles.IExternalSubtitleScanner>(),
             _queue, _notifier,

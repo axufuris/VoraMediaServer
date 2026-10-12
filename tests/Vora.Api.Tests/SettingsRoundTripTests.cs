@@ -1,13 +1,18 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Vora.Api.Tests.Infra;
 using Vora.Application.Settings.ViewModels;
+using Vora.Domain.Enums;
 
 namespace Vora.Api.Tests;
 
 public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
 {
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+
     private readonly VoraApiTestFactory _factory;
 
     public SettingsRoundTripTests(VoraApiTestFactory factory)
@@ -31,7 +36,7 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
         var response = await client.GetAsync("/api/settings/server", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var settings = await response.Content.ReadFromJsonAsync<ServerSettingsVM>(TestContext.Current.CancellationToken);
+        var settings = await response.Content.ReadFromJsonAsync<ServerSettingsVM>(Json, TestContext.Current.CancellationToken);
         settings.Should().NotBeNull();
         settings!.ServerName.Should().NotBeNullOrEmpty();
         settings.NightlyScanTime.Should().MatchRegex(@"^\d{2}:\d{2}$");
@@ -42,7 +47,7 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
+        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", Json, TestContext.Current.CancellationToken);
         current.Should().NotBeNull();
 
         current!.ServerName = "Round-Trip Server";
@@ -50,16 +55,18 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
         current.DvrPreRollSeconds = 90;
         current.DailyMixCount = 8;
         current.TimeshiftMaxSessionHours = 4;
+        current.HardwareAccelerationType = HardwareAccelerationType.QuickSync;
 
-        var put = await client.PutAsJsonAsync("/api/settings/server", current, TestContext.Current.CancellationToken);
+        var put = await client.PutAsJsonAsync("/api/settings/server", current, Json, TestContext.Current.CancellationToken);
         put.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
+        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", Json, TestContext.Current.CancellationToken);
         refreshed!.ServerName.Should().Be("Round-Trip Server");
         refreshed.NightlyScanTime.Should().Be("03:30");
         refreshed.DvrPreRollSeconds.Should().Be(90);
         refreshed.DailyMixCount.Should().Be(8);
         refreshed.TimeshiftMaxSessionHours.Should().Be(4);
+        refreshed.HardwareAccelerationType.Should().Be(HardwareAccelerationType.QuickSync);
     }
 
     [Fact]
@@ -67,11 +74,11 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
+        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", Json, TestContext.Current.CancellationToken);
         current!.VideoThumbnailWidth = 9999;
 
-        await client.PutAsJsonAsync("/api/settings/server", current, TestContext.Current.CancellationToken);
-        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
+        await client.PutAsJsonAsync("/api/settings/server", current, Json, TestContext.Current.CancellationToken);
+        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", Json, TestContext.Current.CancellationToken);
 
         refreshed!.VideoThumbnailWidth.Should().Be(1280);
     }
@@ -81,11 +88,11 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
+        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", Json, TestContext.Current.CancellationToken);
         current!.SilenceThresholdOffsetDb = -999;
 
-        await client.PutAsJsonAsync("/api/settings/server", current, TestContext.Current.CancellationToken);
-        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
+        await client.PutAsJsonAsync("/api/settings/server", current, Json, TestContext.Current.CancellationToken);
+        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", Json, TestContext.Current.CancellationToken);
 
         refreshed!.SilenceThresholdOffsetDb.Should().Be(-40);
     }
@@ -95,11 +102,11 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
+        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", Json, TestContext.Current.CancellationToken);
         current!.DailyMixDriftPercent = 250;
 
-        await client.PutAsJsonAsync("/api/settings/server", current, TestContext.Current.CancellationToken);
-        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
+        await client.PutAsJsonAsync("/api/settings/server", current, Json, TestContext.Current.CancellationToken);
+        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", Json, TestContext.Current.CancellationToken);
 
         refreshed!.DailyMixDriftPercent.Should().Be(100);
     }
@@ -109,11 +116,11 @@ public class SettingsRoundTripTests : IClassFixture<VoraApiTestFactory>
     {
         var client = AdminClient();
 
-        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
+        var current = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", Json, TestContext.Current.CancellationToken);
         current!.TranscoderTempDirectory = "   ";
 
-        await client.PutAsJsonAsync("/api/settings/server", current, TestContext.Current.CancellationToken);
-        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", TestContext.Current.CancellationToken);
+        await client.PutAsJsonAsync("/api/settings/server", current, Json, TestContext.Current.CancellationToken);
+        var refreshed = await client.GetFromJsonAsync<ServerSettingsVM>("/api/settings/server", Json, TestContext.Current.CancellationToken);
 
         refreshed!.TranscoderTempDirectory.Should().Be("/transcode");
     }

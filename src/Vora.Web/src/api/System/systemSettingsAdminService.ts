@@ -1,5 +1,27 @@
 import { apiClient } from '../client';
 
+export type HardwareAccelerationType = 'Auto' | 'Nvidia' | 'QuickSync' | 'Vaapi' | 'Off';
+export type GpuVendor = 'Unknown' | 'Intel' | 'Amd' | 'Nvidia';
+
+export interface HardwareDevice {
+    id: string;
+    name: string;
+    vendor: GpuVendor;
+}
+
+export interface HardwareCapabilities {
+    devices: HardwareDevice[];
+    detected: HardwareAccelerationType | null;
+    detectedDevice: string | null;
+}
+
+export interface HardwareTestResult {
+    success: boolean;
+    type: HardwareAccelerationType | null;
+    device: string | null;
+    message: string;
+}
+
 export interface ServerSettings {
     serverName: string;
     scheduleTimeZone: string;
@@ -46,6 +68,7 @@ export interface ServerSettings {
     disableVideoTranscoding: boolean;
     useHardwareAcceleration: boolean;
     useHardwareEncoding: boolean;
+    hardwareAccelerationType: HardwareAccelerationType;
     enableHevcEncoding: number;
     enableHevcOptimization: boolean;
     maxGpuTranscodes: number;
@@ -104,8 +127,12 @@ export const systemSettingsAdminService = {
         const response = await apiClient.get<ServerSettings>('/settings/server', { serverId });
         return response.data;
     },
-    getHardwareDevices: async (serverId?: string): Promise<string[]> => {
-        const response = await apiClient.get<string[]>('/settings/hardware-devices', { serverId });
+    getHardware: async (serverId?: string): Promise<HardwareCapabilities> => {
+        const response = await apiClient.get<HardwareCapabilities>('/settings/hardware', { serverId });
+        return response.data;
+    },
+    testHardware: async (type: HardwareAccelerationType, device: string, serverId?: string): Promise<HardwareTestResult> => {
+        const response = await apiClient.post<HardwareTestResult>('/settings/hardware/test', { type, device }, { serverId });
         return response.data;
     },
     updateServerSettings: async (settings: ServerSettings, serverId?: string): Promise<void> => {

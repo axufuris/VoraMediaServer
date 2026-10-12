@@ -123,7 +123,40 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         (await after.Set<MediaItem>().AsNoTracking().Select(m => m.FullyRefreshedAt).ToListAsync(cancellationToken)).Should().BeEmpty();
         (await after.PendingTasks.AsNoTracking().Select(t => t.Id).ToListAsync(cancellationToken)).Should().Equal(saved.Id);
         (await SmartListOrderAsync(after, cancellationToken)).Should().Equal(listsBefore);
-        (await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken)).AiPlaylistMatchWindow.Should().Be(0.07);
+        var settings = await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
+        settings.AiPlaylistMatchWindow.Should().Be(0.07);
+        settings.HardwareAccelerationType.Should().Be(HardwareAccelerationType.Auto);
+    }
+
+    [Fact]
+    public async Task A_database_on_the_1_1_migration_only_gains_the_hardware_acceleration_choice()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        await legacy.BuildSecondReleaseStateAsync(cancellationToken);
+
+        var saved = new PendingTask { Id = Guid.NewGuid(), Sequence = 1, Kind = "QueueLibraryAnalysis", Name = "Analyze Library: Movies", QueuedAt = DateTime.UtcNow };
+        List<(Guid Id, int Order, string? Key)> listsBefore;
+        await using (var before = legacy.NewContext())
+        {
+            before.PendingTasks.Add(saved);
+            await before.SaveChangesAsync(cancellationToken);
+            await before.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"HardwareTranscodingDevice\" = '/dev/dri/renderD128', \"AiPlaylistMatchWindow\" = 0.07", cancellationToken);
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            listsBefore = await SmartListOrderAsync(before, cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var settings = await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
+        settings.HardwareAccelerationType.Should().Be(HardwareAccelerationType.Auto);
+        settings.HardwareTranscodingDevice.Should().Be("/dev/dri/renderD128");
+        settings.AiPlaylistMatchWindow.Should().Be(0.07);
+        (await after.PendingTasks.AsNoTracking().Select(t => t.Id).ToListAsync(cancellationToken)).Should().Equal(saved.Id);
+        (await SmartListOrderAsync(after, cancellationToken)).Should().Equal(listsBefore);
     }
 
     [Fact]

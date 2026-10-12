@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
 using Vora.Application.Streaming.ViewModels;
+using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
 
 namespace Vora.Infrastructure.Transcoding;
@@ -19,13 +20,16 @@ public class FFmpegTranscodeService : ITranscodeService
     private static readonly ConcurrentDictionary<Guid, TranscodeProcess> _activeTranscodes = new();
     private static readonly ConcurrentDictionary<Guid, TranscodeContext> _transcodeContexts = new();
     private static readonly SemaphoreSlim _transcodeLock = new(1, 1);
+    private static int _launchCounter;
 
     private readonly IServiceProvider _serviceProvider;
+    private readonly IHardwareCapabilityService _hardware;
     private readonly ILogger<FFmpegTranscodeService> _logger;
 
-    public FFmpegTranscodeService(IServiceProvider serviceProvider, ILogger<FFmpegTranscodeService> logger)
+    public FFmpegTranscodeService(IServiceProvider serviceProvider, IHardwareCapabilityService hardware, ILogger<FFmpegTranscodeService> logger)
     {
         _serviceProvider = serviceProvider;
+        _hardware = hardware;
         _logger = logger;
     }
 
@@ -46,12 +50,16 @@ public class FFmpegTranscodeService : ITranscodeService
         var outputFileName = $"{decision.MediaItemId}.m3u8";
         var outputPath = Path.Combine(targetDir, outputFileName);
 
+        var accelerator = settings.UseHardwareAcceleration
+            ? await _hardware.ResolveAsync(settings.HardwareAccelerationType, settings.HardwareTranscodingDevice, cancellationToken)
+            : null;
+
         await _transcodeLock.WaitAsync(cancellationToken);
         try
         {
             int currentGpu = _activeTranscodes.Values.Count(x => x.IsGpu);
             int currentCpu = _activeTranscodes.Values.Count(x => !x.IsGpu);
-            bool attemptHwAccel = settings.UseHardwareAcceleration && settings.UseHardwareEncoding;
+            bool attemptHwAccel = accelerator is not null && settings.UseHardwareEncoding;
             bool willUseGpu = attemptHwAccel && (settings.MaxGpuTranscodes == 0 || currentGpu < settings.MaxGpuTranscodes);
 
             if (willUseGpu)
@@ -80,10 +88,11 @@ public class FFmpegTranscodeService : ITranscodeService
 
             WriteVodPlaylist(outputPath, decision.MediaItemId, durationSeconds, alignedStart);
 
-            var ctx = new TranscodeContext(sourceFilePath, decision, targetDir, durationSeconds, startSegment);
+            var hardware = accelerator is null ? null : new TranscodeHardware(accelerator, Encode: willUseGpu);
+            var ctx = new TranscodeContext(sourceFilePath, decision, targetDir, durationSeconds, startSegment, hardware);
             _transcodeContexts[decision.MediaItemId] = ctx;
 
-            await LaunchFFmpegAsync(decision.MediaItemId, startSegment, alignedStart, settings, willUseGpu);
+            await LaunchFFmpegAsync(decision.MediaItemId, startSegment, alignedStart, settings);
         }
         finally
         {
@@ -120,7 +129,7 @@ public class FFmpegTranscodeService : ITranscodeService
         // The leading edge on disk tells us where it's gotten to.
         int currentStart = ctx.CurrentStartSegment;
         int leadingEdge = ComputeLeadingEdge(mediaItemId, ctx.TargetDir);
-        bool hasActiveProcess = _activeTranscodes.ContainsKey(mediaItemId);
+        bool hasActiveProcess = IsEncoding(mediaItemId);
 
         // If the requested segment is within the range the current encoder
         // will reach soon (start ≤ requested ≤ start+60, ≈4min of buffer),
@@ -213,7 +222,7 @@ public class FFmpegTranscodeService : ITranscodeService
         {
             if (ct.IsCancellationRequested) return false;
             if (await IsSegmentSealedAsync(mediaItemId, segmentIndex, targetDir, ct)) return true;
-            if (!_activeTranscodes.ContainsKey(mediaItemId))
+            if (!IsEncoding(mediaItemId))
             {
                 // FFmpeg exited — give the OS a tick to flush, check once
                 // more, then fail. Without this we'd race the buffer flush
@@ -349,17 +358,12 @@ public class FFmpegTranscodeService : ITranscodeService
             // they're already-encoded ranges the user may seek back to.
             await KillProcessOnlyAsync(mediaItemId);
 
-            using var scope = _serviceProvider.CreateScope();
-            var settingsRepo = scope.ServiceProvider.GetRequiredService<ISystemSettingsRepository>();
-            var settings = await settingsRepo.GetSettingsAsync();
-            bool attemptHwAccel = settings.UseHardwareAcceleration && settings.UseHardwareEncoding;
-            bool willUseGpu = attemptHwAccel;
-
+            var settings = await LoadSettingsAsync();
             var alignedStart = newStartSegment * (double)SegmentSeconds;
             ctx.CurrentStartSegment = newStartSegment;
             ctx.LaunchedAt = DateTime.UtcNow;
             ctx.LastActivityAt = DateTime.UtcNow;
-            await LaunchFFmpegAsync(mediaItemId, newStartSegment, alignedStart, settings, willUseGpu);
+            await LaunchFFmpegAsync(mediaItemId, newStartSegment, alignedStart, settings);
         }
         finally
         {
@@ -415,6 +419,7 @@ public class FFmpegTranscodeService : ITranscodeService
     {
         if (_activeTranscodes.TryRemove(mediaItemId, out var entry))
         {
+            entry.Stopping = true;
             try
             {
                 if (!entry.Process.HasExited)
@@ -496,7 +501,17 @@ public class FFmpegTranscodeService : ITranscodeService
         File.WriteAllText(outputPath, sb.ToString());
     }
 
-    private Task LaunchFFmpegAsync(Guid mediaItemId, int startSegment, double alignedStartSeconds, Domain.Entities.Settings.ServerSetting settings, bool useGpu)
+    private async Task<ServerSetting> LoadSettingsAsync()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<ISystemSettingsRepository>().GetSettingsAsync();
+    }
+
+    private static bool IsEncoding(Guid mediaItemId) =>
+        _activeTranscodes.ContainsKey(mediaItemId)
+        || (_transcodeContexts.TryGetValue(mediaItemId, out var ctx) && ctx.RetryingOnCpu);
+
+    private Task LaunchFFmpegAsync(Guid mediaItemId, int startSegment, double alignedStartSeconds, ServerSetting settings)
     {
         if (!_transcodeContexts.TryGetValue(mediaItemId, out var ctx))
         {
@@ -505,7 +520,10 @@ public class FFmpegTranscodeService : ITranscodeService
 
         var segmentPattern = Path.Combine(ctx.TargetDir, $"{mediaItemId}_%d.ts");
         var internalPlaylist = Path.Combine(ctx.TargetDir, $"_ffmpeg_{mediaItemId}.m3u8");
-        var arguments = BuildFFmpegArguments(ctx.SourceFile, segmentPattern, internalPlaylist, ctx.Decision, settings, useGpu, startSegment, alignedStartSeconds);
+        var hardware = ctx.Hardware;
+        var arguments = BuildFFmpegArguments(ctx.SourceFile, segmentPattern, internalPlaylist, ctx.Decision, settings, hardware, startSegment, alignedStartSeconds, TranscodeHost.Detect());
+        var launch = new TranscodeLaunch(Interlocked.Increment(ref _launchCounter), startSegment, hardware);
+        ctx.LaunchId = launch.Id;
 
         var process = new Process
         {
@@ -521,6 +539,7 @@ public class FFmpegTranscodeService : ITranscodeService
         };
         foreach (var arg in arguments) process.StartInfo.ArgumentList.Add(arg);
 
+        var entry = new TranscodeProcess(process, isGpu: hardware?.Encode == true);
         var stderrBuffer = new StringBuilder();
         process.ErrorDataReceived += (_, args) =>
         {
@@ -529,50 +548,108 @@ public class FFmpegTranscodeService : ITranscodeService
                 lock (stderrBuffer) stderrBuffer.AppendLine(args.Data);
             }
         };
-        var logger = _logger;
         var cmdLine = $"ffmpeg {string.Join(" ", arguments)}";
-        process.Exited += (_, _) =>
-        {
-            if (_activeTranscodes.TryRemove(mediaItemId, out var stale))
-            {
-                var exitCode = -1;
-                try { exitCode = stale.Process.ExitCode; } catch { /* already disposed / never started */ }
-                if (exitCode != 0)
-                {
-                    string stderr;
-                    lock (stderrBuffer) stderr = stderrBuffer.ToString();
-                    logger.LogError(
-                        "FFmpeg transcode exited with code {ExitCode} for {MediaItemId}. Command: {Command}\nStderr: {Stderr}",
-                        exitCode, mediaItemId, cmdLine, stderr);
-                }
-                stale.Process.Dispose();
-            }
-        };
+        process.Exited += (_, _) => OnFFmpegExited(mediaItemId, entry, launch, stderrBuffer, cmdLine);
 
         process.Start();
         process.BeginErrorReadLine();
-        _activeTranscodes[mediaItemId] = new TranscodeProcess(process, useGpu);
+        _activeTranscodes[mediaItemId] = entry;
         _logger.LogInformation("FFmpeg transcode launched for {MediaItemId} startSegment={StartSegment}: {Command}",
             mediaItemId, startSegment, cmdLine);
         return Task.CompletedTask;
     }
 
-    private static List<string> BuildFFmpegArguments(
+    private void OnFFmpegExited(Guid mediaItemId, TranscodeProcess entry, TranscodeLaunch launch, StringBuilder stderrBuffer, string cmdLine)
+    {
+        int exitCode;
+        try { exitCode = entry.Process.ExitCode; } catch (InvalidOperationException) { exitCode = -1; }
+        bool failed = exitCode != 0 && !entry.Stopping;
+
+        TranscodeContext? retryContext = null;
+        if (failed && launch.Hardware is not null
+            && _transcodeContexts.TryGetValue(mediaItemId, out var ctx) && ctx.LaunchId == launch.Id)
+        {
+            retryContext = ctx;
+            ctx.Hardware = null;
+            ctx.RetryingOnCpu = true;
+        }
+
+        if (!_activeTranscodes.TryRemove(new KeyValuePair<Guid, TranscodeProcess>(mediaItemId, entry)))
+        {
+            if (retryContext is not null) retryContext.RetryingOnCpu = false;
+            return;
+        }
+
+        if (failed)
+        {
+            string stderr;
+            lock (stderrBuffer) stderr = stderrBuffer.ToString();
+            _logger.LogError(
+                "FFmpeg transcode exited with code {ExitCode} for {MediaItemId}. Command: {Command}\nStderr: {Stderr}",
+                exitCode, mediaItemId, cmdLine, stderr);
+        }
+        entry.Process.Dispose();
+
+        if (retryContext is not null)
+        {
+            _ = RetryOnCpuAsync(mediaItemId, launch, retryContext);
+        }
+    }
+
+    private async Task RetryOnCpuAsync(Guid mediaItemId, TranscodeLaunch launch, TranscodeContext ctx)
+    {
+        await _transcodeLock.WaitAsync();
+        try
+        {
+            bool stillCurrent = _transcodeContexts.TryGetValue(mediaItemId, out var current)
+                && ReferenceEquals(current, ctx)
+                && ctx.LaunchId == launch.Id
+                && !_activeTranscodes.ContainsKey(mediaItemId);
+            if (!stillCurrent) return;
+
+            var resumeAt = FirstMissingSegment(mediaItemId, ctx.TargetDir, launch.StartSegment);
+            if (resumeAt * (double)SegmentSeconds >= ctx.DurationSeconds) return;
+
+            _logger.LogWarning("{Hardware} transcode failed for {MediaItemId}; retrying on the CPU from segment {Segment}.",
+                HardwareArguments.Label(launch.Hardware?.Accelerator.Type ?? HardwareAccelerationType.Auto), mediaItemId, resumeAt);
+
+            var settings = await LoadSettingsAsync();
+            ctx.CurrentStartSegment = resumeAt;
+            ctx.LaunchedAt = DateTime.UtcNow;
+            await LaunchFFmpegAsync(mediaItemId, resumeAt, resumeAt * (double)SegmentSeconds, settings);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Could not restart the transcode for {MediaItemId} on the CPU.", mediaItemId);
+        }
+        finally
+        {
+            ctx.RetryingOnCpu = false;
+            _transcodeLock.Release();
+        }
+    }
+
+    private static int FirstMissingSegment(Guid mediaItemId, string targetDir, int fromSegment)
+    {
+        var segment = fromSegment;
+        while (File.Exists(Path.Combine(targetDir, $"{mediaItemId}_{segment}.ts"))) segment++;
+        return segment;
+    }
+
+    internal static List<string> BuildFFmpegArguments(
         string sourceFile,
         string segmentPattern,
         string internalPlaylistPath,
         PlaybackDecisionVM decision,
-        Domain.Entities.Settings.ServerSetting settings,
-        bool useGpu,
+        ServerSetting settings,
+        TranscodeHardware? hardware,
         int startSegment,
-        double alignedStartSeconds)
+        double alignedStartSeconds,
+        TranscodeHost host)
     {
         var args = new List<string>();
         void Flag(string fragment) => args.AddRange(fragment.Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
-        // Determine up front whether we'll actually re-encode video. If
-        // the strategy is Copy / DirectPlay we just pass-through and
-        // don't need filters at all.
         bool encodingVideo = !(decision.Decision == StreamingState.DirectPlay
             || decision.Decision == StreamingState.Remux
             || decision.VideoStrategy == "Copy"
@@ -584,21 +661,15 @@ public class FFmpegTranscodeService : ITranscodeService
             && !string.Equals(hdrType, "None", StringComparison.OrdinalIgnoreCase);
         bool needsTonemap = encodingVideo && settings.EnableHdrToneMapping && isHdrSource;
 
-        // Full-GPU pipeline: NVDEC → (scale_cuda / tonemap_opencl, zero-
-        // copy on the GPU) → NVENC. Engages only when:
-        //   - hardware accel + hardware encoding are both enabled
-        //   - we're actually re-encoding video (not stream copy)
-        //   - we're not burning in subtitles (subtitles filter is CPU-only)
-        // Anything else falls back to the legacy CPU-or-mixed pipeline.
-        bool fullGpuPipeline = useGpu && encodingVideo && !decision.RequiresSubtitleBurnIn;
+        var decoder = encodingVideo ? hardware?.Accelerator : null;
+        var encoder = encodingVideo && hardware is { Encode: true } ? hardware.Accelerator : null;
+        var gpuPipeline = decision.RequiresSubtitleBurnIn ? null : encoder;
 
-        // Resolve the "Auto" values for HDR tonemap quality + downscale
-        // based on detected host environment. WSL2/Docker Desktop on
-        // Windows can't expose Vulkan/OpenCL through to the container,
-        // so we pre-fall-back to Fast tonemap + Always downscale for
-        // 4K HDR. Native Linux / Unraid can do better defaults.
-        var resolvedTonemapQuality = ResolveTonemapQuality(settings.HdrTonemapQuality);
-        var resolvedDownscale = ResolveDownscaleMode(settings.HdrTranscodeDownscale);
+        bool canTonemapOnGpu = gpuPipeline is { Type: not HardwareAccelerationType.Nvidia }
+            ? gpuPipeline.TonemapsOnGpu
+            : host.CanUseGpuHdrTonemap;
+        var resolvedTonemapQuality = ResolveTonemapQuality(settings.HdrTonemapQuality, canTonemapOnGpu);
+        var resolvedDownscale = ResolveDownscaleMode(settings.HdrTranscodeDownscale, canTonemapOnGpu);
         bool downscaleForHdr = needsTonemap && resolvedDownscale == "Always";
 
         int scaleHeight = decision.OutputHeight > 0 ? decision.OutputHeight : 0;
@@ -607,32 +678,18 @@ public class FFmpegTranscodeService : ITranscodeService
             scaleHeight = scaleHeight > 0 ? Math.Min(scaleHeight, 1080) : 1080;
         }
 
-        if (fullGpuPipeline)
+        if (decoder is not null)
         {
-            Flag("-hwaccel cuda -hwaccel_output_format cuda");
-            if (!string.IsNullOrWhiteSpace(settings.HardwareTranscodingDevice) && settings.HardwareTranscodingDevice != "Auto")
+            bool vulkan = gpuPipeline is not null && needsTonemap && UsesVulkanTonemap(gpuPipeline);
+            args.AddRange(HardwareArguments.InitDevices(decoder, withVulkan: vulkan));
+            args.AddRange(HardwareArguments.Decode(decoder, keepFramesOnGpu: gpuPipeline is not null));
+            if (gpuPipeline is { Type: HardwareAccelerationType.Nvidia })
             {
-                Flag("-hwaccel_device"); args.Add(settings.HardwareTranscodingDevice);
-            }
-            // Thread the CPU filter chain across all available cores.
-            // Matters most for the Quality HDR tonemap path where the
-            // zscale chain runs on system RAM.
-            Flag("-filter_threads 0");
-            Flag("-filter_complex_threads 0");
-        }
-        else if (settings.UseHardwareAcceleration)
-        {
-            Flag("-hwaccel auto");
-            if (!string.IsNullOrWhiteSpace(settings.HardwareTranscodingDevice) && settings.HardwareTranscodingDevice != "Auto")
-            {
-                Flag("-hwaccel_device"); args.Add(settings.HardwareTranscodingDevice);
+                Flag("-filter_threads 0");
+                Flag("-filter_complex_threads 0");
             }
         }
 
-        // Seek-to-start using -ss BEFORE -i so FFmpeg uses fast keyframe-
-        // accurate input seek. With the HLS muxer and -start_number
-        // below, the output segment _N.ts will contain content from
-        // source-time [N*SegmentSeconds, +SegmentSeconds).
         if (alignedStartSeconds > 0.0)
         {
             Flag($"-ss {alignedStartSeconds.ToString("0.000", CultureInfo.InvariantCulture)}");
@@ -647,144 +704,49 @@ public class FFmpegTranscodeService : ITranscodeService
         {
             Flag($"-map 0:{decision.SelectedAudioStreamIndex.Value}");
         }
-        // Explicitly drop subtitles from the HLS output. We don't currently
-        // generate in-band WebVTT, so mapping an arbitrary subtitle stream
-        // into mpegts either errors out or produces unrenderable bytes.
-        // Subtitle playback ships as a sidecar VTT in a separate slice.
         Flag("-sn");
 
-        if (decision.Decision == StreamingState.DirectPlay || decision.Decision == StreamingState.Remux || decision.VideoStrategy == "Copy" || decision.VideoStrategy == "DirectStream")
+        if (!encodingVideo)
         {
             Flag("-c:v copy");
         }
         else
         {
-            var cpuPresets = new[] { "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow" };
-            string cpuPreset = cpuPresets[Math.Clamp(settings.BackgroundX264Preset, 0, 8)];
-
             bool encodeHevc = decision.TargetVideoCodec == VideoCodec.Hevc;
 
-            string gpuPreset = settings.TranscodeQuality switch { 1 => "p2", 2 => "p6", 3 => "p7", _ => "p4" };
-            string swPreset = settings.TranscodeQuality switch { 1 => "superfast", 2 => "medium", 3 => "veryslow", _ => "veryfast" };
-
-            if (useGpu)
+            if (encoder is not null)
             {
-                Flag(encodeHevc ? "-c:v hevc_nvenc" : "-c:v h264_nvenc");
-                Flag($"-preset {gpuPreset} -tune hq");
-                if (settings.EnableHevcOptimization && encodeHevc) Flag("-rc vbr -cq 28 -qmin 28 -qmax 34");
+                args.AddRange(EncoderArguments(encoder, encodeHevc, settings, decision));
             }
             else
             {
+                string swPreset = settings.TranscodeQuality switch { 1 => "superfast", 2 => "medium", 3 => "veryslow", _ => "veryfast" };
                 Flag(encodeHevc ? "-c:v libx265" : "-c:v libx264");
                 Flag($"-preset {swPreset}");
             }
 
-            // -pix_fmt only applies when frames live in system RAM (CPU
-            // pipeline). On the full GPU pipeline, frames are CUDA-side
-            // nv12/p010 surfaces and we shouldn't request a CPU pixel
-            // format conversion — that would force a hwdownload/hwupload
-            // pair behind the scenes and defeat the GPU pipeline.
-            if (!encodeHevc && !fullGpuPipeline)
+            if (!encodeHevc && gpuPipeline is null && encoder is null or { Type: HardwareAccelerationType.Nvidia })
             {
                 Flag("-pix_fmt yuv420p");
             }
 
-            // Force keyframes at every segment boundary so the segment muxer
-            // can cut cleanly at exact SegmentSeconds intervals. Without
-            // this, segments drift in duration (FFmpeg cuts at the next
-            // keyframe AFTER the target time) which breaks the player's
-            // mapping between the pre-written EXTINF values and the actual
-            // segment content.
             Flag("-force_key_frames"); args.Add($"expr:gte(t,n_forced*{SegmentSeconds})");
 
-            // Filter chain. We keep source resolution — never silently
-            // downscale to "fix" pipeline speed. The encoder pipeline's
-            // job is to keep up with whatever resolution the user chose;
-            // if the user wants 1080p output they pick it in the Quality
-            // panel and the decision manager sets it explicitly. The
-            // GPU pipeline below handles 4K HDR HEVC → 4K H264 SDR
-            // end-to-end on the GPU with no CPU work in the video path.
-            if (fullGpuPipeline && needsTonemap && HostEnvironmentDetector.HasJellyfinFfmpeg)
+            var filters = gpuPipeline is not null
+                ? GpuFilters(gpuPipeline, settings, host, needsTonemap, isHdrSource, encodeHevc, scaleHeight, resolvedTonemapQuality)
+                : CpuFilters(encoder, decision, sourceFile, settings, needsTonemap, scaleHeight);
+            if (filters.Count > 0)
             {
-                // Full-GPU HDR pipeline via jellyfin-ffmpeg's tonemap_cuda
-                // filter:
-                //   NVDEC (cuda hwframe)
-                //   → optional scale_cuda downscale on GPU
-                //   → tonemap_cuda (HDR PQ → SDR, runs as CUDA compute
-                //     kernels on the GPU — zero CPU on the video path)
-                //   → NVENC encode
-                // tonemap_cuda is what Jellyfin's custom ffmpeg adds
-                // via --enable-cuda-llvm. It works everywhere CUDA
-                // works — bare-metal Linux AND WSL2 — so the WSL2
-                // Vulkan/OpenCL gap goes away entirely. This is the
-                // "how does Plex do it" answer: their ffmpeg has the
-                // same filter via the same build flag.
-                var chain = new List<string>();
-                if (scaleHeight > 0)
-                {
-                    chain.Add($"scale_cuda=-2:{scaleHeight}:format=p010le");
-                }
-                chain.Add($"tonemap_cuda=tonemap={settings.TonemappingAlgorithm}:format=nv12:peak=1000");
-                Flag("-vf"); args.Add(string.Join(",", chain));
-            }
-            else if (fullGpuPipeline && needsTonemap)
-            {
-                // Legacy CPU-tonemap path. Used when jellyfin-ffmpeg
-                // isn't present (stock Debian / Ubuntu apt ffmpeg).
-                // Same shape as the old code but kept as a fallback so
-                // a server that hasn't picked up the new Dockerfile
-                // still plays HDR sources, just slower.
-                //   NVDEC → optional scale_cuda (GPU)
-                //   → hwdownload + format=p010le (CUDA → CPU)
-                //   → CPU zscale + tonemap chain
-                //   → NVENC re-uploads the CPU nv12 to GPU
-                var chain = new List<string>();
-                if (scaleHeight > 0)
-                {
-                    chain.Add($"scale_cuda=-2:{scaleHeight}:format=p010le");
-                }
-                chain.Add("hwdownload");
-                chain.Add("format=p010le");
-                chain.Add(BuildHdrTonemapCpuChain(resolvedTonemapQuality, settings.TonemappingAlgorithm));
-                Flag("-vf"); args.Add(string.Join(",", chain));
-            }
-            else if (fullGpuPipeline)
-            {
-                // SDR source on the GPU pipeline. No tonemap needed —
-                // just make sure the CUDA frame is in a format NVENC
-                // accepts. NVDEC emits nv12 for 8-bit and p010 for 10-bit
-                // sources; h264_nvenc wants nv12, hevc_nvenc can keep
-                // p010le. scale_cuda with iw:ih preserves resolution.
-                var targetFmt = encodeHevc ? "p010le" : "nv12";
-                var scaleSpec = scaleHeight > 0 ? $"-2:{scaleHeight}" : "iw:ih";
-                Flag("-vf"); args.Add($"scale_cuda={scaleSpec}:format={targetFmt}");
-            }
-            else if (needsTonemap)
-            {
-                // Pure CPU tonemap fallback (UseHardwareAcceleration or
-                // UseHardwareEncoding turned off in server settings).
-                // Slow on 4K HDR, but it's the only correct thing when
-                // the user opts out of GPU.
-                var scalePrefix = scaleHeight > 0 ? $"scale=-2:{scaleHeight}," : "";
-                Flag($"-vf {scalePrefix}zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap={settings.TonemappingAlgorithm}:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p");
-            }
-            else if (scaleHeight > 0)
-            {
-                Flag("-vf"); args.Add($"scale=-2:{scaleHeight}");
-            }
-
-            if (decision.RequiresSubtitleBurnIn)
-            {
-                // Subtitle burn-in runs on CPU only, so it can only attach
-                // here in the non-GPU path. We already excluded subtitle
-                // burn-in from fullGpuPipeline above.
-                var subtitleSource = decision.SelectedSubtitleExternalPath ?? sourceFile;
-                Flag("-vf"); args.Add($"subtitles='{subtitleSource}'");
+                Flag("-vf"); args.Add(string.Join(",", filters));
             }
 
             if (decision.BandwidthKbps > 0)
             {
                 int bufferSizeKbps = decision.BandwidthKbps * Math.Max(1, settings.TranscoderThrottleBuffer);
+                if (encoder is { Type: not HardwareAccelerationType.Nvidia })
+                {
+                    Flag($"-b:v {decision.BandwidthKbps}k");
+                }
                 Flag($"-maxrate {decision.BandwidthKbps}k -bufsize {bufferSizeKbps}k");
             }
         }
@@ -860,6 +822,116 @@ public class FFmpegTranscodeService : ITranscodeService
         return args;
     }
 
+    private static List<string> EncoderArguments(HardwareAccelerator encoder, bool encodeHevc, ServerSetting settings, PlaybackDecisionVM decision)
+    {
+        switch (encoder.Type)
+        {
+            case HardwareAccelerationType.Nvidia:
+                var nvencPreset = settings.TranscodeQuality switch { 1 => "p2", 2 => "p6", 3 => "p7", _ => "p4" };
+                var nvenc = new List<string> { "-c:v", encodeHevc ? "hevc_nvenc" : "h264_nvenc", "-preset", nvencPreset, "-tune", "hq" };
+                if (settings.EnableHevcOptimization && encodeHevc) nvenc.AddRange(["-rc", "vbr", "-cq", "28", "-qmin", "28", "-qmax", "34"]);
+                return nvenc;
+            case HardwareAccelerationType.QuickSync:
+                var qsvPreset = settings.TranscodeQuality switch { 1 => "veryfast", 2 => "slow", 3 => "veryslow", _ => "medium" };
+                var qsv = new List<string> { "-c:v", encodeHevc ? "hevc_qsv" : "h264_qsv", "-preset", qsvPreset, "-forced_idr", "1" };
+                if (decision.BandwidthKbps <= 0) qsv.AddRange(["-global_quality", "23"]);
+                return qsv;
+            default:
+                return ["-c:v", encodeHevc ? "hevc_vaapi" : "h264_vaapi"];
+        }
+    }
+
+    private static bool UsesVulkanTonemap(HardwareAccelerator gpu) =>
+        gpu.Type != HardwareAccelerationType.Nvidia && gpu.Vendor != GpuVendor.Intel && gpu.HasVulkanInterop;
+
+    private static List<string> GpuFilters(
+        HardwareAccelerator gpu,
+        ServerSetting settings,
+        TranscodeHost host,
+        bool needsTonemap,
+        bool isHdrSource,
+        bool encodeHevc,
+        int scaleHeight,
+        string tonemapQuality)
+    {
+        var chain = new List<string>();
+        if (gpu.Type == HardwareAccelerationType.Nvidia)
+        {
+            if (needsTonemap && scaleHeight > 0) chain.Add($"scale_cuda=-2:{scaleHeight}:format=p010le");
+            if (needsTonemap && host.HasJellyfinFfmpeg)
+            {
+                chain.Add($"tonemap_cuda=tonemap={settings.TonemappingAlgorithm}:format=nv12:peak=1000");
+            }
+            else if (needsTonemap)
+            {
+                chain.AddRange(["hwdownload", "format=p010le", BuildHdrTonemapCpuChain(tonemapQuality, settings.TonemappingAlgorithm)]);
+            }
+            else
+            {
+                var scaleSpec = scaleHeight > 0 ? $"-2:{scaleHeight}" : "iw:ih";
+                chain.Add($"scale_cuda={scaleSpec}:format={(encodeHevc ? "p010le" : "nv12")}");
+            }
+            return chain;
+        }
+
+        if (needsTonemap && UsesVulkanTonemap(gpu))
+        {
+            chain.Add(HardwareArguments.VulkanTonemap(settings.TonemappingAlgorithm, scaleHeight));
+        }
+        else if (needsTonemap)
+        {
+            if (scaleHeight > 0) chain.Add($"scale_vaapi=w=-2:h={scaleHeight}");
+            if (gpu.Vendor == GpuVendor.Intel)
+            {
+                chain.Add("tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709");
+            }
+            else
+            {
+                chain.AddRange(["hwdownload", "format=p010le", BuildHdrTonemapCpuChain(tonemapQuality, settings.TonemappingAlgorithm), "format=nv12", "hwupload"]);
+            }
+        }
+        else
+        {
+            var format = encodeHevc && isHdrSource ? "p010" : "nv12";
+            chain.Add(scaleHeight > 0 ? $"scale_vaapi=w=-2:h={scaleHeight}:format={format}" : $"scale_vaapi=format={format}");
+        }
+
+        if (gpu.Type == HardwareAccelerationType.QuickSync)
+        {
+            chain.AddRange(["hwmap=derive_device=qsv", "format=qsv"]);
+        }
+        return chain;
+    }
+
+    private static List<string> CpuFilters(
+        HardwareAccelerator? encoder,
+        PlaybackDecisionVM decision,
+        string sourceFile,
+        ServerSetting settings,
+        bool needsTonemap,
+        int scaleHeight)
+    {
+        var chain = new List<string>();
+        if (scaleHeight > 0) chain.Add($"scale=-2:{scaleHeight}");
+        if (needsTonemap)
+        {
+            chain.Add($"zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap={settings.TonemappingAlgorithm}:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p");
+        }
+        if (decision.RequiresSubtitleBurnIn)
+        {
+            chain.Add($"subtitles='{decision.SelectedSubtitleExternalPath ?? sourceFile}'");
+        }
+        if (encoder is { Type: HardwareAccelerationType.Vaapi })
+        {
+            chain.AddRange(["format=nv12", "hwupload"]);
+        }
+        else if (encoder is { Type: HardwareAccelerationType.QuickSync })
+        {
+            chain.Add("format=nv12");
+        }
+        return chain;
+    }
+
     private static bool IsAudioCodecSafeForMpegTs(string? codec)
     {
         if (string.IsNullOrWhiteSpace(codec)) return false;
@@ -871,16 +943,16 @@ public class FFmpegTranscodeService : ITranscodeService
     // "Auto") to a concrete pick. On hosts that can't reach a GPU HDR
     // tonemap path (WSL2, no Vulkan ICD), Auto falls back to Fast so
     // the CPU work is real-time. On hosts that can, Auto picks Quality.
-    private static string ResolveTonemapQuality(string setting)
+    private static string ResolveTonemapQuality(string setting, bool canTonemapOnGpu)
     {
         if (!string.Equals(setting, "Auto", StringComparison.OrdinalIgnoreCase))
         {
             return setting;
         }
-        return HostEnvironmentDetector.CanUseGpuHdrTonemap ? "Quality" : "Fast";
+        return canTonemapOnGpu ? "Quality" : "Fast";
     }
 
-    private static string ResolveDownscaleMode(string setting)
+    private static string ResolveDownscaleMode(string setting, bool canTonemapOnGpu)
     {
         if (!string.Equals(setting, "Auto", StringComparison.OrdinalIgnoreCase))
         {
@@ -890,7 +962,7 @@ public class FFmpegTranscodeService : ITranscodeService
         // source can't keep up at full source resolution even multi-
         // threaded — downscale on the GPU before tonemap so we're only
         // tonemapping 1080p frames on the CPU.
-        return HostEnvironmentDetector.CanUseGpuHdrTonemap ? "Never" : "Always";
+        return canTonemapOnGpu ? "Never" : "Always";
     }
 
     // Build just the CPU-side portion of the HDR tonemap filter chain
@@ -923,12 +995,35 @@ public class FFmpegTranscodeService : ITranscodeService
         }
     }
 
-    private sealed record TranscodeProcess(Process Process, bool IsGpu);
+    internal sealed record TranscodeHost(bool HasJellyfinFfmpeg, bool CanUseGpuHdrTonemap)
+    {
+        public static TranscodeHost Detect() => new(HostEnvironmentDetector.HasJellyfinFfmpeg, HostEnvironmentDetector.CanUseGpuHdrTonemap);
+    }
+
+    internal sealed record TranscodeHardware(HardwareAccelerator Accelerator, bool Encode);
+
+    private sealed record TranscodeLaunch(int Id, int StartSegment, TranscodeHardware? Hardware);
+
+    private sealed class TranscodeProcess(Process process, bool isGpu)
+    {
+        private volatile bool _stopping;
+
+        public Process Process { get; } = process;
+        public bool IsGpu { get; } = isGpu;
+        public bool Stopping
+        {
+            get => _stopping;
+            set => _stopping = value;
+        }
+    }
 
     private sealed class TranscodeContext
     {
-        public TranscodeContext(string sourceFile, PlaybackDecisionVM decision, string targetDir, double durationSeconds, int currentStartSegment)
+        private volatile bool _retryingOnCpu;
+
+        public TranscodeContext(string sourceFile, PlaybackDecisionVM decision, string targetDir, double durationSeconds, int currentStartSegment, TranscodeHardware? hardware)
         {
+            Hardware = hardware;
             SourceFile = sourceFile;
             Decision = decision;
             TargetDir = targetDir;
@@ -943,6 +1038,13 @@ public class FFmpegTranscodeService : ITranscodeService
         public string TargetDir { get; }
         public double DurationSeconds { get; }
         public int CurrentStartSegment { get; set; }
+        public TranscodeHardware? Hardware { get; set; }
+        public int LaunchId { get; set; }
+        public bool RetryingOnCpu
+        {
+            get => _retryingOnCpu;
+            set => _retryingOnCpu = value;
+        }
         public DateTime LaunchedAt { get; set; }
         public DateTime LastActivityAt { get; set; }
         // Highest .ts segment index the chunk handler has actually served

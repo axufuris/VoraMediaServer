@@ -41,6 +41,7 @@ public sealed class LibraryFileCheckTests : IDisposable
             Substitute.For<IMarkerAssembler>(),
             new AudioIntroDetector(new AudioFingerprintComparer()),
             settings,
+            Substitute.For<Vora.Application.Settings.IHardwareCapabilityService>(),
             Substitute.For<Vora.Application.Streaming.ISubtitleExtractionService>(),
             new ExternalSubtitleScanner(NullLogger<ExternalSubtitleScanner>.Instance),
             Substitute.For<ITaskQueueManager>(),

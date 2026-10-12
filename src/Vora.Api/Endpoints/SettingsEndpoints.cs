@@ -32,8 +32,14 @@ public static class SettingsEndpoints
         group.MapPost("/plugins/{pluginId}/test", TestPluginConnectionAsync)
             .Produces<PluginConnectionTestResult>(StatusCodes.Status200OK);
 
-        group.MapGet("/hardware-devices", GetHardwareDevices)
-            .Produces<List<string>>(StatusCodes.Status200OK);
+        group.MapGet("/hardware", GetHardwareAsync)
+            .WithName("GetHardwareCapabilities")
+            .Produces<HardwareCapabilitiesVM>(StatusCodes.Status200OK);
+
+        group.MapPost("/hardware/test", TestHardwareAsync)
+            .WithName("TestHardwareAcceleration")
+            .Produces<HardwareTestResultVM>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
         group.MapPut("/features", UpdateFeatureFlagsAsync)
             .Produces(StatusCodes.Status204NoContent);
@@ -118,8 +124,15 @@ public static class SettingsEndpoints
         return Results.Ok(await manager.UpdateSetupGuideAsync(request));
     }
 
-    private static IResult GetHardwareDevices(IHardwareCapabilityService hardware)
+    private static async Task<IResult> GetHardwareAsync(IHardwareCapabilityService hardware, CancellationToken cancellationToken) =>
+        Results.Ok(await hardware.GetCapabilitiesAsync(cancellationToken));
+
+    private static async Task<IResult> TestHardwareAsync([FromBody] HardwareTestRequest request, IHardwareCapabilityService hardware, CancellationToken cancellationToken)
     {
-        return Results.Ok(hardware.GetAvailableTranscodingDevices());
+        if (!Enum.IsDefined(request.Type))
+        {
+            return Results.Problem("Unknown hardware acceleration type.", statusCode: StatusCodes.Status400BadRequest);
+        }
+        return Results.Ok(await hardware.TestAsync(request.Type, request.Device, cancellationToken));
     }
 }
