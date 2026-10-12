@@ -1,4 +1,5 @@
-﻿using Vora.Application.Media;
+﻿using System.Linq.Expressions;
+using Vora.Application.Media;
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.SmartLists;
@@ -47,10 +48,8 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         var poolSize = Math.Max(maxItems * 10, 100);
         if (sortBy == SmartListSortBy.DateAddedDesc && TvLevelCount(rules) > 1)
         {
-            var tvPool = await LoadTvPoolAsync(query, poolSize, profileId);
-            var keptTvIds = RecentlyAddedTv.OnePerShow(tvPool);
-            var droppedTvIds = tvPool.Select(c => c.Id).Where(id => !keptTvIds.Contains(id)).ToList();
-            query = query.Where(m => !droppedTvIds.Contains(m.Id));
+            var keptTvIds = await OneTilePerShowAsync(query, maxItems, poolSize, profileId);
+            query = query.Where(MediaCapabilities.IsPartOfATvShow.Not().Or(m => keptTvIds.Contains(m.Id)));
         }
         else if (rules?.MediaTypes != null && rules.MediaTypes.Contains("Episode"))
         {
@@ -74,6 +73,29 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
 
     private static int TvLevelCount(SmartListRulesDto? rules) =>
         rules?.MediaTypes == null ? 0 : new[] { "TvShow", "Season", "Episode" }.Count(rules.MediaTypes.Contains);
+
+    private async Task<List<Guid>> OneTilePerShowAsync(IQueryable<MediaItem> query, int maxItems, int poolSize, Guid? profileId)
+    {
+        var kept = new List<Guid>();
+        var showsSeen = new List<Guid>();
+
+        while (kept.Count < maxItems)
+        {
+            var pool = await LoadTvPoolAsync(query.Where(OutsideShows(showsSeen.ToList())), poolSize, profileId);
+            if (pool.Count == 0) break;
+
+            kept.AddRange(RecentlyAddedTv.OnePerShow(pool));
+            showsSeen.AddRange(pool.Select(c => c.ShowId).Distinct());
+            if (pool.Count < poolSize) break;
+        }
+
+        return kept;
+    }
+
+    private static Expression<Func<MediaItem, bool>> OutsideShows(List<Guid> showIds) =>
+        m => !(m is TvShow && showIds.Contains(m.Id))
+            && !(m is Season && showIds.Contains(((Season)m).TvShowId))
+            && !(m is Episode && showIds.Contains(((Episode)m).Season.TvShowId));
 
     private async Task<List<TvCandidate>> LoadTvPoolAsync(IQueryable<MediaItem> query, int poolSize, Guid? profileId)
     {

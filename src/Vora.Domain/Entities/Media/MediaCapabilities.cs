@@ -85,6 +85,17 @@ public static class MediaCapabilities
         return Expression.Lambda<Func<T, bool>>(rebound, path.Parameters[0]);
     }
 
+    public static Expression<Func<MediaItem, bool>> Not(this Expression<Func<MediaItem, bool>> capability) =>
+        Expression.Lambda<Func<MediaItem, bool>>(Expression.Not(capability.Body), capability.Parameters[0]);
+
+    public static Expression<Func<MediaItem, bool>> Or(
+        this Expression<Func<MediaItem, bool>> capability,
+        Expression<Func<MediaItem, bool>> other)
+    {
+        var rebound = new ParameterRebinder(other.Parameters[0], capability.Parameters[0]).Visit(other.Body);
+        return Expression.Lambda<Func<MediaItem, bool>>(Expression.OrElse(capability.Body, rebound), capability.Parameters[0]);
+    }
+
     private sealed class ParameterRebinder(ParameterExpression target, Expression replacement) : ExpressionVisitor
     {
         protected override Expression VisitParameter(ParameterExpression node) =>

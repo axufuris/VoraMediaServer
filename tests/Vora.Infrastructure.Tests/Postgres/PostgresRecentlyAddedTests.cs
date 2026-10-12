@@ -14,4 +14,18 @@ public class PostgresRecentlyAddedTests(PostgresDatabase database) : IClassFixtu
 
         items.Select(i => i.Id).Should().Equal(world.NewShowId, world.MovieId, world.NewEpisodeId);
     }
+
+    [Fact]
+    public async Task A_whole_show_added_at_once_is_one_tile_on_postgres()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        await using var db = database.NewContext();
+        var world = new RecentlyAddedShowsWorld();
+        await world.SeedAsync(db);
+        await world.SeedWholeShowImportAsync(db);
+
+        var items = await world.RecentlyAddedAsync(db, RecentlyAddedShowsWorld.MoviesAndShows);
+
+        items.Select(i => i.Id).Should().Equal(world.WholeShowId, world.NewShowId, world.MovieId, world.NewEpisodeId);
+    }
 }

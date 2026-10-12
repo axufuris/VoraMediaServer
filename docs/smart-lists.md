@@ -28,6 +28,8 @@ All sources share `Title`, `SortBy`, `MaxItems` (clamped 1–100 by `SmartListMa
     - **the season** when several episodes of one season are new.
 
     Only episodes added within two days of the show's latest content count as new. A list with one TV level keeps one episode per show (the first unwatched), and a shows-only list still lifts a show when it gets a new episode.
+
+    The repository reads the newest TV rows in pools (`max(maxItems × 10, 100)` rows) and keeps reading, leaving out the shows it has already seen, until it has `maxItems` tiles or runs out of rows. TV rows that were not chosen are left out of the list entirely. A single pool was not enough: a whole show added at once (a show, 31 seasons and 203 episodes) overflowed a 200-row pool, and the rows past it appeared as separate tiles.
 - **Favorites**: sort `TitleAsc` (name), `DateAddedDesc` (recently favorited) or `Random`. The same channel in two playlists shows once.
 - **Podcasts**: `unwatchedOnly` (only episodes the profile hasn't finished) and `days` (published within). Always newest first.
 - **Music**: `LibraryId` (one music library) and sort `DateAddedDesc` → recently added, `ReleaseDateDesc` → newest year, `TopRated` → most popular (Last.fm), `TitleAsc` → artist A–Z.
