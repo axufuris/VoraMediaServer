@@ -23,10 +23,7 @@ public class UserProfileImageService : IUserProfileImageService
     public UserProfileImageService(IOptions<StoragePathsOptions> storagePaths, ILogger<UserProfileImageService> logger)
     {
         _logger = logger;
-        var configured = storagePaths.Value.UserImages;
-        _basePath = !string.IsNullOrWhiteSpace(configured)
-            ? configured
-            : Path.Combine(AppContext.BaseDirectory, "Users");
+        _basePath = StorageRoots.UserImages(storagePaths.Value);
         if (!Directory.Exists(_basePath))
         {
             Directory.CreateDirectory(_basePath);

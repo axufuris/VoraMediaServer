@@ -659,10 +659,7 @@ public static class ServiceRegistrationExtensions
     private static IServiceCollection AddVoraPluginSystem(this IServiceCollection services, IConfiguration configuration)
     {
         var storagePaths = ReadStoragePaths(configuration);
-        var configured = storagePaths.Plugins;
-        var pluginsPath = !string.IsNullOrWhiteSpace(configured)
-            ? configured
-            : Path.Combine(AppContext.BaseDirectory, "Plugins");
+        var pluginsPath = Vora.Application.Settings.StorageRoots.Plugins(storagePaths);
 
         using var startupLoggerFactory = LoggerFactory.Create(b => b.AddConsole());
         var startupLogger = startupLoggerFactory.CreateLogger("Vora.PluginLoader");

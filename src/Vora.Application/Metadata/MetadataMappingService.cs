@@ -637,8 +637,7 @@ public class MetadataMappingService : IMetadataMappingService
 
     private void CleanupOrphanedOverlay(MediaItem item)
     {
-        var configPath = _storagePaths.CustomArtwork;
-        var overlayDir = !string.IsNullOrWhiteSpace(configPath) ? configPath : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
+        var overlayDir = StorageRoots.CustomArtwork(_storagePaths);
 
         var urlsToCheck = new[] { item.PosterUrl, item.BackgroundUrl };
 

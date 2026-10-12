@@ -29,9 +29,7 @@ public class OverlaySweepService : IOverlaySweepService
     // tests membership instead.
     public void SweepPhysicalOverlays(IEnumerable<string?> urls, CancellationToken cancellationToken = default)
     {
-        var overlayDir = !string.IsNullOrWhiteSpace(_storagePaths.CustomArtwork)
-            ? _storagePaths.CustomArtwork
-            : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
+        var overlayDir = StorageRoots.CustomArtwork(_storagePaths);
 
         var present = urls.Where(u => !string.IsNullOrEmpty(u)).ToList();
         if (present.Count == 0) return;

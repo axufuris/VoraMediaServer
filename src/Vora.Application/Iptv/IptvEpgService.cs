@@ -33,9 +33,7 @@ public class IptvSourceSyncStats
 
 public class IptvEpgService : IIptvEpgService
 {
-    private const string CacheFolder = "Iptv";
     private const string CacheFileName = "epg_cache.json";
-    private const string StorageRoot = "Storage";
     private const int EpgPastWindowHours = 4;
     private const int EpgFutureWindowDays = 3;
     private const string GzipExtension = ".gz";
@@ -59,10 +57,7 @@ public class IptvEpgService : IIptvEpgService
         _httpClientFactory = httpClientFactory;
         _logger = logger;
 
-        var configured = storagePaths.Value.EpgCache;
-        var cacheDirectory = !string.IsNullOrWhiteSpace(configured)
-            ? configured
-            : Path.Combine(AppContext.BaseDirectory, StorageRoot, CacheFolder);
+        var cacheDirectory = StorageRoots.EpgCache(storagePaths.Value);
         if (!Directory.Exists(cacheDirectory)) Directory.CreateDirectory(cacheDirectory);
         _cacheFilePath = Path.Combine(cacheDirectory, CacheFileName);
     }

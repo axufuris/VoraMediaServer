@@ -52,14 +52,10 @@ public class PosterOverlayManager : IPosterOverlayManager
         _scopeFactory = scopeFactory;
         _logger = logger;
 
-        var configPath = storagePaths.Value.CustomArtwork;
-        _overlayDirectory = !string.IsNullOrWhiteSpace(configPath) ? configPath : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
+        _overlayDirectory = StorageRoots.CustomArtwork(storagePaths.Value);
         if (!Directory.Exists(_overlayDirectory)) Directory.CreateDirectory(_overlayDirectory);
 
-        var originalCachePath = storagePaths.Value.OriginalArtworkCache;
-        _originalArtworkCacheDir = !string.IsNullOrWhiteSpace(originalCachePath)
-            ? originalCachePath
-            : Path.Combine(AppContext.BaseDirectory, "Storage", "OriginalArtworkCache");
+        _originalArtworkCacheDir = StorageRoots.OriginalArtworkCache(storagePaths.Value);
         if (!Directory.Exists(_originalArtworkCacheDir)) Directory.CreateDirectory(_originalArtworkCacheDir);
     }
 

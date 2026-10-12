@@ -159,9 +159,11 @@ Key environment variables:
   the keys that protect the saved SMTP password. Keep them all under
   one mounted volume so a single backup covers everything. The app's
   own folder (`/app`) is not writable, so a path must never point
-  there. If thumbnails, logs, backups or the keys are left out, Vora
-  puts them in the same folder as the paths you did set. Transcoder
-  scratch (HLS segments, IPTV timeshift)
+  there. Any path you leave out goes in the same folder as the ones
+  you did set, or in `/app/data` when none is set, so mounting
+  `/app/data` is enough on its own. At startup Vora logs where each
+  folder is, and raises an admin alert for any it cannot write to.
+  Transcoder scratch (HLS segments, IPTV timeshift)
   lives under `/transcode` and is configured separately through the
   admin UI — that path should be a fast local disk or tmpfs.
   The server also writes a **resized-artwork cache** under

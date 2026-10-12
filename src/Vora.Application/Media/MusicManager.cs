@@ -122,10 +122,7 @@ public class MusicManager : IMusicManager
         _notifier = notifier;
         _logger = logger;
 
-        var configured = storagePaths.Value.CustomArtwork;
-        _artworkBasePath = !string.IsNullOrWhiteSpace(configured)
-            ? configured
-            : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
+        _artworkBasePath = StorageRoots.CustomArtwork(storagePaths.Value);
 
         if (!Directory.Exists(_artworkBasePath))
         {

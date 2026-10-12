@@ -32,10 +32,7 @@ public class PlaylistImageStore : IPlaylistImageStore
     public PlaylistImageStore(IOptions<StoragePathsOptions> storagePaths, ILogger<PlaylistImageStore> logger)
     {
         _logger = logger;
-        var configured = storagePaths.Value.CustomArtwork;
-        _basePath = !string.IsNullOrWhiteSpace(configured)
-            ? configured
-            : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
+        _basePath = StorageRoots.CustomArtwork(storagePaths.Value);
         Directory.CreateDirectory(_basePath);
     }
 

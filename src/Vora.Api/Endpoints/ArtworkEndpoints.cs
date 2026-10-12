@@ -43,10 +43,7 @@ public static partial class ArtworkEndpoints
             return Results.NotFound();
         }
 
-        var configPath = storagePaths.Value.CustomArtwork;
-        var basePath = !string.IsNullOrWhiteSpace(configPath)
-            ? configPath
-            : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
+        var basePath = StorageRoots.CustomArtwork(storagePaths.Value);
 
         var path = SafePathResolver.ResolveContainedFilePath(basePath, fileName);
         if (path == null || !File.Exists(path))

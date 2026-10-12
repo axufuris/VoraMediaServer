@@ -100,10 +100,67 @@ public sealed class StorageRootsTests : IDisposable
     }
 
     [Fact]
-    public void With_nothing_configured_the_folder_stays_beside_the_app()
+    public void With_nothing_configured_and_no_data_folder_the_folder_stays_beside_the_app()
     {
         StorageRoots.InDataFolder(new StoragePathsOptions(), _app, "video-thumbnails", "video-thumbnails")
             .Should().Be(Path.Combine(_app, "video-thumbnails"));
+        StorageRoots.DataFolder(new StoragePathsOptions(), _app).Should().BeNull();
+    }
+
+    [Fact]
+    public void With_nothing_configured_the_data_folder_the_image_ships_is_used()
+    {
+        var shipped = Path.Combine(_app, "data");
+        Directory.CreateDirectory(shipped);
+
+        StorageRoots.DataFolder(new StoragePathsOptions(), _app).Should().Be(shipped);
+        StorageRoots.InDataFolder(new StoragePathsOptions(), _app, Path.Combine("Storage", "CustomArtwork"), "custom_artwork")
+            .Should().Be(Path.Combine(shipped, "custom_artwork"));
+        StorageRoots.InDataFolder(new StoragePathsOptions(), _app, "logs", "logs").Should().Be(Path.Combine(shipped, "logs"));
+    }
+
+    [Fact]
+    public void The_answer_does_not_change_while_the_server_runs()
+    {
+        var first = StorageRoots.InDataFolder(new StoragePathsOptions(), _app, "Users", "users");
+        Directory.CreateDirectory(Path.Combine(_app, "data"));
+
+        StorageRoots.InDataFolder(new StoragePathsOptions(), _app, "Users", "users").Should().Be(first);
+    }
+
+    [Fact]
+    public void Every_folder_left_out_lands_in_the_data_folder_under_the_name_the_compose_file_uses()
+    {
+        var paths = new StoragePathsOptions { Subtitles = Path.Combine(_data, "subtitles") };
+
+        StorageRoots.CustomArtwork(paths, _app).Should().Be(Path.Combine(_data, "custom_artwork"));
+        StorageRoots.OriginalArtworkCache(paths, _app).Should().Be(Path.Combine(_data, "original_artwork_cache"));
+        StorageRoots.UserImages(paths, _app).Should().Be(Path.Combine(_data, "users"));
+        StorageRoots.Plugins(paths, _app).Should().Be(Path.Combine(_data, "plugins"));
+        StorageRoots.EpgCache(paths, _app).Should().Be(Path.Combine(_data, "iptv", "epg_cache"));
+        StorageRoots.IptvDvr(paths, null, _app).Should().Be(Path.Combine(_data, "iptv", "dvr"));
+        StorageRoots.AudioFingerprints(paths, _app).Should().Be(Path.Combine(_data, "audiofingerprints"));
+    }
+
+    [Fact]
+    public void The_dvr_folder_chosen_in_settings_wins_over_the_environment()
+    {
+        var paths = ReadmeCompose();
+        var chosen = Path.Combine(_root, "recordings");
+
+        StorageRoots.IptvDvr(paths, chosen).Should().Be(chosen);
+        StorageRoots.IptvDvr(paths, configuredInSettings: " ").Should().Be(paths.IptvDvr);
+    }
+
+    [Fact]
+    public void Every_storage_folder_is_listed_once_for_the_startup_check()
+    {
+        var folders = StorageRoots.All(ReadmeCompose(), null, _app);
+
+        folders.Select(f => f.Setting).Should().OnlyHaveUniqueItems();
+        folders.Should().Contain((nameof(StoragePathsOptions.VideoThumbnails), Path.Combine(_data, "video-thumbnails")));
+        folders.Should().Contain((nameof(StoragePathsOptions.CustomArtwork), Path.Combine(_data, "custom_artwork")));
+        folders.Should().HaveCount(11);
     }
 
     [Fact]
@@ -111,9 +168,9 @@ public sealed class StorageRootsTests : IDisposable
     {
         var paths = ReadmeCompose();
 
-        StorageRoots.VideoThumbnails(paths).Should().Be(Path.Combine(_data, "video-thumbnails"));
-        StorageRoots.Logs(paths).Should().Be(Path.Combine(_data, "logs"));
-        StorageRoots.Backups(paths).Should().Be(Path.Combine(_data, "backups"));
-        StorageRoots.DataProtection(paths).Should().Be(Path.Combine(_data, "dp-keys"));
+        StorageRoots.VideoThumbnails(paths, _app).Should().Be(Path.Combine(_data, "video-thumbnails"));
+        StorageRoots.Logs(paths, _app).Should().Be(Path.Combine(_data, "logs"));
+        StorageRoots.Backups(paths, _app).Should().Be(Path.Combine(_data, "backups"));
+        StorageRoots.DataProtection(paths, _app).Should().Be(Path.Combine(_data, "dp-keys"));
     }
 }

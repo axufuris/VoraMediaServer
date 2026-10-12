@@ -72,10 +72,7 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
         _downloader = downloader;
         _logger = logger;
 
-        var configured = storagePaths.Value.CustomArtwork;
-        _customArtworkPath = !string.IsNullOrWhiteSpace(configured)
-            ? configured
-            : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
+        _customArtworkPath = StorageRoots.CustomArtwork(storagePaths.Value);
 
         _cacheRoot = Path.Combine(_customArtworkPath, "imagecache");
         foreach (var folder in KindFolders.Values.Distinct())

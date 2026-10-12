@@ -64,12 +64,40 @@ public class SubtitleStorePathTests
         resolved.Should().Be("/mnt/subs");
     }
 
-    // Nothing configured at all is a bare-metal run, where the app directory is
-    // writable and is the right answer.
+    // Nothing configured at all, and no data folder beside the app, is a
+    // bare-metal run, where the app directory is writable and is the right answer.
     [Fact]
     public void With_nothing_configured_it_falls_back_to_the_app_directory()
     {
-        SubtitleStorePath.Resolve(Paths()).Should().Be(Path.Combine(AppContext.BaseDirectory, "subtitles"));
+        var app = Path.Combine(Path.GetTempPath(), "vora-subtitle-store-" + Guid.NewGuid().ToString("N"));
+
+        SubtitleStorePath.Resolve(Paths(), app).Should().Be(Path.Combine(app, "subtitles"));
+    }
+
+    // The image ships an empty data folder beside the app. With nothing
+    // configured that is where the mounted volume is, so it is the answer there.
+    [Fact]
+    public void With_nothing_configured_it_uses_the_data_folder_the_image_ships()
+    {
+        var app = Path.Combine(Path.GetTempPath(), "vora-subtitle-store-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(app, "data"));
+        try
+        {
+            SubtitleStorePath.Resolve(Paths(), app).Should().Be(Path.Combine(app, "data", "subtitles"));
+        }
+        finally
+        {
+            Directory.Delete(app, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void A_folder_configured_for_something_else_still_shows_where_the_data_is()
+    {
+        var paths = new StoragePathsOptions { UserImages = Path.Combine(Path.GetTempPath(), "vora-data", "users") };
+        var app = Path.Combine(Path.GetTempPath(), "vora-subtitle-store-" + Guid.NewGuid().ToString("N"));
+
+        SubtitleStorePath.Resolve(paths, app).Should().Be(Path.Combine(Path.GetTempPath(), "vora-data", "subtitles"));
     }
 
     [Theory]

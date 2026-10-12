@@ -20,13 +20,17 @@ public static class SubtitleStorePath
     public static string ItemDirectory(StoragePathsOptions paths, Guid mediaItemId) =>
         Path.Combine(Resolve(paths), mediaItemId.ToString("N")[..2], mediaItemId.ToString("N"));
 
-    public static string Resolve(StoragePathsOptions paths)
+    public static string Resolve(StoragePathsOptions paths) => Resolve(paths, AppContext.BaseDirectory);
+
+    internal static string Resolve(StoragePathsOptions paths, string appFolder)
     {
         if (!string.IsNullOrWhiteSpace(paths.Subtitles)) return paths.Subtitles!;
 
         var dataRoot = FirstConfiguredParent(paths.VideoThumbnails, paths.CustomArtwork, paths.Backups, paths.Logs, paths.Metadata);
 
-        return Path.Combine(dataRoot ?? AppContext.BaseDirectory, DirectoryName);
+        return dataRoot != null
+            ? Path.Combine(dataRoot, DirectoryName)
+            : StorageRoots.InDataFolder(paths, appFolder, DirectoryName, DirectoryName);
     }
 
     private static string? FirstConfiguredParent(params string?[] candidates)
