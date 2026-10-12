@@ -238,6 +238,8 @@ internal static class StreamHistoryProjection
         session.MediaItem?.MediaParts.FirstOrDefault(p => p.Id == session.MediaPartId)
         ?? session.MediaItem?.MediaParts.FirstOrDefault();
 
+    private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
     private static HistorySessionDto BuildHistoryRow(StreamSession session, string userName, string? accountName, string libName, EpisodeShowInfo? episodeInfo)
     {
         var activePart = PlayedPart(session);
@@ -250,6 +252,7 @@ internal static class StreamHistoryProjection
             UserName = userName,
             AccountName = accountName,
             IpAddress = session.ClientDevice?.LastIpAddress ?? "Unknown",
+            Location = NullIfBlank(session.ClientDevice?.Location),
             Platform = session.ClientDevice?.ClientName ?? "Unknown",
             Product = "Vora",
             Player = session.ClientDevice?.DeviceName ?? "Unknown",

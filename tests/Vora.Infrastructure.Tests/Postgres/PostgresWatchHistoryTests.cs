@@ -29,7 +29,7 @@ public class PostgresWatchHistoryTests(PostgresDatabase database) : IClassFixtur
             var account = new User { Email = $"{MovieId:N}@example.com", DisplayName = "Andy" };
             var admin = new UserProfile { Id = AdminProfileId, Name = "AX Media Server", UserId = account.Id };
             var kids = new UserProfile { Id = KidsProfileId, Name = "Kids", UserId = account.Id };
-            var device = new ClientDevice { DeviceId = "web-" + MovieId.ToString("N")[..6], ClientName = "Vora Web", DeviceName = "Web Browser", LastIpAddress = "192.168.0.1" };
+            var device = new ClientDevice { DeviceId = "web-" + MovieId.ToString("N")[..6], ClientName = "Vora Web", DeviceName = "Web Browser", LastIpAddress = "67.199.253.6", Location = "Salt Lake City, UT, US" };
             db.AddRange(library, movie, part, account, admin, kids, device);
 
             StreamSession Session(Guid profileId, DateTime startedUtc, double minutes, double pausedSeconds, double start, double end, string strategy = "DirectPlay") => new()
@@ -121,6 +121,21 @@ public class PostgresWatchHistoryTests(PostgresDatabase database) : IClassFixtur
 
         var (everyone, _) = await world.HistoryAsync(db, Chicago);
         everyone.Select(r => r.UserName).Should().BeEquivalentTo(["AX Media Server", "AX Media Server", "Kids"]);
+    }
+
+    [Fact]
+    public async Task Rows_carry_the_device_address_and_where_it_is()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        await using var db = database.NewContext();
+        var world = new World();
+        await world.SeedAsync(db);
+
+        var (rows, _) = await world.HistoryAsync(db, Chicago, world.KidsProfileId);
+
+        var row = rows.Should().ContainSingle().Subject;
+        row.IpAddress.Should().Be("67.199.253.6");
+        row.Location.Should().Be("Salt Lake City, UT, US");
     }
 
     [Fact]

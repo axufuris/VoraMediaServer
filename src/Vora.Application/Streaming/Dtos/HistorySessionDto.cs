@@ -7,6 +7,7 @@ public class HistorySessionDto
     public string UserName { get; set; } = string.Empty;
     public string? AccountName { get; set; }
     public string IpAddress { get; set; } = string.Empty;
+    public string? Location { get; set; }
     public string Platform { get; set; } = string.Empty;
     public string Product { get; set; } = string.Empty;
     public string Player { get; set; } = string.Empty;

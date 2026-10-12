@@ -60,6 +60,23 @@ function ProfileName({ row, primary }: { row: HistorySessionDto; primary: boolea
     );
 }
 
+function NetworkCell({ ipAddress, location, muted = false }: { ipAddress: string; location?: string | null; muted?: boolean }) {
+    return (
+        <div className="flex flex-col">
+            <span className={`font-mono text-xs ${muted ? 'text-[var(--vora-text-muted)]' : 'text-[var(--vora-text-secondary)]'}`}>{ipAddress}</span>
+            {location && <span className="max-w-[200px] truncate text-[11px] text-[var(--vora-text-muted)]" title={location}>{location}</span>}
+        </div>
+    );
+}
+
+const episodeCode = (row: HistorySessionDto): string | null =>
+    row.seasonNumber != null && row.episodeNumber != null
+        ? `S${String(row.seasonNumber).padStart(2, '0')}E${String(row.episodeNumber).padStart(2, '0')}`
+        : null;
+
+const episodeLine = (row: HistorySessionDto): string =>
+    [episodeCode(row), row.title].filter(Boolean).join(' · ');
+
 function CompletionIcon({ percent }: { percent: number }) {
     if (percent >= 90) {
         return <div className="w-3.5 h-3.5 rounded-full bg-[var(--vora-success-500)] mx-auto" title="Completed" />;
@@ -421,7 +438,7 @@ export default function HistoryPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-2.5"><ProfileName row={row} primary /></td>
-                                                <td className="px-4 py-2.5 font-mono text-xs text-[var(--vora-text-secondary)]">{row.ipAddress}</td>
+                                                <td className="px-4 py-2.5"><NetworkCell ipAddress={row.ipAddress} location={row.location} /></td>
                                                 <td className="px-4 py-2.5 text-[var(--vora-text-secondary)]">{row.platform}</td>
                                                 <td className="px-4 py-2.5 text-[var(--vora-text-secondary)]">{row.product}</td>
                                                 <td className="px-4 py-2.5">
@@ -436,10 +453,10 @@ export default function HistoryPage() {
                                                 <td className="px-4 py-2.5 font-medium">
                                                     {row.showTitle ? (
                                                         <div className="max-w-[260px]">
-                                                            <div className="text-[10px] text-[var(--vora-text-muted)] truncate" title={row.showTitle}>
-                                                                {row.showTitle}{row.seasonNumber != null && row.episodeNumber != null ? ` · S${String(row.seasonNumber).padStart(2, '0')}E${String(row.episodeNumber).padStart(2, '0')}` : ''}
+                                                            <span className="block text-[var(--vora-text-primary)] truncate" title={row.showTitle}>{row.showTitle}</span>
+                                                            <div className="text-[11px] font-normal text-[var(--vora-text-muted)] truncate" title={row.title}>
+                                                                {episodeLine(row)}
                                                             </div>
-                                                            <span className="block text-[var(--vora-text-primary)] truncate" title={row.title}>{row.title}</span>
                                                         </div>
                                                     ) : (
                                                         <span className="text-[var(--vora-text-primary)] truncate max-w-[260px] inline-block align-bottom" title={row.title}>{row.title}</span>
@@ -463,7 +480,7 @@ export default function HistoryPage() {
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2"><ProfileName row={sub} primary={false} /></td>
-                                                    <td className="px-4 py-2 font-mono text-xs text-[var(--vora-text-muted)]">{sub.ipAddress}</td>
+                                                    <td className="px-4 py-2"><NetworkCell ipAddress={sub.ipAddress} location={sub.location} muted /></td>
                                                     <td className="px-4 py-2 text-[var(--vora-text-secondary)]">{sub.platform}</td>
                                                     <td className="px-4 py-2 text-[var(--vora-text-muted)]">{sub.product}</td>
                                                     <td className="px-4 py-2">
