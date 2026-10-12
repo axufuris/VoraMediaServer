@@ -59,10 +59,7 @@ public class VideoThumbnailManager : IVideoThumbnailManager
         _progress = progress;
         _scopeFactory = scopeFactory;
         _logger = logger;
-        var customArtwork = storagePaths.Value.CustomArtwork;
-        _customArtworkBase = !string.IsNullOrWhiteSpace(customArtwork)
-            ? customArtwork
-            : System.IO.Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
+        _customArtworkBase = StorageRoots.CustomArtwork(storagePaths.Value);
     }
 
     public async Task TriggerMediaItemThumbnailGenerationAsync(Guid mediaItemId, bool forceOverride = false, bool isScheduleTrigger = false, CancellationToken cancellationToken = default)

@@ -64,12 +64,24 @@ public class SubtitleStorePathTests
         resolved.Should().Be("/mnt/subs");
     }
 
-    // Nothing configured at all is a bare-metal run, where the app directory is
-    // writable and is the right answer.
+    // Nothing configured at all still must not land in the app folder itself,
+    // which the container cannot write to. The image ships a data folder beside
+    // the app, and that is where the mounted volume is.
     [Fact]
-    public void With_nothing_configured_it_falls_back_to_the_app_directory()
+    public void With_nothing_configured_it_goes_in_the_data_folder_beside_the_app()
     {
-        SubtitleStorePath.Resolve(Paths()).Should().Be(Path.Combine(AppContext.BaseDirectory, "subtitles"));
+        var app = Path.Combine(Path.GetTempPath(), "vora-subtitle-store");
+
+        SubtitleStorePath.Resolve(Paths(), app).Should().Be(Path.Combine(app, "data", "subtitles"));
+    }
+
+    [Fact]
+    public void A_folder_configured_for_something_else_still_shows_where_the_data_is()
+    {
+        var paths = new StoragePathsOptions { UserImages = Path.Combine(Path.GetTempPath(), "vora-data", "users") };
+        var app = Path.Combine(Path.GetTempPath(), "vora-subtitle-store");
+
+        SubtitleStorePath.Resolve(paths, app).Should().Be(Path.Combine(Path.GetTempPath(), "vora-data", "subtitles"));
     }
 
     [Theory]

@@ -24,6 +24,7 @@ public class VoraGlobalExceptionHandler : IExceptionHandler
     {
         var (status, title) = exception switch
         {
+            UnauthorizedAccessException { InnerException: IOException } => (StatusCodes.Status500InternalServerError, "Internal server error"),
             UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Forbidden"),
             ArgumentException => (StatusCodes.Status400BadRequest, "Bad request"),
             InvalidOperationException => (StatusCodes.Status400BadRequest, "Invalid operation"),

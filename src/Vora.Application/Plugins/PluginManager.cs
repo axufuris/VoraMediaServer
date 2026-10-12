@@ -166,10 +166,7 @@ public class PluginManager(
             throw new InvalidOperationException("Only .dll plugin files are supported.");
         }
 
-        var configured = storagePaths.Value.Plugins;
-        var pluginsPath = !string.IsNullOrWhiteSpace(configured)
-            ? configured
-            : Path.Combine(AppContext.BaseDirectory, "Plugins");
+        var pluginsPath = StorageRoots.Plugins(storagePaths.Value);
         if (!Directory.Exists(pluginsPath))
         {
             Directory.CreateDirectory(pluginsPath);

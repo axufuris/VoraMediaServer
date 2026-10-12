@@ -36,8 +36,6 @@ public class MediaManager : IMediaManager
 {
     private const string OverlayMarker = "_overlay_";
     private const string CustomArtworkUrlPrefix = "/api/artwork/custom/";
-    private const string DefaultStorageRoot = "Storage";
-    private const string DefaultCustomArtworkFolder = "CustomArtwork";
 
     private readonly IMediaRepository _repository;
     private readonly IUserMediaStateRepository _stateRepository;
@@ -327,10 +325,7 @@ public class MediaManager : IMediaManager
 
     private void CleanupOrphanedOverlay(MediaItem item)
     {
-        var configPath = _storagePaths.CustomArtwork;
-        var overlayDir = !string.IsNullOrWhiteSpace(configPath)
-            ? configPath
-            : Path.Combine(AppContext.BaseDirectory, DefaultStorageRoot, DefaultCustomArtworkFolder);
+        var overlayDir = StorageRoots.CustomArtwork(_storagePaths);
 
         var urlsToCheck = new[] { item.PosterUrl, item.BackgroundUrl };
 

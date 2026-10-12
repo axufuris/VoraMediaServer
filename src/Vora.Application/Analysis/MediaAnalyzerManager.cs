@@ -700,10 +700,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
 
     private string ResolveFingerprintWorkingDirectory()
     {
-        var configured = _storagePaths.Value.AudioFingerprints;
-        return string.IsNullOrWhiteSpace(configured)
-            ? Path.Combine(AppContext.BaseDirectory, "data", "audiofingerprints")
-            : configured;
+        return StorageRoots.AudioFingerprints(_storagePaths.Value);
     }
 
     private static string ComputeFileIdentity(string filePath)

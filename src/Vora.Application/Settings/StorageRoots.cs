@@ -2,23 +2,108 @@ namespace Vora.Application.Settings;
 
 public static class StorageRoots
 {
-    public static string CustomArtwork(StoragePathsOptions paths) =>
-        Configured(paths.CustomArtwork) ?? Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
+    private const string ShippedDataFolderName = "data";
 
-    public static string OriginalArtworkCache(StoragePathsOptions paths) =>
-        Configured(paths.OriginalArtworkCache) ?? Path.Combine(AppContext.BaseDirectory, "Storage", "OriginalArtworkCache");
+    public static string CustomArtwork(StoragePathsOptions paths) => CustomArtwork(paths, AppContext.BaseDirectory);
 
-    public static string UserImages(StoragePathsOptions paths) =>
-        Configured(paths.UserImages) ?? Path.Combine(AppContext.BaseDirectory, "Users");
+    public static string OriginalArtworkCache(StoragePathsOptions paths) => OriginalArtworkCache(paths, AppContext.BaseDirectory);
 
-    public static string Plugins(StoragePathsOptions paths) =>
-        Configured(paths.Plugins) ?? Path.Combine(AppContext.BaseDirectory, "Plugins");
+    public static string UserImages(StoragePathsOptions paths) => UserImages(paths, AppContext.BaseDirectory);
 
-    public static string AudioFingerprints(StoragePathsOptions paths) =>
-        Configured(paths.AudioFingerprints) ?? Path.Combine(AppContext.BaseDirectory, "data", "audiofingerprints");
+    public static string Plugins(StoragePathsOptions paths) => Plugins(paths, AppContext.BaseDirectory);
+
+    public static string AudioFingerprints(StoragePathsOptions paths) => AudioFingerprints(paths, AppContext.BaseDirectory);
+
+    public static string EpgCache(StoragePathsOptions paths) => EpgCache(paths, AppContext.BaseDirectory);
 
     public static string IptvDvr(StoragePathsOptions paths, string? configuredInSettings) =>
-        Configured(configuredInSettings) ?? Configured(paths.IptvDvr) ?? "/app/data/iptv/dvr";
+        IptvDvr(paths, configuredInSettings, AppContext.BaseDirectory);
+
+    public static string VideoThumbnails(StoragePathsOptions paths) => VideoThumbnails(paths, AppContext.BaseDirectory);
+
+    public static string Logs(StoragePathsOptions paths) => Logs(paths, AppContext.BaseDirectory);
+
+    public static string Backups(StoragePathsOptions paths) => Backups(paths, AppContext.BaseDirectory);
+
+    public static string DataProtection(StoragePathsOptions paths) => DataProtection(paths, AppContext.BaseDirectory);
+
+    public static string DataFolder(StoragePathsOptions paths) => DataFolder(paths, AppContext.BaseDirectory);
+
+    public static IReadOnlyList<(string Setting, string Folder)> All(StoragePathsOptions paths, string? dvrFolderInSettings = null) =>
+        All(paths, dvrFolderInSettings, AppContext.BaseDirectory);
+
+    internal static string CustomArtwork(StoragePathsOptions paths, string appFolder) =>
+        Configured(paths.CustomArtwork) ?? InDataFolder(paths, appFolder, "custom_artwork");
+
+    internal static string OriginalArtworkCache(StoragePathsOptions paths, string appFolder) =>
+        Configured(paths.OriginalArtworkCache) ?? InDataFolder(paths, appFolder, "original_artwork_cache");
+
+    internal static string UserImages(StoragePathsOptions paths, string appFolder) =>
+        Configured(paths.UserImages) ?? InDataFolder(paths, appFolder, "users");
+
+    internal static string Plugins(StoragePathsOptions paths, string appFolder) =>
+        Configured(paths.Plugins) ?? InDataFolder(paths, appFolder, "plugins");
+
+    internal static string AudioFingerprints(StoragePathsOptions paths, string appFolder) =>
+        Configured(paths.AudioFingerprints) ?? InDataFolder(paths, appFolder, "audiofingerprints");
+
+    internal static string EpgCache(StoragePathsOptions paths, string appFolder) =>
+        Configured(paths.EpgCache) ?? InDataFolder(paths, appFolder, Path.Combine("iptv", "epg_cache"));
+
+    internal static string IptvDvr(StoragePathsOptions paths, string? configuredInSettings, string appFolder) =>
+        Configured(configuredInSettings) ?? Configured(paths.IptvDvr) ?? InDataFolder(paths, appFolder, Path.Combine("iptv", "dvr"));
+
+    internal static string VideoThumbnails(StoragePathsOptions paths, string appFolder) =>
+        Configured(paths.VideoThumbnails) ?? InDataFolder(paths, appFolder, "video-thumbnails");
+
+    internal static string Logs(StoragePathsOptions paths, string appFolder) =>
+        Configured(paths.Logs) ?? InDataFolder(paths, appFolder, "logs");
+
+    internal static string Backups(StoragePathsOptions paths, string appFolder) =>
+        Configured(paths.Backups) ?? InDataFolder(paths, appFolder, "backups");
+
+    internal static string DataProtection(StoragePathsOptions paths, string appFolder) =>
+        Configured(paths.DataProtection) ?? InDataFolder(paths, appFolder, "dp-keys");
+
+    internal static string DataFolder(StoragePathsOptions paths, string appFolder) =>
+        ConfiguredDataFolder(paths) ?? Path.Combine(appFolder, ShippedDataFolderName);
+
+    internal static IReadOnlyList<(string Setting, string Folder)> All(StoragePathsOptions paths, string? dvrFolderInSettings, string appFolder) =>
+    [
+        (nameof(StoragePathsOptions.CustomArtwork), CustomArtwork(paths, appFolder)),
+        (nameof(StoragePathsOptions.OriginalArtworkCache), OriginalArtworkCache(paths, appFolder)),
+        (nameof(StoragePathsOptions.UserImages), UserImages(paths, appFolder)),
+        (nameof(StoragePathsOptions.Plugins), Plugins(paths, appFolder)),
+        (nameof(StoragePathsOptions.EpgCache), EpgCache(paths, appFolder)),
+        (nameof(StoragePathsOptions.IptvDvr), IptvDvr(paths, dvrFolderInSettings, appFolder)),
+        (nameof(StoragePathsOptions.VideoThumbnails), VideoThumbnails(paths, appFolder)),
+        (nameof(StoragePathsOptions.AudioFingerprints), AudioFingerprints(paths, appFolder)),
+        (nameof(StoragePathsOptions.Logs), Logs(paths, appFolder)),
+        (nameof(StoragePathsOptions.Backups), Backups(paths, appFolder)),
+        (nameof(StoragePathsOptions.DataProtection), DataProtection(paths, appFolder)),
+    ];
+
+    private static string InDataFolder(StoragePathsOptions paths, string appFolder, string name) =>
+        Path.Combine(DataFolder(paths, appFolder), name);
+
+    private static string? ConfiguredDataFolder(StoragePathsOptions paths)
+    {
+        string?[] besideOneAnother =
+        [
+            paths.CustomArtwork, paths.OriginalArtworkCache, paths.UserImages, paths.Plugins, paths.Subtitles,
+            paths.VideoThumbnails, paths.Backups, paths.Logs, paths.DataProtection, paths.Metadata, paths.AudioFingerprints
+        ];
+
+        foreach (var path in besideOneAnother)
+        {
+            if (string.IsNullOrWhiteSpace(path)) continue;
+
+            var parent = Path.GetDirectoryName(path.TrimEnd('/', '\\'));
+            if (!string.IsNullOrWhiteSpace(parent)) return parent;
+        }
+
+        return null;
+    }
 
     private static string? Configured(string? path) => string.IsNullOrWhiteSpace(path) ? null : path;
 }

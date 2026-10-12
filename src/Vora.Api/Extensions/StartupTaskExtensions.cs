@@ -22,6 +22,7 @@ public static class StartupTaskExtensions
 
         await MigrateDatabaseAsync(app);
         await EnsureServerSettingsAsync(app);
+        await CheckStorageFoldersAsync(app);
         await SeedPluginSettingsFromEnvironmentAsync(app);
         await PreloadIptvEpgCacheAsync(app);
     }
@@ -30,6 +31,41 @@ public static class StartupTaskExtensions
     {
         using var scope = app.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<ISystemSettingsRepository>().GetSettingsForUpdateAsync();
+    }
+
+    private static async Task CheckStorageFoldersAsync(WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        try
+        {
+            var paths = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<StoragePathsOptions>>().Value;
+            var settings = await scope.ServiceProvider.GetRequiredService<ISystemSettingsRepository>().GetSettingsAsync();
+            var folders = StorageRoots.All(paths, settings.DvrStoragePath)
+                .Append((nameof(StoragePathsOptions.Subtitles), Vora.Application.Subtitles.SubtitleStorePath.Resolve(paths)))
+                .ToList();
+
+            logger.LogInformation("Storage folders: {Folders}", string.Join(", ", folders.Select(f => $"{f.Item1}={f.Item2}")));
+
+            var notifications = scope.ServiceProvider.GetRequiredService<Vora.Application.Notifications.IAdminNotificationManager>();
+            foreach (var problem in StorageFolderCheck.FindUnwritable(folders))
+            {
+                logger.LogError(
+                    "Vora can't write to {Folder} (StoragePaths__{Setting}): {Reason} Fix the folder's permissions, or set StoragePaths__{Setting} to a folder Vora can write to, then restart.",
+                    problem.Folder, problem.Setting, problem.Reason, problem.Setting);
+
+                await notifications.RaiseAsync(
+                    Vora.Domain.Enums.AdminNotificationSeverity.Error,
+                    "A storage folder can't be written to",
+                    $"Vora can't write to \"{problem.Folder}\" (StoragePaths__{problem.Setting}). Features that save files there will fail. Fix the folder's permissions, or point the setting at a folder Vora can write to, then restart.",
+                    $"{{\"storageFolder\":\"{problem.Setting}\"}}",
+                    deduplicateByContext: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Could not check the storage folders.");
+        }
     }
 
     private static async Task SeedPluginSettingsFromEnvironmentAsync(WebApplication app)

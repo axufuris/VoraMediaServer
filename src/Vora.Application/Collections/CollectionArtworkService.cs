@@ -30,10 +30,7 @@ public class CollectionArtworkService : ICollectionArtworkService
         _artworkProviders = artworkProviders;
         _imageDownloader = imageDownloader;
 
-        var configPath = storagePaths.Value.CustomArtwork;
-        _basePath = !string.IsNullOrWhiteSpace(configPath)
-            ? configPath
-            : Path.Combine(AppContext.BaseDirectory, "Storage", "CustomArtwork");
+        _basePath = StorageRoots.CustomArtwork(storagePaths.Value);
 
         if (!Directory.Exists(_basePath)) Directory.CreateDirectory(_basePath);
     }

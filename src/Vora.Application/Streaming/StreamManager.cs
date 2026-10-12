@@ -375,7 +375,7 @@ public class StreamManager : IStreamManager
         };
 
         var target = candidates.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p) && Directory.Exists(p))
-            ?? AppContext.BaseDirectory;
+            ?? StorageRoots.DataFolder(_storagePaths);
         target = Path.GetFullPath(target);
 
         DriveInfo? best = null;
