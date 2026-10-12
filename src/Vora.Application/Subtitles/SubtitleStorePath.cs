@@ -28,9 +28,7 @@ public static class SubtitleStorePath
 
         var dataRoot = FirstConfiguredParent(paths.VideoThumbnails, paths.CustomArtwork, paths.Backups, paths.Logs, paths.Metadata);
 
-        return dataRoot != null
-            ? Path.Combine(dataRoot, DirectoryName)
-            : StorageRoots.InDataFolder(paths, appFolder, DirectoryName, DirectoryName);
+        return Path.Combine(dataRoot ?? StorageRoots.DataFolder(paths, appFolder), DirectoryName);
     }
 
     private static string? FirstConfiguredParent(params string?[] candidates)

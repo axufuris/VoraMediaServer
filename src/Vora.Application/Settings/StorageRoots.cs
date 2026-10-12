@@ -1,12 +1,8 @@
-using System.Collections.Concurrent;
-
 namespace Vora.Application.Settings;
 
 public static class StorageRoots
 {
     private const string ShippedDataFolderName = "data";
-
-    private static readonly ConcurrentDictionary<string, string> Resolved = new(StringComparer.Ordinal);
 
     public static string CustomArtwork(StoragePathsOptions paths) => CustomArtwork(paths, AppContext.BaseDirectory);
 
@@ -31,48 +27,46 @@ public static class StorageRoots
 
     public static string DataProtection(StoragePathsOptions paths) => DataProtection(paths, AppContext.BaseDirectory);
 
-    public static string? DataFolder(StoragePathsOptions paths) => DataFolder(paths, AppContext.BaseDirectory);
+    public static string DataFolder(StoragePathsOptions paths) => DataFolder(paths, AppContext.BaseDirectory);
 
     public static IReadOnlyList<(string Setting, string Folder)> All(StoragePathsOptions paths, string? dvrFolderInSettings = null) =>
         All(paths, dvrFolderInSettings, AppContext.BaseDirectory);
 
     internal static string CustomArtwork(StoragePathsOptions paths, string appFolder) =>
-        Configured(paths.CustomArtwork) ?? InDataFolder(paths, appFolder, Path.Combine("Storage", "CustomArtwork"), "custom_artwork");
+        Configured(paths.CustomArtwork) ?? InDataFolder(paths, appFolder, "custom_artwork");
 
     internal static string OriginalArtworkCache(StoragePathsOptions paths, string appFolder) =>
-        Configured(paths.OriginalArtworkCache) ?? InDataFolder(paths, appFolder, Path.Combine("Storage", "OriginalArtworkCache"), "original_artwork_cache");
+        Configured(paths.OriginalArtworkCache) ?? InDataFolder(paths, appFolder, "original_artwork_cache");
 
     internal static string UserImages(StoragePathsOptions paths, string appFolder) =>
-        Configured(paths.UserImages) ?? InDataFolder(paths, appFolder, "Users", "users");
+        Configured(paths.UserImages) ?? InDataFolder(paths, appFolder, "users");
 
     internal static string Plugins(StoragePathsOptions paths, string appFolder) =>
-        Configured(paths.Plugins) ?? InDataFolder(paths, appFolder, "Plugins", "plugins");
+        Configured(paths.Plugins) ?? InDataFolder(paths, appFolder, "plugins");
 
     internal static string AudioFingerprints(StoragePathsOptions paths, string appFolder) =>
-        Configured(paths.AudioFingerprints) ?? InDataFolder(paths, appFolder, Path.Combine("data", "audiofingerprints"), "audiofingerprints");
+        Configured(paths.AudioFingerprints) ?? InDataFolder(paths, appFolder, "audiofingerprints");
 
     internal static string EpgCache(StoragePathsOptions paths, string appFolder) =>
-        Configured(paths.EpgCache) ?? InDataFolder(paths, appFolder, Path.Combine("Storage", "Iptv"), Path.Combine("iptv", "epg_cache"));
+        Configured(paths.EpgCache) ?? InDataFolder(paths, appFolder, Path.Combine("iptv", "epg_cache"));
 
     internal static string IptvDvr(StoragePathsOptions paths, string? configuredInSettings, string appFolder) =>
-        Configured(configuredInSettings)
-        ?? Configured(paths.IptvDvr)
-        ?? InDataFolder(paths, appFolder, Path.Combine("data", "iptv", "dvr"), Path.Combine("iptv", "dvr"));
+        Configured(configuredInSettings) ?? Configured(paths.IptvDvr) ?? InDataFolder(paths, appFolder, Path.Combine("iptv", "dvr"));
 
     internal static string VideoThumbnails(StoragePathsOptions paths, string appFolder) =>
-        Configured(paths.VideoThumbnails) ?? InDataFolder(paths, appFolder, "video-thumbnails", "video-thumbnails");
+        Configured(paths.VideoThumbnails) ?? InDataFolder(paths, appFolder, "video-thumbnails");
 
     internal static string Logs(StoragePathsOptions paths, string appFolder) =>
-        Configured(paths.Logs) ?? InDataFolder(paths, appFolder, "logs", "logs");
+        Configured(paths.Logs) ?? InDataFolder(paths, appFolder, "logs");
 
     internal static string Backups(StoragePathsOptions paths, string appFolder) =>
-        Configured(paths.Backups) ?? InDataFolder(paths, appFolder, "backups", "backups");
+        Configured(paths.Backups) ?? InDataFolder(paths, appFolder, "backups");
 
     internal static string DataProtection(StoragePathsOptions paths, string appFolder) =>
-        Configured(paths.DataProtection) ?? InDataFolder(paths, appFolder, "DataProtectionKeys", "dp-keys");
+        Configured(paths.DataProtection) ?? InDataFolder(paths, appFolder, "dp-keys");
 
-    internal static string? DataFolder(StoragePathsOptions paths, string appFolder) =>
-        ConfiguredDataFolder(paths) ?? ShippedDataFolder(appFolder);
+    internal static string DataFolder(StoragePathsOptions paths, string appFolder) =>
+        ConfiguredDataFolder(paths) ?? Path.Combine(appFolder, ShippedDataFolderName);
 
     internal static IReadOnlyList<(string Setting, string Folder)> All(StoragePathsOptions paths, string? dvrFolderInSettings, string appFolder) =>
     [
@@ -89,19 +83,8 @@ public static class StorageRoots
         (nameof(StoragePathsOptions.DataProtection), DataProtection(paths, appFolder)),
     ];
 
-    internal static string InDataFolder(StoragePathsOptions paths, string appFolder, string nameInAppFolder, string nameInDataFolder)
-    {
-        var besideConfiguredFolders = ConfiguredDataFolder(paths);
-
-        return Resolved.GetOrAdd($"{appFolder}\n{nameInAppFolder}\n{nameInDataFolder}\n{besideConfiguredFolders}", _ =>
-        {
-            var inAppFolder = Path.Combine(appFolder, nameInAppFolder);
-            if (Directory.Exists(inAppFolder)) return inAppFolder;
-
-            var dataFolder = besideConfiguredFolders ?? ShippedDataFolder(appFolder);
-            return dataFolder == null ? inAppFolder : Path.Combine(dataFolder, nameInDataFolder);
-        });
-    }
+    private static string InDataFolder(StoragePathsOptions paths, string appFolder, string name) =>
+        Path.Combine(DataFolder(paths, appFolder), name);
 
     private static string? ConfiguredDataFolder(StoragePathsOptions paths)
     {
@@ -120,12 +103,6 @@ public static class StorageRoots
         }
 
         return null;
-    }
-
-    private static string? ShippedDataFolder(string appFolder)
-    {
-        var shipped = Path.Combine(appFolder, ShippedDataFolderName);
-        return Directory.Exists(shipped) ? shipped : null;
     }
 
     private static string? Configured(string? path) => string.IsNullOrWhiteSpace(path) ? null : path;

@@ -6,14 +6,15 @@ Scrub-bar preview thumbnails for the video player, analogous to Plex's hover thu
 
 Configured via `StoragePaths:VideoThumbnails` (env var `StoragePaths__VideoThumbnails`); in Docker it lives at `/app/data/video-thumbnails` under the existing `./Vora-data:/app/data` volume so the cache survives container rebuilds. **No new Docker volume is required.**
 
-**Unset is a normal case**, because the install examples did not list this path. Every storage folder is resolved by `StorageRoots` (`Vora.Application/Settings`), and an unset one goes, in order:
+**Unset is a normal case**, because the install examples did not list this path. Every storage folder is resolved by `StorageRoots` (`Vora.Application/Settings`):
 
-1. to the folder beside the app that the old default named (`<app>/video-thumbnails`, `<app>/Storage/CustomArtwork`, `<app>/Users`, …) **if it already exists**, so a server with data or a volume there keeps using it;
-2. beside the storage paths that are configured (`StorageRoots.DataFolder`, the parent of `CustomArtwork` and its siblings), under the name `docker-compose.yml` uses (`video-thumbnails`, `custom_artwork`, `users`, `plugins`, `iptv/epg_cache`, `iptv/dvr`, `logs`, `backups`, `dp-keys`);
-3. into `<app>/data` when nothing is configured and that folder exists, which it always does in the image;
-4. beside the app, as before, when there is no data folder at all (a run outside the container).
+1. a path that is set is used as given;
+2. one that is not set goes beside the paths that are set (`StorageRoots.DataFolder`, the parent of `CustomArtwork` and its siblings), under the name `docker-compose.yml` uses (`video-thumbnails`, `custom_artwork`, `original_artwork_cache`, `users`, `plugins`, `iptv/epg_cache`, `iptv/dvr`, `logs`, `backups`, `dp-keys`, `subtitles`);
+3. with nothing set, the data folder is `<app>/data`, which the image ships and the install instructions mount.
 
-In Docker the app folder is `/app`, which the server's user cannot write to; only `/app/data` and `/transcode` are handed to it at startup. The answer is remembered for the life of the process, so two services cannot disagree. **Never compute a storage default inline** — fifteen classes once each had their own copy of step 4.
+So one path is enough to place all the others: `StoragePaths__CustomArtwork=/config/artwork` puts thumbnails in `/config/video-thumbnails`, and with nothing set they are in `/app/data/video-thumbnails`.
+
+**No storage folder is ever placed directly in the app folder.** In Docker that is `/app`, which the server's user cannot write to; only `/app/data` and `/transcode` are handed to it at startup. The old defaults (`<app>/Storage/CustomArtwork`, `<app>/Users`, `<app>/Plugins`, `<app>/video-thumbnails`, `<app>/logs`, …) are gone: sixteen classes each had their own copy, and none of them could work in the container. A server that mounted a volume at one of those old locations instead of setting the path has to set the path. **Never compute a storage default inline.**
 
 At startup `CheckStorageFoldersAsync` logs where every folder is and runs `StorageFolderCheck.FindUnwritable`, which creates each folder and writes a probe file. A folder that fails is logged as an error and raised as an admin alert naming the setting.
 
