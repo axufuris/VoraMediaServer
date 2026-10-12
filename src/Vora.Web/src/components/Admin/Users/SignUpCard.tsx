@@ -4,6 +4,7 @@ import { systemSettingsAdminService, type ServerSettings } from '../../../api/Sy
 import { authService } from '../../../api/Auth/authService';
 import { invitationsAdminService } from '../../../api/Auth/invitationsAdminService';
 import { resolveReason } from '../../../utils/apiError';
+import { copyText } from '../../../utils/copyText';
 
 // How new people get an account, and the one thing to do about it, on the page
 // where accounts are managed. The mode used to live only in System Settings and
@@ -89,12 +90,7 @@ export default function SignUpCard({ serverId, invitationsPath }: SignUpCardProp
 
     const signUpLink = `${window.location.origin}/register`;
     const copyLink = async () => {
-        try {
-            await navigator.clipboard.writeText(signUpLink);
-            setCopied(true);
-        } catch {
-            setCopied(false);
-        }
+        setCopied(await copyText(signUpLink));
     };
 
     const mode = settings?.registrationMode ?? null;
