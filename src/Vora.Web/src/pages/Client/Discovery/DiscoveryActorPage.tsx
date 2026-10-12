@@ -53,7 +53,7 @@ export default function DiscoveryActorPage() {
         return (
             <div>
                 <div className="vora-skeleton h-[70vh] min-h-[540px]" />
-                <div className="px-12 pt-8">
+                <div className="px-12 max-md:px-4 pt-8">
                     <div className="vora-skeleton mb-3 h-10 w-2/3" />
                     <div className="vora-skeleton mb-6 h-6 w-1/2" />
                 </div>

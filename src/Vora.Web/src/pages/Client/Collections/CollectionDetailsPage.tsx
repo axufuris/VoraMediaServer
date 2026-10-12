@@ -167,11 +167,11 @@ export default function CollectionDetailsPage() {
                 <CinematicBackdrop src={collection.backdropUrl || collection.posterUrl} intensity="detail" parallax transitionKey={collection.id} />
             </div>
 
-            <div className="relative z-10 w-full flex-1 px-12 pt-8">
+            <div className="relative z-10 w-full flex-1 px-12 max-md:px-4 pt-8">
 
-                <div className="flex flex-col md:flex-row gap-10 mb-16">
-                    <div className="w-64 shrink-0">
-                        <div className="aspect-[2/3] rounded-lg overflow-hidden shadow-2xl border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)]">
+                <div className="flex flex-col md:flex-row gap-10 mb-16 max-md:gap-5 max-md:mb-10">
+                    <div className="w-64 shrink-0 max-md:w-36">
+                        <div className="aspect-[2/3] rounded-lg overflow-hidden shadow-[var(--vora-shadow-overlay)] border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)]">
                             {collection.posterUrl ? (
                                 <img src={collection.posterUrl} alt={collection.title} className="w-full h-full object-cover" />
                             ) : (
@@ -180,15 +180,15 @@ export default function CollectionDetailsPage() {
                         </div>
                     </div>
 
-                    <div className="flex-1 pt-4">
-                        <div className="flex items-center gap-4 mb-4">
-                            <h1 className="text-5xl font-bold text-[var(--vora-text-primary)] drop-shadow-lg">{collection.title}</h1>
+                    <div className="flex-1 pt-4 max-md:pt-0">
+                        <div className="flex items-center gap-4 mb-4 max-md:flex-wrap max-md:gap-3">
+                            <h1 className="text-5xl max-md:text-3xl font-bold text-[var(--vora-text-primary)] drop-shadow-[0_4px_4px_color-mix(in_srgb,var(--vora-bg-canvas)_70%,transparent)]">{collection.title}</h1>
 
                             {isAdmin && (
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setIsEditModalOpen(true)}
-                                        className="p-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-accent-hover)] rounded-full text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors shadow-lg cursor-pointer"
+                                        className="p-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-accent-hover)] rounded-full text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors shadow-[var(--vora-shadow-lg)] cursor-pointer"
                                         title="Edit Metadata"
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
@@ -197,7 +197,7 @@ export default function CollectionDetailsPage() {
                                     {isAdmin && collection.defaultSort === 'Chronological' && (
                                         <button
                                             onClick={() => setIsReorderModalOpen(true)}
-                                            className="p-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-accent-hover)] rounded-full text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors shadow-lg cursor-pointer"
+                                            className="p-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-accent-hover)] rounded-full text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors shadow-[var(--vora-shadow-lg)] cursor-pointer"
                                             title="Manual Sort Order"
                                         >
                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" /></svg>
@@ -208,7 +208,7 @@ export default function CollectionDetailsPage() {
                                         <button
                                             onClick={handleSyncTimeline}
                                             disabled={isSyncing}
-                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-full text-sm font-bold text-[var(--vora-text-primary)] transition-colors shadow-lg flex items-center gap-2 cursor-pointer"
+                                            className="px-4 py-2 bg-[var(--vora-info-500)] hover:bg-[color-mix(in_srgb,var(--vora-info-500)_85%,var(--vora-text-primary))] disabled:opacity-50 rounded-full text-sm font-bold text-[var(--vora-text-primary)] transition-colors shadow-[var(--vora-shadow-lg)] flex items-center gap-2 cursor-pointer"
                                         >
                                             {isSyncing ? (
                                                 <span className="animate-pulse">Syncing...</span>
@@ -224,15 +224,15 @@ export default function CollectionDetailsPage() {
                             )}
                         </div>
 
-                        <p className="text-lg text-[var(--vora-text-secondary)] leading-relaxed max-w-4xl shadow-sm">
+                        <p className="text-lg max-md:text-base text-[var(--vora-text-secondary)] leading-relaxed max-w-4xl shadow-[var(--vora-shadow-sm)]">
                             {collection.description || "No description available."}
                         </p>
                     </div>
                 </div>
 
                 <div>
-                    <div className="flex items-center justify-between gap-4 mb-6 border-b border-[var(--vora-border-subtle)] pb-2">
-                        <h2 className="text-2xl font-bold text-[var(--vora-text-primary)]">
+                    <div className="flex items-center justify-between gap-4 mb-6 border-b border-[var(--vora-border-subtle)] pb-2 max-md:flex-wrap max-md:gap-2">
+                        <h2 className="text-2xl max-md:text-xl font-bold text-[var(--vora-text-primary)]">
                             Items in Collection ({collection.itemCount})
                         </h2>
 

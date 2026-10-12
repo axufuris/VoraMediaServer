@@ -8,7 +8,8 @@ import { serverVault } from '../../../utils/serverVault';
 import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { useDialog } from '../../../dialogs';
 import GuideProgramModal from '../../../components/Iptv/GuideProgramModal';
-import { ROW_HEIGHT, PX_PER_MINUTE, HOURS_TO_SHOW, CHANNEL_COLUMN_WIDTH, parseDate } from './guideConstants';
+import { ROW_HEIGHT, PX_PER_MINUTE, HOURS_TO_SHOW, CHANNEL_COLUMN_WIDTH, PHONE_CHANNEL_COLUMN_WIDTH, parseDate } from './guideConstants';
+import { useIsPhone } from '../../../hooks/useIsPhone';
 import { useGuideData } from './hooks/useGuideData';
 import { useGuideVirtualization } from './hooks/useGuideVirtualization';
 import GuideRow, { type CleanedProgram } from './components/GuideRow';
@@ -38,6 +39,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
     }, []);
 
     const [containerWidth, setContainerWidth] = useState(0);
+    const channelColumnWidth = useIsPhone() ? PHONE_CHANNEL_COLUMN_WIDTH : CHANNEL_COLUMN_WIDTH;
 
     const timelineStart = useMemo(() => {
         const now = new Date();
@@ -49,10 +51,10 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
 
     const hoursToShow = useMemo(() => {
         if (containerWidth <= 0) return HOURS_TO_SHOW;
-        const availableForTimeline = containerWidth - CHANNEL_COLUMN_WIDTH;
+        const availableForTimeline = containerWidth - channelColumnWidth;
         const neededHours = Math.ceil(availableForTimeline / (PX_PER_MINUTE * 60));
         return Math.max(HOURS_TO_SHOW, neededHours);
-    }, [containerWidth]);
+    }, [containerWidth, channelColumnWidth]);
 
     const { timelineEnd, timeMarkers } = useMemo(() => {
         const end = new Date(timelineStart.getTime() + hoursToShow * 60 * 60 * 1000);
@@ -418,7 +420,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                     <button
                         type="button"
                         onClick={() => toggleFavorite(contextMenu.channelId)}
-                        className="block w-full cursor-pointer px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+                        className="block w-full cursor-pointer px-4 py-2.5 text-left vora-row-interactive"
                         style={{ color: 'var(--vora-text-primary)' }}
                     >
                         {prefs.favoriteChannels.includes(contextMenu.channelId) ? 'Remove favorite' : 'Add to favorites'}
@@ -426,7 +428,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                     <button
                         type="button"
                         onClick={() => hideChannel(contextMenu.channelId)}
-                        className="block w-full cursor-pointer px-4 py-2.5 text-left font-medium transition-colors hover:bg-white/5"
+                        className="block w-full cursor-pointer px-4 py-2.5 text-left font-medium vora-row-interactive"
                         style={{ color: 'var(--vora-danger-text)' }}
                     >
                         Hide channel
@@ -446,7 +448,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                         onClick={() => updatePrefs({ ...prefs, hideEmpty: !prefs.hideEmpty })}
                         className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
                         style={{
-                            background: prefs.hideEmpty ? 'var(--vora-accent-soft)' : 'rgba(255, 255, 255, 0.04)',
+                            background: prefs.hideEmpty ? 'var(--vora-accent-soft)' : 'var(--vora-bg-raised)',
                             color: prefs.hideEmpty ? 'var(--vora-accent-text)' : 'var(--vora-text-secondary)',
                             border: `1px solid ${prefs.hideEmpty ? 'var(--vora-accent-soft-hover)' : 'var(--vora-border-subtle)'}`,
                         }}
@@ -463,7 +465,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                             onClick={() => setShowRegionMenu(!showRegionMenu)}
                             className="inline-flex min-w-[120px] cursor-pointer items-center justify-between gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
                             style={{
-                                background: prefs.regions.length > 0 ? 'var(--vora-accent-soft)' : 'rgba(255, 255, 255, 0.04)',
+                                background: prefs.regions.length > 0 ? 'var(--vora-accent-soft)' : 'var(--vora-bg-raised)',
                                 color: prefs.regions.length > 0 ? 'var(--vora-accent-text)' : 'var(--vora-text-secondary)',
                                 border: `1px solid ${prefs.regions.length > 0 ? 'var(--vora-accent-soft-hover)' : 'var(--vora-border-subtle)'}`,
                             }}
@@ -478,13 +480,13 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                                     className="absolute top-full z-50 mt-2 flex max-h-64 w-56 flex-col gap-0.5 overflow-y-auto rounded-xl p-1.5"
                                     style={{ background: 'var(--vora-bg-raised)', border: '1px solid var(--vora-border-strong)', boxShadow: 'var(--vora-shadow-lg)' }}
                                 >
-                                    <label className="flex cursor-pointer items-center gap-3 rounded-md p-2 text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>
+                                    <label className="flex cursor-pointer items-center gap-3 rounded-md p-2 text-sm vora-row-interactive" style={{ color: 'var(--vora-text-primary)' }}>
                                         <input type="checkbox" checked={prefs.regions.length === 0} onChange={() => updatePrefs({ ...prefs, regions: [] })} className="h-4 w-4 cursor-pointer accent-[var(--vora-accent-500)]" />
                                         All regions
                                     </label>
                                     <div style={{ height: 1, background: 'var(--vora-border-subtle)', margin: '4px 0' }} />
                                     {regions.map(r => (
-                                        <label key={r} className="flex cursor-pointer items-center gap-3 rounded-md p-2 text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>
+                                        <label key={r} className="flex cursor-pointer items-center gap-3 rounded-md p-2 text-sm vora-row-interactive" style={{ color: 'var(--vora-text-primary)' }}>
                                             <input type="checkbox" checked={prefs.regions.includes(r)} onChange={() => toggleArrayItem(r, prefs.regions, 'regions')} className="h-4 w-4 cursor-pointer accent-[var(--vora-accent-500)]" />
                                             {r}
                                         </label>
@@ -500,7 +502,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                             onClick={() => setShowResMenu(!showResMenu)}
                             className="inline-flex min-w-[120px] cursor-pointer items-center justify-between gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
                             style={{
-                                background: prefs.resolutions.length > 0 ? 'var(--vora-accent-soft)' : 'rgba(255, 255, 255, 0.04)',
+                                background: prefs.resolutions.length > 0 ? 'var(--vora-accent-soft)' : 'var(--vora-bg-raised)',
                                 color: prefs.resolutions.length > 0 ? 'var(--vora-accent-text)' : 'var(--vora-text-secondary)',
                                 border: `1px solid ${prefs.resolutions.length > 0 ? 'var(--vora-accent-soft-hover)' : 'var(--vora-border-subtle)'}`,
                             }}
@@ -515,13 +517,13 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                                     className="absolute top-full z-50 mt-2 flex max-h-64 w-56 flex-col gap-0.5 overflow-y-auto rounded-xl p-1.5"
                                     style={{ background: 'var(--vora-bg-raised)', border: '1px solid var(--vora-border-strong)', boxShadow: 'var(--vora-shadow-lg)' }}
                                 >
-                                    <label className="flex cursor-pointer items-center gap-3 rounded-md p-2 text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>
+                                    <label className="flex cursor-pointer items-center gap-3 rounded-md p-2 text-sm vora-row-interactive" style={{ color: 'var(--vora-text-primary)' }}>
                                         <input type="checkbox" checked={prefs.resolutions.length === 0} onChange={() => updatePrefs({ ...prefs, resolutions: [] })} className="h-4 w-4 cursor-pointer accent-[var(--vora-accent-500)]" />
                                         All resolutions
                                     </label>
                                     <div style={{ height: 1, background: 'var(--vora-border-subtle)', margin: '4px 0' }} />
                                     {resolutions.map(r => (
-                                        <label key={r} className="flex cursor-pointer items-center gap-3 rounded-md p-2 text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--vora-text-primary)' }}>
+                                        <label key={r} className="flex cursor-pointer items-center gap-3 rounded-md p-2 text-sm vora-row-interactive" style={{ color: 'var(--vora-text-primary)' }}>
                                             <input type="checkbox" checked={prefs.resolutions.includes(r)} onChange={() => toggleArrayItem(r, prefs.resolutions, 'resolutions')} className="h-4 w-4 cursor-pointer accent-[var(--vora-accent-500)]" />
                                             {r}
                                         </label>
@@ -538,7 +540,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="flex-1 rounded-full px-4 py-1.5 text-sm outline-none transition-colors lg:w-64 lg:flex-none"
                         style={{
-                            background: 'rgba(255, 255, 255, 0.04)',
+                            background: 'var(--vora-bg-raised)',
                             border: '1px solid var(--vora-border-subtle)',
                             color: 'var(--vora-text-primary)',
                         }}
@@ -633,7 +635,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                             onClick={() => { setActiveCategory(cat.key); setScrollTop(0); scrollContainerRef.current?.scrollTo(0, 0); }}
                             className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors"
                             style={{
-                                background: isActive ? 'var(--vora-accent-500)' : 'rgba(255, 255, 255, 0.04)',
+                                background: isActive ? 'var(--vora-accent-500)' : 'var(--vora-bg-raised)',
                                 color: isActive ? 'var(--vora-accent-contrast)' : 'var(--vora-text-secondary)',
                                 border: `1px solid ${isActive ? 'var(--vora-accent-500)' : 'var(--vora-border-subtle)'}`,
                             }}
@@ -648,7 +650,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                                 <span
                                     className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
                                     style={{
-                                        background: isActive ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.06)',
+                                        background: isActive ? 'color-mix(in srgb, var(--vora-accent-contrast) 18%, transparent)' : 'color-mix(in srgb, var(--vora-text-primary) 6%, transparent)',
                                         color: isActive ? 'var(--vora-accent-contrast)' : 'var(--vora-text-muted)',
                                     }}
                                 >
@@ -667,13 +669,13 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                 className="relative flex-1 overflow-auto"
                 style={{ background: 'var(--vora-bg-canvas)' }}
             >
-                <div style={{ width: `${256 + timelineWidth}px`, minHeight: '100%' }}>
+                <div style={{ width: `${channelColumnWidth + timelineWidth}px`, minHeight: '100%' }}>
                     <div
                         className="sticky top-0 z-40 flex h-12"
                         style={{ background: 'var(--vora-bg-surface)', borderBottom: '1px solid var(--vora-border-subtle)' }}
                     >
                         <div
-                            className="sticky left-0 z-50 flex w-64 shrink-0 items-center justify-center text-xs font-semibold uppercase tracking-wider"
+                            className="sticky left-0 z-50 flex w-64 shrink-0 items-center justify-center text-xs font-semibold uppercase tracking-wider max-md:w-[88px] max-md:text-[10px]"
                             style={{ background: 'var(--vora-bg-surface)', borderRight: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-muted)' }}
                         >
                             Channels
@@ -703,7 +705,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                             <div
                                 className="pointer-events-none absolute bottom-0 top-0 z-30 w-0.5"
                                 style={{
-                                    left: `${256 + currentTimelineX}px`,
+                                    left: `${channelColumnWidth + currentTimelineX}px`,
                                     height: `${visibleCount * ROW_HEIGHT}px`,
                                     background: 'var(--vora-danger-500)',
                                     boxShadow: '0 0 12px color-mix(in srgb, var(--vora-danger-500) 70%, transparent)',

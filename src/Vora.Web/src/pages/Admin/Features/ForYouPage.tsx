@@ -69,7 +69,7 @@ export default function ForYouPage() {
                 description="Per-profile Daily Mixes and weekly Discover/Mood mixes."
             />
 
-            <div className="px-8 pt-6 pb-10 max-w-6xl mx-auto">
+            <div className="px-8 max-md:px-4 pt-6 pb-10 max-w-6xl mx-auto">
                 <FeatureToggle
                     featureKey="forYou"
                     label="Enable For You"

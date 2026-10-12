@@ -206,18 +206,18 @@ export default function EditMetadataModal({
                     </div>
 
                     <div className="flex gap-6 text-sm font-bold text-[var(--vora-text-muted)]">
-                        <button onClick={() => setActiveTab('general')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'general' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>
+                        <button onClick={() => setActiveTab('general')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'general' ? 'border-[var(--vora-accent-500)] text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>
                             General
                         </button>
                         {type === 'media' && (
                             <>
-                                <button onClick={() => setActiveTab('poster')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'poster' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>
+                                <button onClick={() => setActiveTab('poster')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'poster' ? 'border-[var(--vora-accent-500)] text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>
                                     Posters
                                 </button>
-                                <button onClick={() => setActiveTab('backdrop')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'backdrop' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>
+                                <button onClick={() => setActiveTab('backdrop')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'backdrop' ? 'border-[var(--vora-accent-500)] text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>
                                     Backdrops
                                 </button>
-                                <button onClick={() => setActiveTab('logo')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'logo' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>
+                                <button onClick={() => setActiveTab('logo')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'logo' ? 'border-[var(--vora-accent-500)] text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>
                                     Logos
                                 </button>
                             </>
@@ -304,7 +304,7 @@ export default function EditMetadataModal({
                                             <option key={p.id} value={p.id}>{p.name}</option>
                                         ))}
                                     </select>
-                                    <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-[var(--vora-text-primary)] text-xs font-bold rounded cursor-pointer transition-colors">
+                                    <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-[var(--vora-info-500)] hover:bg-[color-mix(in_srgb,var(--vora-info-500)_85%,var(--vora-text-primary))] active:bg-[color-mix(in_srgb,var(--vora-info-500)_85%,var(--vora-bg-canvas))] text-[var(--vora-text-primary)] text-xs font-bold rounded cursor-pointer transition-colors">
                                         Fetch Artwork
                                     </button>
                                 </div>
@@ -339,7 +339,7 @@ export default function EditMetadataModal({
                                             <option key={p.id} value={p.id}>{p.name}</option>
                                         ))}
                                     </select>
-                                    <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-[var(--vora-text-primary)] text-xs font-bold rounded cursor-pointer transition-colors">
+                                    <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-[var(--vora-info-500)] hover:bg-[color-mix(in_srgb,var(--vora-info-500)_85%,var(--vora-text-primary))] active:bg-[color-mix(in_srgb,var(--vora-info-500)_85%,var(--vora-bg-canvas))] text-[var(--vora-text-primary)] text-xs font-bold rounded cursor-pointer transition-colors">
                                         Fetch Artwork
                                     </button>
                                 </div>
@@ -374,7 +374,7 @@ export default function EditMetadataModal({
                                             <option key={p.id} value={p.id}>{p.name}</option>
                                         ))}
                                     </select>
-                                    <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-[var(--vora-text-primary)] text-xs font-bold rounded cursor-pointer transition-colors">
+                                    <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-[var(--vora-info-500)] hover:bg-[color-mix(in_srgb,var(--vora-info-500)_85%,var(--vora-text-primary))] active:bg-[color-mix(in_srgb,var(--vora-info-500)_85%,var(--vora-bg-canvas))] text-[var(--vora-text-primary)] text-xs font-bold rounded cursor-pointer transition-colors">
                                         Fetch Artwork
                                     </button>
                                 </div>
@@ -392,7 +392,7 @@ export default function EditMetadataModal({
                     <button onClick={onClose} disabled={saving} className="px-5 py-2 text-sm font-bold text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer">
                         Cancel
                     </button>
-                    <button type="submit" form="metadata-form" onClick={activeTab !== 'general' ? handleSubmit : undefined} disabled={saving} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] active:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-text-primary)] text-sm font-bold rounded shadow transition-colors cursor-pointer">
+                    <button type="submit" form="metadata-form" onClick={activeTab !== 'general' ? handleSubmit : undefined} disabled={saving} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] active:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-accent-contrast)] text-sm font-bold rounded shadow-[var(--vora-shadow-sm)] transition-colors cursor-pointer">
                         {saving ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>

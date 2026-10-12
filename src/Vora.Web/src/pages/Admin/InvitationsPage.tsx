@@ -124,7 +124,7 @@ export default function InvitationsPage() {
                 }
             />
 
-            <div className="px-8 pt-2 pb-10 max-w-5xl mx-auto space-y-6">
+            <div className="px-8 max-md:px-4 pt-2 pb-10 max-w-5xl mx-auto space-y-6">
                 {!emailEnabled && !loading && (
                     <div className="vora-card p-5">
                         <h3 className="text-base font-semibold text-[var(--vora-text-primary)] mb-1">Email isn't enabled</h3>
@@ -148,7 +148,7 @@ export default function InvitationsPage() {
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="w-full text-sm max-md:min-w-[36rem]">
                                 <thead>
                                     <tr className="text-[10px] font-bold uppercase tracking-wider text-[var(--vora-text-muted)] border-b border-[var(--vora-border-subtle)]">
                                         <th className="text-left py-3 pl-6 pr-3">Email</th>

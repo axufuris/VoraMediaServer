@@ -19,7 +19,7 @@ export default function PageHeader({ title, titleAccessory, subtitle, actions, e
                     {backdrop}
                 </div>
             )}
-            <div className="flex items-end justify-between gap-6 px-8 pt-12 pb-6">
+            <div className="flex items-end justify-between gap-6 px-8 pt-12 pb-6 max-md:flex-col max-md:items-stretch max-md:gap-4 max-md:px-4 max-md:pt-6 max-md:pb-4">
                 <div className="min-w-0">
                     {eyebrow && (
                         <div className="mb-3 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>
@@ -27,7 +27,7 @@ export default function PageHeader({ title, titleAccessory, subtitle, actions, e
                         </div>
                     )}
                     <div className="flex flex-wrap items-center gap-3">
-                        <h1 className="m-0 text-3xl font-semibold" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}>
+                        <h1 className="m-0 text-3xl font-semibold max-md:text-2xl" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}>
                             {title}
                         </h1>
                         {titleAccessory}
@@ -38,7 +38,7 @@ export default function PageHeader({ title, titleAccessory, subtitle, actions, e
                         </p>
                     )}
                 </div>
-                {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+                {actions && <div className="flex items-center gap-2 shrink-0 max-md:flex-wrap max-md:*:whitespace-nowrap">{actions}</div>}
             </div>
         </header>
     );

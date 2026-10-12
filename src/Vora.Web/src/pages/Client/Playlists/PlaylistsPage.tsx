@@ -124,7 +124,7 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
         return (
             <div className="min-h-full pb-16">
                 {!embedded && <PageHeader title="My Playlists" subtitle="Curated by you, by us, and by smart rules." />}
-                <div className="px-8">
+                <div className="px-8 max-md:px-4">
                     <div className="vora-skeleton mb-6 h-10 w-64" />
                     <div className="grid grid-cols-2 gap-6 md:grid-cols-4 lg:grid-cols-6">
                         {Array.from({ length: 6 }, (_, i) => <div key={i} className="vora-skeleton aspect-square" />)}
@@ -150,12 +150,12 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
     return (
         <div className="min-h-full pb-16">
             {embedded ? (
-                <div className="flex justify-end px-8 pt-4">{newAction}</div>
+                <div className="flex justify-end px-8 max-md:px-4 pt-4">{newAction}</div>
             ) : (
                 <PageHeader title="My Playlists" subtitle="Curated by you, by us, and by smart rules." actions={newAction} />
             )}
 
-            <div className="px-8">
+            <div className="px-8 max-md:px-4">
                 {/* Whose playlists is the primary split; the media type is a filter
                     within it. In the Music tab the type is already fixed, so only
                     the split shows. */}
@@ -210,11 +210,11 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
                                     className="group text-left cursor-pointer"
                                     title={mix.name}
                                 >
-                                    <div className="w-full aspect-square rounded bg-gradient-to-br from-orange-700 via-purple-900 to-indigo-900 border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-all overflow-hidden mb-2 relative">
+                                    <div className="w-full aspect-square rounded bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-accent-500)_75%,var(--vora-bg-canvas)),color-mix(in_srgb,var(--vora-info-500)_30%,var(--vora-bg-canvas)))] border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-all overflow-hidden mb-2 relative">
                                         {mix.artworkUrl ? <img src={mix.artworkUrl} alt="" className="w-full h-full object-cover opacity-70" /> : null}
-                                        <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-black/80 via-black/30 to-transparent">
-                                            <div className="text-xs uppercase tracking-widest text-orange-300/90 font-bold">Daily Mix {mix.slot}</div>
-                                            <div className="text-sm font-bold text-[var(--vora-text-primary)] drop-shadow-md truncate">{mix.descriptionTag ?? 'Mix'}</div>
+                                        <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-[color-mix(in_srgb,var(--vora-bg-canvas)_80%,transparent)] via-[color-mix(in_srgb,var(--vora-bg-canvas)_30%,transparent)] to-transparent">
+                                            <div className="text-xs uppercase tracking-widest text-[var(--vora-accent-text)] font-bold">Daily Mix {mix.slot}</div>
+                                            <div className="text-sm font-bold text-[var(--vora-text-primary)] drop-shadow-[0_3px_3px_color-mix(in_srgb,var(--vora-bg-canvas)_60%,transparent)] truncate">{mix.descriptionTag ?? 'Mix'}</div>
                                         </div>
                                     </div>
                                     <div className="text-sm font-bold text-[var(--vora-text-secondary)] truncate" title={mix.name}>{mix.name}</div>
@@ -228,7 +228,7 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
                 {visibleSmart.length > 0 && (
                     <div className="mb-10">
                         <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4 flex items-center gap-2">
-                            <span className="text-fuchsia-400">⚙</span> Smart Playlists
+                            <span className="text-[var(--vora-accent-text)]">⚙</span> Smart Playlists
                         </h2>
                         <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-4">
                             {visibleSmart.map(sp => (
@@ -290,8 +290,8 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
             )}
 
             {manualCreatorType && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-2xl max-w-md w-full p-6">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--vora-bg-overlay)] backdrop-blur-sm p-4">
+                    <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-[var(--vora-shadow-overlay)] max-w-md w-full p-6">
                         <h2 className="text-2xl font-bold text-[var(--vora-text-primary)] mb-2">Create Playlist</h2>
                         <div className="text-xs uppercase tracking-widest text-[var(--vora-accent-500)] font-bold mb-6">{manualCreatorType}</div>
                         <form onSubmit={handleManualCreate} className="space-y-4">
@@ -317,7 +317,7 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
                             </div>
                             <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-[var(--vora-border-subtle)]">
                                 <button type="button" onClick={() => setManualCreatorType(null)} disabled={isSubmitting} className="px-4 py-2 rounded text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-raised)] transition-colors cursor-pointer">Cancel</button>
-                                <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors cursor-pointer disabled:opacity-50">
+                                <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] font-bold rounded shadow-[var(--vora-shadow-lg)] transition-colors cursor-pointer disabled:opacity-50">
                                     {isSubmitting ? 'Creating...' : 'Create'}
                                 </button>
                             </div>
@@ -347,17 +347,17 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
 // the second copy.
 function SmartPlaylistTile({ playlist: sp, onOpen }: { playlist: SmartPlaylistSummaryVM; onOpen: () => void }) {
     const grad = sp.mediaType === 'Music'
-        ? 'from-fuchsia-700 via-violet-900 to-indigo-900'
+        ? 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-accent-500)_70%,var(--vora-bg-canvas)),var(--vora-bg-sunken))]'
         : sp.mediaType === 'Movies'
-            ? 'from-sky-700 via-blue-900 to-indigo-900'
-            : 'from-amber-700 via-orange-900 to-red-900';
+            ? 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-info-500)_70%,var(--vora-bg-canvas)),var(--vora-bg-sunken))]'
+            : 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-warning-500)_65%,var(--vora-bg-canvas)),color-mix(in_srgb,var(--vora-danger-500)_35%,var(--vora-bg-sunken)))]';
     const unit = sp.mediaType === 'Shows' ? 'episodes' : sp.mediaType === 'Movies' ? 'movies' : 'tracks';
 
     return (
         <button type="button" onClick={onOpen} className="group text-left cursor-pointer" title={sp.name}>
-            <div className={`w-full aspect-square rounded bg-gradient-to-br ${grad} border border-[var(--vora-border-subtle)] group-hover:border-fuchsia-400 transition-all overflow-hidden mb-2 relative`}>
+            <div className={`w-full aspect-square rounded ${grad} border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-all overflow-hidden mb-2 relative`}>
                 {sp.artworkUrl ? <img src={sp.artworkUrl} alt="" className="w-full h-full object-cover opacity-70" /> : <div className="absolute inset-0 flex items-center justify-center text-5xl text-[var(--vora-text-primary)]/50">⚙</div>}
-                <div className="absolute top-2 right-2 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold rounded bg-fuchsia-500/30 text-fuchsia-100 border border-fuchsia-400/40">{sp.mediaType}</div>
+                <div className="absolute top-2 right-2 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold rounded bg-[color-mix(in_srgb,var(--vora-accent-500)_30%,transparent)] text-[var(--vora-text-primary)] border border-[color-mix(in_srgb,var(--vora-accent-500)_40%,transparent)]">{sp.mediaType}</div>
             </div>
             <div className="text-sm font-bold text-[var(--vora-text-secondary)] truncate" title={sp.name}>{sp.name}</div>
             <div className="text-xs text-[var(--vora-text-muted)]">
@@ -446,17 +446,17 @@ function PlaylistTypeChooser({ presetType, onCancel, onPickManual, onPickSmart }
 
     if (!pickedType) {
         return (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-2xl max-w-lg w-full p-6">
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--vora-bg-overlay)] backdrop-blur-sm p-4">
+                <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-[var(--vora-shadow-overlay)] max-w-lg w-full p-6">
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-xl font-bold text-[var(--vora-text-primary)]">What kind of playlist?</h2>
                         <button onClick={onCancel} className="text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] cursor-pointer text-2xl leading-none">×</button>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                        <TypeChoice label="Music" icon="🎵" colorClass="from-fuchsia-700 to-violet-900" onClick={() => setPickedType('Music')} />
-                        <TypeChoice label="Movies" icon="🎬" colorClass="from-sky-700 to-blue-900" onClick={() => setPickedType('Movies')} />
-                        <TypeChoice label="Shows" icon="📺" colorClass="from-amber-700 to-orange-900" onClick={() => setPickedType('Shows')} />
-                        <TypeChoice label="Mixed" icon="🎨" colorClass="from-gray-700 to-gray-900" onClick={() => setPickedType('Mixed')} />
+                        <TypeChoice label="Music" icon="🎵" colorClass="bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-accent-500)_70%,var(--vora-bg-canvas)),var(--vora-bg-sunken))]" onClick={() => setPickedType('Music')} />
+                        <TypeChoice label="Movies" icon="🎬" colorClass="bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-info-500)_70%,var(--vora-bg-canvas)),var(--vora-bg-sunken))]" onClick={() => setPickedType('Movies')} />
+                        <TypeChoice label="Shows" icon="📺" colorClass="bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-warning-500)_65%,var(--vora-bg-canvas)),color-mix(in_srgb,var(--vora-danger-500)_35%,var(--vora-bg-sunken)))]" onClick={() => setPickedType('Shows')} />
+                        <TypeChoice label="Mixed" icon="🎨" colorClass="bg-[linear-gradient(135deg,var(--vora-bg-raised),var(--vora-bg-sunken))]" onClick={() => setPickedType('Mixed')} />
                     </div>
                 </div>
             </div>
@@ -464,8 +464,8 @@ function PlaylistTypeChooser({ presetType, onCancel, onPickManual, onPickSmart }
     }
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-2xl max-w-lg w-full p-6">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--vora-bg-overlay)] backdrop-blur-sm p-4">
+            <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-[var(--vora-shadow-overlay)] max-w-lg w-full p-6">
                 <div className="flex items-center justify-between mb-2">
                     <h2 className="text-xl font-bold text-[var(--vora-text-primary)]">Manual or Smart?</h2>
                     <button onClick={onCancel} className="text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] cursor-pointer text-2xl leading-none">×</button>
@@ -482,9 +482,9 @@ function PlaylistTypeChooser({ presetType, onCancel, onPickManual, onPickSmart }
                     {pickedType !== 'Mixed' ? (
                         <button
                             onClick={() => onPickSmart(pickedType)}
-                            className="text-left p-4 border border-[var(--vora-border-subtle)] hover:border-fuchsia-500 rounded transition-colors cursor-pointer bg-[var(--vora-bg-canvas)]/40"
+                            className="text-left p-4 border border-[var(--vora-border-subtle)] hover:border-[var(--vora-accent-500)] rounded transition-colors cursor-pointer bg-[var(--vora-bg-canvas)]/40"
                         >
-                            <div className="text-lg font-bold text-[var(--vora-text-primary)] mb-1 flex items-center gap-2"><span className="text-fuchsia-400">⚙</span> Smart</div>
+                            <div className="text-lg font-bold text-[var(--vora-text-primary)] mb-1 flex items-center gap-2"><span className="text-[var(--vora-accent-text)]">⚙</span> Smart</div>
                             <div className="text-xs text-[var(--vora-text-muted)]">Define rules. Auto-updates as your library changes. Best for living views like "Unwatched comedy" or "Heavy rotation rock."</div>
                         </button>
                     ) : (
@@ -506,7 +506,7 @@ function TypeChoice({ label, icon, colorClass, onClick }: { label: string; icon:
     return (
         <button
             onClick={onClick}
-            className={`p-6 rounded border border-[var(--vora-border-subtle)] hover:border-[var(--vora-accent-500)] transition-all cursor-pointer text-left bg-gradient-to-br ${colorClass}`}
+            className={`p-6 rounded border border-[var(--vora-border-subtle)] hover:border-[var(--vora-accent-500)] transition-all cursor-pointer text-left ${colorClass}`}
         >
             <div className="text-3xl mb-2">{icon}</div>
             <div className="font-bold text-[var(--vora-text-primary)] text-lg">{label}</div>

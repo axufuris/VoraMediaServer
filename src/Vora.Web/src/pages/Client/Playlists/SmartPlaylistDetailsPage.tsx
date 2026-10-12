@@ -148,23 +148,23 @@ export default function SmartPlaylistDetailsPage() {
     const showShuffleBtn = items.mediaType === 'Music';
 
     const heroGradient = items.mediaType === 'Music'
-        ? 'from-fuchsia-700 via-violet-900 to-indigo-900'
+        ? 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-accent-500)_70%,var(--vora-bg-canvas)),var(--vora-bg-sunken))]'
         : items.mediaType === 'Movies'
-            ? 'from-sky-700 via-blue-900 to-indigo-900'
-            : 'from-amber-700 via-orange-900 to-red-900';
+            ? 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-info-500)_70%,var(--vora-bg-canvas)),var(--vora-bg-sunken))]'
+            : 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-warning-500)_65%,var(--vora-bg-canvas)),color-mix(in_srgb,var(--vora-danger-500)_35%,var(--vora-bg-sunken)))]';
 
     const playLabel = items.mediaType === 'Music' ? '▶ Play' : '▶ Open';
 
     return (
         <div className="min-h-full pb-16">
-            <div className="mx-auto w-full max-w-6xl px-8 pt-12">
+            <div className="mx-auto w-full max-w-6xl px-8 max-md:px-4 pt-12">
                 <SavedCopyBanner />
                 <div className="mb-8 flex items-end gap-6 pb-6" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>
-                    <div className={`w-48 h-48 rounded shadow-2xl flex items-center justify-center bg-gradient-to-br ${heroGradient} flex-shrink-0 relative overflow-hidden`}>
+                    <div className={`w-48 h-48 rounded shadow-[var(--vora-shadow-overlay)] flex items-center justify-center ${heroGradient} flex-shrink-0 relative overflow-hidden`}>
                         {detail.artworkUrl
                             ? <img src={detail.artworkUrl} alt="" className="w-full h-full object-cover" />
                             : <span className="text-6xl">⚙</span>}
-                        <div className="absolute top-2 right-2 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold rounded bg-white/20 text-[var(--vora-text-primary)] border border-white/30">Smart</div>
+                        <div className="absolute top-2 right-2 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold rounded bg-[color-mix(in_srgb,var(--vora-text-primary)_20%,transparent)] text-[var(--vora-text-primary)] border border-[color-mix(in_srgb,var(--vora-text-primary)_30%,transparent)]">Smart</div>
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="text-xs uppercase tracking-widest text-[var(--vora-text-muted)] mb-2 font-bold">Smart Playlist · {detail.mediaType}</div>
@@ -172,13 +172,13 @@ export default function SmartPlaylistDetailsPage() {
                         {detail.description && <p className="text-[var(--vora-text-muted)] mt-2">{detail.description}</p>}
                         <div className="text-sm text-[var(--vora-text-muted)] mt-3">{itemCount} {itemLabel} · auto-updates as your library changes</div>
                         <div className="flex flex-wrap gap-3 mt-4">
-                            <button onClick={() => handlePlay(0)} disabled={itemCount === 0} className="px-6 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 text-[var(--vora-text-primary)] font-bold rounded shadow-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">{playLabel}</button>
+                            <button onClick={() => handlePlay(0)} disabled={itemCount === 0} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] font-bold rounded shadow-[var(--vora-shadow-lg)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">{playLabel}</button>
                             {showShuffleBtn && (
                                 <button onClick={handleShuffle} disabled={itemCount === 0} className="px-4 py-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] font-bold rounded cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">🔀 Shuffle</button>
                             )}
                             {canEdit && (<>
                                 <button onClick={() => setEditing(true)} className="px-4 py-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] font-bold rounded cursor-pointer">Edit Rules</button>
-                                <button onClick={handleDelete} className="px-4 py-2 bg-rose-900 hover:bg-rose-700 text-[var(--vora-text-primary)] font-bold rounded cursor-pointer">Delete</button>
+                                <button onClick={handleDelete} className="px-4 py-2 bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] text-[var(--vora-danger-text)] hover:text-[var(--vora-text-primary)] font-bold rounded cursor-pointer">Delete</button>
                             </>)}
                             <div className="self-center">
                                 <PlaylistSharingControls
@@ -299,7 +299,7 @@ function EpisodeList({ episodes, onSelect, formatDuration }: { episodes: { id: s
                             <td className="px-3 py-2">
                                 <div className="flex items-center gap-2">
                                     <span className="text-[var(--vora-text-primary)] truncate" title={e.title}>{e.title}</span>
-                                    {e.isWatched && <span className="px-1.5 py-0.5 text-[9px] uppercase font-bold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓</span>}
+                                    {e.isWatched && <span className="px-1.5 py-0.5 text-[9px] uppercase font-bold rounded bg-[var(--vora-success-soft)] text-[var(--vora-success-text)] border border-[color-mix(in_srgb,var(--vora-success-500)_30%,transparent)]">✓</span>}
                                 </div>
                             </td>
                             <td className="px-3 py-2 hidden md:table-cell text-right text-[var(--vora-text-muted)] font-mono">{formatDuration(e.durationSeconds)}</td>

@@ -5,6 +5,7 @@ import { useDialog } from '../../../dialogs';
 import FeatureToggle from '../../../components/Admin/Features/FeatureToggle';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import EmptyState from '../../../components/Admin/Primitives/EmptyState';
+import { reorderListProps, reorderRowProps, useTouchReorder } from '../../../hooks/useTouchReorder';
 
 export default function DiscoveryPage() {
     const dialog = useDialog();
@@ -30,14 +31,22 @@ export default function DiscoveryPage() {
         loadConfigs();
     }, [serverId]);
 
+    const moveRow = (from: number, to: number) => {
+        const _configs = [...configs];
+        const draggedItemContent = _configs.splice(from, 1)[0];
+        _configs.splice(to, 0, draggedItemContent);
+        setConfigs(_configs);
+    };
+
+    const touch = useTouchReorder(moveRow);
+
     const handleSort = () => {
         if (dragItem.current === null || dragOverItem.current === null) return;
-        const _configs = [...configs];
-        const draggedItemContent = _configs.splice(dragItem.current, 1)[0];
-        _configs.splice(dragOverItem.current, 0, draggedItemContent);
+        const from = dragItem.current;
+        const to = dragOverItem.current;
         dragItem.current = null;
         dragOverItem.current = null;
-        setConfigs(_configs);
+        moveRow(from, to);
     };
 
     const toggleEnabled = (index: number) => {
@@ -65,7 +74,7 @@ export default function DiscoveryPage() {
                 description="Curate the dynamic rows that appear on the client Discover page."
             />
 
-            <div className="px-8 pt-6 pb-10 max-w-6xl mx-auto">
+            <div className="px-8 max-md:px-4 pt-6 pb-10 max-w-6xl mx-auto">
                 <FeatureToggle
                     featureKey="discover"
                     label="Enable Discover"
@@ -92,10 +101,12 @@ export default function DiscoveryPage() {
                             </div>
                         ) : (
                             <>
-                                <div className="space-y-2 mb-4">
+                                <div {...reorderListProps} className="space-y-2 mb-4">
                                     {configs.map((config, index) => (
                                         <div
                                             key={config.id}
+                                            {...reorderRowProps(index)}
+                                            style={touch.rowStyle(index)}
                                             draggable
                                             onDragStart={() => (dragItem.current = index)}
                                             onDragEnter={() => (dragOverItem.current = index)}
@@ -104,7 +115,9 @@ export default function DiscoveryPage() {
                                             className={`flex items-center justify-between p-4 vora-card vora-card-interactive cursor-move ${config.isEnabled ? '' : 'opacity-60'}`}
                                         >
                                             <div className="flex items-center gap-3 min-w-0">
-                                                <svg className="w-4 h-4 text-[var(--vora-text-disabled)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                                                <span {...touch.handleProps(index)} aria-hidden="true" className="flex shrink-0 touch-none p-1 -m-1">
+                                                    <svg className="w-4 h-4 text-[var(--vora-text-disabled)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                                                </span>
                                                 <div className="min-w-0">
                                                     <h3 className="text-sm font-semibold text-[var(--vora-text-primary)] truncate">{config.name}</h3>
                                                     <p className="text-xs text-[var(--vora-text-muted)] truncate">Provider: {config.providerName || config.providerId}</p>
@@ -117,7 +130,7 @@ export default function DiscoveryPage() {
                                                 className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer ${config.isEnabled ? 'bg-[var(--vora-accent-500)]' : 'bg-[var(--vora-border-strong)]'}`}
                                                 aria-pressed={config.isEnabled}
                                             >
-                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${config.isEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-[var(--vora-text-primary)] transition-transform shadow-[var(--vora-shadow-sm)] ${config.isEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                                             </button>
                                         </div>
                                     ))}

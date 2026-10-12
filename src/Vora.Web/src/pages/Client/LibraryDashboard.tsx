@@ -45,7 +45,7 @@ export default function LibraryDashboard() {
                 }
             />
 
-            <div className="px-8 pt-6 pb-10 max-w-7xl mx-auto">
+            <div className="px-8 max-md:px-4 pt-6 pb-10 max-w-7xl mx-auto">
                 {loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {[1, 2, 3].map(i => <div key={i} className="vora-skeleton h-32" />)}

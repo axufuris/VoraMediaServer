@@ -383,7 +383,7 @@ export default function NowPlayingFullscreen() {
                                     type="button"
                                     onClick={() => setAudioSettingsOpen(false)}
                                     aria-label="Close"
-                                    className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                                    className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full vora-icon-button transition-colors"
                                     style={{ color: 'var(--vora-text-muted)' }}
                                 >
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
@@ -500,7 +500,7 @@ export default function NowPlayingFullscreen() {
                 </>
             }
         >
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center px-8 pb-4">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center px-8 pb-4 max-md:px-4">
                 {panelsOpen ? (
                     <NowPlayingSongBar
                         posterUrl={posterUrl}
@@ -592,7 +592,7 @@ export default function NowPlayingFullscreen() {
 
             {queueOpen && (
                 <aside
-                    className="flex w-[340px] shrink-0 flex-col"
+                    className="flex w-[340px] shrink-0 flex-col max-md:absolute max-md:inset-0 max-md:z-20 max-md:w-full max-md:bg-[var(--vora-bg-surface)]!"
                     style={{ background: 'color-mix(in srgb, var(--vora-bg-surface) 80%, transparent)', borderLeft: '1px solid var(--vora-border-subtle)' }}
                 >
                     <div className="flex shrink-0 items-center justify-between gap-2 px-5 py-3" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>

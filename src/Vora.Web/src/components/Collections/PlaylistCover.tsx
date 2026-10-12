@@ -16,7 +16,7 @@ export default function PlaylistCover({ imageUrl, posterUrls, shape, className =
 
     return (
         <div
-            className={`${aspect} w-full overflow-hidden rounded-lg border shadow-2xl ${className}`}
+            className={`${aspect} w-full overflow-hidden rounded-lg border shadow-[var(--vora-shadow-overlay)] ${className}`}
             style={{ borderColor: 'var(--vora-border-subtle)', background: 'var(--vora-bg-sunken)' }}
         >
             {imageUrl ? (

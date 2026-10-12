@@ -36,9 +36,8 @@ export default function AuthLayout({ title, subtitle, children }: AuthLayoutProp
                     <svg width="48" height="48" viewBox="0 0 64 64" className="mb-3" aria-hidden="true">
                         <defs>
                             <linearGradient id="auth-v" x1="0.1" y1="0" x2="0.55" y2="1">
-                                <stop offset="0" stopColor="#fdba74" />
-                                <stop offset="0.55" stopColor="#fb923c" />
-                                <stop offset="1" stopColor="#ea580c" />
+                                <stop offset="0" stopColor="var(--vora-accent-text)" />
+                                <stop offset="1" stopColor="var(--vora-accent-500)" />
                             </linearGradient>
                         </defs>
                         <path d="M6 8 L18 8 L32 40 L46 8 L58 8 L32 60 Z" fill="url(#auth-v)" />

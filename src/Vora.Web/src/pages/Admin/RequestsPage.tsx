@@ -118,13 +118,13 @@ export default function RequestsPage() {
                 description="Manage user media requests and monitor Radarr/Sonarr download status."
             />
 
-            <div className="px-8 pb-10 max-w-7xl mx-auto pt-2">
+            <div className="px-8 max-md:px-4 pb-10 max-w-7xl mx-auto pt-2">
                 <div className="flex gap-2 mb-6">
                             {statusPills.map(pill => {
                                 const count = requests.filter(r => r.status === pill.value).length;
                                 const isActive = activeStatus === pill.value;
                                 const activeBg =
-                                    pill.tone === 'accent' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' :
+                                    pill.tone === 'accent' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' :
                                     pill.tone === 'info' ? 'bg-[var(--vora-info-500)] text-[var(--vora-text-primary)]' :
                                     'bg-[var(--vora-success-500)] text-[var(--vora-text-primary)]';
                                 return (
@@ -196,7 +196,7 @@ export default function RequestsPage() {
                                                         <div className="flex flex-wrap gap-1.5 mb-3">
                                                             {req.requesters.map(ru => (
                                                                 <div key={ru.profileId} className="flex items-center gap-1.5 bg-[var(--vora-bg-sunken)] px-2 py-0.5 rounded-full">
-                                                                    <div className="w-4 h-4 rounded-full bg-[var(--vora-accent-500)] flex items-center justify-center text-[9px] font-bold text-[var(--vora-text-primary)] uppercase">{ru.profile.name.charAt(0)}</div>
+                                                                    <div className="w-4 h-4 rounded-full bg-[var(--vora-accent-500)] flex items-center justify-center text-[9px] font-bold text-[var(--vora-accent-contrast)] uppercase">{ru.profile.name.charAt(0)}</div>
                                                                     <span className="text-[11px] text-[var(--vora-text-secondary)] pr-1">{ru.profile.name}</span>
                                                                 </div>
                                                             ))}

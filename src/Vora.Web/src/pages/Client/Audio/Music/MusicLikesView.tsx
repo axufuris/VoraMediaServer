@@ -44,7 +44,7 @@ export default function MusicLikesView({
     return (
         <>
             <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-6 mb-8 pb-6 border-b border-[var(--vora-border-subtle)] text-center sm:text-left">
-                <div className="w-32 h-32 sm:w-40 sm:h-40 rounded bg-gradient-to-br from-orange-600 to-purple-900 border border-orange-400/30 flex items-center justify-center shrink-0 shadow-lg">
+                <div className="w-32 h-32 sm:w-40 sm:h-40 rounded bg-[linear-gradient(135deg,var(--vora-accent-500),color-mix(in_srgb,var(--vora-accent-500)_20%,var(--vora-bg-canvas)))] border border-[color-mix(in_srgb,var(--vora-accent-500)_30%,transparent)] flex items-center justify-center shrink-0 shadow-[var(--vora-shadow-lg)]">
                     <svg className="w-16 h-16 sm:w-20 sm:h-20 text-[var(--vora-text-primary)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -60,7 +60,7 @@ export default function MusicLikesView({
                                 if (isShuffled) toggleShuffle();
                                 playQueue(buildItems(), 0);
                             }}
-                            className="text-sm px-4 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)] font-bold rounded transition-colors cursor-pointer flex items-center gap-2"
+                            className="text-sm px-4 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] font-bold rounded transition-colors cursor-pointer flex items-center gap-2"
                         >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                             Play

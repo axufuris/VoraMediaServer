@@ -17,7 +17,7 @@ function AsyncProviderBlock({ providerId, serverId }: { providerId: string, serv
 
     if (loading) {
         return (
-            <div className="mb-8 px-8">
+            <div className="mb-8 px-8 max-md:px-4">
                 <div className="vora-skeleton mb-4 h-6 w-48" />
                 <div className="flex gap-4 overflow-hidden">
                     {Array.from({ length: 6 }, (_, i) => <div key={i} className="vora-skeleton h-72 w-48 flex-none" />)}
@@ -53,7 +53,7 @@ export default function RecommendationsPage() {
         <div className="min-h-full pb-20">
             <div className="space-y-10 pt-2">
                 {loadingProviders ? (
-                    <div className="px-8">
+                    <div className="px-8 max-md:px-4">
                         <div className="vora-skeleton mb-4 h-6 w-48" />
                         <div className="vora-skeleton h-72 w-full" />
                     </div>

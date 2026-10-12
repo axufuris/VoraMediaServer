@@ -764,8 +764,8 @@ export default function MusicTab() {
                         src={activeBackgroundUrl}
                         className="w-full h-[75vh] object-cover object-top opacity-25"
                         style={{
-                            maskImage: 'linear-gradient(to bottom, black 0%, black 35%, transparent 100%)',
-                            WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 35%, transparent 100%)',
+                            maskImage: 'linear-gradient(to bottom, var(--vora-bg-canvas) 0%, var(--vora-bg-canvas) 35%, transparent 100%)',
+                            WebkitMaskImage: 'linear-gradient(to bottom, var(--vora-bg-canvas) 0%, var(--vora-bg-canvas) 35%, transparent 100%)',
                         }}
                         alt=""
                     />
@@ -794,7 +794,7 @@ export default function MusicTab() {
                     />
                 )}
             />
-            <div className="px-8">
+            <div className="px-8 max-md:px-4">
                 <MusicServerSwitcher />
                 <Tabs<MusicSubTab>
                     tabs={MUSIC_SUB_TABS}
@@ -805,7 +805,7 @@ export default function MusicTab() {
             </div>
 
             {searchActive && (
-                <div className="px-8">
+                <div className="px-8 max-md:px-4">
                     {isSearching ? (
                         <div className="text-[var(--vora-text-muted)] py-12 text-center">Searching...</div>
                     ) : searchResults.length === 0 ? (
@@ -882,7 +882,7 @@ export default function MusicTab() {
             </div>
 
             {!searchActive && nav.view !== 'root' && (
-                <div className="px-8">
+                <div className="px-8 max-md:px-4">
                 {breadcrumbs}
 
             {nav.view === 'artist' && (
@@ -1046,7 +1046,7 @@ export default function MusicTab() {
             {trackContextMenu && currentAlbum && (
                 <div
                     style={{ top: trackContextMenu.y, left: trackContextMenu.x }}
-                    className="fixed z-[9999] bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded-md shadow-2xl py-1 w-48 text-sm"
+                    className="fixed z-[9999] bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded-md shadow-[var(--vora-shadow-overlay)] py-1 w-48 text-sm"
                     onClick={e => e.stopPropagation()}
                 >
                     <button

@@ -14,7 +14,7 @@ export default function ReleaseCalendarPage() {
                 description="Upcoming releases sourced from calendar providers."
             />
 
-            <div className="px-8 pt-6 pb-10 max-w-6xl mx-auto">
+            <div className="px-8 max-md:px-4 pt-6 pb-10 max-w-6xl mx-auto">
                 <FeatureToggle
                     featureKey="releaseCalendar"
                     label="Enable Release Calendar"

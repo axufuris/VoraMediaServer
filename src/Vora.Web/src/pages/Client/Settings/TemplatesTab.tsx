@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { clientTemplateService, type TemplateMetaVM } from '../../../api/System/clientTemplateService';
 import { useClientTemplate } from '../../../theme/useClientTemplate';
+import type { ThemeManifest } from '../../../theme/types';
 import { useDialog } from '../../../dialogs';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import ScheduledTemplateBanner from '../../../components/Client/Primitives/ScheduledTemplateBanner';
@@ -14,15 +15,25 @@ interface TemplateSwatch {
     text: string;
 }
 
-const BUILT_IN_SWATCHES: Record<string, TemplateSwatch> = {
-    'vora-cinema': { canvas: '#08080b', surface: '#101015', accent: '#f59e0b', accentText: '#fbbf24', text: '#fafafa' },
-    'vora-noir':   { canvas: '#000000', surface: '#0a0a0a', accent: '#94a3b8', accentText: '#cbd5e1', text: '#f8fafc' },
-    'vora-velvet': { canvas: '#1a0a0e', surface: '#2a1218', accent: '#c2410c', accentText: '#fed7aa', text: '#fef9c3' },
-    'vora-aurora': { canvas: '#020617', surface: '#0c1726', accent: '#14b8a6', accentText: '#5eead4', text: '#e0f2fe' },
-    default:       { canvas: '#0a0a0e', surface: '#181820', accent: '#9090a0', accentText: '#c4c4cc', text: '#fafafa' },
+const swatchOf = ({ tokens: { colors } }: ThemeManifest): TemplateSwatch => ({
+    canvas: colors.bgCanvas,
+    surface: colors.bgSurface,
+    accent: colors.accent500,
+    accentText: colors.accentText,
+    text: colors.textPrimary,
+});
+
+const PLACEHOLDER_SWATCH: TemplateSwatch = {
+    canvas: 'var(--vora-bg-sunken)',
+    surface: 'var(--vora-bg-raised)',
+    accent: 'var(--vora-border-strong)',
+    accentText: 'var(--vora-text-disabled)',
+    text: 'var(--vora-text-muted)',
 };
 
 function TemplateSwatchStrip({ template, isActive }: { template: TemplateMetaVM, isActive: boolean }) {
+    const { builtInTemplates } = useClientTemplate();
+
     if (template.preview) {
         return (
             <div className="h-24 overflow-hidden" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>
@@ -43,7 +54,8 @@ function TemplateSwatchStrip({ template, isActive }: { template: TemplateMetaVM,
         );
     }
 
-    const s = BUILT_IN_SWATCHES[template.id] ?? BUILT_IN_SWATCHES.default;
+    const builtIn = builtInTemplates.find(t => t.id === template.id);
+    const s = builtIn ? swatchOf(builtIn) : PLACEHOLDER_SWATCH;
     return (
         <div className="grid h-24 grid-cols-5" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>
             <div style={{ background: s.canvas }} />
@@ -187,7 +199,7 @@ export default function TemplatesTab() {
                                         <h3 className="m-0 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{template.name}</h3>
                                         <div className="flex shrink-0 flex-wrap gap-1.5">
                                             {template.isBuiltIn ? (
-                                                <span className="rounded px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--vora-text-secondary)', border: '1px solid var(--vora-border-subtle)' }}>Built-in</span>
+                                                <span className="rounded px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--vora-bg-raised)', color: 'var(--vora-text-secondary)', border: '1px solid var(--vora-border-subtle)' }}>Built-in</span>
                                             ) : (
                                                 <span className="rounded px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--vora-info-soft)', color: 'var(--vora-info-text)', border: '1px solid color-mix(in srgb, var(--vora-info-500) 35%, transparent)' }}>Plugin</span>
                                             )}

@@ -119,7 +119,7 @@ export default function AddToCollectionModal({
                                 type="checkbox"
                                 checked={checkedIds.has(c.id)}
                                 onChange={() => toggleCollection(c.id)}
-                                className="w-5 h-5 accent-orange-500 cursor-pointer"
+                                className="w-5 h-5 accent-[var(--vora-accent-500)] cursor-pointer"
                             />
                             <div className="flex-1">
                                 <h4 className="font-bold text-[var(--vora-text-secondary)]">{c.title}</h4>
@@ -144,14 +144,14 @@ export default function AddToCollectionModal({
 
                         {mediaType !== 'Episode' && (
                             <div className="flex items-center gap-2">
-                                <input type="checkbox" id="globalCheck" checked={isGlobal} onChange={e => setIsGlobal(e.target.checked)} className="accent-orange-500 cursor-pointer" />
+                                <input type="checkbox" id="globalCheck" checked={isGlobal} onChange={e => setIsGlobal(e.target.checked)} className="accent-[var(--vora-accent-500)] cursor-pointer" />
                                 <label htmlFor="globalCheck" className="text-sm text-[var(--vora-text-secondary)] cursor-pointer">Make this a Global Collection</label>
                             </div>
                         )}
 
                         <div className="flex gap-2">
                             <button type="button" onClick={() => setIsCreating(false)} className="flex-1 py-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-secondary)] font-bold rounded transition-colors text-sm cursor-pointer">Cancel</button>
-                            <button type="submit" className="flex-1 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-text-primary)] font-bold rounded transition-colors text-sm cursor-pointer">Create</button>
+                            <button type="submit" className="flex-1 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] font-bold rounded transition-colors text-sm cursor-pointer">Create</button>
                         </div>
                     </form>
                 )}

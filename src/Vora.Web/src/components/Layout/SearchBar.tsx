@@ -147,7 +147,7 @@ export default function SearchBar() {
 
             {isOpen && query.length >= 3 && (
                 <div
-                    className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl"
+                    className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl max-md:fixed max-md:inset-x-2 max-md:top-16 max-md:mt-0"
                     style={{
                         background: 'var(--vora-bg-raised)',
                         border: '1px solid var(--vora-border-strong)',
@@ -256,7 +256,7 @@ function DropdownItem({ title, subtitle, imageUrl, isRound, onClick }: { title: 
     return (
         <li
             onClick={onClick}
-            className="flex cursor-pointer items-center gap-3 px-4 py-2 transition-colors hover:bg-white/5"
+            className="flex cursor-pointer items-center gap-3 px-4 py-2 vora-row-interactive"
         >
             <div
                 className={`flex shrink-0 items-center justify-center overflow-hidden ${isRound ? 'h-12 w-12 rounded-full' : 'h-14 w-10 rounded'}`}

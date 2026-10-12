@@ -124,7 +124,7 @@ export default function AiStatsPage() {
                 }
             />
 
-            <div className="p-8 max-w-7xl mx-auto space-y-6">
+            <div className="p-8 max-md:p-4 max-w-7xl mx-auto space-y-6">
                 <form onSubmit={handleFilter} className="vora-card p-4 flex flex-wrap items-end gap-3">
                     <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1">Start Date</label>
@@ -187,7 +187,7 @@ export default function AiStatsPage() {
                         <h2 className="text-sm font-semibold text-[var(--vora-text-primary)]">Usage Log</h2>
                     </div>
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
+                        <table className="w-full text-left max-md:min-w-[40rem]">
                             <thead>
                                 <tr className="bg-[var(--vora-bg-sunken)] border-b border-[var(--vora-border-subtle)] text-[11px] uppercase tracking-wider text-[var(--vora-text-muted)]">
                                     <th className="px-5 py-3 font-semibold">Timestamp</th>

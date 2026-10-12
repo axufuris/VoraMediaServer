@@ -125,7 +125,7 @@ export default function DiscoveryPage({ embedded = false }: DiscoveryPageProps =
 
             <div className="min-h-full pb-20">
                 {embedded ? (
-                    <div className="flex justify-end px-8 pt-4">
+                    <div className="flex justify-end px-8 max-md:px-4 pt-4">
                         {customizeAction}
                     </div>
                 ) : (
@@ -140,7 +140,7 @@ export default function DiscoveryPage({ embedded = false }: DiscoveryPageProps =
                     {isLoading ? (
                         <>
                             {[1, 2, 3].map(i => (
-                                <div key={i} className="px-8">
+                                <div key={i} className="px-8 max-md:px-4">
                                     <div className="vora-skeleton mb-4 h-6 w-48" />
                                     <div className="flex gap-4 overflow-hidden">
                                         {Array.from({ length: 6 }, (_, j) => <div key={j} className="vora-skeleton h-72 w-48 flex-none" />)}
@@ -203,7 +203,7 @@ function DiscoveryRow({ config, serverId, watchlistIds }: { config: DiscoveryRow
 
     if (loading) {
         return (
-            <div className="px-8">
+            <div className="px-8 max-md:px-4">
                 <div className="vora-skeleton mb-4 h-6 w-48" />
                 <div className="flex gap-4 overflow-hidden">
                     {Array.from({ length: 6 }, (_, i) => <div key={i} className="vora-skeleton h-72 w-48 flex-none" />)}
@@ -213,7 +213,7 @@ function DiscoveryRow({ config, serverId, watchlistIds }: { config: DiscoveryRow
     }
     if (errorMessage) {
         return (
-            <div className="px-8">
+            <div className="px-8 max-md:px-4">
                 <h3 className="m-0 mb-2 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>
                     {config.name} <span style={{ color: 'var(--vora-text-muted)' }}>· {config.providerName || config.providerId}</span>
                 </h3>
@@ -228,7 +228,7 @@ function DiscoveryRow({ config, serverId, watchlistIds }: { config: DiscoveryRow
     }
     if (items.length === 0) {
         return (
-            <div className="px-8">
+            <div className="px-8 max-md:px-4">
                 <h3 className="m-0 mb-2 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>
                     {config.name} <span style={{ color: 'var(--vora-text-muted)' }}>· {config.providerName || config.providerId}</span>
                 </h3>

@@ -52,7 +52,7 @@ export default function SettingsPage() {
                 description="Server name, transcoder behavior, remote access, email, request providers and storage clean-up."
             />
 
-            <div className="px-8 pt-2 pb-10 max-w-6xl mx-auto">
+            <div className="px-8 max-md:px-4 pt-2 pb-10 max-w-6xl mx-auto">
                 <section aria-labelledby="setup-guide-card-heading" className="vora-card mb-6 flex flex-wrap items-center justify-between gap-4 p-5">
                     <div className="min-w-0">
                         <h2 id="setup-guide-card-heading" className="text-base font-semibold text-[var(--vora-text-primary)]">Setup guide</h2>

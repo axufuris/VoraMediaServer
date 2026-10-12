@@ -226,7 +226,7 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
 
     if (isLoading) {
         return (
-            <div className="p-10">
+            <div className="p-10 max-md:p-4">
                 <div className="vora-skeleton mb-6 h-10 w-64" />
                 <div className="vora-skeleton mb-6 h-8 w-96" />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -262,10 +262,10 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
             )}
 
             {embedded && backAction && (
-                <div className="px-8 pt-6">{backAction}</div>
+                <div className="px-8 max-md:px-4 pt-6">{backAction}</div>
             )}
 
-            <div className={embedded ? 'px-8 pt-6' : 'px-8'}>
+            <div className={embedded ? 'px-8 max-md:px-4 pt-6' : 'px-8 max-md:px-4'}>
                 <Tabs<DvrTabKey>
                     tabs={[
                         { key: 'Completed', label: 'Completed', badge: tabBadge(counts.Completed) },
@@ -277,7 +277,7 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
                 />
             </div>
 
-            <div className="px-8 pt-6">
+            <div className="px-8 max-md:px-4 pt-6">
                 {filteredSessions.length === 0 ? (
                     <EmptyState
                         title={`No ${activeTab.toLowerCase()} recordings`}
@@ -346,7 +346,7 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
                                         <button
                                             type="button"
                                             onClick={() => setExpandedGroup(group.title)}
-                                            className="flex flex-1 cursor-pointer items-center justify-center gap-2 py-3 text-sm font-semibold transition-colors hover:bg-white/5"
+                                            className="flex flex-1 cursor-pointer items-center justify-center gap-2 py-3 text-sm font-semibold vora-row-interactive"
                                             style={{ color: 'var(--vora-text-primary)' }}
                                         >
                                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M3 7l3-3h5l2 3" /></svg>
@@ -358,7 +358,7 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
                                                 onClick={(e) => { e.stopPropagation(); handleCancelSeries(group.title, group.sessions[0].id); }}
                                                 title="Cancel series"
                                                 aria-label="Cancel series"
-                                                className="flex w-14 cursor-pointer items-center justify-center transition-colors hover:bg-white/5"
+                                                className="flex w-14 cursor-pointer items-center justify-center vora-icon-button"
                                                 style={{ borderLeft: '1px solid var(--vora-border-subtle)', color: 'var(--vora-danger-text)' }}
                                             >
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -406,7 +406,7 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
                             type="button"
                             onClick={() => seriesPrompt?.onSeries()}
                             className="cursor-pointer rounded-md px-4 py-2.5 text-sm font-semibold transition-colors"
-                            style={{ background: 'var(--vora-danger-500)', color: '#ffffff' }}
+                            style={{ background: 'var(--vora-danger-500)', color: 'var(--vora-text-primary)' }}
                         >
                             Entire series
                         </button>

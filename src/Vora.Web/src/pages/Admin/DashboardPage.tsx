@@ -95,7 +95,7 @@ function NowPlayingRow({ session, onPlay, onPause, onStop }: { session: NowPlayi
         : null;
 
     return (
-        <div className="flex items-center gap-4 px-5 py-4 border-b border-[var(--vora-border-subtle)] last:border-b-0 hover:bg-[var(--vora-bg-sunken)]/50 transition-colors">
+        <div className="flex items-center gap-4 px-5 py-4 border-b border-[var(--vora-border-subtle)] last:border-b-0 hover:bg-[var(--vora-bg-sunken)]/50 transition-colors max-md:flex-wrap max-md:gap-3 max-md:px-4">
             <div className="w-12 h-16 rounded-md bg-[var(--vora-bg-sunken)] overflow-hidden shrink-0">
                 {session.posterUrl
                     ? <img src={session.posterUrl} alt={fullTitle} className="w-full h-full object-cover" />
@@ -129,7 +129,7 @@ function NowPlayingRow({ session, onPlay, onPause, onStop }: { session: NowPlayi
                     </span>
                 </div>
             </div>
-            <div className="flex flex-col items-end gap-2 shrink-0">
+            <div className="flex flex-col items-end gap-2 shrink-0 max-md:w-full max-md:flex-row max-md:items-center max-md:justify-between">
                 <div className="flex items-center gap-1.5">
                     <HealthBadge tone={strategyTone}>{session.strategy}</HealthBadge>
                     {isTranscoding && <HealthBadge tone="info" showDot={false}>Transcode</HealthBadge>}
@@ -306,10 +306,10 @@ export default function DashboardPage() {
                 }
             />
 
-            <div className="p-8 space-y-8 max-w-[1400px] mx-auto">
+            <div className="p-8 max-md:p-4 space-y-8 max-w-[1400px] mx-auto">
                 <SetupGuideBanner serverId={serverId} />
                 {/* Hero stat row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-md:grid-cols-2 max-md:gap-3">
                     <StatCard
                         label="Now Streaming"
                         value={sessions.length}

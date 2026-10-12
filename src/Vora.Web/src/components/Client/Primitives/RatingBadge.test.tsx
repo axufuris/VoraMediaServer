@@ -3,6 +3,10 @@ import { render, screen } from '@testing-library/react';
 import RatingBadge from './RatingBadge';
 import { formatRatingValue, isPercentScaleRating } from '../../../utils/ratings';
 
+function hasFill(root: HTMLElement, selector: string, fill: string): boolean {
+    return Array.from(root.querySelectorAll<SVGElement>(selector)).some(el => el.style.fill === fill);
+}
+
 describe('isPercentScaleRating', () => {
     it.each([
         'Rotten Tomatoes',
@@ -57,31 +61,31 @@ describe('RatingBadge', () => {
 
     it('uses the fresh tomato at or above 60', () => {
         const { container } = render(<RatingBadge value={94} name="Rotten Tomatoes" />);
-        expect(container.querySelector('circle[fill="#fa320a"]')).not.toBeNull();
+        expect(hasFill(container, 'circle', 'var(--vora-rt-red)')).toBe(true);
     });
 
     it('uses the green splat below 60', () => {
         const { container } = render(<RatingBadge value={37} name="Rotten Tomatoes" />);
-        expect(container.querySelector('path[fill="#00a44b"]')).not.toBeNull();
-        expect(container.querySelector('circle[fill="#fa320a"]')).toBeNull();
+        expect(hasFill(container, 'path', 'var(--vora-rt-splat)')).toBe(true);
+        expect(hasFill(container, 'circle', 'var(--vora-rt-red)')).toBe(false);
     });
 
     it('switches exactly at the 60 threshold', () => {
         const { container: fresh } = render(<RatingBadge value={60} name="Rotten Tomatoes" />);
-        expect(fresh.querySelector('circle[fill="#fa320a"]')).not.toBeNull();
+        expect(hasFill(fresh, 'circle', 'var(--vora-rt-red)')).toBe(true);
 
         const { container: rotten } = render(<RatingBadge value={59} name="Rotten Tomatoes" />);
-        expect(rotten.querySelector('circle[fill="#fa320a"]')).toBeNull();
+        expect(hasFill(rotten, 'circle', 'var(--vora-rt-red)')).toBe(false);
     });
 
     it('colours the Metacritic square by score band', () => {
         const { container: good } = render(<RatingBadge value={80} name="Metacritic" />);
-        expect(good.querySelector('rect[fill="#00ce7a"]')).not.toBeNull();
+        expect(hasFill(good, 'rect', 'var(--vora-metacritic-good)')).toBe(true);
 
         const { container: mixed } = render(<RatingBadge value={50} name="Metacritic" />);
-        expect(mixed.querySelector('rect[fill="#ffbd3f"]')).not.toBeNull();
+        expect(hasFill(mixed, 'rect', 'var(--vora-metacritic-mixed)')).toBe(true);
 
         const { container: bad } = render(<RatingBadge value={20} name="Metacritic" />);
-        expect(bad.querySelector('rect[fill="#ff6874"]')).not.toBeNull();
+        expect(hasFill(bad, 'rect', 'var(--vora-metacritic-bad)')).toBe(true);
     });
 });

@@ -8,7 +8,7 @@ export default function PodcastsPage() {
                 title="Podcasts"
                 subtitle="Your subscriptions and the latest episodes."
             />
-            <div className="px-8 pt-6">
+            <div className="px-8 max-md:px-4 pt-6">
                 <PodcastsTab />
             </div>
         </div>

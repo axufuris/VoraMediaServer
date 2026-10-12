@@ -4,13 +4,17 @@ import SidebarV2 from './SidebarV2';
 import TopAppBar from './TopAppBar';
 import SearchPalette from './SearchPalette';
 import SetupGuidePrompt from '../SetupGuide/SetupGuidePrompt';
+import PhoneNavDrawer from '../../Layout/PhoneNavDrawer';
 
 export default function AdminShell() {
     const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+    const [isPhoneNavOpen, setIsPhoneNavOpen] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
 
     const openPalette = useCallback(() => setIsPaletteOpen(true), []);
     const closePalette = useCallback(() => setIsPaletteOpen(false), []);
+    const openPhoneNav = useCallback(() => setIsPhoneNavOpen(true), []);
+    const closePhoneNav = useCallback(() => setIsPhoneNavOpen(false), []);
 
     // ⌘K (Mac) / Ctrl-K (everywhere else) toggles the search palette.
     // We listen at the window level so the shortcut works from any focused
@@ -61,11 +65,13 @@ export default function AdminShell() {
         <div
             ref={rootRef}
             data-vora-admin
-            className="flex flex-col h-screen w-full overflow-hidden bg-[var(--vora-bg-canvas)] text-[var(--vora-text-primary)]"
+            className="flex flex-col h-screen max-md:h-dvh w-full overflow-hidden bg-[var(--vora-bg-canvas)] text-[var(--vora-text-primary)]"
         >
-            <TopAppBar onOpenSearch={openPalette} />
+            <TopAppBar onOpenSearch={openPalette} onToggleSidebar={openPhoneNav} />
             <div className="flex flex-1 overflow-hidden">
-                <SidebarV2 />
+                <PhoneNavDrawer open={isPhoneNavOpen} onClose={closePhoneNav}>
+                    <SidebarV2 />
+                </PhoneNavDrawer>
                 <main className="flex-1 overflow-y-auto">
                     <Outlet />
                 </main>

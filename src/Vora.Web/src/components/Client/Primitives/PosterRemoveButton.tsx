@@ -1,7 +1,7 @@
 import type { MouseEvent } from 'react';
 
 // A dark, outlined circular X used as the hover "remove" affordance on posters
-// (Continue Watching, collection items, …). Deliberately a fixed dark scrim with
+// (Continue Watching, collection items, …). Deliberately a dark scrim with
 // a light icon so it stays legible over any artwork and over the accent-colored
 // unwatched-count badge, rather than blending into it. Turns danger-red on hover.
 export default function PosterRemoveButton({ onClick, title = 'Remove' }: { onClick: (e: MouseEvent) => void; title?: string }) {
@@ -13,20 +13,20 @@ export default function PosterRemoveButton({ onClick, title = 'Remove' }: { onCl
             onClick={(e) => { e.stopPropagation(); onClick(e); }}
             className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-all"
             style={{
-                background: 'rgba(20, 20, 28, 0.88)',
-                color: '#fafafa',
-                border: '1.5px solid rgba(255,255,255,0.4)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                background: 'color-mix(in srgb, var(--vora-bg-raised) 88%, transparent)',
+                color: 'var(--vora-text-primary)',
+                border: '1.5px solid color-mix(in srgb, var(--vora-text-primary) 40%, transparent)',
+                boxShadow: 'var(--vora-shadow-md)',
                 backdropFilter: 'blur(6px)',
             }}
             onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'var(--vora-danger-500)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.7)';
+                e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--vora-text-primary) 70%, transparent)';
                 e.currentTarget.style.transform = 'scale(1.1)';
             }}
             onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(20, 20, 28, 0.88)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
+                e.currentTarget.style.background = 'color-mix(in srgb, var(--vora-bg-raised) 88%, transparent)';
+                e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--vora-text-primary) 40%, transparent)';
                 e.currentTarget.style.transform = 'scale(1)';
             }}
         >

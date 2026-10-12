@@ -45,7 +45,7 @@ export default function LiveTvHubPage() {
                 />
             </div>
 
-            <div className="shrink-0 px-8">
+            <div className="shrink-0 px-8 max-md:px-4">
                 <Tabs<LiveTvTab>
                     tabs={tabDefinitions}
                     active={activeTab}

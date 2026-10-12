@@ -104,7 +104,7 @@ export default function MusicMoodView({
                                     if (isShuffled) toggleShuffle();
                                     playArtistTrackList(tracks, 0);
                                 }}
-                                className="text-sm px-4 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)] font-bold rounded transition-colors cursor-pointer flex items-center gap-2"
+                                className="text-sm px-4 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] font-bold rounded transition-colors cursor-pointer flex items-center gap-2"
                             >
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                                 Play

@@ -93,7 +93,7 @@ export default function MusicMixView({
         <>
             <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-6 mb-8 pb-6 border-b border-[var(--vora-border-subtle)] text-center sm:text-left">
                 <div
-                    className="w-32 h-32 sm:w-40 sm:h-40 rounded border flex items-center justify-center shrink-0 shadow-lg overflow-hidden relative"
+                    className="w-32 h-32 sm:w-40 sm:h-40 rounded border flex items-center justify-center shrink-0 shadow-[var(--vora-shadow-lg)] overflow-hidden relative"
                     style={{ background: 'var(--vora-bg-raised)', borderColor: 'var(--vora-border-subtle)' }}
                 >
                     {mosaicUrls
@@ -102,9 +102,9 @@ export default function MusicMixView({
                             ? <img src={currentMix.artworkUrl} alt="" className={`w-full h-full object-cover ${coverLabel ? 'opacity-60' : ''}`} />
                             : null}
                     {coverLabel && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-[var(--vora-text-primary)] drop-shadow-lg">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-[var(--vora-text-primary)] drop-shadow-[0_4px_4px_color-mix(in_srgb,var(--vora-bg-canvas)_70%,transparent)]">
                             <div className="text-xs uppercase tracking-widest text-[var(--vora-accent-text)] font-bold">{coverLabel}</div>
-                            <div className="text-lg sm:text-xl font-bold text-center px-2">{currentMix.descriptionTag ?? 'Mix'}</div>
+                            <div className="text-lg sm:text-xl font-bold text-center px-2 max-md:line-clamp-4 max-md:text-sm">{currentMix.descriptionTag ?? 'Mix'}</div>
                         </div>
                     )}
                 </div>
@@ -122,7 +122,7 @@ export default function MusicMixView({
                                     if (isShuffled) toggleShuffle();
                                     playMixFromIndex(0);
                                 }}
-                                className="text-sm px-4 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)] font-bold rounded transition-colors cursor-pointer flex items-center gap-2"
+                                className="text-sm px-4 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] font-bold rounded transition-colors cursor-pointer flex items-center gap-2"
                             >
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                                 Play

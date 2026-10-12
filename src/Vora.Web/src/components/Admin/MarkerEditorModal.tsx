@@ -125,7 +125,7 @@ export default function MarkerEditorModal({ isOpen, mediaItemId, mediaItemTitle,
     return (
         <div
             className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-            style={{ background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(6px)' }}
+            style={{ background: 'var(--vora-bg-overlay)', backdropFilter: 'blur(6px)' }}
             onClick={onClose}
         >
             <div
@@ -283,7 +283,7 @@ function MarkerRow({ marker, duration, onChange, onDelete }: { marker: MediaMark
                 </button>
             </div>
             {duration && duration > 0 && (
-                <div className="relative h-1.5 rounded-full" style={{ background: 'rgba(255, 255, 255, 0.08)' }}>
+                <div className="relative h-1.5 rounded-full" style={{ background: 'var(--vora-border-subtle)' }}>
                     <div
                         className="absolute top-0 h-full rounded-full"
                         style={{ left: `${pctStart}%`, width: `${Math.max(0.4, pctEnd - pctStart)}%`, background: 'var(--vora-accent-500)' }}

@@ -56,7 +56,7 @@ export default function DedupePage() {
                 description="Identify and remove duplicate files, tune the rules used to detect them, and review groups you've chosen to ignore."
             />
 
-            <div className="px-8 pt-2 max-w-7xl mx-auto">
+            <div className="px-8 max-md:px-4 pt-2 max-w-7xl mx-auto">
                 <div className="flex gap-2 border-b border-[var(--vora-border-subtle)] mb-2">
                     <TabButton id="duplicates" activeTab={activeTab} setActiveTab={setActiveTab}>Duplicates</TabButton>
                     <TabButton id="rules" activeTab={activeTab} setActiveTab={setActiveTab}>Rules</TabButton>
@@ -64,7 +64,7 @@ export default function DedupePage() {
                 </div>
             </div>
 
-            <div className="px-8 pb-10 max-w-7xl mx-auto pt-6">
+            <div className="px-8 max-md:px-4 pb-10 max-w-7xl mx-auto pt-6">
                 {activeTab === 'duplicates' && <DuplicatesTab dialog={dialog} serverId={serverId} />}
                 {activeTab === 'rules' && <RulesTab dialog={dialog} serverId={serverId} />}
                 {activeTab === 'ignored' && <IgnoredTab dialog={dialog} serverId={serverId} />}

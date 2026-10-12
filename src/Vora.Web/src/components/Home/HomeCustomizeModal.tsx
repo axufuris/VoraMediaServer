@@ -96,7 +96,7 @@ export default function HomeCustomizeModal({ isOpen, onClose, activeLists, saved
                     return (
                         <div key={item.listId} className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${item.isEnabled ? 'bg-[var(--vora-bg-sunken)] border-[var(--vora-border-subtle)]' : 'bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)] opacity-60'}`}>
                             <div className="flex items-center gap-4 flex-1 overflow-hidden">
-                                <input type="checkbox" checked={item.isEnabled} onChange={() => toggleItem(index)} className="w-5 h-5 accent-orange-500 cursor-pointer shrink-0" />
+                                <input type="checkbox" checked={item.isEnabled} onChange={() => toggleItem(index)} className="w-5 h-5 accent-[var(--vora-accent-500)] cursor-pointer shrink-0" />
                                 <span className={`font-bold truncate ${item.isEnabled ? 'text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-muted)] line-through'}`}>{listDetails.title}</span>
                             </div>
                             <div className="flex items-center gap-1 shrink-0 ml-4">
@@ -118,7 +118,7 @@ export default function HomeCustomizeModal({ isOpen, onClose, activeLists, saved
                 </button>
                 <div className="flex gap-3 w-full sm:w-auto">
                     <button onClick={onClose} className="flex-1 sm:flex-none px-6 py-2.5 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] font-bold rounded-lg transition-colors cursor-pointer">Cancel</button>
-                    <button onClick={() => onSave(workingLayout)} className="flex-1 sm:flex-none px-6 py-2.5 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-text-primary)] font-bold rounded-lg transition-colors shadow-lg cursor-pointer">Save Layout</button>
+                    <button onClick={() => onSave(workingLayout)} className="flex-1 sm:flex-none px-6 py-2.5 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] font-bold rounded-lg transition-colors shadow-[var(--vora-shadow-lg)] cursor-pointer">Save Layout</button>
                 </div>
             </div>
         </Modal>

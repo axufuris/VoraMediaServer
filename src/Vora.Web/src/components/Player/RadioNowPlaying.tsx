@@ -94,7 +94,7 @@ export default function RadioNowPlaying({
                 />
             }
         >
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center px-8 pb-4">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center px-8 pb-4 max-md:px-4">
                 <NowPlayingArtwork
                     artworkKey={station.id}
                     posterUrl={station.posterUrl}
@@ -108,7 +108,7 @@ export default function RadioNowPlaying({
 
             {stationsOpen && (
                 <aside
-                    className="flex w-[340px] shrink-0 flex-col"
+                    className="flex w-[340px] shrink-0 flex-col max-md:absolute max-md:inset-0 max-md:z-20 max-md:w-full max-md:bg-[var(--vora-bg-surface)]!"
                     style={{ background: 'color-mix(in srgb, var(--vora-bg-surface) 80%, transparent)', borderLeft: '1px solid var(--vora-border-subtle)' }}
                 >
                     <div className="shrink-0 px-5 py-4 text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--vora-text-muted)', borderBottom: '1px solid var(--vora-border-subtle)' }}>

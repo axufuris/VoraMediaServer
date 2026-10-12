@@ -20,8 +20,8 @@ interface CinematicBackdropProps {
     className?: string;
 }
 
-const HORIZONTAL_FADE = 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.15) 14%, rgba(0,0,0,0.6) 32%, #000 58%)';
-const VERTICAL_FADE = 'linear-gradient(to bottom, #000 0%, #000 42%, rgba(0,0,0,0.55) 74%, transparent 100%)';
+const HORIZONTAL_FADE = 'linear-gradient(to right, transparent 0%, color-mix(in srgb, var(--vora-bg-canvas) 15%, transparent) 14%, color-mix(in srgb, var(--vora-bg-canvas) 60%, transparent) 32%, var(--vora-bg-canvas) 58%)';
+const VERTICAL_FADE = 'linear-gradient(to bottom, var(--vora-bg-canvas) 0%, var(--vora-bg-canvas) 42%, color-mix(in srgb, var(--vora-bg-canvas) 55%, transparent) 74%, transparent 100%)';
 
 const HEIGHT_BY_INTENSITY: Record<BackdropIntensity, string> = {
     hero: '50vh',
@@ -112,16 +112,16 @@ export default function CinematicBackdrop({ src, intensity = 'detail', mask = 's
                 className="absolute inset-0 pointer-events-none"
                 style={{
                     backgroundImage: intensity === 'detail'
-                        ? 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 20%, rgba(0,0,0,0.55) 60%, var(--vora-bg-canvas) 96%)'
-                        : 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 30%, var(--vora-bg-canvas) 96%)',
+                        ? 'linear-gradient(180deg, color-mix(in srgb, var(--vora-bg-canvas) 35%, transparent) 0%, color-mix(in srgb, var(--vora-bg-canvas) 15%, transparent) 20%, color-mix(in srgb, var(--vora-bg-canvas) 55%, transparent) 60%, var(--vora-bg-canvas) 96%)'
+                        : 'linear-gradient(180deg, transparent 0%, transparent 30%, var(--vora-bg-canvas) 96%)',
                 }}
             />
             <div
                 className="absolute inset-0 pointer-events-none"
                 style={{
                     backgroundImage: intensity === 'detail'
-                        ? 'linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.55) 35%, rgba(0,0,0,0.15) 70%, rgba(0,0,0,0) 100%)'
-                        : 'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 65%)',
+                        ? 'linear-gradient(90deg, color-mix(in srgb, var(--vora-bg-canvas) 78%, transparent) 0%, color-mix(in srgb, var(--vora-bg-canvas) 55%, transparent) 35%, color-mix(in srgb, var(--vora-bg-canvas) 15%, transparent) 70%, transparent 100%)'
+                        : 'linear-gradient(90deg, color-mix(in srgb, var(--vora-bg-canvas) 55%, transparent) 0%, transparent 65%)',
                 }}
             />
         </div>

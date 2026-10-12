@@ -20,13 +20,13 @@ export default function LiveTvInfoPanel({ activeProgram, streamUrl, formatTime }
         <div
             className="pointer-events-auto absolute right-8 top-24 z-40 w-full max-w-sm rounded-2xl p-5 text-left backdrop-blur-md"
             style={{
-                background: 'rgba(20, 20, 28, 0.78)',
-                border: '1px solid rgba(255, 255, 255, 0.16)',
+                background: 'color-mix(in srgb, var(--vora-bg-canvas) 78%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--vora-text-primary) 16%, transparent)',
                 boxShadow: 'var(--vora-shadow-overlay)',
-                color: '#fafafa',
+                color: 'var(--vora-text-primary)',
             }}
         >
-            <h3 className="m-0 mb-4 pb-2 text-base font-semibold" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.14)' }}>Stream info</h3>
+            <h3 className="m-0 mb-4 pb-2 text-base font-semibold" style={{ borderBottom: '1px solid color-mix(in srgb, var(--vora-text-primary) 14%, transparent)' }}>Stream info</h3>
             <div className="space-y-3">
                 <Row label="Current program" value={activeProgram?.title || 'Live TV'} />
                 {activeProgram && (

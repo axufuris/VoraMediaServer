@@ -94,9 +94,9 @@ export default function CollectionsPage() {
                 activeTab={activeTab}
             />
 
-            {createAction && <div className="flex justify-end px-8 pt-4">{createAction}</div>}
+            {createAction && <div className="flex justify-end px-8 max-md:px-4 pt-4">{createAction}</div>}
 
-            <div className="px-8">
+            <div className="px-8 max-md:px-4">
                 <nav
                     className="flex gap-1 overflow-x-auto"
                     style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}
@@ -128,7 +128,7 @@ export default function CollectionsPage() {
                 </nav>
             </div>
 
-            <div className="px-8 pt-6">
+            <div className="px-8 max-md:px-4 pt-6">
                 {loading ? (
                     <MediaGrid>
                         {Array.from({ length: 10 }, (_, i) => <div key={i} className="vora-skeleton aspect-[2/3]" />)}

@@ -49,10 +49,10 @@ export default function VideoCard({ title, imageUrl, label, onClick }: VideoCard
                     <div
                         className="flex h-14 w-14 items-center justify-center rounded-full pl-1 backdrop-blur-sm transition-all group-hover:scale-110"
                         style={{
-                            background: 'rgba(250, 250, 250, 0.92)',
-                            color: '#111114',
-                            border: '1px solid rgba(255, 255, 255, 0.9)',
-                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.55)',
+                            background: 'color-mix(in srgb, var(--vora-text-primary) 92%, transparent)',
+                            color: 'var(--vora-text-inverse)',
+                            border: '1px solid color-mix(in srgb, var(--vora-text-primary) 90%, transparent)',
+                            boxShadow: 'var(--vora-shadow-md)',
                         }}
                     >
                         <svg width="24" height="24" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4l12 6-12 6z" /></svg>
@@ -62,9 +62,9 @@ export default function VideoCard({ title, imageUrl, label, onClick }: VideoCard
                     <div
                         className="absolute left-2 top-2 rounded px-2 py-1 font-bold uppercase tracking-wider backdrop-blur-md"
                         style={{
-                            background: 'rgba(8, 8, 11, 0.78)',
-                            color: '#fafafa',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            background: 'color-mix(in srgb, var(--vora-bg-canvas) 78%, transparent)',
+                            color: 'var(--vora-text-primary)',
+                            border: '1px solid var(--vora-border-strong)',
                             fontSize: 'var(--vora-card-badge-size)',
                             letterSpacing: '0.06em',
                         }}

@@ -14,7 +14,7 @@ interface MusicArtistsGridProps {
 export default function MusicArtistsGrid({ isLoading, artists, isServerAdmin, onOpenArtist, onEditArtist }: MusicArtistsGridProps) {
     if (isLoading && artists.length === 0) {
         return (
-            <MediaGrid className="px-8" size="xs">
+            <MediaGrid className="px-8 max-md:px-4" size="xs">
                 {Array.from({ length: 12 }, (_, i) => <div key={i} className="vora-skeleton aspect-square rounded-full" aria-hidden="true" />)}
             </MediaGrid>
         );
@@ -31,7 +31,7 @@ export default function MusicArtistsGrid({ isLoading, artists, isServerAdmin, on
 
     return (
         <MediaGrid
-            className="px-8"
+            className="px-8 max-md:px-4"
             size="xs"
             title="All Artists"
             subtitle={`${artists.length} ${artists.length === 1 ? 'artist' : 'artists'}`}

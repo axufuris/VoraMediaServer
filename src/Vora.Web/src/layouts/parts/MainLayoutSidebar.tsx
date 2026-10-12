@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import type { NavItem } from '../MainLayout';
 import { renderNavIcon } from './navIcons';
 import { dropIndex } from '../../utils/navOrder';
+import { reorderListProps, reorderRowProps, useTouchReorder } from '../../hooks/useTouchReorder';
 
 interface MainLayoutSidebarProps {
     navItems: NavItem[];
@@ -17,7 +18,7 @@ interface MainLayoutSidebarProps {
 }
 
 const navItemStyle = (isActive: boolean): React.CSSProperties => ({
-    background: isActive ? 'var(--vora-accent-soft)' : 'transparent',
+    background: isActive ? 'var(--vora-accent-soft)' : undefined,
     color: isActive ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)',
 });
 
@@ -36,6 +37,10 @@ export default function MainLayoutSidebar({
     const [drop, setDrop] = useState<{ over: number; after: boolean } | null>(null);
     const refocusKey = useRef<string | null>(null);
     const handles = useRef(new Map<string, HTMLButtonElement>());
+
+    const touch = useTouchReorder(onMoveItem);
+    const activeDragIndex = touch.drag ? touch.drag.from : dragIndex;
+    const activeDrop = touch.drag ? { over: touch.drag.over, after: touch.drag.after } : drop;
 
     const keyOf = (item: NavItem) => `${item.serverId || 'local'}-${item.id}`;
 
@@ -90,7 +95,7 @@ export default function MainLayoutSidebar({
                         <NavLink
                             to="/"
                             end
-                            className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${isActive ? '' : 'hover:bg-white/5 hover:text-[var(--vora-text-primary)]'}`}
+                            className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${isActive ? '' : 'vora-row-interactive hover:text-[var(--vora-text-primary)]'}`}
                             style={({ isActive }) => navItemStyle(isActive)}
                         >
                             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
@@ -109,7 +114,7 @@ export default function MainLayoutSidebar({
                                     <NavLink
                                         key={`${item.serverId || 'local'}-${item.id}`}
                                         to={item.path}
-                                        className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? '' : 'hover:bg-white/5 hover:text-[var(--vora-text-primary)]'}`}
+                                        className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? '' : 'vora-row-interactive hover:text-[var(--vora-text-primary)]'}`}
                                         style={({ isActive }) => navItemStyle(isActive)}
                                     >
                                         {icon}
@@ -126,7 +131,7 @@ export default function MainLayoutSidebar({
                                     <button
                                         type="button"
                                         onClick={onToggleShowUnpinned}
-                                        className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-white/5 hover:text-[var(--vora-text-primary)]"
+                                        className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors vora-row-interactive hover:text-[var(--vora-text-primary)]"
                                         style={{ color: 'var(--vora-text-muted)' }}
                                     >
                                         <svg className={`h-4 w-4 transition-transform ${showUnpinned ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -167,7 +172,7 @@ export default function MainLayoutSidebar({
                         <button
                             type="button"
                             onClick={() => onToggleEditNav(true)}
-                            className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-white/5 hover:text-[var(--vora-text-primary)]"
+                            className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors vora-row-interactive hover:text-[var(--vora-text-primary)]"
                             style={{ color: 'var(--vora-text-muted)' }}
                         >
                             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
@@ -198,14 +203,15 @@ export default function MainLayoutSidebar({
                         Manage sidebar
                     </div>
                     <p className="px-4 pt-3 text-xs" style={{ color: 'var(--vora-text-disabled)' }}>Drag to reorder. Pin to show in the sidebar.</p>
-                    <div className="flex-1 space-y-1 overflow-y-auto p-2" onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop(null); }}>
+                    <div {...reorderListProps} className="flex-1 space-y-1 overflow-y-auto p-2" onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop(null); }}>
                         {navItems.map((item, index) => {
                             const icon = renderNavIcon(item.type === 'library' ? item.mediaType : item.id, 'w-4 h-4');
                             const key = keyOf(item);
-                            const showLine = drop !== null && dragIndex !== null && drop.over === index && dropIndex(dragIndex, index, drop.after) !== dragIndex;
+                            const showLine = activeDrop !== null && activeDragIndex !== null && activeDrop.over === index && dropIndex(activeDragIndex, index, activeDrop.after) !== activeDragIndex;
                             return (
                                 <div
                                     key={key}
+                                    {...reorderRowProps(index)}
                                     data-testid={`nav-row-${item.id}`}
                                     draggable
                                     onDragStart={e => {
@@ -234,14 +240,14 @@ export default function MainLayoutSidebar({
                                     style={{
                                         background: 'var(--vora-bg-sunken)',
                                         border: '1px solid var(--vora-border-subtle)',
-                                        opacity: dragIndex === index ? 0.4 : 1,
+                                        opacity: activeDragIndex === index ? 0.4 : 1,
                                     }}
                                 >
                                     {showLine && (
                                         <span
                                             aria-hidden="true"
                                             className="pointer-events-none absolute left-1 right-1 h-0.5 rounded-full"
-                                            style={{ background: 'var(--vora-accent-500)', [drop.after ? 'bottom' : 'top']: -3 }}
+                                            style={{ background: 'var(--vora-accent-500)', [activeDrop.after ? 'bottom' : 'top']: -3 }}
                                         />
                                     )}
                                     <div className="flex items-center gap-2">
@@ -249,9 +255,10 @@ export default function MainLayoutSidebar({
                                             type="button"
                                             ref={node => { if (node) handles.current.set(key, node); else handles.current.delete(key); }}
                                             onKeyDown={e => moveWithKeyboard(e, item, index)}
+                                            {...touch.handleProps(index)}
                                             aria-label={`Move ${item.title}. Use the up and down arrow keys.`}
                                             title="Drag to reorder"
-                                            className="vora-icon-button cursor-grab rounded p-0.5"
+                                            className="vora-icon-button cursor-grab touch-none rounded p-0.5"
                                             style={{ color: 'var(--vora-text-disabled)' }}
                                         >
                                             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -273,11 +280,11 @@ export default function MainLayoutSidebar({
                                     <button
                                         type="button"
                                         onClick={() => onTogglePin(item.id, item.serverId)}
-                                        className="cursor-pointer rounded p-1.5 transition-colors hover:bg-white/5"
+                                        className="vora-icon-button cursor-pointer rounded p-1.5 transition-colors"
                                         title={item.isPinned ? 'Unpin' : 'Pin'}
                                         style={{
                                             color: item.isPinned ? 'var(--vora-accent-text)' : 'var(--vora-text-disabled)',
-                                            background: item.isPinned ? 'var(--vora-accent-soft)' : 'transparent',
+                                            background: item.isPinned ? 'var(--vora-accent-soft)' : undefined,
                                         }}
                                     >
                                         <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>

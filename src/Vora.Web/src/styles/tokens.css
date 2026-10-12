@@ -59,6 +59,30 @@
 
     /* A third party's mark keeps its owner's colour in every template. */
     --vora-lastfm-red: #d51007;
+    --vora-imdb-yellow: #f5c518;
+    --vora-imdb-ink: #000000;
+    --vora-tmdb-green: #90cea1;
+    --vora-tmdb-blue: #01b4e4;
+    --vora-tmdb-navy: #0d253f;
+    --vora-rt-red: #fa320a;
+    --vora-rt-highlight: #ff5a33;
+    --vora-rt-stem: #3a7d3a;
+    --vora-rt-splat: #00a44b;
+    --vora-rt-splat-ink: #0b3d22;
+    --vora-metacritic-good: #00ce7a;
+    --vora-metacritic-mixed: #ffbd3f;
+    --vora-metacritic-bad: #ff6874;
+    --vora-metacritic-ink: #0b1a2b;
+    --vora-trakt-red: #ed1c24;
+    --vora-letterboxd-green: #00e054;
+    --vora-mal-blue: #2e51a2;
+    --vora-anidb-blue: #3d5a80;
+    --vora-mdblist-gold: #d8a24a;
+
+    /* Poster badges are drawn into the artwork by the server in these colours,
+       so the overlay editor previews them the same way in every theme. */
+    --vora-poster-badge-fill: rgba(0, 0, 0, 0.65);
+    --vora-poster-badge-text: #ffffff;
 
     /* === Typography === */
     --vora-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -143,6 +167,29 @@
 
     --vora-bg-glass: rgba(20, 20, 28, 0.55);
     --vora-duration-slow: 560ms;
+}
+
+/*
+ * Phones. Everything at 48rem and wider keeps the values above; below it the
+ * page gutter narrows and cards are sized from the screen width, so a grid
+ * fits three posters (four small tiles) across on any phone and a row shows
+ * the edge of the next card.
+ */
+@media (width < 48rem) {
+    :root {
+        --vora-card-w-xs: clamp(4.25rem, calc((100vw - 5.25rem) / 4), 5.5rem);
+        --vora-card-w-sm: 5.75rem;
+        --vora-card-w-md: clamp(5.5rem, calc((100vw - 5rem) / 3), 7rem);
+        --vora-card-w-lg: 8rem;
+        --vora-card-min-w: 5.5rem;
+        --vora-card-min-w-xs: 4.25rem;
+        --vora-card-gap: 0.75rem;
+        --vora-card-title-size: 0.8125rem;
+        --vora-person-w: 5.75rem;
+        --vora-person-w-sm: 4.75rem;
+        --vora-video-w: 13rem;
+        --vora-row-gutter: 1rem;
+    }
 }
 
 /*
@@ -261,7 +308,7 @@
 [data-vora-client] .vora-button-primary:active { background: var(--vora-accent-active); }
 
 [data-vora-client] .vora-button-secondary {
-    background: rgba(255, 255, 255, 0.06);
+    background: color-mix(in srgb, var(--vora-text-primary) 6%, transparent);
     color: var(--vora-text-primary);
     border: 1px solid var(--vora-border-subtle);
     padding: 12px 22px;
@@ -431,7 +478,7 @@
 }
 
 [data-vora-client] .vora-guide-row:hover {
-    background: rgba(255, 255, 255, 0.025);
+    background: color-mix(in srgb, var(--vora-text-primary) 2.5%, transparent);
 }
 
 [data-vora-client] .vora-guide-row:hover .vora-guide-channel {

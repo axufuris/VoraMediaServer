@@ -122,35 +122,35 @@ export function LibrarySyncPinModal({
             />
             <ModalBody>
                 {phase === 'requesting' && (
-                    <p className="text-sm text-gray-300">Generating authorization code...</p>
+                    <p className="text-sm text-[var(--vora-text-secondary)]">Generating authorization code...</p>
                 )}
 
                 {phase === 'awaiting' && pin && (
                     <div className="space-y-4">
-                        <ol className="text-sm text-gray-300 list-decimal list-inside space-y-1">
+                        <ol className="text-sm text-[var(--vora-text-secondary)] list-decimal list-inside space-y-1">
                             <li>Open <a href={pin.verificationUrl} target="_blank" rel="noopener noreferrer" className="text-[var(--vora-accent-text)] hover:underline">{pin.verificationUrl}</a></li>
                             <li>Sign in to your {providerName} account if asked.</li>
                             <li>Enter the code below and submit.</li>
                         </ol>
                         <div className="flex justify-center">
-                            <div className="font-mono text-4xl tracking-[0.4em] px-6 py-4 rounded-lg border border-gray-700 bg-gray-900 text-white select-all">
+                            <div className="font-mono text-4xl tracking-[0.4em] px-6 py-4 rounded-lg border border-[var(--vora-border-strong)] bg-[var(--vora-bg-sunken)] text-[var(--vora-text-primary)] select-all">
                                 {codeDisplay}
                             </div>
                         </div>
-                        <p className="text-xs text-gray-500 text-center">Waiting for you to authorize the code...</p>
+                        <p className="text-xs text-[var(--vora-text-muted)] text-center">Waiting for you to authorize the code...</p>
                     </div>
                 )}
 
                 {phase === 'success' && (
-                    <p className="text-sm text-green-400">Authorized. You can close this window.</p>
+                    <p className="text-sm text-[var(--vora-success-text)]">Authorized. You can close this window.</p>
                 )}
 
                 {phase === 'expired' && (
-                    <p className="text-sm text-yellow-400">The authorization code expired before it was used. Generate a new one to try again.</p>
+                    <p className="text-sm text-[var(--vora-warning-text)]">The authorization code expired before it was used. Generate a new one to try again.</p>
                 )}
 
                 {phase === 'error' && (
-                    <p className="text-sm text-red-400">{errorMessage ?? 'Something went wrong.'}</p>
+                    <p className="text-sm text-[var(--vora-danger-text)]">{errorMessage ?? 'Something went wrong.'}</p>
                 )}
             </ModalBody>
             <ModalFooter>
@@ -158,7 +158,7 @@ export function LibrarySyncPinModal({
                     <button
                         type="button"
                         onClick={handleClose}
-                        className="px-4 py-2 text-sm text-gray-300 hover:text-white"
+                        className="px-4 py-2 text-sm text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)]"
                     >
                         {phase === 'success' ? 'Done' : 'Cancel'}
                     </button>
@@ -166,7 +166,7 @@ export function LibrarySyncPinModal({
                         <button
                             type="button"
                             onClick={startFlow}
-                            className="px-4 py-2 text-sm rounded-md bg-[var(--vora-accent-500)] text-white hover:opacity-90"
+                            className="px-4 py-2 text-sm rounded-md bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)]"
                         >
                             Try Again
                         </button>

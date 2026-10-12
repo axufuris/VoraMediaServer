@@ -45,10 +45,10 @@ export default function MediaEpisodesList({ episodes, serverId }: Props) {
                         <div key={ep.id} className="flex flex-col sm:flex-row gap-6 p-4 bg-[var(--vora-bg-sunken)]/50 hover:bg-[var(--vora-bg-sunken)] rounded-lg border border-transparent hover:border-[var(--vora-border-subtle)] transition-colors group">
                             <div
                                 onClick={() => navigate(serverId ? `/server/${serverId}/media/${ep.id}` : `/media/${ep.id}`)}
-                                className="w-full sm:w-48 shrink-0 relative aspect-video bg-[var(--vora-bg-canvas)] rounded-md overflow-hidden shadow-md cursor-pointer"
+                                className="w-full sm:w-48 shrink-0 relative aspect-video bg-[var(--vora-bg-canvas)] rounded-md overflow-hidden shadow-[var(--vora-shadow-md)] cursor-pointer"
                             >
-                                <ArtImage src={ep.posterUrl} alt={ep.title} variant="still" imgClassName="w-full h-full object-contain bg-black" />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                <ArtImage src={ep.posterUrl} alt={ep.title} variant="still" imgClassName="w-full h-full object-contain bg-[var(--vora-bg-sunken)]" />
+                                <div className="absolute inset-0 bg-[color-mix(in_srgb,var(--vora-bg-canvas)_40%,transparent)] opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
                                 <PosterCorner>
                                     <CornerChip

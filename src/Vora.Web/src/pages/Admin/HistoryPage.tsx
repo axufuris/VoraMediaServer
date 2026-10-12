@@ -298,7 +298,7 @@ export default function HistoryPage() {
                 }
             />
 
-            <div className="p-8 space-y-4">
+            <div className="p-8 max-md:p-4 space-y-4">
                 <div className="vora-card p-4 flex flex-wrap items-center gap-3">
                     <select
                         aria-label="Profile"

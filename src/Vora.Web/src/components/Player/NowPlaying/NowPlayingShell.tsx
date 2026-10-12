@@ -67,7 +67,7 @@ export function NowPlayingShell({
             </div>
 
             <header
-                className="relative z-20 grid shrink-0 grid-cols-3 items-center px-6 py-4 vora-glass"
+                className="relative z-20 grid shrink-0 grid-cols-3 items-center px-6 py-4 vora-glass max-md:px-3 max-md:py-3"
                 style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}
             >
                 <div className="flex justify-start">
@@ -104,7 +104,7 @@ export function NowPlayingShell({
                 {children}
             </div>
 
-            <div className="relative z-10 shrink-0 px-8 pb-7 pt-2">
+            <div className="relative z-10 shrink-0 px-8 pb-7 pt-2 max-md:px-4 max-md:pb-5">
                 {controls}
             </div>
 

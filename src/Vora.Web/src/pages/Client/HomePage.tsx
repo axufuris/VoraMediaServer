@@ -194,6 +194,7 @@ export default function HomePage() {
             type="button"
             onClick={() => setIsCustomizeOpen(true)}
             className="vora-button-secondary cursor-pointer inline-flex items-center gap-2"
+            aria-label="Customize"
         >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                 <line x1="4" y1="21" x2="4" y2="14" />
@@ -206,7 +207,7 @@ export default function HomePage() {
                 <line x1="9" y1="8" x2="15" y2="8" />
                 <line x1="17" y1="16" x2="23" y2="16" />
             </svg>
-            Customize
+            <span className="max-md:hidden">Customize</span>
         </button>
     );
 
@@ -226,7 +227,7 @@ export default function HomePage() {
     const effectiveTab: HomeTab = tabDefinitions.some(t => t.key === activeTab) ? activeTab : 'overview';
 
     const tabBar = (
-        <div className="px-8 pt-4">
+        <div className="px-8 max-md:px-4 pt-4">
             <Tabs<HomeTab>
                 tabs={tabDefinitions}
                 active={effectiveTab}
@@ -252,7 +253,7 @@ export default function HomePage() {
         return (
             <div className="min-h-full pb-20">
                 {tabBar}
-                <div className="p-8">
+                <div className="p-8 max-md:p-4">
                     <div className="vora-skeleton mb-8 h-24" />
                     <div className="vora-skeleton mb-8 h-48" />
                     <div className="vora-skeleton mb-8 h-48" />

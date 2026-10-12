@@ -60,7 +60,7 @@ export default function UserManagementPage() {
         return (
             <div data-vora-page="">
                 <PageHeader title="Users & Access" description="Manage accounts, profiles, and library permissions." />
-                <div className="p-8 max-w-6xl mx-auto">
+                <div className="p-8 max-md:p-4 max-w-6xl mx-auto">
                     <div className="vora-skeleton h-32" />
                 </div>
             </div>
@@ -79,7 +79,7 @@ export default function UserManagementPage() {
                 }
             />
 
-            <div className="p-8 max-w-6xl mx-auto space-y-10">
+            <div className="p-8 max-md:p-4 max-w-6xl mx-auto space-y-10">
                 <SignUpCard serverId={serverId} invitationsPath={serverId ? `/admin/server/${serverId}/invitations` : '/admin/invitations'} />
 
                 <section className="space-y-4">
@@ -235,7 +235,7 @@ function ShowtimesLocationModal({ profile, serverId, onClose, onSaved }: Showtim
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--vora-bg-overlay)] p-4">
             <div className="bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-[var(--vora-radius-md)] max-w-md w-full">
                 <div className="p-5 border-b border-[var(--vora-border-subtle)]">
                     <h2 className="text-base font-semibold text-[var(--vora-text-primary)]">Movie showtimes location</h2>

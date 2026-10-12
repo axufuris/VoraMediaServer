@@ -13,14 +13,15 @@ interface TopAppBarProps {
 export default function TopAppBar({ onToggleSidebar, onOpenSearch }: TopAppBarProps) {
     return (
         <header
-            className="h-[var(--vora-shell-topbar-h)] shrink-0 bg-[var(--vora-bg-surface)] border-b border-[var(--vora-border-subtle)] flex items-center px-4 gap-3"
+            className="h-[var(--vora-shell-topbar-h)] shrink-0 bg-[var(--vora-bg-surface)] border-b border-[var(--vora-border-subtle)] flex items-center px-4 gap-3 max-md:px-2 max-md:gap-1"
         >
             {onToggleSidebar && (
                 <button
                     type="button"
                     onClick={onToggleSidebar}
-                    className="p-2 rounded-[var(--vora-radius-md)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)] cursor-pointer transition-colors lg:hidden"
-                    title="Toggle navigation"
+                    className="p-2 rounded-[var(--vora-radius-md)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)] cursor-pointer transition-colors md:hidden"
+                    title="Open navigation"
+                    aria-label="Open navigation"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </button>

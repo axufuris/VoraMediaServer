@@ -5,6 +5,7 @@ import MusicPlaylistView from './MusicPlaylistView';
 import PlaylistCover from '../../../components/Collections/PlaylistCover';
 import { playlistTileArt } from '../../../utils/playlistArt';
 import type { PlaylistDetailsVM, PlaylistItemVM } from '../../../api/Collections/playlistService';
+import type { TouchReorder } from '../../../hooks/useTouchReorder';
 
 const song = (n: number, overrides: Partial<PlaylistItemVM> = {}): PlaylistItemVM => ({
     id: `i${n}`, mediaItemId: `t${n}`, order: n, title: `Song ${n}`, type: 'Track',
@@ -16,6 +17,12 @@ const playlist = (overrides: Partial<PlaylistDetailsVM> = {}): PlaylistDetailsVM
     id: 'p1', name: 'TEST', mediaType: 'Music', itemCount: 2, posterUrls: ['/a.jpg'], backdropUrls: [],
     isShared: true, isOwner: true, ownerName: 'Andy', items: [song(1), song(2)], ...overrides,
 });
+
+const noTouchReorder: TouchReorder = {
+    drag: null,
+    handleProps: () => ({ onPointerDown: vi.fn() }),
+    rowStyle: () => undefined,
+};
 
 const renderView = (p: PlaylistDetailsVM, handlers: { onPlay?: (i: number, s: boolean) => void; onQueue?: (i: number | null, next: boolean) => void; onRemove?: (id: string) => void } = {}) => render(
     <MemoryRouter>
@@ -30,6 +37,7 @@ const renderView = (p: PlaylistDetailsVM, handlers: { onPlay?: (i: number, s: bo
             onDragStart={vi.fn()}
             onDragOver={vi.fn()}
             onDrop={vi.fn()}
+            touchReorder={noTouchReorder}
         />
     </MemoryRouter>,
 );

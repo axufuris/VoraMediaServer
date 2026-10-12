@@ -397,7 +397,7 @@ export default function PodcastsTab() {
             {contextMenu && (
                 <div
                     style={{ top: contextMenu.y, left: contextMenu.x }}
-                    className="fixed z-[9999] bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded-md shadow-2xl py-1 w-52 text-sm"
+                    className="fixed z-[9999] bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded-md shadow-[var(--vora-shadow-overlay)] py-1 w-52 text-sm"
                     onClick={e => e.stopPropagation()}
                 >
                     {!contextMenu.isPlayed && (
@@ -435,7 +435,7 @@ export default function PodcastsTab() {
                         <button
                             onClick={() => subscribeToFeed(trimmedQuery)}
                             disabled={isSubscribingDirect || !trimmedQuery}
-                            className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-500)] disabled:opacity-50 text-[var(--vora-text-primary)] font-bold rounded transition-colors cursor-pointer"
+                            className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-accent-contrast)] font-bold rounded transition-colors cursor-pointer"
                         >
                             {isSubscribingDirect ? 'Adding...' : 'Subscribe'}
                         </button>
@@ -472,7 +472,7 @@ export default function PodcastsTab() {
                                             <button
                                                 onClick={() => subscribeToFeed(result.feedUrl)}
                                                 disabled={isAdding}
-                                                className="text-xs px-3 py-1.5 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-500)] disabled:opacity-50 text-[var(--vora-text-primary)] font-bold rounded transition-colors cursor-pointer shrink-0"
+                                                className="text-xs px-3 py-1.5 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-accent-contrast)] font-bold rounded transition-colors cursor-pointer shrink-0"
                                             >
                                                 {isAdding ? 'Adding...' : 'Subscribe'}
                                             </button>
@@ -490,22 +490,22 @@ export default function PodcastsTab() {
                 <div className="text-[var(--vora-text-muted)] py-12 text-center">Loading subscriptions...</div>
             ) : (
                 <>
-                    <div className="flex items-center gap-2 mb-6">
+                    <div className="flex items-center gap-2 mb-6 max-md:flex-wrap">
                         <button
                             onClick={() => switchViewMode('subscriptions')}
-                            className={`px-4 py-2 text-sm font-bold rounded transition-colors cursor-pointer ${viewMode === 'subscriptions' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-sunken)]/60 text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-surface)]'}`}
+                            className={`px-4 py-2 text-sm font-bold rounded transition-colors cursor-pointer max-md:whitespace-nowrap ${viewMode === 'subscriptions' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-sunken)]/60 text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-surface)]'}`}
                         >
                             Subscriptions
                         </button>
                         <button
                             onClick={() => switchViewMode('recent')}
-                            className={`px-4 py-2 text-sm font-bold rounded transition-colors cursor-pointer ${viewMode === 'recent' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-sunken)]/60 text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-surface)]'}`}
+                            className={`px-4 py-2 text-sm font-bold rounded transition-colors cursor-pointer max-md:whitespace-nowrap ${viewMode === 'recent' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-sunken)]/60 text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-surface)]'}`}
                         >
                             New Episodes
                         </button>
                         <button
                             onClick={() => switchViewMode('catalog')}
-                            className={`px-4 py-2 text-sm font-bold rounded transition-colors cursor-pointer ${viewMode === 'catalog' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-sunken)]/60 text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-surface)]'}`}
+                            className={`px-4 py-2 text-sm font-bold rounded transition-colors cursor-pointer max-md:whitespace-nowrap ${viewMode === 'catalog' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-sunken)]/60 text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-surface)]'}`}
                         >
                             Browse Catalog
                         </button>
@@ -559,7 +559,7 @@ export default function PodcastsTab() {
                                         )}
                                         <div className="flex-1 min-w-0">
                                             <div className="text-xs text-[var(--vora-accent-text)] font-bold uppercase tracking-wider truncate">{ep.showTitle}</div>
-                                            <div className={`font-bold text-sm truncate ${ep.isPlayed ? 'text-[var(--vora-text-secondary)] line-through decoration-gray-600' : 'text-[var(--vora-text-primary)] group-hover:text-[var(--vora-text-primary)]'}`}>{ep.title}</div>
+                                            <div className={`font-bold text-sm truncate ${ep.isPlayed ? 'text-[var(--vora-text-secondary)] line-through decoration-[var(--vora-text-disabled)]' : 'text-[var(--vora-text-primary)] group-hover:text-[var(--vora-text-primary)]'}`}>{ep.title}</div>
                                             <div className="text-xs text-[var(--vora-text-muted)] mt-0.5">
                                                 {formatPublished(ep.publishedAt)}
                                                 {ep.durationSeconds ? ` • ${formatDuration(ep.durationSeconds)}` : ''}
@@ -644,7 +644,7 @@ export default function PodcastsTab() {
                                                 <button
                                                     onClick={() => target && subscribeFromCatalog(item.feedUrl, target.serverId)}
                                                     disabled={isAdding || !target}
-                                                    className="text-xs px-3 py-1.5 font-bold rounded transition-colors shrink-0 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-500)] disabled:opacity-50 text-[var(--vora-text-primary)] cursor-pointer"
+                                                    className="text-xs px-3 py-1.5 font-bold rounded transition-colors shrink-0 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-accent-contrast)] cursor-pointer"
                                                 >
                                                     {isAdding ? 'Adding...' : 'Subscribe'}
                                                 </button>
@@ -656,13 +656,13 @@ export default function PodcastsTab() {
                                                             setCatalogDropdownFor(dropdownOpen ? null : item.feedUrl);
                                                         }}
                                                         disabled={isAdding || !target}
-                                                        className="text-xs px-3 py-1.5 font-bold rounded transition-colors bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-500)] disabled:opacity-50 text-[var(--vora-text-primary)] cursor-pointer flex items-center gap-1.5"
+                                                        className="text-xs px-3 py-1.5 font-bold rounded transition-colors bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-accent-contrast)] cursor-pointer flex items-center gap-1.5"
                                                     >
                                                         {isAdding ? 'Adding...' : `Subscribe on ${target?.serverName ?? '...'}`}
                                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                                                     </button>
                                                     {dropdownOpen && (
-                                                        <div className="absolute right-0 top-full mt-1 z-20 bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded-md shadow-2xl py-1 min-w-[180px]">
+                                                        <div className="absolute right-0 top-full mt-1 z-20 bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded-md shadow-[var(--vora-shadow-overlay)] py-1 min-w-[180px]">
                                                             {item.availableOn.map(a => (
                                                                 <button
                                                                     key={a.serverId}
@@ -775,7 +775,7 @@ export default function PodcastsTab() {
                                                         <svg className="w-8 h-8 text-[var(--vora-accent-text)] shrink-0 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                                                     )}
                                                     <div className="flex-1 min-w-0">
-                                                        <div className={`font-bold text-sm truncate ${ep.isPlayed ? 'text-[var(--vora-text-secondary)] line-through decoration-gray-600' : 'text-[var(--vora-text-primary)] group-hover:text-[var(--vora-text-primary)]'}`}>{ep.title}</div>
+                                                        <div className={`font-bold text-sm truncate ${ep.isPlayed ? 'text-[var(--vora-text-secondary)] line-through decoration-[var(--vora-text-disabled)]' : 'text-[var(--vora-text-primary)] group-hover:text-[var(--vora-text-primary)]'}`}>{ep.title}</div>
                                                         <div className="text-xs text-[var(--vora-text-muted)] mt-0.5">
                                                             {formatPublished(ep.publishedAt)}
                                                             {ep.durationSeconds ? ` • ${formatDuration(ep.durationSeconds)}` : ''}

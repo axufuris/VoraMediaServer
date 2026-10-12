@@ -34,7 +34,7 @@ export default function SettingsPage() {
                 subtitle="Personalize Vora for this profile. Most changes save automatically."
             />
 
-            <div className="px-8">
+            <div className="px-8 max-md:px-4">
                 <Tabs<SettingsTabKey>
                     tabs={[
                         { key: 'templates', label: 'Templates' },
@@ -48,7 +48,7 @@ export default function SettingsPage() {
                 />
             </div>
 
-            <div className="px-8 pt-6">
+            <div className="px-8 max-md:px-4 pt-6">
                 {activeTab === 'templates' && <TemplatesTab />}
                 {activeTab === 'playback' && <PlaybackTab activeProfileId={activeProfileId} serverId={serverId} onSaved={onSaved} />}
                 {activeTab === 'providers' && <ProvidersTab activeProfileId={activeProfileId} serverId={serverId} onSaved={onSaved} />}

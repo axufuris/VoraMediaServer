@@ -43,9 +43,9 @@ export default function ActivityPill() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--vora-accent-500)]"></span>
             </span>
             <span className="text-xs font-semibold text-[var(--vora-text-primary)] tabular-nums">{streamCount}</span>
-            <span className="text-xs text-[var(--vora-text-muted)]">streaming</span>
+            <span className="text-xs text-[var(--vora-text-muted)] max-md:hidden">streaming</span>
             {transcodeCount > 0 && (
-                <span className="text-xs text-[var(--vora-text-muted)] border-l border-[var(--vora-border-subtle)] pl-2">
+                <span className="text-xs text-[var(--vora-text-muted)] border-l border-[var(--vora-border-subtle)] pl-2 max-md:hidden">
                     <span className="font-semibold text-[var(--vora-text-primary)] tabular-nums">{transcodeCount}</span> transcoding
                 </span>
             )}

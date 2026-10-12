@@ -25,7 +25,7 @@ export default function GuideProgramModal({
     return (
         <div
             className="fixed inset-0 z-[99999] flex items-center justify-center p-4 backdrop-blur-md"
-            style={{ background: 'rgba(0, 0, 0, 0.78)' }}
+            style={{ background: 'var(--vora-bg-overlay)' }}
         >
             <div
                 className="w-full max-w-md overflow-hidden rounded-2xl p-6"
@@ -56,9 +56,9 @@ export default function GuideProgramModal({
                                 type="button"
                                 onClick={onRecordEpisode}
                                 className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md py-3 text-sm font-semibold transition-colors"
-                                style={{ background: 'var(--vora-danger-500)', color: '#ffffff' }}
+                                style={{ background: 'var(--vora-danger-500)', color: 'var(--vora-text-primary)' }}
                             >
-                                <span className="h-2.5 w-2.5 rounded-full bg-white" />
+                                <span className="h-2.5 w-2.5 rounded-full bg-current" />
                                 Record this episode
                             </button>
 

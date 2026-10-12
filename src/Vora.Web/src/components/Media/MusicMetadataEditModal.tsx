@@ -852,11 +852,11 @@ function ArtworkSection({ label, shape, artworkUrl, onUrlChange, onUploadClick, 
                                     key={`${s.url}-${i}`}
                                     type="button"
                                     onClick={() => onUrlChange(s.url)}
-                                    className={`relative aspect-square rounded overflow-hidden border-2 transition-all cursor-pointer ${artworkUrl === s.url ? 'border-orange-500 ring-2 ring-orange-500/40' : 'border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-strong)]'}`}
+                                    className={`relative aspect-square rounded overflow-hidden border-2 transition-all cursor-pointer ${artworkUrl === s.url ? 'border-[var(--vora-accent-500)] ring-2 ring-[color-mix(in_srgb,var(--vora-accent-500)_40%,transparent)]' : 'border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-strong)]'}`}
                                     title={`${s.providerName}${s.width && s.height ? ` — ${s.width}×${s.height}` : ''}`}
                                 >
                                     <img src={s.thumbnailUrl || s.url} alt="" className="w-full h-full object-cover" />
-                                    <div className="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-[var(--vora-text-secondary)] py-0.5 px-1 text-center truncate">{s.providerName}</div>
+                                    <div className="absolute bottom-0 inset-x-0 bg-[color-mix(in_srgb,var(--vora-bg-canvas)_70%,transparent)] text-[10px] text-[var(--vora-text-secondary)] py-0.5 px-1 text-center truncate">{s.providerName}</div>
                                 </button>
                             ))}
                         </div>

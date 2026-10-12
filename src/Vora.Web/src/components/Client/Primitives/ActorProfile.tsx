@@ -47,7 +47,7 @@ function ageFrom(birthday?: string | null, deathday?: string | null): number | n
 function CreditSection({ title, subtitle, credits }: { title: string; subtitle: string; credits: ActorCredit[] }) {
     if (credits.length === 0) return null;
     return (
-        <div className="mt-16 px-12">
+        <div className="mt-16 px-12 max-md:mt-10 max-md:px-4">
             <MediaGrid title={title} subtitle={subtitle}>
                 {credits.map(credit => (
                     <MediaCard
@@ -88,8 +88,8 @@ export default function ActorProfile({
             </div>
 
             <div className="relative z-10 pt-8">
-                <div className="grid gap-10 px-12 md:grid-cols-[16.25rem_1fr]">
-                    <div className="shrink-0">
+                <div className="grid gap-10 px-12 max-md:gap-5 max-md:px-4 md:grid-cols-[16.25rem_1fr]">
+                    <div className="shrink-0 max-md:w-36">
                         <div
                             className="relative aspect-[2/3] overflow-hidden"
                             style={{

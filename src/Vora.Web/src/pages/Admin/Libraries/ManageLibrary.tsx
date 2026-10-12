@@ -96,9 +96,9 @@ function MarkerCoverageCard({ libraryId, libraryType, serverId }: { libraryId: s
 
     return (
         <div className="vora-card p-5 space-y-4">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start max-md:gap-3">
                 <h2 className="text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Marker coverage</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 max-md:flex-wrap">
                     <button
                         type="button"
                         onClick={load}
@@ -189,9 +189,9 @@ function ThumbnailCoverageCard({ libraryId, libraryType, enabled, serverId }: { 
 
     return (
         <div className="vora-card p-5 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between max-md:flex-col max-md:items-start max-md:gap-3">
                 <h2 className="text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Video preview thumbnails</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 max-md:flex-wrap">
                     <button type="button" onClick={load} disabled={loading} className="vora-button-secondary text-xs disabled:opacity-50">
                         {loading ? 'Refreshing…' : 'Refresh'}
                     </button>
@@ -274,7 +274,7 @@ export default function ManageLibrary() {
         return (
             <div data-vora-page="">
                 <PageHeader title="Manage Library" />
-                <div className="p-8 max-w-5xl mx-auto"><div className="vora-skeleton h-64" /></div>
+                <div className="p-8 max-md:p-4 max-w-5xl mx-auto"><div className="vora-skeleton h-64" /></div>
             </div>
         );
     }
@@ -373,14 +373,14 @@ export default function ManageLibrary() {
                 }
             />
 
-            <div className="px-8 pb-10 max-w-5xl mx-auto pt-6 space-y-6">
+            <div className="px-8 max-md:px-4 pb-10 max-w-5xl mx-auto pt-6 space-y-6">
                 <div className="vora-card p-5 flex flex-wrap gap-2">
                     <button
                         type="button"
                         onClick={handleToggleWatch}
                         className={`px-4 py-2 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer ${library.isBeingWatched
-                            ? 'bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)] hover:bg-[var(--vora-danger-500)] hover:text-white'
-                            : 'bg-[var(--vora-success-soft)] text-[var(--vora-success-text)] hover:bg-[var(--vora-success-500)] hover:text-white'}`}
+                            ? 'bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)]'
+                            : 'bg-[var(--vora-success-soft)] text-[var(--vora-success-text)] hover:bg-[var(--vora-success-500)] hover:text-[var(--vora-text-primary)]'}`}
                     >
                         {library.isBeingWatched ? 'Stop watching' : 'Start watching'}
                     </button>
@@ -536,7 +536,7 @@ export default function ManageLibrary() {
                                 <button
                                     type="button"
                                     onClick={() => handleRemovePath(path)}
-                                    className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-white transition-colors cursor-pointer shrink-0"
+                                    className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer shrink-0"
                                 >
                                     Remove
                                 </button>
@@ -657,7 +657,7 @@ export default function ManageLibrary() {
                         <button
                             type="button"
                             onClick={handleDelete}
-                            className="px-5 py-2 rounded-[var(--vora-radius-md)] text-sm font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-white transition-colors cursor-pointer"
+                            className="px-5 py-2 rounded-[var(--vora-radius-md)] text-sm font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer"
                         >
                             Delete library
                         </button>

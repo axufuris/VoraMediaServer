@@ -10,15 +10,15 @@ export function PlayPauseButton({ isPlaying, onClick, size = 'lg', tone = 'accen
     const dimension = isSmall ? 40 : 64;
     const iconSize = isSmall ? 18 : 28;
 
-    const background = tone === 'accent' ? 'var(--vora-accent-500)' : '#ffffff';
-    const color = tone === 'accent' ? 'var(--vora-accent-contrast)' : '#0a0a0e';
+    const background = tone === 'accent' ? 'var(--vora-accent-500)' : 'var(--vora-text-primary)';
+    const color = tone === 'accent' ? 'var(--vora-accent-contrast)' : 'var(--vora-bg-canvas)';
 
     return (
         <button
             type="button"
             onClick={onClick}
             aria-label={isPlaying ? 'Pause' : 'Play'}
-            className="flex cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105"
+            className="flex cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105 max-md:shrink-0"
             style={{
                 width: dimension,
                 height: dimension,
@@ -57,7 +57,7 @@ export function SkipButton({ seconds, onClick, size = 'lg', direction }: SkipBut
                 onClick={onClick}
                 title={title}
                 aria-label={title}
-                className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-white/10"
+                className="cursor-pointer rounded-full p-1.5 vora-icon-button transition-colors"
                 style={{ color: 'var(--vora-text-secondary)' }}
             >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d={path} /></svg>
@@ -70,8 +70,8 @@ export function SkipButton({ seconds, onClick, size = 'lg', direction }: SkipBut
             onClick={onClick}
             title={title}
             aria-label={title}
-            className="relative cursor-pointer rounded-full p-1.5 transition-colors hover:bg-white/10"
-            style={{ color: '#fafafa' }}
+            className="relative cursor-pointer rounded-full p-1.5 vora-icon-button transition-colors"
+            style={{ color: 'var(--vora-text-primary)' }}
         >
             <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><path d={path} /></svg>
             <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] font-bold" style={{ marginTop: 4 }}>{seconds}</span>
@@ -92,8 +92,8 @@ export function VolumeControl({ value, onChange }: VolumeControlProps) {
                 type="button"
                 aria-label={isMuted ? 'Unmute' : 'Mute'}
                 onClick={() => onChange(isMuted ? 0.7 : 0)}
-                className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-white/10"
-                style={{ color: '#fafafa' }}
+                className="cursor-pointer rounded-full p-1.5 vora-icon-button transition-colors"
+                style={{ color: 'var(--vora-text-primary)' }}
             >
                 {isMuted ? (
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -141,8 +141,8 @@ export function FullscreenButton({ onClick }: FullscreenButtonProps) {
             onClick={onClick}
             title="Toggle fullscreen"
             aria-label="Toggle fullscreen"
-            className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-white/10"
-            style={{ color: '#fafafa' }}
+            className="cursor-pointer rounded-full p-1.5 vora-icon-button transition-colors"
+            style={{ color: 'var(--vora-text-primary)' }}
         >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M8 3H5a2 2 0 0 0-2 2v3" />
@@ -169,8 +169,8 @@ export function SubtitlesButton({ onClick, isActive }: SubtitlesButtonProps) {
             title="Subtitles"
             aria-label="Subtitles"
             aria-pressed={isActive}
-            className="cursor-pointer rounded-full p-2 transition-colors hover:bg-white/10"
-            style={{ color: isActive ? 'var(--vora-accent-500)' : '#fafafa' }}
+            className="cursor-pointer rounded-full p-2 vora-icon-button transition-colors"
+            style={{ color: isActive ? 'var(--vora-accent-500)' : 'var(--vora-text-primary)' }}
         >
             {/* Filled badge with the two Cs punched out, which stays legible at
                 button size where a stroked outline of the same shape muddies.
@@ -193,7 +193,7 @@ export function MaximizeButton({ onClick }: MaximizeButtonProps) {
             onClick={onClick}
             title="Expand player"
             aria-label="Expand player"
-            className="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-white/10"
+            className="cursor-pointer rounded-full p-1.5 vora-icon-button transition-colors"
             style={{ color: 'var(--vora-text-secondary)' }}
         >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -226,10 +226,8 @@ export function EpisodeNavButton({ direction, onClick, disabled, title, size = '
             disabled={disabled}
             title={title ?? (isPrev ? 'Previous episode' : 'Next episode')}
             aria-label={title ?? (isPrev ? 'Previous episode' : 'Next episode')}
-            className={`flex ${dimension} cursor-pointer items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-30`}
+            className={`vora-icon-button flex ${dimension} cursor-pointer items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-30`}
             style={{ color: 'var(--vora-text-primary)' }}
-            onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
             <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 {isPrev ? (
