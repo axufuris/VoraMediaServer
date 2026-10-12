@@ -9,10 +9,25 @@ How subtitles reach the screen: the subtitle strategy a play decision picks, and
 | Value | When | How it reaches the player |
 |---|---|---|
 | `None` | no subtitle selected | — |
-| `BurnIn` | image subtitle — `pgssub`, `hdmv_pgs_subtitle`, `dvd_subtitle`, `vobsub` | painted into the video by FFmpeg (`-vf subtitles=`), which forces a video transcode |
+| `BurnIn` | image subtitle — `pgssub`, `hdmv_pgs_subtitle`, `dvd_subtitle`, `vobsub` | drawn onto the video by an FFmpeg `overlay` (below), which forces a video transcode |
 | `DirectPlay` | anything else (text: `subrip`, `ass`, `mov_text`, …) | WebVTT from the subtitle route, below |
 
-Burn-in runs on CPU only, so it is excluded from the full-GPU pipeline.
+### Burn-in
+
+`BuildFFmpegArguments` draws the picked image track with an `overlay` in `-filter_complex` and maps `[v]` instead of the source video:
+
+```
+[0:V]scale…,tonemap…[main];[0:S][main]scale2ref=…[sub][base];[base][sub]overlay=x=(W-w)/2:y=H-h:eof_action=pass:repeatlast=0[,upload][v]
+```
+
+It used to pass `-vf subtitles=`, which is libass and draws text only. FFmpeg refused every PGS or VobSub track ("Not yet implemented in FFmpeg, patches welcome"), so image burn-in never worked.
+
+- **The overlay comes last**, after the scale and the HDR tone map, so the subtitle is drawn at the output size and in SDR colours.
+- **The subtitle canvas is fitted, not stretched.** A PGS canvas is the disc's full frame. On a remux with the black bars cropped (1920×800 under a 1920×1080 canvas), stretching would squash the text, so `scale2ref` fits the canvas inside the frame keeping its shape, and the overlay pins it to the bottom centre where subtitles sit. Inside `scale2ref`, `iw`/`ih` are the **video's** size and `main_w`/`main_h` the subtitle's, which is also why its `force_original_aspect_ratio` can't do this. `scale2ref` is deprecated in FFmpeg 7.1 in favour of `scale=rw:rh`, which 6.x doesn't have; it still works.
+- **An external VobSub is a second input.** `SubtitleInput` reads a `.sub` through its `.idx` when there is one, because the palette and canvas size live there. FFmpeg rebases every input to start at 0, which would pull a subtitle file's first line to the start of the video, so the file is opened with `-isync 0` to stay on the video's clock. It gets no `-ss` of its own: seeking both inputs hung FFmpeg, and `-isync` already applies the video's seek, so a line on screen at the seek point still shows.
+- **An embedded line already on screen at a seek point is skipped.** Its packet lies before the seek, so subtitles resume from the next line.
+- **Burn-in runs on the CPU**, so it is excluded from the full-GPU pipeline: GPU decode hands frames to system memory, and a GPU encoder gets them back after the overlay (`docs/hardware-acceleration.md`).
+- `ImageSubtitleBurnInTests` draws a generated PGS box (`PgsSubtitleFile`) with a real FFmpeg and checks the pixels in each segment, for an embedded track and an external file, from the start and after a seek. They skip without FFmpeg on PATH; the PR check installs it.
 
 ### Which track plays when nobody picked one
 
@@ -67,7 +82,7 @@ ffmpeg -hide_banner -loglevel warning -y [-sub_charenc CP1252] -i <sidecar> -c:s
 
 A **`.vtt` sidecar is copied**, not converted. Any other sidecar is converted with no `-map` — it has one stream and that stream is the subtitle. FFmpeg assumes UTF-8 and gives up on anything else, which legacy `.srt` files routinely are, so a failed first pass is retried as `CP1252` rather than leaving the track permanently unusable. The first pass deliberately names **no** encoding: guessing one for a file that is already UTF-8 corrupts it. Neither the encoding retry nor the embedded `0:s:N` retry runs when FFmpeg could not open the input at all (`Error opening input`, `InputCouldNotBeOpened`): no option fixes a file it cannot read. A sidecar with no text (zero bytes, or only byte-order marks, blank lines and padding: `SubtitleFileContent.HasText`) is never handed to FFmpeg; it fails at once with one "is empty" warning and gets the usual `.failed` marker. Failure warnings carry FFmpeg's own error lines, not its banner, cut to the last 2,000 characters.
 
-An external **image** subtitle (`.sub`/`.idx`) has no text to convert and can only be burned in. `PlaybackDecisionVM.SelectedSubtitleExternalPath` carries the path so `-vf subtitles=` points at the sidecar; without it the filter would be handed the video and burn in the wrong track, or none.
+An external **image** subtitle (`.sub`/`.idx`) has no text to convert and can only be burned in. `PlaybackDecisionVM.SelectedSubtitleExternalPath` carries the path so the burn-in opens the sidecar as a second input (see Burn-in); without it the transcode would look for the track inside the video.
 
 - **`-map 0:<streamIndex>` is the absolute stream index**, the same form `BuildFFmpegArguments` uses for video and audio. `MediaSubtitleTrack.StreamIndex` is the stream's index in the file, not its position among subtitles. `0:s:N` means something different and would pick the wrong track whenever the subtitle isn't the Nth subtitle.
 - **`-f webvtt` names the muxer explicitly** rather than letting FFmpeg infer it from the `.vtt` extension.

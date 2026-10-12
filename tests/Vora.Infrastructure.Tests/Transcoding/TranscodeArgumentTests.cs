@@ -10,7 +10,9 @@ public class TranscodeArgumentTests
     private const string Keyframes = "-force_key_frames expr:gte(t,n_forced*4)";
     private const string Vaapi = "-init_hw_device vaapi=va:/dev/dri/renderD128 -filter_hw_device va";
     private const string QuickSync = "-init_hw_device vaapi=va:/dev/dri/renderD128 -init_hw_device qsv=qs@va -filter_hw_device va";
-    private const string BurnIn = "subtitles='/media/movies/Heat (1995)/Heat.mkv'";
+    private const string Fit = "scale2ref=w='trunc(main_w*min(iw/main_w,ih/main_h)/2)*2':h='trunc(main_h*min(iw/main_w,ih/main_h)/2)*2'";
+    private const string Overlay = "overlay=x=(W-w)/2:y=H-h:eof_action=pass:repeatlast=0";
+    private const string BurnInScaled = $"-i /media/movies/Heat (1995)/Heat.mkv -filter_complex [0:0]scale=-2:720[main];[0:3][main]{Fit}[sub][base];[base][sub]{Overlay}";
 
     [Fact]
     public void A_cpu_transcode_encodes_with_x264()
@@ -30,28 +32,28 @@ public class TranscodeArgumentTests
     public void Nvidia_keeps_frames_on_the_gpu_from_decode_to_nvenc()
     {
         Build(Transcode(), EncodeOn(Nvidia), JellyfinHost)
-            .Should().Be($"-hwaccel cuda -hwaccel_output_format cuda -filter_threads 0 -filter_complex_threads 0 {Input} -c:v h264_nvenc -preset p4 -tune hq {Keyframes} -vf scale_cuda=iw:ih:format=nv12" + HlsTail);
+            .Should().Be($"-hwaccel cuda -hwaccel_output_format cuda -filter_threads 0 -filter_complex_threads 0 {Input} -c:v h264_nvenc -preset p4 -tune hq -forced-idr 1 {Keyframes} -vf scale_cuda=iw:ih:format=nv12" + HlsTail);
     }
 
     [Fact]
     public void Nvidia_hevc_scales_on_the_gpu_and_caps_the_bitrate()
     {
         Build(Transcode(VideoCodec.Hevc, outputHeight: 1080, bandwidthKbps: 8000), EncodeOn(Nvidia with { Device = "0" }), JellyfinHost)
-            .Should().Be($"-hwaccel cuda -hwaccel_output_format cuda -hwaccel_device 0 -filter_threads 0 -filter_complex_threads 0 {Input} -c:v hevc_nvenc -preset p4 -tune hq -rc vbr -cq 28 -qmin 28 -qmax 34 {Keyframes} -vf scale_cuda=-2:1080:format=p010le -maxrate 8000k -bufsize 480000k" + HlsTail);
+            .Should().Be($"-hwaccel cuda -hwaccel_output_format cuda -hwaccel_device 0 -filter_threads 0 -filter_complex_threads 0 {Input} -c:v hevc_nvenc -preset p4 -tune hq -forced-idr 1 -rc vbr -cq 28 -qmin 28 -qmax 34 {Keyframes} -vf scale_cuda=-2:1080:format=p010le -maxrate 8000k -bufsize 480000k" + HlsTail);
     }
 
     [Fact]
     public void Nvidia_tonemaps_hdr_with_cuda_on_jellyfin_ffmpeg()
     {
         Build(Transcode(hdr: "HDR10", outputHeight: 1080), EncodeOn(Nvidia), JellyfinHost)
-            .Should().Be($"-hwaccel cuda -hwaccel_output_format cuda -filter_threads 0 -filter_complex_threads 0 {Input} -c:v h264_nvenc -preset p4 -tune hq {Keyframes} -vf scale_cuda=-2:1080:format=p010le,tonemap_cuda=tonemap=hable:format=nv12:peak=1000" + HlsTail);
+            .Should().Be($"-hwaccel cuda -hwaccel_output_format cuda -filter_threads 0 -filter_complex_threads 0 {Input} -c:v h264_nvenc -preset p4 -tune hq -forced-idr 1 {Keyframes} -vf scale_cuda=-2:1080:format=p010le,tonemap_cuda=tonemap=hable:format=nv12:peak=1000" + HlsTail);
     }
 
     [Fact]
     public void Nvidia_without_a_gpu_tonemap_downloads_and_tonemaps_on_the_cpu()
     {
         Build(Transcode(hdr: "HDR10"), EncodeOn(Nvidia), PlainHost)
-            .Should().Be($"-hwaccel cuda -hwaccel_output_format cuda -filter_threads 0 -filter_complex_threads 0 {Input} -c:v h264_nvenc -preset p4 -tune hq {Keyframes} -vf scale_cuda=-2:1080:format=p010le,hwdownload,format=p010le,zscale=p=bt709:t=bt709:m=bt709:r=tv:d=ordered,format=yuv420p" + HlsTail);
+            .Should().Be($"-hwaccel cuda -hwaccel_output_format cuda -filter_threads 0 -filter_complex_threads 0 {Input} -c:v h264_nvenc -preset p4 -tune hq -forced-idr 1 {Keyframes} -vf scale_cuda=-2:1080:format=p010le,hwdownload,format=p010le,zscale=p=bt709:t=bt709:m=bt709:r=tv:d=ordered,format=yuv420p" + HlsTail);
     }
 
     [Fact]
@@ -62,17 +64,31 @@ public class TranscodeArgumentTests
     }
 
     [Fact]
-    public void Burned_in_subtitles_share_one_filter_chain_with_the_scale_on_nvidia()
+    public void Nvidia_burns_image_subtitles_in_with_an_overlay_after_scaling()
     {
         Build(Transcode(outputHeight: 720, burnIn: true), EncodeOn(Nvidia), JellyfinHost)
-            .Should().Be($"-hwaccel cuda {Input} -c:v h264_nvenc -preset p4 -tune hq -pix_fmt yuv420p {Keyframes} -vf scale=-2:720,{BurnIn}" + HlsTail);
+            .Should().Be($"-hwaccel cuda {BurnInScaled}[v] -map [v] -map 0:1 -sn -c:v h264_nvenc -preset p4 -tune hq -forced-idr 1 -pix_fmt yuv420p {Keyframes}" + HlsTail);
     }
 
     [Fact]
-    public void Burned_in_subtitles_share_one_filter_chain_with_the_scale_on_the_cpu()
+    public void The_cpu_burns_image_subtitles_in_with_an_overlay_after_scaling()
     {
         Build(Transcode(outputHeight: 720, burnIn: true), hardware: null, JellyfinHost)
-            .Should().Be($"{Input} -c:v libx264 -preset veryfast -pix_fmt yuv420p {Keyframes} -vf scale=-2:720,{BurnIn}" + HlsTail);
+            .Should().Be($"{BurnInScaled}[v] -map [v] -map 0:1 -sn -c:v libx264 -preset veryfast -pix_fmt yuv420p {Keyframes}" + HlsTail);
+    }
+
+    [Fact]
+    public void Hdr_is_tonemapped_before_the_subtitles_go_on()
+    {
+        Build(Transcode(hdr: "HDR10", outputHeight: 1080, burnIn: true), hardware: null, JellyfinHost)
+            .Should().Be($"-i /media/movies/Heat (1995)/Heat.mkv -filter_complex [0:0]scale=-2:1080,zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p[main];[0:3][main]{Fit}[sub][base];[base][sub]{Overlay}[v] -map [v] -map 0:1 -sn -c:v libx264 -preset veryfast -pix_fmt yuv420p {Keyframes}" + HlsTail);
+    }
+
+    [Fact]
+    public void An_external_vobsub_is_a_second_input_kept_on_the_videos_clock_after_a_seek()
+    {
+        Build(Transcode(burnIn: true, externalSubtitle: "/media/movies/Heat (1995)/Heat.en.sub"), hardware: null, JellyfinHost, startSegment: 10)
+            .Should().Be($"-ss 40.000 -i /media/movies/Heat (1995)/Heat.mkv -isync 0 -i /media/movies/Heat (1995)/Heat.en.sub -filter_complex [1:s:0][0:0]{Fit}[sub][base];[base][sub]{Overlay}[v] -map [v] -map 0:1 -sn -c:v libx264 -preset veryfast -pix_fmt yuv420p {Keyframes} -c:a copy -output_ts_offset 40.000 -f hls -hls_time 4 -hls_playlist_type vod -hls_list_size 0 -hls_flags independent_segments+temp_file -hls_segment_filename /transcode/heat_%d.ts -start_number 10 /transcode/_ffmpeg_heat.m3u8");
     }
 
     [Fact]
@@ -121,14 +137,14 @@ public class TranscodeArgumentTests
     public void Quick_sync_burns_subtitles_in_on_the_cpu_and_encodes_on_the_gpu()
     {
         Build(Transcode(outputHeight: 720, burnIn: true), EncodeOn(IntelQuickSync), JellyfinHost)
-            .Should().Be($"{QuickSync} -hwaccel vaapi {Input} -c:v h264_qsv -preset medium -forced_idr 1 -global_quality 23 {Keyframes} -vf scale=-2:720,{BurnIn},format=nv12" + HlsTail);
+            .Should().Be($"{QuickSync} -hwaccel vaapi {BurnInScaled},format=nv12[v] -map [v] -map 0:1 -sn -c:v h264_qsv -preset medium -forced_idr 1 -global_quality 23 {Keyframes}" + HlsTail);
     }
 
     [Fact]
     public void Vaapi_uploads_the_cpu_frames_after_burning_subtitles_in()
     {
         Build(Transcode(outputHeight: 720, burnIn: true), EncodeOn(AmdVaapi), JellyfinHost)
-            .Should().Be($"{Vaapi} -hwaccel vaapi {Input} -c:v h264_vaapi {Keyframes} -vf scale=-2:720,{BurnIn},format=nv12,hwupload" + HlsTail);
+            .Should().Be($"{Vaapi} -hwaccel vaapi {BurnInScaled},format=nv12,hwupload[v] -map [v] -map 0:1 -sn -c:v h264_vaapi {Keyframes}" + HlsTail);
     }
 
     [Fact]

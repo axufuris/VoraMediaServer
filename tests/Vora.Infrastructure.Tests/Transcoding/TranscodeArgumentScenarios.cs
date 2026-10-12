@@ -25,7 +25,7 @@ internal static class TranscodeArgumentScenarios
     public static FFmpegTranscodeService.TranscodeHardware EncodeOn(HardwareAccelerator gpu) => new(gpu, Encode: true);
     public static FFmpegTranscodeService.TranscodeHardware DecodeOn(HardwareAccelerator gpu) => new(gpu, Encode: false);
 
-    public static PlaybackDecisionVM Transcode(VideoCodec target = VideoCodec.H264, string hdr = "SDR", int outputHeight = 0, int bandwidthKbps = 0, bool burnIn = false) => new()
+    public static PlaybackDecisionVM Transcode(VideoCodec target = VideoCodec.H264, string hdr = "SDR", int outputHeight = 0, int bandwidthKbps = 0, bool burnIn = false, string? externalSubtitle = null) => new()
     {
         MediaItemId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
         Decision = StreamingState.Transcode,
@@ -40,6 +40,8 @@ internal static class TranscodeArgumentScenarios
         RequiresSubtitleBurnIn = burnIn,
         SelectedVideoStreamIndex = 0,
         SelectedAudioStreamIndex = 1,
+        SelectedSubtitleStreamIndex = burnIn ? 3 : null,
+        SelectedSubtitleExternalPath = externalSubtitle,
     };
 
     public static PlaybackDecisionVM DirectStream() => new()

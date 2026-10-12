@@ -40,12 +40,12 @@ Every caller turns the setting into a concrete `HardwareAccelerator` (type, devi
 
 | | Decode | Filters | Encode |
 |---|---|---|---|
-| NVIDIA | `-hwaccel cuda -hwaccel_output_format cuda` | `scale_cuda`, `tonemap_cuda` (jellyfin-ffmpeg) | `h264_nvenc` / `hevc_nvenc` |
+| NVIDIA | `-hwaccel cuda -hwaccel_output_format cuda` | `scale_cuda`, `tonemap_cuda` (jellyfin-ffmpeg) | `h264_nvenc` / `hevc_nvenc` with `-forced-idr 1` |
 | Quick Sync | `-hwaccel vaapi -hwaccel_output_format vaapi` | `scale_vaapi`, `tonemap_vaapi`, then `hwmap=derive_device=qsv` | `h264_qsv` / `hevc_qsv` with `-forced_idr 1` |
 | VAAPI | same as Quick Sync | `scale_vaapi`, tone mapping per vendor | `h264_vaapi` / `hevc_vaapi` |
 | CPU | none | `scale`, `zscale` + `tonemap` | `libx264` / `libx265` |
 
-Quick Sync decodes and scales through VAAPI and maps to QSV only for the encoder; that is jellyfin-ffmpeg's default Linux path and lets both Intel pipelines share one filter chain. `-forced_idr 1` matters: without it QSV turns the segment-boundary keyframes into plain I-frames that aren't flagged as keyframes, and the HLS muxer stops cutting at 4 s.
+Quick Sync decodes and scales through VAAPI and maps to QSV only for the encoder; that is jellyfin-ffmpeg's default Linux path and lets both Intel pipelines share one filter chain. `-forced_idr 1` (QSV) and `-forced-idr 1` (NVENC) matter: without them the encoder turns the segment-boundary keyframes into plain I-frames that aren't flagged as keyframes, so the HLS muxer can only cut at the encoder's own GOP (250 frames, about 10 s) under a playlist that promises 4 s segments. NVENC ran that way until the flag was added; players coped by following the timestamps, but the playlist's timing was wrong. VAAPI and x264 turn a forced keyframe into an IDR frame on their own.
 
 **HDR tone mapping** depends on the GPU:
 
@@ -55,7 +55,7 @@ Quick Sync decodes and scales through VAAPI and maps to QSV only for the encoder
 
 `HdrTonemapQuality` / `HdrTranscodeDownscale` on Auto follow where the tone map runs: on the GPU they mean Quality and no downscale; on the CPU, Fast and a 1080p downscale.
 
-**Burned-in subtitles** keep decode and encode on the GPU but filter on the CPU (`subtitles` has no GPU version): the decoder hands frames to system memory, the chain scales and burns in, and VAAPI gets `format=nv12,hwupload` back while QSV takes the CPU frames directly. Scale and subtitles share one `-vf`; two `-vf` flags silently drop the first.
+**Burned-in subtitles** keep decode and encode on the GPU but draw on the CPU: the decoder hands frames to system memory, a `-filter_complex` graph scales, tone-maps and overlays the subtitle (`docs/subtitles.md`), and VAAPI gets `format=nv12,hwupload` back while QSV takes the CPU frames directly.
 
 A **remux** (`-c:v copy`) never touches the GPU.
 
