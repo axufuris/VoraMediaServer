@@ -20,6 +20,6 @@ public interface IStreamRepository
     Task<MediaPart?> GetMediaPartForSessionAsync(Guid sessionId);
     Task<MediaExtra?> GetMediaExtraAsync(Guid extraId);
     Task<MediaStreamInfoDto?> GetExtraStreamInfoAsync(Guid extraId);
-    Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search);
+    Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(StreamHistoryQuery query);
     Task<IEnumerable<T>> GetProjectedActiveStreamsAsync<T>(TimeSpan activeThreshold, Expression<Func<StreamSession, T>> projection);
 }

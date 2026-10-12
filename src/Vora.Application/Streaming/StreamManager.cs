@@ -17,7 +17,7 @@ public interface IStreamManager
     Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
     Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
     Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null);
-    Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search);
+    Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search, Guid? profileId = null);
     Task PingSessionAsync(Guid sessionId, double currentPosition, double duration, bool isPaused);
     Task<List<NowPlayingSessionDto>> GetNowPlayingSessionsAsync();
     Task StopSessionAsync(Guid sessionId);
@@ -243,11 +243,16 @@ public class StreamManager : IStreamManager
         return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}");
     }
 
-    public async Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search)
+    public async Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search, Guid? profileId = null)
     {
-        page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 1, 200);
-        return await _repository.GetGroupedHistoryAsync(page, pageSize, search);
+        var settings = await _settingsRepo.GetSettingsAsync();
+        var query = new StreamHistoryQuery(
+            Math.Max(1, page),
+            Math.Clamp(pageSize, 1, 200),
+            search,
+            profileId,
+            ScheduleClock.Resolve(settings.ScheduleTimeZone));
+        return await _repository.GetGroupedHistoryAsync(query);
     }
 
     public async Task PingSessionAsync(Guid sessionId, double currentPosition, double duration, bool isPaused)

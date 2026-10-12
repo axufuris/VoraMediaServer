@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { useParams } from 'react-router-dom';
 import { historyService, type HistorySessionDto } from '../../api/Media/historyService';
 import { libraryService, type LibrarySummary } from '../../api/Media/libraryService';
+import { userService, type UserVM } from '../../api/Users/userService';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import { formatTime, parseServerDate } from '../../utils/serverTime';
 
@@ -47,6 +48,16 @@ function formatHistoryResolution(row: HistorySessionDto): string {
     return output || source;
 }
 
+function ProfileName({ row, primary }: { row: HistorySessionDto; primary: boolean }) {
+    const showAccount = !!row.accountName && row.accountName.localeCompare(row.userName, undefined, { sensitivity: 'accent' }) !== 0;
+    return (
+        <div className="flex flex-col">
+            <span className={primary ? 'font-semibold text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-secondary)]'}>{row.userName}</span>
+            {showAccount && <span className="text-[11px] font-normal text-[var(--vora-text-muted)]" title="Account">{row.accountName}</span>}
+        </div>
+    );
+}
+
 function CompletionIcon({ percent }: { percent: number }) {
     if (percent >= 90) {
         return <div className="w-3.5 h-3.5 rounded-full bg-[var(--vora-success-500)] mx-auto" title="Completed" />;
@@ -71,7 +82,8 @@ export default function HistoryPage() {
     const [libraries, setLibraries] = useState<LibrarySummary[]>([]);
     const [activeLibraryIds, setActiveLibraryIds] = useState<Set<string>>(new Set());
 
-    const [selectedUser, setSelectedUser] = useState('All users');
+    const [accounts, setAccounts] = useState<UserVM[]>([]);
+    const [selectedProfileId, setSelectedProfileId] = useState('');
     const [streamFilters, setStreamFilters] = useState({ directPlay: true, directStream: true, transcode: true });
     const [search, setSearch] = useState('');
     const [pageSize, setPageSize] = useState(25);
@@ -89,11 +101,19 @@ export default function HistoryPage() {
 
     useEffect(() => {
         let isMounted = true;
+        userService.getAllUsers(serverId).then(users => {
+            if (isMounted) setAccounts(users);
+        }).catch(console.error);
+        return () => { isMounted = false; };
+    }, [serverId]);
+
+    useEffect(() => {
+        let isMounted = true;
         setLoading(true);
 
         const fetchHistory = async () => {
             try {
-                const response = await historyService.getHistory(1, pageSize, search, serverId);
+                const response = await historyService.getHistory(1, pageSize, search, selectedProfileId, serverId);
                 if (isMounted) setData(response.data);
             } catch (error) {
                 console.error('Failed to fetch history:', error);
@@ -104,7 +124,7 @@ export default function HistoryPage() {
 
         fetchHistory();
         return () => { isMounted = false; };
-    }, [pageSize, search, refreshTrigger, serverId]);
+    }, [pageSize, search, selectedProfileId, refreshTrigger, serverId]);
 
     const toggleRow = (id: string) => {
         const newSet = new Set(expandedRows);
@@ -215,7 +235,6 @@ export default function HistoryPage() {
     );
 
     const filteredData = data.filter(row => {
-        if (selectedUser !== 'All users' && row.userName !== selectedUser) return false;
         if (!activeLibraryIds.has(row.libraryId)) return false;
 
         if (row.strategy === 'DirectPlay' && !streamFilters.directPlay) return false;
@@ -224,8 +243,6 @@ export default function HistoryPage() {
 
         return true;
     });
-
-    const userOptions = Array.from(new Set(data.map(d => d.userName)));
 
     return (
         <div data-vora-page="">
@@ -243,12 +260,17 @@ export default function HistoryPage() {
             <div className="p-8 space-y-4">
                 <div className="vora-card p-4 flex flex-wrap items-center gap-3">
                     <select
-                        value={selectedUser}
-                        onChange={(e) => setSelectedUser(e.target.value)}
+                        aria-label="Profile"
+                        value={selectedProfileId}
+                        onChange={(e) => setSelectedProfileId(e.target.value)}
                         className="vora-input !w-auto"
                     >
-                        <option value="All users">All users</option>
-                        {userOptions.map(user => <option key={user} value={user}>{user}</option>)}
+                        <option value="">All profiles</option>
+                        {accounts.filter(account => account.profiles.length > 0).map(account => (
+                            <optgroup key={account.id} label={account.displayName}>
+                                {account.profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+                            </optgroup>
+                        ))}
                     </select>
 
                     <div className="flex border border-[var(--vora-border-strong)] rounded-[var(--vora-radius-md)] overflow-hidden">
@@ -319,7 +341,7 @@ export default function HistoryPage() {
                             <thead className="bg-[var(--vora-bg-sunken)] border-b border-[var(--vora-border-subtle)] text-[var(--vora-text-muted)] text-[11px] uppercase tracking-wider">
                                 <tr>
                                     <th className="px-4 py-3 font-semibold w-40">Date & Time</th>
-                                    <th className="px-4 py-3 font-semibold">User</th>
+                                    <th className="px-4 py-3 font-semibold">Profile</th>
                                     <th className="px-4 py-3 font-semibold">IP</th>
                                     <th className="px-4 py-3 font-semibold">Platform</th>
                                     <th className="px-4 py-3 font-semibold">Product</th>
@@ -358,7 +380,7 @@ export default function HistoryPage() {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-2.5 font-semibold text-[var(--vora-text-primary)]">{row.userName}</td>
+                                                <td className="px-4 py-2.5"><ProfileName row={row} primary /></td>
                                                 <td className="px-4 py-2.5 font-mono text-xs text-[var(--vora-text-secondary)]">{row.ipAddress}</td>
                                                 <td className="px-4 py-2.5 text-[var(--vora-text-secondary)]">{row.platform}</td>
                                                 <td className="px-4 py-2.5 text-[var(--vora-text-secondary)]">{row.product}</td>
@@ -400,7 +422,7 @@ export default function HistoryPage() {
                                                             <span className="text-[var(--vora-text-muted)] text-[11px] tabular-nums">{formatLocalTime(sub.startedAt)}</span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-2 text-[var(--vora-text-secondary)]">{sub.userName}</td>
+                                                    <td className="px-4 py-2"><ProfileName row={sub} primary={false} /></td>
                                                     <td className="px-4 py-2 font-mono text-xs text-[var(--vora-text-muted)]">{sub.ipAddress}</td>
                                                     <td className="px-4 py-2 text-[var(--vora-text-secondary)]">{sub.platform}</td>
                                                     <td className="px-4 py-2 text-[var(--vora-text-muted)]">{sub.product}</td>

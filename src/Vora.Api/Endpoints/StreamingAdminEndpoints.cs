@@ -39,9 +39,10 @@ public static class StreamingAdminEndpoints
         [FromQuery] int page,
         [FromQuery] int pageSize,
         [FromQuery] string? search,
+        [FromQuery] Guid? profileId,
         IStreamManager streamManager)
     {
-        var result = await streamManager.GetGroupedHistoryAsync(page, pageSize, search ?? string.Empty);
+        var result = await streamManager.GetGroupedHistoryAsync(page, pageSize, search ?? string.Empty, profileId);
         return Results.Ok(new StreamHistoryPageVM { Data = result.Data, Total = result.Total });
     }
 

@@ -4,6 +4,7 @@ export interface HistorySessionDto {
     id: string;
     date: string;
     userName: string;
+    accountName?: string;
     ipAddress: string;
     platform: string;
     product: string;
@@ -45,9 +46,9 @@ export interface HistorySessionDto {
 }
 
 export const historyService = {
-    getHistory: async (page: number, pageSize: number, search: string, serverId?: string): Promise<{ data: HistorySessionDto[], total: number }> => {
+    getHistory: async (page: number, pageSize: number, search: string, profileId?: string, serverId?: string): Promise<{ data: HistorySessionDto[], total: number }> => {
         const response = await apiClient.get<{ data: HistorySessionDto[], total: number }>('/streaming/admin/history', {
-            params: { page, pageSize, search },
+            params: { page, pageSize, search, profileId: profileId || undefined },
             serverId
         });
         return response.data;

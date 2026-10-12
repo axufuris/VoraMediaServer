@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Vora.Application.Streaming;
 using Vora.Application.Streaming.Dtos;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Streaming;
@@ -17,14 +18,15 @@ internal static class StreamHistoryProjection
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.EndedAt, x => x.LastPingAt));
     }
 
-    public static async Task<(List<HistorySessionDto> Data, int Total)> LoadAsync(VoraDbContext context, int page, int pageSize, string search)
+    public static async Task<(List<HistorySessionDto> Data, int Total)> LoadAsync(VoraDbContext context, StreamHistoryQuery query)
     {
-        var baseQuery = BuildHistoryBaseQuery(context, search);
+        var zoneId = PostgresZoneId(query.TimeZone);
+        var baseQuery = BuildHistoryBaseQuery(context, query.Search, query.ProfileId);
 
         var keysQuery = baseQuery
             .Select(s => new HistoryGroupKey
             {
-                Date = s.StartedAt.Date,
+                Date = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(s.StartedAt, zoneId).Date,
                 ProfileId = s.UserProfileId,
                 DeviceId = s.ClientDevice != null ? s.ClientDevice.DeviceId : null,
                 MediaItemId = s.MediaItemId
@@ -35,8 +37,8 @@ internal static class StreamHistoryProjection
 
         var pagedKeys = await keysQuery
             .OrderByDescending(k => k.Date)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
             .ToListAsync();
 
         if (pagedKeys.Count == 0)
@@ -44,7 +46,7 @@ internal static class StreamHistoryProjection
             return (new List<HistorySessionDto>(), 0);
         }
 
-        var rawData = await LoadRawSessionDataAsync(baseQuery, pagedKeys);
+        var rawData = await LoadRawSessionDataAsync(baseQuery, pagedKeys, query.TimeZone);
 
         // For episodes, resolve the parent show title + season/episode number so the
         // history can show "Show — S01E02 — Episode" rather than the episode title
@@ -72,7 +74,7 @@ internal static class StreamHistoryProjection
         var grouped = rawData
             .GroupBy(s => new HistoryGroupKey
             {
-                Date = s.StartedAt.Date,
+                Date = LocalDate(s.StartedAt, query.TimeZone),
                 ProfileId = s.UserProfileId,
                 DeviceId = s.ClientDevice?.DeviceId,
                 MediaItemId = s.MediaItemId
@@ -84,9 +86,14 @@ internal static class StreamHistoryProjection
         return (grouped, totalCount);
     }
 
-    private static IQueryable<StreamSession> BuildHistoryBaseQuery(VoraDbContext context, string search)
+    private static IQueryable<StreamSession> BuildHistoryBaseQuery(VoraDbContext context, string search, Guid? profileId)
     {
         var query = context.StreamSessions.AsNoTracking();
+
+        if (profileId.HasValue)
+        {
+            query = query.Where(s => s.UserProfileId == profileId.Value);
+        }
 
         if (string.IsNullOrWhiteSpace(search))
         {
@@ -97,13 +104,23 @@ internal static class StreamHistoryProjection
         return query.Where(s =>
             EF.Functions.ILike(s.MediaItem.Title, searchPattern)
             || (s.ClientDevice != null && EF.Functions.ILike(s.ClientDevice.DeviceName, searchPattern))
-            || (s.UserProfile != null && EF.Functions.ILike(s.UserProfile.Name, searchPattern)));
+            || (s.UserProfile != null && EF.Functions.ILike(s.UserProfile.Name, searchPattern))
+            || EF.Functions.ILike(s.User.DisplayName, searchPattern));
     }
 
-    private static async Task<List<StreamSession>> LoadRawSessionDataAsync(IQueryable<StreamSession> baseQuery, List<HistoryGroupKey> pagedKeys)
+    private static string PostgresZoneId(TimeZoneInfo zone)
     {
-        var minDate = pagedKeys.Min(k => k.Date);
-        var maxDate = pagedKeys.Max(k => k.Date).AddDays(1);
+        if (zone.HasIanaId) return zone.Id;
+        return TimeZoneInfo.TryConvertWindowsIdToIanaId(zone.Id, out var ianaId) ? ianaId : "UTC";
+    }
+
+    private static DateTime LocalDate(DateTime startedAtUtc, TimeZoneInfo zone) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(startedAtUtc, DateTimeKind.Utc), zone).Date;
+
+    private static async Task<List<StreamSession>> LoadRawSessionDataAsync(IQueryable<StreamSession> baseQuery, List<HistoryGroupKey> pagedKeys, TimeZoneInfo zone)
+    {
+        var from = DateTime.SpecifyKind(pagedKeys.Min(k => k.Date).AddDays(-1), DateTimeKind.Utc);
+        var to = DateTime.SpecifyKind(pagedKeys.Max(k => k.Date).AddDays(2), DateTimeKind.Utc);
         var mediaIds = pagedKeys.Select(k => k.MediaItemId).Distinct().ToList();
 
         var rawData = await baseQuery
@@ -112,17 +129,18 @@ internal static class StreamHistoryProjection
             .Include(s => s.MediaItem.Library)
             .Include(s => s.ClientDevice)
             .Include(s => s.UserProfile)
+            .Include(s => s.User)
             .Include(s => s.MediaItem.MediaParts).ThenInclude(p => p.VideoTracks)
             .Include(s => s.MediaItem.MediaParts).ThenInclude(p => p.AudioTracks)
             .Include(s => s.MediaItem.MediaParts).ThenInclude(p => p.SubtitleTracks)
-            .Where(s => s.StartedAt >= minDate && s.StartedAt < maxDate && mediaIds.Contains(s.MediaItemId))
+            .Where(s => s.StartedAt >= from && s.StartedAt < to && mediaIds.Contains(s.MediaItemId))
             .ToListAsync();
 
         var keySet = pagedKeys.ToHashSet();
         return rawData
             .Where(s => keySet.Contains(new HistoryGroupKey
             {
-                Date = s.StartedAt.Date,
+                Date = LocalDate(s.StartedAt, zone),
                 ProfileId = s.UserProfileId,
                 DeviceId = s.ClientDevice?.DeviceId,
                 MediaItemId = s.MediaItemId
@@ -142,47 +160,52 @@ internal static class StreamHistoryProjection
     {
         var newest = sessions[0];
         var oldest = sessions[^1];
-        var userName = newest.UserProfile?.Name ?? "Unknown User";
+        var userName = newest.UserProfile?.Name ?? newest.User?.DisplayName ?? "Unknown user";
+        var accountName = newest.User?.DisplayName;
         var libName = newest.MediaItem?.Library?.Name ?? "Unknown";
         showInfo.TryGetValue(newest.MediaItemId, out var episodeInfo);
-        var mediaDurationSecs = newest.MediaItem?.Analysis?.Duration?.TotalSeconds ?? 0;
 
-        var totalPausedMins = (int)Math.Round(sessions.Sum(x => x.TotalPausedDuration / 60.0));
-        var totalDurationMins = (int)Math.Round(
-            sessions.Sum(x => (x.EndedAt ?? DateTime.UtcNow).Subtract(x.StartedAt).TotalMinutes) - totalPausedMins);
-        var percentComplete = mediaDurationSecs > 0
-            ? (int)Math.Clamp((newest.CurrentPosition / mediaDurationSecs) * 100, 0, 100)
-            : 0;
-
-        var activePart = newest.MediaItem?.MediaParts.FirstOrDefault();
-        var dto = BuildHistoryRow(newest, userName, libName, activePart, episodeInfo);
-        dto.PausedMinutes = totalPausedMins;
-        dto.DurationMinutes = totalDurationMins;
-        dto.PercentComplete = percentComplete;
+        var dto = BuildHistoryRow(newest, userName, accountName, libName, episodeInfo);
+        dto.PausedMinutes = (int)Math.Round(sessions.Sum(x => x.TotalPausedDuration) / 60.0);
+        dto.DurationMinutes = (int)Math.Round(sessions.Sum(WatchedSeconds) / 60.0);
+        dto.PercentComplete = sessions.Max(PercentComplete);
+        dto.Date = oldest.StartedAt.ToString("o");
         dto.StartedAt = oldest.StartedAt.ToString("o");
         dto.IsGrouped = sessions.Count > 1;
         dto.SubSessions = sessions.Count > 1
-            ? sessions.Select(sub => BuildSubSession(sub, userName, libName, activePart, mediaDurationSecs, episodeInfo)).ToList()
+            ? sessions.Select(sub => BuildSubSession(sub, userName, accountName, libName, episodeInfo)).ToList()
             : null;
 
         return dto;
     }
 
-    private static HistorySessionDto BuildSubSession(StreamSession sub, string userName, string libName, MediaPart? activePart, double mediaDurationSecs, EpisodeShowInfo? episodeInfo)
+    private static HistorySessionDto BuildSubSession(StreamSession sub, string userName, string? accountName, string libName, EpisodeShowInfo? episodeInfo)
     {
-        var dto = BuildHistoryRow(sub, userName, libName, activePart, episodeInfo);
+        var dto = BuildHistoryRow(sub, userName, accountName, libName, episodeInfo);
         dto.PausedMinutes = (int)Math.Round(sub.TotalPausedDuration / 60.0);
-        dto.DurationMinutes = (int)Math.Round((sub.EndedAt ?? DateTime.UtcNow).Subtract(sub.StartedAt).TotalMinutes - (sub.TotalPausedDuration / 60.0));
-        dto.PercentComplete = mediaDurationSecs > 0
-            ? (int)Math.Clamp((sub.CurrentPosition / mediaDurationSecs) * 100, 0, 100)
-            : 0;
+        dto.DurationMinutes = (int)Math.Round(WatchedSeconds(sub) / 60.0);
+        dto.PercentComplete = PercentComplete(sub);
         dto.StartedAt = sub.StartedAt.ToString("o");
         dto.IsGrouped = false;
         return dto;
     }
 
-    private static HistorySessionDto BuildHistoryRow(StreamSession session, string userName, string libName, MediaPart? activePart, EpisodeShowInfo? episodeInfo)
+    private static double WatchedSeconds(StreamSession session) =>
+        WatchProgress.WatchedSeconds(session.StartedAt, session.EndedAt ?? DateTime.UtcNow, session.TotalPausedDuration);
+
+    private static int PercentComplete(StreamSession session) =>
+        WatchProgress.PercentComplete(session.StartPosition, session.CurrentPosition, WatchedSeconds(session), MediaDurationSeconds(session));
+
+    private static double MediaDurationSeconds(StreamSession session) =>
+        (PlayedPart(session)?.Duration ?? session.MediaItem?.Analysis?.Duration)?.TotalSeconds ?? 0;
+
+    private static MediaPart? PlayedPart(StreamSession session) =>
+        session.MediaItem?.MediaParts.FirstOrDefault(p => p.Id == session.MediaPartId)
+        ?? session.MediaItem?.MediaParts.FirstOrDefault();
+
+    private static HistorySessionDto BuildHistoryRow(StreamSession session, string userName, string? accountName, string libName, EpisodeShowInfo? episodeInfo)
     {
+        var activePart = PlayedPart(session);
         var originalAudioTrack = activePart?.AudioTracks.FirstOrDefault(t => t.Id == session.AudioTrackId);
 
         return new HistorySessionDto
@@ -190,6 +213,7 @@ internal static class StreamHistoryProjection
             Id = session.Id.ToString(),
             Date = session.StartedAt.ToString("o"),
             UserName = userName,
+            AccountName = accountName,
             IpAddress = session.ClientDevice?.LastIpAddress ?? "Unknown",
             Platform = session.ClientDevice?.ClientName ?? "Unknown",
             Product = "Vora",
