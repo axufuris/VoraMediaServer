@@ -218,22 +218,25 @@ public class CollectionManager : ICollectionManager
             collection.HiddenReason = CollectionVisibility.HiddenReason(collection.SystemGenerated, collection.ItemCount, minimum);
         }
 
-        return collections
-            .Where(c => includeHidden || c.HiddenReason == null)
-            .OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase);
+        return InListOrder(collections.Where(c => includeHidden || c.HiddenReason == null));
     }
 
     public async Task<IEnumerable<CollectionSummaryVM>> GetAllCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs)
     {
         var collections = await _repository.GetAllProjectedAsync(CollectionSummaryVM.StandardProjection, null, false, hasAllAccess, allowedLibs);
-        return collections.OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase);
+        return InListOrder(collections);
     }
 
     public async Task<IEnumerable<CollectionSummaryVM>> GetGlobalCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs)
     {
         var collections = await _repository.GetAllProjectedAsync(CollectionSummaryVM.StandardProjection, null, true, hasAllAccess, allowedLibs);
-        return collections.OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase);
+        return InListOrder(collections);
     }
+
+    private static IEnumerable<CollectionSummaryVM> InListOrder(IEnumerable<CollectionSummaryVM> collections) =>
+        collections
+            .OrderBy(c => string.IsNullOrWhiteSpace(c.SortTitle) ? c.Title : c.SortTitle, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(c => c.Title, StringComparer.OrdinalIgnoreCase);
 
     public async Task RemoveMediaFromCollectionAsync(Guid collectionId, Guid mediaItemId)
     {
