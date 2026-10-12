@@ -26,6 +26,7 @@ public class LogoThumbnailCacheTests : IDisposable
         Directory.CreateDirectory(_root);
         _service = new ArtworkThumbnailService(
             _downloader,
+            new Vora.Application.Artwork.RemoteImageRegistry(),
             Options.Create(new StoragePathsOptions { CustomArtwork = _root }),
             NullLogger<ArtworkThumbnailService>.Instance);
     }

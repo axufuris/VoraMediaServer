@@ -1,3 +1,4 @@
+using Vora.Application.Artwork;
 using Vora.Application.Iptv.ViewModels;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Media.ViewModels;
@@ -21,6 +22,7 @@ public class SmartListEntryVM
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Subtitle { get; set; }
+    [RemoteImage]
     public string? ImageUrl { get; set; }
     public LibraryItemVM? Media { get; set; }
     public IptvChannelVM? Channel { get; set; }

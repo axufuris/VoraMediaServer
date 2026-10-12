@@ -1,3 +1,5 @@
+using Vora.Application.Artwork;
+
 namespace Vora.Application.Podcasts.ViewModels;
 
 public class PodcastSubscriptionVM
@@ -7,6 +9,7 @@ public class PodcastSubscriptionVM
     public string Title { get; set; } = string.Empty;
     public string? Author { get; set; }
     public string? Description { get; set; }
+    [RemoteImage]
     public string? ArtworkUrl { get; set; }
     public string? HomepageUrl { get; set; }
     public DateTime SubscribedAt { get; set; }

@@ -180,7 +180,7 @@ export default function PodcastsAdminPage() {
                                                     >
                                                         <div className="w-12 h-12 rounded bg-[var(--vora-bg-surface)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
                                                             {result.artworkUrl
-                                                                ? <img src={secureImageUrl(result.artworkUrl)} alt={result.title} className="max-w-full max-h-full object-cover" />
+                                                                ? <img src={secureImageUrl(result.artworkUrl, 'poster')} alt={result.title} className="max-w-full max-h-full object-cover" />
                                                                 : <PodcastIcon className="w-5 h-5 text-[var(--vora-text-disabled)]" />}
                                                         </div>
                                                         <div className="flex-1 min-w-0">
@@ -227,7 +227,7 @@ export default function PodcastsAdminPage() {
                                     >
                                         <div className="w-14 h-14 rounded bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
                                             {item.artworkUrl
-                                                ? <img src={secureImageUrl(item.artworkUrl)} alt={item.title} className="max-w-full max-h-full object-cover" />
+                                                ? <img src={secureImageUrl(item.artworkUrl, 'poster')} alt={item.title} className="max-w-full max-h-full object-cover" />
                                                 : <PodcastIcon className="w-6 h-6 text-[var(--vora-text-disabled)]" />}
                                         </div>
                                         <div className="flex-1 min-w-0">

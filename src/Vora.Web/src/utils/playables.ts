@@ -32,7 +32,7 @@ export function podcastPlayable(episode: PodcastFeedEpisodeVM, serverId?: string
         id: episode.id,
         title: episode.title,
         subtitle: episode.showTitle,
-        posterUrl: secureImageUrl(episode.artworkUrl || episode.showArtworkUrl),
+        posterUrl: secureImageUrl(episode.artworkUrl || episode.showArtworkUrl, 'poster'),
         streamUrl: episode.audioUrl,
         serverId: resolveServer(serverId)?.id,
         container: 'audio',

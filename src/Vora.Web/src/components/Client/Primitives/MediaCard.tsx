@@ -135,7 +135,7 @@ export default function MediaCard({
                     <ArtMosaic urls={mosaic} className="opacity-80 transition-opacity group-hover:opacity-100" />
                 ) : showImage ? (
                     <img
-                        src={uncachedImage ? secureImageUrl(imageUrl) : thumbUrl(imageUrl, THUMB_WIDTH[shape], imageFit === 'contain' ? 'logo' : shape === 'still' ? 'still' : undefined)}
+                        src={uncachedImage ? secureImageUrl(imageUrl, imageFit === 'contain' ? 'logo' : 'poster') : thumbUrl(imageUrl, THUMB_WIDTH[shape], imageFit === 'contain' ? 'logo' : shape === 'still' ? 'still' : undefined)}
                         alt={displayTitle}
                         loading="lazy"
                         decoding="async"

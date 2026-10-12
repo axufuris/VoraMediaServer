@@ -1,3 +1,4 @@
+using Vora.Application.Artwork;
 using Vora.Domain.Entities.Iptv;
 
 namespace Vora.Application.Iptv.ViewModels;
@@ -9,6 +10,7 @@ public class IptvChannelVM
     public string PlaylistName { get; set; } = string.Empty;
     public string ExternalChannelId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    [RemoteImage]
     public string? LogoUrl { get; set; }
     public string? GroupTitle { get; set; }
     public string StreamUrl { get; set; } = string.Empty;
