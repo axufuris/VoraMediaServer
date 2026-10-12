@@ -379,8 +379,8 @@ export default function ManageLibrary() {
                         type="button"
                         onClick={handleToggleWatch}
                         className={`px-4 py-2 rounded-[var(--vora-radius-md)] text-xs font-semibold transition-colors cursor-pointer ${library.isBeingWatched
-                            ? 'bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)] hover:bg-[var(--vora-danger-500)] hover:text-white'
-                            : 'bg-[var(--vora-success-soft)] text-[var(--vora-success-text)] hover:bg-[var(--vora-success-500)] hover:text-white'}`}
+                            ? 'bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)]'
+                            : 'bg-[var(--vora-success-soft)] text-[var(--vora-success-text)] hover:bg-[var(--vora-success-500)] hover:text-[var(--vora-text-primary)]'}`}
                     >
                         {library.isBeingWatched ? 'Stop watching' : 'Start watching'}
                     </button>
@@ -536,7 +536,7 @@ export default function ManageLibrary() {
                                 <button
                                     type="button"
                                     onClick={() => handleRemovePath(path)}
-                                    className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-white transition-colors cursor-pointer shrink-0"
+                                    className="text-xs font-semibold px-3 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer shrink-0"
                                 >
                                     Remove
                                 </button>
@@ -657,7 +657,7 @@ export default function ManageLibrary() {
                         <button
                             type="button"
                             onClick={handleDelete}
-                            className="px-5 py-2 rounded-[var(--vora-radius-md)] text-sm font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-white transition-colors cursor-pointer"
+                            className="px-5 py-2 rounded-[var(--vora-radius-md)] text-sm font-semibold text-[var(--vora-danger-text)] bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer"
                         >
                             Delete library
                         </button>

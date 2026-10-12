@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { type DiscoveryRowConfig } from '../../api/Discovery/discoveryService';
 import { Modal } from '../Common/Modal';
+import { reorderListProps, reorderRowProps, useTouchReorder } from '../../hooks/useTouchReorder';
 
 export interface ClientLayoutItem {
     uniqueId: string;
@@ -49,17 +50,24 @@ export default function DiscoveryCustomizeModal({ isOpen, onClose, configs, save
         e.dataTransfer.setData("text/html", index.toString());
     };
 
+    const moveRow = (from: number, to: number) => {
+        if (from === to) return;
+
+        const newItems = [...layoutItems];
+        const draggedItem = newItems[from];
+
+        newItems.splice(from, 1);
+        newItems.splice(to, 0, draggedItem);
+
+        setLayoutItems(newItems.map((item, idx) => ({ ...item, orderIndex: idx })));
+    };
+
+    const touch = useTouchReorder(moveRow);
+
     const handleDrop = (e: React.DragEvent, dropIndex: number) => {
         e.preventDefault();
         if (draggedIndex === null || draggedIndex === dropIndex) return;
-
-        const newItems = [...layoutItems];
-        const draggedItem = newItems[draggedIndex];
-
-        newItems.splice(draggedIndex, 1);
-        newItems.splice(dropIndex, 0, draggedItem);
-
-        setLayoutItems(newItems.map((item, idx) => ({ ...item, orderIndex: idx })));
+        moveRow(draggedIndex, dropIndex);
         setDraggedIndex(null);
     };
 
@@ -90,18 +98,22 @@ export default function DiscoveryCustomizeModal({ isOpen, onClose, configs, save
                 <p className="text-[var(--vora-text-muted)] text-sm">Drag to reorder rows. Toggle to hide lists you don't want to see. Saved to this device.</p>
             </div>
 
-            <ul className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+            <ul {...reorderListProps} className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
                 {layoutItems.map((item, index) => (
                     <li
                         key={item.uniqueId}
+                        {...reorderRowProps(index)}
+                        style={touch.rowStyle(index)}
                         draggable
                         onDragStart={(e) => handleDragStart(e, index)}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => handleDrop(e, index)}
-                        className={`flex items-center justify-between p-4 bg-[var(--vora-bg-sunken)] border ${draggedIndex === index ? 'border-orange-500 opacity-50' : 'border-[var(--vora-border-subtle)]'} rounded-lg cursor-grab hover:bg-[var(--vora-bg-raised)] transition-colors shadow-sm`}
+                        className={`flex items-center justify-between p-4 bg-[var(--vora-bg-sunken)] border ${draggedIndex === index ? 'border-[var(--vora-accent-500)] opacity-50' : 'border-[var(--vora-border-subtle)]'} rounded-lg cursor-grab hover:bg-[var(--vora-bg-raised)] transition-colors shadow-[var(--vora-shadow-sm)]`}
                     >
                         <div className="flex items-center gap-4">
-                            <svg className="w-5 h-5 text-[var(--vora-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                            <span {...touch.handleProps(index)} aria-hidden="true" className="flex touch-none">
+                                <svg className="w-5 h-5 text-[var(--vora-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                            </span>
                             <div>
                                 <p className={`font-bold text-sm ${item.isEnabled ? 'text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-muted)]'}`}>{item.name}</p>
                                 <p className="text-[var(--vora-text-muted)] text-xs uppercase tracking-wider mt-0.5">
@@ -114,7 +126,7 @@ export default function DiscoveryCustomizeModal({ isOpen, onClose, configs, save
                             onClick={() => toggleRow(item.uniqueId)}
                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${item.isEnabled ? 'bg-[var(--vora-accent-500)]' : 'bg-[var(--vora-bg-sunken)]'}`}
                         >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${item.isEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-[var(--vora-text-primary)] transition-transform ${item.isEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                         </button>
                     </li>
                 ))}
@@ -122,7 +134,7 @@ export default function DiscoveryCustomizeModal({ isOpen, onClose, configs, save
 
             <div className="flex justify-end gap-4 mt-6 pt-6 border-t border-[var(--vora-border-subtle)] shrink-0">
                 <button onClick={onClose} className="px-4 py-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer font-medium">Cancel</button>
-                <button onClick={handleSave} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors cursor-pointer">Save Layout</button>
+                <button onClick={handleSave} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] font-bold rounded shadow-[var(--vora-shadow-lg)] transition-colors cursor-pointer">Save Layout</button>
             </div>
         </Modal>
     );

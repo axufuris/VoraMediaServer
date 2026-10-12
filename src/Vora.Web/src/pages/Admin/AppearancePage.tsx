@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { themeService, type ThemeMetaVM } from '../../api/System/themeService';
 import { useTheme } from '../../theme/useTheme';
+import type { ThemeManifest } from '../../theme/types';
 import { useDialog } from '../../dialogs';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
@@ -24,8 +25,8 @@ function ThemeCard({ meta, isActive, isSaving, onSelect }: ThemeCardProps) {
             onKeyDown={!isActive ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } } : undefined}
         >
             {/* Swatch strip — sits above the card to communicate the theme's palette
-                without needing a real preview image. Pulls live tokens from :root if
-                this is the active card; falls back to neutral swatches otherwise. */}
+                without needing a real preview image. Built-in themes show the colours
+                from their definitions; others get a neutral placeholder. */}
             <div className="h-20 relative overflow-hidden border-b border-[var(--vora-border-subtle)]">
                 {meta.preview ? (
                     <img src={meta.preview} alt={`${meta.name} preview`} className="w-full h-full object-cover" />
@@ -70,18 +71,34 @@ function ThemeCard({ meta, isActive, isSaving, onSelect }: ThemeCardProps) {
     );
 }
 
-/**
- * Mini palette strip. The active theme's swatches use the live CSS variables so
- * the strip changes color along with the theme. Other themes show their key
- * colors via inline styles read from the bundled manifests (best-effort —
- * if the theme isn't a known built-in, we render a neutral placeholder).
- */
+interface ThemeSwatch {
+    canvas: string;
+    surface: string;
+    accent: string;
+    text: string;
+    muted: string;
+}
+
+const swatchOf = ({ tokens: { colors } }: ThemeManifest): ThemeSwatch => ({
+    canvas: colors.bgCanvas,
+    surface: colors.bgSurface,
+    accent: colors.accent500,
+    text: colors.textPrimary,
+    muted: colors.textMuted,
+});
+
+const PLACEHOLDER_SWATCH: ThemeSwatch = {
+    canvas: 'var(--vora-bg-sunken)',
+    surface: 'var(--vora-bg-raised)',
+    accent: 'var(--vora-border-strong)',
+    text: 'var(--vora-text-muted)',
+    muted: 'var(--vora-text-disabled)',
+};
+
 function ThemeSwatchStrip({ themeId }: { themeId: string }) {
-    // We could import the manifests directly to read their token colors, but
-    // that creates a circular dep (manifests → registry → page → manifests).
-    // Instead: the active theme uses live CSS vars (always accurate); inactive
-    // themes get an inline palette keyed by known IDs.
-    const swatches = INACTIVE_SWATCHES[themeId] ?? INACTIVE_SWATCHES.default;
+    const { builtInThemes } = useTheme();
+    const builtIn = builtInThemes.find(t => t.id === themeId);
+    const swatches = builtIn ? swatchOf(builtIn) : PLACEHOLDER_SWATCH;
     return (
         <div className="absolute inset-0 grid grid-cols-5 gap-0">
             <div style={{ background: swatches.canvas }} />
@@ -92,18 +109,6 @@ function ThemeSwatchStrip({ themeId }: { themeId: string }) {
         </div>
     );
 }
-
-/**
- * Tiny palette hints used by ThemeSwatchStrip for built-in themes. Kept here
- * rather than re-importing the manifests to avoid the circular dependency.
- * Plugin themes that don't appear in this map render the default palette.
- */
-const INACTIVE_SWATCHES: Record<string, { canvas: string, surface: string, accent: string, text: string, muted: string }> = {
-    'vora-light':   { canvas: '#fafaf9', surface: '#ffffff', accent: '#d97706', text: '#1c1917', muted: '#78716c' },
-    'vora-dark':    { canvas: '#09090b', surface: '#18181b', accent: '#f59e0b', text: '#fafafa', muted: '#71717a' },
-    'vora-ocean':   { canvas: '#0a1623', surface: '#0f1f30', accent: '#14b8a6', text: '#e2e8f0', muted: '#64748b' },
-    default:        { canvas: '#e7e5e4', surface: '#f5f5f4', accent: '#a3a3a3', text: '#525252', muted: '#a3a3a3' },
-};
 
 export default function AppearancePage() {
     const { serverId } = useParams<{ serverId?: string }>();

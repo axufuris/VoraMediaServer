@@ -202,7 +202,7 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
                                             onClick={() => token && selectServer(s, token)}
                                             className="rounded-full px-3 py-1.5 text-xs font-semibold cursor-pointer"
                                             style={{
-                                                background: active ? 'var(--vora-accent-soft)' : 'rgba(255,255,255,0.04)',
+                                                background: active ? 'var(--vora-accent-soft)' : 'var(--vora-bg-sunken)',
                                                 color: active ? 'var(--vora-accent-text)' : 'var(--vora-text-secondary)',
                                                 border: `1px solid ${active ? 'var(--vora-accent-soft-hover)' : 'var(--vora-border-subtle)'}`
                                             }}

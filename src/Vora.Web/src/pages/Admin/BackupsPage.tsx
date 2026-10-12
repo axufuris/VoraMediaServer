@@ -332,7 +332,7 @@ function RestoreDrawer({ fileName, serverId, onClose, onDone }: RestoreDrawerPro
 
     return (
         <div className="fixed inset-0 z-[200] flex">
-            <div className="flex-1 bg-black/40" onClick={onClose} />
+            <div className="flex-1 bg-[var(--vora-bg-overlay)]" onClick={onClose} />
             <div className="w-[640px] max-w-full h-full bg-[var(--vora-bg-canvas)] border-l border-[var(--vora-border-subtle)] flex flex-col">
                 <div className="p-5 border-b border-[var(--vora-border-subtle)] flex items-start justify-between gap-4">
                     <div className="min-w-0">

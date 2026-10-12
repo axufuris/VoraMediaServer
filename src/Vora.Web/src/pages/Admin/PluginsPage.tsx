@@ -118,7 +118,7 @@ function PluginCard({
                         aria-pressed={enabled}
                         title={enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
                     >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-[var(--vora-text-primary)] transition-transform shadow-[var(--vora-shadow-sm)] ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--vora-text-muted)]">{enabled ? 'Enabled' : 'Disabled'}</span>
                 </div>
@@ -325,7 +325,7 @@ export default function PluginsPage() {
                                         key={opt}
                                         type="button"
                                         onClick={() => setEnabledFilter(opt)}
-                                        className={`text-xs font-semibold px-3 py-1.5 transition-colors cursor-pointer capitalize ${enabledFilter === opt ? 'bg-[var(--vora-accent-500)] text-white' : 'text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]/40'}`}
+                                        className={`text-xs font-semibold px-3 py-1.5 transition-colors cursor-pointer capitalize ${enabledFilter === opt ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]/40'}`}
                                     >
                                         {opt}
                                     </button>

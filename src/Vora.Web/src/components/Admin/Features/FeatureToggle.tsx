@@ -84,7 +84,7 @@ export default function FeatureToggle({ featureKey, label, description, serverId
                     className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 ${value ? 'bg-[var(--vora-accent-500)]' : 'bg-[var(--vora-border-strong)]'}`}
                     aria-pressed={value}
                 >
-                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm ${value ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-[var(--vora-text-primary)] transition-transform shadow-[var(--vora-shadow-sm)] ${value ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
             </div>
         </div>

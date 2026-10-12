@@ -322,7 +322,7 @@ export default function LogsPage() {
                     <button
                         type="button"
                         onClick={jumpToBottom}
-                        className="absolute right-12 bottom-16 z-10 px-4 py-2 rounded-full shadow-lg cursor-pointer bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)] text-xs font-semibold hover:opacity-90 transition"
+                        className="absolute right-12 bottom-16 z-10 px-4 py-2 rounded-full shadow-[var(--vora-shadow-lg)] cursor-pointer bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)] text-xs font-semibold hover:opacity-90 transition"
                     >
                         {pendingNewCount} new {pendingNewCount === 1 ? 'entry' : 'entries'} below ↓
                     </button>
@@ -561,7 +561,7 @@ function LogLevelsDrawer({ serverId, onClose }: { serverId?: string; onClose: ()
 
     return (
         <div className="fixed inset-0 z-[200] flex">
-            <div className="flex-1 bg-black/40" onClick={onClose} />
+            <div className="flex-1 bg-[var(--vora-bg-overlay)]" onClick={onClose} />
             <div className="w-[420px] h-full bg-[var(--vora-bg-canvas)] border-l border-[var(--vora-border-subtle)] flex flex-col">
                 <div className="p-5 border-b border-[var(--vora-border-subtle)] flex items-center justify-between">
                     <div>

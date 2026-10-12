@@ -7,6 +7,8 @@ import {
     type CreateTemplateScheduleRequest,
 } from '../../../api/System/clientTemplateService';
 import { useDialog } from '../../../dialogs';
+import { useClientTemplate } from '../../../theme/useClientTemplate';
+import type { ThemeManifest } from '../../../theme/types';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../../components/Admin/Primitives/HealthBadge';
 import EmptyState from '../../../components/Admin/Primitives/EmptyState';
@@ -33,15 +35,31 @@ interface TemplateSwatch {
     border: string;
 }
 
-const BUILT_IN_SWATCHES: Record<string, TemplateSwatch> = {
-    'vora-cinema': { canvas: '#08080b', surface: '#101015', raised: '#1a1a20', accent: '#f59e0b', accentText: '#fbbf24', text: '#fafafa', textMuted: '#a1a1aa', border: '#27272a' },
-    'vora-noir':   { canvas: '#000000', surface: '#0a0a0a', raised: '#16161a', accent: '#94a3b8', accentText: '#cbd5e1', text: '#f8fafc', textMuted: '#94a3b8', border: '#1f1f25' },
-    'vora-velvet': { canvas: '#1a0a0e', surface: '#2a1218', raised: '#3a1a22', accent: '#c2410c', accentText: '#fed7aa', text: '#fef9c3', textMuted: '#fde68a', border: '#451a25' },
-    'vora-aurora': { canvas: '#020617', surface: '#0c1726', raised: '#15233a', accent: '#14b8a6', accentText: '#5eead4', text: '#e0f2fe', textMuted: '#94a3b8', border: '#1e2a44' },
-    default:       { canvas: '#0a0a0e', surface: '#181820', raised: '#26262e', accent: '#9090a0', accentText: '#c4c4cc', text: '#fafafa', textMuted: '#a1a1aa', border: '#2e2e36' },
+const swatchOf = ({ tokens: { colors } }: ThemeManifest): TemplateSwatch => ({
+    canvas: colors.bgCanvas,
+    surface: colors.bgSurface,
+    raised: colors.bgRaised,
+    accent: colors.accent500,
+    accentText: colors.accentText,
+    text: colors.textPrimary,
+    textMuted: colors.textMuted,
+    border: colors.borderSubtle,
+});
+
+const PLACEHOLDER_SWATCH: TemplateSwatch = {
+    canvas: 'var(--vora-bg-sunken)',
+    surface: 'var(--vora-bg-surface)',
+    raised: 'var(--vora-bg-raised)',
+    accent: 'var(--vora-border-strong)',
+    accentText: 'var(--vora-text-disabled)',
+    text: 'var(--vora-text-muted)',
+    textMuted: 'var(--vora-text-disabled)',
+    border: 'var(--vora-border-subtle)',
 };
 
 function TemplatePreview({ template }: { template: TemplateMetaVM }) {
+    const { builtInTemplates } = useClientTemplate();
+
     if (template.preview) {
         return (
             <div className="h-32 overflow-hidden" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>
@@ -50,7 +68,8 @@ function TemplatePreview({ template }: { template: TemplateMetaVM }) {
         );
     }
 
-    const s = BUILT_IN_SWATCHES[template.id] ?? BUILT_IN_SWATCHES.default;
+    const builtIn = builtInTemplates.find(t => t.id === template.id);
+    const s = builtIn ? swatchOf(builtIn) : PLACEHOLDER_SWATCH;
     return (
         <div
             className="relative h-32 overflow-hidden"

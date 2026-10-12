@@ -5,6 +5,7 @@ import type { CollectionDetails, CollectionDetailsLibraryItem } from '../../api/
 import { useDialog } from '../../dialogs';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../Common/Modal';
 import { yearOf } from '../../utils/serverTime';
+import { reorderListProps, reorderRowProps, useTouchReorder } from '../../hooks/useTouchReorder';
 
 interface ReorderCollectionModalProps {
     isOpen: boolean;
@@ -44,16 +45,22 @@ export default function ReorderCollectionModal({
         }
     }, [isOpen, collection]);
 
+    const moveItem = (from: number, to: number) => {
+        const _items = [...items];
+        const draggedItemContent = _items.splice(from, 1)[0];
+        _items.splice(to, 0, draggedItemContent);
+        setItems(_items);
+    };
+
+    const touch = useTouchReorder(moveItem);
+
     const handleSort = () => {
         if (dragItem.current === null || dragOverItem.current === null) return;
-
-        const _items = [...items];
-        const draggedItemContent = _items.splice(dragItem.current, 1)[0];
-        _items.splice(dragOverItem.current, 0, draggedItemContent);
-
+        const from = dragItem.current;
+        const to = dragOverItem.current;
         dragItem.current = null;
         dragOverItem.current = null;
-        setItems(_items);
+        moveItem(from, to);
     };
 
     const persistChrono = async (itemId: string, next: { year: string, locked: boolean }) => {
@@ -114,65 +121,69 @@ export default function ReorderCollectionModal({
             />
 
             <ModalBody className="space-y-2">
-                {items.map((item, index) => (
-                    <div
-                        key={item.id}
-                        draggable
-                        onDragStart={() => (dragItem.current = index)}
-                        onDragEnter={() => (dragOverItem.current = index)}
-                        onDragEnd={handleSort}
-                        onDragOver={(e) => e.preventDefault()}
-                        className="flex items-center gap-4 p-3 bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-lg cursor-grab active:cursor-grabbing hover:border-[var(--vora-accent-500)] transition-colors"
-                    >
-                        <div className="text-[var(--vora-text-muted)] font-bold w-6 text-center">{index + 1}</div>
+                <div {...reorderListProps} className="space-y-2">
+                    {items.map((item, index) => (
+                        <div
+                            key={item.id}
+                            {...reorderRowProps(index)}
+                            style={touch.rowStyle(index)}
+                            draggable
+                            onDragStart={() => (dragItem.current = index)}
+                            onDragEnter={() => (dragOverItem.current = index)}
+                            onDragEnd={handleSort}
+                            onDragOver={(e) => e.preventDefault()}
+                            className="flex items-center gap-4 p-3 bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-lg cursor-grab active:cursor-grabbing hover:border-[var(--vora-accent-500)] transition-colors"
+                        >
+                            <div className="text-[var(--vora-text-muted)] font-bold w-6 text-center">{index + 1}</div>
 
-                        <div className="w-10 h-14 bg-[var(--vora-bg-sunken)] rounded shrink-0 overflow-hidden">
-                            {item.posterUrl && <img src={item.posterUrl} alt="" className="w-full h-full object-cover" />}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-[var(--vora-text-secondary)] text-sm truncate">{item.tvShowTitle ? `${item.tvShowTitle}: ${item.title}` : item.title}</h4>
-                            <p className="text-xs text-[var(--vora-text-muted)]">{yearOf(item.releaseDate) ?? 'Unknown'}</p>
-                        </div>
-
-                        {isChronology && (
-                            <div
-                                className="flex items-center gap-2"
-                                draggable={false}
-                                onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                onMouseDown={(e) => e.stopPropagation()}
-                            >
-                                <label className="text-[10px] uppercase tracking-widest text-[var(--vora-text-muted)]">Set year</label>
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    value={chrono[item.id]?.year ?? ''}
-                                    placeholder="—"
-                                    onChange={(e) => setYear(item.id, e.target.value)}
-                                    onBlur={() => commitYear(item.id)}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                                    className="w-28 px-3 py-1.5 text-sm rounded bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none"
-                                    title="In-universe (story) year used to order this item"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => toggleLock(item.id)}
-                                    disabled={savingItemId === item.id}
-                                    title={chrono[item.id]?.locked ? 'Locked — the AI will not change this year' : 'Unlocked — the AI may re-score this year'}
-                                    className={`px-2 py-1 rounded text-sm transition-colors ${chrono[item.id]?.locked
-                                        ? 'bg-[var(--vora-accent-soft)] text-[var(--vora-accent-text)]'
-                                        : 'bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)]'}`}
-                                >
-                                    {chrono[item.id]?.locked ? '🔒' : '🔓'}
-                                </button>
+                            <div className="w-10 h-14 bg-[var(--vora-bg-sunken)] rounded shrink-0 overflow-hidden">
+                                {item.posterUrl && <img src={item.posterUrl} alt="" className="w-full h-full object-cover" />}
                             </div>
-                        )}
 
-                        <div className="text-[var(--vora-text-muted)]">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                            <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-[var(--vora-text-secondary)] text-sm truncate">{item.tvShowTitle ? `${item.tvShowTitle}: ${item.title}` : item.title}</h4>
+                                <p className="text-xs text-[var(--vora-text-muted)]">{yearOf(item.releaseDate) ?? 'Unknown'}</p>
+                            </div>
+
+                            {isChronology && (
+                                <div
+                                    className="flex items-center gap-2"
+                                    draggable={false}
+                                    onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                >
+                                    <label className="text-[10px] uppercase tracking-widest text-[var(--vora-text-muted)]">Set year</label>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        value={chrono[item.id]?.year ?? ''}
+                                        placeholder="—"
+                                        onChange={(e) => setYear(item.id, e.target.value)}
+                                        onBlur={() => commitYear(item.id)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                        className="w-28 px-3 py-1.5 text-sm rounded bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none"
+                                        title="In-universe (story) year used to order this item"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleLock(item.id)}
+                                        disabled={savingItemId === item.id}
+                                        title={chrono[item.id]?.locked ? 'Locked — the AI will not change this year' : 'Unlocked — the AI may re-score this year'}
+                                        className={`px-2 py-1 rounded text-sm transition-colors ${chrono[item.id]?.locked
+                                            ? 'bg-[var(--vora-accent-soft)] text-[var(--vora-accent-text)]'
+                                            : 'bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)]'}`}
+                                    >
+                                        {chrono[item.id]?.locked ? '🔒' : '🔓'}
+                                    </button>
+                                </div>
+                            )}
+
+                            <div {...touch.handleProps(index)} className="touch-none text-[var(--vora-text-muted)]">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </ModalBody>
 
             <ModalFooter className="flex justify-between items-center">
@@ -183,7 +194,7 @@ export default function ReorderCollectionModal({
                 </span>
                 <div className="flex gap-3">
                     <button onClick={onClose} className="px-5 py-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] font-medium transition-colors cursor-pointer">Close</button>
-                    <button onClick={handleSave} disabled={isSaving} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors cursor-pointer">
+                    <button onClick={handleSave} disabled={isSaving} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-text-primary)] font-bold rounded shadow-[var(--vora-shadow-lg)] transition-colors cursor-pointer">
                         {isSaving ? 'Saving...' : 'Save Order'}
                     </button>
                 </div>

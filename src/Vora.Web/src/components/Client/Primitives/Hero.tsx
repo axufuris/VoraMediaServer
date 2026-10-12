@@ -22,7 +22,7 @@ export default function Hero({ backdropSrc, transitionKey, eyebrow, title, meta,
                         <div
                             className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium"
                             style={{
-                                background: 'rgba(255, 255, 255, 0.06)',
+                                background: 'color-mix(in srgb, var(--vora-text-primary) 6%, transparent)',
                                 border: '1px solid var(--vora-border-subtle)',
                                 color: 'var(--vora-text-secondary)',
                             }}

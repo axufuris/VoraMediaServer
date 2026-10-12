@@ -64,7 +64,7 @@ export default function ArtworkPicker({
     // A logo is a wordmark on transparency, usually near-white. Shown on the
     // panel's own surface it would be invisible, so these sit on a dark tile.
     const tileStyle = artType === 'Logo'
-        ? { background: 'var(--vora-bg-canvas)', backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.04) 75%), linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.04) 75%)', backgroundSize: '16px 16px', backgroundPosition: '0 0, 8px 8px' }
+        ? { background: 'var(--vora-bg-canvas)', backgroundImage: 'linear-gradient(45deg, color-mix(in srgb, var(--vora-text-primary) 4%, transparent) 25%, transparent 25%, transparent 75%, color-mix(in srgb, var(--vora-text-primary) 4%, transparent) 75%), linear-gradient(45deg, color-mix(in srgb, var(--vora-text-primary) 4%, transparent) 25%, transparent 25%, transparent 75%, color-mix(in srgb, var(--vora-text-primary) 4%, transparent) 75%)', backgroundSize: '16px 16px', backgroundPosition: '0 0, 8px 8px' }
         : undefined;
     const labelLower = artType.toLowerCase();
 
@@ -120,16 +120,16 @@ export default function ArtworkPicker({
                                 key={`${art.id}-${idx}`}
                                 onClick={() => onSelect(art.url)}
                                 style={tileStyle}
-                                className={`${aspectClass} rounded bg-[var(--vora-bg-canvas)] overflow-hidden cursor-pointer relative transition-all group ${isSelected ? 'ring-4 ring-orange-500 scale-95' : 'hover:ring-2 hover:ring-gray-500'}`}
+                                className={`${aspectClass} rounded bg-[var(--vora-bg-canvas)] overflow-hidden cursor-pointer relative transition-all group ${isSelected ? 'ring-4 ring-[var(--vora-accent-500)] scale-95' : 'hover:ring-2 hover:ring-[var(--vora-border-strong)]'}`}
                             >
                                 <img src={art.url} alt={`${labelLower} option`} loading="lazy" className={`w-full h-full ${artType === 'Logo' ? 'object-contain p-3' : 'object-cover'}`} />
 
                                 {art.isUserUploaded && (
                                     <>
-                                        <span className="absolute top-2 left-2 bg-blue-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase text-[var(--vora-text-primary)] shadow">Manual</span>
+                                        <span className="absolute top-2 left-2 bg-[var(--vora-info-500)] text-[10px] px-1.5 py-0.5 rounded font-bold uppercase text-[var(--vora-text-primary)] shadow-[var(--vora-shadow-sm)]">Manual</span>
                                         <button
                                             onClick={(e) => onDeleteArtwork(e, art.id)}
-                                            className="absolute top-2 right-2 p-1.5 bg-[var(--vora-danger-500)] hover:bg-[var(--vora-danger-500)] text-[var(--vora-text-primary)] rounded opacity-0 group-hover:opacity-100 transition-opacity shadow cursor-pointer"
+                                            className="absolute top-2 right-2 p-1.5 bg-[var(--vora-danger-500)] hover:bg-[var(--vora-danger-500)] text-[var(--vora-text-primary)] rounded opacity-0 group-hover:opacity-100 transition-opacity shadow-[var(--vora-shadow-sm)] cursor-pointer"
                                             aria-label="Delete artwork"
                                         >
                                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -138,7 +138,7 @@ export default function ArtworkPicker({
                                 )}
 
                                 {isSelected && (
-                                    <div className="absolute top-2 right-2 bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)] rounded-full p-1 shadow-xl">
+                                    <div className="absolute top-2 right-2 bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)] rounded-full p-1 shadow-[var(--vora-shadow-overlay)]">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                     </div>
                                 )}

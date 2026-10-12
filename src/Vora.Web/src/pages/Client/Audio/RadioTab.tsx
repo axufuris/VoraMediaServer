@@ -278,7 +278,7 @@ export default function RadioTab() {
                     <button
                         type="button"
                         onClick={() => { toggleFavorite(contextMenu.channelId); setContextMenu(null); }}
-                        className="block w-full cursor-pointer px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+                        className="block w-full cursor-pointer px-4 py-2.5 text-left vora-row-interactive"
                         style={{ color: 'var(--vora-text-primary)' }}
                     >
                         {prefs.favoriteIds.includes(contextMenu.channelId) ? 'Remove favorite' : 'Add to favorites'}
@@ -287,7 +287,7 @@ export default function RadioTab() {
                         <button
                             type="button"
                             onClick={() => { restoreStation(contextMenu.channelId); setContextMenu(null); }}
-                            className="block w-full cursor-pointer px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+                            className="block w-full cursor-pointer px-4 py-2.5 text-left vora-row-interactive"
                             style={{ color: 'var(--vora-accent-text)' }}
                         >
                             Restore station
@@ -296,7 +296,7 @@ export default function RadioTab() {
                         <button
                             type="button"
                             onClick={() => { hideStation(contextMenu.channelId); setContextMenu(null); }}
-                            className="block w-full cursor-pointer px-4 py-2.5 text-left font-medium transition-colors hover:bg-white/5"
+                            className="block w-full cursor-pointer px-4 py-2.5 text-left font-medium vora-row-interactive"
                             style={{ color: 'var(--vora-danger-text)' }}
                         >
                             Hide station

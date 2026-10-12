@@ -247,7 +247,7 @@ export default function DiscoveryDetailsPage() {
                             {autoLoad === false && !showtimesFetched && !isLoadingTheaters ? (
                                 <button
                                     onClick={fetchTheaters}
-                                    className="px-6 py-3 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors flex items-center gap-2 cursor-pointer"
+                                    className="px-6 py-3 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)] font-bold rounded shadow-[var(--vora-shadow-lg)] transition-colors flex items-center gap-2 cursor-pointer"
                                 >
                                     <svg className="w-5 h-5 text-[var(--vora-accent-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                                     Find Local Showtimes
@@ -276,9 +276,9 @@ export default function DiscoveryDetailsPage() {
                                                         timeClass += "text-[var(--vora-text-muted)] line-through";
                                                         formatClass += "text-[var(--vora-text-muted)]";
                                                     } else if (status === 'soon') {
-                                                        containerClass += "bg-yellow-900/20 border-yellow-600/50";
-                                                        timeClass += "text-yellow-400";
-                                                        formatClass += "text-yellow-600";
+                                                        containerClass += "bg-[var(--vora-warning-soft)] border-[color-mix(in_srgb,var(--vora-warning-500)_50%,transparent)]";
+                                                        timeClass += "text-[var(--vora-warning-text)]";
+                                                        formatClass += "text-[var(--vora-warning-500)]";
                                                     } else {
                                                         containerClass += "bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)]";
                                                         timeClass += "text-[var(--vora-text-secondary)]";

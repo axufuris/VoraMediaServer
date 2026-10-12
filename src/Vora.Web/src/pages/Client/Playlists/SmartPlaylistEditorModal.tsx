@@ -248,8 +248,8 @@ export default function SmartPlaylistEditorModal({ serverId, initialId, initialM
     const typeBadgeColor = mediaType === 'Music' ? 'fuchsia' : mediaType === 'Movies' ? 'sky' : 'amber';
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--vora-bg-overlay)] backdrop-blur-sm p-4">
+            <div className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-[var(--vora-shadow-overlay)] max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                 <div className="sticky top-0 bg-[var(--vora-bg-raised)] border-b border-[var(--vora-border-subtle)] px-6 py-4 flex items-center justify-between">
                     <h2 className="text-xl font-bold text-[var(--vora-text-primary)] flex items-center gap-2">
                         <span className={`text-${typeBadgeColor}-400`}>⚙</span>
@@ -272,7 +272,7 @@ export default function SmartPlaylistEditorModal({ serverId, initialId, initialM
                                         type="text"
                                         value={name}
                                         onChange={e => setName(e.target.value)}
-                                        className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none focus:border-fuchsia-500"
+                                        className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)]"
                                         placeholder={mediaType === 'Music' ? 'e.g. Heavy rotation rock' : mediaType === 'Movies' ? 'e.g. Unwatched sci-fi' : 'e.g. Unwatched comedy episodes'}
                                     />
                                 </div>
@@ -282,7 +282,7 @@ export default function SmartPlaylistEditorModal({ serverId, initialId, initialM
                                         type="text"
                                         value={description}
                                         onChange={e => setDescription(e.target.value)}
-                                        className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none focus:border-fuchsia-500"
+                                        className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none focus:border-[var(--vora-accent-500)]"
                                     />
                                 </div>
                             </div>
@@ -343,14 +343,14 @@ export default function SmartPlaylistEditorModal({ serverId, initialId, initialM
                                 </span>
                             </div>
 
-                            {error && <div className="text-rose-400 text-sm">{error}</div>}
+                            {error && <div className="text-[var(--vora-danger-text)] text-sm">{error}</div>}
                         </>
                     )}
                 </div>
 
                 <div className="sticky bottom-0 bg-[var(--vora-bg-raised)] border-t border-[var(--vora-border-subtle)] px-6 py-4 flex justify-end gap-3">
                     <button onClick={onClose} disabled={saving} className="px-4 py-2 rounded text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)] transition-colors cursor-pointer">Cancel</button>
-                    <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors cursor-pointer disabled:opacity-50">
+                    <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] font-bold rounded shadow-[var(--vora-shadow-lg)] transition-colors cursor-pointer disabled:opacity-50">
                         {saving ? 'Saving…' : initialId ? 'Save changes' : 'Create'}
                     </button>
                 </div>
@@ -369,7 +369,7 @@ interface GroupEditorProps {
 }
 
 function RuleGroupEditor({ group, path, fields, onAddRule, onAddGroup, onUpdate }: GroupEditorProps) {
-    const indent = path.length === 0 ? '' : 'border-l-2 border-fuchsia-700/40 pl-4 ml-2';
+    const indent = path.length === 0 ? '' : 'border-l-2 border-[color-mix(in_srgb,var(--vora-accent-500)_40%,transparent)] pl-4 ml-2';
     return (
         <div className={`${indent} space-y-2`}>
             <div className="flex items-center gap-3 text-sm">
@@ -399,7 +399,7 @@ function RuleGroupEditor({ group, path, fields, onAddRule, onAddGroup, onUpdate 
                 <div key={`g-${idx}`} className="relative">
                     <button
                         onClick={() => onUpdate(path, g => ({ ...g, groups: g.groups.filter((_, i) => i !== idx) }))}
-                        className="absolute -left-2 top-0 w-5 h-5 rounded-full bg-rose-700 hover:bg-rose-500 text-[var(--vora-text-primary)] text-xs cursor-pointer z-10"
+                        className="absolute -left-2 top-0 w-5 h-5 rounded-full bg-[var(--vora-danger-500)] hover:opacity-80 text-[var(--vora-text-primary)] text-xs cursor-pointer z-10"
                         title="Remove group"
                     >×</button>
                     <RuleGroupEditor
@@ -511,7 +511,7 @@ function RuleRow({ rule, fields, onChange, onRemove }: RuleRowProps) {
                 )
             )}
 
-            <button onClick={onRemove} className="ml-auto px-2 py-1 text-rose-400 hover:bg-rose-900/30 rounded text-sm cursor-pointer" title="Remove rule">×</button>
+            <button onClick={onRemove} className="ml-auto px-2 py-1 text-[var(--vora-danger-text)] hover:bg-[var(--vora-danger-soft)] rounded text-sm cursor-pointer" title="Remove rule">×</button>
         </div>
     );
 }

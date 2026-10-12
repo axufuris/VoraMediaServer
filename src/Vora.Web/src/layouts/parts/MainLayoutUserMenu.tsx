@@ -61,11 +61,11 @@ export default function MainLayoutUserMenu({
                 <button
                     type="button"
                     onClick={onToggleMenu}
-                    className="flex cursor-pointer items-center gap-2 rounded-full p-1.5 pr-3 transition-colors hover:bg-white/5"
+                    className="flex cursor-pointer items-center gap-2 rounded-full p-1.5 pr-3 vora-icon-button"
                     style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)' }}
                 >
                     <div
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold uppercase shadow-inner"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold uppercase shadow-[inset_0_2px_4px_color-mix(in_srgb,var(--vora-bg-canvas)_35%,transparent)]"
                         style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}
                     >
                         {profileName.charAt(0)}
@@ -102,7 +102,7 @@ export default function MainLayoutUserMenu({
                             <button
                                 type="button"
                                 onClick={onManageServers}
-                                className="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5"
+                                className="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm vora-row-interactive"
                                 style={{ ...menuItemStyle, borderBottom: '1px solid var(--vora-border-subtle)' }}
                             >
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
@@ -110,34 +110,34 @@ export default function MainLayoutUserMenu({
                             </button>
 
                             {isServerAdmin && (
-                                <button type="button" onClick={onServerSettings} className="block w-full cursor-pointer px-4 py-2 text-left text-sm transition-colors hover:bg-white/5" style={menuItemStyle}>
+                                <button type="button" onClick={onServerSettings} className="block w-full cursor-pointer px-4 py-2 text-left text-sm vora-row-interactive" style={menuItemStyle}>
                                     Server settings
                                 </button>
                             )}
 
-                            <button type="button" onClick={onClientSettings} className="block w-full cursor-pointer px-4 py-2 text-left text-sm transition-colors hover:bg-white/5" style={menuItemStyle}>
+                            <button type="button" onClick={onClientSettings} className="block w-full cursor-pointer px-4 py-2 text-left text-sm vora-row-interactive" style={menuItemStyle}>
                                 Client settings
                             </button>
 
-                            <button type="button" onClick={onAccountSettings} className="block w-full cursor-pointer px-4 py-2 text-left text-sm transition-colors hover:bg-white/5" style={menuItemStyle}>
+                            <button type="button" onClick={onAccountSettings} className="block w-full cursor-pointer px-4 py-2 text-left text-sm vora-row-interactive" style={menuItemStyle}>
                                 Account settings
                             </button>
                             <button
                                 type="button"
                                 onClick={onPlayHistory}
-                                className="block w-full cursor-pointer px-4 py-2 text-left text-sm transition-colors hover:bg-white/5"
+                                className="block w-full cursor-pointer px-4 py-2 text-left text-sm vora-row-interactive"
                                 style={{ ...menuItemStyle, borderBottom: '1px solid var(--vora-border-subtle)' }}
                             >
                                 Play history
                             </button>
 
-                            <button type="button" onClick={onSwitchProfile} className="block w-full cursor-pointer px-4 py-2 text-left text-sm transition-colors hover:bg-white/5" style={menuItemStyle}>
+                            <button type="button" onClick={onSwitchProfile} className="block w-full cursor-pointer px-4 py-2 text-left text-sm vora-row-interactive" style={menuItemStyle}>
                                 Switch profile
                             </button>
                             <button
                                 type="button"
                                 onClick={onSignOut}
-                                className="mt-1 block w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/5"
+                                className="mt-1 block w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium vora-row-interactive"
                                 style={{ color: 'var(--vora-danger-text)', borderTop: '1px solid var(--vora-border-subtle)' }}
                             >
                                 Sign out of client

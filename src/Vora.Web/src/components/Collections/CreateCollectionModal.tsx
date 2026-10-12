@@ -270,7 +270,7 @@ export default function CreateCollectionModal({
                                         id="mirrorListCreate"
                                         checked={mirrorList}
                                         onChange={e => setMirrorList(e.target.checked)}
-                                        className="w-4 h-4 accent-orange-500 rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)]"
+                                        className="w-4 h-4 accent-[var(--vora-accent-500)] rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)]"
                                     />
                                     <label htmlFor="mirrorListCreate" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">
                                         Mirror the list exactly
@@ -315,7 +315,7 @@ export default function CreateCollectionModal({
                     </div>
 
                     {chronologyProviders.length > 0 && (
-                        <div className="p-4 bg-[var(--vora-bg-raised)]/50 border border-orange-500/30 rounded-lg space-y-4">
+                        <div className="p-4 bg-[var(--vora-bg-raised)]/50 border border-[color-mix(in_srgb,var(--vora-accent-500)_30%,transparent)] rounded-lg space-y-4">
                             <div>
                                 <h3 className="text-[var(--vora-accent-500)] font-bold text-sm tracking-wide uppercase">Chronological Ordering (Optional)</h3>
                                 <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-1">
@@ -380,7 +380,7 @@ export default function CreateCollectionModal({
                                             id="autoSyncChronologyCreate"
                                             checked={autoSyncChronology}
                                             onChange={e => setAutoSyncChronology(e.target.checked)}
-                                            className="w-4 h-4 accent-orange-500 rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)]"
+                                            className="w-4 h-4 accent-[var(--vora-accent-500)] rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)]"
                                         />
                                         <label htmlFor="autoSyncChronologyCreate" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">
                                             Enable Auto-Sync
@@ -396,7 +396,7 @@ export default function CreateCollectionModal({
 
                     {activeTab !== 'global' && (
                         <div className="flex items-center gap-2 pt-4 border-t border-[var(--vora-border-subtle)]">
-                            <input type="checkbox" id="isGlobalCreate" checked={isGlobal} onChange={e => setIsGlobal(e.target.checked)} className="w-4 h-4 accent-orange-500" />
+                            <input type="checkbox" id="isGlobalCreate" checked={isGlobal} onChange={e => setIsGlobal(e.target.checked)} className="w-4 h-4 accent-[var(--vora-accent-500)]" />
                             <label htmlFor="isGlobalCreate" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">Make this a Global Collection (visible across all libraries)</label>
                         </div>
                     )}
@@ -429,7 +429,7 @@ export default function CreateCollectionModal({
 
             <ModalFooter className="flex justify-end gap-3">
                 <button type="button" onClick={onClose} className="px-5 py-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] font-medium transition-colors cursor-pointer">Cancel</button>
-                <button type="submit" form="create-collection-form" disabled={isCreating} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-text-primary)] font-bold rounded shadow-lg transition-colors cursor-pointer">
+                <button type="submit" form="create-collection-form" disabled={isCreating} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-accent-contrast)] font-bold rounded shadow-[var(--vora-shadow-lg)] transition-colors cursor-pointer">
                     {isCreating ? 'Creating...' : 'Create Collection'}
                 </button>
             </ModalFooter>

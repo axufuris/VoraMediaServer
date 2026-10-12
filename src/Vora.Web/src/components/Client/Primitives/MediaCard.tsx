@@ -148,7 +148,7 @@ export default function MediaCard({
                 {inWatchlist && (
                     <div
                         className="absolute left-2 top-2 z-10 rounded p-1.5 backdrop-blur-sm"
-                        style={{ background: 'rgba(8, 8, 11, 0.72)', border: '1px solid rgba(255, 255, 255, 0.2)', color: 'var(--vora-accent-500)' }}
+                        style={{ background: 'color-mix(in srgb, var(--vora-bg-canvas) 72%, transparent)', border: '1px solid var(--vora-border-strong)', color: 'var(--vora-accent-500)' }}
                     >
                         <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>
                     </div>
@@ -175,7 +175,7 @@ export default function MediaCard({
                         title="Delete"
                         aria-label={`Delete ${displayTitle}`}
                         className="absolute left-2 top-2 z-20 cursor-pointer rounded-md p-1.5 opacity-0 transition-all hover:scale-105 group-hover:opacity-100 group-focus-within:opacity-100"
-                        style={{ background: 'var(--vora-danger-500)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.85)', boxShadow: 'var(--vora-shadow-md)' }}
+                        style={{ background: 'var(--vora-danger-500)', color: 'var(--vora-text-primary)', border: '1px solid color-mix(in srgb, var(--vora-text-primary) 85%, transparent)', boxShadow: 'var(--vora-shadow-md)' }}
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.25}>
                             <polyline points="3 6 5 6 21 6" />
@@ -189,7 +189,7 @@ export default function MediaCard({
                 {bottomLeftBadge && <div className="absolute bottom-2 left-2 z-10">{bottomLeftBadge}</div>}
 
                 {progressPercent != null && progressPercent > 0 && (
-                    <div className="absolute bottom-2 left-2 right-2 z-10 h-1 overflow-hidden rounded-full" style={{ background: 'rgba(255, 255, 255, 0.2)' }}>
+                    <div className="absolute bottom-2 left-2 right-2 z-10 h-1 overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--vora-text-primary) 20%, transparent)' }}>
                         <div className="h-full" style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%`, background: 'var(--vora-accent-500)' }} />
                     </div>
                 )}

@@ -919,7 +919,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 {adminMessage && (
                     <div className="fixed inset-0 z-[210] flex items-center justify-center bg-[var(--vora-bg-overlay)] backdrop-blur-sm p-4 transition-opacity">
                         <div role="dialog" aria-modal="true" className="bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-xl shadow-[var(--vora-shadow-overlay)] max-w-sm w-full p-6 text-center transform transition-all scale-100">
-                            <div className="w-16 h-16 bg-[var(--vora-danger-soft)] text-[var(--vora-danger-500)] rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--vora-danger-text)]/50 shadow-inner">
+                            <div className="w-16 h-16 bg-[var(--vora-danger-soft)] text-[var(--vora-danger-500)] rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--vora-danger-text)]/50 shadow-[inset_0_2px_4px_color-mix(in_srgb,var(--vora-bg-canvas)_35%,transparent)]">
                                 <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                                 </svg>

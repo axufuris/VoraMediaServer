@@ -369,12 +369,12 @@ function LibraryHero({ library, totalItems, totalCollections, samplePosters, act
                 <div
                     className="absolute inset-0"
                     style={{
-                        backgroundImage: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0) 35%, var(--vora-bg-canvas) 96%), linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 70%)',
+                        backgroundImage: 'linear-gradient(180deg, color-mix(in srgb, var(--vora-bg-canvas) 25%, transparent) 0%, transparent 35%, var(--vora-bg-canvas) 96%), linear-gradient(90deg, color-mix(in srgb, var(--vora-bg-canvas) 55%, transparent) 0%, transparent 70%)',
                     }}
                 />
             </div>
             <div className="relative px-8 max-md:px-4 pt-16 pb-14">
-                <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-secondary)' }}>
+                <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium" style={{ background: 'color-mix(in srgb, var(--vora-text-primary) 6%, transparent)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-secondary)' }}>
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--vora-accent-500)' }} />
                     Library · {library.type}
                 </div>

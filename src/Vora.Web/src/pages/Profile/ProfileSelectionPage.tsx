@@ -279,7 +279,7 @@ export default function ProfileSelectionPage() {
                             {profile.hasPin && (
                                 <div
                                     className="absolute bottom-2 right-2 p-1.5 rounded-full"
-                                    style={{ background: 'rgba(0,0,0,0.75)', border: '1px solid var(--vora-border-subtle)' }}
+                                    style={{ background: 'color-mix(in srgb, var(--vora-bg-canvas) 75%, transparent)', border: '1px solid var(--vora-border-subtle)' }}
                                 >
                                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" style={{ color: 'var(--vora-text-secondary)' }}>
                                         <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
@@ -340,7 +340,7 @@ export default function ProfileSelectionPage() {
             {isCreateOpen && (
                 <div
                     className="fixed inset-0 flex items-center justify-center z-[200] p-4"
-                    style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+                    style={{ background: 'var(--vora-bg-overlay)', backdropFilter: 'blur(8px)' }}
                 >
                     <div
                         className="rounded-xl p-8 max-w-sm w-full"
@@ -372,7 +372,7 @@ export default function ProfileSelectionPage() {
             {selectedProfile && (
                 <div
                     className="fixed inset-0 flex items-center justify-center z-[200] p-4"
-                    style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+                    style={{ background: 'var(--vora-bg-overlay)', backdropFilter: 'blur(8px)' }}
                 >
                     <div
                         className="rounded-xl p-8 max-w-sm w-full text-center"

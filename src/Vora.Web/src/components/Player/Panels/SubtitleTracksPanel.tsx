@@ -77,7 +77,7 @@ export default function SubtitleTracksPanel({
         <div
             className="absolute inset-0 z-50 flex animate-fade-in items-center justify-center backdrop-blur-md"
             onClick={onClose}
-            style={{ background: 'rgba(0, 0, 0, 0.78)' }}
+            style={{ background: 'var(--vora-bg-overlay)' }}
         >
             <div
                 className="w-full max-w-lg overflow-hidden rounded-2xl p-7"
@@ -96,7 +96,7 @@ export default function SubtitleTracksPanel({
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full vora-icon-button transition-colors"
                         style={labelStyle}
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>

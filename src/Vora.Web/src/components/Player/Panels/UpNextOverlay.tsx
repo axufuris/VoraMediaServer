@@ -54,9 +54,9 @@ export default function UpNextOverlay({ currentMedia, upNextData, onPlayNext, on
                                 ) : (
                                     <div className="flex h-full w-full items-center justify-center" style={{ background: 'var(--vora-bg-sunken)', color: 'var(--vora-text-disabled)' }}>No image</div>
                                 )}
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                                <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--vora-bg-canvas)_40%,transparent)] opacity-0 transition-opacity group-hover:opacity-100">
                                     <div
-                                        className="flex h-16 w-16 items-center justify-center rounded-full shadow-xl"
+                                        className="flex h-16 w-16 items-center justify-center rounded-full shadow-[var(--vora-shadow-overlay)]"
                                         style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', paddingLeft: 4 }}
                                     >
                                         <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
@@ -95,8 +95,8 @@ export default function UpNextOverlay({ currentMedia, upNextData, onPlayNext, on
                 type="button"
                 onClick={onClose}
                 aria-label="Close up-next overlay"
-                className="absolute right-12 top-8 z-50 inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10 max-md:right-4 max-md:top-4 max-md:h-10 max-md:w-10"
-                style={{ background: 'rgba(20, 20, 28, 0.55)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}
+                className="vora-icon-button absolute right-12 top-8 z-50 inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--vora-bg-canvas)_55%,transparent)] backdrop-blur-md transition-colors max-md:right-4 max-md:top-4 max-md:h-10 max-md:w-10"
+                style={{ border: '1px solid color-mix(in srgb, var(--vora-text-primary) 16%, transparent)', color: 'var(--vora-text-primary)' }}
             >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>

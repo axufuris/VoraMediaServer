@@ -19,8 +19,8 @@ export default function MusicRecapView({ isLoading, currentRecap, availableYears
     return (
         <>
             <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-6 mb-8 pb-6 border-b border-[var(--vora-border-subtle)] text-center sm:text-left">
-                <div className="w-32 h-32 sm:w-40 sm:h-40 rounded bg-gradient-to-br from-pink-600 via-amber-500 to-purple-700 border border-pink-400/30 flex items-center justify-center shrink-0 shadow-lg">
-                    <div className="text-5xl sm:text-6xl font-bold text-[var(--vora-text-primary)] drop-shadow-lg">{currentRecap.year}</div>
+                <div className="w-32 h-32 sm:w-40 sm:h-40 rounded bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-danger-500)_80%,var(--vora-bg-canvas)),var(--vora-accent-500),color-mix(in_srgb,var(--vora-info-500)_70%,var(--vora-bg-canvas)))] border border-[color-mix(in_srgb,var(--vora-accent-500)_30%,transparent)] flex items-center justify-center shrink-0 shadow-[var(--vora-shadow-lg)]">
+                    <div className="text-5xl sm:text-6xl font-bold text-[var(--vora-text-primary)] drop-shadow-[0_4px_4px_color-mix(in_srgb,var(--vora-bg-canvas)_70%,transparent)]">{currentRecap.year}</div>
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="text-xs uppercase tracking-widest text-[var(--vora-text-secondary)] font-bold mb-1">Year in Music</div>
@@ -35,7 +35,7 @@ export default function MusicRecapView({ isLoading, currentRecap, availableYears
                                     key={y}
                                     type="button"
                                     onClick={() => updateNav({ view: 'recap', year: y })}
-                                    className={`text-xs px-3 py-1 rounded font-bold transition-colors cursor-pointer ${currentRecap.year === y ? 'bg-pink-600 text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-raised)]'}`}
+                                    className={`text-xs px-3 py-1 rounded font-bold transition-colors cursor-pointer ${currentRecap.year === y ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-raised)]'}`}
                                 >
                                     {y}
                                 </button>
@@ -70,11 +70,11 @@ export default function MusicRecapView({ isLoading, currentRecap, availableYears
                                         onClick={() => updateNav({ view: 'artist', artistId: a.id })}
                                         className="w-28 sm:w-32 shrink-0 group text-left cursor-pointer"
                                     >
-                                        <div className="w-full aspect-square rounded-full bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] group-hover:border-pink-400 transition-all overflow-hidden mb-2 relative">
+                                        <div className="w-full aspect-square rounded-full bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-all overflow-hidden mb-2 relative">
                                             {a.artworkUrl
                                                 ? <img src={a.artworkUrl} alt="" className="w-full h-full object-cover" />
                                                 : <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-disabled)]"><svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg></div>}
-                                            <div className="absolute top-1 left-1 bg-pink-600/90 text-[var(--vora-text-primary)] text-xs font-bold rounded px-1.5 py-0.5">#{idx + 1}</div>
+                                            <div className="absolute top-1 left-1 bg-[color-mix(in_srgb,var(--vora-accent-500)_90%,transparent)] text-[var(--vora-accent-contrast)] text-xs font-bold rounded px-1.5 py-0.5">#{idx + 1}</div>
                                         </div>
                                         <div className="text-sm font-bold text-[var(--vora-text-primary)] truncate text-center">{a.name}</div>
                                         <div className="text-xs text-[var(--vora-text-muted)] text-center">{a.playCount} plays</div>
@@ -100,7 +100,7 @@ export default function MusicRecapView({ isLoading, currentRecap, availableYears
                                             <div className="text-sm text-[var(--vora-text-primary)] truncate">{t.title}</div>
                                             <div className="text-xs text-[var(--vora-text-muted)] truncate">{t.artist ?? t.albumTitle ?? ''}</div>
                                         </div>
-                                        <div className="text-xs text-pink-400 font-bold shrink-0">{t.playCount} plays</div>
+                                        <div className="text-xs text-[var(--vora-accent-text)] font-bold shrink-0">{t.playCount} plays</div>
                                     </div>
                                 ))}
                             </div>
@@ -118,7 +118,7 @@ export default function MusicRecapView({ isLoading, currentRecap, availableYears
                                             <span className="text-[var(--vora-text-muted)]">{g.percent}% · {g.playCount} plays</span>
                                         </div>
                                         <div className="h-2 bg-[var(--vora-bg-surface)] rounded-full overflow-hidden">
-                                            <div className="h-full bg-gradient-to-r from-pink-500 to-amber-500" style={{ width: `${g.percent}%` }} />
+                                            <div className="h-full bg-gradient-to-r from-[var(--vora-accent-active)] to-[var(--vora-accent-hover)]" style={{ width: `${g.percent}%` }} />
                                         </div>
                                     </div>
                                 ))}
@@ -138,7 +138,7 @@ export default function MusicRecapView({ isLoading, currentRecap, availableYears
                                         onClick={() => updateNav({ view: 'artist', artistId: a.id })}
                                         className="w-24 sm:w-28 shrink-0 group text-left cursor-pointer"
                                     >
-                                        <div className="w-full aspect-square rounded-full bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] group-hover:border-orange-400 transition-all overflow-hidden mb-2">
+                                        <div className="w-full aspect-square rounded-full bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-all overflow-hidden mb-2">
                                             {a.artworkUrl
                                                 ? <img src={a.artworkUrl} alt="" className="w-full h-full object-cover" />
                                                 : <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-disabled)]"><svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg></div>}
@@ -155,7 +155,7 @@ export default function MusicRecapView({ isLoading, currentRecap, availableYears
                         <DistributionBlock title="Plays by hour" labels={Array.from({length:24}, (_,i) => i.toString())} values={currentRecap.playsByHour} compact />
                     </div>
                     {currentRecap.peakHourLabel && (
-                        <div className="text-sm text-[var(--vora-text-muted)] mb-4">Most active around <span className="text-pink-400 font-bold">{currentRecap.peakHourLabel}</span></div>
+                        <div className="text-sm text-[var(--vora-text-muted)] mb-4">Most active around <span className="text-[var(--vora-accent-text)] font-bold">{currentRecap.peakHourLabel}</span></div>
                     )}
                 </>
             )}
@@ -190,7 +190,7 @@ function DistributionBlock({ title, labels, values, compact }: { title: string; 
                 {values.map((v, i) => (
                     <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
                         <div
-                            className="w-full bg-gradient-to-t from-pink-600 to-amber-500 rounded-sm transition-all"
+                            className="w-full bg-gradient-to-t from-[var(--vora-accent-active)] to-[var(--vora-accent-hover)] rounded-sm transition-all"
                             style={{ height: `${(v / max) * 100}%` }}
                             title={`${labels[i]}: ${v} plays`}
                         />

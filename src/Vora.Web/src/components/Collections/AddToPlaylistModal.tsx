@@ -159,7 +159,7 @@ export default function AddToPlaylistModal({
                                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePlaylist(p.id); } }}
                                 className={`flex items-center gap-4 p-3 rounded-lg border transition-all cursor-pointer ${isActive ? 'bg-[var(--vora-accent-500)]/10 border-[var(--vora-accent-500)]/50' : 'bg-[var(--vora-bg-sunken)]/50 border-[var(--vora-border-subtle)] hover:bg-[var(--vora-bg-sunken)]'}`}
                             >
-                                <div className={`w-6 h-6 rounded flex items-center justify-center border transition-colors shrink-0 ${isActive ? 'bg-[var(--vora-accent-500)] border-[var(--vora-accent-500)] text-[var(--vora-text-primary)]' : 'bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)]'}`}>
+                                <div className={`w-6 h-6 rounded flex items-center justify-center border transition-colors shrink-0 ${isActive ? 'bg-[var(--vora-accent-500)] border-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)]'}`}>
                                     {isActive && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                                 </div>
                                 <div className="flex-1 overflow-hidden">

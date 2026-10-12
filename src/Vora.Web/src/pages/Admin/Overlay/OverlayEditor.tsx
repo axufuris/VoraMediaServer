@@ -493,17 +493,17 @@ export default function OverlayEditor() {
                     </div>
                 </div>
 
-                <div className="flex-1 flex flex-col items-center justify-center relative bg-[#0f1115] rounded-[var(--vora-radius-lg)] border border-[var(--vora-border-subtle)] p-6 lg:min-h-0">
+                <div className="flex-1 flex flex-col items-center justify-center relative bg-[var(--vora-bg-sunken)] rounded-[var(--vora-radius-lg)] border border-[var(--vora-border-subtle)] p-6 lg:min-h-0">
 
                 <div className="flex-1 min-h-0 w-full flex items-center justify-center">
                 <div
                     ref={canvasRef}
-                    className={`relative overflow-hidden bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] shadow-2xl
+                    className={`relative overflow-hidden bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] shadow-[var(--vora-shadow-overlay)]
                         ${mediaType === 'Episode' ? 'aspect-video w-full max-w-4xl max-h-full' : 'aspect-[2/3] h-full max-h-full max-w-full'}`}
                     style={{ borderRadius: `calc(var(--vora-radius-md) * ${cardScale})` }}
                 >
                     <img src={BACKGROUNDS[mediaType]} className="absolute inset-0 w-full h-full object-cover" alt="Canvas Mockup" />
-                    <div className="absolute inset-0 bg-black/20 pointer-events-none"></div>
+                    <div className="absolute inset-0 bg-[color-mix(in_srgb,var(--vora-bg-canvas)_20%,transparent)] pointer-events-none"></div>
 
                     {/* The client's real watched treatment, so the collision an
                         admin is judging is the one their viewers will see. An
@@ -571,9 +571,9 @@ export default function OverlayEditor() {
                                                 const isStar = imgLower.endsWith('star.png');
                                                 const dummyLabel = isStar ? "4.0" : isRottenTomatoes ? "82%" : "7.0";
                                                 return (
-                                                    <div key={i} className="bg-black/65 flex flex-col items-center justify-center w-full" style={{ height: `${rowH}px`, borderRadius: `${radius}px`, paddingLeft: `${padX}px`, paddingRight: `${padX}px` }}>
+                                                    <div key={i} className="bg-[var(--vora-poster-badge-fill)] flex flex-col items-center justify-center w-full" style={{ height: `${rowH}px`, borderRadius: `${radius}px`, paddingLeft: `${padX}px`, paddingRight: `${padX}px` }}>
                                                         <img src={img} className="object-contain" style={{ maxHeight: `${logoMaxH}px`, maxWidth: `${innerW}px` }} alt={`Slot ${i}`} />
-                                                        <span className="text-[var(--vora-text-primary)] font-bold leading-none drop-shadow-md" style={{ fontSize: `${font}px` }}>
+                                                        <span className="text-[var(--vora-poster-badge-text)] font-bold leading-none" style={{ fontSize: `${font}px` }}>
                                                             {dummyLabel}
                                                         </span>
                                                     </div>
@@ -586,13 +586,13 @@ export default function OverlayEditor() {
                                     const padY = Math.max(3 * scale, boxH * 0.1);
                                     const radius = Math.min(padX, padY) * 0.8;
                                     return (
-                                        <div className="w-full h-full bg-black/65 flex items-center justify-center pointer-events-none" style={{ borderRadius: `${radius}px`, padding: `${padY}px ${padX}px` }}>
+                                        <div className="w-full h-full bg-[var(--vora-poster-badge-fill)] flex items-center justify-center pointer-events-none" style={{ borderRadius: `${radius}px`, padding: `${padY}px ${padX}px` }}>
                                             <img src={el.previewImage} alt={el.type} className="max-w-full max-h-full object-contain" />
                                         </div>
                                     );
                                 })()}
 
-                                <div className="absolute inset-0 border-2 border-dashed border-orange-500 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                                <div className="absolute inset-0 border-2 border-dashed border-[var(--vora-accent-500)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                             </Rnd>
                         );
                     })}

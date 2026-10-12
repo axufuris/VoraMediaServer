@@ -241,9 +241,9 @@ export default function EditCollectionModal({
                         <button onClick={onClose} className="text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] text-2xl font-bold cursor-pointer">&times;</button>
                     </div>
                     <div className="flex gap-6 text-sm font-bold text-[var(--vora-text-muted)]">
-                        <button onClick={() => setActiveTab('general')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'general' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>General</button>
-                        <button onClick={() => setActiveTab('poster')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'poster' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>Posters</button>
-                        <button onClick={() => setActiveTab('backdrop')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'backdrop' ? 'border-orange-500 text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>Backdrops</button>
+                        <button onClick={() => setActiveTab('general')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'general' ? 'border-[var(--vora-accent-500)] text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>General</button>
+                        <button onClick={() => setActiveTab('poster')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'poster' ? 'border-[var(--vora-accent-500)] text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>Posters</button>
+                        <button onClick={() => setActiveTab('backdrop')} className={`pb-3 border-b-2 transition-colors cursor-pointer ${activeTab === 'backdrop' ? 'border-[var(--vora-accent-500)] text-[var(--vora-accent-500)]' : 'border-transparent hover:text-[var(--vora-text-primary)]'}`}>Backdrops</button>
                     </div>
                 </div>
 
@@ -353,7 +353,7 @@ export default function EditCollectionModal({
                                                     id="mirrorListEdit"
                                                     checked={mirrorList}
                                                     onChange={e => setMirrorList(e.target.checked)}
-                                                    className="w-4 h-4 accent-orange-500 rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)]"
+                                                    className="w-4 h-4 accent-[var(--vora-accent-500)] rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)]"
                                                 />
                                                 <label htmlFor="mirrorListEdit" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">
                                                     Mirror the list exactly
@@ -395,7 +395,7 @@ export default function EditCollectionModal({
                                 </select>
                             </div>
                             {(chronologyProviders.length > 0 || sortProviderId) && (
-                                <div className="p-4 bg-[var(--vora-bg-raised)]/50 border border-orange-500/30 rounded-lg space-y-4 mt-4">
+                                <div className="p-4 bg-[var(--vora-bg-raised)]/50 border border-[color-mix(in_srgb,var(--vora-accent-500)_30%,transparent)] rounded-lg space-y-4 mt-4">
                                     <div>
                                         <h3 className="text-[var(--vora-accent-500)] font-bold text-sm tracking-wide uppercase">Chronological Ordering (Optional)</h3>
                                         <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-1">
@@ -460,7 +460,7 @@ export default function EditCollectionModal({
                                                     id="autoSyncChronologyEdit"
                                                     checked={autoSyncChronology}
                                                     onChange={e => setAutoSyncChronology(e.target.checked)}
-                                                    className="w-4 h-4 accent-orange-500 rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)] cursor-pointer"
+                                                    className="w-4 h-4 accent-[var(--vora-accent-500)] rounded bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)] cursor-pointer"
                                                 />
                                                 <label htmlFor="autoSyncChronologyEdit" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">
                                                     Enable Auto-Sync
@@ -475,7 +475,7 @@ export default function EditCollectionModal({
                             )}
                             {collection.libraryId && !collection.systemGenerated && (
                                 <div className="flex items-center gap-2 pt-4 border-t border-[var(--vora-border-subtle)]">
-                                    <input type="checkbox" checked={makeGlobal} onChange={e => setMakeGlobal(e.target.checked)} className="w-4 h-4 accent-orange-500" />
+                                    <input type="checkbox" checked={makeGlobal} onChange={e => setMakeGlobal(e.target.checked)} className="w-4 h-4 accent-[var(--vora-accent-500)]" />
                                     <label className="text-sm text-[var(--vora-text-secondary)]">Make this a Global Collection</label>
                                 </div>
                             )}
@@ -506,7 +506,7 @@ export default function EditCollectionModal({
                                                 <option key={p.id} value={p.id}>{p.name}</option>
                                             ))}
                                         </select>
-                                        <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-[var(--vora-text-primary)] text-xs font-bold rounded cursor-pointer transition-colors">
+                                        <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-[var(--vora-info-500)] hover:bg-[color-mix(in_srgb,var(--vora-info-500)_85%,var(--vora-text-primary))] active:bg-[color-mix(in_srgb,var(--vora-info-500)_85%,var(--vora-bg-canvas))] text-[var(--vora-text-primary)] text-xs font-bold rounded cursor-pointer transition-colors">
                                             Fetch Artwork
                                         </button>
                                     </div>
@@ -528,7 +528,7 @@ export default function EditCollectionModal({
                     </div>
                     <div className="flex gap-3">
                         <button type="button" onClick={onClose} className="px-5 py-2 text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)]">Cancel</button>
-                        <button type="submit" form="edit-collection-form" onClick={activeTab !== 'general' ? handleSubmit : undefined} disabled={isSaving} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-text-primary)] font-bold rounded shadow-lg">{isSaving ? 'Saving...' : 'Save Collection'}</button>
+                        <button type="submit" form="edit-collection-form" onClick={activeTab !== 'general' ? handleSubmit : undefined} disabled={isSaving} className="px-6 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] disabled:opacity-50 text-[var(--vora-accent-contrast)] font-bold rounded shadow-[var(--vora-shadow-lg)]">{isSaving ? 'Saving...' : 'Save Collection'}</button>
                     </div>
                 </div>
         </Modal>

@@ -9,6 +9,7 @@ import EmptyState from '../../../components/Admin/Primitives/EmptyState';
 import HealthBadge from '../../../components/Admin/Primitives/HealthBadge';
 import SmartListEditorModal from './SmartListEditorModal';
 import { describeList, emptyForm, formFromList, requestFromForm, type SmartListForm } from './smartListForm';
+import { reorderListProps, reorderRowProps, useTouchReorder } from '../../../hooks/useTouchReorder';
 
 export default function SmartListsPage() {
     const dialog = useDialog();
@@ -52,11 +53,8 @@ export default function SmartListsPage() {
 
     const missingDefaults = defaults.filter(d => !d.isPresent);
 
-    const handleDrop = async (targetId: string) => {
-        if (!draggedId || draggedId === targetId) return;
-
-        const oldIndex = lists.findIndex(l => l.id === draggedId);
-        const newIndex = lists.findIndex(l => l.id === targetId);
+    const moveList = async (oldIndex: number, newIndex: number) => {
+        if (oldIndex === newIndex) return;
 
         const newLists = [...lists];
         const [removed] = newLists.splice(oldIndex, 1);
@@ -72,6 +70,13 @@ export default function SmartListsPage() {
             refreshLists();
         }
     };
+
+    const handleDrop = async (targetId: string) => {
+        if (!draggedId || draggedId === targetId) return;
+        await moveList(lists.findIndex(l => l.id === draggedId), lists.findIndex(l => l.id === targetId));
+    };
+
+    const touch = useTouchReorder((from, to) => { void moveList(from, to); });
 
     const handleDelete = async (list: SmartListAdminDto) => {
         const ok = await dialog.confirm({
@@ -174,10 +179,12 @@ export default function SmartListsPage() {
                                     <th className="px-4 py-3 text-right font-semibold">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-[var(--vora-border-subtle)]">
-                                {lists.map(list => (
+                            <tbody {...reorderListProps} className="divide-y divide-[var(--vora-border-subtle)]">
+                                {lists.map((list, index) => (
                                     <tr
                                         key={list.id}
+                                        {...reorderRowProps(index)}
+                                        style={touch.rowStyle(index)}
                                         draggable
                                         onDragStart={() => setDraggedId(list.id)}
                                         onDragOver={(e) => e.preventDefault()}
@@ -186,7 +193,9 @@ export default function SmartListsPage() {
                                         className={`cursor-grab transition-colors active:cursor-grabbing ${draggedId === list.id ? 'bg-[var(--vora-accent-soft)] opacity-50' : 'hover:bg-[var(--vora-bg-sunken)]/50'}`}
                                     >
                                         <td className="px-3 py-3 text-[var(--vora-text-disabled)]">
-                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                                            <span {...touch.handleProps(index)} className="flex touch-none">
+                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                                            </span>
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex flex-wrap items-center gap-2">

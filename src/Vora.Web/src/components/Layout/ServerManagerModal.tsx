@@ -270,7 +270,7 @@ export default function ServerManagerModal({
                                 }
 
                                 return (
-                                    <div key={server.id} className="bg-[var(--vora-bg-surface)] border border-[var(--vora-border-subtle)] rounded-lg p-4 flex flex-col md:flex-row items-start md:items-center justify-between group shadow gap-4">
+                                    <div key={server.id} className="bg-[var(--vora-bg-surface)] border border-[var(--vora-border-subtle)] rounded-lg p-4 flex flex-col md:flex-row items-start md:items-center justify-between group shadow-[var(--vora-shadow-sm)] gap-4">
                                         <div className="overflow-hidden flex-1">
                                             <h3 className="font-bold text-[var(--vora-text-primary)] truncate flex items-center gap-2">
                                                 <svg className="w-4 h-4 text-[var(--vora-success-text)] shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
@@ -303,7 +303,7 @@ export default function ServerManagerModal({
 
                             <button
                                 onClick={() => { resetForms(); setMode('add'); }}
-                                className="w-full py-3 bg-[var(--vora-bg-canvas)] hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] font-bold rounded shadow-sm transition-colors border border-[var(--vora-border-subtle)] border-dashed flex justify-center items-center gap-2 cursor-pointer"
+                                className="w-full py-3 bg-[var(--vora-bg-canvas)] hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] font-bold rounded shadow-[var(--vora-shadow-sm)] transition-colors border border-[var(--vora-border-subtle)] border-dashed flex justify-center items-center gap-2 cursor-pointer"
                             >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                                 Add Content Source
@@ -347,7 +347,7 @@ export default function ServerManagerModal({
 
                             <div className="flex gap-3 pt-4">
                                 <button type="button" onClick={() => setMode('list')} className="flex-1 py-2.5 bg-[var(--vora-bg-surface)] hover:bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] font-bold rounded transition-colors cursor-pointer">Cancel</button>
-                                <button type="submit" disabled={isLoading} className="flex-[2] py-2.5 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-active)] disabled:opacity-50 text-[var(--vora-text-primary)] font-bold rounded transition-colors cursor-pointer">
+                                <button type="submit" disabled={isLoading} className="flex-[2] py-2.5 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-active)] disabled:opacity-50 text-[var(--vora-accent-contrast)] font-bold rounded transition-colors cursor-pointer">
                                     {isLoading ? 'Connecting...' : 'Connect'}
                                 </button>
                             </div>
@@ -358,7 +358,7 @@ export default function ServerManagerModal({
                         <div className="flex flex-wrap justify-center gap-6">
                             {userAccount.profiles.map(profile => (
                                 <div key={profile.id} onClick={() => handleProfileSelect(profile)} className="flex flex-col items-center group cursor-pointer w-24">
-                                    <div className="w-20 h-20 rounded-full overflow-hidden bg-[var(--vora-bg-surface)] border-2 border-transparent group-hover:border-[var(--vora-accent-500)] transition-all shadow-xl relative">
+                                    <div className="w-20 h-20 rounded-full overflow-hidden bg-[var(--vora-bg-surface)] border-2 border-transparent group-hover:border-[var(--vora-accent-500)] transition-all shadow-[var(--vora-shadow-overlay)] relative">
                                         {profile.profileImageUrl ? (
                                             <img src={profile.profileImageUrl} alt={profile.name} className="w-full h-full object-cover" />
                                         ) : (
@@ -367,7 +367,7 @@ export default function ServerManagerModal({
                                             </div>
                                         )}
                                         {profile.hasPin && (
-                                            <div className="absolute bottom-0 right-0 bg-black/80 p-1 rounded-full border border-[var(--vora-border-subtle)]">
+                                            <div className="absolute bottom-0 right-0 bg-[color-mix(in_srgb,var(--vora-bg-canvas)_80%,transparent)] p-1 rounded-full border border-[var(--vora-border-subtle)]">
                                                 <svg className="w-3 h-3 text-[var(--vora-text-secondary)]" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
                                             </div>
                                         )}
@@ -397,7 +397,7 @@ export default function ServerManagerModal({
                                 {pinError && <p className="text-[var(--vora-danger-text)] text-xs mt-2 font-medium">Incorrect PIN.</p>}
                                 <div className="flex gap-3 mt-8">
                                     <button type="button" disabled={isLoading} onClick={() => setMode('profiles')} className="flex-1 px-4 py-2 bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-raised)] hover:text-[var(--vora-text-primary)] rounded font-medium transition-colors cursor-pointer">Cancel</button>
-                                    <button type="submit" disabled={isLoading} className="flex-1 bg-white text-black hover:bg-gray-200 font-bold py-2 px-4 rounded transition-colors disabled:opacity-50 cursor-pointer">
+                                    <button type="submit" disabled={isLoading} className="flex-1 bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)] hover:bg-[var(--vora-accent-hover)] font-bold py-2 px-4 rounded transition-colors disabled:opacity-50 cursor-pointer">
                                         {isLoading ? 'Verifying...' : 'Enter'}
                                     </button>
                                 </div>

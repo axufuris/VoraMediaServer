@@ -37,15 +37,14 @@ export function HeroChip({ children, tone = 'neutral' }: { children: ReactNode; 
             className="rounded-md px-2.5 py-1 text-xs font-medium backdrop-blur-md"
             style={accent
                 ? { background: 'var(--vora-accent-500)', border: '1px solid var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', fontWeight: 600 }
-                : { background: 'rgba(8, 8, 11, 0.6)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}
+                : { background: 'color-mix(in srgb, var(--vora-bg-canvas) 60%, transparent)', border: '1px solid var(--vora-border-strong)', color: 'var(--vora-text-primary)' }}
         >
             {children}
         </span>
     );
 }
 
-// A square icon action in the hero's button row. Fixed light-on-dark chrome,
-// not theme tokens — these sit over artwork, which isn't themed. `active` is the
+// A square icon action in the hero's button row. `active` is the
 // on-state (Mark as watched once watched).
 export function HeroIconButton({ label, active, onClick, children }: {
     label: string;
@@ -60,11 +59,10 @@ export function HeroIconButton({ label, active, onClick, children }: {
             title={label}
             aria-label={label}
             aria-pressed={active}
-            className={`inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-md backdrop-blur-md transition-colors ${active ? '' : 'hover:bg-[rgba(20,20,28,0.85)]'}`}
+            className={`inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-md backdrop-blur-md transition-colors ${active ? 'bg-[var(--vora-accent-500)]' : 'bg-[color-mix(in_srgb,var(--vora-bg-raised)_72%,transparent)] hover:bg-[linear-gradient(var(--vora-accent-soft),var(--vora-accent-soft))]'}`}
             style={{
-                background: active ? 'var(--vora-accent-500)' : 'rgba(20, 20, 28, 0.72)',
-                color: active ? 'var(--vora-accent-contrast)' : '#fafafa',
-                border: `1px solid ${active ? 'var(--vora-accent-500)' : 'rgba(255, 255, 255, 0.18)'}`,
+                color: active ? 'var(--vora-accent-contrast)' : 'var(--vora-text-primary)',
+                border: `1px solid ${active ? 'var(--vora-accent-500)' : 'var(--vora-border-strong)'}`,
                 padding: 0,
             }}
         >

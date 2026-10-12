@@ -55,6 +55,32 @@ Page gutters that are classes follow the same 1rem: `px-8 max-md:px-4`.
   - Mini players keep the title, play/pause, expand and close.
   - The queue and station lists open over the Now Playing screen instead of beside it.
 
+## Reordering by touch
+
+The browser's drag and drop (`draggable`, `onDragStart`, `onDrop`) only works with a mouse. Every reorderable list therefore also uses `hooks/useTouchReorder.ts` for fingers and pens. Today that covers:
+
+- Edit Navigation;
+- manual and music playlists;
+- Customize Discovery;
+- the admin Discover rows;
+- Smart Lists;
+- Manual Sort Order on collections.
+
+To add it to a list:
+
+- Spread `reorderListProps` on the list container and `reorderRowProps(index)` on each row.
+- Spread `handleProps(index)` on the row's drag handle, and give the handle the `touch-none` class so a drag on it doesn't scroll the page.
+- Pass the list's move function to the hook. It is called once on release with `(from, to)`, the final index, the same move the mouse drop performs.
+- `rowStyle(index)` fades the dragged row and draws the accent drop line. Lists that already draw their own line (Edit Navigation) can read `drag` instead.
+
+The hook:
+
+- ignores mouse pointers, so the mouse keeps the existing drag and drop;
+- scrolls the list's scroll container when a finger nears its top or bottom edge;
+- swallows the click that follows a real drag, so dropping a row doesn't also open it.
+
+A list whose rows have no handle shows one only on touch screens: `hidden pointer-coarse:flex`.
+
 ## Checking a change
 
 Look at the page at 390px wide, and at 360px for the narrowest common phone. Then confirm desktop is unchanged at 768px and wider: a screenshot before and after the change should match pixel for pixel.

@@ -77,11 +77,11 @@ export default function MusicAlbumView({
                 <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 text-center sm:text-left">
                 <div className="relative shrink-0" style={{ width: currentAlbum.discArtUrl ? '14rem' : '10rem', height: '10rem' }}>
                     {currentAlbum.discArtUrl && (
-                        <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-black border border-[var(--vora-border-subtle)] overflow-hidden shadow-lg hidden sm:block">
+                        <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] overflow-hidden shadow-[var(--vora-shadow-lg)] hidden sm:block">
                             <img src={currentAlbum.discArtUrl} alt="" className="w-full h-full object-cover" />
                         </div>
                     )}
-                    <div className="relative w-40 h-40 rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shadow-lg z-10 mx-auto sm:mx-0">
+                    <div className="relative w-40 h-40 rounded bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] flex items-center justify-center overflow-hidden shadow-[var(--vora-shadow-lg)] z-10 mx-auto sm:mx-0">
                         {albumCover(currentAlbum)
                             ? <img src={albumCover(currentAlbum)} alt={currentAlbum.title} className="max-w-full max-h-full object-cover" />
                             : <svg className="w-16 h-16 text-[var(--vora-text-disabled)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>}
@@ -138,7 +138,7 @@ export default function MusicAlbumView({
                                 <button
                                     type="button"
                                     onClick={playWholeAlbum}
-                                    className="text-sm px-4 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)] font-bold rounded transition-colors cursor-pointer flex items-center gap-2"
+                                    className="text-sm px-4 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] font-bold rounded transition-colors cursor-pointer flex items-center gap-2"
                                     title="Play this album from the beginning"
                                 >
                                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>

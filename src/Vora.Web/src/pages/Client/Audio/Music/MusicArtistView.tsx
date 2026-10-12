@@ -81,7 +81,7 @@ export default function MusicArtistView({
                         {ambient ? (
                             <img src={ambient} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-40" />
                         ) : (
-                            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800" />
+                            <div className="absolute inset-0 bg-gradient-to-br from-[var(--vora-bg-surface)] via-[var(--vora-bg-surface)] to-[var(--vora-bg-raised)]" />
                         )}
                         {banner && (
                             <img
@@ -90,17 +90,17 @@ export default function MusicArtistView({
                                 aria-hidden="true"
                                 className="absolute inset-y-0 right-0 h-full w-auto max-w-full object-contain object-right"
                                 style={{
-                                    maskImage: 'linear-gradient(to right, transparent, black 35%)',
-                                    WebkitMaskImage: 'linear-gradient(to right, transparent, black 35%)',
+                                    maskImage: 'linear-gradient(to right, transparent, var(--vora-bg-canvas) 35%)',
+                                    WebkitMaskImage: 'linear-gradient(to right, transparent, var(--vora-bg-canvas) 35%)',
                                 }}
                             />
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/55 to-gray-950/20" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-gray-950/75 via-gray-950/25 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[var(--vora-bg-canvas)] via-[color-mix(in_srgb,var(--vora-bg-canvas)_55%,transparent)] to-[color-mix(in_srgb,var(--vora-bg-canvas)_20%,transparent)]" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-[color-mix(in_srgb,var(--vora-bg-canvas)_75%,transparent)] via-[color-mix(in_srgb,var(--vora-bg-canvas)_25%,transparent)] to-transparent" />
 
                         <div className="relative flex flex-col sm:flex-row items-stretch sm:items-end gap-4 p-5 sm:p-6 min-h-[13rem]">
                             {hasArtwork && (
-                                <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)]/80 overflow-hidden shrink-0 shadow-lg self-start sm:self-end">
+                                <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)]/80 overflow-hidden shrink-0 shadow-[var(--vora-shadow-lg)] self-start sm:self-end">
                                     <img src={currentArtist.artworkUrl} alt={currentArtist.name} className="w-full h-full object-cover" />
                                 </div>
                             )}
@@ -115,10 +115,10 @@ export default function MusicArtistView({
                                         <img
                                             src={titleImage}
                                             alt={currentArtist.name}
-                                            className="max-h-16 sm:max-h-20 max-w-full w-auto object-contain object-left drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]"
+                                            className="max-h-16 sm:max-h-20 max-w-full w-auto object-contain object-left drop-shadow-[0_2px_6px_color-mix(in_srgb,var(--vora-bg-canvas)_80%,transparent)]"
                                         />
                                     ) : (
-                                        <h2 className="text-3xl sm:text-4xl font-bold text-[var(--vora-text-primary)] drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] truncate">{currentArtist.name}</h2>
+                                        <h2 className="text-3xl sm:text-4xl font-bold text-[var(--vora-text-primary)] drop-shadow-[0_2px_6px_color-mix(in_srgb,var(--vora-bg-canvas)_80%,transparent)] truncate">{currentArtist.name}</h2>
                                     )}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -169,7 +169,7 @@ export default function MusicArtistView({
                                             <button
                                                 type="button"
                                                 onClick={() => playArtist(false)}
-                                                className="text-sm px-4 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)] font-bold rounded transition-colors cursor-pointer flex items-center gap-2"
+                                                className="text-sm px-4 py-2 bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] font-bold rounded transition-colors cursor-pointer flex items-center gap-2"
                                                 title="Play every track from every album"
                                             >
                                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>

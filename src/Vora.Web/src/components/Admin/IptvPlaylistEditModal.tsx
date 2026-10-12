@@ -15,14 +15,14 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
     return <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">{children}</label>;
 }
 
-function CheckboxCard({ checked, onChange, label, hint, accent = 'orange' }: { checked: boolean, onChange: (v: boolean) => void, label: string, hint: string, accent?: 'orange' | 'purple' }) {
+function CheckboxCard({ checked, onChange, label, hint }: { checked: boolean, onChange: (v: boolean) => void, label: string, hint: string }) {
     return (
         <label className="flex items-center gap-3 cursor-pointer bg-[var(--vora-bg-sunken)] p-3 rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] select-none">
             <input
                 type="checkbox"
                 checked={checked}
                 onChange={e => onChange(e.target.checked)}
-                className={`w-4 h-4 cursor-pointer ${accent === 'purple' ? 'accent-purple-500' : 'accent-[var(--vora-accent-500)]'}`}
+                className="w-4 h-4 cursor-pointer accent-[var(--vora-accent-500)]"
             />
             <div className="flex flex-col">
                 <span className="text-sm font-semibold text-[var(--vora-text-primary)]">{label}</span>

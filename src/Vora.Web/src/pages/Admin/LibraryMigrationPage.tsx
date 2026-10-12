@@ -284,13 +284,13 @@ export default function LibraryMigrationPage() {
     const subtitle = useMemo(() => 'One-time import of watch state and ratings from another media server.', []);
 
     const accentBorder = 'border-l-4 border-[var(--vora-accent-500)]';
-    const onlineBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-green-900/50 text-green-300';
+    const onlineBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--vora-success-soft)] text-[var(--vora-success-text)]';
     const offlineBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)]';
     const ownerKindBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--vora-accent-500)]/30 text-[var(--vora-accent-text)]';
-    const homeKindBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300';
-    const pinBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-yellow-900/50 text-yellow-300';
+    const homeKindBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--vora-info-soft)] text-[var(--vora-info-text)]';
+    const pinBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--vora-warning-soft)] text-[var(--vora-warning-text)]';
     const libraryKindBadge = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)]';
-    const primaryButton = 'px-4 py-2 text-sm rounded-md bg-[var(--vora-accent-500)] text-[var(--vora-text-primary)] hover:opacity-90 disabled:opacity-50 disabled:cursor-default';
+    const primaryButton = 'px-4 py-2 text-sm rounded-md bg-[var(--vora-accent-500)] hover:bg-[var(--vora-accent-hover)] text-[var(--vora-accent-contrast)] disabled:opacity-50 disabled:cursor-default';
     const secondaryButton = 'px-3 py-1.5 text-xs text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)]';
     const inputClass = 'bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md text-sm px-2 py-1.5 text-[var(--vora-text-primary)]';
 
@@ -303,8 +303,8 @@ export default function LibraryMigrationPage() {
     const renderUserStateBadge = (state: string) => {
         const base = 'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded';
         switch (state) {
-            case 'Running': return <span className={base + ' bg-blue-900/50 text-blue-300'}>Running</span>;
-            case 'Completed': return <span className={base + ' bg-green-900/50 text-green-300'}>Completed</span>;
+            case 'Running': return <span className={base + ' bg-[var(--vora-info-soft)] text-[var(--vora-info-text)]'}>Running</span>;
+            case 'Completed': return <span className={base + ' bg-[var(--vora-success-soft)] text-[var(--vora-success-text)]'}>Completed</span>;
             case 'Failed': return <span className={base + ' bg-[var(--vora-danger-soft)]/50 text-[var(--vora-danger-500)]'}>Failed</span>;
             case 'Skipped': return <span className={base + ' bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)]'}>Skipped</span>;
             default: return <span className={base + ' bg-[var(--vora-bg-sunken)] text-[var(--vora-text-muted)]'}>Pending</span>;

@@ -35,16 +35,16 @@ const getEventTheme = (mediaType: string): EventTheme => {
     switch (mediaType) {
         case 'Movie':
             return {
-                background: 'color-mix(in srgb, #a855f7 18%, transparent)',
-                border: 'color-mix(in srgb, #a855f7 45%, transparent)',
-                text: '#c4b5fd',
+                background: 'color-mix(in srgb, var(--vora-accent-500) 18%, transparent)',
+                border: 'color-mix(in srgb, var(--vora-accent-500) 45%, transparent)',
+                text: 'var(--vora-accent-text)',
             };
         case 'Track':
         case 'Album':
             return {
-                background: 'color-mix(in srgb, #ec4899 18%, transparent)',
-                border: 'color-mix(in srgb, #ec4899 45%, transparent)',
-                text: '#f9a8d4',
+                background: 'color-mix(in srgb, var(--vora-info-500) 18%, transparent)',
+                border: 'color-mix(in srgb, var(--vora-info-500) 45%, transparent)',
+                text: 'var(--vora-info-text)',
             };
         case 'TvShow':
         case 'Episode':
@@ -254,7 +254,7 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
                 type="button"
                 onClick={handlePrevious}
                 aria-label={`Previous ${viewMode}`}
-                className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full vora-icon-button"
                 style={{ color: 'var(--vora-text-secondary)' }}
             >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
@@ -272,7 +272,7 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
                 type="button"
                 onClick={handleNext}
                 aria-label={`Next ${viewMode}`}
-                className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full vora-icon-button"
                 style={{ color: 'var(--vora-text-secondary)' }}
             >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
@@ -414,7 +414,7 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
 
                 <div className="mt-4 flex shrink-0 flex-wrap justify-center gap-x-8 gap-y-2 text-[11px] font-medium" style={{ color: 'var(--vora-text-muted)' }}>
                     <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded" style={{ background: 'color-mix(in srgb, #a855f7 30%, transparent)', border: '1px solid color-mix(in srgb, #a855f7 50%, transparent)' }} />
+                        <span className="h-2.5 w-2.5 rounded" style={{ background: 'color-mix(in srgb, var(--vora-accent-500) 30%, transparent)', border: '1px solid color-mix(in srgb, var(--vora-accent-500) 50%, transparent)' }} />
                         Movies
                     </div>
                     <div className="flex items-center gap-2">
@@ -422,7 +422,7 @@ export default function CalendarPage({ embedded = false }: CalendarPageProps = {
                         TV Shows
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded" style={{ background: 'color-mix(in srgb, #ec4899 30%, transparent)', border: '1px solid color-mix(in srgb, #ec4899 50%, transparent)' }} />
+                        <span className="h-2.5 w-2.5 rounded" style={{ background: 'color-mix(in srgb, var(--vora-info-500) 30%, transparent)', border: '1px solid color-mix(in srgb, var(--vora-info-500) 50%, transparent)' }} />
                         Music
                     </div>
                     <div className="hidden h-3 w-px sm:block" style={{ background: 'var(--vora-border-subtle)' }} />

@@ -11,9 +11,9 @@ export default function RatedBadge({ value, title, color, background }: RatedBad
         <span
             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold backdrop-blur-md"
             style={{
-                background: background ?? 'rgba(8, 8, 11, 0.72)',
+                background: background ?? 'color-mix(in srgb, var(--vora-bg-canvas) 72%, transparent)',
                 color: color ?? 'var(--vora-accent-text)',
-                border: '1px solid rgba(255, 255, 255, 0.18)',
+                border: '1px solid var(--vora-border-strong)',
                 lineHeight: 1,
             }}
             title={title ?? `Rated ${score} of 10`}

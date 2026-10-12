@@ -31,21 +31,21 @@ type AudioTrackType = NonNullable<MediaPart['audioTracks']>[number];
 type SubtitleTrackType = NonNullable<MediaPart['subtitleTracks']>[number];
 
 const chipStyle: React.CSSProperties = {
-    background: 'rgba(20, 20, 28, 0.72)',
-    border: '1px solid rgba(255, 255, 255, 0.18)',
-    color: '#fafafa',
+    background: 'color-mix(in srgb, var(--vora-bg-canvas) 72%, transparent)',
+    border: '1px solid color-mix(in srgb, var(--vora-text-primary) 18%, transparent)',
+    color: 'var(--vora-text-primary)',
     backdropFilter: 'blur(8px)',
     WebkitBackdropFilter: 'blur(8px)',
 };
 
-// Fixed hues, independent of the template accent — the progress fill IS the
+// Hues independent of the template accent — the progress fill IS the
 // accent, so a marker band tinted with the accent is invisible against it.
 const markerBandColors: Record<string, string> = {
-    Intro: 'rgba(255, 255, 255, 0.22)',
-    Recap: 'rgba(255, 255, 255, 0.22)',
-    Credits: 'rgba(120, 170, 255, 0.32)',
-    CreditsScene: 'rgba(120, 170, 255, 0.32)',
-    Preview: 'rgba(180, 140, 255, 0.38)',
+    Intro: 'color-mix(in srgb, var(--vora-text-primary) 22%, transparent)',
+    Recap: 'color-mix(in srgb, var(--vora-text-primary) 22%, transparent)',
+    Credits: 'color-mix(in srgb, var(--vora-info-500) 32%, transparent)',
+    CreditsScene: 'color-mix(in srgb, var(--vora-info-500) 32%, transparent)',
+    Preview: 'color-mix(in srgb, color-mix(in srgb, var(--vora-info-500), var(--vora-danger-500)) 38%, transparent)',
 };
 
 function MarkerBands({ markers, duration }: { markers: MediaMarker[]; duration: number }) {
@@ -56,7 +56,7 @@ function MarkerBands({ markers, duration }: { markers: MediaMarker[]; duration: 
                 const start = Math.max(0, Math.min(100, (m.startSeconds / duration) * 100));
                 const end = Math.max(0, Math.min(100, (m.endSeconds / duration) * 100));
                 const width = Math.max(0.4, end - start);
-                const bg = markerBandColors[m.type] ?? 'rgba(255, 255, 255, 0.18)';
+                const bg = markerBandColors[m.type] ?? 'color-mix(in srgb, var(--vora-text-primary) 18%, transparent)';
                 const isScene = m.type === 'CreditsScene' || m.type === 'Preview';
                 return (
                     <div
@@ -635,7 +635,7 @@ export default function GlobalVideoPlayer() {
             ref={playerContainerRef}
             className={`transition-all duration-300 ease-in-out ${isMinimized
                 ? 'fixed bottom-0 left-0 right-0 z-[99999] flex h-24 flex-col vora-glass'
-                : 'fixed inset-0 z-[99999] bg-black'
+                : 'fixed inset-0 z-[99999] bg-[var(--vora-bg-canvas)]'
                 }`}
             style={isMinimized ? { borderTop: '1px solid var(--vora-border-subtle)' } : undefined}
         >
@@ -644,9 +644,9 @@ export default function GlobalVideoPlayer() {
                 key={currentMedia.sessionId}
                 ref={videoRef}
                 onClick={() => { if (isMinimized) setMinimized(false); }}
-                className={`absolute bg-black transition-all duration-700 ease-in-out
-                    ${isMinimized ? 'bottom-4 left-6 z-20 h-16 w-16 cursor-pointer rounded-md object-cover shadow-lg hover:ring-2 hover:ring-[var(--vora-accent-500)] max-md:left-3' :
-                        isEnding ? 'left-20 top-32 z-20 aspect-video w-96 cursor-pointer rounded-xl object-cover shadow-2xl max-md:left-4 max-md:top-4 max-md:w-40' :
+                className={`absolute bg-[var(--vora-bg-canvas)] transition-all duration-700 ease-in-out
+                    ${isMinimized ? 'bottom-4 left-6 z-20 h-16 w-16 cursor-pointer rounded-md object-cover shadow-[var(--vora-shadow-lg)] hover:ring-2 hover:ring-[var(--vora-accent-500)] max-md:left-3' :
+                        isEnding ? 'left-20 top-32 z-20 aspect-video w-96 cursor-pointer rounded-xl object-cover shadow-[var(--vora-shadow-overlay)] max-md:left-4 max-md:top-4 max-md:w-40' :
                             'absolute left-0 top-0 z-0 h-[100vh] w-full object-contain'}`}
                 style={isEnding && !isMinimized ? { border: '1px solid var(--vora-border-strong)' } : undefined}
             />
@@ -721,13 +721,13 @@ export default function GlobalVideoPlayer() {
                                 onClick={handleProgressClick}
                                 onMouseMove={handleProgressHover}
                                 onMouseLeave={handleProgressLeave}
-                                style={{ background: 'rgba(255, 255, 255, 0.12)' }}
+                                style={{ background: 'color-mix(in srgb, var(--vora-text-primary) 12%, transparent)' }}
                             >
                                 <MarkerBands markers={visibleMarkers} duration={duration} />
                                 <div className="absolute left-0 top-0 h-full rounded-full" style={{ width: `${progressPercent}%`, background: 'var(--vora-accent-500)' }} />
                                 <div
-                                    className="absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full opacity-0 shadow group-hover:opacity-100"
-                                    style={{ left: `calc(${progressPercent}% - 6px)`, background: '#ffffff' }}
+                                    className="absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full opacity-0 shadow-[var(--vora-shadow-sm)] group-hover:opacity-100"
+                                    style={{ left: `calc(${progressPercent}% - 6px)`, background: 'var(--vora-text-primary)' }}
                                 />
                             </div>
                             <span>{formatTime(duration)}</span>
@@ -750,8 +750,8 @@ export default function GlobalVideoPlayer() {
                             if (activeCommercial) seek(activeCommercial.end);
                             if (activeCommId) setHiddenCommercialId(activeCommId);
                         }}
-                        className="pointer-events-auto flex transform cursor-pointer items-center gap-3 rounded-md px-6 py-3 text-lg font-semibold shadow-2xl backdrop-blur-md transition-all hover:scale-105"
-                        style={{ background: 'rgba(20, 20, 28, 0.85)', border: '1px solid rgba(255, 255, 255, 0.22)', color: '#fafafa' }}
+                        className="pointer-events-auto flex transform cursor-pointer items-center gap-3 rounded-md px-6 py-3 text-lg font-semibold shadow-[var(--vora-shadow-overlay)] backdrop-blur-md transition-all hover:scale-105"
+                        style={{ background: 'color-mix(in srgb, var(--vora-bg-canvas) 85%, transparent)', border: '1px solid color-mix(in srgb, var(--vora-text-primary) 22%, transparent)', color: 'var(--vora-text-primary)' }}
                     >
                         Skip commercial
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" /></svg>
@@ -767,7 +767,7 @@ export default function GlobalVideoPlayer() {
                             e.stopPropagation();
                             seek(activeSkipPrompt.target);
                         }}
-                        className="pointer-events-auto flex transform cursor-pointer items-center gap-3 rounded-md px-6 py-3 text-lg font-semibold shadow-2xl backdrop-blur-md transition-all hover:scale-105"
+                        className="pointer-events-auto flex transform cursor-pointer items-center gap-3 rounded-md px-6 py-3 text-lg font-semibold shadow-[var(--vora-shadow-overlay)] backdrop-blur-md transition-all hover:scale-105"
                         style={{ background: 'var(--vora-accent-500)', border: '1px solid var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}
                     >
                         {activeSkipPrompt.label}
@@ -781,7 +781,7 @@ export default function GlobalVideoPlayer() {
                     className={`absolute inset-0 z-30 flex flex-col justify-between transition-opacity duration-500 ${showControls || showSettings || showInfo || showSubtitles ? 'opacity-100' : 'opacity-0'}`}
                     style={{
                         background: showControls || showSettings || showInfo || showSubtitles
-                            ? 'linear-gradient(180deg, rgba(0, 0, 0, 0.7) 0%, transparent 18%, transparent 70%, rgba(0, 0, 0, 0.85) 100%)'
+                            ? 'linear-gradient(180deg, color-mix(in srgb, var(--vora-bg-canvas) 70%, transparent) 0%, transparent 18%, transparent 70%, color-mix(in srgb, var(--vora-bg-canvas) 85%, transparent) 100%)'
                             : 'transparent',
                     }}
                 >
@@ -791,21 +791,21 @@ export default function GlobalVideoPlayer() {
                             type="button"
                             onClick={closePlayer}
                             aria-label="Close player"
-                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10 max-md:h-10 max-md:w-10 max-md:shrink-0"
-                            style={{ background: 'rgba(20, 20, 28, 0.55)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}
+                            className="vora-icon-button flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--vora-bg-canvas)_55%,transparent)] backdrop-blur-md transition-colors max-md:h-10 max-md:w-10 max-md:shrink-0"
+                            style={{ border: '1px solid color-mix(in srgb, var(--vora-text-primary) 16%, transparent)', color: 'var(--vora-text-primary)' }}
                         >
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
                         </button>
 
                         <div className="flex max-w-3xl flex-col items-center text-center">
-                            <h1 className="m-0 text-2xl font-semibold drop-shadow-lg max-md:text-lg" style={{ color: '#fafafa', letterSpacing: '-0.01em' }}>{currentMedia.title}</h1>
+                            <h1 className="m-0 text-2xl font-semibold drop-shadow-[0_4px_4px_color-mix(in_srgb,var(--vora-bg-canvas)_70%,transparent)] max-md:text-lg" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}>{currentMedia.title}</h1>
                             {currentMedia.subtitle && (
-                                <p className="m-0 mt-1 drop-shadow-md" style={{ color: 'rgba(255, 255, 255, 0.78)' }}>{currentMedia.subtitle}</p>
+                                <p className="m-0 mt-1 drop-shadow-[0_3px_3px_color-mix(in_srgb,var(--vora-bg-canvas)_60%,transparent)]" style={{ color: 'color-mix(in srgb, var(--vora-text-primary) 78%, transparent)' }}>{currentMedia.subtitle}</p>
                             )}
 
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
                                 {displayRes && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={chipStyle}>{displayRes}</span>}
-                                {displayHdr && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={{ ...chipStyle, color: '#facc15', borderColor: 'rgba(234, 179, 8, 0.45)' }}>{displayHdr}</span>}
+                                {displayHdr && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={{ ...chipStyle, color: 'var(--vora-warning-text)', borderColor: 'color-mix(in srgb, var(--vora-warning-500) 45%, transparent)' }}>{displayHdr}</span>}
                                 {displayVideoCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{displayVideoCodec}{currentMedia.videoStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}
                                 {displayAudioCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{displayAudioCodec}{currentMedia.audioStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}
                                 {displayAudioChannels !== undefined && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={chipStyle}>{displayAudioChannels}ch</span>}
@@ -829,34 +829,34 @@ export default function GlobalVideoPlayer() {
                             onClick={() => setMinimized(true)}
                             aria-label="Minimize to mini-player"
                             title="Minimize to mini-player"
-                            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-colors hover:bg-white/10 max-md:h-10 max-md:w-10 max-md:shrink-0"
-                            style={{ background: 'rgba(20, 20, 28, 0.55)', border: '1px solid rgba(255, 255, 255, 0.16)', color: '#fafafa' }}
+                            className="vora-icon-button flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--vora-bg-canvas)_55%,transparent)] backdrop-blur-md transition-colors max-md:h-10 max-md:w-10 max-md:shrink-0"
+                            style={{ border: '1px solid color-mix(in srgb, var(--vora-text-primary) 16%, transparent)', color: 'var(--vora-text-primary)' }}
                         >
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
                         </button>
                     </div>
 
                     <div className="mx-auto w-full max-w-screen-2xl p-8 pb-12 max-md:px-4 max-md:pt-4 max-md:pb-6">
-                        <div className="mb-6 flex items-center gap-4 font-medium tabular-nums max-md:mb-4 max-md:gap-3 max-md:text-sm" style={{ color: '#fafafa' }}>
+                        <div className="mb-6 flex items-center gap-4 font-medium tabular-nums max-md:mb-4 max-md:gap-3 max-md:text-sm" style={{ color: 'var(--vora-text-primary)' }}>
                             <span>{formatTime(currentTime)}</span>
                             <div
                                 className="group relative h-1.5 flex-1 cursor-pointer rounded-full"
                                 onClick={handleProgressClick}
                                 onMouseMove={handleProgressHover}
                                 onMouseLeave={handleProgressLeave}
-                                style={{ background: 'rgba(255, 255, 255, 0.18)' }}
+                                style={{ background: 'color-mix(in srgb, var(--vora-text-primary) 18%, transparent)' }}
                             >
                                 <MarkerBands markers={visibleMarkers} duration={duration} />
                                 <div className="absolute left-0 top-0 h-full rounded-full transition-all" style={{ width: `${progressPercent}%`, background: 'var(--vora-accent-500)' }} />
                                 <div
-                                    className="absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
-                                    style={{ left: `calc(${progressPercent}% - 6px)`, background: '#ffffff', boxShadow: '0 0 0 1.5px rgba(0,0,0,0.45)' }}
+                                    className="absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full opacity-0 shadow-[var(--vora-shadow-lg)] transition-opacity group-hover:opacity-100"
+                                    style={{ left: `calc(${progressPercent}% - 6px)`, background: 'var(--vora-text-primary)', boxShadow: '0 0 0 1.5px color-mix(in srgb, var(--vora-bg-canvas) 45%, transparent)' }}
                                 />
                             </div>
                             <span>{formatTime(duration)}</span>
                         </div>
 
-                        <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-y-3" style={{ color: '#fafafa' }}>
+                        <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-y-3" style={{ color: 'var(--vora-text-primary)' }}>
                             <div className="flex w-1/3 items-center gap-6 max-md:hidden"></div>
 
                             <div className="flex w-1/3 items-center justify-center gap-8 max-md:w-full max-md:gap-6">
@@ -887,7 +887,7 @@ export default function GlobalVideoPlayer() {
                                     onClick={() => setShowInfo(true)}
                                     aria-label="Media info"
                                     title="Media info"
-                                    className="cursor-pointer rounded-full p-2 transition-colors hover:bg-white/10"
+                                    className="cursor-pointer rounded-full p-2 vora-icon-button transition-colors"
                                 >
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
                                 </button>
@@ -902,7 +902,7 @@ export default function GlobalVideoPlayer() {
                                     onClick={() => setShowSettings(true)}
                                     aria-label="Quality and tracks"
                                     title="Quality &amp; tracks"
-                                    className="cursor-pointer rounded-full p-2 transition-colors hover:bg-white/10"
+                                    className="cursor-pointer rounded-full p-2 vora-icon-button transition-colors"
                                 >
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z" /></svg>
                                 </button>

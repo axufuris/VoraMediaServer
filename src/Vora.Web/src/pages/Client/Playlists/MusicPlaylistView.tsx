@@ -5,6 +5,7 @@ import AddToPlaylistButton from '../../../components/Collections/AddToPlaylistBu
 import ContentRatingBadge from '../../../components/Media/ContentRatingBadge';
 import TrackListeners from '../../../components/Media/TrackListeners';
 import { useState } from 'react';
+import { reorderListProps, reorderRowProps, type TouchReorder } from '../../../hooks/useTouchReorder';
 
 // A music playlist laid out like an album: its own cover, name and length at
 // the top, and a numbered list where clicking a song plays from there.
@@ -26,6 +27,7 @@ interface MusicPlaylistViewProps {
     onDragStart: (e: React.DragEvent, index: number) => void;
     onDragOver: (e: React.DragEvent) => void;
     onDrop: (e: React.DragEvent, index: number) => void;
+    touchReorder: TouchReorder;
 }
 
 const formatDuration = (s?: number): string => {
@@ -40,7 +42,7 @@ const formatTotal = (seconds: number): string => {
 };
 
 export default function MusicPlaylistView({
-    playlist, canEdit, headerActions, onPlay, onQueue, onRemove, draggedIndex, onDragStart, onDragOver, onDrop,
+    playlist, canEdit, headerActions, onPlay, onQueue, onRemove, draggedIndex, onDragStart, onDragOver, onDrop, touchReorder,
 }: MusicPlaylistViewProps) {
     const [menuFor, setMenuFor] = useState<number | null>(null);
     const tracks = playlist.items;
@@ -102,10 +104,12 @@ export default function MusicPlaylistView({
                         : 'Nothing in this playlist is available to you right now.'}
                 </div>
             ) : (
-                <ol className="space-y-1">
+                <ol {...reorderListProps} className="space-y-1">
                     {tracks.map((track, index) => (
                         <li
                             key={track.id}
+                            {...reorderRowProps(index)}
+                            style={touchReorder.rowStyle(index)}
                             draggable={canEdit}
                             onDragStart={canEdit ? e => onDragStart(e, index) : undefined}
                             onDragOver={canEdit ? onDragOver : undefined}
@@ -113,6 +117,16 @@ export default function MusicPlaylistView({
                             onClick={() => onPlay(index, false)}
                             className={`vora-row-interactive group flex cursor-pointer items-center gap-3 rounded border border-transparent p-2 transition-all max-md:gap-2 max-md:px-1 ${draggedIndex === index ? 'opacity-50' : ''}`}
                         >
+                            {canEdit && (
+                                <span
+                                    {...touchReorder.handleProps(index)}
+                                    onClick={e => e.stopPropagation()}
+                                    aria-hidden="true"
+                                    className="hidden shrink-0 touch-none items-center text-[var(--vora-text-muted)] pointer-coarse:flex"
+                                >
+                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                                </span>
+                            )}
                             <div className="w-6 shrink-0 text-right text-sm tabular-nums text-[var(--vora-text-muted)] group-hover:text-[var(--vora-accent-text)] sm:w-8">
                                 {index + 1}
                             </div>

@@ -235,7 +235,7 @@ function ShowtimesLocationModal({ profile, serverId, onClose, onSaved }: Showtim
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--vora-bg-overlay)] p-4">
             <div className="bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-[var(--vora-radius-md)] max-w-md w-full">
                 <div className="p-5 border-b border-[var(--vora-border-subtle)]">
                     <h2 className="text-base font-semibold text-[var(--vora-text-primary)]">Movie showtimes location</h2>

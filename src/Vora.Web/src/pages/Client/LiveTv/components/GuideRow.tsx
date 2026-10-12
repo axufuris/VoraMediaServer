@@ -42,7 +42,7 @@ export default function GuideRow({
             onContextMenu={(e) => onRightClick(e, channel.externalChannelId)}
             className="vora-guide-row group flex h-[80px] transition-colors"
             style={{
-                background: isCurrentlyPlaying ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
+                background: isCurrentlyPlaying ? 'var(--vora-accent-soft)' : 'transparent',
                 borderBottom: '1px solid var(--vora-border-subtle)',
             }}
         >

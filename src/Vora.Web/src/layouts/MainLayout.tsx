@@ -321,13 +321,13 @@ export default function MainLayout() {
 
     if (isBlockedBySchedule) {
         return (
-            <div className="flex flex-col h-screen bg-gray-950 text-white items-center justify-center p-8 text-center z-50">
-                <svg className="w-24 h-24 text-orange-500 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <div data-vora-client="" className="flex flex-col h-screen bg-[var(--vora-bg-canvas)] text-[var(--vora-text-primary)] items-center justify-center p-8 text-center z-50">
+                <svg className="w-24 h-24 text-[var(--vora-accent-500)] mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 <h1 className="text-4xl font-bold mb-4">Outside Allowed Timeframe</h1>
-                <p className="text-gray-400 text-lg mb-8 max-w-md">Your profile is currently restricted by a time schedule. Please come back later or switch to a different profile.</p>
+                <p className="text-[var(--vora-text-muted)] text-lg mb-8 max-w-md">Your profile is currently restricted by a time schedule. Please come back later or switch to a different profile.</p>
                 <div className="flex gap-4">
-                    <button onClick={handleSwitchProfile} className="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-md font-bold transition-colors cursor-pointer">Switch Profile</button>
-                    <button onClick={handleSignOut} className="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-md font-bold transition-colors cursor-pointer">Sign Out of Client</button>
+                    <button onClick={handleSwitchProfile} className="px-6 py-3 bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] vora-icon-button rounded-md font-bold cursor-pointer">Switch Profile</button>
+                    <button onClick={handleSignOut} className="px-6 py-3 bg-[var(--vora-bg-raised)] text-[var(--vora-text-primary)] vora-icon-button rounded-md font-bold cursor-pointer">Sign Out of Client</button>
                 </div>
             </div>
         );
