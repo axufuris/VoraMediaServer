@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using Vora.Application.Settings;
 using Vora.Application.Thumbnails;
+using Vora.Infrastructure.Analysis;
 using Vora.Infrastructure.Transcoding;
 
 namespace Vora.Infrastructure.Thumbnails;
@@ -33,6 +34,10 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
         // -ss before -i seeks fast to the offset; one frame, decent JPEG quality.
         startInfo.ArgumentList.Add("-ss");
         startInfo.ArgumentList.Add(at.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture));
+        foreach (var argument in await CoverImageStreams.ProbeIgnoreArgumentsAsync(inputPath, _logger, cancellationToken))
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
         startInfo.ArgumentList.Add("-i");
         startInfo.ArgumentList.Add(inputPath);
         startInfo.ArgumentList.Add("-frames:v");
@@ -124,12 +129,13 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
         var filter = string.Create(CultureInfo.InvariantCulture,
             $"fps=1/{parameters.IntervalSeconds},scale={parameters.Width}:{parameters.Height}:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad={parameters.Width}:{parameters.Height}:(ow-iw)/2:(oh-ih)/2:color=black,tile={spriteColumns}x{spriteRows}");
 
-        var (ok, exitCode, stderrTail) = await RunSpriteProcessAsync(parameters, filter, tempSpritePath, parameters.HardwareDecoder, cancellationToken);
+        var ignoreCoverImages = await CoverImageStreams.ProbeIgnoreArgumentsAsync(parameters.InputPath, _logger, cancellationToken);
+        var (ok, exitCode, stderrTail) = await RunSpriteProcessAsync(parameters, filter, tempSpritePath, ignoreCoverImages, parameters.HardwareDecoder, cancellationToken);
 
         if ((!ok || !File.Exists(tempSpritePath)) && parameters.HardwareDecoder is not null && !cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning("Hardware-accelerated sprite generation failed for {Input}; retrying in software.", parameters.InputPath);
-            (ok, exitCode, stderrTail) = await RunSpriteProcessAsync(parameters, filter, tempSpritePath, hardware: null, cancellationToken);
+            (ok, exitCode, stderrTail) = await RunSpriteProcessAsync(parameters, filter, tempSpritePath, ignoreCoverImages, hardware: null, cancellationToken);
         }
 
         if (!ok || !File.Exists(tempSpritePath))
@@ -174,7 +180,7 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
     }
 
     private async Task<(bool Ok, int ExitCode, string StderrTail)> RunSpriteProcessAsync(
-        VideoThumbnailGenerationParameters parameters, string filter, string tempSpritePath, HardwareAccelerator? hardware, CancellationToken cancellationToken)
+        VideoThumbnailGenerationParameters parameters, string filter, string tempSpritePath, IReadOnlyList<string> ignoreCoverImages, HardwareAccelerator? hardware, CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -200,6 +206,10 @@ public class FFmpegVideoThumbnailGeneratorService : IVideoThumbnailGeneratorServ
         // option, so it must precede -i.
         startInfo.ArgumentList.Add("-skip_frame");
         startInfo.ArgumentList.Add("nokey");
+        foreach (var argument in ignoreCoverImages)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
         startInfo.ArgumentList.Add("-i");
         startInfo.ArgumentList.Add(parameters.InputPath);
         startInfo.ArgumentList.Add("-vf");

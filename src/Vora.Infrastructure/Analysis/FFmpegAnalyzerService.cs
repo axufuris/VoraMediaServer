@@ -99,7 +99,8 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
     public async Task<MediaAnalysisResult> AnalyzeSilenceDetectionsAsync(string filePath, SilenceDetectionParameters parameters, CancellationToken cancellationToken = default)
     {
         var result = new MediaAnalysisResult();
-        await RunFFmpegSilenceAndBlackDetectionAsync(filePath, parameters, result, cancellationToken);
+        var ignoreCoverImages = await CoverImageStreams.ProbeIgnoreArgumentsAsync(filePath, _logger, cancellationToken);
+        await RunFFmpegSilenceAndBlackDetectionAsync(filePath, parameters, ignoreCoverImages, result, cancellationToken);
         return result;
     }
 
@@ -416,10 +417,12 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
 
             if (root.TryGetProperty("streams", out var streams) && streams.ValueKind == JsonValueKind.Array)
             {
+                var videoStreams = CoverImageStreams.Read(streams);
                 foreach (var stream in streams.EnumerateArray())
                 {
                     var codecType = stream.TryGetProperty("codec_type", out var ct) ? ct.GetString() : "";
                     var index = stream.TryGetProperty("index", out var idx) ? idx.GetInt32() : 0;
+                    if (codecType == "video" && videoStreams.IsCoverImage(index)) continue;
 
                     var (isDefault, isForced, _) = ReadDisposition(stream);
 
@@ -520,7 +523,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             .ToList();
 
         if (hdr10Tracks.Count == 0) return;
-        if (!await HasHdr10PlusMetadataAsync(filePath, cancellationToken)) return;
+        if (!await HasHdr10PlusMetadataAsync(filePath, hdr10Tracks[0].StreamIndex, cancellationToken)) return;
 
         foreach (var track in hdr10Tracks)
         {
@@ -528,7 +531,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         }
     }
 
-    private async Task<bool> HasHdr10PlusMetadataAsync(string filePath, CancellationToken cancellationToken = default)
+    private async Task<bool> HasHdr10PlusMetadataAsync(string filePath, int streamIndex, CancellationToken cancellationToken = default)
     {
         var processInfo = new ProcessStartInfo
         {
@@ -542,7 +545,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         processInfo.ArgumentList.Add("-print_format");
         processInfo.ArgumentList.Add("json");
         processInfo.ArgumentList.Add("-select_streams");
-        processInfo.ArgumentList.Add("v:0");
+        processInfo.ArgumentList.Add(streamIndex.ToString(CultureInfo.InvariantCulture));
         processInfo.ArgumentList.Add("-read_intervals");
         processInfo.ArgumentList.Add("%+#5");
         processInfo.ArgumentList.Add("-show_frames");
@@ -606,7 +609,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         }
     }
 
-    private async Task RunFFmpegSilenceAndBlackDetectionAsync(string filePath, SilenceDetectionParameters parameters, MediaAnalysisResult result, CancellationToken cancellationToken = default)
+    private async Task RunFFmpegSilenceAndBlackDetectionAsync(string filePath, SilenceDetectionParameters parameters, IReadOnlyList<string> ignoreCoverImages, MediaAnalysisResult result, CancellationToken cancellationToken = default)
     {
         // blackdetect forces a full-frame video decode. The marker assembler only
         // reads gaps from the head (intro/recap) and tail (credits), so when those
@@ -621,7 +624,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
                 "Running windowed silence+black detection on {FilePath} ({Head}, tail {TailStart}s–end; threshold {Threshold} dB / {SilenceMin}s, black {BlackMin}s).",
                 filePath, parameters.SkipHeadWindow ? "head skipped" : $"head 0–{headEnd}s", tailStart, parameters.NoiseThresholdDb, parameters.MinSilenceDurationSec, parameters.MinBlackFrameDurationSec);
 
-            var tail = await RunDetectionPassAsync(filePath, parameters, seekSeconds: tailStart, limitSeconds: null, parameters.SamplePictureInTail, cancellationToken);
+            var tail = await RunDetectionPassAsync(filePath, parameters, ignoreCoverImages, seekSeconds: tailStart, limitSeconds: null, parameters.SamplePictureInTail, cancellationToken);
             result.PictureSamples = tail.Pictures;
 
             if (parameters.SkipHeadWindow)
@@ -631,7 +634,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             }
             else
             {
-                var head = await RunDetectionPassAsync(filePath, parameters, seekSeconds: null, limitSeconds: headEnd, samplePicture: false, cancellationToken);
+                var head = await RunDetectionPassAsync(filePath, parameters, ignoreCoverImages, seekSeconds: null, limitSeconds: headEnd, samplePicture: false, cancellationToken);
                 result.SilenceIntervals = head.Silence.Concat(tail.Silence).ToList();
                 result.BlackIntervals = head.Black.Concat(tail.Black).ToList();
             }
@@ -642,7 +645,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
                 "Running full-file silence+black detection on {FilePath} (threshold {Threshold} dB / {SilenceMin}s, black {BlackMin}s).",
                 filePath, parameters.NoiseThresholdDb, parameters.MinSilenceDurationSec, parameters.MinBlackFrameDurationSec);
 
-            var full = await RunDetectionPassAsync(filePath, parameters, seekSeconds: null, limitSeconds: null, parameters.SamplePictureInTail, cancellationToken);
+            var full = await RunDetectionPassAsync(filePath, parameters, ignoreCoverImages, seekSeconds: null, limitSeconds: null, parameters.SamplePictureInTail, cancellationToken);
             result.SilenceIntervals = full.Silence;
             result.BlackIntervals = full.Black;
             result.PictureSamples = full.Pictures;
@@ -658,21 +661,21 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
     // (-ss before -i) is what actually skips the decode; -copyts keeps the reported
     // times on the file's own timeline.
     private async Task<(List<DetectedInterval> Silence, List<DetectedInterval> Black, List<PictureSample> Pictures)> RunDetectionPassAsync(
-        string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, bool samplePicture, CancellationToken cancellationToken)
+        string filePath, SilenceDetectionParameters parameters, IReadOnlyList<string> ignoreCoverImages, double? seekSeconds, double? limitSeconds, bool samplePicture, CancellationToken cancellationToken)
     {
-        var (ok, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, parameters.HardwareDecoder, samplePicture, cancellationToken);
+        var (ok, result) = await RunDetectionProcessAsync(filePath, parameters, ignoreCoverImages, seekSeconds, limitSeconds, parameters.HardwareDecoder, samplePicture, cancellationToken);
 
         if (!ok && parameters.HardwareDecoder is not null && !cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning("Hardware-accelerated detection pass failed for {Input}; retrying in software.", filePath);
-            (_, result) = await RunDetectionProcessAsync(filePath, parameters, seekSeconds, limitSeconds, hardware: null, samplePicture, cancellationToken);
+            (_, result) = await RunDetectionProcessAsync(filePath, parameters, ignoreCoverImages, seekSeconds, limitSeconds, hardware: null, samplePicture, cancellationToken);
         }
 
         return result;
     }
 
     private async Task<(bool Ok, (List<DetectedInterval> Silence, List<DetectedInterval> Black, List<PictureSample> Pictures) Result)> RunDetectionProcessAsync(
-        string filePath, SilenceDetectionParameters parameters, double? seekSeconds, double? limitSeconds, HardwareAccelerator? hardware, bool samplePicture, CancellationToken cancellationToken)
+        string filePath, SilenceDetectionParameters parameters, IReadOnlyList<string> ignoreCoverImages, double? seekSeconds, double? limitSeconds, HardwareAccelerator? hardware, bool samplePicture, CancellationToken cancellationToken)
     {
         var silenceStarts = new List<double>();
         var silenceEnds = new List<double>();
@@ -704,6 +707,10 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             processInfo.ArgumentList.Add("-ss");
             processInfo.ArgumentList.Add(seekSeconds.Value.ToString(CultureInfo.InvariantCulture));
             processInfo.ArgumentList.Add("-copyts");
+        }
+        foreach (var argument in ignoreCoverImages)
+        {
+            processInfo.ArgumentList.Add(argument);
         }
         processInfo.ArgumentList.Add("-i");
         processInfo.ArgumentList.Add(filePath);
