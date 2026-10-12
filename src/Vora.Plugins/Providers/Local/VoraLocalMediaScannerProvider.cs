@@ -81,6 +81,8 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var library = LibraryHandle.FromGuid(libraryId);
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
         var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        var (episodeRegex, _, _, _) = BuildTvRegexes(details.ScannerRegex);
+        await RepairEpisodeRangesAsync(library, details.FolderPaths, existing, episodeRegex);
         var newFiles = GetNewFilesInDirectories(details.FolderPaths, existing)
             .Where(f => !IsExcluded(f, details.ExcludeFilters))
             .ToList();

@@ -500,6 +500,24 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
             Arg.Is<IReadOnlyDictionary<string, int>>(ranges => ranges.Count == 1 && ranges[doubleEpisode] == 10));
     }
 
+    [Fact]
+    public async Task A_library_scan_records_ranges_for_files_it_already_knows()
+    {
+        var doubleEpisode = Path.Combine(_tempRoot, "Ghosts (US) (2021)", "Season 05", "Ghosts (US) (2021) - S05E09-E10 - Its a Wonderful Christmas Carol.mkv");
+        var singleEpisode = Path.Combine(_tempRoot, "Ghosts (US) (2021)", "Season 05", "Ghosts (US) (2021) - S05E11 - The Christmas Spirit.mkv");
+        _ingestion.GetLibraryDetailsAsync(Arg.Any<LibraryHandle>())
+            .Returns(Task.FromResult<(List<string> FolderPaths, string? ScannerRegex, List<string> ExcludeFilters)>((new List<string> { _tempRoot }, RetiredTvPattern, new List<string>())));
+        _ingestion.GetExistingLibraryPathsAsync(Arg.Any<LibraryHandle>())
+            .Returns(new HashSet<string> { doubleEpisode, singleEpisode });
+
+        var units = await _scanner.DiscoverTvScanUnitsAsync(_library.Value);
+
+        units.Should().BeEmpty();
+        await _ingestion.Received(1).SetEpisodeRangesAsync(
+            Arg.Any<LibraryHandle>(),
+            Arg.Is<IReadOnlyDictionary<string, int>>(ranges => ranges.Count == 1 && ranges[doubleEpisode] == 10));
+    }
+
     private const string RetiredTvPattern = @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*(?<Absolute>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$";
 
     [Fact]
