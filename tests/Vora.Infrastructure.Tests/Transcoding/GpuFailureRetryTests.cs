@@ -1,5 +1,3 @@
-using System.ComponentModel;
-using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -13,8 +11,6 @@ namespace Vora.Infrastructure.Tests.Transcoding;
 
 public sealed class GpuFailureRetryTests : IDisposable
 {
-    private const string SkipReason = "Needs ffmpeg with libx264 on PATH.";
-
     private readonly string _root = Path.Combine(Path.GetTempPath(), "vora-gpu-retry-" + Guid.NewGuid().ToString("N"));
 
     public GpuFailureRetryTests()
@@ -33,43 +29,14 @@ public sealed class GpuFailureRetryTests : IDisposable
         }
     }
 
-    private static bool FfmpegAvailable()
-    {
-        try
-        {
-            using var process = Process.Start(new ProcessStartInfo("ffmpeg", "-hide_banner -version") { RedirectStandardOutput = true, UseShellExecute = false });
-            if (process is null) return false;
-            process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-            return process.ExitCode == 0;
-        }
-        catch (Win32Exception)
-        {
-            return false;
-        }
-    }
-
-    private async Task<string> MakeSourceAsync(CancellationToken cancellationToken)
-    {
-        var path = Path.Combine(_root, "source.mkv");
-        var startInfo = new ProcessStartInfo("ffmpeg") { RedirectStandardError = true, UseShellExecute = false };
-        foreach (var arg in new[] { "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=25", "-f", "lavfi", "-i", "sine=frequency=440", "-t", "12", "-c:v", "libx264", "-c:a", "aac", path })
-        {
-            startInfo.ArgumentList.Add(arg);
-        }
-        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("ffmpeg did not start");
-        await process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        process.ExitCode.Should().Be(0);
-        return path;
-    }
-
     [Fact]
     public async Task A_gpu_transcode_that_dies_restarts_on_the_cpu_instead_of_hanging_the_stream()
     {
-        Assert.SkipUnless(FfmpegAvailable(), SkipReason);
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
         var cancellationToken = TestContext.Current.CancellationToken;
-        var source = await MakeSourceAsync(cancellationToken);
+        var source = Path.Combine(_root, "source.mkv");
+        await FfmpegTool.RunAsync(cancellationToken,
+            "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=25", "-f", "lavfi", "-i", "sine=frequency=440", "-t", "12", "-c:v", "libx264", "-c:a", "aac", source);
         var output = Path.Combine(_root, "transcode");
         Directory.CreateDirectory(output);
 

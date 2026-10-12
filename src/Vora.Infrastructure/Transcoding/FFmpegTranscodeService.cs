@@ -661,9 +661,10 @@ public class FFmpegTranscodeService : ITranscodeService
             && !string.Equals(hdrType, "None", StringComparison.OrdinalIgnoreCase);
         bool needsTonemap = encodingVideo && settings.EnableHdrToneMapping && isHdrSource;
 
+        bool burnIn = encodingVideo && decision.RequiresSubtitleBurnIn;
         var decoder = encodingVideo ? hardware?.Accelerator : null;
         var encoder = encodingVideo && hardware is { Encode: true } ? hardware.Accelerator : null;
-        var gpuPipeline = decision.RequiresSubtitleBurnIn ? null : encoder;
+        var gpuPipeline = burnIn ? null : encoder;
 
         bool canTonemapOnGpu = gpuPipeline is { Type: not HardwareAccelerationType.Nvidia }
             ? gpuPipeline.TonemapsOnGpu
@@ -696,7 +697,20 @@ public class FFmpegTranscodeService : ITranscodeService
         }
         Flag("-i"); args.Add(sourceFile);
 
-        if (decision.SelectedVideoStreamIndex.HasValue)
+        var externalSubtitle = burnIn ? SubtitleInput(decision.SelectedSubtitleExternalPath) : null;
+        if (externalSubtitle is not null)
+        {
+            Flag("-isync 0");
+            Flag("-i"); args.Add(externalSubtitle);
+        }
+
+        if (burnIn)
+        {
+            Flag("-filter_complex");
+            args.Add(BurnInGraph(decision, externalSubtitle is not null, CpuFilters(settings, needsTonemap, scaleHeight), UploadFilters(encoder)));
+            Flag("-map [v]");
+        }
+        else if (decision.SelectedVideoStreamIndex.HasValue)
         {
             Flag($"-map 0:{decision.SelectedVideoStreamIndex.Value}");
         }
@@ -732,12 +746,15 @@ public class FFmpegTranscodeService : ITranscodeService
 
             Flag("-force_key_frames"); args.Add($"expr:gte(t,n_forced*{SegmentSeconds})");
 
-            var filters = gpuPipeline is not null
-                ? GpuFilters(gpuPipeline, settings, host, needsTonemap, isHdrSource, encodeHevc, scaleHeight, resolvedTonemapQuality)
-                : CpuFilters(encoder, decision, sourceFile, settings, needsTonemap, scaleHeight);
-            if (filters.Count > 0)
+            if (!burnIn)
             {
-                Flag("-vf"); args.Add(string.Join(",", filters));
+                var filters = gpuPipeline is not null
+                    ? GpuFilters(gpuPipeline, settings, host, needsTonemap, isHdrSource, encodeHevc, scaleHeight, resolvedTonemapQuality)
+                    : [.. CpuFilters(settings, needsTonemap, scaleHeight), .. UploadFilters(encoder)];
+                if (filters.Count > 0)
+                {
+                    Flag("-vf"); args.Add(string.Join(",", filters));
+                }
             }
 
             if (decision.BandwidthKbps > 0)
@@ -828,7 +845,7 @@ public class FFmpegTranscodeService : ITranscodeService
         {
             case HardwareAccelerationType.Nvidia:
                 var nvencPreset = settings.TranscodeQuality switch { 1 => "p2", 2 => "p6", 3 => "p7", _ => "p4" };
-                var nvenc = new List<string> { "-c:v", encodeHevc ? "hevc_nvenc" : "h264_nvenc", "-preset", nvencPreset, "-tune", "hq" };
+                var nvenc = new List<string> { "-c:v", encodeHevc ? "hevc_nvenc" : "h264_nvenc", "-preset", nvencPreset, "-tune", "hq", "-forced-idr", "1" };
                 if (settings.EnableHevcOptimization && encodeHevc) nvenc.AddRange(["-rc", "vbr", "-cq", "28", "-qmin", "28", "-qmax", "34"]);
                 return nvenc;
             case HardwareAccelerationType.QuickSync:
@@ -903,13 +920,7 @@ public class FFmpegTranscodeService : ITranscodeService
         return chain;
     }
 
-    private static List<string> CpuFilters(
-        HardwareAccelerator? encoder,
-        PlaybackDecisionVM decision,
-        string sourceFile,
-        ServerSetting settings,
-        bool needsTonemap,
-        int scaleHeight)
+    private static List<string> CpuFilters(ServerSetting settings, bool needsTonemap, int scaleHeight)
     {
         var chain = new List<string>();
         if (scaleHeight > 0) chain.Add($"scale=-2:{scaleHeight}");
@@ -917,19 +928,47 @@ public class FFmpegTranscodeService : ITranscodeService
         {
             chain.Add($"zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap={settings.TonemappingAlgorithm}:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p");
         }
-        if (decision.RequiresSubtitleBurnIn)
-        {
-            chain.Add($"subtitles='{decision.SelectedSubtitleExternalPath ?? sourceFile}'");
-        }
-        if (encoder is { Type: HardwareAccelerationType.Vaapi })
-        {
-            chain.AddRange(["format=nv12", "hwupload"]);
-        }
-        else if (encoder is { Type: HardwareAccelerationType.QuickSync })
-        {
-            chain.Add("format=nv12");
-        }
         return chain;
+    }
+
+    private static List<string> UploadFilters(HardwareAccelerator? encoder) => encoder?.Type switch
+    {
+        HardwareAccelerationType.Vaapi => ["format=nv12", "hwupload"],
+        HardwareAccelerationType.QuickSync => ["format=nv12"],
+        _ => []
+    };
+
+    private const string SubtitleCanvasFit =
+        "scale2ref=w='trunc(main_w*min(iw/main_w,ih/main_h)/2)*2':h='trunc(main_h*min(iw/main_w,ih/main_h)/2)*2'";
+
+    private static string BurnInGraph(PlaybackDecisionVM decision, bool externalSubtitle, List<string> before, List<string> after)
+    {
+        var video = decision.SelectedVideoStreamIndex is { } videoIndex ? $"0:{videoIndex}" : "0:v:0";
+        var subtitle = externalSubtitle
+            ? "1:s:0"
+            : decision.SelectedSubtitleStreamIndex is { } subtitleIndex ? $"0:{subtitleIndex}" : "0:s:0";
+
+        var graph = new StringBuilder();
+        var main = video;
+        if (before.Count > 0)
+        {
+            graph.Append('[').Append(video).Append(']').AppendJoin(',', before).Append("[main];");
+            main = "main";
+        }
+        graph.Append('[').Append(subtitle).Append("][").Append(main).Append(']').Append(SubtitleCanvasFit).Append("[sub][base];");
+        graph.Append("[base][sub]overlay=x=(W-w)/2:y=H-h:eof_action=pass:repeatlast=0");
+        if (after.Count > 0) graph.Append(',').AppendJoin(',', after);
+        return graph.Append("[v]").ToString();
+    }
+
+    internal static string? SubtitleInput(string? externalPath)
+    {
+        if (string.IsNullOrWhiteSpace(externalPath)) return null;
+        if (!string.Equals(Path.GetExtension(externalPath), ".sub", StringComparison.OrdinalIgnoreCase)) return externalPath;
+
+        return new[] { ".idx", ".IDX" }
+            .Select(extension => Path.ChangeExtension(externalPath, extension))
+            .FirstOrDefault(File.Exists) ?? externalPath;
     }
 
     private static bool IsAudioCodecSafeForMpegTs(string? codec)
