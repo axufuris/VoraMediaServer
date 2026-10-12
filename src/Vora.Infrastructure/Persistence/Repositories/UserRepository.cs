@@ -11,12 +11,14 @@ public class UserRepository(VoraDbContext context) : IUserRepository
     public Task<List<UserVM>> GetAllProjectedUsersAsync() =>
         context.Users
             .AsNoTracking()
+            .AsSplitQuery()
             .Select(UserVM.Projection)
             .ToListAsync();
 
     public Task<T?> GetProjectedUserByIdAsync<T>(Guid id, Expression<Func<User, T>> projection) =>
         context.Users
             .AsNoTracking()
+            .AsSplitQuery()
             .Where(u => u.Id == id)
             .Select(projection)
             .FirstOrDefaultAsync();
@@ -48,6 +50,7 @@ public class UserRepository(VoraDbContext context) : IUserRepository
     {
         var emailLower = email.ToLower();
         return context.Users
+            .AsSplitQuery()
             .Include(u => u.Profiles)
                 .ThenInclude(p => p.AccessSchedules)
             .FirstOrDefaultAsync(u => u.Email.ToLower() == emailLower);

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Vora.Infrastructure.Persistence;
@@ -27,6 +28,7 @@ public sealed class PostgresDatabase : IAsyncLifetime
     public VoraDbContext NewContext() =>
         new(new DbContextOptionsBuilder<VoraDbContext>()
             .UseNpgsql(_connectionString, npgsql => npgsql.UseVector())
+            .ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))
             .Options);
 
     public async ValueTask DisposeAsync()

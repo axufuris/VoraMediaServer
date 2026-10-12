@@ -8,6 +8,13 @@ PostgreSQL with the `vector` extension, accessed via EF Core.
 - `DbSet<T>` properties are grouped by aggregate at the top of the class.
 - Be aware of **vector columns** when modifying entities or writing queries — they're used for embeddings on media items.
 
+## Queries that load more than one collection
+
+No splitting behaviour is set globally. A query that loads two or more collection navigations, through `Include`/`ThenInclude` or through a projection, has to say `.AsSplitQuery()`. That includes a collection nested inside another, such as `UserVM.Projection`, which loads profiles and each profile's schedules. Without it, EF logs `MultipleCollectionIncludeWarning` and runs a single query that repeats the parent rows for every child combination.
+
+- Combine `Take`/`Skip` with a split query only after an `OrderBy` on a unique key. Each split query reruns the filter, and without a stable order each one can pick different rows.
+- `PostgresDatabase.NewContext()` turns the warning into an exception, so a database test that runs an unsplit query fails. `PostgresQuerySplittingTests` covers the queries that needed it: the user lists, playlist summaries, titles waiting for an embedding, and the duplicate-show merge.
+
 ## Migrations
 
 - Migrations live in `/src/Vora.Infrastructure/Migrations`.
