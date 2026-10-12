@@ -12,6 +12,10 @@ separately on `Collection` (`src/Vora.Domain/Entities/Library/Collection.cs`):
 Providers implement `ICollectionSyncProvider` (content) and `IChronologyProvider`
 (sort). Built-ins: AI (`openai_list`, `openai_chronology`), Trakt, MDbList, IMDb.
 
+## Order of collection lists
+
+Every list of collections (the Collections tabs, the library's Collections tab, the global list and collection search) is ordered by **Sort Title**, falling back to the title when Sort Title is blank, then by title. A Sort Title such as `1_Halloween` therefore pins a collection to the top. The order of items inside a collection is the collection's own sort (Chronological, Alphabetical by the items' sort titles, release date, date added).
+
 ## Automatic (TMDB) collections: visibility and descriptions
 
 - **Visibility** is one rule, `CollectionVisibility.HiddenReason`, driven by the library's `MinimumCollectionSize`: `0` hides every automatic (`SystemGenerated`) collection, `1`–`25` hides automatic ones with fewer items; admin-created collections always show; any empty collection is hidden. Default is 3 for new libraries (a request that omits it gets 3; an update that omits it keeps the current value). Applied to `GET /collections/library/{id}` and collection search. Admins pass `includeHidden=true` (ignored for everyone else) and get `hiddenReason` (`Empty` / `AutomaticCollectionsHidden` / `BelowMinimumSize`) — the Collections tabs' **Show hidden (N)** toggle and the Add-to-collection picker use it. Deleting an automatic collection stays blocked: a rescan would recreate it.

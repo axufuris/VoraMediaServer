@@ -50,4 +50,32 @@ public class CollectionManagerSortTests
         var titles = result!.Items.Select(i => i.Title).ToList();
         Assert.Equal(new[] { "First", "Second", "FreshOld", "FreshNew" }, titles);
     }
+
+    [Fact]
+    public async Task Collection_lists_follow_the_sort_title_and_fall_back_to_the_title()
+    {
+        var repo = Substitute.For<ICollectionRepository>();
+        var manager = new CollectionManager(repo, Substitute.For<ITaskQueueManager>(), Substitute.For<IClientNotifier>());
+        var libraryId = Guid.NewGuid();
+
+        repo.GetAllProjectedAsync(
+            Arg.Any<Expression<Func<Collection, CollectionSummaryVM>>>(),
+            Arg.Any<Guid?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<List<Guid>?>())
+            .Returns(_ => new List<CollectionSummaryVM>
+            {
+                new() { Id = Guid.NewGuid(), Title = "Aladdin Collection", ItemCount = 3 },
+                new() { Id = Guid.NewGuid(), Title = "The Matrix Collection", SortTitle = "Matrix Collection", ItemCount = 4 },
+                new() { Id = Guid.NewGuid(), Title = "Halloween Season", SortTitle = "1_Halloween", ItemCount = 9 },
+                new() { Id = Guid.NewGuid(), Title = "Die Hard Collection", SortTitle = " ", ItemCount = 5 },
+            });
+
+        var expected = new[] { "Halloween Season", "Aladdin Collection", "Die Hard Collection", "The Matrix Collection" };
+
+        Assert.Equal(expected, (await manager.GetGlobalCollectionsAsync(true, [])).Select(c => c.Title));
+        Assert.Equal(expected, (await manager.GetAllCollectionsAsync(true, [])).Select(c => c.Title));
+        Assert.Equal(expected, (await manager.GetLibraryCollectionsAsync(libraryId, true, [])).Select(c => c.Title));
+    }
 }

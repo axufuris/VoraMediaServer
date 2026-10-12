@@ -82,7 +82,8 @@ public class SearchRepository(VoraDbContext context) : ISearchRepository
         var searchPattern = $"%{query}%";
         return await dbQuery
             .Where(c => EF.Functions.ILike(c.Title, searchPattern))
-            .OrderBy(c => c.Title)
+            .OrderBy(c => c.SortTitle == null || c.SortTitle.Trim() == "" ? c.Title : c.SortTitle)
+            .ThenBy(c => c.Title)
             .Take(limit)
             .Select(CollectionSearchResultVM.Projection)
             .ToListAsync();
