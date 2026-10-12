@@ -275,8 +275,8 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
         return await query.FirstOrDefaultAsync(p => p.MediaItemId == session.MediaItemId);
     }
 
-    public Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search) =>
-        StreamHistoryProjection.LoadAsync(context, page, pageSize, search);
+    public Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(StreamHistoryQuery query) =>
+        StreamHistoryProjection.LoadAsync(context, query);
 
     public async Task<IEnumerable<T>> GetProjectedActiveStreamsAsync<T>(TimeSpan activeThreshold, Expression<Func<StreamSession, T>> projection)
     {

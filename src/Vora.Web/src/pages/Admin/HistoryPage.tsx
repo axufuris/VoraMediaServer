@@ -1,7 +1,8 @@
 import { useState, useEffect, Fragment } from 'react';
 import { useParams } from 'react-router-dom';
-import { historyService, type HistorySessionDto } from '../../api/Media/historyService';
+import { historyService, type HistoryDelivery, type HistorySessionDto } from '../../api/Media/historyService';
 import { libraryService, type LibrarySummary } from '../../api/Media/libraryService';
+import { userService, type UserVM } from '../../api/Users/userService';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import { formatTime, parseServerDate } from '../../utils/serverTime';
 
@@ -47,6 +48,18 @@ function formatHistoryResolution(row: HistorySessionDto): string {
     return output || source;
 }
 
+const ALL_DELIVERIES: HistoryDelivery[] = ['DirectPlay', 'DirectStream', 'Transcode'];
+
+function ProfileName({ row, primary }: { row: HistorySessionDto; primary: boolean }) {
+    const showAccount = !!row.accountName && row.accountName.localeCompare(row.userName, undefined, { sensitivity: 'accent' }) !== 0;
+    return (
+        <div className="flex flex-col">
+            <span className={primary ? 'font-semibold text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-secondary)]'}>{row.userName}</span>
+            {showAccount && <span className="text-[11px] font-normal text-[var(--vora-text-muted)]" title="Account">{row.accountName}</span>}
+        </div>
+    );
+}
+
 function CompletionIcon({ percent }: { percent: number }) {
     if (percent >= 90) {
         return <div className="w-3.5 h-3.5 rounded-full bg-[var(--vora-success-500)] mx-auto" title="Completed" />;
@@ -64,6 +77,8 @@ function CompletionIcon({ percent }: { percent: number }) {
 export default function HistoryPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const [data, setData] = useState<HistorySessionDto[]>([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -71,7 +86,8 @@ export default function HistoryPage() {
     const [libraries, setLibraries] = useState<LibrarySummary[]>([]);
     const [activeLibraryIds, setActiveLibraryIds] = useState<Set<string>>(new Set());
 
-    const [selectedUser, setSelectedUser] = useState('All users');
+    const [accounts, setAccounts] = useState<UserVM[]>([]);
+    const [selectedProfileId, setSelectedProfileId] = useState('');
     const [streamFilters, setStreamFilters] = useState({ directPlay: true, directStream: true, transcode: true });
     const [search, setSearch] = useState('');
     const [pageSize, setPageSize] = useState(25);
@@ -89,12 +105,49 @@ export default function HistoryPage() {
 
     useEffect(() => {
         let isMounted = true;
+        userService.getAllUsers(serverId).then(users => {
+            if (isMounted) setAccounts(users);
+        }).catch(console.error);
+        return () => { isMounted = false; };
+    }, [serverId]);
+
+    const deliveries: HistoryDelivery[] = [
+        ...(streamFilters.directPlay ? ['DirectPlay' as const] : []),
+        ...(streamFilters.directStream ? ['DirectStream' as const] : []),
+        ...(streamFilters.transcode ? ['Transcode' as const] : []),
+    ];
+    const deliveryKey = deliveries.join(',');
+    const libraryKey = libraries.length > 0 && activeLibraryIds.size < libraries.length
+        ? Array.from(activeLibraryIds).sort().join(',')
+        : '';
+    const nothingSelected = deliveries.length === 0 || (libraries.length > 0 && activeLibraryIds.size === 0);
+
+    useEffect(() => {
+        if (nothingSelected) {
+            setData([]);
+            setTotal(0);
+            setLoading(false);
+            return;
+        }
+
+        let isMounted = true;
         setLoading(true);
+        const selectedDeliveries = ALL_DELIVERIES.filter(d => deliveryKey.split(',').includes(d));
 
         const fetchHistory = async () => {
             try {
-                const response = await historyService.getHistory(1, pageSize, search, serverId);
-                if (isMounted) setData(response.data);
+                const response = await historyService.getHistory({
+                    page,
+                    pageSize,
+                    search,
+                    profileId: selectedProfileId,
+                    libraryIds: libraryKey ? libraryKey.split(',') : undefined,
+                    deliveries: selectedDeliveries.length < ALL_DELIVERIES.length ? selectedDeliveries : undefined,
+                }, serverId);
+                if (isMounted) {
+                    setData(response.data);
+                    setTotal(response.total);
+                }
             } catch (error) {
                 console.error('Failed to fetch history:', error);
             } finally {
@@ -104,7 +157,24 @@ export default function HistoryPage() {
 
         fetchHistory();
         return () => { isMounted = false; };
-    }, [pageSize, search, refreshTrigger, serverId]);
+    }, [page, pageSize, search, selectedProfileId, libraryKey, deliveryKey, nothingSelected, refreshTrigger, serverId]);
+
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    const firstShown = total === 0 ? 0 : (page - 1) * pageSize + 1;
+    const lastShown = Math.min(total, page * pageSize);
+
+    const toggleStream = (key: 'directPlay' | 'directStream' | 'transcode') => {
+        setStreamFilters(p => ({ ...p, [key]: !p[key] }));
+        setPage(1);
+    };
+
+    const toggleLibrary = (id: string) => {
+        const next = new Set(activeLibraryIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setActiveLibraryIds(next);
+        setPage(1);
+    };
 
     const toggleRow = (id: string) => {
         const newSet = new Set(expandedRows);
@@ -214,18 +284,6 @@ export default function HistoryPage() {
         </div>
     );
 
-    const filteredData = data.filter(row => {
-        if (selectedUser !== 'All users' && row.userName !== selectedUser) return false;
-        if (!activeLibraryIds.has(row.libraryId)) return false;
-
-        if (row.strategy === 'DirectPlay' && !streamFilters.directPlay) return false;
-        if ((row.strategy === 'Copy' || row.strategy === 'Remux' || row.strategy === 'DirectStream') && !streamFilters.directStream) return false;
-        if (row.strategy === 'Transcode' && !streamFilters.transcode) return false;
-
-        return true;
-    });
-
-    const userOptions = Array.from(new Set(data.map(d => d.userName)));
 
     return (
         <div data-vora-page="">
@@ -243,12 +301,17 @@ export default function HistoryPage() {
             <div className="p-8 space-y-4">
                 <div className="vora-card p-4 flex flex-wrap items-center gap-3">
                     <select
-                        value={selectedUser}
-                        onChange={(e) => setSelectedUser(e.target.value)}
+                        aria-label="Profile"
+                        value={selectedProfileId}
+                        onChange={(e) => { setSelectedProfileId(e.target.value); setPage(1); }}
                         className="vora-input !w-auto"
                     >
-                        <option value="All users">All users</option>
-                        {userOptions.map(user => <option key={user} value={user}>{user}</option>)}
+                        <option value="">All profiles</option>
+                        {accounts.filter(account => account.profiles.length > 0).map(account => (
+                            <optgroup key={account.id} label={account.displayName}>
+                                {account.profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+                            </optgroup>
+                        ))}
                     </select>
 
                     <div className="flex border border-[var(--vora-border-strong)] rounded-[var(--vora-radius-md)] overflow-hidden">
@@ -258,12 +321,8 @@ export default function HistoryPage() {
                                 <button
                                     key={lib.id}
                                     type="button"
-                                    onClick={() => {
-                                        const newSet = new Set(activeLibraryIds);
-                                        if (isActive) newSet.delete(lib.id);
-                                        else newSet.add(lib.id);
-                                        setActiveLibraryIds(newSet);
-                                    }}
+                                    aria-pressed={isActive}
+                                    onClick={() => toggleLibrary(lib.id)}
                                     className={`px-3 py-1.5 text-xs font-semibold border-r last:border-r-0 border-[var(--vora-border-strong)] transition-colors cursor-pointer ${isActive ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                                 >
                                     {lib.name}
@@ -275,17 +334,20 @@ export default function HistoryPage() {
                     <div className="flex border border-[var(--vora-border-strong)] rounded-[var(--vora-radius-md)] overflow-hidden">
                         <button
                             type="button"
-                            onClick={() => setStreamFilters(p => ({ ...p, directPlay: !p.directPlay }))}
+                            aria-pressed={streamFilters.directPlay}
+                            onClick={() => toggleStream('directPlay')}
                             className={`px-3 py-1.5 text-xs font-semibold border-r border-[var(--vora-border-strong)] transition-colors cursor-pointer ${streamFilters.directPlay ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                         >Direct Play</button>
                         <button
                             type="button"
-                            onClick={() => setStreamFilters(p => ({ ...p, directStream: !p.directStream }))}
+                            aria-pressed={streamFilters.directStream}
+                            onClick={() => toggleStream('directStream')}
                             className={`px-3 py-1.5 text-xs font-semibold border-r border-[var(--vora-border-strong)] transition-colors cursor-pointer ${streamFilters.directStream ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                         >Direct Stream</button>
                         <button
                             type="button"
-                            onClick={() => setStreamFilters(p => ({ ...p, transcode: !p.transcode }))}
+                            aria-pressed={streamFilters.transcode}
+                            onClick={() => toggleStream('transcode')}
                             className={`px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${streamFilters.transcode ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
                         >Transcode</button>
                     </div>
@@ -294,7 +356,7 @@ export default function HistoryPage() {
                         <input
                             type="text"
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                             placeholder="Search…"
                             className="vora-input !w-64"
                         />
@@ -304,7 +366,7 @@ export default function HistoryPage() {
                 <div className="flex justify-between items-center text-xs text-[var(--vora-text-muted)]">
                     <div className="flex items-center gap-2">
                         <span>Show</span>
-                        <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="vora-input !w-auto !py-1">
+                        <select aria-label="Entries per page" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} className="vora-input !w-auto !py-1">
                             <option value={25}>25</option>
                             <option value={50}>50</option>
                             <option value={100}>100</option>
@@ -319,7 +381,7 @@ export default function HistoryPage() {
                             <thead className="bg-[var(--vora-bg-sunken)] border-b border-[var(--vora-border-subtle)] text-[var(--vora-text-muted)] text-[11px] uppercase tracking-wider">
                                 <tr>
                                     <th className="px-4 py-3 font-semibold w-40">Date & Time</th>
-                                    <th className="px-4 py-3 font-semibold">User</th>
+                                    <th className="px-4 py-3 font-semibold">Profile</th>
                                     <th className="px-4 py-3 font-semibold">IP</th>
                                     <th className="px-4 py-3 font-semibold">Platform</th>
                                     <th className="px-4 py-3 font-semibold">Product</th>
@@ -335,10 +397,10 @@ export default function HistoryPage() {
                             <tbody className="divide-y divide-[var(--vora-border-subtle)]">
                                 {loading ? (
                                     <tr><td colSpan={12} className="px-4 py-12 text-center text-[var(--vora-text-muted)]">Loading history…</td></tr>
-                                ) : filteredData.length === 0 ? (
+                                ) : data.length === 0 ? (
                                     <tr><td colSpan={12} className="px-4 py-12 text-center text-[var(--vora-text-muted)]">No matching history found.</td></tr>
                                 ) : (
-                                    filteredData.map(row => (
+                                    data.map(row => (
                                         <Fragment key={row.id}>
                                             <tr className="hover:bg-[var(--vora-bg-sunken)]/40 transition-colors">
                                                 <td className="px-4 py-2.5">
@@ -358,7 +420,7 @@ export default function HistoryPage() {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-2.5 font-semibold text-[var(--vora-text-primary)]">{row.userName}</td>
+                                                <td className="px-4 py-2.5"><ProfileName row={row} primary /></td>
                                                 <td className="px-4 py-2.5 font-mono text-xs text-[var(--vora-text-secondary)]">{row.ipAddress}</td>
                                                 <td className="px-4 py-2.5 text-[var(--vora-text-secondary)]">{row.platform}</td>
                                                 <td className="px-4 py-2.5 text-[var(--vora-text-secondary)]">{row.product}</td>
@@ -400,7 +462,7 @@ export default function HistoryPage() {
                                                             <span className="text-[var(--vora-text-muted)] text-[11px] tabular-nums">{formatLocalTime(sub.startedAt)}</span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-2 text-[var(--vora-text-secondary)]">{sub.userName}</td>
+                                                    <td className="px-4 py-2"><ProfileName row={sub} primary={false} /></td>
                                                     <td className="px-4 py-2 font-mono text-xs text-[var(--vora-text-muted)]">{sub.ipAddress}</td>
                                                     <td className="px-4 py-2 text-[var(--vora-text-secondary)]">{sub.platform}</td>
                                                     <td className="px-4 py-2 text-[var(--vora-text-muted)]">{sub.product}</td>
@@ -430,6 +492,29 @@ export default function HistoryPage() {
                         </table>
                     </div>
                 </div>
+
+                <nav aria-label="Watch history pages" className="flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--vora-text-muted)]">
+                    <span className="tabular-nums">{total === 0 ? 'No sessions' : `Showing ${firstShown}–${lastShown} of ${total}`}</span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page <= 1 || loading}
+                            className="vora-button-secondary text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Previous
+                        </button>
+                        <span className="tabular-nums">Page {Math.min(page, pageCount)} of {pageCount}</span>
+                        <button
+                            type="button"
+                            onClick={() => setPage(p => Math.min(pageCount, p + 1))}
+                            disabled={page >= pageCount || loading}
+                            className="vora-button-secondary text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </nav>
             </div>
         </div>
     );
