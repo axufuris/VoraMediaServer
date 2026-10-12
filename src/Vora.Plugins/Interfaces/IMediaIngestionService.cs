@@ -7,6 +7,7 @@ public interface IMediaIngestionService
     Task<(List<string> FolderPaths, string? ScannerRegex, List<string> ExcludeFilters)> GetLibraryDetailsAsync(LibraryHandle library);
     Task<LibraryHandle?> GetLibraryForMediaAsync(MediaItemHandle item);
     Task<HashSet<string>> GetExistingLibraryPathsAsync(LibraryHandle library);
+    Task SetEpisodeRangesAsync(LibraryHandle library, IReadOnlyDictionary<string, int> lastEpisodeByFile);
     Task<List<string>> GetLibraryItemFilePathsAsync(LibraryHandle library);
     Task RemoveMediaItemByPathAsync(string filePath);
     Task ReleaseTrackedEntitiesAsync();

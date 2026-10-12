@@ -372,7 +372,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
     private (Regex episodeRegex, Regex showFolderRegex, Regex resolutionRegex, Regex editionRegex) BuildTvRegexes(string? customRegex)
     {
-        var episodeRegexPattern = customRegex ?? @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*[eE](?<EndEpisode>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$";
+        var episodeRegexPattern = LocalScannerPatterns.EffectiveTvEpisode(customRegex);
         var episodeRegex = new Regex(episodeRegexPattern, RegexOptions.IgnoreCase);
         var showFolderRegex = new Regex(@"^(?<SeriesTitle>.+?)(?:\s*\((?<Year>\d{4})\))?(?:\s*\[(?<Provider>imdb|tmdb|tvdb)-(?<ProviderId>[^\]]+)\])?$", RegexOptions.IgnoreCase);
         var resolutionRegex = new Regex(@"(?<Resolution>480p|720p|1080p|4k|2160p)", RegexOptions.IgnoreCase);
@@ -387,6 +387,8 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         await CleanupLegacyExtrasAsync(library);
 
         var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        await RepairEpisodeRangesAsync(library, directories, existingPathsSet, episodeRegex);
+
         var newFiles = GetNewFilesInDirectories(directories, existingPathsSet)
             .Where(f => !IsExcluded(f, excludeFilters))
             .ToList();
@@ -404,6 +406,42 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         {
             await IngestTvExtraAsync(library, extraPath, showFolderRegex);
         }
+    }
+
+    private async Task RepairEpisodeRangesAsync(LibraryHandle library, IEnumerable<string> directories, HashSet<string> knownFiles, Regex episodeRegex)
+    {
+        var roots = directories.ToList();
+        var lastEpisodeByFile = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var file in knownFiles)
+        {
+            if (IsExtraFile(file) || !roots.Any(root => IsInside(file, root))) continue;
+            if (LastEpisodeOfRange(Path.GetFileNameWithoutExtension(file), episodeRegex) is { } lastEpisode)
+            {
+                lastEpisodeByFile[file] = lastEpisode;
+            }
+        }
+
+        if (lastEpisodeByFile.Count > 0)
+        {
+            await _ingestionService.SetEpisodeRangesAsync(library, lastEpisodeByFile);
+        }
+    }
+
+    internal static int? LastEpisodeOfRange(string fileName, Regex episodeRegex)
+    {
+        var match = episodeRegex.Match(fileName);
+        if (!match.Success) return null;
+        if (!int.TryParse(match.Groups["Episode"].Value, out var first)) return null;
+        if (!int.TryParse(match.Groups["EndEpisode"].Value, out var last)) return null;
+        return last > first ? last : null;
+    }
+
+    private static bool IsInside(string file, string root)
+    {
+        var trimmed = root.TrimEnd('/', '\\');
+        return file.Length > trimmed.Length
+            && file.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase)
+            && file[trimmed.Length] is '/' or '\\';
     }
 
     private async Task IngestTvExtraAsync(LibraryHandle library, string extraPath, Regex showFolderRegex)

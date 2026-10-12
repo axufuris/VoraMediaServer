@@ -1,0 +1,26 @@
+# Library migration (Plex → Vora)
+
+Admin → Library Migration copies each mapped Plex account's watch state and ratings onto a Vora profile. `LibraryMigrationJobRunner` runs the job in the background and pushes progress over SignalR. The Plex side is `PlexLibrarySyncProvider` (an `ILibrarySyncProvider`), and the database side is `LibraryMigrationRepository`.
+
+## Matching
+
+Nothing is matched by title or file path. Plex and Vora agree on provider ids, so:
+
+- **Movies** match on the item's own TMDB, then IMDb, then TVDB id.
+- **Episodes** match on the **show's** id plus season and episode number (`FindEpisodeMatchesAsync`), then fall back to the episode's own TVDB / IMDb / TMDB id (`FindEpisodeMatchesByOwnIdsAsync`).
+- A Vora episode that covers a range (`Episode.EndEpisodeNumber`, a multi-episode file) answers for every number in it. Plex lists `S05E09` and `S05E10` separately; both land on the one Vora episode for `S05E09-E10`, and their watch states and ratings are merged (played if either was, the latest rating).
+- Anything left over is counted as skipped, and up to 40 are listed on the job as `watch episode tmdb:<show> S<n>E<n> ep-tvdb:<id>`.
+
+## Multi-episode files
+
+A file named `S05E09-E10`, `S05E09 - E10`, `S05E09E10` or `S02E01-E02-E03` holds every episode in the range. The scanner records the first number as `EpisodeNumber` and the last as `EndEpisodeNumber`, which also feeds episode counts (`docs/scanning-and-tasks.md`).
+
+- **One pattern.** `LocalScannerPatterns.TvEpisode` (`Vora.Plugins`) is both the scanner's default and what `LibraryManager` gives a new TV library. It keeps the older absolute form (`S01E01 - 001 - Title`).
+- **Old defaults still work.** TV libraries used to have a pattern with no end-episode group copied into `ScannerRegex`, so `S05E09-E10` read as episode 9 titled "E10 - …", and no episode had a range. `LocalScannerPatterns.EffectiveTvEpisode` treats any former built-in default as "use the current default", and saving the library replaces it. A pattern the admin wrote is kept as is.
+- **Known files get repaired.** A scan only ingests files it hasn't seen, so every TV scan also reads the range from the names of the files it already knows under the scanned folders (`RepairEpisodeRangesAsync`, names only, no disk access). It then sets `EndEpisodeNumber` where it is missing or different (`IMediaIngestionService.SetEpisodeRangesAsync`). A new file for an existing episode can widen its range (`WidenEpisodeRangeAsync`), never narrow it.
+
+After this landed, a library scan followed by running the migration again picks up episodes that used to be skipped.
+
+## Ratings and poster overlays
+
+A profile's ratings go to `UserMediaRatings`. With **Set admin ratings** ticked, they also become the item's `ServerAdminRating`, which is the rating poster overlays draw. The import marks each item whose server rating changed as needing a new overlay (`LastOverlayGeneratedAt = null`) and queues one **Generate Poster Overlays** task per library it touched. That sync redraws only the items marked this way, rather than queueing a task per item. Ratings set from the app queue the item's overlay the same way (`UserMediaStateManager`).

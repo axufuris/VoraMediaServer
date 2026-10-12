@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.LibraryMigration.ViewModels;
+using Vora.Application.Tasks;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -293,7 +294,12 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             await repository.BulkUpsertRatingsAsync(mapping.ProfileId, ratingUpserts);
             if (input.SetAdminRatings)
             {
-                await repository.BulkSetAdminRatingsAsync(ratingUpserts);
+                var librariesChanged = await repository.BulkSetAdminRatingsAsync(ratingUpserts);
+                var taskQueue = scopedServices.GetRequiredService<ITaskQueueManager>();
+                foreach (var libraryId in librariesChanged)
+                {
+                    taskQueue.QueueGenerateLibraryPosterOverlays(libraryId);
+                }
             }
         }
 

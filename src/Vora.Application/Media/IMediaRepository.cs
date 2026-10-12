@@ -25,6 +25,8 @@ public interface IMediaRepository
     Task<bool> MediaItemExistsAsync(Guid id);
     Task<Guid?> GetSeasonIdByNumberAsync(Guid tvShowId, int seasonNumber);
     Task<Guid?> GetEpisodeIdByNumberAsync(Guid seasonId, int episodeNumber);
+    Task<int> SetEpisodeEndNumbersAsync(Guid libraryId, IReadOnlyDictionary<string, int> lastEpisodeByFile);
+    Task WidenEpisodeRangeAsync(Guid episodeId, int endEpisodeNumber);
     Task<List<Guid>> GetMediaIdsByExternalIdsAsync(List<string> tmdbIds, List<string> imdbIds);
     Task<CollectionMatchCandidatesDto> GetCollectionMatchCandidatesAsync(Guid? libraryId);
     Task<Dictionary<Guid, SeasonShowInfoDto>> GetSeasonShowInfoAsync(IReadOnlyCollection<Guid> seasonIds);

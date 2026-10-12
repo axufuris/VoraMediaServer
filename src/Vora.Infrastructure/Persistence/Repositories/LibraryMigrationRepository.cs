@@ -134,9 +134,9 @@ public class LibraryMigrationRepository : ILibraryMigrationRepository
         await _context.SaveChangesAsync();
     }
 
-    public async Task BulkSetAdminRatingsAsync(IReadOnlyCollection<RatingUpsert> entries)
+    public async Task<IReadOnlyCollection<Guid>> BulkSetAdminRatingsAsync(IReadOnlyCollection<RatingUpsert> entries)
     {
-        if (entries.Count == 0) return;
+        if (entries.Count == 0) return [];
 
         var byItem = entries
             .GroupBy(e => e.MediaItemId)
@@ -147,15 +147,17 @@ public class LibraryMigrationRepository : ILibraryMigrationRepository
             .Where(m => targetIds.Contains(m.Id))
             .ToListAsync();
 
+        var librariesChanged = new HashSet<Guid>();
         foreach (var item in items)
         {
-            if (byItem.TryGetValue(item.Id, out var rating))
-            {
-                item.ServerAdminRating = rating;
-            }
+            if (!byItem.TryGetValue(item.Id, out var rating) || item.ServerAdminRating == rating) continue;
+            item.ServerAdminRating = rating;
+            item.LastOverlayGeneratedAt = null;
+            librariesChanged.Add(item.LibraryId);
         }
 
         await _context.SaveChangesAsync();
+        return librariesChanged;
     }
 
     public async Task BulkUpsertRatingsAsync(Guid profileId, IReadOnlyCollection<RatingUpsert> entries)
