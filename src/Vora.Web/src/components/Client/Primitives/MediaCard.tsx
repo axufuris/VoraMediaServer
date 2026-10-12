@@ -5,6 +5,7 @@ import ArtMosaic from './ArtMosaic';
 import MediaPlaceholder from './MediaPlaceholder';
 import PosterRemoveButton from './PosterRemoveButton';
 import { CornerChip, PosterCorner, UnplayedCountBadge, WatchedBadge } from './WatchedBadge';
+import { secureImageUrl } from '../../../utils/secureImageUrl';
 
 export type MediaCardShape = 'poster' | 'still' | 'square' | 'circle';
 export type MediaCardSize = 'xs' | 'sm' | 'md' | 'lg';
@@ -134,7 +135,7 @@ export default function MediaCard({
                     <ArtMosaic urls={mosaic} className="opacity-80 transition-opacity group-hover:opacity-100" />
                 ) : showImage ? (
                     <img
-                        src={uncachedImage ? imageUrl ?? undefined : thumbUrl(imageUrl, THUMB_WIDTH[shape], imageFit === 'contain' ? 'logo' : shape === 'still' ? 'still' : undefined)}
+                        src={uncachedImage ? secureImageUrl(imageUrl, imageFit === 'contain' ? 'logo' : 'poster') : thumbUrl(imageUrl, THUMB_WIDTH[shape], imageFit === 'contain' ? 'logo' : shape === 'still' ? 'still' : undefined)}
                         alt={displayTitle}
                         loading="lazy"
                         decoding="async"

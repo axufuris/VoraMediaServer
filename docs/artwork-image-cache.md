@@ -41,6 +41,18 @@ The endpoint (`Vora.Api/Endpoints/ArtworkEndpoints.cs`) is `AllowAnonymous` — 
 
 Frontend: use the `thumbUrl(src, width, kind)` helper (`src/Vora.Web/src/utils/thumbnails.ts`) to build the URL — don't hand-write `/api/artwork/thumb` query strings in components.
 
+### Third-party images over plain HTTP
+
+Channel logos, station logos and podcast artwork come from hosts outside the allowlist, so the browser loads them directly (`MediaCard`'s `uncachedImage`). Many are stored as `http://`, and a browser will not load those into an HTTPS page: it retries over HTTPS, logs a mixed-content warning, and shows nothing when the host has no HTTPS. A site cannot opt out of that.
+
+So on an HTTPS page those images go through the cache:
+
+- **Web:** `secureImageUrl(url, kind)` (`utils/secureImageUrl.ts`) wraps every place one becomes an `<img src>` or a player `posterUrl`. On an HTTPS page an `http://` address becomes `thumbUrl(url, 500, kind)`; anything else, and everything on an HTTP page, is returned unchanged. `kind` is `'logo'` (kept as PNG) or `'poster'` for podcast covers (JPEG).
+- **Server:** `ArtworkThumbnailService` fetches a source outside the allowlist only when `IRemoteImageRegistry.IsKnown(src)`. The registry (`Vora.Application/Artwork/RemoteImageRegistry.cs`, a singleton, `http://` addresses only, 250,000 entries then it starts over) holds the addresses the server has itself **sent to a client**. `/api/artwork/thumb` is anonymous, so without this it would fetch any public image for anyone.
+- **How an address gets in:** the response property carries `[RemoteImage]`, and `RemoteImageJson.RememberRemoteImages` (added to the HTTP and MVC JSON options in `AddVoraJsonOptions`) records the value as it is written. A new view model that returns a third-party image address **must** carry the attribute, or its `http://` images 404 on an HTTPS page. Marked today: `IptvChannelVM.LogoUrl`, `IptvRecordingChannelVM.LogoUrl`, `SmartListEntryVM.ImageUrl`, and `ArtworkUrl` / `ShowArtworkUrl` on the five podcast view models.
+- **Limits:** `SafeImageDownloader` still applies (public hosts only on every redirect hop, 10 MB, image bytes checked), so a logo served from a LAN address is not fetched. Eight third-party fetches run at once, and a source that failed is not retried for 15 minutes (`FailedRemoteImageRetryAfter`), so a page of dead logos does not hold eight connections open on every visit.
+- **After a restart** the registry is empty until a client loads a list again. Images already in the cache are served regardless, because the cached file is checked first.
+
 ### Orphan cleanup
 
 When a source image stops being referenced — poster/backdrop changed, item deleted, overlay replaced — its cached resizes must be evicted so the cap isn't wasted on dead entries. `IArtworkThumbnailService.RemoveThumbnailsForSource(src)` deletes every width bucket for that source. Current callers:

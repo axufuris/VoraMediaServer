@@ -26,6 +26,7 @@ public class ArtworkThumbnailRemovalTests : IDisposable
 
         _service = new ArtworkThumbnailService(
             Substitute.For<ISafeImageDownloader>(),
+            new Vora.Application.Artwork.RemoteImageRegistry(),
             Options.Create(new StoragePathsOptions { CustomArtwork = _root }),
             NullLogger<ArtworkThumbnailService>.Instance);
     }

@@ -1,3 +1,4 @@
+using Vora.Application.Artwork;
 using Vora.Domain.Entities.Iptv;
 
 namespace Vora.Application.Iptv.ViewModels;
@@ -55,6 +56,7 @@ public class IptvRecordingScheduleVM
 public class IptvRecordingChannelVM
 {
     public string Name { get; set; } = "Unknown Channel";
+    [RemoteImage]
     public string? LogoUrl { get; set; }
 }
 

@@ -482,6 +482,7 @@ public static class ServiceRegistrationExtensions
     private static IServiceCollection AddVoraApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<IArtworkService, ArtworkService>();
+        services.AddSingleton<Vora.Application.Artwork.IRemoteImageRegistry, Vora.Application.Artwork.RemoteImageRegistry>();
         services.AddSingleton<Vora.Application.Artwork.IArtworkThumbnailService, Vora.Infrastructure.Artwork.ArtworkThumbnailService>();
         services.AddScoped<ICollectionArtworkService, CollectionArtworkService>();
         services.AddScoped<IIptvEpgService, IptvEpgService>();
@@ -884,6 +885,13 @@ public static class ServiceRegistrationExtensions
             options.JsonSerializerOptions.Converters.Add(new Vora.Application.Serialization.DateOnlyConverter());
             options.JsonSerializerOptions.Converters.Add(new Vora.Application.Serialization.NullableDateOnlyConverter());
         });
+
+        services.AddOptions<Microsoft.AspNetCore.Http.Json.JsonOptions>()
+            .Configure<Vora.Application.Artwork.IRemoteImageRegistry>((options, remoteImages) =>
+                Vora.Application.Serialization.RemoteImageJson.RememberRemoteImages(options.SerializerOptions, remoteImages));
+        services.AddOptions<Microsoft.AspNetCore.Mvc.JsonOptions>()
+            .Configure<Vora.Application.Artwork.IRemoteImageRegistry>((options, remoteImages) =>
+                Vora.Application.Serialization.RemoteImageJson.RememberRemoteImages(options.JsonSerializerOptions, remoteImages));
 
         return services;
     }

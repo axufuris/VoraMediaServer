@@ -4,6 +4,7 @@ import { iptvClientService } from '../../../api/Iptv/iptvClientService';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
 import { StorageKeys } from '../../../utils/storageKeys';
 import { parseGuidePrefs } from '../LiveTv/hooks/useGuideData';
+import { secureImageUrl } from '../../../utils/secureImageUrl';
 
 export default function ProvidersTab({ activeProfileId, serverId, onSaved }: { activeProfileId: string, serverId?: string, onSaved: () => void }) {
     const [providers, setProviders] = useState<IptvPlaylistVM[]>([]);
@@ -210,7 +211,7 @@ function HiddenChannelsSection({ title, description, ids, emptyLabel, channelByI
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="flex h-8 w-12 shrink-0 items-center justify-center overflow-hidden rounded" style={{ background: 'var(--vora-bg-canvas)' }}>
-                                        {channel?.logoUrl ? <img src={channel.logoUrl} alt="" className="max-h-full max-w-full object-contain p-1" /> : <span className="text-[8px]" style={{ color: 'var(--vora-text-disabled)' }}>No logo</span>}
+                                        {channel?.logoUrl ? <img src={secureImageUrl(channel.logoUrl)} alt="" className="max-h-full max-w-full object-contain p-1" /> : <span className="text-[8px]" style={{ color: 'var(--vora-text-disabled)' }}>No logo</span>}
                                     </div>
                                     <span className="text-sm font-medium" style={{ color: 'var(--vora-text-primary)' }}>{channel?.name || 'Unknown channel'}</span>
                                 </div>

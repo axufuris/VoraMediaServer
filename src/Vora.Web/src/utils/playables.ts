@@ -7,6 +7,7 @@ import type { PodcastFeedEpisodeVM } from '../api/Podcasts/podcastService';
 import type { PlayableMedia } from '../contexts/usePlayer';
 import { audioQualityStore } from './audioQuality';
 import { serverVault } from './serverVault';
+import { secureImageUrl } from './secureImageUrl';
 
 const resolveServer = (serverId?: string) => (serverId ? serverVault.getServer(serverId) : serverVault.getActiveServer());
 
@@ -16,7 +17,7 @@ export function channelPlayable(channel: IptvChannelVM, nowPlaying: string | nul
         id: channel.id,
         title: channel.name,
         subtitle: nowPlaying || channel.groupTitle || (isRadio ? 'Live Radio' : 'Live TV'),
-        posterUrl: channel.logoUrl,
+        posterUrl: secureImageUrl(channel.logoUrl),
         streamUrl: channel.streamUrl,
         serverId: resolveServer(serverId)?.id,
         container: 'hls',
@@ -31,7 +32,7 @@ export function podcastPlayable(episode: PodcastFeedEpisodeVM, serverId?: string
         id: episode.id,
         title: episode.title,
         subtitle: episode.showTitle,
-        posterUrl: episode.artworkUrl || episode.showArtworkUrl,
+        posterUrl: secureImageUrl(episode.artworkUrl || episode.showArtworkUrl, 'poster'),
         streamUrl: episode.audioUrl,
         serverId: resolveServer(serverId)?.id,
         container: 'audio',

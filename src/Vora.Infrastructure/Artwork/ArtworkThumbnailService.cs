@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
@@ -59,18 +60,31 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
 
     private static int _writeCount;
 
+    private const int ConcurrentRemoteImageFetches = 8;
+    private const int MaxRememberedFailures = 5_000;
+    internal static readonly TimeSpan FailedRemoteImageRetryAfter = TimeSpan.FromMinutes(15);
+
+    private readonly SemaphoreSlim _remoteImageFetches = new(ConcurrentRemoteImageFetches);
+    private readonly ConcurrentDictionary<string, DateTime> _failedRemoteImages = new(StringComparer.Ordinal);
+    private readonly TimeProvider _time;
+
     private readonly ISafeImageDownloader _downloader;
+    private readonly IRemoteImageRegistry _remoteImages;
     private readonly ILogger<ArtworkThumbnailService> _logger;
     private readonly string _customArtworkPath;
     private readonly string _cacheRoot;
 
     public ArtworkThumbnailService(
         ISafeImageDownloader downloader,
+        IRemoteImageRegistry remoteImages,
         IOptions<StoragePathsOptions> storagePaths,
-        ILogger<ArtworkThumbnailService> logger)
+        ILogger<ArtworkThumbnailService> logger,
+        TimeProvider? time = null)
     {
         _downloader = downloader;
+        _remoteImages = remoteImages;
         _logger = logger;
+        _time = time ?? TimeProvider.System;
 
         var configured = storagePaths.Value.CustomArtwork;
         _customArtworkPath = !string.IsNullOrWhiteSpace(configured)
@@ -93,13 +107,23 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
         var cacheFile = Path.Combine(kindDir, CacheKey(src, width) + CacheExtension(kind));
         if (File.Exists(cacheFile)) return cacheFile;
 
+        var fromThirdPartyHost = _remoteImages.IsKnown(src);
+        if (fromThirdPartyHost && FailedRecently(src)) return null;
+
         byte[]? sourceBytes;
         try
         {
-            sourceBytes = await LoadSourceAsync(ResolveDownloadSource(src, width), cancellationToken);
+            sourceBytes = fromThirdPartyHost
+                ? await LoadThirdPartyImageAsync(src, cancellationToken)
+                : await LoadSourceAsync(ResolveDownloadSource(src, width), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return null;
         }
         catch (Exception ex)
         {
+            if (fromThirdPartyHost) RememberFailure(src);
             _logger.LogWarning(ex, "Thumbnail source fetch failed for {Src}.", src);
             return null;
         }
@@ -137,6 +161,7 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
         }
         catch (Exception ex)
         {
+            if (fromThirdPartyHost) RememberFailure(src);
             _logger.LogWarning(ex, "Thumbnail resize failed for {Src}.", src);
             return null;
         }
@@ -279,6 +304,29 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
         }
 
         return null;
+    }
+
+    private async Task<byte[]?> LoadThirdPartyImageAsync(string src, CancellationToken cancellationToken)
+    {
+        await _remoteImageFetches.WaitAsync(cancellationToken);
+        try
+        {
+            return await _downloader.DownloadAsync(src, cancellationToken);
+        }
+        finally
+        {
+            _remoteImageFetches.Release();
+        }
+    }
+
+    private bool FailedRecently(string src) =>
+        _failedRemoteImages.TryGetValue(src, out var failedAt)
+        && _time.GetUtcNow().UtcDateTime - failedAt < FailedRemoteImageRetryAfter;
+
+    private void RememberFailure(string src)
+    {
+        if (_failedRemoteImages.Count >= MaxRememberedFailures) _failedRemoteImages.Clear();
+        _failedRemoteImages[src] = _time.GetUtcNow().UtcDateTime;
     }
 
     internal static string CacheKey(string src, int width)

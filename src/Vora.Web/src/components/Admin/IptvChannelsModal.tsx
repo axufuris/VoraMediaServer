@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { iptvAdminService, type IptvChannelVM } from '../../api/Iptv/iptvAdminService';
 import { Modal, ModalHeader } from '../Common/Modal';
+import { secureImageUrl } from '../../utils/secureImageUrl';
 
 interface Props {
     isOpen: boolean;
@@ -67,7 +68,7 @@ export default function IptvChannelsModal({ isOpen, onClose, playlistName, chann
                     <div key={c.id} className={`flex items-center justify-between p-3 rounded-[var(--vora-radius-md)] border transition-colors ${c.isHiddenByAdmin ? 'bg-[var(--vora-danger-soft)]/40 border-[var(--vora-danger-500)]/30' : 'bg-[var(--vora-bg-surface)] border-[var(--vora-border-subtle)] hover:border-[var(--vora-border-strong)]'}`}>
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-8 bg-[var(--vora-bg-sunken)] border border-[var(--vora-border-subtle)] rounded flex items-center justify-center shrink-0 overflow-hidden">
-                                {c.logoUrl ? <img src={c.logoUrl} alt="" className="max-w-full max-h-full object-contain" /> : <span className="text-[8px] text-[var(--vora-text-disabled)]">No logo</span>}
+                                {c.logoUrl ? <img src={secureImageUrl(c.logoUrl)} alt="" className="max-w-full max-h-full object-contain" /> : <span className="text-[8px] text-[var(--vora-text-disabled)]">No logo</span>}
                             </div>
                             <div className="flex flex-col">
                                 <div className="flex items-center gap-2">

@@ -20,6 +20,7 @@ import { useCallback } from 'react';
 import { useDialog } from '../../dialogs';
 import { userService } from '../../api/Users/userService';
 import { parseServerDate, serverTimeMs } from '../../utils/serverTime';
+import { secureImageUrl } from '../../utils/secureImageUrl';
 
 export default function LiveTvPlayer() {
     const dialog = useDialog();
@@ -299,7 +300,7 @@ export default function LiveTvPlayer() {
         setIsVideoLoading(true);
         playMedia({
             ...currentMedia, id: nextChannel.id, title: nextChannel.name, subtitle: 'Live TV',
-            posterUrl: nextChannel.logoUrl, streamUrl: nextChannel.streamUrl,
+            posterUrl: secureImageUrl(nextChannel.logoUrl), streamUrl: nextChannel.streamUrl,
         });
     };
 
@@ -662,7 +663,7 @@ export default function LiveTvPlayer() {
                                     className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full"
                                     style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
                                 >
-                                    {displayChannel?.logoUrl && <img src={displayChannel.logoUrl} alt="" className="max-h-[80%] max-w-[80%] object-contain" />}
+                                    {displayChannel?.logoUrl && <img src={secureImageUrl(displayChannel.logoUrl)} alt="" className="max-h-[80%] max-w-[80%] object-contain" />}
                                 </div>
                                 <div>
                                     <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}>{displayChannel?.name || currentMedia.title}</h2>
@@ -686,7 +687,7 @@ export default function LiveTvPlayer() {
                                 setIsVideoLoading(true);
                                 playMedia({
                                     id: channel.id, title: channel.name, subtitle: program ? program.title : 'Live TV',
-                                    posterUrl: channel.logoUrl, streamUrl: channel.streamUrl, serverId: currentMedia.serverId, container: 'hls', playbackContextType: 'LiveTv',
+                                    posterUrl: secureImageUrl(channel.logoUrl), streamUrl: channel.streamUrl, serverId: currentMedia.serverId, container: 'hls', playbackContextType: 'LiveTv',
                                 });
                                 setShowOverlayGuide(false);
                             }}

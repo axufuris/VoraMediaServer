@@ -7,6 +7,7 @@ import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSe
 import { usePlayer } from '../../../contexts/usePlayer';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
+import { secureImageUrl } from '../../../utils/secureImageUrl';
 
 interface RadioPrefs {
     favoriteIds: string[];
@@ -253,7 +254,7 @@ export default function RadioTab() {
             id: channel.id,
             title: channel.name,
             subtitle: channel.groupTitle || 'Live Radio',
-            posterUrl: channel.logoUrl,
+            posterUrl: secureImageUrl(channel.logoUrl),
             streamUrl: channel.streamUrl,
             serverId: serverId ?? undefined,
             container: 'hls',
@@ -419,7 +420,7 @@ export default function RadioTab() {
                                             style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
                                         >
                                             {c.logoUrl ? (
-                                                <img src={c.logoUrl} alt={c.name} className="max-h-[80%] max-w-[80%] object-contain" />
+                                                <img src={secureImageUrl(c.logoUrl)} alt={c.name} className="max-h-[80%] max-w-[80%] object-contain" />
                                             ) : (
                                                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--vora-text-disabled)' }}>
                                                     <path d="M3.5 12a8.5 8.5 0 0117 0" />

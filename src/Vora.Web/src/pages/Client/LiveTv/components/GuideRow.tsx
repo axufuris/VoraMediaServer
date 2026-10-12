@@ -4,6 +4,7 @@ import { type IptvProgramDto } from '../../../../api/Iptv/iptvClientService';
 import { type IptvRecordingSessionVM } from '../../../../api/Iptv/dvrService';
 import { HOURS_TO_SHOW, PX_PER_MINUTE } from '../guideConstants';
 import { serverTimeMs } from '../../../../utils/serverTime';
+import { secureImageUrl } from '../../../../utils/secureImageUrl';
 
 export type CleanedProgram = IptvProgramDto & { _safeStart: number, _safeEnd: number };
 
@@ -61,7 +62,7 @@ export default function GuideRow({
                     style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
                 >
                     {channel.logoUrl ? (
-                        <img src={channel.logoUrl} alt="" className="max-h-[78%] max-w-[78%] object-contain" />
+                        <img src={secureImageUrl(channel.logoUrl)} alt="" className="max-h-[78%] max-w-[78%] object-contain" />
                     ) : (
                         <span className="text-[9px]" style={{ color: 'var(--vora-text-disabled)' }}>No logo</span>
                     )}
