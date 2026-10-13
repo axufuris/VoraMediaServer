@@ -90,6 +90,10 @@ Failures are `AiEndpointException` (an `InvalidOperationException`, with the HTT
 - **Picking a different provider clears the API key and the model names.** A key belongs to the server it was made for; left in the field it would be sent to the next one.
 - An empty address means OpenAI on a server that never saved one, but "Another server" also leaves it empty for the admin to fill in. `currentAiProvider` uses the choice made in the form to tell them apart.
 
+## Cost on the usage page
+
+AI Usage & Stats estimates cost in `utils/aiPricing.ts`: OpenAI's standard list prices per million tokens, looked up by the exact model name (a dated snapshot and an `openai/` prefix resolve to their model). A model with no price there, such as one from another company or one on the admin's own computer, adds nothing and is named under the figure. Add a row when Vora starts offering a new OpenAI model; the old "name contains" rule left `gpt-5` at $0.
+
 ## Not done
 
 - No request has been sent to a real Ollama or LM Studio server. The behaviour above is covered by tests against stand-in servers.

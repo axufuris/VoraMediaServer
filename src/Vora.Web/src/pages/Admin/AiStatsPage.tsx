@@ -7,6 +7,7 @@ import StatCard from '../../components/Admin/Primitives/StatCard';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
 import EmptyState from '../../components/Admin/Primitives/EmptyState';
 import { resolveAdminPath } from '../../components/Admin/Shell/adminNavData';
+import { estimateAiCost } from '../../utils/aiPricing';
 
 const getLocalDateString = (date: Date) => {
     const year = date.getFullYear();
@@ -78,33 +79,10 @@ export default function AiStatsPage() {
     };
 
     const costTotals = useMemo(() => {
-        if (!data) return { prompt: 0, comp: 0, total: 0, cost: 0 };
-        let prompt = 0;
-        let comp = 0;
-        let totalCost = 0;
-
-        data.dailyStats.forEach(stat => {
-            prompt += stat.promptTokens;
-            comp += stat.completionTokens;
-
-            // Approximate OpenAI list prices per token (input, output). Check the
-            // "-mini"/"-nano" variants before their base model since the base name
-            // is a substring of the variant.
-            const m = stat.modelUsed;
-            if (m.includes('gpt-4o-mini')) {
-                totalCost += (stat.promptTokens * 0.00000015) + (stat.completionTokens * 0.00000060);
-            } else if (m.includes('gpt-4.1-mini') || m.includes('gpt-4.1-nano')) {
-                totalCost += (stat.promptTokens * 0.00000040) + (stat.completionTokens * 0.00000160);
-            } else if (m.includes('gpt-4.1')) {
-                totalCost += (stat.promptTokens * 0.00000200) + (stat.completionTokens * 0.00000800);
-            } else if (m.includes('gpt-4o')) {
-                totalCost += (stat.promptTokens * 0.00000250) + (stat.completionTokens * 0.00001000);
-            } else if (m.includes('embedding')) {
-                totalCost += (stat.promptTokens * 0.00000002);
-            }
-        });
-
-        return { prompt, comp, total: prompt + comp, cost: totalCost };
+        const stats = data?.dailyStats ?? [];
+        const prompt = stats.reduce((sum, stat) => sum + stat.promptTokens, 0);
+        const comp = stats.reduce((sum, stat) => sum + stat.completionTokens, 0);
+        return { prompt, comp, total: prompt + comp, ...estimateAiCost(stats) };
     }, [data]);
 
     return (
@@ -183,6 +161,9 @@ export default function AiStatsPage() {
                         label="Estimated Cost"
                         value={`$${costTotals.cost.toFixed(3)}`}
                         tone="accent"
+                        footer={costTotals.unpriced.length > 0
+                            ? <p className="text-xs text-[var(--vora-text-muted)]">Not counted, no known price: {costTotals.unpriced.join(', ')}</p>
+                            : undefined}
                     />
                 </div>
 
