@@ -1,5 +1,8 @@
 import { apiClient } from '../client';
-import { scanDeviceCapabilities } from '../../utils/hardwareScanner';
+import { scanDeviceCapabilities, scanDeviceCapabilitiesSync } from '../../utils/hardwareScanner';
+import { mediaService, type MediaItem } from '../Media/mediaService';
+import { applyTitlePlaybackCapabilities, hasTitlePlaybackPreferences, readTitlePlaybackPreferences, resolveTitlePlayback } from '../../utils/titlePlaybackPreferences';
+import { isImageSubtitleCodec, isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
 
 export interface StartSessionResponse {
     sessionId: string;
@@ -18,6 +21,7 @@ export interface StartSessionResponse {
     bandwidthKbps: number;
     outputResolution?: string | null;
     outputHdrType?: string | null;
+    textSubtitleTrackId?: string | null;
 }
 
 // Object URLs for sidecar WebVTT, keyed by session + track. The endpoint needs
@@ -29,8 +33,31 @@ const subtitleObjectUrls = new Map<string, string>();
 const subtitleCacheKey = (sessionId: string, subtitleTrackId: string) => `${sessionId}|${subtitleTrackId}`;
 
 export const streamingService = {
-    startSession: async (mediaId: string, deviceId: string, startPosition: number = 0, videoTrackId?: string, audioTrackId?: string, subtitleTrackId?: string, serverId?: string, mediaPartId?: string) => {
-        const capabilities = await scanDeviceCapabilities();
+    startSession: async (mediaId: string, deviceId: string, startPosition: number = 0, videoTrackId?: string, audioTrackId?: string, subtitleTrackId?: string, serverId?: string, mediaPartId?: string, mediaDetails?: MediaItem) => {
+        let capabilities = await scanDeviceCapabilities();
+        let textSubtitleTrackId: string | null | undefined;
+        if (hasTitlePlaybackPreferences(serverId)) {
+            let details = mediaDetails ?? await mediaService.getMediaItem(mediaId, serverId);
+            const preferences = readTitlePlaybackPreferences(details, serverId);
+            if (Object.values(preferences).some(value => value !== undefined)) {
+                capabilities = applyTitlePlaybackCapabilities(capabilities, scanDeviceCapabilitiesSync(), preferences);
+                if (details.type === 'TvShow' && !details.mediaParts?.length) {
+                    const next = await mediaService.getUpNext(details.id, undefined, undefined, serverId);
+                    if (next.nextItem) details = await mediaService.getMediaItem(next.nextItem.id, serverId);
+                }
+                const requestedPart = details.mediaParts?.find(part => part.id === mediaPartId || part.videoTracks?.some(track => track.id === videoTrackId));
+                const selected = resolveTitlePlayback(details, preferences, capabilities, requestedPart);
+                videoTrackId ??= selected.video?.id;
+                audioTrackId ??= selected.manualAudio ? selected.audio?.id : undefined;
+                mediaPartId ??= selected.part?.id;
+                if (subtitleTrackId === undefined && preferences.subtitles) {
+                    const subtitle = selected.part?.subtitleTracks?.find(track => track.id === selected.subtitleId);
+                    const burnIn = subtitle && isImageSubtitleCodec(subtitle.codec);
+                    subtitleTrackId = burnIn ? subtitle.id : NoSubtitle;
+                    textSubtitleTrackId = !burnIn && !isNoSubtitle(selected.subtitleId) ? selected.subtitleId : null;
+                }
+            }
+        }
 
         const response = await apiClient.post('/streaming/start', {
             mediaId,
@@ -43,7 +70,8 @@ export const streamingService = {
             mediaPartId
         }, { serverId });
 
-        return response.data as StartSessionResponse;
+        const session = response.data as StartSessionResponse;
+        return textSubtitleTrackId === undefined ? session : { ...session, textSubtitleTrackId };
     },
     startExtraSession: async (extraId: string, startPosition: number = 0, serverId?: string) => {
         const capabilities = await scanDeviceCapabilities();

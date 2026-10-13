@@ -85,6 +85,8 @@ There are two parallel invitation systems and they coexist:
 
 ## localStorage keys
 
+Movie/show playback overrides use `StorageKeys.titlePlayback(serverUrl, profileId, deviceId, titleId)` (`title_playback_` followed by the JSON tuple). They are browser-local, independent of global playback settings, and survive reloads and logout. Episodes and seasons use the show's ID; a movie uses its own ID. The destination server's profile determines the scope. Clearing browser storage removes these overrides; they do not sync to another device.
+
 These are the canonical keys. Don't invent new ones in a vacuum.
 
 | Key | Purpose | Set by |

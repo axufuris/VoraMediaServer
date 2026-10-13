@@ -5,7 +5,7 @@ import { mediaService, type MediaItem, type MediaPart, type UpNextItemVM, type U
 import { profileService, type PlaybackPreferencesVM } from '../../api/Users/profileService';
 import { streamingService } from '../../api/Streaming/streamingService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
-import { getEffectiveCapabilities } from '../../utils/hardwareScanner';
+import { getEffectiveCapabilities, scanDeviceCapabilitiesSync } from '../../utils/hardwareScanner';
 import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 import type Hls from 'hls.js';
 import { loadHls } from '../../utils/loadHls';
@@ -25,6 +25,7 @@ import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { ScrubPreview } from './VideoScrubThumbnails';
 import { seasonEpisodeLabel } from '../../utils/seasonLabel';
 import { safeMediaUrl } from '../../utils/safeUrl';
+import { applyTitlePlaybackCapabilities, readTitlePlaybackPreferences, saveAudioChoice, saveSubtitleChoice, saveTitlePlaybackPreferences, saveVideoChoice } from '../../utils/titlePlaybackPreferences';
 
 type VideoTrackType = NonNullable<MediaPart['videoTracks']>[number];
 type AudioTrackType = NonNullable<MediaPart['audioTracks']>[number];
@@ -79,11 +80,12 @@ function MarkerBands({ markers, duration }: { markers: MediaMarker[]; duration: 
 
 export default function GlobalVideoPlayer() {
     const dialog = useDialog();
-    const { serverId } = useParams<{ serverId?: string }>();
+    const { serverId: routeServerId } = useParams<{ serverId?: string }>();
     const {
         currentMedia, isPlaying, isMinimized, volume, sessionId,
         togglePlayPause, seek, skipForward, skipBackward, setMinimized, closePlayer, setVolume, changeStreams, videoRef, playMedia,
     } = usePlayer();
+    const serverId = currentMedia?.serverId ?? routeServerId;
     const { currentTime, duration } = usePlayerTime();
 
     const flags = useFeatureFlags();
@@ -182,8 +184,9 @@ export default function GlobalVideoPlayer() {
         const profileToken = localStorage.getItem(StorageKeys.profileToken);
         const profileId = (profileToken ? getProfileIdFromToken(profileToken) : null) || 'unknown';
         const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
-        return getEffectiveCapabilities(profileId, deviceId);
-    }, []);
+        const base = getEffectiveCapabilities(profileId, deviceId);
+        return mediaDetails ? applyTitlePlaybackCapabilities(base, scanDeviceCapabilitiesSync(), readTitlePlaybackPreferences(mediaDetails, serverId)) : base;
+    }, [mediaDetails, serverId]);
 
     const [upNextData, setUpNextData] = useState<UpNextResultVM | null>(null);
 
@@ -528,6 +531,18 @@ export default function GlobalVideoPlayer() {
 
     const handleApplyStreams = async () => {
         setShowSettings(false);
+        if (mediaDetails) {
+            const part = mediaDetails.mediaParts?.find(p => p.videoTracks?.some(track => track.id === selVideo));
+            const video = part?.videoTracks?.find(track => track.id === selVideo);
+            const audio = part?.audioTracks?.find(track => track.id === selAudio);
+            try {
+                saveTitlePlaybackPreferences(mediaDetails, {
+                    ...readTitlePlaybackPreferences(mediaDetails, serverId),
+                    video: part && video ? saveVideoChoice(part, video) : undefined,
+                    audio: audio ? saveAudioChoice(audio) : undefined,
+                }, serverId);
+            } catch { await dialog.alert('Your browser could not save these playback preferences.'); }
+        }
 
         const chosenTrack = mediaDetails?.mediaParts
             ?.flatMap((p: MediaPart) => p.subtitleTracks ?? [])
@@ -558,6 +573,13 @@ export default function GlobalVideoPlayer() {
             .find((st: SubtitleTrackType) => st.id === subtitleTrackId);
 
         const wantsBurnIn = !!chosen && isImageSubtitleCodec(chosen.codec);
+        if (mediaDetails) {
+            try {
+                saveTitlePlaybackPreferences(mediaDetails, {
+                    ...readTitlePlaybackPreferences(mediaDetails, serverId), subtitles: saveSubtitleChoice(chosen),
+                }, serverId);
+            } catch { await dialog.alert('Your browser could not save these playback preferences.'); }
+        }
         const hasBurnedInSub = currentMedia?.subtitleStrategy === 'BurnIn';
 
         setSelSub(subtitleTrackId);

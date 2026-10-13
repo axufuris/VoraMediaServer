@@ -110,6 +110,8 @@ Right-clicking a movie, show, season or episode, or holding it on a touch screen
 
 ## Player shared primitives
 
+`TitlePlaybackControls` appears below the movie/show/episode hero with Video, Audio and Subtitles selectors, plus title-specific resolution, bitrate and audio output overrides. Changes save immediately for this browser's profile/device and title; **Use global defaults** clears that title's overrides. The existing Quality & tracks menu edits the same saved choices. Show preferences apply across episodes by matching version characteristics, audio language/channels/codec and subtitle language/forced/SDH flags rather than reusing episode-specific track IDs. Missing audio/version choices fall back to automatic selection; missing subtitle choices use Off. `streamingService.startSession` applies saved overrides to next-episode and playlist playback as well as the details page; text subtitles remain sideloaded and image subtitles request burn-in. Explicit track choices take priority over automatic selection, while codec support and server bandwidth limits still apply. Player track/subtitle changes update the same preferences.
+
 `components/Player/Controls/PlayerButtons.tsx` exports `PlayPauseButton`, `SkipButton`, `VolumeControl`, `FullscreenButton`, `MaximizeButton`, `CloseButton`. Both `GlobalVideoPlayer` and `LiveTvPlayer` use these.
 
 `useAutoHideControls({ isMinimized, isPlaying, keepVisibleWhen })` and `useFullscreen(containerRef)` factor out the mousemove auto-hide effect and fullscreen toggle. Use them in any future player surface.
