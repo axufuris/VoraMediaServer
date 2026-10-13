@@ -154,6 +154,7 @@ export default function SearchPage() {
                                         captionLines={subtitle ? [subtitle] : []}
                                         imageUrl={m.posterUrl}
                                         onClick={() => navigateToMedia(m.serverId, m.id)}
+                                        menu={{ id: m.id, serverId: m.serverId }}
                                         fill
                                     />
                                 );
@@ -175,6 +176,7 @@ export default function SearchPage() {
                                         captionLines={subtitle ? [subtitle] : []}
                                         imageUrl={m.posterUrl}
                                         onClick={() => navigateToMedia(m.serverId, m.id)}
+                                        menu={{ id: m.id, serverId: m.serverId }}
                                         fill
                                     />
                                 );

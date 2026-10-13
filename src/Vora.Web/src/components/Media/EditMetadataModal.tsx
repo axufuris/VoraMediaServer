@@ -15,13 +15,16 @@ interface EditMetadataModalProps {
     itemId: string;
     type: 'media' | 'season';
     libraryType?: string;
+    // The server the item is on, when that is not the one in the address bar.
+    serverId?: string;
     initialData: UpdateMediaRequest & { lockedFields?: string[]; libraryArtworkProviderId?: string };
 }
 
 export default function EditMetadataModal({
-    isOpen, onClose, onSaved, itemId, type, libraryType, initialData }: EditMetadataModalProps) {
+    isOpen, onClose, onSaved, itemId, type, libraryType, serverId: serverIdProp, initialData }: EditMetadataModalProps) {
     const dialog = useDialog();
-    const { serverId } = useParams<{ serverId?: string }>();
+    const { serverId: routeServerId } = useParams<{ serverId?: string }>();
+    const serverId = serverIdProp ?? routeServerId;
     const [activeTab, setActiveTab] = useState<'general' | 'poster' | 'backdrop' | 'logo'>('general');
     const [saving, setSaving] = useState(false);
     const [loadingArt, setLoadingArt] = useState(false);

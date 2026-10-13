@@ -7,13 +7,16 @@ import { CornerChip, PosterCorner } from '../Client/Primitives/WatchedBadge';
 import { episodeCornerLabel } from '../../utils/posterCaption';
 import { StorageKeys } from '../../utils/storageKeys';
 import { formatDate } from '../../utils/serverTime';
+import { mediaMenuTarget } from './ItemMenu/mediaItemMenu';
+import MediaMenuArea from './ItemMenu/MediaMenuArea';
 
 interface Props {
     episodes: Episode[];
     serverId?: string;
+    onChanged?: () => void;
 }
 
-export default function MediaEpisodesList({ episodes, serverId }: Props) {
+export default function MediaEpisodesList({ episodes, serverId, onChanged }: Props) {
     const navigate = useNavigate();
     const [localRatings, setLocalRatings] = useState<Record<string, number | null>>({});
 
@@ -42,7 +45,7 @@ export default function MediaEpisodesList({ episodes, serverId }: Props) {
                     const ratingValue = ep.id in localRatings ? localRatings[ep.id] : (ep.myRating ?? null);
 
                     return (
-                        <div key={ep.id} className="flex flex-col sm:flex-row gap-6 p-4 bg-[var(--vora-bg-sunken)]/50 hover:bg-[var(--vora-bg-sunken)] rounded-lg border border-transparent hover:border-[var(--vora-border-subtle)] transition-colors group">
+                        <MediaMenuArea key={ep.id} target={mediaMenuTarget({ id: ep.id, type: 'Episode' }, serverId, { onChanged })} className="flex flex-col sm:flex-row gap-6 p-4 bg-[var(--vora-bg-sunken)]/50 hover:bg-[var(--vora-bg-sunken)] rounded-lg border border-transparent hover:border-[var(--vora-border-subtle)] transition-colors group">
                             <div
                                 onClick={() => navigate(serverId ? `/server/${serverId}/media/${ep.id}` : `/media/${ep.id}`)}
                                 className="w-full sm:w-48 shrink-0 relative aspect-video bg-[var(--vora-bg-canvas)] rounded-md overflow-hidden shadow-[var(--vora-shadow-md)] cursor-pointer"
@@ -97,7 +100,7 @@ export default function MediaEpisodesList({ episodes, serverId }: Props) {
                                     {ep.overview || "No overview available for this episode."}
                                 </p>
                             </div>
-                        </div>
+                        </MediaMenuArea>
                     );
                 })}
             </div>

@@ -17,6 +17,7 @@ import { recentlyAddedTime } from '../../utils/recentlyAdded';
 import { yearOf } from '../../utils/serverTime';
 import { errorDetail, isMissingOrForbidden } from '../../utils/apiError';
 import LibraryCollectionGrid from '../../components/Collections/LibraryCollectionGrid';
+import { mediaMenuTarget } from '../../components/Media/ItemMenu/mediaItemMenu';
 
 type LibraryTabKey = 'library' | 'collections' | 'recommendations';
 
@@ -88,9 +89,10 @@ function renderLibraryCard(
         navigate: (to: string) => void;
         serverId?: string;
         handleDeleteMedia: (e: React.MouseEvent, id: string) => void;
+        reload: () => void;
     }
 ) {
-    const { isAdmin, navigate, serverId, handleDeleteMedia } = ctx;
+    const { isAdmin, navigate, serverId, handleDeleteMedia, reload } = ctx;
     return (
         <div key={item.id} className="[content-visibility:auto] [contain-intrinsic-size:11rem_20rem]">
             <MediaCard
@@ -100,6 +102,7 @@ function renderLibraryCard(
                 unplayedCount={item.unplayedItemCount}
                 onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
                 onDelete={isAdmin ? (e) => handleDeleteMedia(e, item.id) : undefined}
+                menu={mediaMenuTarget(item, serverId, { onChanged: reload })}
                 fill
             />
         </div>
@@ -484,6 +487,8 @@ export default function LibraryPage() {
         }
     }, [id, serverId, isAdmin]);
 
+    const reloadQuietly = useCallback(() => { void loadData(true); }, [loadData]);
+
     useEffect(() => {
         loadData();
     }, [loadData]);
@@ -803,13 +808,13 @@ export default function LibraryPage() {
                                     <section key={letter} id={`letter-${letter}`} className="mb-10 scroll-mt-24">
                                         <h2 className="m-0 mb-4 text-base font-semibold" style={{ color: 'var(--vora-text-muted)', letterSpacing: '0.04em' }}>{letter}</h2>
                                         <MediaGrid>
-                                            {groupedItems[letter].map(item => renderLibraryCard(item, { isAdmin, navigate, serverId, handleDeleteMedia }))}
+                                            {groupedItems[letter].map(item => renderLibraryCard(item, { isAdmin, navigate, serverId, handleDeleteMedia, reload: reloadQuietly }))}
                                         </MediaGrid>
                                     </section>
                                 ))
                             ) : (
                                 <MediaGrid>
-                                    {visibleItems.map(item => renderLibraryCard(item, { isAdmin, navigate, serverId, handleDeleteMedia }))}
+                                    {visibleItems.map(item => renderLibraryCard(item, { isAdmin, navigate, serverId, handleDeleteMedia, reload: reloadQuietly }))}
                                 </MediaGrid>
                             )}
                         </>

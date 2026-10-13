@@ -18,6 +18,7 @@ import MediaRow, { MediaRowItem } from '../../components/Client/Primitives/Media
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import PosterRemoveButton from '../../components/Client/Primitives/PosterRemoveButton';
 import { useDialog } from '../../dialogs';
+import { mediaMenuTarget } from '../../components/Media/ItemMenu/mediaItemMenu';
 
 type HomeTab = 'overview' | 'forYou' | 'watchlist' | 'collections' | 'playlists';
 
@@ -91,6 +92,7 @@ function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serve
                             imageUrl={item.posterUrl ?? item.backgroundUrl}
                             progressPercent={percent}
                             onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
+                            menu={mediaMenuTarget(item, serverId, { onChanged: () => fetchItems(true) })}
                             hoverBadge={<PosterRemoveButton onClick={() => handleHide(item)} title="Hide from Continue Watching" />}
                         />
                     </MediaRowItem>

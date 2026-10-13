@@ -205,7 +205,7 @@ export default function SmartPlaylistDetailsPage() {
                 ) : items.mediaType === 'Music' && items.tracks ? (
                     <MusicTable tracks={items.tracks} onPlay={handlePlay} formatDuration={formatDuration} />
                 ) : items.mediaType === 'Movies' && items.movies ? (
-                    <MovieGrid movies={items.movies} onSelect={(idx) => handlePlay(idx)} />
+                    <MovieGrid movies={items.movies} serverId={serverId} onSelect={(idx) => handlePlay(idx)} />
                 ) : items.mediaType === 'Shows' && items.episodes ? (
                     <EpisodeList episodes={items.episodes} onSelect={(idx) => handlePlay(idx)} formatDuration={formatDuration} />
                 ) : null}
@@ -259,7 +259,7 @@ function MusicTable({ tracks, onPlay, formatDuration }: { tracks: ArtistTrackVM[
     );
 }
 
-function MovieGrid({ movies, onSelect }: { movies: { id: string; title: string; year?: number; posterUrl?: string; isWatched: boolean }[]; onSelect: (i: number) => void }) {
+function MovieGrid({ movies, serverId, onSelect }: { movies: { id: string; title: string; year?: number; posterUrl?: string; isWatched: boolean }[]; serverId?: string; onSelect: (i: number) => void }) {
     return (
         <MediaGrid>
             {movies.map((m, idx) => (
@@ -271,6 +271,7 @@ function MovieGrid({ movies, onSelect }: { movies: { id: string; title: string; 
                     isPlayed={m.isWatched}
                     fill
                     onClick={() => onSelect(idx)}
+                    menu={{ id: m.id, serverId }}
                 />
             ))}
         </MediaGrid>

@@ -93,6 +93,19 @@ and falling the whole cast back would replace the guest actors with the show's.
 
 **Sizing.** Card metrics are tokens in `styles/tokens.css`: `--vora-card-w-sm|md|lg`, `--vora-card-min-w`, `--vora-card-gap`, `--vora-card-title-size`, `--vora-card-caption-size`, `--vora-card-badge-size`, `--vora-person-w`, `--vora-video-w`, `--vora-row-title-size`, `--vora-row-gutter`. The widths are `clamp(rem, vw, rem)` so a tile follows both the root font size and the viewport instead of snapping at breakpoints. Change a token and every rail, grid and detail page moves together. Never size a tile in `px`.
 
+## The title menu
+
+Right-clicking a movie, show, season or episode, or holding it on a touch screen, opens the same menu as the title page's "more" button. One set of actions feeds both, so they cannot drift.
+
+- **`useMediaItemActions(media, options)`** (`components/Media/ItemMenu/`) returns the menu's `entries` and the `dialogs` they open (media info, edit metadata, add to playlist / collection, fix match, marker editor), and owns their state. What it offers depends on the title's type and on whether the viewer is an admin. `MediaDetailsPage` adds its own "Quality & tracks" entry in front and draws the rows with `ActionMenuList`.
+- **`MediaItemMenuProvider`** wraps `MainLayout`. It is the one host for the menu on posters: it loads the title with `mediaService.getMediaItem`, shows `ActionMenu`, and keeps the dialogs alive after the menu closes.
+- **A poster only says which title it is.** `MediaCard` takes `menu={mediaMenuTarget(item, serverId, { onChanged })}`. `mediaMenuTarget` returns nothing for anything that is not a Movie, TvShow, Season or Episode, so tracks, albums, channels and discovery results keep the browser's own menu. Pass `onChanged` (and `onDeleted` if it differs) when the page has a reload to run.
+- **A row that is not a `MediaCard`** (the episode list, playlist rows) uses `<MediaMenuArea target={...}>` in place of its outer `div`, or spreads `useMediaMenuTrigger(target)` itself.
+- **Every new place a title is drawn passes a target.** That is the whole cost of supporting the menu there.
+- **`ActionMenu`** (`Primitives/`) opens beside the pointer on a desktop, kept inside the window, and as a sheet from the bottom edge below 48rem. It sits at `z-[150]`: over the header, under modals.
+- **Long press:** 500 ms without moving more than 10 px (`useMediaMenuTrigger`), so scrolling a row never opens it. Lifting that finger still produces a click, so the trigger swallows the next click on the poster, and `ActionMenu` ignores any click that did not start with a press on the menu itself. Without the second, the lift landed on the sheet that had just appeared and closed it, or picked a row.
+- Actions go to the server the title is on (`target.serverId`), not the one in the address bar: a search result can belong to another server.
+
 ## Player shared primitives
 
 `components/Player/Controls/PlayerButtons.tsx` exports `PlayPauseButton`, `SkipButton`, `VolumeControl`, `FullscreenButton`, `MaximizeButton`, `CloseButton`. Both `GlobalVideoPlayer` and `LiveTvPlayer` use these.

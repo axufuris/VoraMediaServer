@@ -13,6 +13,7 @@ import { formatAiredAt } from '../../utils/dvrDisplay';
 import { channelPlayable, podcastPlayable, recordingPlayable, trackPlayable } from '../../utils/playables';
 import MediaCard from '../Client/Primitives/MediaCard';
 import MediaRow, { MediaRowItem } from '../Client/Primitives/MediaRow';
+import { mediaMenuTarget } from '../Media/ItemMenu/mediaItemMenu';
 
 interface SmartListRowProps {
     list: SmartListClientDto;
@@ -89,7 +90,15 @@ export default function SmartListRow({ list, serverId }: SmartListRowProps) {
                     />
                 );
             }
-            return <MediaCard item={media} imageUrl={media.posterUrl} isPlayed={media.isPlayed} onClick={() => openMedia(media.id)} />;
+            return (
+                <MediaCard
+                    item={media}
+                    imageUrl={media.posterUrl}
+                    isPlayed={media.isPlayed}
+                    onClick={() => openMedia(media.id)}
+                    menu={mediaMenuTarget(media, serverId, { onChanged: () => fetchEntries(true) })}
+                />
+            );
         }
 
         if ((entry.kind === 'Channel' || entry.kind === 'Station') && entry.channel) {

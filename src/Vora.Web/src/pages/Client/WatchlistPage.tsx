@@ -72,6 +72,7 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
                                 captionLines={[item.type === 'TvShow' ? 'TV Series' : 'Movie']}
                                 inWatchlist
                                 onClick={() => navigate(openPath(item))}
+                                menu={item.mediaItemId ? { id: item.mediaItemId, serverId } : undefined}
                                 fill
                             />
                         ))}
