@@ -3,6 +3,7 @@ import { Modal } from '../Common/Modal';
 import ArtImage from '../Client/Primitives/ArtImage';
 import { libraryAdminService, type MediaMatchCandidate, type MediaMatchFiles, type MediaMatchResult } from '../../api/Media/libraryAdminService';
 import { errorDetail } from '../../utils/apiError';
+import { copyText } from '../../utils/copyText';
 
 // Re-identifies a movie or show whose folder carried no usable external id, so
 // metadata can find it. Search results come from the library's own metadata
@@ -71,12 +72,7 @@ export default function FixMatchModal({ mediaItemId, mediaType, currentYear, ser
     }, [copied]);
 
     const copyName = async (name: string) => {
-        try {
-            await navigator.clipboard.writeText(name);
-            setCopied(name);
-        } catch {
-            setCopied(null);
-        }
+        setCopied(await copyText(name) ? name : null);
     };
 
     useEffect(() => {
