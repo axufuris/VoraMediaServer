@@ -784,7 +784,7 @@ public class FFmpegTranscodeService : ITranscodeService
             || decision.AudioStrategy == "Copy"
             || decision.AudioStrategy == "DirectStream";
 
-        if (shouldCopyAudio && !IsAudioCodecSafeForMpegTs(decision.SourceAudioCodec))
+        if (shouldCopyAudio && !AudioPlayback.CanCopyToHls(decision.SourceAudioCodec))
         {
             shouldCopyAudio = false;
         }
@@ -969,13 +969,6 @@ public class FFmpegTranscodeService : ITranscodeService
         return new[] { ".idx", ".IDX" }
             .Select(extension => Path.ChangeExtension(externalPath, extension))
             .FirstOrDefault(File.Exists) ?? externalPath;
-    }
-
-    private static bool IsAudioCodecSafeForMpegTs(string? codec)
-    {
-        if (string.IsNullOrWhiteSpace(codec)) return false;
-        var c = codec.ToLowerInvariant();
-        return c is "aac" or "mp3" or "ac3" or "eac3";
     }
 
     // Resolve HdrTonemapQuality from the server setting (which may be

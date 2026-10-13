@@ -1,6 +1,7 @@
 import type { AudioTrack, MediaItem, MediaPart, SubtitleTrack, VideoTrack } from '../api/Media/mediaService';
 import type { DeviceCapabilities } from './hardwareScanner';
-import { isAudioDirectPlayable, isVideoDirectPlayable, parseResolutionHeight } from './playbackDecision';
+import { isVideoDirectPlayable, parseResolutionHeight } from './playbackDecision';
+import { pickBestAudioTrack } from './audioTrackSelection';
 import { serverVault } from './serverVault';
 import { getProfileIdFromToken, StorageKeys } from './storageKeys';
 
@@ -107,11 +108,6 @@ function language(value?: string): string {
     try { return new Intl.Locale(code).language; } catch { return code; }
 }
 
-function audioQuality(codec?: string): number {
-    const ranks: Record<string, number> = { truehd: 6, dts: 5, flac: 5, eac3: 4, ac3: 3, aac: 2, opus: 2, mp3: 1 };
-    return ranks[normalized(codec)] ?? 0;
-}
-
 export function saveVideoChoice(part: MediaPart, track: VideoTrack): SavedVideoChoice {
     return { id: track.id, partId: part.id, resolution: part.resolution, edition: part.edition, codec: track.codec, hdrType: track.hdrType };
 }
@@ -163,10 +159,6 @@ export function resolveTitlePlayback(media: MediaItem, preferences: TitlePlaybac
         : savedVideo?.track ?? part?.videoTracks?.find(track => isVideoDirectPlayable(track, part, caps))
             ?? part?.videoTracks?.find(track => track.isDefault) ?? part?.videoTracks?.[0];
     const manualAudio = resolveAudioChoice(part, preferences.audio);
-    const audio = manualAudio ?? [...(part?.audioTracks ?? [])].sort((a, b) => {
-        const penalty = (track: AudioTrack) => (isAudioDirectPlayable(track, caps) ? 0 : 1000)
-            + (normalized(track.title).includes('commentary') ? 500 : 0) - (track.channels ?? 2) * 10 - audioQuality(track.codec);
-        return penalty(a) - penalty(b);
-    })[0];
+    const audio = manualAudio ?? pickBestAudioTrack(part?.audioTracks, caps);
     return { part, video, audio, subtitleId: resolveSubtitleChoice(part, preferences.subtitles), manualAudio: !!manualAudio };
 }

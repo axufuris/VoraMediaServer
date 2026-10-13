@@ -102,6 +102,17 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 : part.AudioTracks;
 
             if (!audioTracksToEvaluate.Any() && requestedAudioId.HasValue) audioTracksToEvaluate = part.AudioTracks;
+            if (!requestedAudioId.HasValue)
+            {
+                var mainTracks = audioTracksToEvaluate.Where(track => !IsCommentary(track)).ToList();
+                if (mainTracks.Count > 0) audioTracksToEvaluate = mainTracks;
+                if (MetadataLanguageCodes.Normalize(primaryAudioTrack?.Language) != null)
+                {
+                    var sameLanguage = audioTracksToEvaluate
+                        .Where(track => MetadataLanguageCodes.SameLanguage(track.Language, primaryAudioTrack?.Language)).ToList();
+                    if (sameLanguage.Count > 0) audioTracksToEvaluate = sameLanguage;
+                }
+            }
 
             int bitrateKbps = (int)((part.OverallBitrate ?? 3000000) / 1000);
             bool exceedsBandwidth = maxAllowedBandwidthKbps > 0 && bitrateKbps > maxAllowedBandwidthKbps;
@@ -125,14 +136,19 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             foreach (var audioTrack in audioTracksToEvaluate)
             {
                 var audioCodec = audioTrack.Codec?.ToLower() ?? "";
-                int trackChannels = audioTrack.Channels ?? 2;
+                int trackChannels = audioTrack.Channels is > 0 ? audioTrack.Channels.Value : 2;
+                int outputChannels = client.MaxAudioChannels > 0 ? client.MaxAudioChannels : 2;
                 bool isPrimaryAudio = audioTrack.Id == primaryAudioTrack?.Id;
 
                 bool codecUnsupported = !string.IsNullOrEmpty(videoCodec) && !client.SupportedVideoCodecs.Contains(videoCodec);
                 bool needsVideoTranscode = codecUnsupported || requiresBurnIn || exceedsBandwidth || hdrNotRenderable || bitDepthTooHigh;
-                bool needsAudioDownmix = trackChannels > client.MaxAudioChannels;
+                bool needsAudioDownmix = trackChannels > outputChannels;
                 bool needsAudioTranscode = (!string.IsNullOrEmpty(audioCodec) && !client.SupportedAudioCodecs.Contains(audioCodec)) || needsAudioDownmix;
-                bool needsRemux = !string.IsNullOrEmpty(container) && !client.SupportedContainers.Contains(container);
+                bool containerUnsupported = !string.IsNullOrEmpty(container) && !client.SupportedContainers.Contains(container);
+                bool needsRemux = containerUnsupported || !isPrimaryAudio;
+                bool audioUnsupportedInHls = (needsVideoTranscode || needsAudioTranscode || needsRemux)
+                    && !AudioPlayback.CanCopyToHls(audioCodec);
+                needsAudioTranscode |= audioUnsupportedInHls;
 
                 var reasons = new List<string>();
 
@@ -156,7 +172,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                         SelectedAudioTrackId = audioTrack.Id,
                         SelectedSubtitleTrackId = subTrack?.Id,
                         RequiresSubtitleBurnIn = requiresBurnIn,
-                        TargetAudioChannels = needsAudioDownmix ? client.MaxAudioChannels : trackChannels,
+                        TargetAudioChannels = needsAudioDownmix ? outputChannels : trackChannels,
                         SubtitleStrategy = subTrack == null ? "None" : (requiresBurnIn ? "BurnIn" : "DirectPlay")
                     }
                 };
@@ -207,10 +223,11 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                         option.Decision.AudioStrategy = "Transcode";
                         option.Decision.TargetAudioCodec = "aac";
 
-                        if (needsAudioDownmix) reasons.Add($"Audio Transcode: Downmix required ({trackChannels}ch > {client.MaxAudioChannels}ch).");
+                        if (needsAudioDownmix) reasons.Add($"Audio Transcode: Downmix required ({trackChannels}ch > {outputChannels}ch).");
+                        else if (audioUnsupportedInHls) reasons.Add($"Audio Transcode: '{audioCodec}' cannot be copied to HLS MPEG-TS.");
                         else reasons.Add($"Audio Transcode: '{audioCodec}' unsupported.");
 
-                        currentScore += 10;
+                        currentScore += 1000;
                     }
                     else
                     {
@@ -226,8 +243,9 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     option.Decision.AudioStrategy = "DirectStream";
                     option.Decision.TargetVideoCodec = videoCodec;
                     option.Decision.TargetAudioCodec = audioCodec;
-                    option.Decision.TargetContainer = "mp4";
-                    reasons.Add($"Remux: Container '{container}' unsupported. Remuxing to mp4.");
+                    option.Decision.TargetContainer = "hls";
+                    if (containerUnsupported) reasons.Add($"Remux: Container '{container}' unsupported. Copying streams to HLS.");
+                    if (!isPrimaryAudio) reasons.Add("Audio Direct Stream: Copying the selected non-default track to HLS.");
                     currentScore += 5;
 
                     if (settings.StreamingProfile == StreamingProfile.BandwidthOptimized) currentScore += bitrateKbps;
@@ -284,12 +302,10 @@ public class BestPathDecisionManager : IBestPathDecisionManager
 
                 if (audioTrack.IsDefault) currentScore -= 2;
 
-                if (!needsAudioDownmix && trackChannels < client.MaxAudioChannels)
-                {
-                    currentScore += (client.MaxAudioChannels - trackChannels);
-                }
+                currentScore += Math.Abs(outputChannels - trackChannels) * 10;
+                currentScore -= AudioPlayback.QualityRank(audioCodec) * 5;
 
-                if (!string.IsNullOrEmpty(audioTrack.Title) && audioTrack.Title.Contains("commentary", StringComparison.OrdinalIgnoreCase))
+                if (IsCommentary(audioTrack))
                 {
                     currentScore += 500;
                     reasons.Add("[Commentary Track Penalized]");
@@ -348,6 +364,9 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         bestOption.Decision.EvaluatedOptions = decisionLogs;
         return bestOption.Decision;
     }
+
+    private static bool IsCommentary(TrackStreamInfoDto track) =>
+        track.Title?.Contains("commentary", StringComparison.OrdinalIgnoreCase) == true;
 
     // Parse a video height from MediaPart.Resolution, which is a
     // freeform string that the analyzer produces. Supports common
