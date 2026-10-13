@@ -50,6 +50,7 @@ const ClientDiscoveryActorPage = lazy(() => import('./pages/Client/Discovery/Dis
 const ClientDiscoveryViewAllPage = lazy(() => import('./pages/Client/Discovery/DiscoveryViewAllPage'));
 const AdminRequestsPage = lazy(() => import('./pages/Admin/RequestsPage'));
 const AdminAiStatsPage = lazy(() => import('./pages/Admin/AiStatsPage'));
+const AdminAiSettingsPage = lazy(() => import('./pages/Admin/AiSettingsPage'));
 const AdminDedupePage = lazy(() => import('./pages/Admin/DedupePage'));
 const AdminMediaTrashPage = lazy(() => import('./pages/Admin/MediaTrashPage'));
 const OverlayEditor = lazy(() => import('./pages/Admin/Overlay/OverlayEditor'));
@@ -227,6 +228,7 @@ export default function App() {
                         <Route path="dvr-settings" element={<AdminDvrPage />} />
                         <Route path="requests" element={<AdminRequestsPage />} />
                         <Route path="ai-stats" element={<AdminAiStatsPage />} />
+                        <Route path="ai-settings" element={<AdminAiSettingsPage />} />
                         <Route path="overlays" element={<OverlayEditor />} />
                         <Route path="live-tv" element={<AdminLiveTvPage />} />
                         <Route path="internet-radio" element={<AdminInternetRadioPage />} />
@@ -260,6 +262,7 @@ export default function App() {
                         <Route path="dvr-settings" element={<AdminDvrPage />} />
                             <Route path="requests" element={<AdminRequestsPage />} />
                             <Route path="ai-stats" element={<AdminAiStatsPage />} />
+                            <Route path="ai-settings" element={<AdminAiSettingsPage />} />
                             <Route path="overlays" element={<OverlayEditor />} />
                             <Route path="live-tv" element={<AdminLiveTvPage />} />
                         <Route path="internet-radio" element={<AdminInternetRadioPage />} />

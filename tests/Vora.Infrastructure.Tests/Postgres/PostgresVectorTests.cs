@@ -63,29 +63,95 @@ public class PostgresVectorTests(PostgresDatabase database) : IClassFixture<Post
         found.Select(c => c.Distance).Should().BeInAscendingOrder();
     }
 
+    private const string OpenAiModel = "text-embedding-3-small";
+    private const string OtherModel = "nomic-embed-text";
+
+    private static async Task<(MediaLibrary Library, Movie Unstamped, Movie ByOtherModel, Movie Fresh)> MoviesAsync(VoraDbContext db, float[] vector)
+    {
+        var library = new MediaLibrary { Id = Guid.NewGuid(), Name = "Movies", Type = LibraryType.Movie, FolderPaths = new List<string> { "/movies" } };
+        var unstamped = new Movie { Id = Guid.NewGuid(), Title = "Read before models were recorded", LibraryId = library.Id };
+        var byOtherModel = new Movie { Id = Guid.NewGuid(), Title = "Read by another model", LibraryId = library.Id };
+        var fresh = new Movie { Id = Guid.NewGuid(), Title = "Never read", LibraryId = library.Id };
+        db.Set<MediaLibrary>().Add(library);
+        db.Set<Movie>().AddRange(unstamped, byOtherModel, fresh);
+        db.MediaItemEmbeddings.Add(new MediaItemEmbedding { MediaItemId = unstamped.Id, Embedding = new Pgvector.Vector(vector) });
+        db.MediaItemEmbeddings.Add(new MediaItemEmbedding { MediaItemId = byOtherModel.Id, Embedding = new Pgvector.Vector(vector), Model = OtherModel });
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        db.ChangeTracker.Clear();
+        return (library, unstamped, byOtherModel, fresh);
+    }
+
     [Fact]
-    public async Task Embedding_saves_skip_items_that_are_gone_or_already_embedded()
+    public async Task A_title_waits_for_an_embedding_until_the_current_model_has_read_it()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        await using var db = database.NewContext();
+        var (_, unstamped, byOtherModel, fresh) = await MoviesAsync(db, Vector(new Random(3)));
+        var repository = new OpenAiRecommendationRepository(db);
+
+        var forOpenAi = (await repository.GetMediaItemsMissingEmbeddingsAsync(int.MaxValue, OpenAiModel)).Select(m => m.Id).ToList();
+        var forOther = (await repository.GetMediaItemsMissingEmbeddingsAsync(int.MaxValue, OtherModel)).Select(m => m.Id).ToList();
+
+        forOpenAi.Should().Contain(new[] { byOtherModel.Id, fresh.Id }).And.NotContain(unstamped.Id);
+        forOther.Should().Contain(new[] { unstamped.Id, fresh.Id }).And.NotContain(byOtherModel.Id);
+    }
+
+    [Fact]
+    public async Task Recommendations_only_search_vectors_the_current_model_made()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        await using var db = database.NewContext();
+        var vector = Vector(new Random(5));
+        var (library, unstamped, byOtherModel, _) = await MoviesAsync(db, vector);
+        var repository = new OpenAiRecommendationRepository(db);
+        var viewer = Guid.NewGuid();
+
+        var withOpenAi = await repository.VectorSearchUnwatchedMediaAsync(viewer, library.Id, vector, 10, OpenAiModel);
+        var withOther = await repository.VectorSearchUnwatchedMediaAsync(viewer, library.Id, vector, 10, OtherModel);
+
+        withOpenAi.Should().Equal(unstamped.Id);
+        withOther.Should().Equal(byOtherModel.Id);
+    }
+
+    [Fact]
+    public async Task Saving_replaces_a_vector_another_model_made_and_skips_a_title_that_is_gone()
     {
         Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
         var random = new Random(11);
         await using var db = database.NewContext();
-        var library = new MediaLibrary { Id = Guid.NewGuid(), Name = "Movies", Type = LibraryType.Movie, FolderPaths = new List<string> { "/movies" } };
-        var embedded = new Movie { Id = Guid.NewGuid(), Title = "Embedded", LibraryId = library.Id };
-        var fresh = new Movie { Id = Guid.NewGuid(), Title = "Fresh", LibraryId = library.Id };
-        db.Set<MediaLibrary>().Add(library);
-        db.Set<Movie>().AddRange(embedded, fresh);
-        db.MediaItemEmbeddings.Add(new MediaItemEmbedding { MediaItemId = embedded.Id, Embedding = new Pgvector.Vector(Vector(random)) });
-        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
-        db.ChangeTracker.Clear();
+        var (_, unstamped, _, fresh) = await MoviesAsync(db, Vector(random));
 
-        var saved = await EmbeddingWrites.InsertNewAsync(db, new[]
+        await new OpenAiRecommendationRepository(db).SaveEmbeddingsAsync(new List<MediaItemEmbedding>
         {
-            new MediaItemEmbedding { MediaItemId = embedded.Id, Embedding = new Pgvector.Vector(Vector(random)) },
-            new MediaItemEmbedding { MediaItemId = fresh.Id, Embedding = new Pgvector.Vector(Vector(random)) },
-            new MediaItemEmbedding { MediaItemId = Guid.NewGuid(), Embedding = new Pgvector.Vector(Vector(random)) },
+            new() { MediaItemId = unstamped.Id, Embedding = new Pgvector.Vector(Vector(random)), Model = OtherModel },
+            new() { MediaItemId = fresh.Id, Embedding = new Pgvector.Vector(Vector(random)), Model = OtherModel },
+            new() { MediaItemId = Guid.NewGuid(), Embedding = new Pgvector.Vector(Vector(random)), Model = OtherModel },
         });
 
-        saved.Should().Be(1);
-        (await db.MediaItemEmbeddings.AsNoTracking().CountAsync(e => e.MediaItemId == fresh.Id || e.MediaItemId == embedded.Id, TestContext.Current.CancellationToken)).Should().Be(2);
+        var saved = await db.MediaItemEmbeddings.AsNoTracking()
+            .Where(e => e.MediaItemId == unstamped.Id || e.MediaItemId == fresh.Id)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        saved.Should().HaveCount(2).And.OnlyContain(e => e.Model == OtherModel);
+    }
+
+    [Fact]
+    public async Task A_song_search_only_reads_vectors_the_named_model_made()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var random = new Random(13);
+        await using var db = database.NewContext();
+        var (libraryId, albumId) = await MusicLibraryAsync(db);
+        var model = "model-" + Guid.NewGuid().ToString("N");
+        var current = new Track { Id = Guid.NewGuid(), Title = "Read by the current model", LibraryId = libraryId, AlbumId = albumId, Artist = "Daft Punk" };
+        var stale = new Track { Id = Guid.NewGuid(), Title = "Read by the last model", LibraryId = libraryId, AlbumId = albumId, Artist = "Daft Punk" };
+        db.Set<Track>().AddRange(current, stale);
+        db.MediaItemEmbeddings.Add(new MediaItemEmbedding { MediaItemId = current.Id, Embedding = new Pgvector.Vector(Vector(random)), Model = model });
+        db.MediaItemEmbeddings.Add(new MediaItemEmbedding { MediaItemId = stale.Id, Embedding = new Pgvector.Vector(Vector(random)), Model = OpenAiModel });
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var repository = new AiPlaylistRepository(db);
+
+        var found = await repository.FindNearestTracksAsync(Vector(random), MusicAccessFilter.Unrestricted, new AiTrackFilter(EmbeddingModel: model), 50);
+
+        found.Select(c => c.TrackId).Should().Equal(current.Id);
     }
 }

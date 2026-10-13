@@ -81,6 +81,7 @@ export const ADMIN_NAV: AdminNavEntry[] = [
     { label: 'Music History',        pathTemplate: '/admin/music-history',    section: 'Server',  icon: 'music-note', keywords: ['listening', 'plays'] },
     { label: 'Appearance',           pathTemplate: '/admin/appearance',       section: 'Server',  icon: 'palette',    keywords: ['theme', 'colors', 'look', 'admin appearance'] },
     { label: 'Client Templates',     pathTemplate: '/admin/client-templates', section: 'Server',  icon: 'image',      keywords: ['client', 'template', 'schedule', 'thanksgiving', 'holiday', 'seasonal'] },
+    { label: 'AI Settings',          pathTemplate: '/admin/ai-settings',      section: 'Server',  icon: 'layers',     keywords: ['openai', 'ollama', 'lm studio', 'openrouter', 'local', 'llm', 'model', 'api key', 'embedding', 'endpoint'] },
     { label: 'AI Usage & Stats',     pathTemplate: '/admin/ai-stats',         section: 'Server',  icon: 'chart',      keywords: ['tokens', 'openai', 'cost'], requires: 'ai' },
     { label: 'Server Logs',          pathTemplate: '/admin/logs',             section: 'Server',  icon: 'logs',       keywords: ['logs', 'errors', 'warnings', 'tail', 'trace', 'debug'] },
     { label: 'Backup & Restore',     pathTemplate: '/admin/backups',          section: 'Server',  icon: 'backup',     keywords: ['backup', 'restore', 'export', 'import', 'snapshot', 'schedule'] },

@@ -131,7 +131,7 @@ export default function PluginSettingsForm({ serverId, pluginId, pluginName, sup
                         </select>
                     ) : (
                         <input
-                            type={field.type}
+                            type={field.type === 'model' ? 'text' : field.type}
                             value={values[field.key] || ''}
                             onChange={e => handleValueChange(field.key, e.target.value)}
                             placeholder={field.placeholder || undefined}

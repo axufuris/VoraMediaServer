@@ -25,14 +25,16 @@ public class AiPlaylistServiceTests
     private readonly UserProfile _me = new() { Id = Guid.NewGuid(), Name = "Andy", AiMusicPlaylistsEnabled = true };
     private readonly UserProfile _sam = new() { Id = Guid.NewGuid(), Name = "Sam", AiMusicPlaylistsEnabled = true };
     private static readonly MusicAccessFilter CleanOnly = new() { AllowedRatings = new List<string> { "Clean" } };
+    private const string EmbeddingModel = "text-embedding-3-small";
 
     public AiPlaylistServiceTests()
     {
         Server();
         _openAi.IsConfiguredAsync().Returns(true);
+        _openAi.GetEmbeddingModelAsync().Returns(EmbeddingModel);
         _users.GetProfileByIdAsync(_me.Id).Returns(_me);
         _users.GetProfileByIdAsync(_sam.Id).Returns(_sam);
-        _repo.GetPlayedVectorsAsync(Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<int>())
+        _repo.GetPlayedVectorsAsync(Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>())
             .Returns(Enumerable.Range(0, 6).Select(i => new PlayedVector(new[] { 1f, i }, 3)).ToList());
         _repo.FindNearestTracksAsync(Arg.Any<float[]>(), Arg.Any<MusicAccessFilter>(), Arg.Any<AiTrackFilter>(), Arg.Any<int>())
             .Returns(_ => Enumerable.Range(0, 40).Select(i => new AiTrackCandidate(Guid.NewGuid(), $"artist{i % 10}", "/art.jpg")).ToList());

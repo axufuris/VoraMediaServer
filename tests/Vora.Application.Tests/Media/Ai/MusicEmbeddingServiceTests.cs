@@ -31,9 +31,10 @@ public class MusicEmbeddingServiceTests
     {
         _settings.GetSettingsAsync().Returns(new ServerSetting { EnableAiMusicPlaylists = on });
         _openAi.IsConfiguredAsync().Returns(true);
+        _openAi.GetEmbeddingModelAsync().Returns(AiConnection.OpenAiEmbeddingModel);
     }
 
-    private TrackDescriptor Song(string title, string? hash = null, string? model = OpenAiClient.EmbeddingModel) => new(
+    private TrackDescriptor Song(string title, string? hash = null, string? model = AiConnection.OpenAiEmbeddingModel) => new(
         Guid.NewGuid(), title, "blink-182", "Enema of the State", 1999, "Punk", _blink,
         new List<string> { "playful", "rebellious" }, TrackEnergy.High, new List<string> { "growing up" }, new List<string> { "road trip", "party" }, false,
         hash, model);
@@ -98,7 +99,7 @@ public class MusicEmbeddingServiceTests
         embedded.Should().Be(3);
         SentBatches().Single().Should().HaveCount(3).And.NotContain(t => t.Contains("All the Small Things"));
         await _repository.Received(1).SaveTrackEmbeddingsAsync(Arg.Is<IReadOnlyList<TrackEmbeddingUpdate>>(u =>
-            u.Count == 3 && u.All(x => x.Model == OpenAiClient.EmbeddingModel && x.SourceHash.Length == 64)));
+            u.Count == 3 && u.All(x => x.Model == AiConnection.OpenAiEmbeddingModel && x.SourceHash.Length == 64)));
     }
 
     [Fact]

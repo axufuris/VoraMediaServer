@@ -6,7 +6,7 @@ public interface IAiPlaylistRepository
 {
     // The vectors of the songs a profile has played most in the window, with how
     // often - the raw material for its taste.
-    Task<List<PlayedVector>> GetPlayedVectorsAsync(Guid profileId, int withinDays, int limit);
+    Task<List<PlayedVector>> GetPlayedVectorsAsync(Guid profileId, int withinDays, int limit, string embeddingModel);
 
     // The songs nearest the vector that the access filter allows, nearest
     // first. The only way AI playlists get songs, so the viewer's parental
@@ -46,7 +46,7 @@ public sealed record AiTrackCandidate(
     public SongFacts Song => new(ArtistKey, Title, DurationSeconds, AudioCodec, SampleRate, Bitrate);
 }
 
-public sealed record AiTrackFilter(int? YearFrom = null, int? YearTo = null, IReadOnlyCollection<Guid>? Exclude = null)
+public sealed record AiTrackFilter(int? YearFrom = null, int? YearTo = null, IReadOnlyCollection<Guid>? Exclude = null, string? EmbeddingModel = null)
 {
     public static AiTrackFilter None { get; } = new();
 }

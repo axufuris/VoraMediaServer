@@ -364,6 +364,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Application.Media.Ai.IAiPlaylistRepository, AiPlaylistRepository>();
         services.AddScoped<IOpenAiRecommendationRepository, OpenAiRecommendationRepository>();
         services.AddScoped<IAiUsageRepository, AiUsageRepository>();
+        services.AddScoped<IAiEndpoint, AiEndpoint>();
+        services.AddScoped<IAiConnectionTester, AiConnectionTester>();
         services.AddScoped<IOpenAiClient, OpenAiClient>();
         services.AddScoped<IOverlayTemplateRepository, OverlayTemplateRepository>();
         services.AddScoped<IPlaylistRepository, PlaylistRepository>();

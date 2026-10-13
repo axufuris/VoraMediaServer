@@ -30,6 +30,7 @@ export const AI_FEATURE_OPTIONS: { id: string; label: string }[] = [
     { id: 'openai_chronology', label: 'Chronology Sync' },
     { id: 'openai_list', label: 'Auto-Fill Content' },
     { id: 'openai_recommendations', label: 'Recommendations' },
+    { id: 'openai_music_playlists', label: 'AI Playlists' },
 ];
 
 export function aiFeatureLabel(pluginId: string): string {

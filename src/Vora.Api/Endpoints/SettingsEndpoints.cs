@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Vora.Application.Ai;
+using Vora.Application.Ai.ViewModels;
 using Vora.Application.Plugins;
 using Vora.Application.Plugins.ViewModels;
 using Vora.Application.Settings;
@@ -31,6 +33,14 @@ public static class SettingsEndpoints
 
         group.MapPost("/plugins/{pluginId}/test", TestPluginConnectionAsync)
             .Produces<PluginConnectionTestResult>(StatusCodes.Status200OK);
+
+        group.MapGet("/ai/status", GetAiStatusAsync)
+            .WithName("GetAiStatus")
+            .Produces<AiStatusVM>(StatusCodes.Status200OK);
+
+        group.MapPost("/ai/models", ListAiModelsAsync)
+            .WithName("ListAiModels")
+            .Produces<AiModelsVM>(StatusCodes.Status200OK);
 
         group.MapGet("/hardware", GetHardwareAsync)
             .WithName("GetHardwareCapabilities")
@@ -99,6 +109,12 @@ public static class SettingsEndpoints
         var result = await pluginManager.TestPluginConnectionAsync(pluginId, settings);
         return Results.Ok(result);
     }
+
+    private static async Task<IResult> GetAiStatusAsync(IAiConnectionTester tester) =>
+        Results.Ok(await tester.GetStatusAsync());
+
+    private static async Task<IResult> ListAiModelsAsync([FromBody] Dictionary<string, string> settings, IAiConnectionTester tester, CancellationToken cancellationToken) =>
+        Results.Ok(await tester.ListModelsAsync(settings, cancellationToken));
 
     private static async Task<IResult> GetFeatureFlagsAsync(ISystemSettingsManager manager)
     {

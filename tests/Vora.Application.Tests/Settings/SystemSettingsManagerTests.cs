@@ -608,6 +608,9 @@ public class SystemSettingsManagerTests
         vm.LiveTv.Should().BeFalse();
     }
 
+    private void SavedAi(params (string Key, string Value)[] saved) =>
+        _repo.GetAllPluginSettingsAsync("openai_recommendations").Returns(saved.ToDictionary(s => s.Key, s => s.Value));
+
     // AI playlists are off until an admin turns them on, and then usable only
     // with For You on and an OpenAI key to make them with.
     [Theory]
@@ -618,7 +621,7 @@ public class SystemSettingsManagerTests
     public async Task AI_playlists_need_the_toggle_For_You_and_a_key(bool toggle, bool forYou, string? key, bool requests, bool expected)
     {
         _repo.GetSettingsAsync().Returns(new ServerSetting { EnableAiMusicPlaylists = toggle, EnableForYou = forYou, EnableAiPlaylistRequests = requests });
-        _repo.GetPluginSettingAsync("openai_recommendations", "api_key").Returns(key);
+        if (key != null) SavedAi(("api_key", key));
 
         var vm = await Build().GetFeatureFlagsAsync();
 
@@ -626,11 +629,30 @@ public class SystemSettingsManagerTests
         vm.AiPlaylistRequests.Should().Be(expected);
     }
 
+    // A server of your own needs no key, but playlists need both a chat model
+    // and an embedding model on it.
+    [Theory]
+    [InlineData("llama3.1", "nomic-embed-text", true)]
+    [InlineData("llama3.1", null, false)]
+    [InlineData(null, "nomic-embed-text", false)]
+    public async Task AI_playlists_on_another_server_need_a_chat_and_an_embedding_model(string? chat, string? embedding, bool expected)
+    {
+        _repo.GetSettingsAsync().Returns(new ServerSetting { EnableAiMusicPlaylists = true, EnableForYou = true, EnableAiPlaylistRequests = true });
+        var saved = new List<(string, string)> { ("base_url", "http://ollama.example:11434/v1") };
+        if (chat != null) saved.Add(("chat_model", chat));
+        if (embedding != null) saved.Add(("embedding_model", embedding));
+        SavedAi(saved.ToArray());
+
+        var vm = await Build().GetFeatureFlagsAsync();
+
+        vm.AiPlaylists.Should().Be(expected);
+    }
+
     [Fact]
     public async Task The_make_me_a_playlist_box_has_its_own_off_switch()
     {
         _repo.GetSettingsAsync().Returns(new ServerSetting { EnableAiMusicPlaylists = true, EnableForYou = true, EnableAiPlaylistRequests = false });
-        _repo.GetPluginSettingAsync("openai_recommendations", "api_key").Returns("sk-key");
+        SavedAi(("api_key", "sk-key"));
 
         var vm = await Build().GetFeatureFlagsAsync();
 

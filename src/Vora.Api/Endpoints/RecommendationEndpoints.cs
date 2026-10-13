@@ -126,6 +126,7 @@ public static class RecommendationEndpoints
     private static IResult TriggerAiTaskAsync(ITaskQueueManager taskQueue)
     {
         taskQueue.QueueGenerateAiEmbeddings();
+        taskQueue.QueuePrepareMusicForAiPlaylists();
         return Results.Ok();
     }
 }

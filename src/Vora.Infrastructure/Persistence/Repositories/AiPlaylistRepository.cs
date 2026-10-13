@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
+using Vora.Application.Ai;
 using Vora.Application.Media;
 using Vora.Application.Media.Ai;
 using Vora.Domain.Entities.Media;
@@ -20,9 +21,10 @@ public class AiPlaylistRepository : IAiPlaylistRepository
         _context = context;
     }
 
-    public async Task<List<PlayedVector>> GetPlayedVectorsAsync(Guid profileId, int withinDays, int limit)
+    public async Task<List<PlayedVector>> GetPlayedVectorsAsync(Guid profileId, int withinDays, int limit, string embeddingModel)
     {
         var since = DateTime.UtcNow.AddDays(-withinDays);
+        var unstampedCounts = AiConnection.IsLegacyStamp(embeddingModel);
         var plays = _context.TrackPlayHistory
             .AsNoTracking()
             .Where(p => p.ProfileId == profileId && p.PlayedAt >= since)
@@ -31,7 +33,7 @@ public class AiPlaylistRepository : IAiPlaylistRepository
 
         var rows = await (from play in plays
                           join e in _context.MediaItemEmbeddings.AsNoTracking() on play.TrackId equals e.MediaItemId
-                          where e.Embedding != null
+                          where e.Embedding != null && (e.Model == embeddingModel || (unstampedCounts && e.Model == null))
                           orderby play.Plays descending
                           select new { e.Embedding, play.Plays })
             .Take(Math.Max(1, limit))
@@ -50,11 +52,17 @@ public class AiPlaylistRepository : IAiPlaylistRepository
         if (filter.YearTo is int to) tracks = tracks.Where(t => t.Album != null && t.Album.Year <= to);
         if (exclude.Count > 0) tracks = tracks.Where(t => !exclude.Contains(t.Id));
 
+        var embeddings = _context.MediaItemEmbeddings.AsNoTracking().Where(e => e.Embedding != null);
+        if (filter.EmbeddingModel is string model)
+        {
+            var unstampedCounts = AiConnection.IsLegacyStamp(model);
+            embeddings = embeddings.Where(e => e.Model == model || (unstampedCounts && e.Model == null));
+        }
+
         var take = Math.Max(1, limit);
         var rows = await VectorSearch.WideAsync(_context, take, () =>
-            (from e in _context.MediaItemEmbeddings.AsNoTracking()
+            (from e in embeddings
              join t in tracks on e.MediaItemId equals t.Id
-             where e.Embedding != null
              orderby e.Embedding!.CosineDistance(target)
              select new
              {

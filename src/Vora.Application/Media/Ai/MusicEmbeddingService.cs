@@ -37,13 +37,16 @@ public class MusicEmbeddingService : IMusicEmbeddingService
         var server = await _settings.GetSettingsAsync();
         if (!server.EnableAiMusicPlaylists || !await _openAi.IsConfiguredAsync()) return 0;
 
+        var model = await _openAi.GetEmbeddingModelAsync();
+        if (string.IsNullOrEmpty(model)) return 0;
+
         await _profiles.ProfileTracksAsync(cancellationToken);
 
         var tags = await _repository.GetAllArtistTagNamesAsync(TrackProfileService.TagsPerArtist);
         var due = (await _repository.GetTrackDescriptorsAsync())
             .Select(t => (Track: t, Text: SongProfile.Describe(t, ArtistTags(t, tags))))
             .Select(x => (x.Track, x.Text, Hash: SongProfile.Fingerprint(x.Text)))
-            .Where(x => x.Hash != x.Track.EmbeddedHash || x.Track.EmbeddedModel != OpenAiClient.EmbeddingModel)
+            .Where(x => x.Hash != x.Track.EmbeddedHash || x.Track.EmbeddedModel != model)
             .ToList();
 
         var done = 0;
@@ -58,7 +61,7 @@ public class MusicEmbeddingService : IMusicEmbeddingService
             var updates = batch
                 .Select((x, i) => (x.Track.TrackId, x.Hash, Vector: i < vectors.Count ? vectors[i] : null))
                 .Where(x => x.Vector != null)
-                .Select(x => new TrackEmbeddingUpdate(x.TrackId, x.Vector ?? Array.Empty<float>(), x.Hash, OpenAiClient.EmbeddingModel))
+                .Select(x => new TrackEmbeddingUpdate(x.TrackId, x.Vector ?? Array.Empty<float>(), x.Hash, model))
                 .ToList();
             if (updates.Count == 0) break;
 

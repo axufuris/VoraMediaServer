@@ -31,7 +31,7 @@ public interface IAiPlaylistService
 public class AiPlaylistService : IAiPlaylistService
 {
     public const string PluginId = MusicEmbeddingService.PluginId;
-    public const string ModelSettingKey = "music_playlists_model";
+    public const string ModelSettingKey = AiConnection.PlaylistsModelKey;
 
     public const int WeeklyThemes = 4;
     public const int PlaylistLength = 25;
@@ -61,6 +61,8 @@ public class AiPlaylistService : IAiPlaylistService
     private readonly ISystemSettingsRepository _settings;
     private readonly ITaskProgressReporter _progress;
     private readonly ILogger<AiPlaylistService> _logger;
+    private string? _embeddingModel;
+    private bool _embeddingModelRead;
 
     public AiPlaylistService(
         IAiPlaylistRepository repository,
@@ -328,7 +330,10 @@ public class AiPlaylistService : IAiPlaylistService
     // handful of songs, where it would be one album's worth of guessing.
     private async Task<float[]?> TasteAsync(Guid profileId)
     {
-        var played = await _repository.GetPlayedVectorsAsync(profileId, TasteWindowDays, 300);
+        var model = await EmbeddingModelAsync();
+        if (string.IsNullOrEmpty(model)) return null;
+
+        var played = await _repository.GetPlayedVectorsAsync(profileId, TasteWindowDays, 300, model);
         if (played.Count < 5) return null;
 
         var sum = new float[played[0].Vector.Length];
@@ -344,7 +349,7 @@ public class AiPlaylistService : IAiPlaylistService
     {
         var window = (await _settings.GetSettingsAsync()).AiPlaylistMatchWindow;
         var pool = Math.Min(count * CandidatesPerSong, MaxCandidates);
-        var candidates = await _repository.FindNearestTracksAsync(query, access, (filter ?? AiTrackFilter.None) with { Exclude = used }, pool);
+        var candidates = await _repository.FindNearestTracksAsync(query, access, (filter ?? AiTrackFilter.None) with { Exclude = used, EmbeddingModel = await EmbeddingModelAsync() }, pool);
         var limit = MatchLimit(candidates, window);
         var matches = candidates.TakeWhile(c => c.Distance <= limit).ToList();
         var pick = PickVaried(matches, count, used);
@@ -427,7 +432,7 @@ public class AiPlaylistService : IAiPlaylistService
         {
             var t = step / (float)(BridgeLength - 1);
             var point = Blend(from, 1 - t, to, t);
-            var nearest = await _repository.FindNearestTracksAsync(point, access, new AiTrackFilter(Exclude: used), 8);
+            var nearest = await _repository.FindNearestTracksAsync(point, access, new AiTrackFilter(Exclude: used, EmbeddingModel: await EmbeddingModelAsync()), 8);
             var next = SameSong.Group(nearest, c => c.Song).FirstOrDefault(s =>
                 s.All.All(c => !used.Contains(c.TrackId))
                 && !path.Any(p => SameSong.Same(p.Song, s.Best.Song))
@@ -639,7 +644,20 @@ public class AiPlaylistService : IAiPlaylistService
     private async Task<bool> IsServerEnabledAsync()
     {
         var server = await _settings.GetSettingsAsync();
-        return server.EnableAiMusicPlaylists && server.EnableForYou && await _openAi.IsConfiguredAsync();
+        return server.EnableAiMusicPlaylists
+            && server.EnableForYou
+            && await _openAi.IsConfiguredAsync()
+            && !string.IsNullOrEmpty(await EmbeddingModelAsync());
+    }
+
+    private async Task<string?> EmbeddingModelAsync()
+    {
+        if (!_embeddingModelRead)
+        {
+            _embeddingModel = await _openAi.GetEmbeddingModelAsync();
+            _embeddingModelRead = true;
+        }
+        return _embeddingModel;
     }
 
     internal static MusicAccessFilter AccessFor(UserProfile profile) => new()
