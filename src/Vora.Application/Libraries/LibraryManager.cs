@@ -143,8 +143,12 @@ public class LibraryManager : ILibraryManager
         var pathsChanged = addedPaths.Any() || removedPaths.Any();
 
         bool artworkProviderChanged = library.ArtworkProviderId != request.ArtworkProviderId;
-        var localMetadataMode = LocalMetadataSettings.Mode(request.LocalMetadataMode, library.Type);
-        var preferLocalArtwork = LocalMetadataSettings.PreferArtwork(request.PreferLocalArtwork, library.Type);
+        var localMetadataMode = request.LocalMetadataMode is int requestedMode
+            ? LocalMetadataSettings.Mode(requestedMode, library.Type)
+            : library.LocalMetadataMode;
+        var preferLocalArtwork = request.PreferLocalArtwork is bool requestedPreference
+            ? LocalMetadataSettings.PreferArtwork(requestedPreference, library.Type)
+            : library.PreferLocalArtwork;
         bool localMetadataChanged = library.LocalMetadataMode != localMetadataMode || library.PreferLocalArtwork != preferLocalArtwork;
         var requestedThumbnails = request.EnableVideoPreviewThumbnails &&
             library.Type.HasVideoContent();

@@ -391,6 +391,18 @@ public class LibraryManagerTests
     }
 
     [Fact]
+    public async Task A_client_that_does_not_know_these_settings_leaves_them_as_they_are()
+    {
+        var library = Held(LibraryType.Movie, LocalMetadataMode.Prefer, preferLocalArtwork: true);
+
+        await _manager.UpdateLibraryAsync(library.Id, new UpdateLibraryRequest { Name = library.Name, FolderPaths = library.FolderPaths.ToList() });
+
+        library.LocalMetadataMode.Should().Be(LocalMetadataMode.Prefer);
+        library.PreferLocalArtwork.Should().BeTrue();
+        _queue.DidNotReceive().QueueLocalMetadataSync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<DateTime?>());
+    }
+
+    [Fact]
     public async Task Saving_a_library_without_touching_those_settings_queues_no_pass()
     {
         var library = Held(LibraryType.Movie, LocalMetadataMode.Prefer, preferLocalArtwork: true);

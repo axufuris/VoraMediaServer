@@ -6,7 +6,7 @@ The NFO reader and its test fixtures came from PR #97 (`harikiran-lab`, issue #6
 
 ## The two library settings
 
-`MediaLibrary.LocalMetadataMode` (`LocalMetadataMode`: `Off`, `MatchOnly`, `Prefer`) and `MediaLibrary.PreferLocalArtwork`. Both are saved only for Movie and TV libraries (`LibraryType.ReadsLocalMetadata()`, applied by `LocalMetadataSettings`). In the admin they are **Read NFO files** and **Prefer local artwork** on Create Library and Manage Library (`components/Admin/Libraries/LocalFilesFields.tsx`).
+`MediaLibrary.LocalMetadataMode` (`LocalMetadataMode`: `Off`, `MatchOnly`, `Prefer`) and `MediaLibrary.PreferLocalArtwork`. Both are saved only for Movie and TV libraries (`LibraryType.ReadsLocalMetadata()`, applied by `LocalMetadataSettings`). In the admin they are **Read NFO files** and **Prefer local artwork** on Create Library and Manage Library (`components/Admin/Libraries/LocalFilesFields.tsx`). `PUT /api/libraries/{id}` leaves either one as it is when the request does not include it, so a client that predates them cannot switch them off by saving a library.
 
 | Read NFO files | Which title it is | Where the details come from |
 | --- | --- | --- |
