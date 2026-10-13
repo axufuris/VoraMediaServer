@@ -1,11 +1,20 @@
 import { useState, useEffect } from 'react';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
 import { StorageKeys } from '../../../utils/storageKeys';
+import { detectAudioOutputChannels } from '../../../utils/hardwareScanner';
 
 export default function PlaybackTab({ activeProfileId, serverId, onSaved }: { activeProfileId: string, serverId?: string, onSaved: () => void }) {
     const [clientBitrateLimit, setClientBitrateLimit] = useState(0);
     const [maxResolution, setMaxResolution] = useState(0);
     const [maxAudioChannels, setMaxAudioChannels] = useState(0);
+    const [detectedAudioChannels, setDetectedAudioChannels] = useState(detectAudioOutputChannels);
+
+    useEffect(() => {
+        const devices = navigator.mediaDevices;
+        const refreshOutput = () => setDetectedAudioChannels(detectAudioOutputChannels());
+        devices?.addEventListener('devicechange', refreshOutput);
+        return () => devices?.removeEventListener('devicechange', refreshOutput);
+    }, []);
 
     useEffect(() => {
         const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
@@ -67,13 +76,14 @@ export default function PlaybackTab({ activeProfileId, serverId, onSaved }: { ac
                         </select>
                     </div>
                     <div>
-                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Max audio channels</label>
-                        <select value={maxAudioChannels} onChange={e => setMaxAudioChannels(parseInt(e.target.value, 10))} className="w-full cursor-pointer rounded-md p-2.5 text-sm outline-none" style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-primary)' }}>
-                            <option value={0}>Device capability</option>
+                        <label htmlFor="playback-audio-output" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Audio output</label>
+                        <select id="playback-audio-output" value={maxAudioChannels} onChange={e => setMaxAudioChannels(parseInt(e.target.value, 10))} className="w-full cursor-pointer rounded-md p-2.5 text-sm outline-none" style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-primary)' }}>
+                            <option value={0}>Automatic ({detectedAudioChannels} channels detected)</option>
                             <option value={2}>Stereo (2.0)</option>
                             <option value={6}>5.1 surround</option>
                             <option value={8}>7.1 surround</option>
                         </select>
+                        <p className="mb-0 mt-2 text-xs" style={{ color: 'var(--vora-text-muted)' }}>Automatic uses the browser's reported output. Choose your speaker layout if detection is wrong. Playback prefers a compatible original audio track; unsupported codecs may still need conversion.</p>
                     </div>
                 </div>
             </section>

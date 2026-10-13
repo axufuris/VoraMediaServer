@@ -107,7 +107,7 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
     const videoCodecs: string[] = [];
     const audioCodecs: string[] = [];
     const containers: string[] = [];
-    let maxAudioChannels = 2;
+    const maxAudioChannels = detectAudioOutputChannels();
     let clientBandwidthKbps = 100000;
 
     let requestedClientBitrateKbps = 0;
@@ -141,18 +141,6 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
         }
     } catch (error: unknown) {
         console.warn("Could not check client bandwidth.", error);
-    }
-
-    try {
-        const extWindow = window as ExtendedWindow;
-        const AudioCtx = window.AudioContext || extWindow.webkitAudioContext;
-        if (AudioCtx) {
-            const ctx = new AudioCtx();
-            maxAudioChannels = ctx.destination.maxChannelCount || 2;
-            ctx.close().catch((err: unknown) => console.warn("Failed to close audio context", err));
-        }
-    } catch (error: unknown) {
-        console.warn("Could not check audio capabilities.", error);
     }
 
     const videoTests = {
@@ -273,17 +261,12 @@ export function readPlaybackPrefs(profileId: string, deviceId: string): Playback
     return { maxResolution: 0, maxAudioChannels: 0 };
 }
 
-// Apply the user's caps to a raw device profile. A value of 0 means
-// "Original / device limit" (use the device value); a specific value caps to
-// min(userVal, deviceVal) so a preference can only lower capability. HDR
-// formats and bit depth pass through unchanged. requestedMaxResolution holds
-// the resolution height. Matches the Android semantics exactly.
 export function applyUserCaps(device: DeviceCapabilities, prefs: PlaybackPrefs): DeviceCapabilities {
     const effRes = prefs.maxResolution > 0
         ? Math.min(prefs.maxResolution, device.requestedMaxResolution)
         : device.requestedMaxResolution;
-    const effCh = prefs.maxAudioChannels > 0
-        ? Math.min(prefs.maxAudioChannels, device.maxAudioChannels)
+    const effCh = Number.isInteger(prefs.maxAudioChannels) && prefs.maxAudioChannels > 0 && prefs.maxAudioChannels <= 8
+        ? prefs.maxAudioChannels
         : device.maxAudioChannels;
     return { ...device, requestedMaxResolution: effRes, maxAudioChannels: effCh };
 }
@@ -305,3 +288,17 @@ export const scanDeviceCapabilities = async (): Promise<DeviceCapabilities> => {
     const { profileId, deviceId } = getCurrentProfileDeviceIds();
     return applyUserCaps({ ...base, supportedHdrFormats }, readPlaybackPrefs(profileId, deviceId));
 };
+
+export function detectAudioOutputChannels(): number {
+    try {
+        const extWindow = window as ExtendedWindow;
+        const AudioCtx = window.AudioContext || extWindow.webkitAudioContext;
+        if (!AudioCtx) return 2;
+        const ctx = new AudioCtx();
+        const channels = ctx.destination.maxChannelCount;
+        void ctx.close().catch(() => undefined);
+        return Number.isInteger(channels) && channels > 0 ? Math.min(channels, 8) : 2;
+    } catch {
+        return 2;
+    }
+}

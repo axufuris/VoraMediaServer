@@ -1,6 +1,7 @@
 import type { MediaItem, MediaPart } from '../../../api/Media/mediaService';
 import type { DeviceCapabilities } from '../../../utils/hardwareScanner';
 import { isVideoDirectPlayable, isAudioDirectPlayable } from '../../../utils/playbackDecision';
+import { pickBestAudioTrack } from '../../../utils/audioTrackSelection';
 
 type VideoTrackType = NonNullable<MediaPart['videoTracks']>[number];
 type AudioTrackType = NonNullable<MediaPart['audioTracks']>[number];
@@ -85,13 +86,7 @@ export default function PlayerSettingsPanel({
                                     const newPart = mediaDetails?.mediaParts?.find((p: MediaPart) => p.videoTracks?.some((vt: VideoTrackType) => vt.id === newVid));
                                     if (newPart) {
                                         if (newPart.audioTracks && newPart.audioTracks.length > 0) {
-                                            const sorted = [...newPart.audioTracks].sort((a: AudioTrackType, b: AudioTrackType) => {
-                                                const aTranscode = !isAudioDirectPlayable(a, caps);
-                                                const bTranscode = !isAudioDirectPlayable(b, caps);
-                                                if (aTranscode !== bTranscode) return aTranscode ? 1 : -1;
-                                                return (b.channels || 0) - (a.channels || 0);
-                                            });
-                                            setSelAudio(sorted[0].id);
+                                            setSelAudio(pickBestAudioTrack(newPart.audioTracks, caps)?.id ?? '');
                                         } else {
                                             setSelAudio('');
                                         }
