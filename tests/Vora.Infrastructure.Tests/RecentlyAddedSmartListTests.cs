@@ -48,6 +48,33 @@ public sealed class RecentlyAddedShowsWorld
         MovieId = movie.Id;
     }
 
+    public const int WholeShowEpisodes = 230;
+    public static readonly DateTime WholeShowAdded = new(2026, 10, 6, 1, 0, 0, DateTimeKind.Utc);
+    public Guid WholeShowId { get; private set; }
+
+    public async Task SeedWholeShowImportAsync(VoraDbContext db)
+    {
+        var lastEpisodeAdded = WholeShowAdded.AddSeconds(WholeShowEpisodes);
+        var topGear = new TvShow { Title = "Top Gear", LibraryId = LibraryId, AddedAt = WholeShowAdded, LastContentAddedAt = lastEpisodeAdded };
+        db.Add(topGear);
+
+        var episodeNumber = 0;
+        for (var seasonNumber = 1; episodeNumber < WholeShowEpisodes; seasonNumber++)
+        {
+            var season = new Season { Title = "Season " + seasonNumber, SeasonNumber = seasonNumber, TvShowId = topGear.Id, LibraryId = LibraryId, AddedAt = WholeShowAdded.AddSeconds(episodeNumber + 1) };
+            db.Add(season);
+            for (var inSeason = 1; inSeason <= 10 && episodeNumber < WholeShowEpisodes; inSeason++)
+            {
+                episodeNumber++;
+                season.LastContentAddedAt = WholeShowAdded.AddSeconds(episodeNumber);
+                db.Add(new Episode { Title = "Episode " + inSeason, EpisodeNumber = inSeason, SeasonId = season.Id, LibraryId = LibraryId, AddedAt = WholeShowAdded.AddSeconds(episodeNumber) });
+            }
+        }
+
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        WholeShowId = topGear.Id;
+    }
+
     public Task<List<LibraryItemVM>> RecentlyAddedAsync(VoraDbContext db, SmartListRulesDto rules) =>
         new SmartListRepository(db).GetSmartListItemsAsync(null, LibraryId, rules, SmartListSortBy.DateAddedDesc, 20);
 }
@@ -67,6 +94,19 @@ public class RecentlyAddedSmartListTests
         var items = await world.RecentlyAddedAsync(db, RecentlyAddedShowsWorld.MoviesAndShows);
 
         items.Select(i => i.Id).Should().Equal(world.NewShowId, world.MovieId, world.NewEpisodeId);
+    }
+
+    [Fact]
+    public async Task A_whole_show_added_at_once_is_one_tile_and_leaves_room_for_the_others()
+    {
+        await using var db = NewContext();
+        var world = new RecentlyAddedShowsWorld();
+        await world.SeedAsync(db);
+        await world.SeedWholeShowImportAsync(db);
+
+        var items = await world.RecentlyAddedAsync(db, RecentlyAddedShowsWorld.MoviesAndShows);
+
+        items.Select(i => i.Id).Should().Equal(world.WholeShowId, world.NewShowId, world.MovieId, world.NewEpisodeId);
     }
 
     [Fact]

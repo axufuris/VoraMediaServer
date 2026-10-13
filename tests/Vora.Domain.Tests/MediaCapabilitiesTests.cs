@@ -181,6 +181,29 @@ public class MediaCapabilitiesTests
         public MediaItem Item { get; init; } = null!;
     }
 
+    [Fact]
+    public void Not_selects_everything_the_capability_leaves_out()
+    {
+        var outsideAShow = MediaCapabilities.IsPartOfATvShow.Not().Compile();
+
+        foreach (var item in new[] { Movie, Show, Season, Episode, Track })
+        {
+            outsideAShow(item).Should().Be(!item.BelongsToATvShow());
+        }
+    }
+
+    [Fact]
+    public void Or_adds_the_items_another_condition_names()
+    {
+        var outsideAShowOrThisEpisode = MediaCapabilities.IsPartOfATvShow.Not().Or(m => m.Id == Episode.Id).Compile();
+
+        outsideAShowOrThisEpisode(Movie).Should().BeTrue();
+        outsideAShowOrThisEpisode(Track).Should().BeTrue();
+        outsideAShowOrThisEpisode(Episode).Should().BeTrue();
+        outsideAShowOrThisEpisode(Show).Should().BeFalse();
+        outsideAShowOrThisEpisode(Season).Should().BeFalse();
+    }
+
     // On() rebinds the capability's parameter onto a path rather than invoking it,
     // because an Invoke node is what EF refuses to translate. The rebound
     // expression has to select exactly what the original selects.
