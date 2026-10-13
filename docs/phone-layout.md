@@ -54,6 +54,7 @@ Page gutters that are classes follow the same 1rem: `px-8 max-md:px-4`.
   - The volume slider is hidden on phones; the phone's own volume buttons do that job.
   - Mini players keep the title, play/pause, expand and close.
   - The queue and station lists open over the Now Playing screen instead of beside it.
+- **Menus opened on a title:** holding a poster opens its menu as a sheet from the bottom edge, with taller rows (`ActionMenu`). See `docs/frontend-client-ui.md` → The title menu.
 
 ## Reordering by touch
 

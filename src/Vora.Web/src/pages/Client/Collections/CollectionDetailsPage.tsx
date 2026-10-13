@@ -11,6 +11,7 @@ import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { useDialog } from '../../../dialogs';
 import CinematicBackdrop from '../../../components/Client/Primitives/CinematicBackdrop';
 import { StorageKeys } from '../../../utils/storageKeys';
+import { mediaMenuTarget } from '../../../components/Media/ItemMenu/mediaItemMenu';
 
 const SORT_LABELS: Record<CollectionSortOrder, string> = {
     Chronological: 'Chronological (Timeline)',
@@ -262,6 +263,7 @@ export default function CollectionDetailsPage() {
                                 isPlayed={item.isPlayed}
                                 unplayedCount={item.unplayedItemCount}
                                 onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
+                                menu={mediaMenuTarget(item, serverId, { onChanged: () => fetchCollection(true) })}
                                 onRemove={isAdmin && !collection.systemGenerated ? (e) => handleRemoveItem(e, item.id) : undefined}
                                 fill
                             />

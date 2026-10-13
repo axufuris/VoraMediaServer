@@ -27,9 +27,9 @@ export default function SmartPlaylistDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [editing, setEditing] = useState(false);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (quietly = false) => {
         if (!id) return;
-        setLoading(true);
+        if (!quietly) setLoading(true);
         try {
             const [d, t] = await Promise.all([
                 smartPlaylistService.get(id, serverId),
@@ -205,7 +205,7 @@ export default function SmartPlaylistDetailsPage() {
                 ) : items.mediaType === 'Music' && items.tracks ? (
                     <MusicTable tracks={items.tracks} onPlay={handlePlay} formatDuration={formatDuration} />
                 ) : items.mediaType === 'Movies' && items.movies ? (
-                    <MovieGrid movies={items.movies} onSelect={(idx) => handlePlay(idx)} />
+                    <MovieGrid movies={items.movies} serverId={serverId} onChanged={() => { void load(true); }} onSelect={(idx) => handlePlay(idx)} />
                 ) : items.mediaType === 'Shows' && items.episodes ? (
                     <EpisodeList episodes={items.episodes} onSelect={(idx) => handlePlay(idx)} formatDuration={formatDuration} />
                 ) : null}
@@ -259,7 +259,7 @@ function MusicTable({ tracks, onPlay, formatDuration }: { tracks: ArtistTrackVM[
     );
 }
 
-function MovieGrid({ movies, onSelect }: { movies: { id: string; title: string; year?: number; posterUrl?: string; isWatched: boolean }[]; onSelect: (i: number) => void }) {
+function MovieGrid({ movies, serverId, onChanged, onSelect }: { movies: { id: string; title: string; year?: number; posterUrl?: string; isWatched: boolean }[]; serverId?: string; onChanged: () => void; onSelect: (i: number) => void }) {
     return (
         <MediaGrid>
             {movies.map((m, idx) => (
@@ -271,6 +271,7 @@ function MovieGrid({ movies, onSelect }: { movies: { id: string; title: string; 
                     isPlayed={m.isWatched}
                     fill
                     onClick={() => onSelect(idx)}
+                    menu={{ id: m.id, serverId, onChanged }}
                 />
             ))}
         </MediaGrid>

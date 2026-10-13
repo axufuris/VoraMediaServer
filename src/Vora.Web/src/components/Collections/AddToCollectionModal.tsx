@@ -13,12 +13,15 @@ interface AddToCollectionModalProps {
     mediaType: string;
     initialCollectionIds: string[];
     onSaved: () => void;
+    // The server the item is on, when that is not the one in the address bar.
+    serverId?: string;
 }
 
 export default function AddToCollectionModal({
-    isOpen, onClose, mediaId, libraryId, mediaType, initialCollectionIds, onSaved }: AddToCollectionModalProps) {
+    isOpen, onClose, mediaId, libraryId, mediaType, initialCollectionIds, onSaved, serverId: serverIdProp }: AddToCollectionModalProps) {
     const dialog = useDialog();
-    const { serverId } = useParams<{ serverId?: string }>();
+    const { serverId: routeServerId } = useParams<{ serverId?: string }>();
+    const serverId = serverIdProp ?? routeServerId;
     const [collections, setCollections] = useState<CollectionSummary[]>([]);
     const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);

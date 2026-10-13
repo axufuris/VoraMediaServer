@@ -1,11 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mediaService, type MediaItem, type MediaPart } from '../../../api/Media/mediaService';
-import { libraryAdminService } from '../../../api/Media/libraryAdminService';
-import EditMetadataModal from '../../../components/Media/EditMetadataModal';
-import MarkerEditorModal from '../../../components/Admin/MarkerEditorModal';
-import AddToCollectionModal from '../../../components/Collections/AddToCollectionModal';
-import AddToPlaylistModal from '../../../components/Collections/AddToPlaylistModal';
 import CastRow from '../../../components/Client/Primitives/CastRow';
 import MediaExtrasRow from '../../../components/Media/MediaExtrasRow';
 import MediaEpisodesList from '../../../components/Media/MediaEpisodesList';
@@ -28,15 +23,18 @@ import StarRating from '../../../components/Client/Primitives/StarRating';
 import RateDialog from '../../../components/Client/Primitives/RateDialog';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { formatRuntime } from '../../../utils/formatRuntime';
-import { isFullyWatched, affectedEpisodeCount } from '../../../utils/watchState';
+import { isFullyWatched } from '../../../utils/watchState';
 import { isImageSubtitleCodec, isNoSubtitle } from '../../../utils/subtitleKind';
-import FixMatchModal from '../../../components/Media/FixMatchModal';
-import MediaInfoDialog from '../../../components/Media/MediaInfoDialog';
 import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
 import { audioChipLabel, heroFactsLine, pickChipAudioTrack, resolutionChipLabel, subtitleChipLabel } from '../../../utils/heroQualityChips';
 import { formatDate, serverTimeMs, yearOf } from '../../../utils/serverTime';
 import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
 import { errorDetail, isMissingOrForbidden } from '../../../utils/apiError';
+import { ActionMenuList } from '../../../components/Client/Primitives/ActionMenu';
+import { menuAction, tidyMenu } from '../../../components/Client/Primitives/menuEntries';
+import { mediaMenuTarget } from '../../../components/Media/ItemMenu/mediaItemMenu';
+import { useMediaItemActions } from '../../../components/Media/ItemMenu/useMediaItemActions';
+import { toggleWatched, toggleWatchlist } from '../../../components/Media/ItemMenu/watchActions';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -68,16 +66,9 @@ export default function MediaDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [loadFailure, setLoadFailure] = useState<string | null>(null);
 
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
-    const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [playingTrailer, setPlayingTrailer] = useState<TrailerSource | null>(null);
     const [inWatchlist, setInWatchlist] = useState(false);
-    const [isMarkerEditorOpen, setIsMarkerEditorOpen] = useState(false);
-    const [isFixMatchOpen, setIsFixMatchOpen] = useState(false);
-    const [isInfoOpen, setIsInfoOpen] = useState(false);
-    const closeInfo = useCallback(() => setIsInfoOpen(false), []);
     const [isQualityPanelOpen, setIsQualityPanelOpen] = useState(false);
     const [isRateOpen, setIsRateOpen] = useState(false);
 
@@ -102,8 +93,6 @@ export default function MediaDetailsPage() {
         setShowMenu(false);
         setInWatchlist(false);
     }
-
-    const [thumbnailsLocked, setThumbnailsLocked] = useState<boolean | null>(null);
 
     const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
     const caps = useMemo(() => {
@@ -143,6 +132,30 @@ export default function MediaDetailsPage() {
             console.error('Failed to reload media details.');
         }
     }, [id, serverId]);
+
+    const itemActions = useMediaItemActions(media, {
+        serverId,
+        onChanged: reloadMedia,
+        onDeleted: deleted => navigate(deleted.libraryId
+            ? (serverId ? `/server/${serverId}/library/${deleted.libraryId}` : `/library/${deleted.libraryId}`)
+            : '/'),
+        onMatched: async (result: MediaMatchResult) => {
+            if (result.mediaItemId !== id) {
+                navigate(serverId ? `/server/${serverId}/media/${result.mediaItemId}` : `/media/${result.mediaItemId}`, { replace: true });
+                await dialog.alert({
+                    title: 'Match applied',
+                    message: 'This was a second copy of a show already in your library, so the two have been merged. Its metadata is refreshing now.',
+                });
+                return;
+            }
+            await dialog.alert({
+                title: 'Match applied',
+                message: result.mergedDuplicate
+                    ? 'A duplicate copy of this show was merged into it. Metadata is refreshing now, and this page will update when it finishes.'
+                    : 'Metadata is refreshing now, and this page will update when it finishes.',
+            });
+        },
+    });
 
     useEffect(() => {
         let isMounted = true;
@@ -247,14 +260,6 @@ export default function MediaDetailsPage() {
         if (id && updatedId.toLowerCase() === id.toLowerCase()) reloadMedia();
     }, [id, reloadMedia]));
 
-    useEffect(() => {
-        if (!media || !isAdmin) return;
-        if (media.type !== 'Movie' && media.type !== 'Episode') return;
-        libraryAdminService.getThumbnailsLock(media.id, serverId)
-            .then(r => setThumbnailsLocked(r.locked))
-            .catch(() => setThumbnailsLocked(null));
-    }, [media, isAdmin, serverId]);
-
     const handlePlay = async (resume: boolean = true) => {
         if (!media) return;
 
@@ -302,112 +307,14 @@ export default function MediaDetailsPage() {
         }
     };
 
-    const handleScan = async () => {
-        if (!media) return;
-        try {
-            await libraryAdminService.triggerMediaScan(media.id);
-            await dialog.alert('Targeted folder scan started in the background!');
-        } catch {
-            await dialog.alert('Failed to start scan.');
-        }
-        setShowMenu(false);
-    };
-
-    const handleRefresh = async () => {
-        if (!media) return;
-        libraryAdminService.refreshItemMetadata(media.id, true);
-        await dialog.alert('Metadata refresh started in the background!');
-        setShowMenu(false);
-    };
-
-    const handleAnalyze = async () => {
-        if (!media) return;
-        libraryAdminService.analyzeMedia(media.id);
-        await dialog.alert('Media analysis started in the background!');
-        setShowMenu(false);
-    };
-
-    const handleRegenerateThumbnails = async () => {
-        if (!media) return;
-        try {
-            await libraryAdminService.regenerateMediaItemThumbnails(media.id, serverId);
-            await dialog.alert('Thumbnail regeneration started in the background!');
-        } catch {
-            await dialog.alert('Failed to queue thumbnail regeneration.');
-        }
-        setShowMenu(false);
-    };
-
-    const handleToggleThumbnailsLock = async () => {
-        if (!media) return;
-        try {
-            const next = !(thumbnailsLocked ?? false);
-            const result = await libraryAdminService.setThumbnailsLock(media.id, next, serverId);
-            setThumbnailsLocked(result.locked);
-        } catch {
-            await dialog.alert('Failed to update thumbnails lock.');
-        }
-        setShowMenu(false);
-    };
-
-    const handleDelete = async () => {
-        if (!media) return;
-        if (await dialog.confirm({
-            title: 'Delete media item?',
-            message: 'This permanently removes the item from Vora. Your physical files on disk will NOT be touched.',
-            confirmText: 'Delete',
-            tone: 'danger',
-        })) {
-            try {
-                await libraryAdminService.deleteMediaItem(media.id);
-                navigate(media.libraryId ? (serverId ? `/server/${serverId}/library/${media.libraryId}` : `/library/${media.libraryId}`) : '/');
-            } catch {
-                await dialog.alert('Failed to delete media item.');
-            }
-        }
-        setShowMenu(false);
-    };
-
     const handleToggleWatchlist = async () => {
         if (!media) return;
-        try {
-            const next = await watchlistService.toggle(
-                { mediaItemId: media.id },
-                { type: media.type, title: media.title, posterUrl: media.posterUrl },
-                serverId
-            );
-            setInWatchlist(next);
-        } catch {
-            await dialog.alert('Failed to update watchlist.');
-        }
+        const next = await toggleWatchlist(media, dialog, serverId);
+        if (next !== null) setInWatchlist(next);
     };
 
     const handleTogglePlayed = async () => {
-        if (!media) return;
-        const next = !isFullyWatched(media);
-
-        // Marking a show or season fans out to every episode under it, so say
-        // how many before doing it.
-        const episodeCount = affectedEpisodeCount(media);
-        if (episodeCount > 1) {
-            const scope = media.type === 'TvShow' ? 'this show' : 'this season';
-            const ok = await dialog.confirm({
-                title: next ? `Mark ${episodeCount} episodes as watched?` : `Mark ${episodeCount} episodes as unwatched?`,
-                message: next
-                    ? `Every episode in ${scope} will be marked watched, and any playback progress on them will be cleared.`
-                    : `Every episode in ${scope} will be marked unwatched.`,
-                confirmText: next ? 'Mark watched' : 'Mark unwatched',
-                cancelText: 'Cancel',
-            });
-            if (!ok) return;
-        }
-
-        try {
-            await mediaService.markAsPlayed(media.id, next, serverId);
-            reloadMedia();
-        } catch {
-            await dialog.alert('Failed to update play state.');
-        }
+        if (media && await toggleWatched(media, dialog, serverId)) reloadMedia();
     };
 
     const handleSetRating = useCallback(async (next: number | null) => {
@@ -546,31 +453,13 @@ export default function MediaDetailsPage() {
 
     const isEpisode = media.type === 'Episode';
     const isSeason = media.type === 'Season';
-    const showParentNav = (isEpisode && (!!media.seasonId || !!media.tvShowId)) || (isSeason && !!media.tvShowId);
-    const canFixMatch = isAdmin && (media.type === 'Movie' || media.type === 'TvShow');
-    const hasFileInfo = (media.type === 'Movie' || isEpisode) && (media.mediaParts?.length ?? 0) > 0;
-    const mediaPath = (mediaId: string) => serverId ? `/server/${serverId}/media/${mediaId}` : `/media/${mediaId}`;
-
-    const handleMatched = async (result: MediaMatchResult) => {
-        setIsFixMatchOpen(false);
-        if (result.mediaItemId !== media.id) {
-            navigate(mediaPath(result.mediaItemId), { replace: true });
-            await dialog.alert({
-                title: 'Match applied',
-                message: 'This was a second copy of a show already in your library, so the two have been merged. Its metadata is refreshing now.',
-            });
-            return;
-        }
-        await dialog.alert({
-            title: 'Match applied',
-            message: result.mergedDuplicate
-                ? 'A duplicate copy of this show was merged into it. Metadata is refreshing now, and this page will update when it finishes.'
-                : 'Metadata is refreshing now, and this page will update when it finishes.',
-        });
-    };
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = isSeason ? seasonName(media.seasonNumber, media.title) : isEpisode ? media.title : undefined;
     const showQualityButton = (media.type === 'Movie' || isEpisode || media.type === 'TvShow') && (versionOptions.length > 1 || sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
+    const moreEntries = tidyMenu([
+        ...(showQualityButton ? [menuAction('quality', 'Quality & tracks', () => setIsQualityPanelOpen(true))] : []),
+        ...itemActions.entries,
+    ]);
     const playLabel = media.type === 'TvShow' ? 'Play next' : inProgress ? 'Resume' : 'Play';
     const playRuntime = formatRuntime(media.durationMinutes);
 
@@ -673,6 +562,7 @@ export default function MediaDetailsPage() {
                     <>
                         <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
                         <div
+                            role="menu"
                             className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl z-50"
                             style={{
                                 background: 'var(--vora-bg-raised)',
@@ -680,47 +570,7 @@ export default function MediaDetailsPage() {
                                 boxShadow: 'var(--vora-shadow-lg)',
                             }}
                         >
-                            {showQualityButton && (
-                                <button type="button" onClick={() => { setIsQualityPanelOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Quality & tracks</button>
-                            )}
-                            {hasFileInfo && (
-                                <button type="button" onClick={() => { setIsInfoOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Media info</button>
-                            )}
-                            {(showQualityButton || hasFileInfo) && <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />}
-                            {isEpisode && media.seasonId && (
-                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.seasonId}` : `/media/${media.seasonId}`); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Go to season</button>
-                            )}
-                            {isEpisode && media.tvShowId && (
-                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Go to show</button>
-                            )}
-                            {isSeason && media.tvShowId && (
-                                <button type="button" onClick={() => { navigate(serverId ? `/server/${serverId}/media/${media.tvShowId}` : `/media/${media.tvShowId}`); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Go to show</button>
-                            )}
-                            {showParentNav && <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />}
-                            <button type="button" onClick={() => { setIsEditModalOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Edit metadata</button>
-                            <button type="button" onClick={() => { setIsPlaylistModalOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Add to playlist</button>
-                            <button type="button" onClick={() => { setIsCollectionModalOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Add to collection</button>
-                            {isAdmin && (
-                                <>
-                                    <div className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />
-                                    {canFixMatch && (
-                                        <button type="button" onClick={() => { setIsFixMatchOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Fix match…</button>
-                                    )}
-                                    <button type="button" onClick={handleRefresh} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Refresh metadata</button>
-                                    <button type="button" onClick={handleScan} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Scan files</button>
-                                    <button type="button" onClick={handleAnalyze} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Analyze media</button>
-                                    {(media.type === 'Movie' || media.type === 'Episode') && (
-                                        <>
-                                            <button type="button" onClick={handleRegenerateThumbnails} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Regenerate thumbnails</button>
-                                            <button type="button" onClick={handleToggleThumbnailsLock} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>
-                                                {thumbnailsLocked ? 'Unlock thumbnails' : 'Lock thumbnails'}
-                                            </button>
-                                        </>
-                                    )}
-                                    <button type="button" onClick={() => { setIsMarkerEditorOpen(true); setShowMenu(false); }} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm" style={{ color: 'var(--vora-text-primary)' }}>Edit markers</button>
-                                    <button type="button" onClick={handleDelete} className="vora-row-interactive block w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium" style={{ color: 'var(--vora-danger-text)' }}>Delete item</button>
-                                </>
-                            )}
+                            <ActionMenuList entries={moreEntries} onSelected={() => setShowMenu(false)} />
                         </div>
                     </>
                 )}
@@ -760,24 +610,8 @@ export default function MediaDetailsPage() {
             {isRateOpen && (
                 <RateDialog title={heroTitle} value={media.myRating ?? null} onSave={handleSetRating} onClose={() => setIsRateOpen(false)} />
             )}
-            {isInfoOpen && (
-                <MediaInfoDialog parts={media.mediaParts ?? []} placement="fixed" onClose={closeInfo} />
-            )}
-            {isFixMatchOpen && (media.type === 'Movie' || media.type === 'TvShow') && (
-                <FixMatchModal
-                    mediaItemId={media.id}
-                    mediaType={media.type}
-                    currentYear={yearOf(media.releaseDate) ?? undefined}
-                    serverId={serverId}
-                    onClose={() => setIsFixMatchOpen(false)}
-                    onMatched={handleMatched}
-                />
-            )}
-            <EditMetadataModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSaved={reloadMedia} itemId={media.id} type="media" libraryType={media.type === 'Movie' ? 'Movie' : 'TvShow'} initialData={{ ...media, lockedFields: media.lockedFields ?? [] }} />
-            <AddToCollectionModal isOpen={isCollectionModalOpen} onClose={() => setIsCollectionModalOpen(false)} mediaId={media.id} libraryId={media.libraryId} mediaType={media.type} initialCollectionIds={media.collectionIds || []} onSaved={reloadMedia} />
-            <AddToPlaylistModal isOpen={isPlaylistModalOpen} onClose={() => setIsPlaylistModalOpen(false)} mediaId={media.id} kind="video" />
+            {itemActions.dialogs}
             <TrailerOverlay trailer={playingTrailer} onClose={() => setPlayingTrailer(null)} />
-            <MarkerEditorModal isOpen={isMarkerEditorOpen} onClose={() => setIsMarkerEditorOpen(false)} mediaItemId={media.id} mediaItemTitle={media.title} durationSeconds={media.durationMinutes ? media.durationMinutes * 60 : undefined} serverId={serverId} onSaved={reloadMedia} />
 
             <QualityPanel open={isQualityPanelOpen} onClose={() => setIsQualityPanelOpen(false)}>
                 {versionOptions.length > 1 && (
@@ -822,6 +656,7 @@ export default function MediaDetailsPage() {
                                     captionLines={[`${season.episodeCount || 0} episode${season.episodeCount === 1 ? '' : 's'}`]}
                                     unplayedCount={season.unplayedItemCount}
                                     onClick={() => navigate(serverId ? `/server/${serverId}/media/${season.id}` : `/media/${season.id}`)}
+                                    menu={mediaMenuTarget({ id: season.id, type: 'Season' }, serverId, { onChanged: reloadMedia })}
                                 />
                             </MediaRowItem>
                         ))}
@@ -842,7 +677,7 @@ export default function MediaDetailsPage() {
                     onSelect={member => navigate(serverId ? `/server/${serverId}/actor/${member.id}` : `/actor/${member.id}`)}
                 />
                 <MediaExtrasRow videos={media.videos || []} extras={media.extras || []} serverId={serverId} />
-                <MediaEpisodesList episodes={media.episodes || []} serverId={serverId} />
+                <MediaEpisodesList episodes={media.episodes || []} serverId={serverId} onChanged={reloadMedia} />
             </div>
         </div>
     );

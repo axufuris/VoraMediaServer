@@ -17,6 +17,8 @@ import MusicPlaylistView from './MusicPlaylistView';
 import PlaylistCover from '../../../components/Collections/PlaylistCover';
 import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
 import { reorderListProps, reorderRowProps, useTouchReorder } from '../../../hooks/useTouchReorder';
+import { mediaMenuTarget } from '../../../components/Media/ItemMenu/mediaItemMenu';
+import MediaMenuArea from '../../../components/Media/ItemMenu/MediaMenuArea';
 
 export default function PlaylistDetailsPage() {
     const dialog = useDialog();
@@ -547,8 +549,9 @@ export default function PlaylistDetailsPage() {
                     <h2 className="text-2xl font-bold mb-6 text-[var(--vora-text-primary)] border-b border-[var(--vora-border-subtle)] pb-2 max-md:text-xl max-md:mb-4">Up Next ({playlist.items.length})</h2>
                     <div {...reorderListProps} className="space-y-3">
                         {playlist.items.map((item, index) => (
-                            <div
+                            <MediaMenuArea
                                 key={item.id}
+                                target={mediaMenuTarget({ id: item.mediaItemId, type: item.type }, serverId, { onChanged: loadPlaylist })}
                                 {...reorderRowProps(index)}
                                 style={touch.rowStyle(index)}
                                 draggable={canEdit}
@@ -635,7 +638,7 @@ export default function PlaylistDetailsPage() {
                                         </button>
                                     )}
                                 </div>
-                            </div>
+                            </MediaMenuArea>
                         ))}
                     </div>
                 </div>

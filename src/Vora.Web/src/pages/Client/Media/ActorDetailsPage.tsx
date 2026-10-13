@@ -69,6 +69,7 @@ export default function ActorDetailsPage() {
             releaseDate: local.releaseDate,
             year,
             onOpen: () => navigate(mediaPath(local.id)),
+            menu: { id: local.id, serverId },
         });
     }
 
@@ -82,6 +83,7 @@ export default function ActorDetailsPage() {
             releaseDate: credit.releaseDate,
             year: credit.year,
             onOpen: () => navigate(mediaPath(credit.mediaItemId!)),
+            menu: { id: credit.mediaItemId, serverId },
         });
     }
 

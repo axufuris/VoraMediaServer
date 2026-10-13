@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { watchlistService, type WatchlistItem } from '../../api/Watchlist/watchlistService';
 import PageHeader from '../../components/Client/Primitives/PageHeader';
@@ -31,6 +31,10 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
             .catch(console.error)
             .finally(() => setIsLoading(false));
     }, [activeProfileId, serverId]);
+
+    const reload = useCallback(() => {
+        watchlistService.getWatchlist(serverId).then(setItems).catch(console.error);
+    }, [serverId]);
 
     // A bookmarked title that is in the library opens the local item, where it
     // can actually be played; anything else opens the provider page.
@@ -72,6 +76,7 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
                                 captionLines={[item.type === 'TvShow' ? 'TV Series' : 'Movie']}
                                 inWatchlist
                                 onClick={() => navigate(openPath(item))}
+                                menu={item.mediaItemId ? { id: item.mediaItemId, serverId, onChanged: reload } : undefined}
                                 fill
                             />
                         ))}

@@ -5,6 +5,7 @@ import MediaGrid from './MediaGrid';
 import EmptyState from './EmptyState';
 import { parseServerDate, yearOf } from '../../../utils/serverTime';
 import { newestFirst } from '../../../utils/credits';
+import type { MediaMenuTarget } from '../../Media/ItemMenu/mediaItemMenu';
 
 // One tile in either of the actor's two credit sections.
 export interface ActorCredit {
@@ -16,6 +17,9 @@ export interface ActorCredit {
     releaseDate?: string | null;
     year?: number | null;
     onOpen: () => void;
+    // Set for a credit that is in the library, so its poster offers that
+    // title's menu.
+    menu?: MediaMenuTarget;
 }
 
 interface ActorProfileProps {
@@ -56,6 +60,7 @@ function CreditSection({ title, subtitle, credits }: { title: string; subtitle: 
                         captionLines={credit.caption ? [credit.caption] : []}
                         imageUrl={credit.posterUrl}
                         onClick={credit.onOpen}
+                        menu={credit.menu}
                         fill
                     />
                 ))}

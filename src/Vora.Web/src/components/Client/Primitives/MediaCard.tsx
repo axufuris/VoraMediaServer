@@ -6,6 +6,8 @@ import MediaPlaceholder from './MediaPlaceholder';
 import PosterRemoveButton from './PosterRemoveButton';
 import { CornerChip, PosterCorner, UnplayedCountBadge, WatchedBadge } from './WatchedBadge';
 import { secureImageUrl } from '../../../utils/secureImageUrl';
+import type { MediaMenuTarget } from '../../Media/ItemMenu/mediaItemMenu';
+import { useMediaMenuTrigger } from '../../Media/ItemMenu/useMediaMenuTrigger';
 
 export type MediaCardShape = 'poster' | 'still' | 'square' | 'circle';
 export type MediaCardSize = 'xs' | 'sm' | 'md' | 'lg';
@@ -39,6 +41,11 @@ export interface MediaCardProps {
     bottomLeftBadge?: ReactNode;
     onRemove?: (e: React.MouseEvent) => void;
     onDelete?: (e: React.MouseEvent) => void;
+    // The library title this card stands for. Right-clicking the card, or
+    // holding it on a touch screen, opens that title's menu. Build it with
+    // mediaMenuTarget(), which leaves it out for anything that is not a movie,
+    // show, season or episode.
+    menu?: MediaMenuTarget | null;
     className?: string;
 }
 
@@ -72,8 +79,9 @@ export default function MediaCard({
     item, title, captionLines, captionExtra, imageUrl, imageFit = 'cover', uncachedImage, mosaicUrls,
     shape = 'poster', size = 'md', fill, onClick,
     isPlayed, unplayedCount, progressPercent, inWatchlist,
-    badge, hoverBadge, bottomLeftBadge, onRemove, onDelete, className,
+    badge, hoverBadge, bottomLeftBadge, onRemove, onDelete, menu, className,
 }: MediaCardProps) {
+    const menuTrigger = useMediaMenuTrigger(menu);
     const caption = item ? posterCaption(item) : { title: title ?? '', lines: captionLines ?? [] };
     const lines = captionLines ?? caption.lines;
     const displayTitle = title ?? caption.title;
@@ -118,8 +126,9 @@ export default function MediaCard({
             tabIndex={onClick ? 0 : undefined}
             onClick={onClick}
             onKeyDown={handleKeyDown}
+            {...menuTrigger}
             className={`group block text-left ${onClick ? 'cursor-pointer' : ''} ${className ?? ''}`}
-            style={{ width: fill ? '100%' : WIDTH_VAR[size], background: 'transparent', border: 'none', padding: 0 }}
+            style={{ ...menuTrigger?.style, width: fill ? '100%' : WIDTH_VAR[size], background: 'transparent', border: 'none', padding: 0 }}
         >
             <div
                 className="relative overflow-hidden border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)]"

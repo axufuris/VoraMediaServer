@@ -21,6 +21,7 @@ import MainLayoutUserMenu from './parts/MainLayoutUserMenu';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import type { FeatureFlagsVM } from '../api/System/featureFlagsService';
 import { moveNavItem } from '../utils/navOrder';
+import MediaItemMenuProvider from '../components/Media/ItemMenu/MediaItemMenuProvider';
 
 const isNavItemEnabled = (item: NavItem, flags: FeatureFlagsVM): boolean => {
     if (item.type !== 'system') return true;
@@ -343,6 +344,7 @@ export default function MainLayout() {
             className={`flex h-screen overflow-hidden max-md:h-dvh transition-all duration-300 ${currentMedia && isMinimized ? 'pb-24' : ''}`}
             style={{ background: 'var(--vora-bg-canvas)', color: 'var(--vora-text-primary)' }}
         >
+            <MediaItemMenuProvider>
 
             <ServerManagerModal
                 isOpen={isServerManagerOpen}
@@ -394,6 +396,7 @@ export default function MainLayout() {
                     : <GlobalVideoPlayer />}
 
             <NowPlayingFullscreen />
+            </MediaItemMenuProvider>
         </div>
     );
 }
