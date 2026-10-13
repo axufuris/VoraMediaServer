@@ -367,6 +367,16 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         string? imdbId = provider == "imdb" ? providerId : null;
         string? tvdbId = provider == "tvdb" ? providerId : null;
 
+        var localMetadata = LocalNfoReader.ReadMovie(filePath, _logger);
+        if (localMetadata != null)
+        {
+            title = localMetadata.Title ?? title;
+            year = localMetadata.ReleaseDate?.Year ?? year;
+            tmdbId = localMetadata.TmdbId ?? tmdbId;
+            imdbId = localMetadata.ImdbId ?? imdbId;
+            tvdbId = localMetadata.TvdbId ?? tvdbId;
+        }
+
         var movieId = await _ingestionService.EnsureMovieAsync(library, title, year, tmdbId, imdbId, tvdbId, edition);
         await _ingestionService.AddMediaPartAsync(movieId, filePath, resolution, edition);
         return movieId.Value;
@@ -528,6 +538,20 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         string? tmdbId = provider == "tmdb" ? providerId : null;
         string? imdbId = provider == "imdb" ? providerId : null;
         string? tvdbId = provider == "tvdb" ? providerId : null;
+
+        var showDirectory = LocalMediaAssets.ShowDirectory(filePath);
+        var localShow = showDirectory == null ? null : LocalNfoReader.ReadTvShow(showDirectory, _logger);
+        if (localShow != null)
+        {
+            showTitle = localShow.Title ?? showTitle;
+            showYear = localShow.ReleaseDate?.Year ?? showYear;
+            tmdbId = localShow.TmdbId ?? tmdbId;
+            imdbId = localShow.ImdbId ?? imdbId;
+            tvdbId = localShow.TvdbId ?? tvdbId;
+        }
+        var localEpisode = LocalNfoReader.ReadEpisode(filePath, seasonNumber, episodeNumber, _logger);
+        episodeTitle = localEpisode?.Title ?? episodeTitle;
+        airDate = localEpisode?.ReleaseDate ?? airDate;
 
         var showId = await _ingestionService.EnsureTvShowAsync(library, showTitle, showYear, tmdbId, imdbId, tvdbId);
 

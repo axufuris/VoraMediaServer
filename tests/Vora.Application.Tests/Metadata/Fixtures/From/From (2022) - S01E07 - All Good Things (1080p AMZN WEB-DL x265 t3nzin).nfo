@@ -1,0 +1,87 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<episodedetails>
+  <plot><![CDATA[Father Khatri tells Boyd why he believes Sara may be useful; Jim and Tabitha find comfort in each other; Colony House celebrates the one-year anniversary of Fatima's arrival with a party that goes terribly wrong.]]></plot>
+  <outline />
+  <lockdata>false</lockdata>
+  <dateadded>2026-07-25 15:33:55</dateadded>
+  <title>All Good Things</title>
+  <director tvdbid="8192117">Jennifer Liao</director>
+  <rating>8.3</rating>
+  <year>2022</year>
+  <sorttitle>All Good Things</sorttitle>
+  <mpaa>TV-MA</mpaa>
+  <imdbid>tt15505758</imdbid>
+  <tvdbid>8808287</tvdbid>
+  <runtime>50</runtime>
+  <genre>Drama</genre>
+  <genre>Horror</genre>
+  <genre>Mystery</genre>
+  <uniqueid type="tvdb">8808287</uniqueid>
+  <uniqueid type="official website">https://www.epix.com/movie/from-s1-e7</uniqueid>
+  <uniqueid type="imdb">tt15505758</uniqueid>
+  <episode>7</episode>
+  <season>1</season>
+  <aired>2022-04-03</aired>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>hevc</codec>
+        <micodec>hevc</micodec>
+        <bitrate>2470345</bitrate>
+        <width>1920</width>
+        <height>958</height>
+        <aspect>960:479</aspect>
+        <aspectratio>960:479</aspectratio>
+        <framerate>23.976025</framerate>
+        <scantype>progressive</scantype>
+        <default>True</default>
+        <forced>False</forced>
+        <duration>50</duration>
+        <durationinseconds>3005</durationinseconds>
+      </video>
+      <audio>
+        <codec>eac3</codec>
+        <micodec>eac3</micodec>
+        <bitrate>640000</bitrate>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <channels>6</channels>
+        <samplingrate>48000</samplingrate>
+        <default>False</default>
+        <forced>False</forced>
+      </audio>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+</episodedetails>
