@@ -111,7 +111,8 @@ public static class StreamingEndpoints
                 req.AudioTrackId,
                 req.SubtitleTrackId,
                 req.Capabilities,
-                req.MediaPartId);
+                req.MediaPartId,
+                context.GetClientAddress());
 
             return Results.Ok(new StartStreamResponse
             {
@@ -165,7 +166,8 @@ public static class StreamingEndpoints
                 req.AudioTrackId,
                 req.SubtitleTrackId,
                 req.Capabilities,
-                req.MediaPartId);
+                req.MediaPartId,
+                context.GetClientAddress());
 
             return Results.Ok(new StreamDecisionResponse(
                 d.SelectedMediaPartId,
@@ -208,7 +210,7 @@ public static class StreamingEndpoints
                 return Results.BadRequest("Missing X-Vora-Device-Id header");
             }
 
-            var result = await streamManager.StartExtraSessionAsync(req.ExtraId, deviceId, accountId, profileId, req.StartPosition, req.Capabilities);
+            var result = await streamManager.StartExtraSessionAsync(req.ExtraId, deviceId, accountId, profileId, req.StartPosition, req.Capabilities, context.GetClientAddress());
 
             return Results.Ok(new StartStreamResponse
             {

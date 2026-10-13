@@ -1252,6 +1252,8 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.Resolution).HasMaxLength(16);
             entity.Property(e => e.HdrType).HasMaxLength(32);
             entity.Property(e => e.Quality).HasMaxLength(64);
+            entity.Property(e => e.IpAddress).HasMaxLength(45);
+            entity.Property(e => e.Location).HasMaxLength(128);
 
             entity.HasIndex(e => new { e.UserId, e.StartedAt }).HasFilter("\"EndedAt\" IS NULL");
             entity.HasIndex(e => e.LastPingAt).HasFilter("\"EndedAt\" IS NULL");

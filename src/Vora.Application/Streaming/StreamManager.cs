@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using Vora.Application.Analysis;
+using Vora.Application.Devices;
 using Vora.Application.Settings;
 using Vora.Application.Streaming.Dtos;
 using Vora.Application.Streaming.ViewModels;
@@ -14,9 +15,9 @@ public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[]
 
 public interface IStreamManager
 {
-    Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
-    Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null);
-    Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null);
+    Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null);
+    Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null);
+    Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null, string? clientAddress = null);
     Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search, Guid? profileId = null, IReadOnlyCollection<Guid>? libraryIds = null, IReadOnlyCollection<HistoryDelivery>? deliveries = null);
     Task PingSessionAsync(Guid sessionId, double currentPosition, double duration, bool isPaused);
     Task<List<NowPlayingSessionDto>> GetNowPlayingSessionsAsync();
@@ -40,9 +41,11 @@ public class StreamManager : IStreamManager
     private readonly IClientNotifier _notifier;
     private readonly ITranscodeService _transcodeService;
     private readonly StoragePathsOptions _storagePaths;
+    private readonly IClientLocationResolver _locations;
 
-    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths)
+    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths, IClientLocationResolver locations)
     {
+        _locations = locations;
         _repository = repository;
         _decisionManager = decisionManager;
         _settingsRepo = settingsRepo;
@@ -52,11 +55,12 @@ public class StreamManager : IStreamManager
         _storagePaths = storagePaths.Value;
     }
 
-    public async Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null)
+    public async Task<(StreamSession Session, string StreamUrl)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null)
     {
-        var (decision, mediaInfo, client, resolvedMediaId) = await ComputeDecisionAsync(mediaId, deviceId, profileId, videoTrackId, audioTrackId, subtitleTrackId, capabilities, mediaPartId);
+        var (decision, mediaInfo, client, resolvedMediaId) = await ComputeDecisionAsync(mediaId, deviceId, profileId, videoTrackId, audioTrackId, subtitleTrackId, capabilities, mediaPartId, clientAddress);
 
         await _repository.EndActiveSessionsForDeviceAsync(client.Id);
+        var (address, location) = await WhereFromAsync(client, clientAddress);
 
         var selectedPart = mediaInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);
         var selectedVideo = selectedPart?.VideoTracks.FirstOrDefault(v => v.Id == decision.SelectedVideoTrackId);
@@ -64,6 +68,8 @@ public class StreamManager : IStreamManager
         var session = new StreamSession
         {
             ClientDeviceId = client.Id,
+            IpAddress = address,
+            Location = location,
             MediaItemId = resolvedMediaId,
             UserId = userId,
             UserProfileId = profileId,
@@ -97,13 +103,13 @@ public class StreamManager : IStreamManager
         return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}");
     }
 
-    public async Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null)
+    public async Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null)
     {
-        var (decision, _, _, _) = await ComputeDecisionAsync(mediaId, deviceId, profileId, videoTrackId, audioTrackId, subtitleTrackId, capabilities, mediaPartId);
+        var (decision, _, _, _) = await ComputeDecisionAsync(mediaId, deviceId, profileId, videoTrackId, audioTrackId, subtitleTrackId, capabilities, mediaPartId, clientAddress);
         return decision;
     }
 
-    private async Task<(StreamDecisionDto Decision, MediaStreamInfoDto MediaInfo, ClientDevice Client, Guid MediaId)> ComputeDecisionAsync(Guid mediaId, string deviceId, Guid? profileId, Guid? videoTrackId, Guid? audioTrackId, Guid? subtitleTrackId, DeviceCapsDto? capabilities, Guid? mediaPartId)
+    private async Task<(StreamDecisionDto Decision, MediaStreamInfoDto MediaInfo, ClientDevice Client, Guid MediaId)> ComputeDecisionAsync(Guid mediaId, string deviceId, Guid? profileId, Guid? videoTrackId, Guid? audioTrackId, Guid? subtitleTrackId, DeviceCapsDto? capabilities, Guid? mediaPartId, string? clientAddress)
     {
         mediaId = await _repository.ResolvePlayableMediaIdAsync(mediaId, profileId);
 
@@ -125,7 +131,7 @@ public class StreamManager : IStreamManager
             client.MaxVideoBitDepth = capabilities.MaxVideoBitDepth;
         }
 
-        bool isRemote = !IsLocalIp(client.LastIpAddress);
+        bool isRemote = !IsLocalIp(AddressOf(client, clientAddress));
         int maxAllowedBandwidthKbps = 0;
         string bandwidthLimitSource = "None";
 
@@ -179,7 +185,7 @@ public class StreamManager : IStreamManager
         return (decision, mediaInfo, client, mediaId);
     }
 
-    public async Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null)
+    public async Task<(StreamSession Session, string StreamUrl)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null, string? clientAddress = null)
     {
         var extra = await _repository.GetMediaExtraAsync(extraId);
         if (extra == null) throw new InvalidOperationException("Extra not found.");
@@ -203,6 +209,7 @@ public class StreamManager : IStreamManager
         await _repository.EndActiveSessionsForDeviceAsync(client.Id);
 
         var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, 0, "None", null, null, null, capabilities?.RequestedMaxResolution ?? 0);
+        var (address, location) = await WhereFromAsync(client, clientAddress);
 
         var selectedPart = streamInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);
         var selectedVideo = selectedPart?.VideoTracks.FirstOrDefault(v => v.Id == decision.SelectedVideoTrackId);
@@ -210,6 +217,8 @@ public class StreamManager : IStreamManager
         var session = new StreamSession
         {
             ClientDeviceId = client.Id,
+            IpAddress = address,
+            Location = location,
             MediaItemId = extra.MediaItemId,
             ExtraId = extra.Id,
             UserId = userId,
@@ -316,7 +325,21 @@ public class StreamManager : IStreamManager
 
     // The one rule every part of the server uses, so streaming can't disagree
     // with the device list about who is at home.
-    private static bool IsLocalIp(string ipAddress) => Vora.Application.Devices.ClientAddress.IsLocal(ipAddress);
+    private static bool IsLocalIp(string ipAddress) => ClientAddress.IsLocal(ipAddress);
+
+    private static string AddressOf(ClientDevice client, string? clientAddress) =>
+        string.IsNullOrWhiteSpace(clientAddress) ? client.LastIpAddress : clientAddress;
+
+    private async Task<(string? Address, string? Location)> WhereFromAsync(ClientDevice client, string? clientAddress)
+    {
+        var address = AddressOf(client, clientAddress);
+        if (string.IsNullOrWhiteSpace(address)) return (null, null);
+
+        var location = address == client.LastIpAddress && !ClientAddress.NeedsLookup(client.Location)
+            ? client.Location
+            : await _locations.ResolveAsync(address);
+        return (address, location);
+    }
 
     public async Task<SystemStatsVM> GetSystemStatsAsync(ISystemMetricRepository metricRepo)
     {

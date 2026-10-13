@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Vora.Application.Streaming;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
@@ -83,6 +84,49 @@ public class PostgresWatchHistoryTests(PostgresDatabase database) : IClassFixtur
         evening.PercentComplete.Should().BeGreaterThanOrEqualTo(90);
         var reopened = rows.Single(r => r != evening);
         reopened.PercentComplete.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_stream_shows_the_address_it_was_started_from_and_older_ones_show_the_devices()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var db = database.NewContext();
+        var world = new World();
+        await world.SeedAsync(db);
+        var away = await db.StreamSessions.SingleAsync(s => s.UserProfileId == world.KidsProfileId, cancellationToken);
+        away.IpAddress = "203.0.113.9";
+        away.Location = "Denver, CO, US";
+        await db.SaveChangesAsync(cancellationToken);
+
+        var (kids, _) = await world.HistoryAsync(db, TimeZoneInfo.Utc, world.KidsProfileId);
+        var (admin, _) = await world.HistoryAsync(db, TimeZoneInfo.Utc, world.AdminProfileId);
+
+        var recorded = kids.Should().ContainSingle().Subject;
+        recorded.IpAddress.Should().Be("203.0.113.9");
+        recorded.Location.Should().Be("Denver, CO, US");
+        var older = admin.Should().ContainSingle().Subject;
+        older.IpAddress.Should().Be("67.199.253.6");
+        older.Location.Should().Be("Salt Lake City, UT, US");
+    }
+
+    [Fact]
+    public async Task A_stream_whose_address_could_not_be_located_does_not_borrow_the_devices_location()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var db = database.NewContext();
+        var world = new World();
+        await world.SeedAsync(db);
+        var away = await db.StreamSessions.SingleAsync(s => s.UserProfileId == world.KidsProfileId, cancellationToken);
+        away.IpAddress = "203.0.113.9";
+        await db.SaveChangesAsync(cancellationToken);
+
+        var (kids, _) = await world.HistoryAsync(db, TimeZoneInfo.Utc, world.KidsProfileId);
+
+        var recorded = kids.Should().ContainSingle().Subject;
+        recorded.IpAddress.Should().Be("203.0.113.9");
+        recorded.Location.Should().BeNull();
     }
 
     [Fact]

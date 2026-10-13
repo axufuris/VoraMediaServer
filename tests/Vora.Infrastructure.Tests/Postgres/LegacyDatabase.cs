@@ -82,9 +82,16 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string SecondReleaseMigration = "20261009020545_ChangesSinceInitial";
 
+    public const string HardwareAccelerationMigration = "20261011233931_ChangesSinceInitial";
+
+    private const string ColumnsSinceHardwareAcceleration = """
+        ALTER TABLE "StreamSessions" DROP COLUMN "IpAddress";
+        ALTER TABLE "StreamSessions" DROP COLUMN "Location";
+        """;
+
     private const string ColumnsSinceSecondRelease = """
         ALTER TABLE "ServerSettings" DROP COLUMN "HardwareAccelerationType";
-        """;
+        """ + ColumnsSinceHardwareAcceleration;
 
     private const string ColumnsSinceRelease = """
         ALTER TABLE "MediaItems" DROP COLUMN "FullyRefreshedAt";
@@ -125,6 +132,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await db.Database.MigrateAsync(cancellationToken);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceSecondRelease, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, SecondReleaseMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildHardwareAccelerationStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceHardwareAcceleration, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, HardwareAccelerationMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

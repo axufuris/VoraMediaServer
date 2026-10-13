@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.SmartLists;
 using Vora.Domain.Entities.Iptv;
+using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.SmartLists;
+using Vora.Domain.Entities.Streaming;
 using Vora.Domain.Entities.Tasks;
 using Vora.Domain.Entities.Users;
 using Vora.Domain.Enums;
@@ -127,6 +129,63 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         settings.AiPlaylistMatchWindow.Should().Be(0.07);
         settings.HardwareAccelerationType.Should().Be(HardwareAccelerationType.Auto);
     }
+
+    [Fact]
+    public async Task A_database_on_the_migration_before_this_one_only_gains_where_each_stream_came_from()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var sessionId = Guid.NewGuid();
+        await legacy.BuildHardwareAccelerationStateAsync(async db =>
+        {
+            var library = new MediaLibrary { Name = "Movies", Type = LibraryType.Movie, FolderPaths = ["/movies"] };
+            var movie = new Movie { Title = "Arrival", LibraryId = library.Id };
+            var part = new MediaPart { FilePath = "/movies/arrival.mkv", MediaItemId = movie.Id };
+            var account = new User { Email = "andy@example.com", DisplayName = "Andy" };
+            var profile = new UserProfile { Name = "Andy", UserId = account.Id };
+            var device = new ClientDevice { DeviceId = "web-1", ClientName = "Vora Web", DeviceName = "Web Browser", LastIpAddress = "67.199.253.6", Location = "Salt Lake City, UT, US" };
+            var session = new StreamSession
+            {
+                Id = sessionId,
+                MediaItemId = movie.Id,
+                MediaPartId = part.Id,
+                UserId = account.Id,
+                UserProfileId = profile.Id,
+                ClientDeviceId = device.Id,
+                Strategy = "DirectPlay",
+                VideoStrategy = "DirectPlay",
+                AudioStrategy = "DirectPlay",
+                SubtitleStrategy = "None",
+            };
+            db.AddRange(library, movie, part, account, profile, device, session);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            await before.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"HardwareAccelerationType\" = 2", cancellationToken);
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await StreamSessionColumnsAsync(before, cancellationToken)).Should().NotContain("IpAddress").And.NotContain("Location");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        (await StreamSessionColumnsAsync(after, cancellationToken)).Should().Contain("IpAddress").And.Contain("Location");
+        var kept = await after.StreamSessions.AsNoTracking().SingleAsync(s => s.Id == sessionId, cancellationToken);
+        kept.Strategy.Should().Be("DirectPlay");
+        kept.IpAddress.Should().BeNull();
+        kept.Location.Should().BeNull();
+        var settings = await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
+        settings.HardwareAccelerationType.Should().Be(HardwareAccelerationType.QuickSync);
+    }
+
+    private static Task<List<string>> StreamSessionColumnsAsync(VoraDbContext db, CancellationToken cancellationToken) =>
+        db.Database
+            .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'StreamSessions'")
+            .ToListAsync(cancellationToken);
 
     [Fact]
     public async Task A_database_on_the_1_1_migration_only_gains_the_hardware_acceleration_choice()
