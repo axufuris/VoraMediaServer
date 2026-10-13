@@ -131,7 +131,7 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
     }
 
     [Fact]
-    public async Task A_database_on_the_migration_before_this_one_only_gains_where_each_stream_came_from()
+    public async Task A_database_from_before_stream_origins_gains_where_each_stream_came_from()
     {
         Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -181,6 +181,41 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         var settings = await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
         settings.HardwareAccelerationType.Should().Be(HardwareAccelerationType.QuickSync);
     }
+
+    [Fact]
+    public async Task A_database_on_the_migration_before_this_one_only_gains_the_local_metadata_choices_switched_off()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var libraryId = Guid.NewGuid();
+        await legacy.BuildStreamOriginStateAsync(async db =>
+        {
+            db.Add(new MediaLibrary { Id = libraryId, Name = "Movies", Type = LibraryType.Movie, FolderPaths = ["/movies"] });
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await LibraryColumnsAsync(before, cancellationToken)).Should().NotContain("LocalMetadataMode").And.NotContain("PreferLocalArtwork");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var kept = await after.Set<MediaLibrary>().AsNoTracking().SingleAsync(l => l.Id == libraryId, cancellationToken);
+        kept.Name.Should().Be("Movies");
+        kept.FolderPaths.Should().Equal("/movies");
+        kept.LocalMetadataMode.Should().Be(LocalMetadataMode.Off);
+        kept.PreferLocalArtwork.Should().BeFalse();
+    }
+
+    private static Task<List<string>> LibraryColumnsAsync(VoraDbContext db, CancellationToken cancellationToken) =>
+        db.Database
+            .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'MediaLibraries'")
+            .ToListAsync(cancellationToken);
 
     private static Task<List<string>> StreamSessionColumnsAsync(VoraDbContext db, CancellationToken cancellationToken) =>
         db.Database

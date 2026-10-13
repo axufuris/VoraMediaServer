@@ -11,6 +11,7 @@ import { renderNavIcon } from '../../../layouts/parts/navIcons';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import FolderPathInput from '../../../components/Admin/FolderBrowser/FolderPathInput';
 import MinimumCollectionSizeField from '../../../components/Admin/Libraries/MinimumCollectionSizeField';
+import LocalFilesFields from '../../../components/Admin/Libraries/LocalFilesFields';
 
 const MEDIA_TYPE_OPTIONS: IconSelectOption<number>[] = [
     { value: 1, label: 'Movies', icon: renderNavIcon('Movie', 'w-5 h-5') },
@@ -72,6 +73,8 @@ export default function CreateLibrary() {
         useSeasonTitles: true,
         seasonsDisplay: 0,
         enableIntroDetection: false,
+        localMetadataMode: 0,
+        preferLocalArtwork: false,
     });
 
     // Refetched when the type changes rather than filtered in place, so the one
@@ -283,6 +286,15 @@ export default function CreateLibrary() {
                             {availableArtworkProviders.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                     </div>
+
+                    {showVideoOptions && (
+                        <LocalFilesFields
+                            mode={library.localMetadataMode}
+                            preferLocalArtwork={library.preferLocalArtwork}
+                            onModeChange={mode => handleChange('localMetadataMode', mode)}
+                            onPreferLocalArtworkChange={prefer => handleChange('preferLocalArtwork', prefer)}
+                        />
+                    )}
 
                     <SectionHeading>Folder Paths</SectionHeading>
                     <div className="space-y-3">

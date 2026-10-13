@@ -42,6 +42,9 @@ public static class TaskRecipes
             case nameof(ITaskQueueManager.QueueRefreshMatchedMediaItem):
                 queue.QueueRefreshMatchedMediaItem(r.Guid("mediaItemId"), r.Guid("libraryId"), r.Flag("isTvShow"));
                 return true;
+            case nameof(ITaskQueueManager.QueueLocalMetadataSync):
+                queue.QueueLocalMetadataSync(r.Guid("libraryId"), r.Text("libraryName"), r.Time("since") ?? queuedAt);
+                return true;
             case nameof(ITaskQueueManager.QueueAnalyzeMediaItemContent):
                 queue.QueueAnalyzeMediaItemContent(r.Guid("mediaItemId"), r.Text("mediaItemName"), r.Flag("forceOverride"));
                 return true;

@@ -12,6 +12,7 @@ using Vora.Domain.Enums;
 using Vora.Plugins;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
+using Vora.Plugins.Providers.Local;
 using ArtworkKind = Vora.Domain.Enums.ArtworkKind;
 
 namespace Vora.Application.Metadata;
@@ -117,8 +118,11 @@ public class MetadataMappingService : IMetadataMappingService
 
         if (artworkEntities.Any())
         {
-            var topPoster = artworkEntities.OrderByDescending(a => a.VoteAverage).FirstOrDefault(a => a.Kind == ArtworkKind.Poster);
-            var topBackdrop = artworkEntities.OrderByDescending(a => a.VoteAverage).FirstOrDefault(a => a.Kind == ArtworkKind.Backdrop);
+            var prefersLocal = item.Library?.PreferLocalArtwork == true;
+            bool IsPreferredLocal(MediaArtwork artwork) => prefersLocal && artwork.ProviderId == LocalArtworkProvider.ProviderId;
+
+            var topPoster = artworkEntities.OrderByDescending(IsPreferredLocal).ThenByDescending(a => a.VoteAverage).FirstOrDefault(a => a.Kind == ArtworkKind.Poster);
+            var topBackdrop = artworkEntities.OrderByDescending(IsPreferredLocal).ThenByDescending(a => a.VoteAverage).FirstOrDefault(a => a.Kind == ArtworkKind.Backdrop);
 
             // A logo carries the title as artwork, so the wrong language is the
             // wrong picture: prefer the server's metadata language, then English,
@@ -126,7 +130,8 @@ public class MetadataMappingService : IMetadataMappingService
             var metadataLanguage = MetadataLanguageCodes.ToIso6391(await _pluginSettings.GetMetadataLanguageAsync());
             var topLogo = artworkEntities
                 .Where(a => a.Kind == ArtworkKind.Logo)
-                .OrderByDescending(a => a.Language == metadataLanguage)
+                .OrderByDescending(IsPreferredLocal)
+                .ThenByDescending(a => a.Language == metadataLanguage)
                 .ThenByDescending(a => a.Language == "en")
                 .ThenByDescending(a => a.VoteAverage)
                 .FirstOrDefault();
@@ -172,7 +177,7 @@ public class MetadataMappingService : IMetadataMappingService
                 updated = true;
             }
 
-            await _artworkRepository.ReplaceMediaArtworkAsync(item.Id, artworkEntities);
+            await _artworkRepository.ReplaceProviderMediaArtworkAsync(item.Id, artworkEntities);
         }
 
         return updated;
@@ -228,7 +233,7 @@ public class MetadataMappingService : IMetadataMappingService
         if (!item.IsLocked(nameof(item.Title)) || forceOverride) item.Title = metadata.Title ?? item.Title;
         if (!item.IsLocked(nameof(item.OriginalTitle)) || forceOverride) item.OriginalTitle = metadata.OriginalTitle ?? item.OriginalTitle;
         if (!item.IsLocked(nameof(item.OriginalLanguage)) || forceOverride) item.OriginalLanguage = metadata.OriginalLanguage ?? item.OriginalLanguage;
-        if (!item.IsLocked(nameof(item.SortTitle)) || forceOverride) item.SortTitle = metadata.Title ?? item.OriginalTitle;
+        if (!item.IsLocked(nameof(item.SortTitle)) || forceOverride) item.SortTitle = metadata.SortTitle ?? metadata.Title ?? item.OriginalTitle;
         if (!item.IsLocked(nameof(item.Status)) || forceOverride) item.Status = metadata.Status ?? item.Status;
         if (!item.IsLocked(nameof(item.Tagline)) || forceOverride) item.Tagline = metadata.Tagline ?? item.Tagline;
         if (!item.IsLocked(nameof(item.Overview)) || forceOverride) item.Overview = metadata.Overview ?? item.Overview;
@@ -242,7 +247,11 @@ public class MetadataMappingService : IMetadataMappingService
         item.HasMidCreditsStinger = metadata.HasMidCreditsStinger;
         item.HasPostCreditsStinger = metadata.HasPostCreditsStinger;
 
-        if (!item.IsLocked(nameof(item.PosterUrl)) || forceOverride)
+        var keepsLocalArtwork = item.Library?.PreferLocalArtwork == true;
+        var keepsLocalPoster = keepsLocalArtwork && LocalArtworkAddress.Is(item.OriginalPosterUrl);
+        var keepsLocalBackground = keepsLocalArtwork && LocalArtworkAddress.Is(item is Episode ? item.OriginalPosterUrl : item.BackgroundUrl);
+
+        if (!keepsLocalPoster && (!item.IsLocked(nameof(item.PosterUrl)) || forceOverride))
         {
             if (metadata.PosterUrl != null && metadata.PosterUrl != item.OriginalPosterUrl)
             {
@@ -252,7 +261,7 @@ public class MetadataMappingService : IMetadataMappingService
             }
         }
 
-        if (!item.IsLocked(nameof(item.BackgroundUrl)) || forceOverride)
+        if (!keepsLocalBackground && (!item.IsLocked(nameof(item.BackgroundUrl)) || forceOverride))
         {
             if (metadata.BackgroundUrl != null)
             {
@@ -614,7 +623,8 @@ public class MetadataMappingService : IMetadataMappingService
                 if (!season.IsLocked(nameof(season.OriginalTitle)) || forceOverride) season.OriginalTitle = seasonName;
                 if (!season.IsLocked(nameof(season.SortTitle)) || forceOverride) season.SortTitle = seasonName;
                 if (!season.IsLocked(nameof(season.Overview)) || forceOverride) season.Overview = parsedSeason.Overview;
-                if (!season.IsLocked(nameof(season.PosterUrl)) || forceOverride) season.PosterUrl = parsedSeason.PosterUrl;
+                var keepsLocalPoster = tvItem.Library?.PreferLocalArtwork == true && LocalArtworkAddress.Is(season.OriginalPosterUrl);
+                if (!keepsLocalPoster && (!season.IsLocked(nameof(season.PosterUrl)) || forceOverride)) season.PosterUrl = parsedSeason.PosterUrl;
                 if (!season.IsLocked(nameof(season.ReleaseDate)) || forceOverride) season.ReleaseDate = parsedSeason.AirDate;
                 if (!season.IsLocked(nameof(season.EpisodeCount)) || forceOverride) season.EpisodeCount = parsedSeason.EpisodeCount;
                 if (!season.IsLocked(nameof(season.VoteAverage)) || forceOverride) season.VoteAverage = parsedSeason.VoteAverage;

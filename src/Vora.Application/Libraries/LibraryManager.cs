@@ -63,6 +63,8 @@ public class LibraryManager : ILibraryManager
             ThirdPartyRating1ProviderId = request.ThirdPartyRating1ProviderId,
             ThirdPartyRating2ProviderId = request.ThirdPartyRating2ProviderId,
             ArtworkProviderId = request.ArtworkProviderId,
+            LocalMetadataMode = LocalMetadataSettings.Mode(request.LocalMetadataMode, request.Type),
+            PreferLocalArtwork = LocalMetadataSettings.PreferArtwork(request.PreferLocalArtwork, request.Type),
 
             FindExtras = request.FindExtras,
             OnlyShowTrailers = request.OnlyShowTrailers,
@@ -141,6 +143,13 @@ public class LibraryManager : ILibraryManager
         var pathsChanged = addedPaths.Any() || removedPaths.Any();
 
         bool artworkProviderChanged = library.ArtworkProviderId != request.ArtworkProviderId;
+        var localMetadataMode = request.LocalMetadataMode is int requestedMode
+            ? LocalMetadataSettings.Mode(requestedMode, library.Type)
+            : library.LocalMetadataMode;
+        var preferLocalArtwork = request.PreferLocalArtwork is bool requestedPreference
+            ? LocalMetadataSettings.PreferArtwork(requestedPreference, library.Type)
+            : library.PreferLocalArtwork;
+        bool localMetadataChanged = library.LocalMetadataMode != localMetadataMode || library.PreferLocalArtwork != preferLocalArtwork;
         var requestedThumbnails = request.EnableVideoPreviewThumbnails &&
             library.Type.HasVideoContent();
         bool thumbnailsTurnedOff = library.EnableVideoPreviewThumbnails && !requestedThumbnails;
@@ -164,6 +173,8 @@ public class LibraryManager : ILibraryManager
         library.ThirdPartyRating1ProviderId = request.ThirdPartyRating1ProviderId;
         library.ThirdPartyRating2ProviderId = request.ThirdPartyRating2ProviderId;
         library.ArtworkProviderId = request.ArtworkProviderId;
+        library.LocalMetadataMode = localMetadataMode;
+        library.PreferLocalArtwork = preferLocalArtwork;
 
         library.EnableRealTimeWatching = request.EnableRealTimeWatching;
         library.ScannerRegex = ResolveScannerRegex(library.Type, request.ScannerRegex);
@@ -194,6 +205,11 @@ public class LibraryManager : ILibraryManager
         if (artworkProviderChanged)
         {
             _taskQueueManager.QueueArtworkProviderSwap(library.Id, library.Name);
+        }
+
+        if (localMetadataChanged)
+        {
+            _taskQueueManager.QueueLocalMetadataSync(library.Id, library.Name);
         }
 
         if (thumbnailsTurnedOff)

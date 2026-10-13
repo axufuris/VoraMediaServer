@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.Media;
 using Vora.Application.Media.ViewModels;
+using Vora.Application.Metadata;
 using Vora.Domain.Entities.Collections;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Users;
@@ -137,6 +138,11 @@ public class MediaDedupeRepository : IMediaDedupeRepository
         await MergeCollectionMembershipsAsync(dropId, keeperId);
 
         var dropShow = await _context.Set<TvShow>().FirstAsync(t => t.Id == dropId);
+        if (dropShow.IsLocked(MediaMatchManager.MatchLock))
+        {
+            var keeperShow = await _context.Set<TvShow>().FirstAsync(t => t.Id == keeperId);
+            keeperShow.LockField(MediaMatchManager.MatchLock);
+        }
         _context.Remove(dropShow);
 
         await _context.SaveChangesAsync();

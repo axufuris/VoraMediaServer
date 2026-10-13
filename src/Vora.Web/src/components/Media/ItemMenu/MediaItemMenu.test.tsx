@@ -31,6 +31,7 @@ const admin = {
     analyzeMedia: vi.fn<(id: string, serverId?: string) => Promise<void>>(),
     regenerateMediaItemThumbnails: vi.fn<(id: string, serverId?: string) => Promise<void>>(),
     deleteMediaItem: vi.fn<(id: string, serverId?: string) => Promise<void>>(),
+    clearMatch: vi.fn<(id: string, serverId?: string) => Promise<void>>(),
 };
 
 vi.mock('../../../api/Media/mediaService', () => ({
@@ -56,6 +57,7 @@ vi.mock('../../../api/Media/libraryAdminService', () => ({
         analyzeMedia: (id: string, serverId?: string) => admin.analyzeMedia(id, serverId),
         regenerateMediaItemThumbnails: (id: string, serverId?: string) => admin.regenerateMediaItemThumbnails(id, serverId),
         deleteMediaItem: (id: string, serverId?: string) => admin.deleteMediaItem(id, serverId),
+        clearMatch: (id: string, serverId?: string) => admin.clearMatch(id, serverId),
     },
 }));
 
@@ -160,6 +162,7 @@ describe('the menu on a poster', () => {
         admin.analyzeMedia.mockResolvedValue();
         admin.regenerateMediaItemThumbnails.mockResolvedValue();
         admin.deleteMediaItem.mockResolvedValue();
+        admin.clearMatch.mockResolvedValue();
         markAsPlayed.mockResolvedValue();
         watchlist.check.mockResolvedValue(false);
         watchlist.toggle.mockResolvedValue(true);
@@ -290,6 +293,46 @@ describe('the menu on a poster', () => {
 
         await waitFor(() => expect(onDeleted).toHaveBeenCalled());
         expect(admin.deleteMediaItem).toHaveBeenCalledWith('movie-1', 'srv1');
+    });
+
+    it('offers to clear a manual match only on a title that was matched by hand', async () => {
+        await openMenuFor(title({ lockedFields: ['Title', 'Match'] }));
+
+        expect(labels()).toContain('Clear manual match');
+        expect(labels().indexOf('Clear manual match')).toBe(labels().indexOf('Fix match…') + 1);
+    });
+
+    it('does not offer it on a title whose match was automatic', async () => {
+        await openMenuFor(title({ lockedFields: ['Title'] }));
+        expect(labels()).not.toContain('Clear manual match');
+    });
+
+    it('does not offer it on an episode', async () => {
+        await openMenuFor(title({ ...episode, lockedFields: ['Match'] }));
+        expect(labels()).not.toContain('Clear manual match');
+    });
+
+    it('clears the match on that server once confirmed, and tells the page', async () => {
+        const onChanged = vi.fn();
+        const matched = title({ lockedFields: ['Match'] });
+        await openMenuFor(matched, mediaMenuTarget(matched, 'srv1', { onChanged }));
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Clear manual match' }));
+        expect(admin.clearMatch).not.toHaveBeenCalled();
+        fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clear match' }));
+
+        await waitFor(() => expect(admin.clearMatch).toHaveBeenCalledWith('movie-1', 'srv1'));
+        expect(await screen.findByText('Manual match cleared. The title is being matched again in the background.')).toBeInTheDocument();
+    });
+
+    it('keeps the match when the question is cancelled', async () => {
+        await openMenuFor(title({ lockedFields: ['Match'] }));
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Clear manual match' }));
+        fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        expect(admin.clearMatch).not.toHaveBeenCalled();
     });
 
     it('leaves the title alone when the delete is cancelled', async () => {

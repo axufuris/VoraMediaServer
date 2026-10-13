@@ -25,6 +25,7 @@ public class PosterOverlayManager : IPosterOverlayManager
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ITaskProgressReporter _progress;
     private readonly Vora.Application.Artwork.IArtworkThumbnailService _thumbnails;
+    private readonly Vora.Application.Artwork.ILocalArtworkLocator _localArtwork;
     private readonly ILogger<PosterOverlayManager> _logger;
     private readonly string _overlayDirectory;
     private readonly string _originalArtworkCacheDir;
@@ -40,6 +41,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         IHttpClientFactory httpClientFactory,
         ITaskProgressReporter progress,
         Vora.Application.Artwork.IArtworkThumbnailService thumbnails,
+        Vora.Application.Artwork.ILocalArtworkLocator localArtwork,
         IServiceScopeFactory scopeFactory,
         ILogger<PosterOverlayManager> logger)
     {
@@ -49,6 +51,7 @@ public class PosterOverlayManager : IPosterOverlayManager
         _httpClientFactory = httpClientFactory;
         _progress = progress;
         _thumbnails = thumbnails;
+        _localArtwork = localArtwork;
         _scopeFactory = scopeFactory;
         _logger = logger;
 
@@ -270,7 +273,8 @@ public class PosterOverlayManager : IPosterOverlayManager
             OriginalPosterUrl = item.OriginalPosterUrl
         };
 
-        var newPosterUrl = await activeProvider.GenerateOverlayAsync(dto, physicalSourcePath, template.ConfigurationJson, _overlayDirectory, cancellationToken);
+        var generated = await activeProvider.GenerateOverlayAsync(dto, physicalSourcePath, template.ConfigurationJson, _overlayDirectory, cancellationToken);
+        var newPosterUrl = string.Equals(generated, physicalSourcePath, StringComparison.Ordinal) ? item.OriginalPosterUrl : generated;
 
         if (!string.Equals(newPosterUrl, item.PosterUrl, StringComparison.Ordinal))
         {
@@ -287,6 +291,11 @@ public class PosterOverlayManager : IPosterOverlayManager
     private async Task<string> EnsureLocalArtworkAsync(string urlOrPath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(urlOrPath)) return string.Empty;
+
+        if (Vora.Application.Artwork.LocalArtworkAddress.Is(urlOrPath))
+        {
+            return await _localArtwork.ResolveAsync(urlOrPath) ?? string.Empty;
+        }
 
         if (File.Exists(urlOrPath)) return urlOrPath;
 

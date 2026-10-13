@@ -103,6 +103,28 @@ public sealed class MediaEditsRestoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_locked_local_poster_points_at_the_title_it_was_restored_onto()
+    {
+        using var source = BackupTestWorld.Source();
+        using var target = BackupTestWorld.RebuiltTarget();
+        AddFiles(source);
+        AddFiles(target);
+        var ct = TestContext.Current.CancellationToken;
+        var matrix = await source.Db.MediaItems.SingleAsync(m => m.Id == source.Matrix, ct);
+        matrix.PosterUrl = $"/api/artwork/local/{source.Matrix}/poster.jpg?v=638000000000000000";
+        matrix.LockedFields = new List<string> { nameof(MediaItem.PosterUrl) };
+        await source.Db.SaveChangesAsync(ct);
+
+        await BackupTestWorld.CopyAsync(
+            new MediaEditsBackupSection(source.Db, source.References),
+            new MediaEditsBackupSection(target.Db, target.References));
+
+        target.Matrix.Should().NotBe(source.Matrix);
+        (await target.Db.MediaItems.AsNoTracking().SingleAsync(m => m.Id == target.Matrix, ct)).PosterUrl
+            .Should().Be($"/api/artwork/local/{target.Matrix}/poster.jpg?v=638000000000000000");
+    }
+
+    [Fact]
     public async Task A_downloaded_subtitle_whose_file_is_gone_is_skipped()
     {
         using var source = BackupTestWorld.Source();

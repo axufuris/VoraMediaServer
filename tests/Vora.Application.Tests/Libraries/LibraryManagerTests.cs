@@ -324,6 +324,94 @@ public class LibraryManagerTests
         library.ScannerRegex.Should().Be(custom);
     }
 
+    private Domain.Entities.Library.MediaLibrary Held(LibraryType type, LocalMetadataMode mode = LocalMetadataMode.Off, bool preferLocalArtwork = false)
+    {
+        var library = new Domain.Entities.Library.MediaLibrary
+        {
+            Id = Guid.NewGuid(),
+            Name = "Library",
+            Type = type,
+            FolderPaths = new List<string> { "/media/library" },
+            LocalMetadataMode = mode,
+            PreferLocalArtwork = preferLocalArtwork
+        };
+        _repo.GetForUpdateAsync(library.Id).Returns(library);
+        return library;
+    }
+
+    private Task SaveAsync(Domain.Entities.Library.MediaLibrary library, int localMetadataMode, bool preferLocalArtwork) =>
+        _manager.UpdateLibraryAsync(library.Id, new UpdateLibraryRequest
+        {
+            Name = library.Name,
+            FolderPaths = library.FolderPaths.ToList(),
+            ArtworkProviderId = library.ArtworkProviderId,
+            LocalMetadataMode = localMetadataMode,
+            PreferLocalArtwork = preferLocalArtwork
+        });
+
+    [Fact]
+    public async Task A_new_library_reads_no_nfo_files_and_prefers_no_local_images_unless_asked()
+    {
+        Domain.Entities.Library.MediaLibrary? created = null;
+        _repo.CreateLibraryAsync(Arg.Do<Domain.Entities.Library.MediaLibrary>(l => created = l)).Returns(Guid.NewGuid());
+
+        await _manager.CreateLibraryAsync(new CreateLibraryRequest { Name = "Movies", Type = LibraryType.Movie, FolderPaths = new List<string> { "/media/movies" } });
+
+        var library = Assert.IsType<Domain.Entities.Library.MediaLibrary>(created);
+        library.LocalMetadataMode.Should().Be(LocalMetadataMode.Off);
+        library.PreferLocalArtwork.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(LibraryType.Movie, 2, LocalMetadataMode.Prefer, true)]
+    [InlineData(LibraryType.TvShow, 1, LocalMetadataMode.MatchOnly, true)]
+    [InlineData(LibraryType.HomeVideo, 2, LocalMetadataMode.Off, false)]
+    [InlineData(LibraryType.Music, 1, LocalMetadataMode.Off, false)]
+    [InlineData(LibraryType.Movie, 7, LocalMetadataMode.Off, true)]
+    public async Task Reading_local_files_is_kept_only_for_film_and_tv_libraries(LibraryType type, int requested, LocalMetadataMode savedMode, bool savedPreference)
+    {
+        var library = Held(type);
+
+        await SaveAsync(library, requested, preferLocalArtwork: true);
+
+        library.LocalMetadataMode.Should().Be(savedMode);
+        library.PreferLocalArtwork.Should().Be(savedPreference);
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(0, true)]
+    public async Task Changing_how_a_library_reads_local_files_queues_one_pass_over_what_it_already_holds(int mode, bool preferLocalArtwork)
+    {
+        var library = Held(LibraryType.Movie);
+
+        await SaveAsync(library, mode, preferLocalArtwork);
+
+        _queue.Received(1).QueueLocalMetadataSync(library.Id, "Library");
+    }
+
+    [Fact]
+    public async Task A_client_that_does_not_know_these_settings_leaves_them_as_they_are()
+    {
+        var library = Held(LibraryType.Movie, LocalMetadataMode.Prefer, preferLocalArtwork: true);
+
+        await _manager.UpdateLibraryAsync(library.Id, new UpdateLibraryRequest { Name = library.Name, FolderPaths = library.FolderPaths.ToList() });
+
+        library.LocalMetadataMode.Should().Be(LocalMetadataMode.Prefer);
+        library.PreferLocalArtwork.Should().BeTrue();
+        _queue.DidNotReceive().QueueLocalMetadataSync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<DateTime?>());
+    }
+
+    [Fact]
+    public async Task Saving_a_library_without_touching_those_settings_queues_no_pass()
+    {
+        var library = Held(LibraryType.Movie, LocalMetadataMode.Prefer, preferLocalArtwork: true);
+
+        await SaveAsync(library, (int)LocalMetadataMode.Prefer, preferLocalArtwork: true);
+
+        _queue.DidNotReceive().QueueLocalMetadataSync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<DateTime?>());
+    }
+
     [Fact]
     public async Task Libraries_are_listed_alphabetically_whatever_order_they_were_added_in()
     {

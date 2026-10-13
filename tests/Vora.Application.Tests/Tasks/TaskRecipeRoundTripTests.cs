@@ -38,6 +38,7 @@ public class TaskRecipeRoundTripTests
         new(nameof(ITaskQueueManager.QueueScanNewMusicFile), q => q.QueueScanNewMusicFile(Library, "/media/music/song.flac")),
         new(nameof(ITaskQueueManager.QueueRefreshMediaItemMetadata), q => q.QueueRefreshMediaItemMetadata(Item, null, true, null)),
         new(nameof(ITaskQueueManager.QueueRefreshMatchedMediaItem), q => q.QueueRefreshMatchedMediaItem(Item, Library, true)),
+        new(nameof(ITaskQueueManager.QueueLocalMetadataSync), q => q.QueueLocalMetadataSync(Library, "Movies", Since)),
         new(nameof(ITaskQueueManager.QueueAnalyzeMediaItemContent), q => q.QueueAnalyzeMediaItemContent(Item, "Heat", true)),
         new(nameof(ITaskQueueManager.QueueArtworkProviderSwap), q => q.QueueArtworkProviderSwap(Library, "Movies")),
         new(nameof(ITaskQueueManager.QueueRefreshLibraryRatings), q => q.QueueRefreshLibraryRatings(Library, true, Since)),

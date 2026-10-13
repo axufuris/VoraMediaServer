@@ -4,6 +4,7 @@ using Vora.Application.Analysis;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
+using Vora.Application.Metadata;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
@@ -182,7 +183,12 @@ public class MediaManager : IMediaManager
         item.HomePage = request.HomePage;
         item.ContentRating = request.ContentRating;
         item.ReleaseDate = request.ReleaseDate;
-        item.LockedFields = request.LockedFields;
+
+        var matchedByHand = item.IsLocked(MediaMatchManager.MatchLock);
+        item.LockedFields = request.LockedFields
+            .Where(field => !field.Equals(MediaMatchManager.MatchLock, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (matchedByHand) item.LockField(MediaMatchManager.MatchLock);
 
         await _repository.UpdateMediaItemAsync(item);
 

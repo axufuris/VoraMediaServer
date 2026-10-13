@@ -1,0 +1,71 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<episodedetails>
+  <plot><![CDATA[The Matthews family must choose which of the two settlements they will join. Meanwhile, Jade comes to terms with his situation and Boyd is faced with an impossible decision that strikes at the very heart of life in the town.]]></plot>
+  <outline />
+  <lockdata>false</lockdata>
+  <dateadded>2026-07-25 15:32:00</dateadded>
+  <title>Choosing Day</title>
+  <director tmdbid="28976" tvdbid="248008">Jack Bender</director>
+  <rating>7.5</rating>
+  <year>2022</year>
+  <sorttitle>Choosing Day</sorttitle>
+  <mpaa>TV-MA</mpaa>
+  <imdbid>tt15205338</imdbid>
+  <tvdbid>8808283</tvdbid>
+  <runtime>55</runtime>
+  <genre>Drama</genre>
+  <genre>Horror</genre>
+  <genre>Mystery</genre>
+  <uniqueid type="tvdb">8808283</uniqueid>
+  <uniqueid type="official website">https://www.epix.com/movie/from-s1-e3</uniqueid>
+  <uniqueid type="imdb">tt15205338</uniqueid>
+  <episode>3</episode>
+  <season>1</season>
+  <aired>2022-03-06</aired>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>hevc</codec>
+        <micodec>hevc</micodec>
+        <bitrate>2999231</bitrate>
+        <width>1920</width>
+        <height>958</height>
+        <aspect>960:479</aspect>
+        <aspectratio>960:479</aspectratio>
+        <framerate>23.976025</framerate>
+        <scantype>progressive</scantype>
+        <default>True</default>
+        <forced>False</forced>
+        <duration>54</duration>
+        <durationinseconds>3280</durationinseconds>
+      </video>
+      <audio>
+        <codec>eac3</codec>
+        <micodec>eac3</micodec>
+        <bitrate>640000</bitrate>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <channels>6</channels>
+        <samplingrate>48000</samplingrate>
+        <default>False</default>
+        <forced>False</forced>
+      </audio>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+</episodedetails>

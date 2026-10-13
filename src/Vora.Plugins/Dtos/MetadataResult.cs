@@ -3,6 +3,7 @@ namespace Vora.Plugins.Dtos;
 public class MetadataResult
 {
     public string? Title { get; set; }
+    public string? SortTitle { get; set; }
     public string? Overview { get; set; }
     public DateOnly? ReleaseDate { get; set; }
     public string? PosterUrl { get; set; }
@@ -45,6 +46,8 @@ public class MetadataResult
     public List<NetworkResult> Networks { get; set; } = new List<NetworkResult>();
     public List<SeasonResult> Seasons { get; set; } = new List<SeasonResult>();
     public List<VideoResult> Videos { get; set; } = new List<VideoResult>();
+
+    public MetadataResult Clone() => (MetadataResult)MemberwiseClone();
 }
 
 public class ActorMetadataResult

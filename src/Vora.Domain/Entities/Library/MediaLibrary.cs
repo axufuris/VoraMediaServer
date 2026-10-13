@@ -21,6 +21,9 @@ public class MediaLibrary
     public string? ThirdPartyRating1ProviderId { get; set; }
     public string? ThirdPartyRating2ProviderId { get; set; }
 
+    public LocalMetadataMode LocalMetadataMode { get; set; } = LocalMetadataMode.Off;
+    public bool PreferLocalArtwork { get; set; }
+
     public bool EnableRealTimeWatching { get; set; } = true;
     public bool FindExtras { get; set; } = true;
     public bool OnlyShowTrailers { get; set; }

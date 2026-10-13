@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Vora.Application.Media;
 using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
+using Vora.Application.Metadata.Local;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
 using Vora.Plugins.Dtos;
@@ -14,6 +15,7 @@ public interface IMediaMatchManager
     Task<IReadOnlyList<MediaMatchCandidateVM>> SearchAsync(Guid mediaItemId, string? query, int? year, CancellationToken cancellationToken = default);
     Task<MediaMatchResultVM> ApplyAsync(Guid mediaItemId, ApplyMediaMatchRequest request, CancellationToken cancellationToken = default);
     Task<MediaMatchFilesVM> GetFilesAsync(Guid mediaItemId);
+    Task ClearAsync(Guid mediaItemId);
 }
 
 public class MediaMatchManager(
@@ -21,6 +23,7 @@ public class MediaMatchManager(
     IEnumerable<IMetadataProvider> providers,
     IMediaDedupeManager dedupeManager,
     ITaskQueueManager taskQueue,
+    ILocalMediaReader localMedia,
     ILogger<MediaMatchManager> logger) : IMediaMatchManager
 {
     public const string MatchLock = "Match";
@@ -128,6 +131,38 @@ public class MediaMatchManager(
             isTvShow ? "show" : "movie", item.Id, MediaMatchIds.Label(source), externalId, targetId, mergedDuplicate);
 
         return new MediaMatchResultVM { MediaItemId = targetId, MergedDuplicate = mergedDuplicate };
+    }
+
+    public async Task ClearAsync(Guid mediaItemId)
+    {
+        var item = await LoadMatchableAsync(mediaItemId);
+        if (!item.IsLocked(MatchLock)) return;
+
+        var naming = await localMedia.ReadNamingAsync(item.Id);
+
+        item.UnlockField(MatchLock);
+        if (!item.IsLocked(nameof(item.TmdbId))) item.TmdbId = naming?.TaggedIds.TmdbId;
+        if (!item.IsLocked(nameof(item.ImdbId))) item.ImdbId = naming?.TaggedIds.ImdbId;
+        if (!item.IsLocked(nameof(item.TvdbId))) item.TvdbId = naming?.TaggedIds.TvdbId;
+
+        if (naming != null)
+        {
+            if (!item.IsLocked(nameof(item.Title))) item.Title = naming.Title ?? item.Title;
+            if (!item.IsLocked(nameof(item.ReleaseDate))) item.ReleaseDate = naming.Year is int year ? new DateOnly(year, 1, 1) : null;
+        }
+
+        item.LastMetadataRefresh = null;
+        await repository.UpdateMediaItemAsync(item);
+
+        if (item is TvShow)
+        {
+            await repository.ClearMetadataRefreshAsync(await repository.GetEpisodeIdsForShowAsync(item.Id));
+        }
+
+        taskQueue.QueueRefreshMediaItemMetadata(item.Id, item.Title, false, item.LibraryId);
+
+        logger.LogInformation("Cleared the manual match on {MediaType} {MediaItemId}; matching it again from its files.",
+            item is TvShow ? "show" : "movie", item.Id);
     }
 
     private async Task<MediaItem> LoadMatchableAsync(Guid mediaItemId)

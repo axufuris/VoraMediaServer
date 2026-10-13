@@ -27,7 +27,9 @@ ALTER TABLE ""MediaItemEmbeddings"" ADD COLUMN IF NOT EXISTS ""SourceHash"" char
 ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""AiPlaylistMatchWindow"" double precision NOT NULL DEFAULT 0.04;
 ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""HardwareAccelerationType"" integer NOT NULL DEFAULT 0;
 ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""IpAddress"" character varying(45);
-ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""Location"" character varying(128);");
+ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""Location"" character varying(128);
+ALTER TABLE ""MediaLibraries"" ADD COLUMN IF NOT EXISTS ""LocalMetadataMode"" integer NOT NULL DEFAULT 0;
+ALTER TABLE ""MediaLibraries"" ADD COLUMN IF NOT EXISTS ""PreferLocalArtwork"" boolean NOT NULL DEFAULT FALSE;");
 
             migrationBuilder.Sql(@"
 DO $$
@@ -208,6 +210,14 @@ CREATE INDEX IF NOT EXISTS ""IX_PendingTasks_Sequence"" ON ""PendingTasks"" (""S
             migrationBuilder.DropColumn(
                 name: "Location",
                 table: "StreamSessions");
+
+            migrationBuilder.DropColumn(
+                name: "LocalMetadataMode",
+                table: "MediaLibraries");
+
+            migrationBuilder.DropColumn(
+                name: "PreferLocalArtwork",
+                table: "MediaLibraries");
 
             migrationBuilder.DropColumn(
                 name: "SetupGuideContent",

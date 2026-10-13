@@ -23,6 +23,7 @@ A forced run now saves **when it was asked for**, as `since` in its recipe (no m
 | `QueueLibraryAdded` / `QueueLibraryUpdated` / `QueueScanLibrary` forced | a forced scan | `FullyRefreshedAt`, checked per unit in `ScanAndEnrichUnitAsync` (the file scan itself always runs) |
 | `QueueRefreshLibraryRatings` | **Refresh ratings** (forced) / **Refresh popularity** (music, always every artist) | `RatingsCheckedAt`; `Artist.PopularityRefreshedAt` |
 | music artwork in the two metadata tasks above | forced | `ArtworkCheckedAt` |
+| `QueueLocalMetadataSync` | saving a library with **Read NFO files** or **Prefer local artwork** changed | `LastMetadataRefresh` of each title that has an NFO (`docs/local-metadata.md`) |
 
 `FullyRefreshedAt` is the one column this needed. The existing stamps can't say "this item is finished": `LastMetadataRefresh` is written when a show's own details are applied, before its seasons and episodes, and `RatingsCheckedAt` is skipped while a provider is out of quota, so after OMDb's daily limit most items would never count as done. A forced metadata refresh therefore works **item by item** (`TriggerLibraryEnrichmentAsync`: metadata → artwork → ratings) and stamps `FullyRefreshedAt` only after all three, only on forced runs; a non-forced refresh keeps its three library-wide phases. An item that fails is not stamped and is tried again.
 

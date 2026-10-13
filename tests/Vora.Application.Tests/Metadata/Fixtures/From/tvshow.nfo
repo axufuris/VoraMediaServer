@@ -1,0 +1,233 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<tvshow>
+  <plot><![CDATA[In a nightmarish town in middle America that traps everyone who enters, unwilling residents fight to stay alive and search for a way out. But they are plagued by the threats of the surrounding forest including terrifying nocturnal creatures.]]></plot>
+  <outline><![CDATA[In a nightmarish town in middle America that traps everyone who enters, unwilling residents fight to stay alive and search for a way out. But they are plagued by the threats of the surrounding forest including terrifying nocturnal creatures.]]></outline>
+  <lockdata>false</lockdata>
+  <dateadded>2026-07-25 20:27:31</dateadded>
+  <title>FROM</title>
+  <originaltitle>FROM</originaltitle>
+  <actor>
+    <name>Harold Perrineau</name>
+    <role>Boyd Stevens</role>
+    <type>Actor</type>
+    <tmdbid>6195</tmdbid>
+    <tvdbid>7933614</tvdbid>
+  </actor>
+  <actor>
+    <name>Ricky He</name>
+    <role>Kenny</role>
+    <type>Actor</type>
+    <tvdbid>643998</tvdbid>
+    <tmdbid>1927025</tmdbid>
+  </actor>
+  <actor>
+    <name>Eion Bailey</name>
+    <role>Jim Matthews</role>
+    <type>Actor</type>
+    <tvdbid>252163</tvdbid>
+    <tmdbid>7498</tmdbid>
+  </actor>
+  <actor>
+    <name>Catalina Sandino Moreno</name>
+    <role>Tabitha Matthews</role>
+    <type>Actor</type>
+    <tvdbid>7960373</tvdbid>
+    <tmdbid>5887</tmdbid>
+  </actor>
+  <actor>
+    <name>Hannah Cheramy</name>
+    <role>Julie Matthews</role>
+    <type>Actor</type>
+    <tvdbid>658497</tvdbid>
+    <tmdbid>1562430</tmdbid>
+  </actor>
+  <actor>
+    <name>Simon Webster</name>
+    <role>Ethan Matthews</role>
+    <type>Actor</type>
+    <tmdbid>3118207</tmdbid>
+    <tvdbid>9103538</tvdbid>
+  </actor>
+  <actor>
+    <name>Scott McCord</name>
+    <role>Victor</role>
+    <type>Actor</type>
+    <tmdbid>124315</tmdbid>
+    <tvdbid>261364</tvdbid>
+  </actor>
+  <actor>
+    <name>Elizabeth Saunders</name>
+    <role>Donna</role>
+    <type>Actor</type>
+    <tmdbid>108895</tmdbid>
+    <tvdbid>596114</tvdbid>
+  </actor>
+  <actor>
+    <name>David Alpay</name>
+    <role>Jade</role>
+    <type>Actor</type>
+    <tvdbid>346926</tvdbid>
+    <tmdbid>60089</tmdbid>
+  </actor>
+  <actor>
+    <name>Pegah Ghafoori</name>
+    <role>Fatima</role>
+    <type>Actor</type>
+    <tvdbid>9089101</tvdbid>
+    <tmdbid>3437121</tmdbid>
+  </actor>
+  <actor>
+    <name>Corteon Moore</name>
+    <role>Ellis</role>
+    <type>Actor</type>
+    <tvdbid>8011071</tvdbid>
+    <tmdbid>2710310</tmdbid>
+  </actor>
+  <actor>
+    <name>Avery Konrad</name>
+    <role>Sara Myers</role>
+    <type>Actor</type>
+    <tvdbid>9089102</tvdbid>
+    <tmdbid>2578201</tmdbid>
+  </actor>
+  <actor>
+    <name>Chloe Van Landschoot</name>
+    <role>Kristi Miller</role>
+    <type>Actor</type>
+    <tvdbid>8230121</tvdbid>
+    <tmdbid>2520942</tmdbid>
+  </actor>
+  <actor>
+    <name>Kaelen Ohm</name>
+    <role>Marielle</role>
+    <type>Actor</type>
+    <tvdbid>603915</tvdbid>
+    <tmdbid>1503397</tmdbid>
+  </actor>
+  <actor>
+    <name>Shaun Majumder</name>
+    <role>Father Khatri</role>
+    <type>Actor</type>
+    <tmdbid>113244</tmdbid>
+    <tvdbid>271679</tvdbid>
+  </actor>
+  <actor>
+    <name>Elizabeth Moy</name>
+    <role>Tian Chen Liu</role>
+    <type>Actor</type>
+    <tvdbid>9095157</tvdbid>
+  </actor>
+  <actor>
+    <name>A.J. Simmons</name>
+    <role>Randall</role>
+    <type>Actor</type>
+    <tvdbid>8748300</tvdbid>
+    <tmdbid>2194626</tmdbid>
+  </actor>
+  <actor>
+    <name>Nathan D. Simmons</name>
+    <role>Elgin</role>
+    <type>Actor</type>
+    <tvdbid>9109145</tvdbid>
+    <tmdbid>3705079</tmdbid>
+  </actor>
+  <actor>
+    <name>Jamie McGuire</name>
+    <role>Smiley</role>
+    <type>Actor</type>
+    <tvdbid>9154090</tvdbid>
+    <tmdbid>4988781</tmdbid>
+  </actor>
+  <actor>
+    <name>Deborah Grover</name>
+    <role>Tillie</role>
+    <type>Actor</type>
+    <tvdbid>344147</tvdbid>
+  </actor>
+  <actor>
+    <name>Angela Moore</name>
+    <role>Bakta</role>
+    <type>Actor</type>
+    <tmdbid>1449399</tmdbid>
+    <tvdbid>281669</tvdbid>
+  </actor>
+  <actor>
+    <name>Robert Joy</name>
+    <role>Henry</role>
+    <type>Actor</type>
+    <tmdbid>19976</tmdbid>
+    <tvdbid>295998</tvdbid>
+  </actor>
+  <actor>
+    <name>Samantha Brown</name>
+    <role>Acosta</role>
+    <type>Actor</type>
+    <tvdbid>9026727</tvdbid>
+    <tmdbid>1785654</tmdbid>
+  </actor>
+  <actor>
+    <name>Douglas E Hughes</name>
+    <type>Actor</type>
+    <tvdbid>8522496</tvdbid>
+  </actor>
+  <actor>
+    <name>Julia Doyle</name>
+    <role>Sophia</role>
+    <type>Actor</type>
+    <tvdbid>9094684</tvdbid>
+    <tmdbid>2676077</tmdbid>
+  </actor>
+  <actor>
+    <name>Trina Corkum</name>
+    <role>Patty</role>
+    <type>Actor</type>
+    <tvdbid>8483505</tvdbid>
+    <tmdbid>1580790</tmdbid>
+  </actor>
+  <trailer>http://www.youtube.com/watch?v=pDHqAj4eJcM</trailer>
+  <rating>7.8</rating>
+  <year>2022</year>
+  <sorttitle>FROM</sorttitle>
+  <mpaa>TV-MA</mpaa>
+  <imdb_id>tt9813792</imdb_id>
+  <tmdbid>124364</tmdbid>
+  <premiered>2022-02-20</premiered>
+  <releasedate>2022-02-20</releasedate>
+  <enddate>2022-10-21</enddate>
+  <runtime>51</runtime>
+  <tagline>Savor the journey</tagline>
+  <genre>Science Fiction</genre>
+  <genre>Horror</genre>
+  <genre>Drama</genre>
+  <genre>Thriller</genre>
+  <genre>Mystery</genre>
+  <studio>EPIX</studio>
+  <studio>MGM Television</studio>
+  <studio>AGBO</studio>
+  <studio>MGM+</studio>
+  <uniqueid type="tvdb">401003</uniqueid>
+  <tvdbid>401003</tvdbid>
+  <uniqueid type="eidr">10.5240/0E0B-6C8A-9081-5185-FE41-D</uniqueid>
+  <eidrid>10.5240/0E0B-6C8A-9081-5185-FE41-D</eidrid>
+  <uniqueid type="facebook">FROMonMGM</uniqueid>
+  <facebookid>FROMonMGM</facebookid>
+  <uniqueid type="imdb">tt9813792</uniqueid>
+  <uniqueid type="instagram">fromonmgm</uniqueid>
+  <instagramid>fromonmgm</instagramid>
+  <uniqueid type="official website">https://www.mgmplus.com/series/from</uniqueid>
+  <uniqueid type="reddit">FromTVEpix</uniqueid>
+  <redditid>FromTVEpix</redditid>
+  <uniqueid type="tmdb">124364</uniqueid>
+  <uniqueid type="tv maze">54723</uniqueid>
+  <uniqueid type="wikidata">Q107072432</uniqueid>
+  <wikidataid>Q107072432</wikidataid>
+  <uniqueid type="wikipedia">From_(TV_series)</uniqueid>
+  <wikipediaid>From_(TV_series)</wikipediaid>
+  <uniqueid type="x (twitter)">fromonmgm</uniqueid>
+  <episodeguide>{"tvdb":"401003","eidr":"10.5240/0e0b-6c8a-9081-5185-fe41-d","facebook":"fromonmgm","imdb":"tt9813792","instagram":"fromonmgm","official website":"https://www.mgmplus.com/series/from","reddit":"fromtvepix","tmdb":"124364","tv maze":"54723","wikidata":"q107072432","wikipedia":"from_(tv_series)","x (twitter)":"fromonmgm"}</episodeguide>
+  <id>401003</id>
+  <season>-1</season>
+  <episode>-1</episode>
+  <displayorder>aired</displayorder>
+  <status>Continuing</status>
+</tvshow>

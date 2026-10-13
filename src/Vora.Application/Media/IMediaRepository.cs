@@ -32,6 +32,10 @@ public interface IMediaRepository
     Task<Dictionary<Guid, SeasonShowInfoDto>> GetSeasonShowInfoAsync(IReadOnlyCollection<Guid> seasonIds);
     Task<HashSet<string>> GetExistingLibraryPathsAsync(Guid libraryId);
     Task<List<string>> GetLibraryItemFilePathsAsync(Guid libraryId);
+    Task<Vora.Application.Media.Dtos.TitleOwnerDto?> GetTitleOwningFileAsync(Guid libraryId, string filePath);
+    Task<Vora.Application.Media.Dtos.LocalMediaSourceDto?> GetLocalMediaSourceAsync(Guid mediaItemId);
+    Task<List<Vora.Application.Media.Dtos.LocalMediaSourceDto>> GetLibraryLocalMediaSourcesAsync(Guid libraryId);
+    Task ClearMetadataRefreshAsync(IReadOnlyCollection<Guid> mediaItemIds);
     Task<IEnumerable<Guid>> GetAllMediaItemIdsByLibraryAsync(Guid libraryId);
     Task<List<Guid>> GetTopLevelMediaItemIdsByLibraryAsync(Guid libraryId);
     Task<MarkerDetectionGateDto?> GetMarkerDetectionGateAsync(Guid mediaItemId);

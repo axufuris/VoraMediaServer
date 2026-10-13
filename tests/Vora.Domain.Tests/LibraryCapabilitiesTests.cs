@@ -30,4 +30,13 @@ public class LibraryCapabilitiesTests
 
         Enum.GetValues<LibraryType>().Count(t => t.HasVideoContent()).Should().Be(3);
     }
+
+    [Theory]
+    [InlineData(LibraryType.Movie, true)]
+    [InlineData(LibraryType.TvShow, true)]
+    [InlineData(LibraryType.HomeVideo, false)]
+    [InlineData(LibraryType.Music, false)]
+    [InlineData(LibraryType.LiveTv, false)]
+    public void ReadsLocalMetadata_is_for_movie_and_show_libraries(LibraryType type, bool expected) =>
+        type.ReadsLocalMetadata().Should().Be(expected);
 }

@@ -21,7 +21,7 @@ public class ActorMetadataFetchTests
     }
 
     private static MetadataFetchService Build(params IMetadataProvider[] providers) =>
-        new(providers, Array.Empty<IRatingsProvider>(), Array.Empty<IArtworkProvider>());
+        new(providers, Array.Empty<IRatingsProvider>(), Array.Empty<IArtworkProvider>(), Substitute.For<Vora.Application.Metadata.Local.ILocalMediaReader>());
 
     [Fact]
     public async Task Uses_the_tmdb_provider_even_when_another_is_registered_first()
