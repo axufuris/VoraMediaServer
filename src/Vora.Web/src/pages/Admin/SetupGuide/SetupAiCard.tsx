@@ -7,7 +7,7 @@ import { AI_KEYS } from '../../../components/Admin/Ai/aiProviders';
 import { useAiSettings } from '../../../components/Admin/Ai/useAiSettings';
 import HealthBadge from '../../../components/Admin/Primitives/HealthBadge';
 import { resolveAdminPath } from '../../../components/Admin/Shell/adminNavData';
-import { useStepSaver } from './setupSaver';
+import { StepValidationError, useStepSaver } from './setupSaver';
 import { CardHeading, FieldLabel, Hint, SetupCard, StatusMessage } from './SetupParts';
 
 interface SetupAiCardProps {
@@ -45,8 +45,12 @@ export default function SetupAiCard({ plugin, serverId, onChanged, children }: S
         onChanged();
     };
 
+    // An untouched step is passed over. One that was started and not finished
+    // stays put and says what is missing: moving on would drop what was
+    // entered without a word. "Skip this step" still leaves it.
     useStepSaver(useCallback(async () => {
-        if (!dirty || problem) return;
+        if (!dirty) return;
+        if (problem) throw new StepValidationError(`${problem} To leave AI for later, use "Skip this step".`);
         const failure = await save(ENABLED);
         if (failure) throw new Error(failure);
         onChanged();
@@ -64,7 +68,7 @@ export default function SetupAiCard({ plugin, serverId, onChanged, children }: S
 
     return (
         <SetupCard>
-            <CardHeading title="AI connection" subtitle="Powers every AI feature. OpenAI charges per use and the monthly limit caps it; a model you run yourself costs nothing per use." badges={badge} />
+            <CardHeading title="AI connection" subtitle="Powers every AI feature. OpenAI charges per use; a model you run yourself does not." badges={badge} />
             {form.loadError && <StatusMessage tone="error">Couldn't load the AI settings. Open AI Settings to set them up.</StatusMessage>}
             {form.loading && <div className="vora-skeleton h-16" />}
             {!form.loading && !form.loadError && !showForm && (
