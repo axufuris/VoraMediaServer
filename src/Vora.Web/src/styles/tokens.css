@@ -425,6 +425,14 @@
                 color var(--vora-duration-fast) var(--vora-ease-out);
 }
 
+[data-vora-client] .vora-track-pill:has(> select:focus-visible) {
+    box-shadow: 0 0 0 2px var(--vora-accent-500);
+}
+
+[data-vora-client] .vora-track-pill > select:focus-visible {
+    outline: none;
+}
+
 [data-vora-client] .vora-pill[data-active="true"],
 [data-vora-client] .vora-pill:not(:disabled):hover,
 [data-vora-client] .vora-pill:focus-visible {

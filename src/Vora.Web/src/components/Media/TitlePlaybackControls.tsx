@@ -43,7 +43,7 @@ export default function TitlePlaybackControls(props: TitlePlaybackControlsProps)
                 const disabled = field.options.length <= 1;
                 const current = field.options.find(option => option.value === field.value);
                 return (
-                    <span key={field.label} className="relative inline-flex max-w-full rounded-full" style={pillStyle}>
+                    <span key={field.label} className="vora-track-pill relative inline-flex max-w-full rounded-full" style={pillStyle}>
                         <TrackIcon kind={field.label} />
                         <select
                             aria-label={field.label}
