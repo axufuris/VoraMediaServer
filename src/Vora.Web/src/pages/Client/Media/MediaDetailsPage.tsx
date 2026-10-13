@@ -8,6 +8,7 @@ import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { streamingService } from '../../../api/Streaming/streamingService';
 import { getEffectiveCapabilities } from '../../../utils/hardwareScanner';
+import { pickBestAudioTrack } from '../../../utils/audioTrackSelection';
 import { isVideoDirectPlayable, isAudioDirectPlayable, parseResolutionHeight } from '../../../utils/playbackDecision';
 import { useDialog } from '../../../dialogs';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
@@ -43,20 +44,6 @@ interface UpcomingEpisodeParsed {
     AirDate: string;
 }
 
-const audioCodecRank = (codec?: string): number => {
-    switch ((codec ?? '').toLowerCase()) {
-        case 'truehd': return 6;
-        case 'dts':
-        case 'flac': return 5;
-        case 'eac3': return 4;
-        case 'ac3': return 3;
-        case 'aac':
-        case 'opus': return 2;
-        case 'mp3': return 1;
-        default: return 0;
-    }
-};
-
 export default function MediaDetailsPage() {
     const dialog = useDialog();
     const { serverId, id } = useParams<{ serverId?: string, id: string }>();
@@ -74,6 +61,7 @@ export default function MediaDetailsPage() {
 
     const [selectedVideoId, setSelectedVideoId] = useState<string>('');
     const [selectedAudioId, setSelectedAudioId] = useState<string>('');
+    const [hasManualAudioSelection, setHasManualAudioSelection] = useState(false);
     const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>('none');
 
     const [upNextQuality, setUpNextQuality] = useState<{ showId: string; episode: MediaItem | null } | null>(null);
@@ -108,19 +96,7 @@ export default function MediaDetailsPage() {
     // Max Audio Channels cap), then prefer more channels among the playable
     // ones (commentary tracks deprioritized). Never picks on IsDefault alone.
     const pickBestAudioId = useCallback((part?: MediaPart): string => {
-        if (!part?.audioTracks?.length) return '';
-        let bestId = '';
-        let lowest = Number.POSITIVE_INFINITY;
-        for (const track of part.audioTracks) {
-            let penalty = 0;
-            const channels = track.channels || 2;
-            if (!isAudioDirectPlayable(track, caps)) penalty += 1000;
-            penalty -= channels * 10;
-            penalty -= audioCodecRank(track.codec);
-            if (track.title?.toLowerCase().includes('commentary')) penalty += 500;
-            if (penalty < lowest) { lowest = penalty; bestId = track.id; }
-        }
-        return bestId;
+        return pickBestAudioTrack(part?.audioTracks, caps)?.id ?? '';
     }, [caps]);
 
     const reloadMedia = useCallback(async () => {
@@ -236,6 +212,7 @@ export default function MediaDetailsPage() {
             setTimeout(() => {
                 setSelectedVideoId(prev => prev !== bestVideoId ? bestVideoId : prev);
                 setSelectedAudioId(prev => prev !== bestAudioId ? bestAudioId : prev);
+                setHasManualAudioSelection(false);
                 setSelectedSubtitleId(prev => prev !== bestSubId ? bestSubId : prev);
             }, 0);
         }
@@ -286,10 +263,11 @@ export default function MediaDetailsPage() {
             const textSubtitleTrackId = !isNoSubtitle(selectedSubtitleId) && !wantsBurnIn ? selectedSubtitleId : null;
             const subId = wantsBurnIn ? selectedSubtitleId : '00000000-0000-0000-0000-000000000000';
 
-            const sessionInfo = await streamingService.startSession(media.id, deviceId, startPos, selectedVideoId || undefined, selectedAudioId || undefined, subId, serverId, activePart?.id);
+            const sessionInfo = await streamingService.startSession(media.id, deviceId, startPos, selectedVideoId || undefined,
+                hasManualAudioSelection ? selectedAudioId || undefined : undefined, subId, serverId, activePart?.id);
 
             const activeVideoTrack = activePart?.videoTracks?.find(v => v.id === selectedVideoId) || activePart?.videoTracks?.[0];
-            const activeAudioTrack = pickChipAudioTrack(activePart?.audioTracks, selectedAudioId);
+            const activeAudioTrack = pickChipAudioTrack(activePart?.audioTracks, sessionInfo.audioTrackId);
 
             playMedia({
                 id: media.id, title: media.title, subtitle: subtitle,
@@ -347,6 +325,7 @@ export default function MediaDetailsPage() {
             // Switching version/video always re-selects the audio the client can
             // play; only a manual audio pick keeps a track the client can't.
             if (newPart.audioTracks?.length) setSelectedAudioId(pickBestAudioId(newPart));
+            setHasManualAudioSelection(false);
 
             const hasCurrentSub = selectedSubtitleId === 'none' || newPart.subtitleTracks?.some(s => s.id === selectedSubtitleId);
             if (!hasCurrentSub && newPart.subtitleTracks?.length) {
@@ -621,7 +600,10 @@ export default function MediaDetailsPage() {
                     <QualityPanelSection title="Video" options={videoOptions} value={selectedVideoId} onChange={handleVideoChange} />
                 )}
                 {audioOptions.length > 0 && (
-                    <QualityPanelSection title="Audio" options={audioOptions} value={selectedAudioId} onChange={setSelectedAudioId} />
+                    <QualityPanelSection title="Audio" options={audioOptions} value={selectedAudioId} onChange={audioId => {
+                        setSelectedAudioId(audioId);
+                        setHasManualAudioSelection(true);
+                    }} />
                 )}
                 <QualityPanelSection title="Subtitles" options={subtitleOptions} value={selectedSubtitleId} onChange={setSelectedSubtitleId} />
             </QualityPanel>
