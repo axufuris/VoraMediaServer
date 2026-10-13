@@ -3,6 +3,7 @@ namespace Vora.Plugins.Dtos;
 public class MetadataResult
 {
     public string? Title { get; set; }
+    public string? SortTitle { get; set; }
     public string? Overview { get; set; }
     public DateOnly? ReleaseDate { get; set; }
     public string? PosterUrl { get; set; }

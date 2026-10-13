@@ -1,0 +1,331 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<movie>
+  <plot>Vampires and werewolves have waged a nocturnal war against each other for centuries. But all bets are off when a female vampire warrior named Selene, who's famous for her strength and werewolf-hunting prowess, becomes smitten with a peace-loving male werewolf, Michael, who wants to end the war.</plot>
+  <lockdata>false</lockdata>
+  <dateadded>2024-03-02 19:15:08</dateadded>
+  <title>Underworld</title>
+  <originaltitle>Underworld</originaltitle>
+  <director>Len Wiseman</director>
+  <trailer>plugin://plugin.video.youtube/play/?video_id=mn4O3iQ8B_s</trailer>
+  <trailer>plugin://plugin.video.youtube/play/?video_id=2_IoL7g5Ub8</trailer>
+  <rating>7</rating>
+  <year>2003</year>
+  <sorttitle>Underworld</sorttitle>
+  <mpaa>R</mpaa>
+  <collectionnumber>2326</collectionnumber>
+  <imdbid>tt0320691</imdbid>
+  <tvdbid>1154</tvdbid>
+  <tmdbid>277</tmdbid>
+  <premiered>2003-09-19</premiered>
+  <releasedate>2003-09-19</releasedate>
+  <criticrating>31</criticrating>
+  <runtime>126</runtime>
+  <tagline>An immortal battle for supremacy.</tagline>
+  <country>United States of America</country>
+  <country>Germany</country>
+  <country>Hungary</country>
+  <country>United Kingdom</country>
+  <genre>Fantasy</genre>
+  <genre>Action</genre>
+  <genre>Thriller</genre>
+  <studio>Screen Gems</studio>
+  <studio>Lakeshore Entertainment</studio>
+  <studio>Laurinfilm</studio>
+  <studio>Subterranean Productions LLC</studio>
+  <studio>Subterranean Productions UK Ltd.</studio>
+  <studio>Underworld Produktions GmbH</studio>
+  <tag>budapest, hungary</tag>
+  <tag>love of one's life</tag>
+  <tag>vampire</tag>
+  <tag>subway</tag>
+  <tag>hostility</tag>
+  <tag>bite</tag>
+  <tag>descendant</tag>
+  <tag>hybrid</tag>
+  <tag>rivalry</tag>
+  <tag>shootout</tag>
+  <tag>werewolf</tag>
+  <tag>gothic</tag>
+  <tag>dark fantasy</tag>
+  <tag>lycanthrope</tag>
+  <tag>urban gothic</tag>
+  <tag>supernatural power</tag>
+  <art>
+    <poster>/data/movies/HollywoodMovies/Underworld (2003)/poster.jpg</poster>
+    <fanart>/data/movies/HollywoodMovies/Underworld (2003)/fanart.jpg</fanart>
+    <fanart>/data/movies/HollywoodMovies/Underworld (2003)/backdrop.jpg</fanart>
+  </art>
+  <actor>
+    <name>Kate Beckinsale</name>
+    <role>Selene</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/K/Kate Beckinsale/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Scott Speedman</name>
+    <role>Michael Corvin</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/S/Scott Speedman/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Michael Sheen</name>
+    <role>Lucian</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/M/Michael Sheen/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Shane Brolly</name>
+    <role>Kraven</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/S/Shane Brolly/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Bill Nighy</name>
+    <role>Viktor</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/B/Bill Nighy/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Erwin Leder</name>
+    <role>Singe</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/E/Erwin Leder/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Sophia Myles</name>
+    <role>Erika</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/S/Sophia Myles/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Robbie Gee</name>
+    <role>Kahn</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/R/Robbie Gee/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Wentworth Miller</name>
+    <role>Dr. Adam Lockwood</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/W/Wentworth Miller/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Kevin Grevioux</name>
+    <role>Raze</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/K/Kevin Grevioux/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Zita Görög</name>
+    <role>Amelia</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/Z/Zita Görög/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Scott McElroy</name>
+    <role>Soren</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/S/Scott McElroy/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Richard Cetrone</name>
+    <role>Pierce</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/R/Richard Cetrone/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Mike Mukatis</name>
+    <role>Taylor</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Dennis J. Kozeluh</name>
+    <role>Dignitary</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Todd Schneider</name>
+    <role>Trix</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Sándor Bolla</name>
+    <role>Rigel</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Hank Amos</name>
+    <role>Nathaniel</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Zsuzsa Barsi</name>
+    <role>Gunshot Girl</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Andreas Patton</name>
+    <role>Death Dealer Captain</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Danny McBride</name>
+    <role>Mason</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/D/Danny McBride/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Jázmin Dammak</name>
+    <role>Sonja</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Judit Kuchta</name>
+    <role>Zsuzsa</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Vanessa Nagy</name>
+    <role>Timea</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Atilla Pinke</name>
+    <role>Wolfgang</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Ildikó Kovács</name>
+    <role>Michael's Old Girlfriend</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Sándor Boros</name>
+    <role>Candidate #1</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>János Oláh</name>
+    <role>Candidate #2</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Brian Steele</name>
+    <role>Werewolf</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Kurt Carley</name>
+    <role>Werewolf</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Zoltan Papp</name>
+    <role>Werewolf (uncredited)</role>
+    <type>Actor</type>
+  </actor>
+  <id>tt0320691</id>
+  <set>Underworld Collection</set>
+  <fileinfo>
+    <streamdetails>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <width>0</width>
+        <height>0</height>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <video>
+        <codec>hevc</codec>
+        <micodec>hevc</micodec>
+        <bitrate>51236547</bitrate>
+        <width>3840</width>
+        <height>2160</height>
+        <aspect>16:9</aspect>
+        <aspectratio>16:9</aspectratio>
+        <framerate>23.976025</framerate>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>True</default>
+        <forced>False</forced>
+        <duration>125</duration>
+        <durationinseconds>7555</durationinseconds>
+      </video>
+      <audio>
+        <codec>truehd</codec>
+        <micodec>truehd</micodec>
+        <bitrate>5185612</bitrate>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <channels>8</channels>
+        <samplingrate>48000</samplingrate>
+        <default>True</default>
+        <forced>False</forced>
+      </audio>
+      <audio>
+        <codec>ac3</codec>
+        <micodec>ac3</micodec>
+        <bitrate>640000</bitrate>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <channels>6</channels>
+        <samplingrate>48000</samplingrate>
+        <default>False</default>
+        <forced>False</forced>
+      </audio>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <width>0</width>
+        <height>0</height>
+        <language>rum</language>
+        <scantype>progressive</scantype>
+        <default>True</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>PGSSUB</codec>
+        <micodec>PGSSUB</micodec>
+        <width>1920</width>
+        <height>1080</height>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>PGSSUB</codec>
+        <micodec>PGSSUB</micodec>
+        <width>1920</width>
+        <height>1080</height>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>PGSSUB</codec>
+        <micodec>PGSSUB</micodec>
+        <width>1920</width>
+        <height>1080</height>
+        <language>fre</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>PGSSUB</codec>
+        <micodec>PGSSUB</micodec>
+        <width>1920</width>
+        <height>1080</height>
+        <language>ita</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+</movie>

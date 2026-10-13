@@ -1,5 +1,7 @@
 ﻿using Vora.Domain.Entities.Media;
 using Vora.Plugins;
+using Vora.Application.Media;
+using Vora.Plugins.Providers.Local;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -22,23 +24,34 @@ public class MetadataFetchService : IMetadataFetchService
     private readonly IEnumerable<IMetadataProvider> _providers;
     private readonly IEnumerable<IRatingsProvider> _ratingsProviders;
     private readonly IEnumerable<IArtworkProvider> _artworkProviders;
+    private readonly IMediaRepository? _repository;
 
     public MetadataFetchService(
         IEnumerable<IMetadataProvider> providers,
         IEnumerable<IRatingsProvider> ratingsProviders,
-        IEnumerable<IArtworkProvider> artworkProviders)
+        IEnumerable<IArtworkProvider> artworkProviders,
+        IMediaRepository? repository = null)
     {
         _providers = providers;
         _ratingsProviders = ratingsProviders;
         _artworkProviders = artworkProviders;
+        _repository = repository;
     }
 
     public async Task<(MetadataResult? Metadata, string ProviderId, string ProviderName)> GetTextMetadataAsync(MediaItem item)
     {
+        var localProvider = _providers.FirstOrDefault(p => p.Id == "local_metadata");
+        if (localProvider != null)
+        {
+            var localMetadata = await FetchMetadataForItemAsync(item, localProvider);
+            if (localMetadata != null) return (localMetadata, localProvider.Id, localProvider.ProviderName);
+        }
+
         var providerIdToUse = item.Library?.MetadataProviderId ?? "tmdb_metadata";
         var primaryProvider = _providers.FirstOrDefault(p => p.Id == providerIdToUse) ?? _providers.FirstOrDefault();
 
         if (primaryProvider == null) return (null, string.Empty, string.Empty);
+        if (primaryProvider == localProvider) return (null, primaryProvider.Id, primaryProvider.ProviderName);
 
         var metadata = await FetchMetadataForItemAsync(item, primaryProvider);
         return (metadata, primaryProvider.Id, primaryProvider.ProviderName);
@@ -98,15 +111,12 @@ public class MetadataFetchService : IMetadataFetchService
     {
         if (provider.Id == "local_metadata")
         {
-            var physicalPath = item.MediaParts.FirstOrDefault()?.FilePath;
+            var physicalPath = await GetLocalPathAsync(item);
             if (string.IsNullOrEmpty(physicalPath)) return null;
-
-            var folderPath = Path.GetDirectoryName(physicalPath) ?? physicalPath;
-
-            if (item is Movie) return await provider.FetchMovieMetadataByIdAsync(folderPath, "local");
-            if (item is TvShow) return await provider.FetchTvShowMetadataByIdAsync(folderPath, "local");
-
-            if (item is Episode ep) return await provider.FetchEpisodeMetadataAsync(folderPath, ep.Season?.SeasonNumber ?? 1, ep.EpisodeNumber);
+            if (item is Movie) return await provider.FetchMovieMetadataByIdAsync(physicalPath, "local");
+            if (item is TvShow) return await provider.FetchTvShowMetadataByIdAsync(physicalPath, "local");
+            if (item is Season seasonItem) return await provider.FetchSeasonMetadataAsync(physicalPath, "local", seasonItem.SeasonNumber);
+            if (item is Episode ep) return await provider.FetchEpisodeMetadataAsync(physicalPath, ep.Season?.SeasonNumber ?? 1, ep.EpisodeNumber);
 
             return null;
         }
@@ -237,25 +247,47 @@ public class MetadataFetchService : IMetadataFetchService
 
         var providerIdToUse = item.Library.ArtworkProviderId ?? "tmdb_artwork";
         var provider = _artworkProviders.FirstOrDefault(p => p.Id == providerIdToUse) ?? _artworkProviders.FirstOrDefault(p => p.Id == "tmdb_artwork");
-        if (provider == null) return artworkEntities;
-
-        var localPath = item.MediaParts.FirstOrDefault()?.FilePath;
-        if (!string.IsNullOrEmpty(localPath)) localPath = Path.GetDirectoryName(localPath);
-
-        var results = await provider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name, localPath, item.Title);
-
-        artworkEntities.AddRange(results.Select(r => new MediaArtwork
+        var localProvider = _artworkProviders.FirstOrDefault(p => p.Id == "local_artwork");
+        var localPath = await GetLocalPathAsync(item);
+        if (localProvider != null && localPath != null)
         {
-            MediaItemId = item.Id,
-            Url = r.Url,
-            Kind = (Vora.Domain.Enums.ArtworkKind)r.Kind,
-            Language = r.Language,
-            Width = r.Width,
-            Height = r.Height,
-            VoteAverage = r.VoteAverage,
-            ProviderId = provider.Id
-        }));
+            Add(await localProvider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name, localPath, item.Title), localProvider.Id);
+        }
+        var localKinds = artworkEntities.Select(a => a.Kind).ToHashSet();
+        if (provider != null && provider != localProvider && localKinds.Count < (item is Episode or Season ? 2 : 3))
+        {
+            var results = await provider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name,
+                localPath == null ? null : LocalMediaAssets.DirectoryPath(localPath), item.Title);
+            Add(results.Where(r => !localKinds.Contains((Vora.Domain.Enums.ArtworkKind)r.Kind)), provider.Id);
+        }
 
         return artworkEntities;
+
+        void Add(IEnumerable<ArtworkResult> results, string providerId) => artworkEntities.AddRange(results.Select(r => new MediaArtwork
+        {
+            MediaItemId = item.Id, Url = r.Url, Kind = (Vora.Domain.Enums.ArtworkKind)r.Kind,
+            Language = r.Language, Width = r.Width, Height = r.Height, VoteAverage = r.VoteAverage, ProviderId = providerId
+        }));
+    }
+
+    private async Task<string?> GetLocalPathAsync(MediaItem item)
+    {
+        var path = item.MediaParts.FirstOrDefault()?.FilePath;
+        if (item is TvShow show)
+        {
+            if (path == null && _repository != null)
+                path = (await _repository.GetEpisodeFilePathsForShowAsync(show.Id)).FirstOrDefault();
+            return path == null ? null : LocalMediaAssets.ShowDirectory(path);
+        }
+        if (item is Season season)
+        {
+            if (path == null && _repository != null)
+            {
+                var episodeIds = await _repository.GetEpisodeIdsForSeasonAsync(season.Id);
+                if (episodeIds.Count > 0) path = (await _repository.GetMediaFilePathsAsync(episodeIds[0])).FirstOrDefault();
+            }
+            return path == null ? null : LocalMediaAssets.DirectoryPath(path);
+        }
+        return path;
     }
 }

@@ -228,7 +228,7 @@ public class MetadataMappingService : IMetadataMappingService
         if (!item.IsLocked(nameof(item.Title)) || forceOverride) item.Title = metadata.Title ?? item.Title;
         if (!item.IsLocked(nameof(item.OriginalTitle)) || forceOverride) item.OriginalTitle = metadata.OriginalTitle ?? item.OriginalTitle;
         if (!item.IsLocked(nameof(item.OriginalLanguage)) || forceOverride) item.OriginalLanguage = metadata.OriginalLanguage ?? item.OriginalLanguage;
-        if (!item.IsLocked(nameof(item.SortTitle)) || forceOverride) item.SortTitle = metadata.Title ?? item.OriginalTitle;
+        if (!item.IsLocked(nameof(item.SortTitle)) || forceOverride) item.SortTitle = metadata.SortTitle ?? metadata.Title ?? item.OriginalTitle;
         if (!item.IsLocked(nameof(item.Status)) || forceOverride) item.Status = metadata.Status ?? item.Status;
         if (!item.IsLocked(nameof(item.Tagline)) || forceOverride) item.Tagline = metadata.Tagline ?? item.Tagline;
         if (!item.IsLocked(nameof(item.Overview)) || forceOverride) item.Overview = metadata.Overview ?? item.Overview;
