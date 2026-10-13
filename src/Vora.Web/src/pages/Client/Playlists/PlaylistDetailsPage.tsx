@@ -551,7 +551,7 @@ export default function PlaylistDetailsPage() {
                         {playlist.items.map((item, index) => (
                             <MediaMenuArea
                                 key={item.id}
-                                target={mediaMenuTarget({ id: item.mediaItemId, type: item.type }, serverId)}
+                                target={mediaMenuTarget({ id: item.mediaItemId, type: item.type }, serverId, { onChanged: loadPlaylist })}
                                 {...reorderRowProps(index)}
                                 style={touch.rowStyle(index)}
                                 draggable={canEdit}

@@ -1,12 +1,16 @@
 import { createContext } from 'react';
+import type { MediaItem } from '../../../api/Media/mediaService';
 import type { MenuPoint } from '../../Client/Primitives/menuEntries';
 
 // What a poster hands over when it is right-clicked or long-pressed: enough to
 // load the item and to tell the page that drew it when the item changed.
+// `onChanged` is given the title as it is now, for a page that would sooner
+// patch one tile than load its list again. It is missing when the title could
+// not be read back.
 export interface MediaMenuTarget {
     id: string;
     serverId?: string;
-    onChanged?: () => void;
+    onChanged?: (media?: MediaItem) => void;
     onDeleted?: () => void;
 }
 
@@ -18,10 +22,7 @@ export const MediaItemMenuContext = createContext<MediaItemMenuApi | null>(null)
 
 const TYPES_WITH_A_MENU = new Set(['Movie', 'TvShow', 'Season', 'Episode']);
 
-interface MenuCallbacks {
-    onChanged?: () => void;
-    onDeleted?: () => void;
-}
+type MenuCallbacks = Pick<MediaMenuTarget, 'onChanged' | 'onDeleted'>;
 
 // Only library titles have this menu. A track, an album, a channel or a
 // discovery result that is not in the library gets none, so those tiles keep

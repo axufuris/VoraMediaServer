@@ -23,7 +23,7 @@ import StarRating from '../../../components/Client/Primitives/StarRating';
 import RateDialog from '../../../components/Client/Primitives/RateDialog';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { formatRuntime } from '../../../utils/formatRuntime';
-import { isFullyWatched, affectedEpisodeCount } from '../../../utils/watchState';
+import { isFullyWatched } from '../../../utils/watchState';
 import { isImageSubtitleCodec, isNoSubtitle } from '../../../utils/subtitleKind';
 import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
 import { audioChipLabel, heroFactsLine, pickChipAudioTrack, resolutionChipLabel, subtitleChipLabel } from '../../../utils/heroQualityChips';
@@ -34,6 +34,7 @@ import { ActionMenuList } from '../../../components/Client/Primitives/ActionMenu
 import { menuAction, tidyMenu } from '../../../components/Client/Primitives/menuEntries';
 import { mediaMenuTarget } from '../../../components/Media/ItemMenu/mediaItemMenu';
 import { useMediaItemActions } from '../../../components/Media/ItemMenu/useMediaItemActions';
+import { toggleWatched, toggleWatchlist } from '../../../components/Media/ItemMenu/watchActions';
 
 interface UpcomingEpisodeParsed {
     SeasonNumber: number;
@@ -308,44 +309,12 @@ export default function MediaDetailsPage() {
 
     const handleToggleWatchlist = async () => {
         if (!media) return;
-        try {
-            const next = await watchlistService.toggle(
-                { mediaItemId: media.id },
-                { type: media.type, title: media.title, posterUrl: media.posterUrl },
-                serverId
-            );
-            setInWatchlist(next);
-        } catch {
-            await dialog.alert('Failed to update watchlist.');
-        }
+        const next = await toggleWatchlist(media, dialog, serverId);
+        if (next !== null) setInWatchlist(next);
     };
 
     const handleTogglePlayed = async () => {
-        if (!media) return;
-        const next = !isFullyWatched(media);
-
-        // Marking a show or season fans out to every episode under it, so say
-        // how many before doing it.
-        const episodeCount = affectedEpisodeCount(media);
-        if (episodeCount > 1) {
-            const scope = media.type === 'TvShow' ? 'this show' : 'this season';
-            const ok = await dialog.confirm({
-                title: next ? `Mark ${episodeCount} episodes as watched?` : `Mark ${episodeCount} episodes as unwatched?`,
-                message: next
-                    ? `Every episode in ${scope} will be marked watched, and any playback progress on them will be cleared.`
-                    : `Every episode in ${scope} will be marked unwatched.`,
-                confirmText: next ? 'Mark watched' : 'Mark unwatched',
-                cancelText: 'Cancel',
-            });
-            if (!ok) return;
-        }
-
-        try {
-            await mediaService.markAsPlayed(media.id, next, serverId);
-            reloadMedia();
-        } catch {
-            await dialog.alert('Failed to update play state.');
-        }
+        if (media && await toggleWatched(media, dialog, serverId)) reloadMedia();
     };
 
     const handleSetRating = useCallback(async (next: number | null) => {

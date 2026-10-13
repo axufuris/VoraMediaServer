@@ -2,9 +2,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { MediaItem } from '../../../api/Media/mediaService';
 import { libraryAdminService, type MediaMatchResult } from '../../../api/Media/libraryAdminService';
+import { watchlistService } from '../../../api/Watchlist/watchlistService';
 import { useDialog } from '../../../dialogs';
 import { StorageKeys } from '../../../utils/storageKeys';
 import { yearOf } from '../../../utils/serverTime';
+import { isFullyWatched } from '../../../utils/watchState';
 import EditMetadataModal from '../EditMetadataModal';
 import FixMatchModal from '../FixMatchModal';
 import MediaInfoDialog from '../MediaInfoDialog';
@@ -12,11 +14,16 @@ import MarkerEditorModal from '../../Admin/MarkerEditorModal';
 import AddToCollectionModal from '../../Collections/AddToCollectionModal';
 import AddToPlaylistModal from '../../Collections/AddToPlaylistModal';
 import { menuAction, menuSeparator, tidyMenu, type MenuEntry } from '../../Client/Primitives/menuEntries';
+import { toggleWatched, toggleWatchlist } from './watchActions';
 
 type OpenDialog = 'info' | 'edit' | 'playlist' | 'collection' | 'match' | 'markers';
 
 export interface MediaItemActionsOptions {
     serverId?: string;
+    // Leads the menu with Mark as watched and Add to watchlist. The title page
+    // has those as buttons beside the menu, so it leaves them out; a poster has
+    // nowhere else to put them.
+    withWatchActions?: boolean;
     // The item was edited, matched, or had something about it queued.
     onChanged: () => void;
     onDeleted: (media: MediaItem) => void;
@@ -34,11 +41,12 @@ export interface MediaItemActions {
 // menu and the menu on a poster both come from here, so the two cannot drift.
 // Whoever shows the menu renders `dialogs` somewhere that outlives the menu.
 export function useMediaItemActions(media: MediaItem | null, options: MediaItemActionsOptions): MediaItemActions {
-    const { serverId, onChanged, onDeleted, onMatched } = options;
+    const { serverId, withWatchActions = false, onChanged, onDeleted, onMatched } = options;
     const dialog = useDialog();
     const navigate = useNavigate();
     const [openDialog, setOpenDialog] = useState<OpenDialog | null>(null);
     const [thumbnailsLock, setThumbnailsLock] = useState<{ id: string; locked: boolean } | null>(null);
+    const [watchlist, setWatchlist] = useState<{ id: string; saved: boolean } | null>(null);
 
     const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
     const mediaId = media?.id;
@@ -53,11 +61,25 @@ export function useMediaItemActions(media: MediaItem | null, options: MediaItemA
         return () => { current = false; };
     }, [mediaId, isAdmin, hasThumbnails, serverId]);
 
+    // Asked again every time the title is loaded, not once per title: the
+    // watchlist can be changed from the title page between two openings of the
+    // same poster's menu.
+    useEffect(() => {
+        if (!media || !withWatchActions) return;
+        const id = media.id;
+        let current = true;
+        watchlistService.check({ mediaItemId: id }, serverId)
+            .then(saved => { if (current) setWatchlist({ id, saved }); })
+            .catch(() => { if (current) setWatchlist(null); });
+        return () => { current = false; };
+    }, [media, withWatchActions, serverId]);
+
     if (!media) return { entries: [], dialogs: null };
 
     const isEpisode = media.type === 'Episode';
     const isSeason = media.type === 'Season';
     const thumbnailsLocked = thumbnailsLock?.id === media.id ? thumbnailsLock.locked : false;
+    const inWatchlist = watchlist?.id === media.id ? watchlist.saved : false;
     const hasFileInfo = hasThumbnails && (media.mediaParts?.length ?? 0) > 0;
     const canFixMatch = media.type === 'Movie' || media.type === 'TvShow';
     const pathTo = (id: string) => serverId ? `/server/${serverId}/media/${id}` : `/media/${id}`;
@@ -132,7 +154,23 @@ export function useMediaItemActions(media: MediaItem | null, options: MediaItemA
         onChanged();
     };
 
+    const markWatched = async () => {
+        if (await toggleWatched(media, dialog, serverId)) onChanged();
+    };
+
+    const saveToWatchlist = async () => {
+        const saved = await toggleWatchlist(media, dialog, serverId);
+        if (saved === null) return;
+        setWatchlist({ id: media.id, saved });
+        onChanged();
+    };
+
     const entries: MenuEntry[] = [];
+    if (withWatchActions) {
+        entries.push(menuAction('watched', isFullyWatched(media) ? 'Mark as unwatched' : 'Mark as watched', markWatched));
+        entries.push(menuAction('watchlist', inWatchlist ? 'Remove from watchlist' : 'Add to watchlist', saveToWatchlist));
+        entries.push(menuSeparator('before-info'));
+    }
     if (hasFileInfo) entries.push(menuAction('info', 'Media info', () => setOpenDialog('info')));
 
     entries.push(menuSeparator('before-parents'));

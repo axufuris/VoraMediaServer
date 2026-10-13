@@ -2,15 +2,27 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { MediaItem } from '../../../api/Media/mediaService';
+import type { LibraryItem } from '../../../api/Media/libraryService';
+import type { WatchlistTarget } from '../../../api/Watchlist/watchlistService';
+import { ActionMenuList } from '../../Client/Primitives/ActionMenu';
 import MediaCard from '../../Client/Primitives/MediaCard';
+import RecommendationRow from '../RecommendationRow';
 import { DialogProvider } from '../../../dialogs';
 import { StorageKeys } from '../../../utils/storageKeys';
 import MediaItemMenuProvider from './MediaItemMenuProvider';
 import MediaMenuArea from './MediaMenuArea';
 import { mediaMenuTarget, type MediaMenuTarget } from './mediaItemMenu';
+import { useMediaItemActions } from './useMediaItemActions';
 import { LONG_PRESS_MS } from './useMediaMenuTrigger';
 
+type WatchlistDetails = { type: string; title: string; posterUrl?: string };
+
 const getMediaItem = vi.fn<(id: string, serverId?: string) => Promise<MediaItem>>();
+const markAsPlayed = vi.fn<(id: string, isPlayed: boolean, serverId?: string) => Promise<void>>();
+const watchlist = {
+    check: vi.fn<(target: WatchlistTarget, serverId?: string) => Promise<boolean>>(),
+    toggle: vi.fn<(target: WatchlistTarget, details: WatchlistDetails, serverId?: string) => Promise<boolean>>(),
+};
 const admin = {
     getThumbnailsLock: vi.fn<(id: string, serverId?: string) => Promise<{ locked: boolean }>>(),
     setThumbnailsLock: vi.fn<(id: string, locked: boolean, serverId?: string) => Promise<{ locked: boolean }>>(),
@@ -22,7 +34,17 @@ const admin = {
 };
 
 vi.mock('../../../api/Media/mediaService', () => ({
-    mediaService: { getMediaItem: (id: string, serverId?: string) => getMediaItem(id, serverId) },
+    mediaService: {
+        getMediaItem: (id: string, serverId?: string) => getMediaItem(id, serverId),
+        markAsPlayed: (id: string, isPlayed: boolean, serverId?: string) => markAsPlayed(id, isPlayed, serverId),
+    },
+}));
+
+vi.mock('../../../api/Watchlist/watchlistService', () => ({
+    watchlistService: {
+        check: (target: WatchlistTarget, serverId?: string) => watchlist.check(target, serverId),
+        toggle: (target: WatchlistTarget, details: WatchlistDetails, serverId?: string) => watchlist.toggle(target, details, serverId),
+    },
 }));
 
 vi.mock('../../../api/Media/libraryAdminService', () => ({
@@ -76,6 +98,10 @@ const title = (overrides: Partial<MediaItem>): MediaItem => ({
 
 const movie = title({});
 const show = title({ id: 'show-1', title: 'Top Gear', type: 'TvShow', mediaParts: [] });
+const longShow = title({
+    ...show,
+    seasons: [{ id: 'season-1', seasonNumber: 1, episodeCount: 10 }, { id: 'season-2', seasonNumber: 2, episodeCount: 12 }] as MediaItem['seasons'],
+});
 const season = title({ id: 'season-3', title: 'Season 3', type: 'Season', tvShowId: 'show-1', tvShowTitle: 'Top Gear', seasonNumber: 3, mediaParts: [] });
 const episode = title({
     id: 'episode-8', title: 'Episode 8', type: 'Episode', tvShowId: 'show-1', seasonId: 'season-3',
@@ -134,6 +160,9 @@ describe('the menu on a poster', () => {
         admin.analyzeMedia.mockResolvedValue();
         admin.regenerateMediaItemThumbnails.mockResolvedValue();
         admin.deleteMediaItem.mockResolvedValue();
+        markAsPlayed.mockResolvedValue();
+        watchlist.check.mockResolvedValue(false);
+        watchlist.toggle.mockResolvedValue(true);
     });
 
     afterEach(() => {
@@ -148,6 +177,7 @@ describe('the menu on a poster', () => {
         expect(getMediaItem).toHaveBeenCalledWith('movie-1', 'srv1');
         expect(screen.getByRole('menu')).toHaveTextContent('Arrival');
         expect(labels()).toEqual([
+            'Mark as watched', 'Add to watchlist',
             'Media info', 'Edit metadata', 'Add to playlist', 'Add to collection',
             'Fix match…', 'Refresh metadata', 'Scan files', 'Analyze media',
             'Regenerate thumbnails', 'Lock thumbnails', 'Edit markers', 'Delete item',
@@ -180,7 +210,7 @@ describe('the menu on a poster', () => {
 
         await openMenuFor(movie);
 
-        expect(labels()).toEqual(['Media info', 'Add to playlist', 'Add to collection']);
+        expect(labels()).toEqual(['Mark as watched', 'Add to watchlist', 'Media info', 'Add to playlist', 'Add to collection']);
         expect(admin.getThumbnailsLock).not.toHaveBeenCalled();
     });
 
@@ -188,6 +218,7 @@ describe('the menu on a poster', () => {
         await openMenuFor(show);
 
         expect(labels()).toEqual([
+            'Mark as watched', 'Add to watchlist',
             'Edit metadata', 'Add to playlist', 'Add to collection',
             'Fix match…', 'Refresh metadata', 'Scan files', 'Analyze media', 'Delete item',
         ]);
@@ -197,14 +228,14 @@ describe('the menu on a poster', () => {
         await openMenuFor(season);
 
         expect(screen.getByRole('menu')).toHaveTextContent('Top Gear · Season 3');
-        expect(labels().slice(0, 2)).toEqual(['Go to show', 'Edit metadata']);
+        expect(labels().slice(0, 4)).toEqual(['Mark as watched', 'Add to watchlist', 'Go to show', 'Edit metadata']);
         expect(labels()).not.toContain('Fix match…');
     });
 
     it('offers an episode the way to its season and its show', async () => {
         await openMenuFor(episode);
 
-        expect(labels().slice(0, 3)).toEqual(['Media info', 'Go to season', 'Go to show']);
+        expect(labels().slice(0, 5)).toEqual(['Mark as watched', 'Add to watchlist', 'Media info', 'Go to season', 'Go to show']);
         fireEvent.click(screen.getByRole('menuitem', { name: 'Go to season' }));
 
         expect(screen.getByTestId('where')).toHaveTextContent('/server/srv1/media/season-3');
@@ -271,6 +302,111 @@ describe('the menu on a poster', () => {
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
         expect(admin.deleteMediaItem).not.toHaveBeenCalled();
         expect(onDeleted).not.toHaveBeenCalled();
+    });
+
+    it('leads with what the title page keeps as buttons, as they stand', async () => {
+        watchlist.check.mockResolvedValue(true);
+
+        await openMenuFor(title({ isPlayed: true }));
+
+        expect(await screen.findByRole('menuitem', { name: 'Remove from watchlist' })).toBeInTheDocument();
+        expect(labels().slice(0, 3)).toEqual(['Mark as unwatched', 'Remove from watchlist', 'Media info']);
+        expect(watchlist.check).toHaveBeenCalledWith({ mediaItemId: 'movie-1' }, 'srv1');
+    });
+
+    it('marks a movie watched on its own server, then hands the page the title as it is now', async () => {
+        const onChanged = vi.fn();
+        await openMenuFor(movie, mediaMenuTarget(movie, 'srv1', { onChanged }));
+        const watched = title({ isPlayed: true });
+        getMediaItem.mockResolvedValue(watched);
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Mark as watched' }));
+
+        await waitFor(() => expect(onChanged).toHaveBeenCalledWith(watched));
+        expect(markAsPlayed).toHaveBeenCalledWith('movie-1', true, 'srv1');
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('marks a watched movie unwatched', async () => {
+        await openMenuFor(title({ isPlayed: true }));
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Mark as unwatched' }));
+
+        await waitFor(() => expect(markAsPlayed).toHaveBeenCalledWith('movie-1', false, 'srv1'));
+    });
+
+    it('says how many episodes a show holds before marking them all', async () => {
+        const onChanged = vi.fn();
+        await openMenuFor(longShow, mediaMenuTarget(longShow, 'srv1', { onChanged }));
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Mark as watched' }));
+        const question = await screen.findByRole('dialog', { name: 'Mark 22 episodes as watched?' });
+        expect(markAsPlayed).not.toHaveBeenCalled();
+        fireEvent.click(within(question).getByRole('button', { name: 'Mark watched' }));
+
+        await waitFor(() => expect(onChanged).toHaveBeenCalled());
+        expect(markAsPlayed).toHaveBeenCalledWith('show-1', true, 'srv1');
+    });
+
+    it('leaves a show as it was when that question is cancelled', async () => {
+        const onChanged = vi.fn();
+        await openMenuFor(longShow, mediaMenuTarget(longShow, 'srv1', { onChanged }));
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Mark as watched' }));
+        fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        expect(markAsPlayed).not.toHaveBeenCalled();
+        expect(onChanged).not.toHaveBeenCalled();
+    });
+
+    it('says so and leaves the page alone when the title cannot be marked', async () => {
+        const onChanged = vi.fn();
+        markAsPlayed.mockRejectedValue(new Error('offline'));
+        await openMenuFor(movie, mediaMenuTarget(movie, 'srv1', { onChanged }));
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Mark as watched' }));
+
+        expect(await screen.findByText('Failed to update play state.')).toBeInTheDocument();
+        expect(onChanged).not.toHaveBeenCalled();
+    });
+
+    it('adds the title to the watchlist and offers to take it off next time', async () => {
+        const onChanged = vi.fn();
+        const poster = await openMenuFor(movie, mediaMenuTarget(movie, 'srv1', { onChanged }));
+        watchlist.check.mockResolvedValue(true);
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Add to watchlist' }));
+
+        await waitFor(() => expect(onChanged).toHaveBeenCalled());
+        expect(watchlist.toggle).toHaveBeenCalledWith({ mediaItemId: 'movie-1' }, { type: 'Movie', title: 'Arrival', posterUrl: undefined }, 'srv1');
+
+        fireEvent.contextMenu(poster, { clientX: 120, clientY: 80 });
+        expect(await screen.findByRole('menuitem', { name: 'Remove from watchlist' })).toBeInTheDocument();
+    });
+
+    it('asks about the watchlist again each time the menu opens', async () => {
+        const poster = await openMenuFor(movie);
+        expect(labels()).toContain('Add to watchlist');
+        fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+
+        watchlist.check.mockResolvedValue(true);
+        getMediaItem.mockResolvedValue({ ...movie });
+        fireEvent.contextMenu(poster, { clientX: 120, clientY: 80 });
+
+        expect(await screen.findByRole('menuitem', { name: 'Remove from watchlist' })).toBeInTheDocument();
+        expect(watchlist.check).toHaveBeenCalledTimes(2);
+    });
+
+    it('says so when the watchlist cannot be changed', async () => {
+        const onChanged = vi.fn();
+        watchlist.toggle.mockRejectedValue(new Error('offline'));
+        await openMenuFor(movie, mediaMenuTarget(movie, 'srv1', { onChanged }));
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Add to watchlist' }));
+
+        expect(await screen.findByText('Failed to update watchlist.')).toBeInTheDocument();
+        expect(onChanged).not.toHaveBeenCalled();
     });
 
     it('opens over the poster for the keyboard menu key, which reports no position', async () => {
@@ -360,6 +496,68 @@ describe('the menu on a poster', () => {
 
         expect(await screen.findByRole('menuitem', { name: 'Go to show' })).toBeInTheDocument();
         expect(screen.getByTestId('episode-row')).toHaveClass('row');
+    });
+});
+
+describe('the menu on the title page', () => {
+    function TitlePageMenu({ media }: { media: MediaItem }) {
+        const actions = useMediaItemActions(media, { serverId: 'srv1', onChanged: vi.fn(), onDeleted: vi.fn() });
+        return <ActionMenuList entries={actions.entries} onSelected={vi.fn()} />;
+    }
+
+    afterEach(() => {
+        vi.clearAllMocks();
+        localStorage.clear();
+    });
+
+    it('leaves out what the page already has as buttons', () => {
+        render(
+            <MemoryRouter>
+                <DialogProvider>
+                    <TitlePageMenu media={movie} />
+                </DialogProvider>
+            </MemoryRouter>,
+        );
+
+        expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Media info', 'Add to playlist', 'Add to collection']);
+        expect(watchlist.check).not.toHaveBeenCalled();
+    });
+});
+
+describe('a recommendation row', () => {
+    beforeAll(() => vi.stubGlobal('PointerEvent', TestPointerEvent));
+    afterAll(() => vi.unstubAllGlobals());
+
+    afterEach(() => {
+        vi.clearAllMocks();
+        localStorage.clear();
+    });
+
+    it('shows a show as watched once its menu marked it, without asking for the row again', async () => {
+        const recommended = { id: 'show-1', title: 'Top Gear', type: 'TvShow', unplayedItemCount: 22 } as LibraryItem;
+        getMediaItem.mockResolvedValue(longShow);
+        markAsPlayed.mockResolvedValue();
+        watchlist.check.mockResolvedValue(false);
+        render(
+            <MemoryRouter>
+                <DialogProvider>
+                    <div data-vora-client="">
+                        <MediaItemMenuProvider>
+                            <RecommendationRow list={{ title: 'Because you watched', weight: 1, items: [recommended] }} serverId="srv1" />
+                        </MediaItemMenuProvider>
+                    </div>
+                </DialogProvider>
+            </MemoryRouter>,
+        );
+        expect(screen.getByText('22')).toBeInTheDocument();
+
+        fireEvent.contextMenu(screen.getByRole('button', { name: /Top Gear/ }), { clientX: 120, clientY: 80 });
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Mark as watched' }));
+        getMediaItem.mockResolvedValue({ ...longShow, isPlayed: true, unplayedItemCount: 0 });
+        fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Mark watched' }));
+
+        await waitFor(() => expect(screen.queryByText('22')).not.toBeInTheDocument());
+        expect(markAsPlayed).toHaveBeenCalledWith('show-1', true, 'srv1');
     });
 });
 

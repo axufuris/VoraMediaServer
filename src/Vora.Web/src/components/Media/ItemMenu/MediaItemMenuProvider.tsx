@@ -40,14 +40,16 @@ export default function MediaItemMenuProvider({ children }: { children: ReactNod
     const [subject, setSubject] = useState<Subject | null>(null);
     const latestRequest = useRef(0);
 
-    const load = useCallback((target: MediaMenuTarget) => {
+    const load = useCallback((target: MediaMenuTarget): Promise<MediaItem | null> => {
         const request = ++latestRequest.current;
-        mediaService.getMediaItem(target.id, target.serverId)
+        return mediaService.getMediaItem(target.id, target.serverId)
             .then(media => {
                 if (latestRequest.current === request) setSubject({ target, media, failed: false });
+                return media;
             })
             .catch(() => {
                 if (latestRequest.current === request) setSubject({ target, media: null, failed: true });
+                return null;
             });
     }, []);
 
@@ -56,7 +58,7 @@ export default function MediaItemMenuProvider({ children }: { children: ReactNod
         setSubject(current => current?.media && current.target.id === target.id && current.target.serverId === target.serverId
             ? { ...current, target }
             : { target, media: null, failed: false });
-        load(target);
+        void load(target);
     }, [load]);
 
     const close = useCallback(() => setMenu(null), []);
@@ -65,10 +67,10 @@ export default function MediaItemMenuProvider({ children }: { children: ReactNod
     const target = subject?.target;
     const actions = useMediaItemActions(subject?.media ?? null, {
         serverId: target?.serverId,
+        withWatchActions: true,
         onChanged: () => {
             if (!target) return;
-            load(target);
-            target.onChanged?.();
+            void load(target).then(media => target.onChanged?.(media ?? undefined));
         },
         onDeleted: () => {
             setSubject(null);
