@@ -388,6 +388,37 @@ describe('SetupGuidePage', () => {
         expect(mocks.updatePluginSettings).not.toHaveBeenCalled();
     });
 
+    it('stays on an AI step that was started and not finished, and says what is missing', async () => {
+        await openAiStep();
+
+        fireEvent.click(screen.getByRole('button', { name: 'LM Studio' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('Choose a model for recommendations first. Load the models the server has, or type its name. To leave AI for later, use "Skip this step".');
+        expect(screen.getByRole('heading', { name: 'AI features' })).toBeInTheDocument();
+        expect(mocks.updatePluginSettings).not.toHaveBeenCalled();
+    });
+
+    it('asks for the key when OpenAI was touched without one', async () => {
+        await openAiStep();
+
+        fireEvent.change(screen.getByLabelText('Monthly token limit'), { target: { value: '500000' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('Paste the API key first.');
+        expect(mocks.updatePluginSettings).not.toHaveBeenCalled();
+    });
+
+    it('leaves a half-filled AI step behind when it is skipped', async () => {
+        await openAiStep();
+
+        fireEvent.click(screen.getByRole('button', { name: 'LM Studio' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Skip this step' }));
+
+        expect(await screen.findByRole('heading', { name: 'Backups' })).toBeInTheDocument();
+        expect(mocks.updatePluginSettings).not.toHaveBeenCalled();
+    });
+
     it('saves a filled-in AI step on the way to the next one', async () => {
         await openAiStep();
 
