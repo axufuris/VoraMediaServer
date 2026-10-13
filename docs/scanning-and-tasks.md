@@ -143,6 +143,16 @@ The per-file work item:
 3. **Only if a new season was created**, refreshes the parent show's metadata once (see next section).
 4. Overlays + silence detection for the item. The per-file path deliberately does **not** call the global `TriggerActorMetadataRefreshAsync` — that fetches up to 50 actors from TMDB per call, which is crippling when a whole library is ingested one file at a time. Actor **entity** metadata (bios, photos on the actor detail page) is enriched by the nightly scan and the full-library workflow instead; the cast list itself is already set in step 2.
 
+## Local Emby, Jellyfin and Kodi metadata
+
+Library scans and single-file ingestion automatically check local NFOs before using the library's configured metadata provider. Movies prefer `<video filename>.nfo`, then `movie.nfo`; episodes use the matching video sidecar, shows use `tvshow.nfo` in the show folder, and seasons use `season.nfo` alongside their episodes. The scanner imports the local title, year and provider IDs before creating the movie or show, so renamed files and additional versions can match the same title by ID. Metadata refresh imports the plot, original/sort title, release/air date, content rating, runtime, TMDB/IMDb/TVDB IDs (including `uniqueid`), standard genres, cast, directors, writers, YouTube trailers and credit-stinger tags. A collection is imported when both its name and TMDB `collectionnumber` are present.
+
+Local artwork also takes priority automatically: `poster`, `folder` or `cover`; `fanart`, `backdrop` or `background`; and `logo` or `clearlogo`, with JPG/JPEG/PNG/WebP extensions. Movies can use `<video filename>-poster`, `-fanart` and `-logo`; episodes use their own `-thumb` or matching image rather than a shared season poster. Show and season paths are resolved from their episode files. Files beside the video remain usable when the NFO's old Emby container paths no longer exist. The configured artwork provider fills slots that have no local image.
+
+Missing, unreadable, malformed or wrong-type NFOs fall back to the configured metadata provider. Artwork alone does not prevent an online text lookup. Existing Vora field locks still apply, and scans never modify the source NFO or images. XML DTDs are prohibited and documents are size-limited. Vora's configured ratings providers retain ownership of its rating slots; NFO ratings, watch history, tags other than stingers, named studios/countries without provider IDs, BIF files and stream-analysis data are not imported by this path. External subtitles continue through the existing subtitle scanner.
+
+For items already enriched before local files were added, use **Replace all metadata** to run the import again. Normal scans fill new and missing metadata and keep their existing refresh guards.
+
 ## Single-file scanner + new-season metadata
 
 `ILocalMediaScannerProvider` gained `ScanMovieFileAsync(libraryId, filePath)`, `ScanTvFileAsync(libraryId, filePath)` and `ScanMusicFileAsync(libraryId, filePath)`. They reuse the same parsing as the full-library scan — the per-file body was factored into `IngestMovieFileAsync` / `IngestTvFileAsync` and the regex setup into `BuildMovieRegexes` / `BuildTvRegexes`, so library and single-file scans share one code path. All three skip a path already in the library.
