@@ -1,0 +1,71 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<episodedetails>
+  <plot><![CDATA[Jim, Tabitha, and Ethan begin asking questions about where they are in the hopes it may lead them home. Ellis and Fatima show Julie the lighter side of life in town. Jade struggles to make sense of their situation as Boyd seeks guidance.]]></plot>
+  <outline />
+  <lockdata>false</lockdata>
+  <dateadded>2026-07-25 15:32:03</dateadded>
+  <title>Silhouettes</title>
+  <director tmdbid="1397843" tvdbid="278805">Brad Turner</director>
+  <rating>7.2</rating>
+  <year>2022</year>
+  <sorttitle>Silhouettes</sorttitle>
+  <mpaa>TV-MA</mpaa>
+  <imdbid>tt15383506</imdbid>
+  <tvdbid>8808285</tvdbid>
+  <runtime>48</runtime>
+  <genre>Drama</genre>
+  <genre>Horror</genre>
+  <genre>Mystery</genre>
+  <uniqueid type="tvdb">8808285</uniqueid>
+  <uniqueid type="official website">https://www.epix.com/movie/from-s1-e5</uniqueid>
+  <uniqueid type="imdb">tt15383506</uniqueid>
+  <episode>5</episode>
+  <season>1</season>
+  <aired>2022-03-20</aired>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>hevc</codec>
+        <micodec>hevc</micodec>
+        <bitrate>3077427</bitrate>
+        <width>1920</width>
+        <height>958</height>
+        <aspect>960:479</aspect>
+        <aspectratio>960:479</aspectratio>
+        <framerate>23.976025</framerate>
+        <scantype>progressive</scantype>
+        <default>True</default>
+        <forced>False</forced>
+        <duration>48</duration>
+        <durationinseconds>2902</durationinseconds>
+      </video>
+      <audio>
+        <codec>eac3</codec>
+        <micodec>eac3</micodec>
+        <bitrate>640000</bitrate>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <channels>6</channels>
+        <samplingrate>48000</samplingrate>
+        <default>False</default>
+        <forced>False</forced>
+      </audio>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+</episodedetails>
