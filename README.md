@@ -498,7 +498,7 @@ in addition to the keys shown.
 | `imdb_chronology` | IMDB Community Lists | — |
 | `itunes_podcast_discovery` | iTunes Podcast Discovery | — |
 | `opensubtitles_search` | OpenSubtitles | `api_key`, `auth_mode`, `username`, `password`, `default_languages` |
-| `openai_recommendations` | OpenAI Smart Recommendations | `api_key`, `chat_model`, `schedule_time` |
+| `openai_recommendations` | AI Smart Recommendations (holds the AI connection for every AI feature) | `base_url`, `api_key`, `chat_model`, `collections_model`, `music_playlists_model`, `embedding_model`, `schedule_time`, `monthly_token_limit` |
 | `local_imagesharp_overlays` | Vora Native Overlays | `enable_schedule`, `schedule_time` |
 | `local_metadata` | Local Assets (NFO & Images) | — |
 | `local_artwork` | Local Assets Artwork | — |
@@ -585,11 +585,15 @@ provider keys:
       Vora__PluginSettings__trakt_collection_sync__client_id: "YOUR_TRAKT_CLIENT_ID"
       Vora__PluginSettings__mdblist_collection_sync__api_key: "YOUR_MDBLIST_KEY"
 
-      # OpenAI smart recommendations (opt-in)
+      # AI features (opt-in). OpenAI needs only the key; the rest are its defaults.
       Vora__PluginSettings__openai_recommendations__is_enabled: "true"
       Vora__PluginSettings__openai_recommendations__api_key: "YOUR_OPENAI_KEY"
       Vora__PluginSettings__openai_recommendations__chat_model: "gpt-4o-mini"
       Vora__PluginSettings__openai_recommendations__schedule_time: "02:00"
+      # A model you run yourself instead (Ollama shown): no key, and name the models.
+      # Vora__PluginSettings__openai_recommendations__base_url: "http://host.docker.internal:11434/v1"
+      # Vora__PluginSettings__openai_recommendations__chat_model: "llama3.1"
+      # Vora__PluginSettings__openai_recommendations__embedding_model: "nomic-embed-text"
 
       # Local poster overlays
       Vora__PluginSettings__local_imagesharp_overlays__enable_schedule: "true"

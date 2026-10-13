@@ -38,5 +38,4 @@ export const PLUGIN_FIELDS = {
     openSubtitles: ['api_key', 'default_languages'],
     lastFm: ['api_key', 'api_secret'],
     genius: ['access_token'],
-    openAi: ['api_key', 'monthly_token_limit'],
 } as const satisfies Record<string, readonly string[]>;

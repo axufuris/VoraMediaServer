@@ -152,9 +152,14 @@ changed by any pass.**
 ## AI model, freshness, and accuracy
 
 The AI providers share one model setting — `collections_model` on the
-`openai_recommendations` plugin (`OpenAiRecommendationProvider`). It defaults to
-**`gpt-5`** and also offers `gpt-5-mini`/`gpt-5-nano` and the older
-`gpt-4o`/`gpt-4.1` families. The `gpt-5` and `o*` families are reasoning models
+`openai_recommendations` plugin (`OpenAiRecommendationProvider`), set under
+**AI Settings**. On OpenAI its form default is **`gpt-5`**, with
+`gpt-5-mini`/`gpt-5-nano` and the older `gpt-4o`/`gpt-4.1` families as
+alternatives; any model the server lists can be chosen, and an empty value uses
+the recommendations model. The connection itself can be another server
+(`docs/ai-connection.md`), but this is the feature that suffers most on a small
+local model: it leans on knowing films and shows, so expect invented titles and
+wrong orders. The `gpt-5` and `o*` families are reasoning models
 that reject a custom sampling temperature, so `OpenAiClient` omits the
 `temperature` parameter for them and keeps sending it (`0.2`) for the `gpt-4.x`
 models. Cost is a few thousand tokens per sync — pennies on any of these.

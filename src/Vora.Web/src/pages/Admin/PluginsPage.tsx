@@ -7,6 +7,8 @@ import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
 import EmptyState from '../../components/Admin/Primitives/EmptyState';
 import PluginSettingsForm from '../../components/Admin/Settings/PluginSettingsForm';
+import AiSettingsForm from '../../components/Admin/Ai/AiSettingsForm';
+import { AI_PLUGIN_ID } from '../../components/Admin/Ai/aiProviders';
 
 interface PluginReleaseData {
     tag_name?: string;
@@ -126,13 +128,17 @@ function PluginCard({
 
             {canExpand && isExpanded && (
                 <div className="border-t border-[var(--vora-border-subtle)] p-4 bg-[var(--vora-bg-sunken)]/40">
-                    <PluginSettingsForm
-                        serverId={serverId}
-                        pluginId={plugin.id}
-                        pluginName={plugin.name}
-                        supportsConnectionTest={plugin.supportsConnectionTest}
-                        showModal={showModal}
-                    />
+                    {plugin.id === AI_PLUGIN_ID ? (
+                        <AiSettingsForm serverId={serverId} idPrefix="plugin-ai" />
+                    ) : (
+                        <PluginSettingsForm
+                            serverId={serverId}
+                            pluginId={plugin.id}
+                            pluginName={plugin.name}
+                            supportsConnectionTest={plugin.supportsConnectionTest}
+                            showModal={showModal}
+                        />
+                    )}
                 </div>
             )}
 

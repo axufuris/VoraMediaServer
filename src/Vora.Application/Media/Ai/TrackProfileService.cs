@@ -19,13 +19,15 @@ public class TrackProfileService : ITrackProfileService
     public const int TagsPerArtist = 5;
 
     private readonly IMusicRepository _repository;
+    private readonly IOpenAiClient _openAi;
     private readonly IServiceScopeFactory _scopes;
     private readonly ITaskProgressReporter _progress;
     private readonly ILogger<TrackProfileService> _logger;
 
-    public TrackProfileService(IMusicRepository repository, IServiceScopeFactory scopes, ITaskProgressReporter progress, ILogger<TrackProfileService> logger)
+    public TrackProfileService(IMusicRepository repository, IOpenAiClient openAi, IServiceScopeFactory scopes, ITaskProgressReporter progress, ILogger<TrackProfileService> logger)
     {
         _repository = repository;
+        _openAi = openAi;
         _scopes = scopes;
         _progress = progress;
         _logger = logger;
@@ -39,13 +41,14 @@ public class TrackProfileService : ITrackProfileService
         var tags = await _repository.GetAllArtistTagNamesAsync(TagsPerArtist);
         var batches = pending.Chunk(BatchSize).ToList();
         var done = 0;
+        var parallelism = Math.Clamp(await _openAi.GetParallelismAsync(), 1, Parallelism);
 
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
         {
             await Parallel.ForEachAsync(
                 batches,
-                new ParallelOptions { MaxDegreeOfParallelism = Parallelism, CancellationToken = stop.Token },
+                new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = stop.Token },
                 async (batch, token) =>
                 {
                     using var scope = _scopes.CreateScope();

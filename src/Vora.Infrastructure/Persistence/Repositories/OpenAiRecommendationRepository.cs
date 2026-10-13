@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 using Vora.Application.Recommendations;
+using Vora.Application.Ai;
 using Vora.Application.Ai.Dtos;
 using Vora.Application.Ai.ViewModels;
 using Vora.Domain.Entities.Media;
@@ -27,13 +28,15 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
         await context.SaveChangesAsync();
     }
 
-    public async Task<List<Guid>> VectorSearchUnwatchedMediaAsync(Guid profileId, Guid? libraryId, float[] searchVector, int limit)
+    public async Task<List<Guid>> VectorSearchUnwatchedMediaAsync(Guid profileId, Guid? libraryId, float[] searchVector, int limit, string embeddingModel)
     {
         var pgVector = new Pgvector.Vector(searchVector);
+        var unstampedCounts = AiConnection.IsLegacyStamp(embeddingModel);
 
         var query = context.Set<MediaItemEmbedding>()
             .AsNoTracking()
             .Where(e => e.Embedding != null)
+            .Where(e => e.Model == embeddingModel || (unstampedCounts && e.Model == null))
             .Where(MediaCapabilities.IsBrowsableTitle.On((MediaItemEmbedding e) => e.MediaItem));
 
         if (libraryId.HasValue)
@@ -52,20 +55,25 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
             .ToListAsync());
     }
 
-    public Task<List<MediaItemForEmbeddingDto>> GetMediaItemsMissingEmbeddingsAsync(int batchSize) =>
-        context.MediaItems
+    public Task<List<MediaItemForEmbeddingDto>> GetMediaItemsMissingEmbeddingsAsync(int batchSize, string embeddingModel)
+    {
+        var unstampedCounts = AiConnection.IsLegacyStamp(embeddingModel);
+
+        return context.MediaItems
             .AsNoTracking()
             .Where(MediaCapabilities.IsBrowsableTitle)
-            .Where(m => !context.MediaItemEmbeddings.Any(e => e.MediaItemId == m.Id))
+            .Where(m => !context.MediaItemEmbeddings.Any(e =>
+                e.MediaItemId == m.Id && (e.Model == embeddingModel || (unstampedCounts && e.Model == null))))
             .OrderBy(m => m.Id)
             .Take(batchSize)
             .AsSplitQuery()
             .Select(MediaItemForEmbeddingDto.Projection)
             .ToListAsync();
+    }
 
     public async Task SaveEmbeddingsAsync(List<MediaItemEmbedding> embeddings)
     {
-        await EmbeddingWrites.InsertNewAsync(context, embeddings);
+        await EmbeddingWrites.UpsertAsync(context, embeddings);
     }
 
     public Task<bool> IsAiEnabledForProfileAsync(Guid profileId) =>

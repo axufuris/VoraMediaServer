@@ -12,6 +12,7 @@ const LABELS: Record<string, string> = {
     history: 'Watch History',
     'music-history': 'Music History',
     'ai-stats': 'AI Usage & Stats',
+    'ai-settings': 'AI Settings',
     libraries: 'Libraries',
     collections: 'Collections',
     music: 'Music',

@@ -37,7 +37,7 @@ Re-running a finished or skipped guide keeps its status: every step is open from
 | Live TV & radio | Live TV, Internet radio | feature flags, `POST /iptv/admin/playlists` (kind Tv / Radio), `POST /iptv/admin/epg-sources`, the DVR flag |
 | Podcasts | Podcasts | feature flag, `GET /podcasts/search`, `POST /podcasts/admin/catalog` |
 | Music | Last.fm, Lyrics | plugin settings |
-| AI | AI features | OpenAI plugin settings, `enableAiMusicPlaylists` |
+| AI | AI features | the AI connection (`SetupAiCard`: provider, address, key, models, monthly limit), `enableAiMusicPlaylists` |
 | Backups | Backups, then Done | `PUT /admin/backups/settings` (`autoBackupEnabled`, cadence, time, how many to keep) |
 
 - **Remote access** offers Only at home, Reverse proxy or tunnel, and Open a port. A proxy or tunnel address is normalized by `publicUrl.ts` (trimmed, `https://` assumed, a dotted host required) and saved as `externalUrl`, which makes the server check that address and skip UPnP. **Save and check** saves it straight away and reports whether the server could reach it.
@@ -67,7 +67,8 @@ Each step saves when the admin presses **Save and continue**, **Back** or a rail
 ## Fixed alongside
 
 - **Save defaults.** `ServerSettingsVM`'s property defaults disagreed with `ServerSetting`'s for 18 fields (hardware acceleration and encoding, streaming profile, tone mapping, HEVC, GPU transcode limit, thumbnail size, …), so a settings PUT that left a field out reset it. They now match, and `SetupGuideSettingsTests` fails if a default VM ever differs from the projection of a default entity.
-- **OpenAI connection test.** `OpenAiRecommendationProvider` implements `IPluginConnectionTest` (`GET https://api.openai.com/v1/models`): 401/403 rejected, 429 accepted but no billing or credit.
+- **OpenAI connection test.** `OpenAiRecommendationProvider` implements `IPluginConnectionTest` (`GET https://api.openai.com/v1/models`): 401/403 rejected, 429 accepted but no billing or credit. It now tests whichever server the form points at; see `docs/ai-connection.md`.
+- **The AI step is the AI Settings form.** `SetupAiCard` reuses `AiConnectionFields`, so a model the admin runs themselves can be set up here too. It saves on Save & test and with the step, and skips saving while the form is incomplete. The Done step reads `GET /api/settings/ai/status` instead of looking for a key.
 - **New libraries follow the setup.** `CreateLibrary` replaces any default provider that has no key with one that does (`utils/libraryProviderDefaults.ts`: TV metadata falls back from TVDB to TMDB, IMDb ratings from OMDb to TMDB, a second rating never repeats the first), and pre-ticks preview thumbnails and intro/credit detection when those are on server-wide.
 - The System Settings "In-Memory Cache" card was removed: its `cacheSizeLimitMb` had no backend field and was dropped on every save.
 - Time zones, metadata languages and IPTV presets are shared modules (`utils/serverSettingOptions.ts`, `utils/iptvPresets.ts`) instead of copies.

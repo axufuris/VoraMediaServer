@@ -19,6 +19,7 @@ public class TrackProfileServiceTests
     {
         var provider = Substitute.For<IServiceProvider>();
         provider.GetService(typeof(IOpenAiClient)).Returns(_openAi);
+        _openAi.GetParallelismAsync().Returns(TrackProfileService.Parallelism);
         provider.GetService(typeof(IMusicRepository)).Returns(_scopedRepository);
         var scope = Substitute.For<IServiceScope>();
         scope.ServiceProvider.Returns(provider);
@@ -30,7 +31,7 @@ public class TrackProfileServiceTests
 
     private readonly IServiceScopeFactory _scopes = Substitute.For<IServiceScopeFactory>();
 
-    private TrackProfileService Service() => new(_repository, _scopes, new NullTaskProgressReporter(), NullLogger<TrackProfileService>.Instance);
+    private TrackProfileService Service() => new(_repository, _openAi, _scopes, new NullTaskProgressReporter(), NullLogger<TrackProfileService>.Instance);
 
     private TrackForProfile Song(string title) => new(Guid.NewGuid(), title, "Daft Punk", "Discovery", 2001, "Electronic", _daftPunk);
 
@@ -91,6 +92,43 @@ public class TrackProfileServiceTests
         _scopes.Received(2).CreateScope();
         await _scopedRepository.Received(2).SaveTrackProfilesAsync(Arg.Any<IReadOnlyList<TrackProfileUpdate>>());
         await _repository.DidNotReceive().SaveTrackProfilesAsync(Arg.Any<IReadOnlyList<TrackProfileUpdate>>());
+    }
+
+    // A model on one home GPU answers one request at a time; six at once sat
+    // in its queue until the later ones timed out.
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(6, 3)]
+    public async Task No_more_requests_are_in_flight_than_the_server_takes(int serverTakes, int expectedPeak)
+    {
+        Pending(Enumerable.Range(0, TrackProfileService.BatchSize * 3).Select(i => Song($"Song {i}")).ToArray());
+        _openAi.GetParallelismAsync().Returns(serverTakes);
+        var inFlight = 0;
+        var peak = 0;
+        var allStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _openAi.CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>())
+            .Returns(async _ =>
+            {
+                var now = Interlocked.Increment(ref inFlight);
+                InterlockedMax(ref peak, now);
+                if (now >= expectedPeak) allStarted.TrySetResult();
+                await allStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Interlocked.Decrement(ref inFlight);
+                return (string?)"""{"songs":[]}""";
+            });
+
+        await Service().ProfileTracksAsync(TestContext.Current.CancellationToken);
+
+        peak.Should().Be(expectedPeak);
+    }
+
+    private static void InterlockedMax(ref int target, int value)
+    {
+        int seen;
+        do
+        {
+            seen = Volatile.Read(ref target);
+        } while (value > seen && Interlocked.CompareExchange(ref target, value, seen) != seen);
     }
 
     [Fact]

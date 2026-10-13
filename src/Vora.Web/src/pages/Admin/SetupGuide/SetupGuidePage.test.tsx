@@ -7,6 +7,7 @@ import type { ServerSettings, PluginSettingField } from '../../../api/System/sys
 import { DEFAULT_FEATURE_FLAGS, type FeatureFlagsVM } from '../../../api/System/featureFlagsService';
 import type { PluginVM } from '../../../api/System/pluginAdminService';
 import type { DiscoveryRowConfig } from '../../../api/Discovery/discoveryService';
+import { aiFields, OPENAI_DEFAULTS } from '../../../components/Admin/Ai/aiTestFields';
 import type { EmailSettings } from '../../../api/System/emailAdminService';
 import type { RemoteAccessStatus, UpdateRemoteAccessRequest } from '../../../api/System/remoteAccessService';
 import type { BackupSettingsVM } from '../../../api/System/backupsService';
@@ -32,6 +33,8 @@ const mocks = vi.hoisted(() => ({
     updateRemote: vi.fn(),
     getBackupSettings: vi.fn(),
     updateBackupSettings: vi.fn(),
+    getAiStatus: vi.fn(),
+    listAiModels: vi.fn(),
     confirm: vi.fn(),
 }));
 
@@ -47,6 +50,7 @@ vi.mock('../../../api/System/systemSettingsAdminService', () => ({
         updateRegistrationMode: mocks.updateRegistrationMode,
     },
 }));
+vi.mock('../../../api/System/aiSettingsService', () => ({ aiSettingsService: { getStatus: mocks.getAiStatus, listModels: mocks.listAiModels } }));
 vi.mock('../../../api/System/emailAdminService', () => ({ emailAdminService: { getSettings: mocks.getEmailSettings, updateSettings: mocks.updateEmailSettings, sendTest: mocks.sendTestEmail } }));
 vi.mock('../../../api/System/remoteAccessService', () => ({ remoteAccessService: { getRemoteAccessStatus: mocks.getRemoteStatus, updateRemoteAccess: mocks.updateRemote } }));
 vi.mock('../../../api/System/backupsService', () => ({ backupsService: { getSettings: mocks.getBackupSettings, updateSettings: mocks.updateBackupSettings } }));
@@ -110,7 +114,21 @@ describe('SetupGuidePage', () => {
         mocks.updateRemote.mockImplementation((request: UpdateRemoteAccessRequest) => Promise.resolve({ ...remote, ...request, reachable: true }));
         mocks.getBackupSettings.mockResolvedValue({ ...backups });
         mocks.updateBackupSettings.mockImplementation((saved: BackupSettingsVM) => Promise.resolve(saved));
+        mocks.getAiStatus.mockResolvedValue({ configured: false, embeddings: false, isOpenAi: true, host: 'api.openai.com' });
+        mocks.listAiModels.mockResolvedValue({ chatModels: [], embeddingModels: [], error: null });
     });
+
+    const renderAiStep = (saved: Record<string, string> = {}) => {
+        mocks.getGuide.mockResolvedValue(guide({ step: 'ai' }));
+        mocks.getPlugins.mockResolvedValue([plugin('openai_recommendations', false)]);
+        mocks.getPluginSettings.mockResolvedValue(aiFields(saved));
+        renderGuide();
+    };
+
+    const openAiStep = async () => {
+        renderAiStep();
+        await screen.findByLabelText('Server address');
+    };
 
     it('starts a new guide, shows what the server has now, and saves each step', async () => {
         mocks.getGuide.mockResolvedValue(guide({ status: 'NotStarted', step: null }));
@@ -202,7 +220,6 @@ describe('SetupGuidePage', () => {
 
     it('finishes by marking the guide complete and opening Add library', async () => {
         mocks.getGuide.mockResolvedValue(guide({ step: 'done' }));
-        mocks.getPluginSettings.mockResolvedValue([field('api_key', 'OpenAI key')]);
         renderGuide();
 
         expect(await screen.findByRole('heading', { name: 'The groundwork is set' })).toBeInTheDocument();
@@ -315,6 +332,81 @@ describe('SetupGuidePage', () => {
 
         await waitFor(() => expect(mocks.updateBackupSettings).toHaveBeenCalledWith(expect.objectContaining({ autoBackupEnabled: true, cadence: 'Daily', hour: 2, minute: 30 }), undefined));
         expect(await screen.findByRole('heading', { name: 'The groundwork is set' })).toBeInTheDocument();
+    });
+
+    it('sets up OpenAI from the AI step with only a key, on the models it defaults to', async () => {
+        await openAiStep();
+        mocks.testPluginConnection.mockResolvedValue({ success: true, message: 'OpenAI accepted the API key.' });
+
+        expect(screen.getByText('Not set up')).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'sk-test' } });
+        mocks.getAiStatus.mockResolvedValue({ configured: true, embeddings: true, isOpenAi: true, host: 'api.openai.com' });
+        fireEvent.click(screen.getByRole('button', { name: 'Save & test' }));
+
+        await waitFor(() => expect(mocks.updatePluginSettings).toHaveBeenCalledWith('openai_recommendations', { ...OPENAI_DEFAULTS, api_key: 'sk-test', is_enabled: 'true' }, undefined));
+        expect(await screen.findByText('OpenAI accepted the API key.')).toBeInTheDocument();
+        expect(screen.getByText('Connected')).toBeInTheDocument();
+        expect(mocks.testPluginConnection).toHaveBeenCalledWith('openai_recommendations', expect.objectContaining({ api_key: 'sk-test', base_url: 'https://api.openai.com/v1' }), undefined);
+    });
+
+    it('sets up a model the admin runs themselves, with no key', async () => {
+        await openAiStep();
+        mocks.testPluginConnection.mockResolvedValue({ success: true, message: 'Connected. No embedding model is chosen, so recommendations and AI playlists stay off.' });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Ollama' }));
+        fireEvent.change(screen.getByRole('textbox', { name: 'Recommendations' }), { target: { value: 'llama3.1' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save & test' }));
+
+        await waitFor(() => expect(mocks.updatePluginSettings).toHaveBeenCalledWith('openai_recommendations', {
+            ...OPENAI_DEFAULTS,
+            base_url: 'http://host.docker.internal:11434/v1',
+            chat_model: 'llama3.1',
+            collections_model: '',
+            music_playlists_model: '',
+            embedding_model: '',
+            is_enabled: 'true',
+        }, undefined));
+        expect(await screen.findByText(/No embedding model is chosen/)).toBeInTheDocument();
+    });
+
+    it('shows a server that already has AI set up where it is pointed, and lets it be changed', async () => {
+        mocks.getAiStatus.mockResolvedValue({ configured: true, embeddings: true, isOpenAi: false, host: 'host.docker.internal:11434' });
+        renderAiStep({ base_url: 'http://host.docker.internal:11434/v1', chat_model: 'llama3.1' });
+
+        expect(await screen.findByText('AI is set up and using the server at host.docker.internal:11434.')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Change' }));
+
+        expect(await screen.findByLabelText('Server address')).toHaveValue('http://host.docker.internal:11434/v1');
+    });
+
+    it('moves past the AI step without saving when nothing was filled in', async () => {
+        await openAiStep();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+
+        expect(await screen.findByRole('heading', { name: 'Backups' })).toBeInTheDocument();
+        expect(mocks.updatePluginSettings).not.toHaveBeenCalled();
+    });
+
+    it('saves a filled-in AI step on the way to the next one', async () => {
+        await openAiStep();
+
+        fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'sk-test' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+
+        await waitFor(() => expect(mocks.updatePluginSettings).toHaveBeenCalledWith('openai_recommendations', expect.objectContaining({ api_key: 'sk-test', is_enabled: 'true' }), undefined));
+        expect(await screen.findByRole('heading', { name: 'Backups' })).toBeInTheDocument();
+    });
+
+    it('reads whether AI is set up from the server on the last step, not from a key', async () => {
+        mocks.getGuide.mockResolvedValue(guide({ step: 'done' }));
+        mocks.getAiStatus.mockResolvedValue({ configured: true, embeddings: false, isOpenAi: false, host: 'host.docker.internal:11434' });
+        renderGuide();
+
+        await screen.findByRole('heading', { name: 'The groundwork is set' });
+
+        await waitFor(() => expect(mocks.getAiStatus).toHaveBeenCalledWith(undefined));
+        expect(mocks.getPluginSettings).not.toHaveBeenCalledWith('openai_recommendations', undefined);
     });
 
     it('remembers this session so the pop-up does not follow the admin out of the guide', async () => {

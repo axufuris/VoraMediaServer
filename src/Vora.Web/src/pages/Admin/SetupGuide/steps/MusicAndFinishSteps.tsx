@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { systemSettingsAdminService } from '../../../../api/System/systemSettingsAdminService';
+import { aiSettingsService } from '../../../../api/System/aiSettingsService';
 import { remoteAccessService } from '../../../../api/System/remoteAccessService';
 import { emailAdminService } from '../../../../api/System/emailAdminService';
 import { backupsService } from '../../../../api/System/backupsService';
 import HealthBadge from '../../../../components/Admin/Primitives/HealthBadge';
 import { PLUGIN_FIELDS, findPlugin, hasKeySaved, type SetupStepProps } from '../setupContext';
 import SetupPluginCard from '../SetupPluginCard';
+import SetupAiCard from '../SetupAiCard';
 import { CardHeading, Hint, SetupCard, StepHeading, SwitchRow, WhyNote } from '../SetupParts';
 
 export function LastFmStep({ plugins, onPluginsChanged, serverId }: SetupStepProps) {
@@ -46,7 +47,7 @@ export function AiStep({ plugins, onPluginsChanged, serverId, content, settings,
     ];
     return (
         <>
-            <StepHeading eyebrow="AI" title="AI features" lead="With OpenAI, Vora can do jobs you would otherwise do by hand and goes further than its built-in suggestions and mixes." />
+            <StepHeading eyebrow="AI" title="AI features" lead="With OpenAI, or a model you run yourself, Vora can do jobs you would otherwise do by hand and goes further than its built-in suggestions and mixes." />
             <SetupCard>
                 <span className="text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">What it powers</span>
                 <ul className="grid gap-2 sm:grid-cols-2">
@@ -58,13 +59,13 @@ export function AiStep({ plugins, onPluginsChanged, serverId, content, settings,
                     ))}
                 </ul>
             </SetupCard>
-            <SetupPluginCard pluginId="openai_recommendations" title="OpenAI" subtitle="Powers every AI feature. OpenAI charges per use; the monthly limit caps it." fieldKeys={PLUGIN_FIELDS.openAi} plugin={findPlugin(plugins, 'openai_recommendations')} serverId={serverId} onChanged={onPluginsChanged}>
+            <SetupAiCard plugin={findPlugin(plugins, 'openai_recommendations')} serverId={serverId} onChanged={onPluginsChanged}>
                 {content.music && (
                     <div className="border-t border-dashed border-[var(--vora-border-strong)] pt-4">
-                        <SwitchRow id="setup-ai-music" label="Turn on AI music playlists" description={'Off by default. Users get "Make me a playlist for…" on the Music page and weekly AI mixes.'} checked={settings.enableAiMusicPlaylists} onChange={on => onSettings({ enableAiMusicPlaylists: on })} />
+                        <SwitchRow id="setup-ai-music" label="Turn on AI music playlists" description={'Off by default. Users get "Make me a playlist for…" on the Music page and weekly AI mixes. Needs an embedding model.'} checked={settings.enableAiMusicPlaylists} onChange={on => onSettings({ enableAiMusicPlaylists: on })} />
                     </div>
                 )}
-            </SetupPluginCard>
+            </SetupAiCard>
         </>
     );
 }
@@ -86,12 +87,12 @@ interface AccessSummary {
 const SIGN_UP_LABELS: Record<number, string> = { 0: 'Only you', 1: 'Open', 2: 'PIN', 3: 'Invitations' };
 
 export function DoneStep({ plugins, settings, features, content, discoverRows, serverId }: SetupStepProps) {
-    const [aiKey, setAiKey] = useState(false);
+    const [aiReady, setAiReady] = useState(false);
     const [access, setAccess] = useState<AccessSummary>({ remote: false, email: false, backups: false });
     useEffect(() => {
-        systemSettingsAdminService.getPluginSettings('openai_recommendations', serverId)
-            .then(fields => setAiKey(!!fields.find(f => f.key === 'api_key')?.value?.trim()))
-            .catch(() => setAiKey(false));
+        aiSettingsService.getStatus(serverId)
+            .then(status => setAiReady(status.configured))
+            .catch(() => setAiReady(false));
         Promise.all([
             remoteAccessService.getRemoteAccessStatus(serverId).then(r => r.isEnabled).catch(() => false),
             emailAdminService.getSettings(serverId).then(e => e.emailEnabled && !!e.smtpHost?.trim()).catch(() => false),
@@ -124,7 +125,7 @@ export function DoneStep({ plugins, settings, features, content, discoverRows, s
     if (content.internetRadio) rows.push({ title: 'Internet radio', state: on(features.internetRadioEnabled) });
     if (content.podcasts) rows.push({ title: 'Podcasts', state: on(features.podcasts) });
     if (content.music) rows.push({ title: 'Last.fm', state: key('lastfm_listening') }, { title: 'Lyrics', state: 'set' });
-    rows.push({ title: 'AI features', state: aiKey ? 'set' : 'skipped' }, { title: 'Backups', state: on(access.backups) });
+    rows.push({ title: 'AI features', state: aiReady ? 'set' : 'skipped' }, { title: 'Backups', state: on(access.backups) });
 
     const badge = (row: DoneRow) => row.state === 'set'
         ? <HealthBadge tone="ok">{row.label ?? 'Set up'}</HealthBadge>

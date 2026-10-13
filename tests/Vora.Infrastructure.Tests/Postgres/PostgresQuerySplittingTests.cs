@@ -81,7 +81,7 @@ public class PostgresQuerySplittingTests(PostgresDatabase database) : IClassFixt
         db.AddRange(library, movie);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var waiting = await new OpenAiRecommendationRepository(db).GetMediaItemsMissingEmbeddingsAsync(int.MaxValue);
+        var waiting = await new OpenAiRecommendationRepository(db).GetMediaItemsMissingEmbeddingsAsync(int.MaxValue, "text-embedding-3-small");
 
         var item = waiting.Single(m => m.Id == movie.Id);
         item.Genres.Should().ContainSingle();

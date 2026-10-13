@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Vora.Application.Ai;
 using Vora.Application.Media.Ai;
 using Vora.Application.Plugins.ViewModels;
 using Vora.Application.Settings.ViewModels;
@@ -221,10 +222,14 @@ public class SystemSettingsManager : ISystemSettingsManager
         var iptv = await GetIptvSourceAvailabilityAsync();
 
         // Switched on AND usable: the admin's toggle, the For You page they live
-        // on, and an OpenAI key to make them with.
-        var aiPlaylists = settings.EnableAiMusicPlaylists
-            && settings.EnableForYou
-            && !string.IsNullOrWhiteSpace(await _settingsRepo.GetPluginSettingAsync("openai_recommendations", "api_key"));
+        // on, and an AI connection with a chat and an embedding model to make
+        // them with.
+        var aiPlaylists = settings.EnableAiMusicPlaylists && settings.EnableForYou;
+        if (aiPlaylists)
+        {
+            var ai = await AiConnection.LoadAsync(_settingsRepo);
+            aiPlaylists = ai.CanChat && ai.CanEmbed;
+        }
 
         return new FeatureFlagsVM
         {
