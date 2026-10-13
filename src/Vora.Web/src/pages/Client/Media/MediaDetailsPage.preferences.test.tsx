@@ -57,11 +57,40 @@ describe('movie and show playback preferences', () => {
     it('reset removes saved track and capability overrides', async () => {
         saveTitlePlaybackPreferences(movie, { maxAudioChannels: 6, subtitles: { id: 'none' } });
         mount();
+        await screen.findByRole('combobox', { name: 'Audio', exact: true });
+        await userEvent.click(screen.getByRole('button', { name: 'More actions' }));
+        await userEvent.click(screen.getByText('Quality & tracks', { exact: true }));
         await screen.findByRole('combobox', { name: 'Audio output' });
         await userEvent.click(screen.getByRole('button', { name: 'Use global defaults' }));
         expect(readTitlePlaybackPreferences(movie).maxAudioChannels).toBeUndefined();
         expect(screen.getByRole('combobox', { name: 'Audio output' })).toHaveValue('global');
         expect(screen.getByRole('combobox', { name: 'Subtitles' })).toHaveValue('text');
+    });
+    it('places compact track pills above Play and keeps one file read-only', async () => {
+        mount();
+        const group = await screen.findByRole('group', { name: 'Title playback preferences' });
+        const play = screen.getByRole('button', { name: 'Play', exact: true });
+        expect(play.parentElement).toContainElement(group);
+        expect(group.compareDocumentPosition(play) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(screen.getByRole('combobox', { name: 'Video', exact: true })).toBeDisabled();
+        expect(screen.queryByRole('combobox', { name: 'Audio output' })).not.toBeInTheDocument();
+    });
+    it('lists only the chosen file audio and subtitles after switching copies', async () => {
+        vi.mocked(mediaService.getMediaItem).mockResolvedValue({ ...movie, mediaParts: [
+            ...(movie.mediaParts ?? []),
+            { id: 'part-4k', filePath: '', resolution: '2160p', videoTracks: [{ id: 'video-4k', codec: 'hevc' }], audioTracks: [{ id: 'other-audio', language: 'fra', codec: 'aac', channels: 2 }], subtitleTracks: [{ id: 'other-sub', language: 'fra', codec: 'srt' }] },
+        ] });
+        mount();
+        const video = await screen.findByRole('combobox', { name: 'Video', exact: true });
+        expect(video).toBeEnabled();
+        await userEvent.selectOptions(video, 'part-4k');
+        expect(screen.getByRole('combobox', { name: 'Audio', exact: true }).querySelectorAll('option')).toHaveLength(1);
+        expect(screen.getByRole('combobox', { name: 'Audio', exact: true })).toHaveValue('other-audio');
+        const subtitles = screen.getByRole('combobox', { name: 'Subtitles' });
+        expect([...subtitles.querySelectorAll('option')].map(option => option.value)).toEqual(['none', 'other-sub']);
+        await userEvent.selectOptions(video, 'part');
+        expect(screen.getByRole('combobox', { name: 'Audio', exact: true }).querySelectorAll('option')).toHaveLength(2);
+        expect([...subtitles.querySelectorAll('option')].map(option => option.value)).toEqual(['none', 'text']);
     });
     it('starts the actual next episode with inherited show choices and its resume position', async () => {
         vi.mocked(mediaService.getMediaItem).mockImplementation(async id => id === 'show' ? show : episode);

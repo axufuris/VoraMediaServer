@@ -8,7 +8,7 @@ import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { streamingService } from '../../../api/Streaming/streamingService';
 import { getEffectiveCapabilities, scanDeviceCapabilitiesSync } from '../../../utils/hardwareScanner';
-import TitlePlaybackControls from '../../../components/Media/TitlePlaybackControls';
+import TitlePlaybackControls, { TitlePlaybackAdvanced } from '../../../components/Media/TitlePlaybackControls';
 import { applyTitlePlaybackCapabilities, readTitlePlaybackPreferences, resolveTitlePlayback, saveAudioChoice, saveSubtitleChoice, saveTitlePlaybackPreferences, saveVideoChoice, titlePlaybackKey, type TitlePlaybackPreferences } from '../../../utils/titlePlaybackPreferences';
 import { isVideoDirectPlayable, isAudioDirectPlayable, parseResolutionHeight } from '../../../utils/playbackDecision';
 import { useDialog } from '../../../dialogs';
@@ -28,7 +28,7 @@ import { formatRuntime } from '../../../utils/formatRuntime';
 import { isFullyWatched } from '../../../utils/watchState';
 import { isImageSubtitleCodec, isNoSubtitle } from '../../../utils/subtitleKind';
 import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
-import { audioChipLabel, heroFactsLine, pickChipAudioTrack, resolutionChipLabel, subtitleChipLabel } from '../../../utils/heroQualityChips';
+import { heroFactsLine, pickChipAudioTrack } from '../../../utils/heroQualityChips';
 import { formatDate, serverTimeMs, yearOf } from '../../../utils/serverTime';
 import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
 import { errorDetail, isMissingOrForbidden } from '../../../utils/apiError';
@@ -43,6 +43,16 @@ interface UpcomingEpisodeParsed {
     EpisodeNumber: number;
     Title: string;
     AirDate: string;
+}
+
+function trackLanguageName(code?: string): string {
+    if (!code) return 'Unknown';
+    try { return new Intl.DisplayNames(['en'], { type: 'language' }).of(new Intl.Locale(code).language) ?? code; }
+    catch { return code; }
+}
+
+function audioLayout(channels?: number): string {
+    return channels === 6 ? '5.1' : channels === 8 ? '7.1' : channels === 2 ? '2.0' : channels ? `${channels}ch` : '';
 }
 
 export default function MediaDetailsPage() {
@@ -354,9 +364,6 @@ export default function MediaDetailsPage() {
         ? [...activePart.audioTracks].sort((a, b) => (b.channels || 0) - (a.channels || 0))
         : [];
 
-    // What the chips advertise is what Quality & tracks has selected, not the
-    // richest track the file happens to carry.
-    const chipAudioLabel = audioChipLabel(pickChipAudioTrack(activePart?.audioTracks, selectedAudioId));
 
     const videoOptions: QualityOption<string>[] = sortedVideoTracks.map(v => {
         const displayRes = v.part.resolution === '2160p' ? '4K' : (v.part.resolution || 'Unknown');
@@ -369,14 +376,14 @@ export default function MediaDetailsPage() {
     });
     const audioOptions: QualityOption<string>[] = sortedAudioTracks.map(a => ({
         value: a.id,
-        label: `${a.language || 'Unknown'} · ${a.codec?.toUpperCase() ?? '—'}${a.channels ? ` · ${a.channels}ch` : ''}`,
+        label: [trackLanguageName(a.language), a.codec?.toUpperCase(), audioLayout(a.channels), a.isDefault ? '(Default)' : null, a.title?.toLowerCase().includes('commentary') ? a.title : null].filter(Boolean).join(' '),
         sublabel: [a.title, a.isDefault ? 'Default' : null, isAudioDirectPlayable(a, caps) ? 'Direct Play' : 'Transcode'].filter(Boolean).join(' · ') || undefined,
     }));
     const subtitleOptions: QualityOption<string>[] = [
         { value: 'none', label: 'Off' },
         ...(activePart?.subtitleTracks ?? []).map(s => ({
             value: s.id,
-            label: s.language || 'Unknown',
+            label: [trackLanguageName(s.language), s.isDefault ? '(Default)' : null, s.codec?.toUpperCase(), s.isForced ? 'Forced' : null, s.isHearingImpaired ? 'SDH' : null].filter(Boolean).join(' '),
             sublabel: [s.title, s.isForced ? 'Forced' : null, s.isHearingImpaired ? 'SDH' : null, s.isDefault ? 'Default' : null].filter(Boolean).join(' · ') || undefined,
         })),
     ];
@@ -388,8 +395,8 @@ export default function MediaDetailsPage() {
             const playbackBadge = partVideo && isVideoDirectPlayable(partVideo, p, caps) ? 'Direct Play' : 'Transcode';
             return {
                 value: p.id,
-                label: p.edition || displayRes,
-                sublabel: [p.edition ? displayRes : null, p.bitrateKbps ? `${Math.round(p.bitrateKbps / 1000)} Mbps` : null, playbackBadge].filter(Boolean).join(' · ') || undefined,
+                label: [displayRes, partVideo?.codec?.toUpperCase(), playbackBadge].filter(Boolean).join(' · '),
+                sublabel: [p.edition, p.bitrateKbps ? `${Math.round(p.bitrateKbps / 1000)} Mbps` : null].filter(Boolean).join(' · ') || undefined,
             };
         });
 
@@ -412,7 +419,7 @@ export default function MediaDetailsPage() {
     const isSeason = media.type === 'Season';
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = isSeason ? seasonName(media.seasonNumber, media.title) : isEpisode ? media.title : undefined;
-    const showQualityButton = (media.type === 'Movie' || isEpisode || media.type === 'TvShow') && (versionOptions.length > 1 || sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
+    const showQualityButton = media.type === 'Movie' || isEpisode || media.type === 'TvShow';
     const moreEntries = tidyMenu([
         ...(showQualityButton ? [menuAction('quality', 'Quality & tracks', () => setIsQualityPanelOpen(true))] : []),
         ...itemActions.entries,
@@ -434,15 +441,6 @@ export default function MediaDetailsPage() {
         </>
     ) : null;
 
-    const resolutionLabel = resolutionChipLabel(activePart?.resolution);
-    const subtitleLabel = subtitleChipLabel(activePart?.subtitleTracks, selectedSubtitleId);
-    const heroTechChips = (resolutionLabel || chipAudioLabel || subtitleLabel) ? (
-        <>
-            {resolutionLabel && <HeroChip tone="accent">{resolutionLabel}</HeroChip>}
-            {chipAudioLabel && <HeroChip>{chipAudioLabel}</HeroChip>}
-            {subtitleLabel && <HeroChip>{subtitleLabel}</HeroChip>}
-        </>
-    ) : null;
 
     const heroRatings = (
         <>
@@ -464,6 +462,15 @@ export default function MediaDetailsPage() {
 
     const heroActions = (
         <>
+            {showQualityButton && versionOptions.length > 0 && (
+                <div className="w-full pb-0.5">
+                    <TitlePlaybackControls
+                        videoOptions={versionOptions} audioOptions={audioOptions} subtitleOptions={subtitleOptions}
+                        videoId={activePart?.id ?? ''} audioId={selectedAudioId} subtitleId={selectedSubtitleId}
+                        onVideoChange={handleVersionChange} onAudioChange={handleAudioChange} onSubtitleChange={handleSubtitleChange}
+                    />
+                </div>
+            )}
             <button
                 type="button"
                 onClick={() => handlePlay(true)}
@@ -581,6 +588,7 @@ export default function MediaDetailsPage() {
                     <QualityPanelSection title="Audio" options={audioOptions} value={selectedAudioId} onChange={handleAudioChange} />
                 )}
                 <QualityPanelSection title="Subtitles" options={subtitleOptions} value={selectedSubtitleId} onChange={handleSubtitleChange} />
+                <TitlePlaybackAdvanced preferences={preferences} onPreferencesChange={handlePreferencesChange} onReset={() => handlePreferencesChange({})} />
             </QualityPanel>
 
             <DetailHero
@@ -600,17 +608,7 @@ export default function MediaDetailsPage() {
                 actions={heroActions}
                 notice={heroNotice}
                 overview={media.overview}
-                techChips={heroTechChips}
             />
-            {(media.type === 'Movie' || media.type === 'Episode' || media.type === 'TvShow') && (
-                <TitlePlaybackControls
-                    videoOptions={videoOptions} audioOptions={audioOptions} subtitleOptions={subtitleOptions}
-                    videoId={selectedVideoId} audioId={selectedAudioId} subtitleId={selectedSubtitleId}
-                    preferences={preferences} isShow={media.type !== 'Movie'}
-                    onVideoChange={handleVideoChange} onAudioChange={handleAudioChange} onSubtitleChange={handleSubtitleChange}
-                    onPreferencesChange={handlePreferencesChange} onReset={() => handlePreferencesChange({})}
-                />
-            )}
             {media.type === 'TvShow' && (media.seasons || []).length > 0 && (
                 <div className="mt-12">
                     <MediaRow title="Seasons">
