@@ -251,7 +251,17 @@ public class MetadataFetchService : IMetadataFetchService
         var localPath = await GetLocalPathAsync(item);
         if (localProvider != null && localPath != null)
         {
-            Add(await localProvider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name, localPath, item.Title), localProvider.Id);
+            var localArtwork = await localProvider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name, localPath, item.Title);
+            if (item is Season localSeason)
+            {
+                var poster = LocalMediaAssets.SeasonPoster(localPath, localSeason.SeasonNumber);
+                localArtwork = localArtwork.Where(artwork => artwork.Kind != Vora.Plugins.Dtos.ArtworkKind.Poster);
+                if (poster != null) localArtwork = localArtwork.Prepend(new ArtworkResult
+                {
+                    Kind = Vora.Plugins.Dtos.ArtworkKind.Poster, Url = poster, Language = "Local"
+                });
+            }
+            Add(localArtwork, localProvider.Id);
         }
         var localKinds = artworkEntities.Select(a => a.Kind).ToHashSet();
         if (provider != null && provider != localProvider && localKinds.Count < (item is Episode or Season ? 2 : 3))

@@ -1,0 +1,70 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<episodedetails>
+  <plot><![CDATA[In the wake of another death, Boyd questions his decision to leave. Kenny steps up and embraces his new role. Jim rallies the town around his idea to build a radio tower. Fatima urges Ellis to make amends with his father before it’s too late.]]></plot>
+  <outline />
+  <lockdata>false</lockdata>
+  <dateadded>2026-07-25 15:33:55</dateadded>
+  <title>Broken Windows, Open Doors</title>
+  <director tvdbid="8192117">Jennifer Liao</director>
+  <rating>7.7</rating>
+  <year>2022</year>
+  <sorttitle>Broken Windows, Open Doors</sorttitle>
+  <mpaa>TV-MA</mpaa>
+  <imdbid>tt15505832</imdbid>
+  <tvdbid>8808288</tvdbid>
+  <runtime>55</runtime>
+  <genre>Drama</genre>
+  <genre>Horror</genre>
+  <genre>Mystery</genre>
+  <uniqueid type="tvdb">8808288</uniqueid>
+  <uniqueid type="imdb">tt15505832</uniqueid>
+  <episode>8</episode>
+  <season>1</season>
+  <aired>2022-04-10</aired>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>hevc</codec>
+        <micodec>hevc</micodec>
+        <bitrate>2873328</bitrate>
+        <width>1920</width>
+        <height>958</height>
+        <aspect>960:479</aspect>
+        <aspectratio>960:479</aspectratio>
+        <framerate>23.976025</framerate>
+        <scantype>progressive</scantype>
+        <default>True</default>
+        <forced>False</forced>
+        <duration>55</duration>
+        <durationinseconds>3302</durationinseconds>
+      </video>
+      <audio>
+        <codec>eac3</codec>
+        <micodec>eac3</micodec>
+        <bitrate>640000</bitrate>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <channels>6</channels>
+        <samplingrate>48000</samplingrate>
+        <default>False</default>
+        <forced>False</forced>
+      </audio>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+</episodedetails>

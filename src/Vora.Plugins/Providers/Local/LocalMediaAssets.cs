@@ -15,6 +15,7 @@ public static partial class LocalMediaAssets
     public static string? ShowDirectory(string episodePath)
     {
         var directory = DirectoryPath(episodePath);
+        if (NamedFile(Files(directory), "tvshow.nfo") != null) return directory;
         return directory != null && SeasonFolder().IsMatch(Path.GetFileName(directory))
             ? Path.GetDirectoryName(directory)
             : directory;
@@ -41,6 +42,19 @@ public static partial class LocalMediaAssets
         names.Select(name => files.FirstOrDefault(file => ImageExtensions.Contains(Path.GetExtension(file))
             && Path.GetFileNameWithoutExtension(file).Equals(name, StringComparison.OrdinalIgnoreCase)))
             .FirstOrDefault(file => file != null);
+
+    public static string? SeasonPoster(string directory, int seasonNumber)
+    {
+        var files = Files(directory);
+        var seasonName = $"season{seasonNumber:D2}";
+        var poster = Image(files, seasonName + "-poster", seasonName);
+        if (poster != null) return poster;
+
+        var showDirectory = ShowDirectory(directory);
+        if (showDirectory == null || showDirectory == directory) return null;
+        return Image(files, "poster", "folder", "cover")
+            ?? Image(Files(showDirectory), seasonName + "-poster", seasonName);
+    }
 
     [GeneratedRegex(@"^(season|series|specials?)\b|^s\d{1,3}$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SeasonFolder();

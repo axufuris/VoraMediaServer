@@ -121,6 +121,7 @@ public static class LocalNfoReader
             if (name != null) result.Cast.Add(new CastMemberResult
             {
                 Name = name, CharacterName = Text(actor, "role"),
+                TmdbId = PositiveId(Text(actor, "tmdbid")), TvdbId = PositiveId(Text(actor, "tvdbid")),
                 ProfileImageUrl = ExistingImage(Text(actor, "thumb")), Roles = CastRole.Actor
             });
         }
@@ -154,6 +155,7 @@ public static class LocalNfoReader
 
     private static string? ProviderId(XElement root, string provider) =>
         Text(root, provider + "id")
+        ?? Text(root, provider + "_id")
         ?? root.Elements("uniqueid").FirstOrDefault(node => string.Equals((string?)node.Attribute("type"), provider, StringComparison.OrdinalIgnoreCase)
             && !string.IsNullOrWhiteSpace(node.Value))?.Value.Trim();
 
@@ -178,7 +180,15 @@ public static class LocalNfoReader
         foreach (var person in root.Elements(element))
         {
             var name = person.Value.Trim();
-            if (name.Length > 0) result.Cast.Add(new CastMemberResult { Name = name, Roles = role });
+            if (name.Length > 0) result.Cast.Add(new CastMemberResult
+            {
+                Name = name, Roles = role,
+                TmdbId = PositiveId((string?)person.Attribute("tmdbid")),
+                TvdbId = PositiveId((string?)person.Attribute("tvdbid"))
+            });
         }
     }
+
+    private static int PositiveId(string? value) =>
+        int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) && id > 0 ? id : 0;
 }

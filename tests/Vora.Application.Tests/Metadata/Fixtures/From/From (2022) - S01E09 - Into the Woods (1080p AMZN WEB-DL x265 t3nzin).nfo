@@ -1,0 +1,69 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<episodedetails>
+  <plot><![CDATA[Boyd and Sara journey deeper into the forest than Boyd has ever gone, encountering new and terrifying mysteries. Jim’s confidence in the radio tower begins to wane. An unexpected tragedy causes Donna to unravel. Kenny and Kristi share a moment.]]></plot>
+  <outline />
+  <lockdata>false</lockdata>
+  <dateadded>2026-07-25 15:33:55</dateadded>
+  <title>Into the Woods</title>
+  <director tvdbid="464938">Jeff Renfroe</director>
+  <rating>7.6</rating>
+  <year>2022</year>
+  <sorttitle>Into the Woods</sorttitle>
+  <imdbid>tt15576042</imdbid>
+  <tvdbid>8808289</tvdbid>
+  <runtime>45</runtime>
+  <genre>Drama</genre>
+  <genre>Horror</genre>
+  <genre>Mystery</genre>
+  <uniqueid type="tvdb">8808289</uniqueid>
+  <uniqueid type="imdb">tt15576042</uniqueid>
+  <episode>9</episode>
+  <season>1</season>
+  <aired>2022-04-17</aired>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>hevc</codec>
+        <micodec>hevc</micodec>
+        <bitrate>3185660</bitrate>
+        <width>1920</width>
+        <height>952</height>
+        <aspect>240:119</aspect>
+        <aspectratio>240:119</aspectratio>
+        <framerate>23.976025</framerate>
+        <scantype>progressive</scantype>
+        <default>True</default>
+        <forced>False</forced>
+        <duration>45</duration>
+        <durationinseconds>2717</durationinseconds>
+      </video>
+      <audio>
+        <codec>eac3</codec>
+        <micodec>eac3</micodec>
+        <bitrate>640000</bitrate>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <channels>6</channels>
+        <samplingrate>48000</samplingrate>
+        <default>False</default>
+        <forced>False</forced>
+      </audio>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+</episodedetails>

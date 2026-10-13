@@ -1,0 +1,71 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<episodedetails>
+  <plot><![CDATA[Julie finds comfort in her new friends as Jim and Tabitha deal with their struggling marriage. Ethan ventures off into the forest with Victor while Father Khatri urges Boyd to embrace his role as leader. Sara receives another horrifying directive.]]></plot>
+  <outline />
+  <lockdata>false</lockdata>
+  <dateadded>2026-07-25 15:31:27</dateadded>
+  <title>A Rock and a Farway</title>
+  <director tmdbid="28976" tvdbid="248008">Jack Bender</director>
+  <rating>7.3</rating>
+  <year>2022</year>
+  <sorttitle>Rock and a Farway</sorttitle>
+  <mpaa>TV-MA</mpaa>
+  <imdbid>tt15205340</imdbid>
+  <tvdbid>8808284</tvdbid>
+  <runtime>48</runtime>
+  <genre>Drama</genre>
+  <genre>Horror</genre>
+  <genre>Mystery</genre>
+  <uniqueid type="tvdb">8808284</uniqueid>
+  <uniqueid type="official website">https://www.epix.com/movie/from-s1-e4</uniqueid>
+  <uniqueid type="imdb">tt15205340</uniqueid>
+  <episode>4</episode>
+  <season>1</season>
+  <aired>2022-03-13</aired>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>hevc</codec>
+        <micodec>hevc</micodec>
+        <bitrate>3282134</bitrate>
+        <width>1920</width>
+        <height>958</height>
+        <aspect>960:479</aspect>
+        <aspectratio>960:479</aspectratio>
+        <framerate>23.976025</framerate>
+        <scantype>progressive</scantype>
+        <default>True</default>
+        <forced>False</forced>
+        <duration>47</duration>
+        <durationinseconds>2877</durationinseconds>
+      </video>
+      <audio>
+        <codec>eac3</codec>
+        <micodec>eac3</micodec>
+        <bitrate>640000</bitrate>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <channels>6</channels>
+        <samplingrate>48000</samplingrate>
+        <default>False</default>
+        <forced>False</forced>
+      </audio>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+</episodedetails>

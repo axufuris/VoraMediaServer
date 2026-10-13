@@ -321,4 +321,144 @@ public class LocalMetadataImportTests : IDisposable
         artwork.Should().ContainSingle(a => a.Kind == ArtworkKind.Logo && a.Url == ownLogo);
         artwork.Should().NotContain(a => a.Url == sharedPoster || a.Url.EndsWith(".nfo"));
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Imports_the_FROM_show_and_all_ten_episodes_from_the_supplied_season_layout(bool singleFile)
+    {
+        const string folder = "From (2022) Season 1 S01 (1080p AMZN WEB-DL x265 HEVC 10bit EAC3 5.1 t3nzin)";
+        var sampleDirectory = Path.Combine(_directory, folder);
+        Directory.CreateDirectory(sampleDirectory);
+        var source = Path.Combine(AppContext.BaseDirectory, "Metadata", "Fixtures", "From");
+        foreach (var nfo in Directory.GetFiles(source, "*.nfo"))
+            File.Copy(nfo, Path.Combine(sampleDirectory, Path.GetFileName(nfo)));
+        var episodeNfos = Directory.GetFiles(sampleDirectory, "*.nfo")
+            .Where(path => Path.GetFileName(path) != "tvshow.nfo").Order(StringComparer.Ordinal).ToList();
+        episodeNfos.Should().HaveCount(10);
+        var episodes = episodeNfos.Select((nfo, index) => new Episode
+        {
+            Title = "Filename title", EpisodeNumber = index + 1,
+            Library = new MediaLibrary { Name = "TV" },
+            MediaParts = [new MediaPart { FilePath = Write(Path.Combine(folder, Path.GetFileNameWithoutExtension(nfo) + ".mkv")) }]
+        }).ToList();
+        var poster = Write(Path.Combine(folder, "poster.jpg"));
+        var backdrop = Write(Path.Combine(folder, "fanart.jpg"));
+        var logo = Write(Path.Combine(folder, "clearlogo.png"));
+        var seasonPoster = Write(Path.Combine(folder, "season01-poster.jpg"));
+        foreach (var episode in episodes)
+            Write(Path.Combine(folder, Path.GetFileNameWithoutExtension(episode.MediaParts.Single().FilePath) + "-thumb.jpg"));
+        var show = new TvShow { Title = "Filename show", Library = new MediaLibrary { Name = "TV" } };
+        var season = new Season { Title = "Season 1", SeasonNumber = 1, TvShow = show, Library = show.Library };
+        foreach (var episode in episodes) episode.Season = season;
+        _repository.GetEpisodeFilePathsForShowAsync(show.Id).Returns(episodes.Select(episode => episode.MediaParts.Single().FilePath).ToList());
+        _repository.GetEpisodeIdsForSeasonAsync(season.Id).Returns(episodes.Select(episode => episode.Id).ToList());
+        _repository.GetMediaFilePathsAsync(episodes[0].Id).Returns([episodes[0].MediaParts.Single().FilePath]);
+        var fetch = Fetch(new LocalArtworkProvider());
+
+        var showMetadata = Assert.IsType<MetadataResult>((await fetch.GetTextMetadataAsync(show)).Metadata);
+        showMetadata.Title.Should().Be("FROM");
+        showMetadata.Overview.Should().Contain("nightmarish town");
+        showMetadata.TmdbId.Should().Be("124364");
+        showMetadata.ImdbId.Should().Be("tt9813792");
+        showMetadata.TvdbId.Should().Be("401003");
+        showMetadata.ReleaseDate.Should().Be(new DateOnly(2022, 2, 20));
+        showMetadata.ContentRating.Should().Be("TV-MA");
+        showMetadata.Status.Should().Be("Continuing");
+        showMetadata.Cast.Should().Contain(actor => actor.Name == "Harold Perrineau" && actor.CharacterName == "Boyd Stevens"
+            && actor.TmdbId == 6195 && actor.TvdbId == 7933614);
+        var actorRepository = Substitute.For<IActorRepository>();
+        actorRepository.GetActorsByTmdbIdsOrNamesAsync(Arg.Any<IEnumerable<int>>(), Arg.Any<IEnumerable<string>>())
+            .Returns(new List<Vora.Domain.Entities.Actors.Actor>());
+        var pluginSettings = Substitute.For<IPluginSettingsProvider>();
+        pluginSettings.GetMetadataLanguageAsync().Returns("eng");
+        var mapper = new MetadataMappingService(_repository, Substitute.For<IMediaArtworkRepository>(),
+            actorRepository, Substitute.For<ICollectionRepository>(), Substitute.For<IReferenceRepository>(),
+            new ReferenceWriteGate(), Options.Create(new StoragePathsOptions()), pluginSettings);
+        await mapper.ApplyTextMetadataAsync(show, showMetadata, false, "local_metadata", "Local");
+        show.Title.Should().Be("FROM");
+        show.ContentRating.Should().Be("TV-MA");
+        var showArtwork = await fetch.GetArtworkAsync(show);
+        showArtwork.Should().Contain(a => a.Kind == ArtworkKind.Poster && a.Url == poster);
+        showArtwork.Should().Contain(a => a.Kind == ArtworkKind.Backdrop && a.Url == backdrop);
+        showArtwork.Should().Contain(a => a.Kind == ArtworkKind.Logo && a.Url == logo);
+        (await fetch.GetArtworkAsync(season)).Should().ContainSingle(a => a.Kind == ArtworkKind.Poster && a.Url == seasonPoster);
+
+        var expectedTitles = new[]
+        {
+            "Long Day's Journey Into Night", "The Way Things Are Now", "Choosing Day", "A Rock and a Farway",
+            "Silhouettes", "Book 74", "All Good Things", "Broken Windows, Open Doors", "Into the Woods", "Oh, the Places We'll Go"
+        };
+        var ingestion = Substitute.For<IMediaIngestionService>();
+        var library = LibraryHandle.FromGuid(Guid.NewGuid());
+        var showId = new MediaItemHandle(show.Id);
+        var seasonId = new SeasonHandle(season.Id);
+        ingestion.GetLibraryDetailsAsync(library).Returns((new List<string> { _directory }, null, new List<string>()));
+        ingestion.GetExistingLibraryPathsAsync(library).Returns(new HashSet<string>());
+        ingestion.EnsureTvShowAsync(library, "FROM", 2022, "124364", "tt9813792", "401003").Returns(showId);
+        ingestion.EnsureSeasonAsync(library, showId, 1).Returns(seasonId);
+        var scanner = new VoraLocalMediaScannerProvider(NullLogger<VoraLocalMediaScannerProvider>.Instance, ingestion, new NullTaskProgressReporter());
+        if (singleFile)
+        {
+            foreach (var episode in episodes) await scanner.ScanTvFileAsync(library.Value, episode.MediaParts.Single().FilePath);
+        }
+        else await scanner.ScanTvShowLibraryAsync(library.Value);
+
+        for (var index = 0; index < episodes.Count; index++)
+        {
+            var episode = episodes[index];
+            var metadata = Assert.IsType<MetadataResult>((await fetch.GetTextMetadataAsync(episode)).Metadata);
+            metadata.Title.Should().Be(expectedTitles[index]);
+            metadata.Overview.Should().NotBeNullOrWhiteSpace();
+            metadata.ReleaseDate.Should().NotBeNull();
+            await mapper.ApplyTextMetadataAsync(episode, metadata, false, "local_metadata", "Local");
+            episode.ContentRating.Should().Be("TV-MA");
+            episode.Title.Should().Be(expectedTitles[index]);
+            metadata.TvdbId.Should().NotBeNullOrWhiteSpace();
+            var thumb = Path.Combine(sampleDirectory, Path.GetFileNameWithoutExtension(episode.MediaParts.Single().FilePath) + "-thumb.jpg");
+            (await fetch.GetArtworkAsync(episode)).Should().ContainSingle(a => a.Kind == ArtworkKind.Backdrop && a.Url == thumb);
+            await ingestion.Received(1).EnsureEpisodeAsync(library, seasonId, index + 1, expectedTitles[index], metadata.ReleaseDate, null, null);
+        }
+        var pilot = Assert.IsType<MetadataResult>((await fetch.GetTextMetadataAsync(episodes[0])).Metadata);
+        pilot.ReleaseDate.Should().Be(new DateOnly(2022, 2, 20));
+        pilot.RuntimeMinutes.Should().Be(52);
+        pilot.Cast.Should().Contain(person => person.Name == "Jack Bender" && person.Roles == CastRole.Director
+            && person.TmdbId == 28976 && person.TvdbId == 248008);
+    }
+
+    [Fact]
+    public void A_show_folder_that_starts_with_Season_keeps_its_own_tvshow_nfo()
+    {
+        Write("Season One/tvshow.nfo", "<tvshow><title>Season One</title></tvshow>");
+        var path = Write("Season One/Season.One.S01E01.mkv");
+        LocalMediaAssets.ShowDirectory(path).Should().Be(Path.GetDirectoryName(path));
+    }
+
+    [Fact]
+    public async Task Does_not_assign_a_flat_show_poster_to_a_season_without_its_own_poster()
+    {
+        Write("tvshow.nfo", "<tvshow><title>Show</title></tvshow>");
+        Write("poster.jpg");
+        var episodePath = Write("Show.S01E01.mkv");
+        var season = new Season { Title = "Season 1", SeasonNumber = 1, Library = new MediaLibrary { Name = "TV" } };
+        var episodeId = Guid.NewGuid();
+        _repository.GetEpisodeIdsForSeasonAsync(season.Id).Returns([episodeId]);
+        _repository.GetMediaFilePathsAsync(episodeId).Returns([episodePath]);
+
+        (await Fetch(new LocalArtworkProvider()).GetArtworkAsync(season)).Should().NotContain(a => a.Kind == ArtworkKind.Poster);
+    }
+
+    [Fact]
+    public async Task Reads_a_show_level_season_poster_for_an_episode_in_a_season_subfolder()
+    {
+        Write("Show/tvshow.nfo", "<tvshow><title>Show</title></tvshow>");
+        var poster = Write("Show/season02-poster.jpg");
+        var episodePath = Write("Show/Season 02/Show.S02E01.mkv");
+        var season = new Season { Title = "Season 2", SeasonNumber = 2, Library = new MediaLibrary { Name = "TV" } };
+        var episodeId = Guid.NewGuid();
+        _repository.GetEpisodeIdsForSeasonAsync(season.Id).Returns([episodeId]);
+        _repository.GetMediaFilePathsAsync(episodeId).Returns([episodePath]);
+
+        (await Fetch(new LocalArtworkProvider()).GetArtworkAsync(season)).Should().ContainSingle(a => a.Kind == ArtworkKind.Poster && a.Url == poster);
+    }
 }

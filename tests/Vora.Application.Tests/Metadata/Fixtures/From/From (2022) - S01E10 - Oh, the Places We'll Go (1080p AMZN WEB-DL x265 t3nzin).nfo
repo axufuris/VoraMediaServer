@@ -1,0 +1,69 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<episodedetails>
+  <plot><![CDATA[Boyd draws strength from an unlikely source. Jim’s radio tower yields consequences which rock him to his very core. The hole that Tabitha has been digging leads her somewhere – and to someone - she could never have expected. Everything is about to change.]]></plot>
+  <outline />
+  <lockdata>false</lockdata>
+  <dateadded>2026-07-25 15:33:55</dateadded>
+  <title>Oh, the Places We'll Go</title>
+  <director tvdbid="464938">Jeff Renfroe</director>
+  <rating>7.8</rating>
+  <year>2022</year>
+  <sorttitle>Oh, the Places We'll Go</sorttitle>
+  <imdbid>tt15576046</imdbid>
+  <tvdbid>8808290</tvdbid>
+  <runtime>47</runtime>
+  <genre>Drama</genre>
+  <genre>Horror</genre>
+  <genre>Mystery</genre>
+  <uniqueid type="tvdb">8808290</uniqueid>
+  <uniqueid type="imdb">tt15576046</uniqueid>
+  <episode>10</episode>
+  <season>1</season>
+  <aired>2022-04-24</aired>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>hevc</codec>
+        <micodec>hevc</micodec>
+        <bitrate>3713800</bitrate>
+        <width>1920</width>
+        <height>958</height>
+        <aspect>960:479</aspect>
+        <aspectratio>960:479</aspectratio>
+        <framerate>23.976025</framerate>
+        <scantype>progressive</scantype>
+        <default>True</default>
+        <forced>False</forced>
+        <duration>47</duration>
+        <durationinseconds>2843</durationinseconds>
+      </video>
+      <audio>
+        <codec>eac3</codec>
+        <micodec>eac3</micodec>
+        <bitrate>640000</bitrate>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <channels>6</channels>
+        <samplingrate>48000</samplingrate>
+        <default>False</default>
+        <forced>False</forced>
+      </audio>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>subrip</codec>
+        <micodec>subrip</micodec>
+        <language>eng</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+</episodedetails>
