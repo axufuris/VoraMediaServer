@@ -25,6 +25,8 @@ public class MediaLibraryVM
     public string? ThirdPartyRating1ProviderId { get; set; }
     public string? ThirdPartyRating2ProviderId { get; set; }
     public string? ArtworkProviderId { get; set; }
+    public int LocalMetadataMode { get; set; }
+    public bool PreferLocalArtwork { get; set; }
 
     public int EpisodeSorting { get; set; }
     public int EpisodeOrder { get; set; }
@@ -61,6 +63,8 @@ public class MediaLibraryVM
             ThirdPartyRating1ProviderId = l.ThirdPartyRating1ProviderId,
             ThirdPartyRating2ProviderId = l.ThirdPartyRating2ProviderId,
             ArtworkProviderId = l.ArtworkProviderId,
+            LocalMetadataMode = (int)l.LocalMetadataMode,
+            PreferLocalArtwork = l.PreferLocalArtwork,
             EnableRealTimeWatching = l.EnableRealTimeWatching
         };
 }

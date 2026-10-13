@@ -37,6 +37,7 @@ public interface ITaskQueueManager
     void QueueScanNewMusicFile(Guid libraryId, string filePath);
     void QueueRefreshMediaItemMetadata(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false, Guid? libraryId = null);
     void QueueRefreshMatchedMediaItem(Guid mediaItemId, Guid libraryId, bool isTvShow);
+    void QueueLocalMetadataSync(Guid libraryId, string? libraryName = null, DateTime? since = null);
     void QueueAnalyzeMediaItemContent(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueueArtworkProviderSwap(Guid libraryId, string libraryName);
     void QueueRefreshLibraryRatings(Guid libraryId, bool forceOverride = false, DateTime? since = null);
@@ -395,6 +396,43 @@ public class TaskQueueManager : ITaskQueueManager
                 await dedupeManager.MergeDuplicateTvShowsAsync(libraryId, ct);
             }
         }, resourceKey: LibraryKey(libraryId), libraryId: libraryId, mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueueRefreshMatchedMediaItem), new { mediaItemId, libraryId, isTvShow }));
+    }
+
+    public void QueueLocalMetadataSync(Guid libraryId, string? libraryName = null, DateTime? since = null)
+    {
+        var askedAt = since ?? DateTime.UtcNow;
+        Enqueue($"Read Local Metadata: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
+        {
+            await SyncLocalMetadataAsync(sp, libraryId, askedAt, ct);
+
+            var libraryType = await sp.GetRequiredService<ILibraryRepository>().GetProjectedByIdAsync(libraryId, l => (LibraryType?)l.Type);
+            if (libraryType == LibraryType.TvShow)
+            {
+                await sp.GetRequiredService<Vora.Application.Media.IMediaDedupeManager>().MergeDuplicateTvShowsAsync(libraryId, ct);
+            }
+
+            await sp.GetRequiredService<IMetadataManager>().TriggerActorMetadataRefreshAsync(ct);
+            await sp.GetRequiredService<IPosterOverlayManager>().RunLibraryOverlaySyncAsync(libraryId, ct);
+        },
+        libraryName == null ? LibraryLabel(libraryId, "Read Local Metadata: {0}") : null,
+        resourceKey: LibraryKey(libraryId),
+        dedupeKey: $"library-local-metadata:{libraryId}",
+        rerunIfRunning: true,
+        libraryId: libraryId,
+        recipe: TaskRecipe.Of(nameof(QueueLocalMetadataSync), new { libraryId, libraryName, since = askedAt }));
+    }
+
+    private static async Task SyncLocalMetadataAsync(IServiceProvider sp, Guid libraryId, DateTime? since, CancellationToken ct)
+    {
+        var artworkChanged = await sp.GetRequiredService<IMetadataManager>().TriggerLibraryLocalMetadataSyncAsync(libraryId, since, ct);
+        if (artworkChanged.Count == 0) return;
+
+        var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
+        foreach (var mediaItemId in artworkChanged)
+        {
+            ct.ThrowIfCancellationRequested();
+            await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
+        }
     }
 
     public void QueueAnalyzeMediaItemContent(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false)
@@ -1248,6 +1286,11 @@ public class TaskQueueManager : ITaskQueueManager
         // library must never end up with, say, no analysis just because overlay
         // generation threw. Cancellation still stops the whole workflow.
         Task RunStepAsync(string label, Func<Task> step) => RunWorkflowStepAsync(progress, logger, libraryId, label, step, ct);
+
+        if (libraryType.HasValue)
+        {
+            await RunStepAsync("Reading local metadata…", () => SyncLocalMetadataAsync(sp, libraryId, null, ct));
+        }
 
         // Safety net for anything the per-unit path missed (never double-fetches
         // an already-enriched item; force stays off here so a force rescan the

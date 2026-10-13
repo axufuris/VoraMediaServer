@@ -8,6 +8,7 @@ import FolderPathInput from '../../../components/Admin/FolderBrowser/FolderPathI
 import { useDialog } from '../../../dialogs';
 import { libraryHasVideoContent } from '../../../utils/libraryTypes';
 import MinimumCollectionSizeField from '../../../components/Admin/Libraries/MinimumCollectionSizeField';
+import LocalFilesFields from '../../../components/Admin/Libraries/LocalFilesFields';
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
     return <h2 className="text-base font-semibold text-[var(--vora-text-primary)] pb-2 border-b border-[var(--vora-border-subtle)]">{children}</h2>;
@@ -527,6 +528,15 @@ export default function ManageLibrary() {
                             {availableArtworkProviders.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                     </div>
+
+                    {showVideoOptions && (
+                        <LocalFilesFields
+                            mode={library.localMetadataMode ?? 0}
+                            preferLocalArtwork={library.preferLocalArtwork ?? false}
+                            onModeChange={mode => handleChange('localMetadataMode', mode)}
+                            onPreferLocalArtworkChange={prefer => handleChange('preferLocalArtwork', prefer)}
+                        />
+                    )}
 
                     <SectionHeading>Folder Paths</SectionHeading>
                     <div className="space-y-3">

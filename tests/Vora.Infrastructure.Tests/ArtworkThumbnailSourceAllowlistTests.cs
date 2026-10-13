@@ -22,6 +22,7 @@ public class ArtworkThumbnailSourceAllowlistTests : IDisposable
     private readonly string _root;
     private readonly ISafeImageDownloader _downloader = Substitute.For<ISafeImageDownloader>();
     private readonly RemoteImageRegistry _remoteImages = new();
+    private readonly ILocalArtworkLocator _localArtwork = Substitute.For<ILocalArtworkLocator>();
     private readonly Clock _clock = new();
     private readonly ArtworkThumbnailService _service;
 
@@ -41,6 +42,7 @@ public class ArtworkThumbnailSourceAllowlistTests : IDisposable
             _remoteImages,
             Options.Create(new StoragePathsOptions { CustomArtwork = _root }),
             NullLogger<ArtworkThumbnailService>.Instance,
+            _localArtwork,
             _clock);
     }
 

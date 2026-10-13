@@ -18,3 +18,10 @@ public enum SeasonDisplayMode
     HideForSingleSeason,
     Hide
 }
+
+public enum LocalMetadataMode
+{
+    Off,
+    MatchOnly,
+    Prefer
+}

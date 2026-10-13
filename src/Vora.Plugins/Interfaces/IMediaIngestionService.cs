@@ -5,6 +5,8 @@ namespace Vora.Plugins.Interfaces;
 public interface IMediaIngestionService
 {
     Task<(List<string> FolderPaths, string? ScannerRegex, List<string> ExcludeFilters)> GetLibraryDetailsAsync(LibraryHandle library);
+    Task<LocalMetadataMode> GetLocalMetadataModeAsync(LibraryHandle library);
+    Task<MediaItemHandle?> FindHandMatchedOwnerAsync(LibraryHandle library, string knownFilePath);
     Task<LibraryHandle?> GetLibraryForMediaAsync(MediaItemHandle item);
     Task<HashSet<string>> GetExistingLibraryPathsAsync(LibraryHandle library);
     Task SetEpisodeRangesAsync(LibraryHandle library, IReadOnlyDictionary<string, int> lastEpisodeByFile);

@@ -292,6 +292,157 @@ public partial class MediaRepository : IMediaRepository
             .ToListAsync();
     }
 
+    public async Task<Vora.Application.Media.Dtos.TitleOwnerDto?> GetTitleOwningFileAsync(Guid libraryId, string filePath)
+    {
+        var part = await _context.MediaParts
+            .AsNoTracking()
+            .Where(p => p.FilePath == filePath && p.MediaItem != null && p.MediaItem.LibraryId == libraryId)
+            .Select(p => new
+            {
+                ItemId = p.MediaItemId,
+                ShowId = p.MediaItem is Episode ? (Guid?)((Episode)p.MediaItem).Season.TvShowId : null
+            })
+            .FirstOrDefaultAsync();
+        if ((part?.ShowId ?? part?.ItemId) is not Guid titleId) return null;
+
+        var locks = await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == titleId)
+            .Select(m => m.LockedFields)
+            .FirstOrDefaultAsync();
+
+        var matchedByHand = locks != null && locks.Contains(Vora.Application.Metadata.MediaMatchManager.MatchLock, StringComparer.OrdinalIgnoreCase);
+        return new Vora.Application.Media.Dtos.TitleOwnerDto(titleId, matchedByHand);
+    }
+
+    public async Task<LocalMediaSourceDto?> GetLocalMediaSourceAsync(Guid mediaItemId)
+    {
+        var item = await _context.MediaItems.AsNoTracking().FirstOrDefaultAsync(m => m.Id == mediaItemId);
+        var parts = _context.MediaParts.AsNoTracking();
+
+        switch (item)
+        {
+            case Movie:
+                return LocalSource(item, LocalMediaSourceDto.Movie, null, null, null,
+                    await parts.Where(p => p.MediaItemId == mediaItemId).Select(p => p.FilePath).ToListAsync());
+
+            case Episode episode:
+                var parent = await _context.Set<Season>()
+                    .AsNoTracking()
+                    .Where(s => s.Id == episode.SeasonId)
+                    .Select(s => new { s.SeasonNumber, s.TvShowId })
+                    .FirstOrDefaultAsync();
+                return LocalSource(item, LocalMediaSourceDto.Episode, parent?.SeasonNumber, episode.EpisodeNumber, parent?.TvShowId,
+                    await parts.Where(p => p.MediaItemId == mediaItemId).Select(p => p.FilePath).ToListAsync());
+
+            case Season season:
+                return LocalSource(item, LocalMediaSourceDto.Season, season.SeasonNumber, null, season.TvShowId,
+                    await parts.Where(p => p.MediaItem is Episode && ((Episode)p.MediaItem).SeasonId == mediaItemId).Select(p => p.FilePath).ToListAsync());
+
+            case TvShow:
+                return LocalSource(item, LocalMediaSourceDto.TvShow, null, null, mediaItemId, await GetEpisodeFilePathsForShowAsync(mediaItemId));
+
+            default:
+                return null;
+        }
+    }
+
+    private static LocalMediaSourceDto LocalSource(MediaItem item, string kind, int? seasonNumber, int? episodeNumber, Guid? tvShowId, List<string> filePaths) =>
+        new(item.Id, kind, seasonNumber, episodeNumber, filePaths)
+        {
+            TvShowId = tvShowId,
+            LastMetadataRefresh = item.LastMetadataRefresh,
+            PosterUrl = item.OriginalPosterUrl,
+            BackgroundUrl = item.BackgroundUrl,
+            LogoUrl = item.LogoUrl,
+            LockedFields = item.LockedFields.ToList()
+        };
+
+    public async Task<List<LocalMediaSourceDto>> GetLibraryLocalMediaSourcesAsync(Guid libraryId)
+    {
+        var items = await _context.MediaItems
+            .AsNoTracking()
+            .Where(MediaCapabilities.SupportsMetadataEnrichment)
+            .Where(m => m.LibraryId == libraryId && m.MissingSince == null)
+            .Select(m => new
+            {
+                m.Id,
+                m.LastMetadataRefresh,
+                m.OriginalPosterUrl,
+                m.BackgroundUrl,
+                m.LogoUrl,
+                m.LockedFields,
+                Kind = m is Movie ? LocalMediaSourceDto.Movie
+                    : m is TvShow ? LocalMediaSourceDto.TvShow
+                    : m is Season ? LocalMediaSourceDto.Season
+                    : m is Episode ? LocalMediaSourceDto.Episode
+                    : null,
+                SeasonNumber = m is Season ? (int?)((Season)m).SeasonNumber
+                    : m is Episode ? (int?)((Episode)m).Season.SeasonNumber
+                    : null,
+                EpisodeNumber = m is Episode ? (int?)((Episode)m).EpisodeNumber : null,
+                SeasonId = m is Episode ? (Guid?)((Episode)m).SeasonId : null,
+                TvShowId = m is Season ? (Guid?)((Season)m).TvShowId
+                    : m is Episode ? (Guid?)((Episode)m).Season.TvShowId
+                    : null
+            })
+            .ToListAsync();
+
+        var parts = await _context.MediaParts
+            .AsNoTracking()
+            .Where(p => p.MediaItem != null && p.MediaItem.LibraryId == libraryId && p.MediaItem.MissingSince == null)
+            .Select(p => new { p.MediaItemId, p.FilePath })
+            .ToListAsync();
+
+        var pathsByItem = parts
+            .Where(p => p.MediaItemId.HasValue)
+            .GroupBy(p => p.MediaItemId.GetValueOrDefault())
+            .ToDictionary(g => g.Key, g => g.Select(p => p.FilePath).ToList());
+        var episodesBySeason = items
+            .Where(i => i.SeasonId.HasValue)
+            .ToLookup(i => i.SeasonId.GetValueOrDefault(), i => i.Id);
+        var episodesByShow = items
+            .Where(i => i.Kind == LocalMediaSourceDto.Episode && i.TvShowId.HasValue)
+            .ToLookup(i => i.TvShowId.GetValueOrDefault(), i => i.Id);
+
+        List<string> PathsOf(Guid id) => pathsByItem.TryGetValue(id, out var own) ? own : [];
+
+        var sources = new List<LocalMediaSourceDto>(items.Count);
+        foreach (var item in items)
+        {
+            if (item.Kind == null) continue;
+
+            var filePaths = item.Kind switch
+            {
+                LocalMediaSourceDto.Season => episodesBySeason[item.Id].SelectMany(PathsOf).ToList(),
+                LocalMediaSourceDto.TvShow => episodesByShow[item.Id].SelectMany(PathsOf).ToList(),
+                _ => PathsOf(item.Id)
+            };
+
+            sources.Add(new LocalMediaSourceDto(item.Id, item.Kind, item.SeasonNumber, item.EpisodeNumber, filePaths)
+            {
+                TvShowId = item.Kind == LocalMediaSourceDto.TvShow ? item.Id : item.TvShowId,
+                LastMetadataRefresh = item.LastMetadataRefresh,
+                PosterUrl = item.OriginalPosterUrl,
+                BackgroundUrl = item.BackgroundUrl,
+                LogoUrl = item.LogoUrl,
+                LockedFields = item.LockedFields
+            });
+        }
+
+        return sources;
+    }
+
+    public async Task ClearMetadataRefreshAsync(IReadOnlyCollection<Guid> mediaItemIds)
+    {
+        foreach (var chunk in mediaItemIds.Chunk(500))
+        {
+            await _context.MediaItems
+                .Where(m => chunk.Contains(m.Id))
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.LastMetadataRefresh, (DateTime?)null));
+        }
+    }
+
     public Task<Vora.Application.Media.Dtos.MediaMatchInfoDto?> GetMediaMatchInfoAsync(Guid mediaItemId) =>
         _context.MediaItems
             .AsNoTracking()

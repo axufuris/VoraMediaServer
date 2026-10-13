@@ -72,6 +72,18 @@ public class MediaIngestionService : IMediaIngestionService
         return (row.FolderPaths, row.ScannerRegex, excludeFilters);
     }
 
+    public async Task<Vora.Plugins.Dtos.LocalMetadataMode> GetLocalMetadataModeAsync(LibraryHandle library)
+    {
+        var row = await _libraryRepository.GetProjectedByIdAsync(library.Value, l => new { l.LocalMetadataMode });
+        return row == null ? Vora.Plugins.Dtos.LocalMetadataMode.Off : (Vora.Plugins.Dtos.LocalMetadataMode)(int)row.LocalMetadataMode;
+    }
+
+    public async Task<MediaItemHandle?> FindHandMatchedOwnerAsync(LibraryHandle library, string knownFilePath)
+    {
+        var owner = await _repository.GetTitleOwningFileAsync(library.Value, knownFilePath);
+        return owner is { MatchedByHand: true } ? new MediaItemHandle(owner.TitleId) : null;
+    }
+
     public async Task<LibraryHandle?> GetLibraryForMediaAsync(MediaItemHandle item)
     {
         var row = await _repository.GetProjectedAsync(item.Value, m => new { m.LibraryId });

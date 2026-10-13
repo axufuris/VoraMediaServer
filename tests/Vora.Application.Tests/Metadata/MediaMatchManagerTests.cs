@@ -22,6 +22,7 @@ public class MediaMatchManagerTests
     private readonly IMediaRepository _repository = Substitute.For<IMediaRepository>();
     private readonly IMediaDedupeManager _dedupe = Substitute.For<IMediaDedupeManager>();
     private readonly ITaskQueueManager _taskQueue = Substitute.For<ITaskQueueManager>();
+    private readonly Vora.Application.Metadata.Local.ILocalMediaReader _localMedia = Substitute.For<Vora.Application.Metadata.Local.ILocalMediaReader>();
     private readonly IMetadataProvider _tvdb = Provider("tvdb_metadata", "TVDB");
     private readonly IMetadataProvider _tmdb = Provider("tmdb_metadata", "TMDB");
 
@@ -34,7 +35,7 @@ public class MediaMatchManagerTests
     }
 
     private MediaMatchManager Manager() =>
-        new(_repository, [_tvdb, _tmdb], _dedupe, _taskQueue, NullLogger<MediaMatchManager>.Instance);
+        new(_repository, [_tvdb, _tmdb], _dedupe, _taskQueue, _localMedia, NullLogger<MediaMatchManager>.Instance);
 
     private static TvShow DuplicateShow(string providerId = "tvdb_metadata") => new()
     {
@@ -288,6 +289,96 @@ public class MediaMatchManagerTests
 
         files.FileNames.Should().Equal("Heat (1995) 1080p.mkv", "Heat (1995) 2160p.mkv");
         files.FolderNames.Should().BeEmpty();
+    }
+
+    private static Movie MatchedByHand() => new()
+    {
+        Id = DuplicateShowId,
+        Title = "The film chosen by hand",
+        ReleaseDate = new DateOnly(1999, 3, 31),
+        LibraryId = LibraryId,
+        Library = new MediaLibrary { Name = "Movies" },
+        TmdbId = "603",
+        ImdbId = "tt0133093",
+        LastMetadataRefresh = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
+        LockedFields = [MediaMatchManager.MatchLock]
+    };
+
+    [Fact]
+    public async Task Clearing_a_manual_match_names_the_title_from_its_file_again_and_refreshes_it_without_overriding_locks()
+    {
+        var movie = MatchedByHand();
+        Holds(movie);
+        _localMedia.ReadNamingAsync(movie.Id).Returns(new Vora.Application.Metadata.Local.LocalNaming("Underworld", 2003, ExternalIdSet.Empty));
+
+        await Manager().ClearAsync(movie.Id);
+
+        movie.IsLocked(MediaMatchManager.MatchLock).Should().BeFalse();
+        movie.TmdbId.Should().BeNull();
+        movie.ImdbId.Should().BeNull();
+        movie.Title.Should().Be("Underworld");
+        movie.ReleaseDate.Should().Be(new DateOnly(2003, 1, 1));
+        movie.LastMetadataRefresh.Should().BeNull();
+        await _repository.Received(1).UpdateMediaItemAsync(movie);
+        _taskQueue.Received(1).QueueRefreshMediaItemMetadata(movie.Id, "Underworld", false, LibraryId);
+    }
+
+    [Fact]
+    public async Task Clearing_a_manual_match_goes_back_to_the_id_written_in_the_file_name()
+    {
+        var movie = MatchedByHand();
+        Holds(movie);
+        _localMedia.ReadNamingAsync(movie.Id).Returns(new Vora.Application.Metadata.Local.LocalNaming("Underworld", 2003, ExternalIdSet.From(tmdbId: "277")));
+
+        await Manager().ClearAsync(movie.Id);
+
+        movie.TmdbId.Should().Be("277");
+        movie.ImdbId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Clearing_a_manual_match_keeps_a_title_and_ids_the_admin_locked()
+    {
+        var movie = MatchedByHand();
+        movie.LockField(nameof(movie.Title));
+        movie.LockField(nameof(movie.TmdbId));
+        Holds(movie);
+        _localMedia.ReadNamingAsync(movie.Id).Returns(new Vora.Application.Metadata.Local.LocalNaming("Underworld", 2003, ExternalIdSet.Empty));
+
+        await Manager().ClearAsync(movie.Id);
+
+        movie.Title.Should().Be("The film chosen by hand");
+        movie.TmdbId.Should().Be("603");
+        movie.IsLocked(MediaMatchManager.MatchLock).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Clearing_a_shows_manual_match_has_its_episodes_read_again_too()
+    {
+        var show = DuplicateShow();
+        show.LockField(MediaMatchManager.MatchLock);
+        Holds(show);
+        var episodes = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() };
+        _repository.GetEpisodeIdsForShowAsync(show.Id).Returns(episodes);
+
+        await Manager().ClearAsync(show.Id);
+
+        await _repository.Received(1).ClearMetadataRefreshAsync(episodes);
+        _taskQueue.Received(1).QueueRefreshMediaItemMetadata(show.Id, Arg.Any<string?>(), false, LibraryId);
+    }
+
+    [Fact]
+    public async Task A_title_that_was_never_matched_by_hand_is_left_exactly_as_it_is()
+    {
+        var movie = MatchedByHand();
+        movie.UnlockField(MediaMatchManager.MatchLock);
+        Holds(movie);
+
+        await Manager().ClearAsync(movie.Id);
+
+        movie.TmdbId.Should().Be("603");
+        await _repository.DidNotReceive().UpdateMediaItemAsync(Arg.Any<MediaItem>());
+        _taskQueue.DidNotReceive().QueueRefreshMediaItemMetadata(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<Guid?>());
     }
 
     [Fact]

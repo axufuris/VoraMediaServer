@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Vora.Application.Artwork;
 using Vora.Application.Backups;
 using Vora.Application.Metadata;
 using Vora.Domain.Entities.Common;
@@ -223,6 +224,7 @@ public sealed class MediaEditsBackupSection : IBackupSection
             if (entity == null) continue;
 
             ApplyValues(entity, record.Values);
+            if (entity is MediaItem moved) RehomeLocalArtwork(moved, record.Id);
             entity.LockedFields = entity.LockedFields.Union(record.LockedFields, StringComparer.OrdinalIgnoreCase).ToList();
             if (record.LockedFields.Contains(MediaMatchManager.MatchLock, StringComparer.OrdinalIgnoreCase)) rematched++;
 
@@ -239,6 +241,14 @@ public sealed class MediaEditsBackupSection : IBackupSection
             result.Warnings.Add($"{rematched} {(rematched == 1 ? "title was" : "titles were")} matched again by hand. Refresh {(rematched == 1 ? "its" : "their")} library's metadata to bring in the matching details and artwork.");
         }
         return result;
+    }
+
+    private static void RehomeLocalArtwork(MediaItem item, Guid savedAs)
+    {
+        item.PosterUrl = LocalArtworkAddress.Rehome(item.PosterUrl, savedAs, item.Id);
+        item.OriginalPosterUrl = LocalArtworkAddress.Rehome(item.OriginalPosterUrl, savedAs, item.Id);
+        item.BackgroundUrl = LocalArtworkAddress.Rehome(item.BackgroundUrl, savedAs, item.Id);
+        item.LogoUrl = LocalArtworkAddress.Rehome(item.LogoUrl, savedAs, item.Id);
     }
 
     private async Task ReplaceMarkersAsync(Guid itemId, List<MediaItemMarker> markers, CancellationToken ct)

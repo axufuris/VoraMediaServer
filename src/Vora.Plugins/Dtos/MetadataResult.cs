@@ -46,6 +46,8 @@ public class MetadataResult
     public List<NetworkResult> Networks { get; set; } = new List<NetworkResult>();
     public List<SeasonResult> Seasons { get; set; } = new List<SeasonResult>();
     public List<VideoResult> Videos { get; set; } = new List<VideoResult>();
+
+    public MetadataResult Clone() => (MetadataResult)MemberwiseClone();
 }
 
 public class ActorMetadataResult

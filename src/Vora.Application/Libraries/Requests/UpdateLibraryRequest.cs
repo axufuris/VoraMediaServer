@@ -25,4 +25,6 @@ public class UpdateLibraryRequest
     public string? ThirdPartyRating1ProviderId { get; set; }
     public string? ThirdPartyRating2ProviderId { get; set; }
     public string? ArtworkProviderId { get; set; }
+    public int LocalMetadataMode { get; set; }
+    public bool PreferLocalArtwork { get; set; }
 }

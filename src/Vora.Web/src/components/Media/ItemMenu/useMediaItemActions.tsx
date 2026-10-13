@@ -18,6 +18,10 @@ import { toggleWatched, toggleWatchlist } from './watchActions';
 
 type OpenDialog = 'info' | 'edit' | 'playlist' | 'collection' | 'match' | 'markers';
 
+// Fix match leaves this in a title's locked fields; while it is there, nothing
+// automatic (a scan, a refresh, an NFO file) changes which title this is.
+const MATCH_LOCK = 'match';
+
 export interface MediaItemActionsOptions {
     serverId?: string;
     // Leads the menu with Mark as watched and Add to watchlist. The title page
@@ -82,6 +86,7 @@ export function useMediaItemActions(media: MediaItem | null, options: MediaItemA
     const inWatchlist = watchlist?.id === media.id ? watchlist.saved : false;
     const hasFileInfo = hasThumbnails && (media.mediaParts?.length ?? 0) > 0;
     const canFixMatch = media.type === 'Movie' || media.type === 'TvShow';
+    const matchedByHand = canFixMatch && (media.lockedFields ?? []).some(field => field.toLowerCase() === MATCH_LOCK);
     const pathTo = (id: string) => serverId ? `/server/${serverId}/media/${id}` : `/media/${id}`;
     const close = () => setOpenDialog(null);
 
@@ -154,6 +159,23 @@ export function useMediaItemActions(media: MediaItem | null, options: MediaItemA
         onChanged();
     };
 
+    const clearMatch = async () => {
+        const confirmed = await dialog.confirm({
+            title: 'Clear manual match?',
+            message: 'Vora will match this title again from its file name, and from its NFO file if this library reads them. Details you have locked stay as they are.',
+            confirmText: 'Clear match',
+        });
+        if (!confirmed) return;
+
+        try {
+            await libraryAdminService.clearMatch(media.id, serverId);
+            await dialog.alert('Manual match cleared. The title is being matched again in the background.');
+            onChanged();
+        } catch {
+            await dialog.alert('Failed to clear the manual match.');
+        }
+    };
+
     const markWatched = async () => {
         if (await toggleWatched(media, dialog, serverId)) onChanged();
     };
@@ -191,6 +213,7 @@ export function useMediaItemActions(media: MediaItem | null, options: MediaItemA
     if (isAdmin) {
         entries.push(menuSeparator('before-admin'));
         if (canFixMatch) entries.push(menuAction('match', 'Fix match…', () => setOpenDialog('match')));
+        if (matchedByHand) entries.push(menuAction('clear-match', 'Clear manual match', clearMatch));
         entries.push(menuAction('refresh', 'Refresh metadata', refresh));
         entries.push(menuAction('scan', 'Scan files', scan));
         entries.push(menuAction('analyze', 'Analyze media', analyze));

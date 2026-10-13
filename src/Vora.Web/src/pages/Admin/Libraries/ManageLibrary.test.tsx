@@ -7,6 +7,7 @@ import type { MediaLibrary } from '../../../api/Media/libraryService';
 const mocks = vi.hoisted(() => ({
     getLibraryById: vi.fn(),
     refreshMetadata: vi.fn(),
+    updateLibrary: vi.fn(),
     confirm: vi.fn(),
     alert: vi.fn(),
 }));
@@ -22,6 +23,7 @@ vi.mock('../../../api/System/pluginAdminService', () => ({
 vi.mock('../../../api/Media/libraryAdminService', () => ({
     libraryAdminService: {
         refreshMetadata: mocks.refreshMetadata,
+        updateLibrary: mocks.updateLibrary,
         getLibraryMarkerCoverage: () => new Promise(() => {}),
         getLibraryThumbnailCoverage: () => new Promise(() => {}),
     },
@@ -52,6 +54,8 @@ const library = (type: string): MediaLibrary => ({
     isBeingWatched: false,
     enableRealTimeWatching: false,
     metadataProviderId: 'tmdb_metadata',
+    localMetadataMode: 0,
+    preferLocalArtwork: false,
 });
 
 const renderManage = async (type = 'Movie') => {
@@ -110,6 +114,49 @@ describe('ManageLibrary metadata buttons', () => {
         await waitFor(() => expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
             message: expect.stringContaining('every artist and album'),
         })));
+    });
+});
+
+describe('ManageLibrary local files', () => {
+    beforeEach(() => {
+        Object.values(mocks).forEach(m => m.mockReset());
+        mocks.updateLibrary.mockResolvedValue(undefined);
+    });
+
+    it('shows a film library both choices as they are saved', async () => {
+        mocks.getLibraryById.mockResolvedValue({ ...library('Movie'), localMetadataMode: 2, preferLocalArtwork: true });
+        render(
+            <MemoryRouter initialEntries={['/admin/libraries/lib1/manage']}>
+                <Routes>
+                    <Route path="/admin/libraries/:id/manage" element={<ManageLibrary />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+        await screen.findByRole('button', { name: 'Refresh metadata' });
+
+        expect(screen.getByLabelText('Read NFO files')).toHaveValue('2');
+        expect(screen.getByLabelText('Prefer local artwork')).toBeChecked();
+    });
+
+    it('saves what the admin chose', async () => {
+        await renderManage();
+
+        fireEvent.change(screen.getByLabelText('Read NFO files'), { target: { value: '1' } });
+        fireEvent.click(screen.getByLabelText('Prefer local artwork'));
+        fireEvent.click(screen.getAllByRole('button', { name: 'Save changes' })[0]);
+
+        await waitFor(() => expect(mocks.updateLibrary).toHaveBeenCalledWith(
+            'lib1',
+            expect.objectContaining({ localMetadataMode: 1, preferLocalArtwork: true }),
+            undefined,
+        ));
+    });
+
+    it('does not offer them to a music library', async () => {
+        await renderManage('Music');
+
+        expect(screen.queryByLabelText('Read NFO files')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Prefer local artwork')).not.toBeInTheDocument();
     });
 });
 

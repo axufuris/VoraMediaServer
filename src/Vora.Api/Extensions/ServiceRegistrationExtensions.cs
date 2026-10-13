@@ -482,6 +482,9 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMediaEmbeddingService, MediaEmbeddingService>();
         services.AddScoped<IMediaIngestionService, MediaIngestionService>();
         services.AddScoped<IMetadataFetchService, MetadataFetchService>();
+        services.AddScoped<Vora.Application.Metadata.Local.ILocalMediaReader, Vora.Application.Metadata.Local.LocalMediaReader>();
+        services.AddScoped<Vora.Application.Metadata.Local.ILocalMetadataChangeFinder, Vora.Application.Metadata.Local.LocalMetadataChangeFinder>();
+        services.AddSingleton<Vora.Application.Artwork.ILocalArtworkLocator, Vora.Application.Artwork.LocalArtworkLocator>();
         services.AddScoped<IMetadataMappingService, MetadataMappingService>();
         services.AddSingleton<Vora.Application.Metadata.ReferenceWriteGate>();
         services.AddScoped<IRequestNotificationService, RequestNotificationService>();

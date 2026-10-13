@@ -40,6 +40,7 @@ public sealed class PosterOverlayRevertAndSweepTests : IDisposable
             Substitute.For<IHttpClientFactory>(),
             new NullTaskProgressReporter(),
             Substitute.For<Vora.Application.Artwork.IArtworkThumbnailService>(),
+            Substitute.For<Vora.Application.Artwork.ILocalArtworkLocator>(),
             scopes,
             NullLogger<PosterOverlayManager>.Instance);
     }

@@ -1,13 +1,18 @@
 using System.Globalization;
-using System.Xml;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using Microsoft.Extensions.Logging;
 using Vora.Plugins.Dtos;
 
 namespace Vora.Plugins.Providers.Local;
 
-public static class LocalNfoReader
+public static partial class LocalNfoReader
 {
+    private const string MovieRoot = "movie";
+    private const string ShowRoot = "tvshow";
+    private const string SeasonRoot = "season";
+    private const string EpisodeRoot = "episodedetails";
+    private const string NfoExtension = ".nfo";
+
     private static readonly Dictionary<string, int> Genres = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Action"] = 28, ["Adventure"] = 12, ["Animation"] = 16, ["Comedy"] = 35,
@@ -20,73 +25,71 @@ public static class LocalNfoReader
         ["Talk"] = 10767, ["War & Politics"] = 10768
     };
 
-    public static MetadataResult? ReadMovie(string path, ILogger logger)
+    public static MetadataResult? ReadMovie(string path, LocalMediaFolders folders) =>
+        MovieDocuments(path, folders)
+            .Select(candidate => First(folders, candidate, MovieRoot))
+            .FirstOrDefault(result => result != null);
+
+    public static MetadataResult? ReadTvShow(string directory, LocalMediaFolders folders)
     {
-        var files = LocalMediaAssets.Files(LocalMediaAssets.DirectoryPath(path), logger);
-        var candidates = new List<string?>();
-        if (!Directory.Exists(path)) candidates.Add(LocalMediaAssets.NamedFile(files, Path.GetFileNameWithoutExtension(path) + ".nfo"));
-        candidates.Add(LocalMediaAssets.NamedFile(files, "movie.nfo"));
-        if (Directory.Exists(path)) candidates.AddRange(files.Where(file => Path.GetExtension(file).Equals(".nfo", StringComparison.OrdinalIgnoreCase)));
-        return ReadFirst(candidates, "movie", logger);
+        var document = LocalMediaAssets.NamedFile(folders.Files(directory), LocalMediaAssets.ShowDocument);
+        return document == null ? null : First(folders, document, ShowRoot);
     }
 
-    public static MetadataResult? ReadTvShow(string path, ILogger logger) =>
-        ReadFirst([LocalMediaAssets.NamedFile(LocalMediaAssets.Files(path, logger), "tvshow.nfo")], "tvshow", logger);
-
-    public static MetadataResult? ReadSeason(string path, ILogger logger) =>
-        ReadFirst([LocalMediaAssets.NamedFile(LocalMediaAssets.Files(path, logger), "season.nfo")], "season", logger);
-
-    public static MetadataResult? ReadEpisode(string path, int seasonNumber, int episodeNumber, ILogger logger)
+    public static MetadataResult? ReadSeason(string directory, int seasonNumber, LocalMediaFolders folders)
     {
-        if (!Directory.Exists(path))
-        {
-            var files = LocalMediaAssets.Files(LocalMediaAssets.DirectoryPath(path), logger);
-            return ReadFirst([LocalMediaAssets.NamedFile(files, Path.GetFileNameWithoutExtension(path) + ".nfo")], "episodedetails", logger);
-        }
+        var document = LocalMediaAssets.NamedFile(folders.Files(directory), LocalMediaAssets.SeasonDocument);
+        if (document == null) return null;
 
-        var token = $"S{seasonNumber:D2}E{episodeNumber:D2}";
-        var alternate = $"{seasonNumber}x{episodeNumber:D2}";
-        var candidates = ResilientDirectory.EnumerateFiles(path,
-                (directory, ex) => logger.LogWarning(ex, "Could not read episode NFOs in {Directory}.", directory))
-            .Where(file => Path.GetExtension(file).Equals(".nfo", StringComparison.OrdinalIgnoreCase))
-            .Where(file => ContainsEpisodeToken(Path.GetFileNameWithoutExtension(file), token)
-                || ContainsEpisodeToken(Path.GetFileNameWithoutExtension(file), alternate))
-            .OrderByDescending(file => ContainsEpisodeToken(Path.GetFileNameWithoutExtension(file), token))
-            .ThenBy(file => file, StringComparer.Ordinal);
-        return ReadFirst(candidates, "episodedetails", logger);
+        var root = Roots(folders, document, SeasonRoot).FirstOrDefault();
+        if (root == null) return null;
+        if (Number(root, "seasonnumber") is int declared && declared != seasonNumber) return null;
+
+        return Usable(Parse(root));
     }
 
-    private static bool ContainsEpisodeToken(string name, string token)
+    public static MetadataResult? ReadEpisode(string videoPath, int seasonNumber, int episodeNumber, LocalMediaFolders folders)
     {
-        var index = name.IndexOf(token, StringComparison.OrdinalIgnoreCase);
-        return index >= 0 && (index + token.Length == name.Length || !char.IsDigit(name[index + token.Length]));
+        var sidecar = Sidecar(videoPath, folders);
+        return sidecar == null ? null : Episode(folders, sidecar, seasonNumber, episodeNumber);
     }
 
-    private static MetadataResult? ReadFirst(IEnumerable<string?> candidates, string rootName, ILogger logger)
+    public static IEnumerable<string> MovieDocuments(string videoPath, LocalMediaFolders folders)
     {
-        foreach (var path in candidates.OfType<string>().Distinct())
-        {
-            try
-            {
-                using var reader = XmlReader.Create(path, new XmlReaderSettings
-                {
-                    DtdProcessing = DtdProcessing.Prohibit,
-                    XmlResolver = null,
-                    MaxCharactersInDocument = 4 * 1024 * 1024
-                });
-                var root = XDocument.Load(reader).Root;
-                if (root == null || root.Name != rootName) continue;
-                var result = Parse(root);
-                if (result.Title != null || result.Overview != null || result.TmdbId != null || result.ImdbId != null
-                    || result.TvdbId != null || result.ReleaseDate != null || result.Cast.Count > 0) return result;
-            }
-            catch (Exception ex) when (ex is XmlException or IOException or UnauthorizedAccessException)
-            {
-                logger.LogWarning(ex, "Could not import local metadata from {NfoPath}.", path);
-            }
-        }
-        return null;
+        var files = folders.Files(Path.GetDirectoryName(videoPath));
+
+        var sidecar = Sidecar(videoPath, folders);
+        if (sidecar != null) yield return sidecar;
+
+        var shared = LocalMediaAssets.NamedFile(files, LocalMediaAssets.MovieDocument);
+        if (shared != null && LocalMediaAssets.HoldsOneFilm(files, videoPath)) yield return shared;
     }
+
+    public static string? Sidecar(string videoPath, LocalMediaFolders folders) =>
+        LocalMediaAssets.NamedFile(folders.Files(Path.GetDirectoryName(videoPath)), Path.GetFileNameWithoutExtension(videoPath) + NfoExtension);
+
+    private static IEnumerable<XElement> Roots(LocalMediaFolders folders, string path, string rootName) =>
+        folders.Document(path).Where(root => root.Name == rootName);
+
+    private static MetadataResult? First(LocalMediaFolders folders, string path, string rootName)
+    {
+        var root = Roots(folders, path, rootName).FirstOrDefault();
+        return root == null ? null : Usable(Parse(root));
+    }
+
+    private static MetadataResult? Episode(LocalMediaFolders folders, string path, int seasonNumber, int episodeNumber)
+    {
+        var roots = Roots(folders, path, EpisodeRoot).ToList();
+        var root = roots.FirstOrDefault(r => Number(r, "episode") == episodeNumber && (Number(r, "season") ?? seasonNumber) == seasonNumber)
+            ?? (roots.Count == 1 ? roots[0] : null);
+        return root == null ? null : Usable(Parse(root));
+    }
+
+    private static MetadataResult? Usable(MetadataResult result) =>
+        result.Title != null || result.Overview != null || result.TmdbId != null || result.ImdbId != null
+            || result.TvdbId != null || result.ReleaseDate != null || result.Cast.Count > 0
+            ? result
+            : null;
 
     private static MetadataResult Parse(XElement root)
     {
@@ -94,8 +97,8 @@ public static class LocalNfoReader
         {
             Title = Text(root, "title"), OriginalTitle = Text(root, "originaltitle"),
             SortTitle = Text(root, "sorttitle"), Overview = Text(root, "plot"),
-            Tagline = Text(root, "tagline"), ContentRating = Text(root, "mpaa"), Status = Text(root, "status"),
-            TmdbId = ProviderId(root, "tmdb"), ImdbId = ProviderId(root, "imdb"), TvdbId = ProviderId(root, "tvdb")
+            Tagline = Text(root, "tagline"), ContentRating = Certification(Text(root, "mpaa")), Status = Text(root, "status"),
+            TmdbId = ProviderId(root, "tmdb"), ImdbId = ProviderId(root, "imdb") ?? LegacyImdbId(root), TvdbId = ProviderId(root, "tvdb")
         };
         foreach (var name in new[] { "premiered", "releasedate", "aired" })
         {
@@ -105,9 +108,9 @@ public static class LocalNfoReader
                 break;
             }
         }
-        if (result.ReleaseDate == null && int.TryParse(Text(root, "year"), out var year) && year is >= 1 and <= 9999)
+        if (result.ReleaseDate == null && Number(root, "year") is int year and >= 1 and <= 9999)
             result.ReleaseDate = new DateOnly(year, 1, 1);
-        if (int.TryParse(Text(root, "runtime"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var runtime) && runtime > 0)
+        if (Number(root, "runtime") is int runtime and > 0)
             result.RuntimeMinutes = runtime;
         if (decimal.TryParse(Text(root, "rating"), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var rating))
             result.Rating = rating;
@@ -122,7 +125,7 @@ public static class LocalNfoReader
             {
                 Name = name, CharacterName = Text(actor, "role"),
                 TmdbId = PositiveId(Text(actor, "tmdbid")), TvdbId = PositiveId(Text(actor, "tvdbid")),
-                ProfileImageUrl = ExistingImage(Text(actor, "thumb")), Roles = CastRole.Actor
+                ProfileImageUrl = RemoteImage(Text(actor, "thumb")), Roles = CastRole.Actor
             });
         }
         AddPeople(root, result, "director", CastRole.Director);
@@ -136,7 +139,7 @@ public static class LocalNfoReader
             if (value is "aftercreditsstinger" or "postcreditsstinger") result.HasPostCreditsStinger = true;
         }
         var collectionName = Text(root.Element("set"), "name") ?? Text(root, "set");
-        if (collectionName != null && int.TryParse(Text(root, "collectionnumber"), out var collectionId) && collectionId > 0)
+        if (collectionName != null && Number(root, "collectionnumber") is int collectionId and > 0)
             result.Collection = new CollectionResult { Id = collectionId, Name = collectionName };
         foreach (var trailer in root.Elements("trailer"))
         {
@@ -153,11 +156,30 @@ public static class LocalNfoReader
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
+    private static int? Number(XElement root, string name) =>
+        int.TryParse(Text(root, name), NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) ? number : null;
+
     private static string? ProviderId(XElement root, string provider) =>
         Text(root, provider + "id")
         ?? Text(root, provider + "_id")
         ?? root.Elements("uniqueid").FirstOrDefault(node => string.Equals((string?)node.Attribute("type"), provider, StringComparison.OrdinalIgnoreCase)
             && !string.IsNullOrWhiteSpace(node.Value))?.Value.Trim();
+
+    private static string? Certification(string? value)
+    {
+        if (value == null) return null;
+        var match = CertificationText().Match(value);
+        return match.Success ? match.Groups["Rating"].Value : null;
+    }
+
+    [GeneratedRegex(@"^(?:rated\s+|[a-z]{2}[:/]\s*)?(?<Rating>[a-z0-9+\-]{1,10})$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex CertificationText();
+
+    private static string? LegacyImdbId(XElement root)
+    {
+        var id = Text(root, "id");
+        return id != null && id.StartsWith("tt", StringComparison.OrdinalIgnoreCase) && id.Skip(2).All(char.IsAsciiDigit) && id.Length > 2 ? id : null;
+    }
 
     private static string? YoutubeKey(string value)
     {
@@ -172,8 +194,8 @@ public static class LocalNfoReader
         return key is { Length: 11 } && key.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_') ? key : null;
     }
 
-    private static string? ExistingImage(string? path) =>
-        path != null && (File.Exists(path) || Uri.TryCreate(path, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") ? path : null;
+    private static string? RemoteImage(string? address) =>
+        address != null && Uri.TryCreate(address, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? address : null;
 
     private static void AddPeople(XElement root, MetadataResult result, string element, CastRole role)
     {

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vora.Application.FileSystem;
 using Vora.Application.Media;
+using Vora.Application.Metadata.Local;
 using Vora.Application.Net;
 using Vora.Application.Settings;
 using Vora.Domain.Entities.Media;
@@ -31,6 +32,7 @@ public class ArtworkService : IArtworkService
     private readonly IMediaRepository _mediaRepository;
     private readonly IEnumerable<IArtworkProvider> _artworkProviders;
     private readonly ISafeImageDownloader _imageDownloader;
+    private readonly ILocalMediaReader _localMedia;
     private readonly ILogger<ArtworkService> _logger;
     private readonly string _basePath;
 
@@ -40,12 +42,14 @@ public class ArtworkService : IArtworkService
         IEnumerable<IArtworkProvider> artworkProviders,
         IOptions<StoragePathsOptions> storagePaths,
         ISafeImageDownloader imageDownloader,
+        ILocalMediaReader localMedia,
         ILogger<ArtworkService> logger)
     {
         _repository = repository;
         _mediaRepository = mediaRepository;
         _artworkProviders = artworkProviders;
         _imageDownloader = imageDownloader;
+        _localMedia = localMedia;
         _logger = logger;
 
         _basePath = StorageRoots.CustomArtwork(storagePaths.Value);
@@ -99,6 +103,8 @@ public class ArtworkService : IArtworkService
             ProviderId = provider.Id,
             IsUserUploaded = false
         }).ToList();
+
+        newArtwork.AddRange(await _localMedia.FindArtworkAsync(mediaItemId));
 
         await _repository.ReplaceProviderMediaArtworkAsync(mediaItemId, newArtwork);
     }

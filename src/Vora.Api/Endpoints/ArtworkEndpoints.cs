@@ -20,6 +20,9 @@ public static partial class ArtworkEndpoints
         group.MapGet("/artwork/custom/{fileName}", ServeCustomArtwork)
             .AllowAnonymous();
 
+        group.MapGet("/artwork/local/{mediaItemId:guid}/{fileName}", ServeLocalArtworkAsync)
+            .AllowAnonymous();
+
         group.MapGet("/artwork/thumb", ServeThumbnailAsync)
             .AllowAnonymous();
 
@@ -51,16 +54,28 @@ public static partial class ArtworkEndpoints
             return Results.NotFound();
         }
 
-        var contentType = Path.GetExtension(path).ToLowerInvariant() switch
+        httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
+        return Results.File(path, ImageContentType(path));
+    }
+
+    private static async Task<IResult> ServeLocalArtworkAsync(Guid mediaItemId, string fileName, ILocalArtworkLocator localArtwork, HttpContext httpContext)
+    {
+        var path = await localArtwork.ResolveAsync(mediaItemId, fileName);
+        if (path == null || !File.Exists(path))
         {
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            _ => "image/jpeg"
-        };
+            return Results.NotFound();
+        }
 
         httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
-        return Results.File(path, contentType);
+        return Results.File(path, ImageContentType(path));
     }
+
+    private static string ImageContentType(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".png" => "image/png",
+        ".webp" => "image/webp",
+        _ => "image/jpeg"
+    };
 
     private static async Task<IResult> ServeThumbnailAsync(
         [FromQuery] string? src,

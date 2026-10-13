@@ -1,9 +1,10 @@
-﻿using Vora.Domain.Entities.Media;
+﻿using Vora.Application.Metadata.Local;
+using Vora.Domain.Entities.Media;
 using Vora.Plugins;
-using Vora.Application.Media;
-using Vora.Plugins.Providers.Local;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
+using Vora.Plugins.Providers.Local;
+using LocalMetadataMode = Vora.Domain.Enums.LocalMetadataMode;
 
 namespace Vora.Application.Metadata;
 
@@ -20,41 +21,122 @@ public class MetadataFetchService : IMetadataFetchService
 {
     private const string TmdbMetadataProviderId = "tmdb_metadata";
     private const string TvdbMetadataProviderId = "tvdb_metadata";
+    private const string TmdbArtworkProviderId = "tmdb_artwork";
 
     private readonly IEnumerable<IMetadataProvider> _providers;
     private readonly IEnumerable<IRatingsProvider> _ratingsProviders;
     private readonly IEnumerable<IArtworkProvider> _artworkProviders;
-    private readonly IMediaRepository? _repository;
+    private readonly ILocalMediaReader _localMedia;
+    private readonly Dictionary<Guid, bool> _trustedShowDocuments = new();
 
     public MetadataFetchService(
         IEnumerable<IMetadataProvider> providers,
         IEnumerable<IRatingsProvider> ratingsProviders,
         IEnumerable<IArtworkProvider> artworkProviders,
-        IMediaRepository? repository = null)
+        ILocalMediaReader localMedia)
     {
         _providers = providers;
         _ratingsProviders = ratingsProviders;
         _artworkProviders = artworkProviders;
-        _repository = repository;
+        _localMedia = localMedia;
     }
 
     public async Task<(MetadataResult? Metadata, string ProviderId, string ProviderName)> GetTextMetadataAsync(MediaItem item)
     {
-        var localProvider = _providers.FirstOrDefault(p => p.Id == "local_metadata");
-        if (localProvider != null)
-        {
-            var localMetadata = await FetchMetadataForItemAsync(item, localProvider);
-            if (localMetadata != null) return (localMetadata, localProvider.Id, localProvider.ProviderName);
-        }
-
-        var providerIdToUse = item.Library?.MetadataProviderId ?? "tmdb_metadata";
+        var providerIdToUse = item.Library?.MetadataProviderId ?? TmdbMetadataProviderId;
         var primaryProvider = _providers.FirstOrDefault(p => p.Id == providerIdToUse) ?? _providers.FirstOrDefault();
 
         if (primaryProvider == null) return (null, string.Empty, string.Empty);
-        if (primaryProvider == localProvider) return (null, primaryProvider.Id, primaryProvider.ProviderName);
 
-        var metadata = await FetchMetadataForItemAsync(item, primaryProvider);
-        return (metadata, primaryProvider.Id, primaryProvider.ProviderName);
+        var readsOnlyLocal = primaryProvider.Id == LocalMetadataProvider.ProviderId;
+        var mode = readsOnlyLocal ? LocalMetadataMode.Prefer : item.Library?.LocalMetadataMode ?? LocalMetadataMode.Off;
+
+        var local = await ReadTrustedDocumentAsync(item, mode);
+        if (readsOnlyLocal) return (local?.Document, primaryProvider.Id, primaryProvider.ProviderName);
+
+        if (local != null) AdoptIdentity(item, local);
+
+        var namedOnlyByTheDocument = local != null && LocalIdentity.Ids(local.Document).IsEmpty && IdsOf(item).IsEmpty;
+        var metadata = namedOnlyByTheDocument
+            ? await FetchMetadataForItemAsync(item, primaryProvider, local?.Document.Title, local?.Document.ReleaseDate?.Year)
+            : await FetchMetadataForItemAsync(item, primaryProvider);
+
+        if (local == null || mode != LocalMetadataMode.Prefer) return (metadata, primaryProvider.Id, primaryProvider.ProviderName);
+
+        return metadata == null
+            ? (local.Document, LocalMetadataProvider.ProviderId, LocalMetadataProvider.LocalProviderName)
+            : (LocalMetadataMerge.Overlay(metadata, local.Document), primaryProvider.Id, primaryProvider.ProviderName);
+    }
+
+    private async Task<LocalDocument?> ReadTrustedDocumentAsync(MediaItem item, LocalMetadataMode mode)
+    {
+        if (mode == LocalMetadataMode.Off) return null;
+
+        if (item.CanBeMatchedToAProvider()) return Trusted(item, await _localMedia.ReadDocumentAsync(item.Id));
+
+        if (mode != LocalMetadataMode.Prefer) return null;
+
+        var show = item switch
+        {
+            Season season => season.TvShow,
+            Episode episode => episode.Season?.TvShow,
+            _ => null
+        };
+        if (show == null || !await ShowDocumentIsTrustedAsync(show)) return null;
+
+        return await _localMedia.ReadDocumentAsync(item.Id);
+    }
+
+    private async Task<bool> ShowDocumentIsTrustedAsync(TvShow show)
+    {
+        if (_trustedShowDocuments.TryGetValue(show.Id, out var known)) return known;
+
+        var local = await _localMedia.ReadDocumentAsync(show.Id);
+        var trusted = local == null ? !HasFixedIdentity(show) : Trusted(show, local) != null;
+        _trustedShowDocuments[show.Id] = trusted;
+        return trusted;
+    }
+
+    private static LocalDocument? Trusted(MediaItem title, LocalDocument? local)
+    {
+        if (local == null) return null;
+
+        if (HasFixedIdentity(title))
+        {
+            var declared = LocalIdentity.Ids(local.Document);
+            var own = IdsOf(title);
+            return LocalIdentity.SharesAnId(declared, own) && !LocalIdentity.Contradicts(declared, own) ? local : null;
+        }
+
+        return LocalIdentity.Trusted(local.Document, local.ParsedYear, local.TaggedIds) == null ? null : local;
+    }
+
+    private static bool HasFixedIdentity(MediaItem title) =>
+        title.IsLocked(MediaMatchManager.MatchLock)
+        || title.IsLocked(nameof(title.TmdbId))
+        || title.IsLocked(nameof(title.ImdbId))
+        || title.IsLocked(nameof(title.TvdbId));
+
+    private static ExternalIdSet IdsOf(MediaItem item) => ExternalIdSet.From(item.TmdbId, item.ImdbId, item.TvdbId);
+
+    private static void AdoptIdentity(MediaItem item, LocalDocument local)
+    {
+        if (!item.CanBeMatchedToAProvider() || HasFixedIdentity(item)) return;
+
+        var declared = LocalIdentity.Merge(local.TaggedIds, LocalIdentity.Ids(local.Document));
+        if (declared.IsEmpty) return;
+
+        if (LocalIdentity.Contradicts(declared, IdsOf(item)))
+        {
+            item.TmdbId = declared.TmdbId;
+            item.ImdbId = declared.ImdbId;
+            item.TvdbId = declared.TvdbId;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(item.TmdbId)) item.TmdbId = declared.TmdbId;
+        if (string.IsNullOrWhiteSpace(item.ImdbId)) item.ImdbId = declared.ImdbId;
+        if (string.IsNullOrWhiteSpace(item.TvdbId)) item.TvdbId = declared.TvdbId;
     }
 
     // Route by whichever id space the person came from. It used to take
@@ -79,23 +161,25 @@ public class MetadataFetchService : IMetadataFetchService
 
     public async Task<((decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) Ratings, List<MediaArtwork> Artwork)> GetSecondaryDataAsync(MediaItem item, bool forceOverride, CancellationToken cancellationToken = default)
     {
-        var ratingsTask = FetchRatingsDataAsync(item, cancellationToken);
-
-        var artworkProviderIdToUse = item.Library?.ArtworkProviderId ?? "tmdb_artwork";
+        var artworkProviderIdToUse = item.Library?.ArtworkProviderId ?? TmdbArtworkProviderId;
         var needsArtworkRefresh = forceOverride || item.Artwork == null || !item.Artwork.Any() || !item.Artwork.Any(a => a.ProviderId == artworkProviderIdToUse);
 
+        var localArtwork = needsArtworkRefresh ? await FindLocalArtworkAsync(item) : [];
+
+        var ratingsTask = FetchRatingsDataAsync(item, cancellationToken);
         var artworkTask = needsArtworkRefresh
-            ? FetchArtworkDataAsync(item)
+            ? FetchProviderArtworkAsync(item)
             : Task.FromResult(new List<MediaArtwork>());
 
         await Task.WhenAll(ratingsTask, artworkTask);
 
-        return (await ratingsTask, await artworkTask);
+        return (await ratingsTask, [.. localArtwork, .. await artworkTask]);
     }
 
     public async Task<List<MediaArtwork>> GetArtworkAsync(MediaItem item)
     {
-        return await FetchArtworkDataAsync(item);
+        var localArtwork = await FindLocalArtworkAsync(item);
+        return [.. localArtwork, .. await FetchProviderArtworkAsync(item)];
     }
 
     public async Task<(decimal? Rating1, string? Name1, decimal? Rating2, string? Name2)> GetRatingsAsync(MediaItem item, CancellationToken cancellationToken = default)
@@ -107,20 +191,8 @@ public class MetadataFetchService : IMetadataFetchService
     // and a trailing "(year)" both pollute a title search and can stop a title
     // from matching at all (the year is already passed as a separate param).
     // Strip them before falling back to a title lookup.
-    private async Task<MetadataResult?> FetchMetadataForItemAsync(MediaItem item, IMetadataProvider provider)
+    private async Task<MetadataResult?> FetchMetadataForItemAsync(MediaItem item, IMetadataProvider provider, string? searchTitle = null, int? searchYear = null)
     {
-        if (provider.Id == "local_metadata")
-        {
-            var physicalPath = await GetLocalPathAsync(item);
-            if (string.IsNullOrEmpty(physicalPath)) return null;
-            if (item is Movie) return await provider.FetchMovieMetadataByIdAsync(physicalPath, "local");
-            if (item is TvShow) return await provider.FetchTvShowMetadataByIdAsync(physicalPath, "local");
-            if (item is Season seasonItem) return await provider.FetchSeasonMetadataAsync(physicalPath, "local", seasonItem.SeasonNumber);
-            if (item is Episode ep) return await provider.FetchEpisodeMetadataAsync(physicalPath, ep.Season?.SeasonNumber ?? 1, ep.EpisodeNumber);
-
-            return null;
-        }
-
         if (item is Movie movie)
         {
             if (provider.Id == "tvdb_metadata" && !string.IsNullOrEmpty(movie.TvdbId))
@@ -147,7 +219,7 @@ public class MetadataFetchService : IMetadataFetchService
                 if (res != null) return res;
             }
 
-            return await provider.FetchMovieMetadataAsync(MediaMatchIds.CleanSearchTitle(movie.Title), movie.ReleaseDate?.Year);
+            return await provider.FetchMovieMetadataAsync(MediaMatchIds.CleanSearchTitle(searchTitle ?? movie.Title), searchYear ?? movie.ReleaseDate?.Year);
         }
 
         if (item is TvShow tvShow)
@@ -176,7 +248,7 @@ public class MetadataFetchService : IMetadataFetchService
                 if (res != null) return res;
             }
 
-            return await provider.FetchTvShowMetadataAsync(MediaMatchIds.CleanSearchTitle(tvShow.Title), tvShow.ReleaseDate?.Year);
+            return await provider.FetchTvShowMetadataAsync(MediaMatchIds.CleanSearchTitle(searchTitle ?? tvShow.Title), searchYear ?? tvShow.ReleaseDate?.Year);
         }
 
         if (item is Season season)
@@ -240,64 +312,43 @@ public class MetadataFetchService : IMetadataFetchService
         return (await task1, available1 ? provider1!.RatingSourceName : null, await task2, available2 ? provider2!.RatingSourceName : null);
     }
 
-    private async Task<List<MediaArtwork>> FetchArtworkDataAsync(MediaItem item)
+    private static bool UsesLocalArtworkProvider(MediaItem item) =>
+        item.Library?.ArtworkProviderId == LocalArtworkProvider.ProviderId;
+
+    private async Task<List<MediaArtwork>> FindLocalArtworkAsync(MediaItem item)
     {
-        var artworkEntities = new List<MediaArtwork>();
-        if (item?.Library == null) return artworkEntities;
+        if (item?.Library == null) return [];
+        if (!item.Library.PreferLocalArtwork && !UsesLocalArtworkProvider(item)) return [];
 
-        var providerIdToUse = item.Library.ArtworkProviderId ?? "tmdb_artwork";
-        var provider = _artworkProviders.FirstOrDefault(p => p.Id == providerIdToUse) ?? _artworkProviders.FirstOrDefault(p => p.Id == "tmdb_artwork");
-        var localProvider = _artworkProviders.FirstOrDefault(p => p.Id == "local_artwork");
-        var localPath = await GetLocalPathAsync(item);
-        if (localProvider != null && localPath != null)
-        {
-            var localArtwork = await localProvider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name, localPath, item.Title);
-            if (item is Season localSeason)
-            {
-                var poster = LocalMediaAssets.SeasonPoster(localPath, localSeason.SeasonNumber);
-                localArtwork = localArtwork.Where(artwork => artwork.Kind != Vora.Plugins.Dtos.ArtworkKind.Poster);
-                if (poster != null) localArtwork = localArtwork.Prepend(new ArtworkResult
-                {
-                    Kind = Vora.Plugins.Dtos.ArtworkKind.Poster, Url = poster, Language = "Local"
-                });
-            }
-            Add(localArtwork, localProvider.Id);
-        }
-        var localKinds = artworkEntities.Select(a => a.Kind).ToHashSet();
-        if (provider != null && provider != localProvider && localKinds.Count < (item is Episode or Season ? 2 : 3))
-        {
-            var results = await provider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name,
-                localPath == null ? null : LocalMediaAssets.DirectoryPath(localPath), item.Title);
-            Add(results.Where(r => !localKinds.Contains((Vora.Domain.Enums.ArtworkKind)r.Kind)), provider.Id);
-        }
-
-        return artworkEntities;
-
-        void Add(IEnumerable<ArtworkResult> results, string providerId) => artworkEntities.AddRange(results.Select(r => new MediaArtwork
-        {
-            MediaItemId = item.Id, Url = r.Url, Kind = (Vora.Domain.Enums.ArtworkKind)r.Kind,
-            Language = r.Language, Width = r.Width, Height = r.Height, VoteAverage = r.VoteAverage, ProviderId = providerId
-        }));
+        return await _localMedia.FindArtworkAsync(item.Id);
     }
 
-    private async Task<string?> GetLocalPathAsync(MediaItem item)
+    private async Task<List<MediaArtwork>> FetchProviderArtworkAsync(MediaItem item)
     {
-        var path = item.MediaParts.FirstOrDefault()?.FilePath;
-        if (item is TvShow show)
+        var artworkEntities = new List<MediaArtwork>();
+        if (item?.Library == null || UsesLocalArtworkProvider(item)) return artworkEntities;
+
+        var providerIdToUse = item.Library.ArtworkProviderId ?? TmdbArtworkProviderId;
+        var provider = _artworkProviders.FirstOrDefault(p => p.Id == providerIdToUse) ?? _artworkProviders.FirstOrDefault(p => p.Id == TmdbArtworkProviderId);
+        if (provider == null) return artworkEntities;
+
+        var localPath = item.MediaParts.FirstOrDefault()?.FilePath;
+        if (!string.IsNullOrEmpty(localPath)) localPath = Path.GetDirectoryName(localPath);
+
+        var results = await provider.GetArtworkAsync(item.TmdbId, item.TvdbId, item.ImdbId, item.GetType().Name, localPath, item.Title);
+
+        artworkEntities.AddRange(results.Select(r => new MediaArtwork
         {
-            if (path == null && _repository != null)
-                path = (await _repository.GetEpisodeFilePathsForShowAsync(show.Id)).FirstOrDefault();
-            return path == null ? null : LocalMediaAssets.ShowDirectory(path);
-        }
-        if (item is Season season)
-        {
-            if (path == null && _repository != null)
-            {
-                var episodeIds = await _repository.GetEpisodeIdsForSeasonAsync(season.Id);
-                if (episodeIds.Count > 0) path = (await _repository.GetMediaFilePathsAsync(episodeIds[0])).FirstOrDefault();
-            }
-            return path == null ? null : LocalMediaAssets.DirectoryPath(path);
-        }
-        return path;
+            MediaItemId = item.Id,
+            Url = r.Url,
+            Kind = (Vora.Domain.Enums.ArtworkKind)r.Kind,
+            Language = r.Language,
+            Width = r.Width,
+            Height = r.Height,
+            VoteAverage = r.VoteAverage,
+            ProviderId = provider.Id
+        }));
+
+        return artworkEntities;
     }
 }

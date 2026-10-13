@@ -22,6 +22,7 @@ public class MetadataManagerTests
     private readonly IClientNotifier _notifier;
     private readonly IMetadataFetchService _fetch;
     private readonly IMetadataMappingService _mapping;
+    private readonly Vora.Application.Metadata.Local.ILocalMetadataChangeFinder _localChanges = Substitute.For<Vora.Application.Metadata.Local.ILocalMetadataChangeFinder>();
     private readonly MetadataManager _manager;
 
     public MetadataManagerTests()
@@ -43,6 +44,7 @@ public class MetadataManagerTests
             _media, _actors, _scopeFactory, _notifier, _fetch, _mapping,
             settingsRepo, Array.Empty<Vora.Plugins.Interfaces.IMetadataProvider>(),
             new Vora.Plugins.Interfaces.NullTaskProgressReporter(),
+            _localChanges,
             NullLogger<MetadataManager>.Instance);
     }
 

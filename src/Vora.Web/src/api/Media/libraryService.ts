@@ -25,6 +25,8 @@ export interface MediaLibrary {
     thirdPartyRating1ProviderId?: string;
     thirdPartyRating2ProviderId?: string;
     artworkProviderId?: string;
+    localMetadataMode: number;
+    preferLocalArtwork: boolean;
 }
 
 export interface LibrarySummary {

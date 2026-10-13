@@ -3,8 +3,11 @@ using Microsoft.Extensions.Logging;
 using Vora.Application.Actors;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
+using Vora.Application.Media.Dtos;
+using Vora.Application.Metadata.Local;
 using Vora.Application.Settings;
 using Vora.Domain.Entities.Media;
+using Vora.Plugins.Dtos;
 
 namespace Vora.Application.Metadata;
 
@@ -20,6 +23,7 @@ public interface IMetadataManager
     Task TriggerLibraryArtworkRefreshAsync(Guid libraryId, bool forceOverride = false, CancellationToken cancellationToken = default);
     Task TriggerMediaItemRatingsRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default);
     Task RefreshMetadataAsync(Guid mediaItemId, bool forceOverride = false, bool notify = true);
+    Task<IReadOnlyList<Guid>> TriggerLibraryLocalMetadataSyncAsync(Guid libraryId, DateTime? since = null, CancellationToken cancellationToken = default);
 }
 
 public class MetadataManager : IMetadataManager
@@ -36,6 +40,7 @@ public class MetadataManager : IMetadataManager
     private readonly ISystemSettingsRepository _settingsRepository;
     private readonly IEnumerable<Vora.Plugins.Interfaces.IMetadataProvider> _metadataProviders;
     private readonly Vora.Plugins.Interfaces.ITaskProgressReporter _progress;
+    private readonly ILocalMetadataChangeFinder _localChanges;
     private readonly ILogger<MetadataManager> _logger;
 
     private const string TvdbMetadataProviderId = "tvdb_metadata";
@@ -51,6 +56,7 @@ public class MetadataManager : IMetadataManager
         ISystemSettingsRepository settingsRepository,
         IEnumerable<Vora.Plugins.Interfaces.IMetadataProvider> metadataProviders,
         Vora.Plugins.Interfaces.ITaskProgressReporter progress,
+        ILocalMetadataChangeFinder localChanges,
         ILogger<MetadataManager> logger)
     {
         _repository = repository;
@@ -62,8 +68,62 @@ public class MetadataManager : IMetadataManager
         _settingsRepository = settingsRepository;
         _metadataProviders = metadataProviders;
         _progress = progress;
+        _localChanges = localChanges;
         _logger = logger;
     }
+
+    public async Task<IReadOnlyList<Guid>> TriggerLibraryLocalMetadataSyncAsync(Guid libraryId, DateTime? since = null, CancellationToken cancellationToken = default)
+    {
+        var changes = await _localChanges.FindAsync(libraryId, since, cancellationToken);
+        if (changes.IsEmpty) return [];
+
+        await _repository.ClearMetadataRefreshAsync(changes.Documents.Select(source => source.Id).ToList());
+
+        var changedByTitle = changes.Documents
+            .GroupBy(source => source.TvShowId ?? source.Id)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        await ProcessLibraryItemsAsync(libraryId, changedByTitle.Keys, "local", async titleId =>
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var scopedManager = scope.ServiceProvider.GetRequiredService<IMetadataManager>();
+            await RefreshTitleFromLocalMetadataAsync(scopedManager, titleId, changedByTitle[titleId], cancellationToken);
+        }, cancellationToken);
+
+        await ProcessLibraryItemsAsync(libraryId, changes.Artwork, "artwork", id => RefreshArtworkAsync(id), cancellationToken);
+
+        return changes.Artwork;
+    }
+
+    private async Task RefreshTitleFromLocalMetadataAsync(IMetadataManager scopedManager, Guid titleId, IReadOnlyList<LocalMediaSourceDto> changed, CancellationToken cancellationToken)
+    {
+        var title = changed.FirstOrDefault(source => source.Id == titleId);
+        if (title != null)
+        {
+            var isShow = title.Kind == LocalMediaSourceDto.TvShow;
+            var identityBefore = isShow ? await IdentityOfAsync(titleId) : null;
+            await scopedManager.RefreshMetadataAsync(titleId);
+
+            if (isShow && identityBefore != await IdentityOfAsync(titleId))
+            {
+                await _repository.ClearMetadataRefreshAsync(await _repository.GetEpisodeIdsForShowAsync(titleId));
+                await scopedManager.TriggerMediaItemMetadataRefreshAsync(titleId, false, cancellationToken);
+                return;
+            }
+        }
+
+        var children = changed.Where(source => source.Id != titleId).ToList();
+        foreach (var child in children)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await scopedManager.RefreshMetadataAsync(child.Id, notify: false);
+        }
+
+        if (children.Count > 0) await _notifier.NotifyMediaItemUpdatedAsync(titleId);
+    }
+
+    private Task<ExternalIdSet?> IdentityOfAsync(Guid mediaItemId) =>
+        _repository.GetProjectedAsync(mediaItemId, m => ExternalIdSet.From(m.TmdbId, m.ImdbId, m.TvdbId));
 
     public async Task TriggerActorMetadataRefreshAsync(CancellationToken cancellationToken = default)
     {
@@ -489,6 +549,7 @@ public class MetadataManager : IMetadataManager
         "artwork" => "Fetching artwork",
         "ratings" => "Fetching ratings",
         "enrich" => "Fetching details",
+        "local" => "Reading local metadata",
         _ => $"Processing {operation}"
     };
 

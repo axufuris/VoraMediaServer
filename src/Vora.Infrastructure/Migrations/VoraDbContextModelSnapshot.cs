@@ -919,6 +919,9 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("LocalMetadataMode")
+                        .HasColumnType("integer");
+
                     b.Property<string>("MetadataProviderId")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -933,6 +936,9 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("character varying(128)");
 
                     b.Property<bool>("OnlyShowTrailers")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("PreferLocalArtwork")
                         .HasColumnType("boolean");
 
                     b.Property<string>("ScannerRegex")

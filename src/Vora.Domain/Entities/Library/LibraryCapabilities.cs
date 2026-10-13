@@ -17,4 +17,7 @@ public static class LibraryCapabilities
     // is not scanned into media items at all.
     public static bool HasVideoContent(this LibraryType type) =>
         type is LibraryType.Movie or LibraryType.TvShow or LibraryType.HomeVideo;
+
+    public static bool ReadsLocalMetadata(this LibraryType type) =>
+        type is LibraryType.Movie or LibraryType.TvShow;
 }

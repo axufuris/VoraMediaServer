@@ -67,6 +67,8 @@ export interface CreateLibraryRequest {
     useSeasonTitles: boolean;
     seasonsDisplay: number;
     enableIntroDetection: boolean;
+    localMetadataMode: number;
+    preferLocalArtwork: boolean;
 }
 
 export type UpdateLibraryRequest = Omit<MediaLibrary, 'id' | 'type' | 'isBeingWatched'>;
@@ -168,6 +170,10 @@ export const libraryAdminService = {
     applyMatch: async (mediaItemId: string, source: MediaMatchSource, externalId: string, serverId?: string): Promise<MediaMatchResult> => {
         const response = await apiClient.post<MediaMatchResult>(`/media/${mediaItemId}/match`, { source, externalId }, { serverId });
         return response.data;
+    },
+
+    clearMatch: async (mediaItemId: string, serverId?: string): Promise<void> => {
+        await apiClient.delete(`/media/${mediaItemId}/match`, { serverId });
     },
 
     analyzeMedia: async (mediaItemId: string, serverId?: string): Promise<void> => {
