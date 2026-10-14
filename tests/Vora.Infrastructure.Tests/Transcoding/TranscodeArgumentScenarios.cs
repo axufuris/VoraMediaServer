@@ -58,5 +58,5 @@ internal static class TranscodeArgumentScenarios
     };
 
     public static string Build(PlaybackDecisionVM decision, FFmpegTranscodeService.TranscodeHardware? hardware, FFmpegTranscodeService.TranscodeHost host, int startSegment = 0) =>
-        string.Join(" ", FFmpegTranscodeService.BuildFFmpegArguments(Source, Segments, InternalPlaylist, decision, new ServerSetting(), hardware, startSegment, startSegment * 4.0, host));
+        string.Join(" ", FFmpegTranscodeService.BuildFFmpegArguments(Source, Segments, InternalPlaylist, decision, new ServerSetting(), hardware, SegmentLaunch.Uniform(startSegment), host));
 }

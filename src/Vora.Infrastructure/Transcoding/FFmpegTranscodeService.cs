@@ -9,17 +9,23 @@ using Vora.Application.Streaming;
 using Vora.Application.Streaming.ViewModels;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
+using Vora.Infrastructure.Transcoding.Keyframes;
 
 namespace Vora.Infrastructure.Transcoding;
 
 public class FFmpegTranscodeService : ITranscodeService
 {
-    private const int SegmentSeconds = 4;
+    private const int SegmentSeconds = SegmentPlan.SegmentSeconds;
     private const double FallbackDurationSeconds = 4 * 60 * 60;
+    private const double EncodingPathSeconds = 60 * SegmentSeconds;
+    private const double BackwardRequestSeconds = 5 * SegmentSeconds;
+    private const string UnfinishedSegmentExtension = ".part";
+    private static readonly TimeSpan KilledProcessExitWait = TimeSpan.FromSeconds(2);
 
     private static readonly ConcurrentDictionary<Guid, TranscodeProcess> _activeTranscodes = new();
     private static readonly ConcurrentDictionary<Guid, TranscodeContext> _transcodeContexts = new();
     private static readonly SemaphoreSlim _transcodeLock = new(1, 1);
+    private static readonly Lock _segmentPublishLock = new();
     private static int _launchCounter;
 
     private readonly IServiceProvider _serviceProvider;
@@ -54,6 +60,16 @@ public class FFmpegTranscodeService : ITranscodeService
             ? await _hardware.ResolveAsync(settings.HardwareAccelerationType, settings.HardwareTranscodingDevice, cancellationToken)
             : null;
 
+        var durationSeconds = decision.SourceDurationSeconds > 0 ? decision.SourceDurationSeconds : FallbackDurationSeconds;
+        if (decision.SourceDurationSeconds <= 0)
+        {
+            _logger.LogWarning("Source duration unknown for {MediaItemId}; using {Fallback}s placeholder. Re-analyze the media to populate Duration.",
+                decision.MediaItemId, FallbackDurationSeconds);
+        }
+        var plan = PlanSegments(sourceFilePath, decision, durationSeconds);
+        int startSegment = plan.IndexAt(Math.Max(0, decision.StartPositionSeconds));
+
+        TranscodeContext ctx;
         await _transcodeLock.WaitAsync(cancellationToken);
         try
         {
@@ -75,34 +91,44 @@ public class FFmpegTranscodeService : ITranscodeService
 
             await StopProcessAndCleanFilesAsync(decision.MediaItemId, targetDir);
 
-            var durationSeconds = decision.SourceDurationSeconds > 0 ? decision.SourceDurationSeconds : FallbackDurationSeconds;
-            if (decision.SourceDurationSeconds <= 0)
-            {
-                _logger.LogWarning("Source duration unknown for {MediaItemId}; using {Fallback}s placeholder. Re-analyze the media to populate Duration.",
-                    decision.MediaItemId, FallbackDurationSeconds);
-            }
-
-            var rawStart = Math.Max(0, decision.StartPositionSeconds);
-            var startSegment = (int)Math.Floor(rawStart / SegmentSeconds);
-            var alignedStart = startSegment * (double)SegmentSeconds;
-
-            WriteVodPlaylist(outputPath, decision.MediaItemId, durationSeconds, alignedStart);
+            WriteVodPlaylist(outputPath, decision.MediaItemId, plan, startSegment);
 
             var hardware = accelerator is null ? null : new TranscodeHardware(accelerator, Encode: willUseGpu);
-            var ctx = new TranscodeContext(sourceFilePath, decision, targetDir, durationSeconds, startSegment, hardware);
+            ctx = new TranscodeContext(sourceFilePath, decision, targetDir, plan, startSegment, hardware);
             _transcodeContexts[decision.MediaItemId] = ctx;
 
-            await LaunchFFmpegAsync(decision.MediaItemId, startSegment, alignedStart, settings);
+            await LaunchFFmpegAsync(decision.MediaItemId, startSegment, settings);
         }
         finally
         {
             _transcodeLock.Release();
         }
 
-        var firstSegmentIndex = Math.Max(0, (int)Math.Floor(Math.Max(0, decision.StartPositionSeconds) / SegmentSeconds));
-        await WaitForSegmentSealedAsync(decision.MediaItemId, firstSegmentIndex, targetDir, TimeSpan.FromSeconds(30), cancellationToken);
+        await WaitForSegmentSealedAsync(decision.MediaItemId, startSegment, ctx, TimeSpan.FromSeconds(30), cancellationToken);
         return outputPath;
     }
+
+    private SegmentPlan PlanSegments(string sourceFilePath, PlaybackDecisionVM decision, double durationSeconds)
+    {
+        if (decision.SourceDurationSeconds <= 0 || !CopiesVideo(decision)) return SegmentPlan.Uniform(durationSeconds);
+
+        var keyframes = KeyframeIndex.TryRead(sourceFilePath, decision.SelectedVideoStreamIndex ?? 0);
+        var plan = keyframes is null ? null : SegmentPlan.FromKeyframes(keyframes, durationSeconds);
+        if (plan is null)
+        {
+            _logger.LogInformation("No keyframe index for {MediaItemId}; copied video uses even {Seconds}-second segments.", decision.MediaItemId, SegmentSeconds);
+            return SegmentPlan.Uniform(durationSeconds);
+        }
+
+        _logger.LogInformation("Copied video for {MediaItemId} is cut at its own keyframes: {Count} segments.", decision.MediaItemId, plan.Count);
+        return plan;
+    }
+
+    private static bool CopiesVideo(PlaybackDecisionVM decision) =>
+        decision.Decision == StreamingState.DirectPlay
+        || decision.Decision == StreamingState.Remux
+        || decision.VideoStrategy == "Copy"
+        || decision.VideoStrategy == "DirectStream";
 
     public async Task<bool> EnsureSegmentAvailableAsync(Guid mediaItemId, int segmentIndex, CancellationToken cancellationToken = default)
     {
@@ -111,15 +137,13 @@ public class FFmpegTranscodeService : ITranscodeService
             return false;
         }
 
-        var segmentPath = Path.Combine(ctx.TargetDir, $"{mediaItemId}_{segmentIndex}.ts");
-
         // If the segment file is on disk AND sealed (FFmpeg has moved on),
         // serve it. The seal check is critical — if the file exists but
         // FFmpeg is mid-write, ASP.NET's Results.File picks up the current
         // size as Content-Length, then more bytes get appended while
         // streaming, producing "Response Content-Length mismatch: too many
         // bytes written" and a corrupt segment for the player.
-        if (await IsSegmentSealedAsync(mediaItemId, segmentIndex, ctx.TargetDir, cancellationToken))
+        if (await IsSegmentSealedAsync(mediaItemId, segmentIndex, ctx, cancellationToken))
         {
             return true;
         }
@@ -135,10 +159,11 @@ public class FFmpegTranscodeService : ITranscodeService
         // will reach soon (start ≤ requested ≤ start+60, ≈4min of buffer),
         // just wait. Don't relaunch — multiple concurrent requests for
         // adjacent missing segments must not each trigger a relaunch.
-        bool inEncodingPath = hasActiveProcess && segmentIndex >= currentStart && segmentIndex <= currentStart + 60;
+        bool inEncodingPath = hasActiveProcess && segmentIndex >= currentStart
+            && ctx.Plan.StartOf(segmentIndex) - ctx.Plan.StartOf(currentStart) <= EncodingPathSeconds;
         if (inEncodingPath)
         {
-            if (await WaitForSegmentSealedAsync(mediaItemId, segmentIndex, ctx.TargetDir, TimeSpan.FromSeconds(15), cancellationToken))
+            if (await WaitForSegmentSealedAsync(mediaItemId, segmentIndex, ctx, TimeSpan.FromSeconds(15), cancellationToken))
             {
                 return true;
             }
@@ -161,7 +186,7 @@ public class FFmpegTranscodeService : ITranscodeService
         // a segment, the player has begun real playback and any future
         // backward request is a legitimate user seek that deserves a
         // proper restart.
-        bool isBackwardRequest = segmentIndex < currentStart - 5;
+        bool isBackwardRequest = ctx.Plan.StartOf(currentStart) - ctx.Plan.StartOf(segmentIndex) > BackwardRequestSeconds;
         if (isBackwardRequest && ctx.HighestServedSegment < 0)
         {
             _logger.LogInformation("Suppressing pre-seek-probe restart for {MediaItemId} segment={SegmentIndex} currentStart={CurrentStart} (no segments served yet)",
@@ -178,17 +203,24 @@ public class FFmpegTranscodeService : ITranscodeService
 
         await RelaunchAtSegmentAsync(mediaItemId, segmentIndex, cancellationToken);
 
-        return await WaitForSegmentSealedAsync(mediaItemId, segmentIndex, ctx.TargetDir, TimeSpan.FromSeconds(30), cancellationToken);
+        return await WaitForSegmentSealedAsync(mediaItemId, segmentIndex, ctx, TimeSpan.FromSeconds(30), cancellationToken);
     }
 
     // A segment is "sealed" (safe to serve) when FFmpeg has either moved
     // on to the next segment (the next .ts file exists) or finished the
     // movie entirely (last segment, no successor). Until then the size on
     // disk is still growing.
-    private static async Task<bool> IsSegmentSealedAsync(Guid mediaItemId, int segmentIndex, string targetDir, CancellationToken ct)
+    private static async Task<bool> IsSegmentSealedAsync(Guid mediaItemId, int segmentIndex, TranscodeContext ctx, CancellationToken ct)
     {
-        var segmentPath = Path.Combine(targetDir, $"{mediaItemId}_{segmentIndex}.ts");
-        var nextSegmentPath = Path.Combine(targetDir, $"{mediaItemId}_{segmentIndex + 1}.ts");
+        var targetDir = ctx.TargetDir;
+        var segmentPath = SegmentPath(targetDir, mediaItemId, segmentIndex);
+        var nextSegmentPath = SegmentPath(targetDir, mediaItemId, segmentIndex + 1);
+
+        if (ctx.Plan.FollowsKeyframes)
+        {
+            PublishFinishedSegments(targetDir, SegmentListPath(targetDir, mediaItemId));
+            return File.Exists(segmentPath);
+        }
 
         if (!File.Exists(segmentPath)) return false;
 
@@ -215,20 +247,20 @@ public class FFmpegTranscodeService : ITranscodeService
         }
     }
 
-    private async Task<bool> WaitForSegmentSealedAsync(Guid mediaItemId, int segmentIndex, string targetDir, TimeSpan timeout, CancellationToken ct)
+    private async Task<bool> WaitForSegmentSealedAsync(Guid mediaItemId, int segmentIndex, TranscodeContext ctx, TimeSpan timeout, CancellationToken ct)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
             if (ct.IsCancellationRequested) return false;
-            if (await IsSegmentSealedAsync(mediaItemId, segmentIndex, targetDir, ct)) return true;
+            if (await IsSegmentSealedAsync(mediaItemId, segmentIndex, ctx, ct)) return true;
             if (!IsEncoding(mediaItemId))
             {
                 // FFmpeg exited — give the OS a tick to flush, check once
                 // more, then fail. Without this we'd race the buffer flush
                 // on the very last segment of the movie.
                 await Task.Delay(200, ct);
-                return await IsSegmentSealedAsync(mediaItemId, segmentIndex, targetDir, ct);
+                return await IsSegmentSealedAsync(mediaItemId, segmentIndex, ctx, ct);
             }
             await Task.Delay(150, ct);
         }
@@ -357,13 +389,13 @@ public class FFmpegTranscodeService : ITranscodeService
             // Kill the existing process but DO NOT wipe existing .ts files —
             // they're already-encoded ranges the user may seek back to.
             await KillProcessOnlyAsync(mediaItemId);
+            if (ctx.Plan.FollowsKeyframes) SettleUnfinishedSegments(mediaItemId, ctx.TargetDir);
 
             var settings = await LoadSettingsAsync();
-            var alignedStart = newStartSegment * (double)SegmentSeconds;
             ctx.CurrentStartSegment = newStartSegment;
             ctx.LaunchedAt = DateTime.UtcNow;
             ctx.LastActivityAt = DateTime.UtcNow;
-            await LaunchFFmpegAsync(mediaItemId, newStartSegment, alignedStart, settings);
+            await LaunchFFmpegAsync(mediaItemId, newStartSegment, settings);
         }
         finally
         {
@@ -408,6 +440,8 @@ public class FFmpegTranscodeService : ITranscodeService
             {
                 try { File.Delete(f); } catch { /* keep going */ }
             }
+            DeleteUnfinishedSegments(mediaItemId, targetDir);
+            DeleteQuietly(SegmentListPath(targetDir, mediaItemId));
         }
         catch (Exception ex)
         {
@@ -425,6 +459,7 @@ public class FFmpegTranscodeService : ITranscodeService
                 if (!entry.Process.HasExited)
                 {
                     entry.Process.Kill(entireProcessTree: true);
+                    entry.Process.WaitForExit(KilledProcessExitWait);
                 }
             }
             catch (Exception ex)
@@ -464,17 +499,15 @@ public class FFmpegTranscodeService : ITranscodeService
         return leadingEdge;
     }
 
-    private static void WriteVodPlaylist(string outputPath, Guid mediaItemId, double durationSeconds, double startOffsetSeconds)
-    {
-        var totalSegments = (int)Math.Ceiling(durationSeconds / SegmentSeconds);
-        if (totalSegments < 1) totalSegments = 1;
-        var lastSegmentDuration = durationSeconds - (totalSegments - 1) * SegmentSeconds;
-        if (lastSegmentDuration <= 0.01) lastSegmentDuration = SegmentSeconds;
+    private static void WriteVodPlaylist(string outputPath, Guid mediaItemId, SegmentPlan plan, int startSegment) =>
+        File.WriteAllText(outputPath, VodPlaylist(mediaItemId, plan, startSegment));
 
+    internal static string VodPlaylist(Guid mediaItemId, SegmentPlan plan, int startSegment)
+    {
         var sb = new StringBuilder();
         sb.AppendLine("#EXTM3U");
         sb.AppendLine("#EXT-X-VERSION:6");
-        sb.AppendLine($"#EXT-X-TARGETDURATION:{SegmentSeconds}");
+        sb.AppendLine($"#EXT-X-TARGETDURATION:{plan.TargetDuration}");
         sb.AppendLine("#EXT-X-PLAYLIST-TYPE:VOD");
         sb.AppendLine("#EXT-X-MEDIA-SEQUENCE:0");
         sb.AppendLine("#EXT-X-INDEPENDENT-SEGMENTS");
@@ -485,20 +518,20 @@ public class FFmpegTranscodeService : ITranscodeService
         // Resume). With it, hls.js / ExoPlayer fetch the segment at
         // startOffsetSeconds directly and skip the segment-0 probe.
         // PRECISE=YES means the player should not snap to a nearby
-        // keyframe — our segments are already keyframe-aligned by
-        // force_key_frames so PRECISE matches the actual content.
-        if (startOffsetSeconds > 0.0)
+        // keyframe — every segment starts on one, forced by
+        // force_key_frames when encoding and taken from the file's own
+        // keyframes when copying, so PRECISE matches the actual content.
+        if (startSegment > 0)
         {
-            sb.AppendLine($"#EXT-X-START:TIME-OFFSET={startOffsetSeconds.ToString("0.000", CultureInfo.InvariantCulture)},PRECISE=YES");
+            sb.AppendLine($"#EXT-X-START:TIME-OFFSET={plan.StartOf(startSegment).ToString("0.000", CultureInfo.InvariantCulture)},PRECISE=YES");
         }
-        for (int i = 0; i < totalSegments; i++)
+        for (int i = 0; i < plan.Count; i++)
         {
-            double dur = i == totalSegments - 1 ? lastSegmentDuration : SegmentSeconds;
-            sb.AppendLine($"#EXTINF:{dur.ToString("0.000", CultureInfo.InvariantCulture)},");
+            sb.AppendLine($"#EXTINF:{plan.DurationOf(i).ToString("0.000", CultureInfo.InvariantCulture)},");
             sb.AppendLine($"{mediaItemId}_{i}.ts");
         }
         sb.AppendLine("#EXT-X-ENDLIST");
-        File.WriteAllText(outputPath, sb.ToString());
+        return sb.ToString();
     }
 
     private async Task<ServerSetting> LoadSettingsAsync()
@@ -511,17 +544,17 @@ public class FFmpegTranscodeService : ITranscodeService
         _activeTranscodes.ContainsKey(mediaItemId)
         || (_transcodeContexts.TryGetValue(mediaItemId, out var ctx) && ctx.RetryingOnCpu);
 
-    private Task LaunchFFmpegAsync(Guid mediaItemId, int startSegment, double alignedStartSeconds, ServerSetting settings)
+    private Task LaunchFFmpegAsync(Guid mediaItemId, int startSegment, ServerSetting settings)
     {
         if (!_transcodeContexts.TryGetValue(mediaItemId, out var ctx))
         {
             throw new InvalidOperationException("No transcode context to launch.");
         }
 
-        var segmentPattern = Path.Combine(ctx.TargetDir, $"{mediaItemId}_%d.ts");
-        var internalPlaylist = Path.Combine(ctx.TargetDir, $"_ffmpeg_{mediaItemId}.m3u8");
+        var segmentPattern = Path.Combine(ctx.TargetDir, ctx.Plan.FollowsKeyframes ? $"{mediaItemId}_%d{UnfinishedSegmentExtension}" : $"{mediaItemId}_%d.ts");
+        var internalPlaylist = ctx.Plan.FollowsKeyframes ? SegmentListPath(ctx.TargetDir, mediaItemId) : Path.Combine(ctx.TargetDir, $"_ffmpeg_{mediaItemId}.m3u8");
         var hardware = ctx.Hardware;
-        var arguments = BuildFFmpegArguments(ctx.SourceFile, segmentPattern, internalPlaylist, ctx.Decision, settings, hardware, startSegment, alignedStartSeconds, TranscodeHost.Detect());
+        var arguments = BuildFFmpegArguments(ctx.SourceFile, segmentPattern, internalPlaylist, ctx.Decision, settings, hardware, ctx.Plan.LaunchAt(startSegment), TranscodeHost.Detect());
         var launch = new TranscodeLaunch(Interlocked.Increment(ref _launchCounter), startSegment, hardware);
         ctx.LaunchId = launch.Id;
 
@@ -607,8 +640,9 @@ public class FFmpegTranscodeService : ITranscodeService
                 && !_activeTranscodes.ContainsKey(mediaItemId);
             if (!stillCurrent) return;
 
+            if (ctx.Plan.FollowsKeyframes) SettleUnfinishedSegments(mediaItemId, ctx.TargetDir);
             var resumeAt = FirstMissingSegment(mediaItemId, ctx.TargetDir, launch.StartSegment);
-            if (resumeAt * (double)SegmentSeconds >= ctx.DurationSeconds) return;
+            if (resumeAt >= ctx.Plan.Count) return;
 
             _logger.LogWarning("{Hardware} transcode failed for {MediaItemId}; retrying on the CPU from segment {Segment}.",
                 HardwareArguments.Label(launch.Hardware?.Accelerator.Type ?? HardwareAccelerationType.Auto), mediaItemId, resumeAt);
@@ -616,7 +650,7 @@ public class FFmpegTranscodeService : ITranscodeService
             var settings = await LoadSettingsAsync();
             ctx.CurrentStartSegment = resumeAt;
             ctx.LaunchedAt = DateTime.UtcNow;
-            await LaunchFFmpegAsync(mediaItemId, resumeAt, resumeAt * (double)SegmentSeconds, settings);
+            await LaunchFFmpegAsync(mediaItemId, resumeAt, settings);
         }
         catch (Exception ex)
         {
@@ -632,8 +666,73 @@ public class FFmpegTranscodeService : ITranscodeService
     private static int FirstMissingSegment(Guid mediaItemId, string targetDir, int fromSegment)
     {
         var segment = fromSegment;
-        while (File.Exists(Path.Combine(targetDir, $"{mediaItemId}_{segment}.ts"))) segment++;
+        while (File.Exists(SegmentPath(targetDir, mediaItemId, segment))) segment++;
         return segment;
+    }
+
+    private static string SegmentPath(string targetDir, Guid mediaItemId, int segment) => Path.Combine(targetDir, $"{mediaItemId}_{segment}.ts");
+
+    private static string SegmentListPath(string targetDir, Guid mediaItemId) => Path.Combine(targetDir, $"_ffmpeg_{mediaItemId}.list");
+
+    internal static void PublishFinishedSegments(string targetDir, string segmentListPath)
+    {
+        lock (_segmentPublishLock)
+        {
+            string listed;
+            try
+            {
+                using var stream = new FileStream(segmentListPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(stream);
+                listed = reader.ReadToEnd();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return;
+            }
+
+            int lastCompleteLine = listed.LastIndexOf('\n');
+            if (lastCompleteLine < 0) return;
+            foreach (var line in listed[..lastCompleteLine].Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            {
+                var unfinished = Path.Combine(targetDir, Path.GetFileName(line));
+                if (!unfinished.EndsWith(UnfinishedSegmentExtension, StringComparison.Ordinal) || !File.Exists(unfinished)) continue;
+                try
+                {
+                    File.Move(unfinished, Path.ChangeExtension(unfinished, ".ts"), overwrite: true);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                }
+            }
+        }
+    }
+
+    private static void SettleUnfinishedSegments(Guid mediaItemId, string targetDir)
+    {
+        var segmentList = SegmentListPath(targetDir, mediaItemId);
+        lock (_segmentPublishLock)
+        {
+            PublishFinishedSegments(targetDir, segmentList);
+            DeleteQuietly(segmentList);
+            DeleteUnfinishedSegments(mediaItemId, targetDir);
+        }
+    }
+
+    private static void DeleteUnfinishedSegments(Guid mediaItemId, string targetDir)
+    {
+        if (!Directory.Exists(targetDir)) return;
+        foreach (var unfinished in Directory.EnumerateFiles(targetDir, $"{mediaItemId}_*{UnfinishedSegmentExtension}")) DeleteQuietly(unfinished);
+    }
+
+    private static void DeleteQuietly(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     internal static List<string> BuildFFmpegArguments(
@@ -643,17 +742,13 @@ public class FFmpegTranscodeService : ITranscodeService
         PlaybackDecisionVM decision,
         ServerSetting settings,
         TranscodeHardware? hardware,
-        int startSegment,
-        double alignedStartSeconds,
+        SegmentLaunch launch,
         TranscodeHost host)
     {
         var args = new List<string>();
         void Flag(string fragment) => args.AddRange(fragment.Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
-        bool encodingVideo = !(decision.Decision == StreamingState.DirectPlay
-            || decision.Decision == StreamingState.Remux
-            || decision.VideoStrategy == "Copy"
-            || decision.VideoStrategy == "DirectStream");
+        bool encodingVideo = !CopiesVideo(decision);
 
         var hdrType = decision.SourceHdrType;
         bool isHdrSource = !string.IsNullOrWhiteSpace(hdrType)
@@ -691,9 +786,10 @@ public class FFmpegTranscodeService : ITranscodeService
             }
         }
 
-        if (alignedStartSeconds > 0.0)
+        if (launch.Seeks)
         {
-            Flag($"-ss {alignedStartSeconds.ToString("0.000", CultureInfo.InvariantCulture)}");
+            if (launch.FollowsKeyframes) Flag("-noaccurate_seek");
+            Flag($"-ss {Seconds(launch.SeekSeconds)}");
         }
         Flag("-i"); args.Add(sourceFile);
 
@@ -811,9 +907,23 @@ public class FFmpegTranscodeService : ITranscodeService
         // timestamps match the playlist position. Internal encoding still
         // runs with PTS=0 so -force_key_frames math works, but the muxer
         // writes PTS+offset.
-        if (alignedStartSeconds > 0.0)
+        if (launch.TimestampOffsetSeconds > 0.0)
         {
-            Flag($"-output_ts_offset {alignedStartSeconds.ToString("0.000", CultureInfo.InvariantCulture)}");
+            Flag($"-output_ts_offset {Seconds(launch.TimestampOffsetSeconds)}");
+        }
+
+        if (launch.CutTimes is { } cutTimes)
+        {
+            Flag("-f segment -segment_format mpegts");
+            if (cutTimes.Count > 0)
+            {
+                Flag("-segment_times"); args.Add(string.Join(",", cutTimes.Select(Seconds)));
+            }
+            Flag("-segment_list"); args.Add(internalPlaylistPath);
+            Flag("-segment_list_type flat");
+            Flag($"-segment_start_number {launch.StartSegment} -reset_timestamps 0");
+            args.Add(segmentPattern);
+            return args;
         }
 
         // Use FFmpeg's HLS muxer for actual segment writing — it handles
@@ -832,11 +942,13 @@ public class FFmpegTranscodeService : ITranscodeService
         // the wrong name makes FFmpeg exit with code 8 + "Unrecognized
         // option 'hls_start_number'. Error splitting the argument list:
         // Option not found".
-        Flag($"-start_number {startSegment}");
+        Flag($"-start_number {launch.StartSegment}");
         args.Add(internalPlaylistPath);
 
         return args;
     }
+
+    private static string Seconds(double seconds) => seconds.ToString("0.000", CultureInfo.InvariantCulture);
 
     private static List<string> EncoderArguments(HardwareAccelerator encoder, bool encodeHevc, ServerSetting settings, PlaybackDecisionVM decision)
     {
@@ -1060,13 +1172,13 @@ public class FFmpegTranscodeService : ITranscodeService
     {
         private volatile bool _retryingOnCpu;
 
-        public TranscodeContext(string sourceFile, PlaybackDecisionVM decision, string targetDir, double durationSeconds, int currentStartSegment, TranscodeHardware? hardware)
+        public TranscodeContext(string sourceFile, PlaybackDecisionVM decision, string targetDir, SegmentPlan plan, int currentStartSegment, TranscodeHardware? hardware)
         {
             Hardware = hardware;
             SourceFile = sourceFile;
             Decision = decision;
             TargetDir = targetDir;
-            DurationSeconds = durationSeconds;
+            Plan = plan;
             CurrentStartSegment = currentStartSegment;
             LaunchedAt = DateTime.UtcNow;
             LastActivityAt = DateTime.UtcNow;
@@ -1075,7 +1187,7 @@ public class FFmpegTranscodeService : ITranscodeService
         public string SourceFile { get; }
         public PlaybackDecisionVM Decision { get; }
         public string TargetDir { get; }
-        public double DurationSeconds { get; }
+        public SegmentPlan Plan { get; }
         public int CurrentStartSegment { get; set; }
         public TranscodeHardware? Hardware { get; set; }
         public int LaunchId { get; set; }

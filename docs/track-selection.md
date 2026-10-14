@@ -123,7 +123,6 @@ The last rule fails when two different kinds of outcome are within ten points of
 ## Known limits
 
 - The matrix proves the decision, not playback on a device.
-- A repackaged stream is cut on the source's keyframes while the playlist promises even segments.
 - Only Edge was measured for which track a browser starts on. Firefox and Safari are assumed to behave the same, and the "default and first" test is safe either way.
 - A TV app's hard limit is what it detected. The server does not assume the device can downmix.
 - Per-track audio bitrates are not stored, so the bitrate limit is checked against the file's overall bitrate.
