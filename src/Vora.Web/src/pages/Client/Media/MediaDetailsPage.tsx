@@ -29,6 +29,7 @@ import { burnInSubtitleId, isNoSubtitle } from '../../../utils/subtitleKind';
 import { useServerPlaybackChoice } from '../../../hooks/useServerPlaybackChoice';
 import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
 import { audioChipLabel, heroFactsLine, pickChipAudioTrack, resolutionChipLabel, subtitleChipLabel } from '../../../utils/heroQualityChips';
+import { playTargetFor } from '../../../utils/playTarget';
 import { formatDate, serverTimeMs, yearOf } from '../../../utils/serverTime';
 import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
 import { errorDetail, isMissingOrForbidden } from '../../../utils/apiError';
@@ -261,18 +262,18 @@ export default function MediaDetailsPage() {
 
     const handlePlay = async (resume: boolean = true) => {
         if (!media) return;
+        const { item, startSeconds: startPos, contextType } = playTargetFor(media, qualityMedia, resume);
 
         let subtitle = '';
-        if (media.type === 'Episode' && media.seasonNumber != null && media.episodeNumber != null) {
-            subtitle = `${seasonEpisodeLabel(media.seasonNumber, media.episodeNumber, { endEpisodeNumber: media.endEpisodeNumber })} - ${media.tvShowTitle}`;
+        if (item.type === 'Episode' && item.seasonNumber != null && item.episodeNumber != null) {
+            subtitle = `${seasonEpisodeLabel(item.seasonNumber, item.episodeNumber, { endEpisodeNumber: item.endEpisodeNumber })} - ${item.tvShowTitle}`;
         }
-        else if (media.releaseDate) subtitle = String(yearOf(media.releaseDate) ?? '');
+        else if (item.releaseDate) subtitle = String(yearOf(item.releaseDate) ?? '');
 
         const deviceId = localStorage.getItem(StorageKeys.deviceId);
         if (!deviceId) return;
 
         try {
-            const startPos = resume ? (media.resumePositionSeconds || 0) : 0;
 
             const activePart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === selectedVideoId)) || qualityMedia?.mediaParts?.[0];
 
@@ -284,22 +285,22 @@ export default function MediaDetailsPage() {
             const textSubtitleTrackId = !isNoSubtitle(selectedSubtitleId) && !wantsBurnIn ? selectedSubtitleId : null;
             const subId = wantsBurnIn ? selectedSubtitleId : '00000000-0000-0000-0000-000000000000';
 
-            const sessionInfo = await streamingService.startSession(media.id, deviceId, startPos, selectedVideoId || undefined,
+            const sessionInfo = await streamingService.startSession(item.id, deviceId, startPos, selectedVideoId || undefined,
                 hasManualAudioSelection ? selectedAudioId || undefined : undefined, subId, serverId, activePart?.id);
 
             const activeVideoTrack = activePart?.videoTracks?.find(v => v.id === selectedVideoId) || activePart?.videoTracks?.[0];
             const activeAudioTrack = pickChipAudioTrack(activePart?.audioTracks, sessionInfo.audioTrackId);
 
             playMedia({
-                id: media.id, title: media.title, subtitle: subtitle,
-                posterUrl: media.posterUrl, backgroundUrl: media.backgroundUrl,
+                id: item.id, title: item.title, subtitle: subtitle,
+                posterUrl: item.posterUrl || media.posterUrl, backgroundUrl: item.backgroundUrl || media.backgroundUrl,
                 ...sessionInfo, startPosition: startPos, textSubtitleTrackId,
                 serverId: serverId ?? undefined,
                 resolution: activePart?.resolution, hdrType: activeVideoTrack?.hdrType,
                 outputResolution: sessionInfo.outputResolution ?? undefined,
                 outputHdrType: sessionInfo.outputHdrType ?? undefined,
                 audioCodec: activeAudioTrack?.codec, audioChannels: activeAudioTrack?.channels,
-                playbackContextType: media.type === 'Episode' ? 'tvshow' : 'movie'
+                playbackContextType: contextType
             });
         } catch {
             await dialog.alert('Failed to start playback session.');
