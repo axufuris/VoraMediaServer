@@ -59,14 +59,15 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                         HdrType = vt.HdrType,
                         BitDepth = vt.BitDepth
                     }).ToList(),
-                    AudioTracks = p.AudioTracks.Select(at => new TrackStreamInfoDto
+                    AudioTracks = p.AudioTracks.OrderBy(at => at.StreamIndex).Select(at => new TrackStreamInfoDto
                     {
                         Id = at.Id,
                         Title = at.Title,
                         Codec = at.Codec,
                         Language = at.Language,
                         IsDefault = at.IsDefault,
-                        Channels = at.Channels
+                        Channels = at.Channels,
+                        StreamIndex = at.StreamIndex
                     }).ToList(),
                     SubtitleTracks = p.SubtitleTracks.Select(st => new SubtitleStreamInfoDto
                     {
@@ -221,14 +222,15 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                         HdrType = vt.HdrType,
                         BitDepth = vt.BitDepth
                     }).ToList(),
-                    AudioTracks = p.AudioTracks.Select(at => new TrackStreamInfoDto
+                    AudioTracks = p.AudioTracks.OrderBy(at => at.StreamIndex).Select(at => new TrackStreamInfoDto
                     {
                         Id = at.Id,
                         Title = at.Title,
                         Codec = at.Codec,
                         Language = at.Language,
                         IsDefault = at.IsDefault,
-                        Channels = at.Channels
+                        Channels = at.Channels,
+                        StreamIndex = at.StreamIndex
                     }).ToList(),
                     SubtitleTracks = p.SubtitleTracks.Select(st => new SubtitleStreamInfoDto
                     {

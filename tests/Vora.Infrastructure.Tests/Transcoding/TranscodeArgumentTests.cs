@@ -95,7 +95,7 @@ public class TranscodeArgumentTests
     public void A_remux_after_a_seek_copies_video_without_touching_the_gpu()
     {
         Build(DirectStream(), EncodeOn(Nvidia), JellyfinHost, startSegment: 10)
-            .Should().Be("-ss 40.000 -i /media/movies/Heat (1995)/Heat.mkv -map 0:0 -map 0:2 -sn -c:v copy -c:a ac3 -ac 6 -b:a 384k -output_ts_offset 40.000 -f hls -hls_time 4 -hls_playlist_type vod -hls_list_size 0 -hls_flags independent_segments+temp_file -hls_segment_filename /transcode/heat_%d.ts -start_number 10 /transcode/_ffmpeg_heat.m3u8");
+            .Should().Be("-ss 40.000 -i /media/movies/Heat (1995)/Heat.mkv -map 0:0 -map 0:2 -sn -c:v copy -c:a ac3 -ac 6 -b:a 640k -output_ts_offset 40.000 -f hls -hls_time 4 -hls_playlist_type vod -hls_list_size 0 -hls_flags independent_segments+temp_file -hls_segment_filename /transcode/heat_%d.ts -start_number 10 /transcode/_ffmpeg_heat.m3u8");
     }
 
     [Fact]

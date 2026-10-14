@@ -56,7 +56,7 @@ public class AudioTrackDecisionTests
         decision.Strategy.Should().Be(StreamStrategy.Remux);
         decision.TargetContainer.Should().Be("hls");
         decision.TargetAudioChannels.Should().Be(2);
-        decision.Reason.Should().Contain("non-default track");
+        decision.Reason.Should().Contain("cannot switch tracks");
     }
 
     [Theory]
@@ -97,15 +97,30 @@ public class AudioTrackDecisionTests
     }
 
     [Fact]
-    public async Task Copies_stereo_audio_even_when_the_video_needs_transcoding()
+    public async Task Copies_stereo_audio_for_a_stereo_output_even_when_the_video_needs_transcoding()
     {
         var stereo = Audio(2);
-        var decision = await DecideAsync(Media(Audio(6, "eac3", true), stereo), 6,
+        var decision = await DecideAsync(Media(Audio(6, "eac3", true), stereo), 2,
             profile: StreamingProfile.ClientPreference, codecs: ["aac"], transcodeVideo: true);
 
         decision.SelectedAudioTrackId.Should().Be(stereo.Id);
         decision.VideoStrategy.Should().Be("Transcode");
         decision.AudioStrategy.Should().Be("DirectStream");
+    }
+
+    [Theory]
+    [InlineData(StreamingProfile.DirectStreamPreference)]
+    [InlineData(StreamingProfile.ClientPreference)]
+    [InlineData(StreamingProfile.BandwidthOptimized)]
+    public async Task Keeps_surround_for_a_surround_output_by_converting_the_audio_when_the_video_is_converted_anyway(StreamingProfile profile)
+    {
+        var surround = Audio(6, "eac3", true);
+        var decision = await DecideAsync(Media(surround, Audio(2)), 6, profile: profile, codecs: ["aac"], transcodeVideo: true);
+
+        decision.SelectedAudioTrackId.Should().Be(surround.Id);
+        decision.VideoStrategy.Should().Be("Transcode");
+        decision.AudioStrategy.Should().Be("Transcode");
+        decision.TargetAudioChannels.Should().Be(6);
     }
 
     [Fact]
@@ -120,12 +135,12 @@ public class AudioTrackDecisionTests
     }
 
     [Fact]
-    public async Task Chooses_a_better_supported_codec_for_the_same_channel_layout()
+    public async Task Plays_the_default_track_directly_instead_of_repackaging_for_another_codec_in_the_same_layout()
     {
-        var surround = Audio(6, "eac3");
-        var decision = await DecideAsync(Media(Audio(6, isDefault: true), surround), 6);
-        decision.SelectedAudioTrackId.Should().Be(surround.Id);
-        decision.AudioStrategy.Should().Be("DirectStream");
+        var original = Audio(6, isDefault: true);
+        var decision = await DecideAsync(Media(original, Audio(6, "eac3")), 6);
+        decision.SelectedAudioTrackId.Should().Be(original.Id);
+        decision.Strategy.Should().Be(StreamStrategy.DirectPlay);
     }
 
     [Fact]

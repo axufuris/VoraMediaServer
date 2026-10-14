@@ -8,6 +8,7 @@ public class TrackStreamInfoDto
     public string? Language { get; set; }
     public bool IsDefault { get; set; }
     public int? Channels { get; set; }
+    public int? StreamIndex { get; set; }
     public string? HdrType { get; set; }
     public int? BitDepth { get; set; }
 }

@@ -6,6 +6,7 @@ export interface StartSessionResponse {
     streamUrl: string;
     videoTrackId: string;
     audioTrackId: string;
+    audioTrackPosition?: number;
     subtitleTrackId: string | null;
     strategy: string;
     videoStrategy: string;
@@ -18,6 +19,26 @@ export interface StartSessionResponse {
     bandwidthKbps: number;
     outputResolution?: string | null;
     outputHdrType?: string | null;
+}
+
+export interface StreamDecisionPreview {
+    mediaPartId: string;
+    videoTrackId: string;
+    audioTrackId: string;
+    audioTrackPosition?: number;
+    subtitleTrackId: string | null;
+    strategy: string;
+    videoStrategy: string;
+    audioStrategy: string;
+    targetAudioChannels: number;
+}
+
+export interface StreamDecisionQuestion {
+    serverId?: string;
+    mediaPartId?: string;
+    videoTrackId?: string;
+    audioTrackId?: string;
+    subtitleTrackId?: string;
 }
 
 // Object URLs for sidecar WebVTT, keyed by session + track. The endpoint needs
@@ -44,6 +65,20 @@ export const streamingService = {
         }, { serverId });
 
         return response.data as StartSessionResponse;
+    },
+    previewDecision: async (mediaId: string, deviceId: string, question: StreamDecisionQuestion = {}) => {
+        const capabilities = await scanDeviceCapabilities();
+        const { serverId, ...tracks } = question;
+
+        const response = await apiClient.post('/streaming/decision', {
+            mediaId,
+            deviceId,
+            startPosition: 0,
+            ...tracks,
+            capabilities
+        }, { serverId });
+
+        return response.data as StreamDecisionPreview;
     },
     startExtraSession: async (extraId: string, startPosition: number = 0, serverId?: string) => {
         const capabilities = await scanDeviceCapabilities();

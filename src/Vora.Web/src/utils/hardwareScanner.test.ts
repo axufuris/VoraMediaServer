@@ -7,6 +7,7 @@ let outputChannels = 2;
 
 const device: DeviceCapabilities = {
     videoCodecs: ['h264'], audioCodecs: ['aac'], containers: ['mp4'], maxAudioChannels: 2,
+    detectedAudioChannels: 2, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false,
     clientBandwidthKbps: 100000, requestedClientBitrateKbps: 0, requestedMaxResolution: 2160,
     supportedHdrFormats: ['HDR10'], maxVideoBitDepth: 10,
 };
@@ -51,23 +52,38 @@ describe('audio output detection', () => {
     });
 
     it('rescans the output on each playback request after a system change', async () => {
-        expect((await scanDeviceCapabilities()).maxAudioChannels).toBe(2);
+        expect((await scanDeviceCapabilities()).detectedAudioChannels).toBe(2);
         outputChannels = 6;
-        expect((await scanDeviceCapabilities()).maxAudioChannels).toBe(6);
+        expect((await scanDeviceCapabilities()).detectedAudioChannels).toBe(6);
+    });
+
+    it('tells the server a browser mixes any layout down itself and cannot switch tracks', async () => {
+        const capabilities = await scanDeviceCapabilities();
+        expect(capabilities.playsAnyAudioLayout).toBe(true);
+        expect(capabilities.canSwitchAudioTracks).toBe(false);
     });
 });
 
 describe('per-device audio output preference', () => {
-    it.each([2, 6, 8])('uses the explicit %i channel layout even when the browser reports stereo', channels => {
-        expect(applyUserCaps(device, { maxResolution: 0, maxAudioChannels: channels }).maxAudioChannels).toBe(channels);
+    it.each([2, 6, 8])('reports a %i channel pick beside the stereo the browser detected', channels => {
+        const result = applyUserCaps(device, { maxResolution: 0, maxAudioChannels: channels });
+        expect(result.pickedAudioChannels).toBe(channels);
+        expect(result.detectedAudioChannels).toBe(2);
     });
 
-    it('uses the reported layout in automatic mode', () => {
-        expect(applyUserCaps({ ...device, maxAudioChannels: 6 }, { maxResolution: 0, maxAudioChannels: 0 }).maxAudioChannels).toBe(6);
+    it('reports no pick in automatic mode', () => {
+        const result = applyUserCaps({ ...device, detectedAudioChannels: 6 }, { maxResolution: 0, maxAudioChannels: 0 });
+        expect(result.pickedAudioChannels).toBe(0);
+        expect(result.detectedAudioChannels).toBe(6);
     });
 
-    it.each([-1, 9, Number.NaN, 2.5])('ignores an invalid override (%s)', channels => {
-        expect(applyUserCaps(device, { maxResolution: 0, maxAudioChannels: channels }).maxAudioChannels).toBe(2);
+    it.each([-1, 9, Number.NaN, 2.5])('ignores an invalid pick (%s)', channels => {
+        expect(applyUserCaps(device, { maxResolution: 0, maxAudioChannels: channels }).pickedAudioChannels).toBe(0);
+    });
+
+    it.each([[2, 6, 2], [6, 2, 2], [6, 6, 6], [0, 6, 6]])('keeps the single older value at the lower of a %i pick and %i detected', (picked, detected, expected) => {
+        const result = applyUserCaps({ ...device, detectedAudioChannels: detected }, { maxResolution: 0, maxAudioChannels: picked });
+        expect(result.maxAudioChannels).toBe(expected);
     });
 
     it('preserves codec, HDR and resolution limits when overriding output channels', () => {
@@ -77,10 +93,10 @@ describe('per-device audio output preference', () => {
         expect(result.requestedMaxResolution).toBe(1080);
     });
 
-    it('applies the same saved output override to the picker and server capability report', async () => {
+    it('applies the same saved pick to the picker and server capability report', async () => {
         localStorage.setItem(StorageKeys.deviceId, 'test-device');
         localStorage.setItem('playback_prefs_unknown_test-device', JSON.stringify({ maxAudioChannels: 6 }));
-        expect(getEffectiveCapabilities('unknown', 'test-device').maxAudioChannels).toBe(6);
-        expect((await scanDeviceCapabilities()).maxAudioChannels).toBe(6);
+        expect(getEffectiveCapabilities('unknown', 'test-device').pickedAudioChannels).toBe(6);
+        expect((await scanDeviceCapabilities()).pickedAudioChannels).toBe(6);
     });
 });

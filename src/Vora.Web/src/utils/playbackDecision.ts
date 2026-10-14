@@ -70,6 +70,6 @@ export function isVideoDirectPlayable(track: VideoTrackLike, part: PartLike, cap
 export function isAudioDirectPlayable(track: AudioTrackLike, caps: DeviceCapabilities): boolean {
     const codec = track.codec?.toLowerCase() || '';
     if (codec && !caps.audioCodecs.includes(codec)) return false;
-    if ((track.channels ?? 2) > caps.maxAudioChannels) return false;
+    if (!caps.playsAnyAudioLayout && (track.channels ?? 2) > caps.maxAudioChannels) return false;
     return true;
 }

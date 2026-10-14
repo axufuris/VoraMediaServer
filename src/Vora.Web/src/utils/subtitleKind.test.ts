@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isImageSubtitleCodec, isTextSubtitleCodec, isNoSubtitle, NoSubtitle } from './subtitleKind';
+import { burnInSubtitleId, isImageSubtitleCodec, isTextSubtitleCodec, isNoSubtitle, NoSubtitle } from './subtitleKind';
 
 // This classification decides whether picking a subtitle restarts the stream.
 // Text subtitles are sideloaded as a <track> and change nothing about playback;
@@ -42,5 +42,21 @@ describe('no-subtitle selection', () => {
 
     it('reads a real track id as a selection', () => {
         expect(isNoSubtitle('7f1c0f2e-1111-2222-3333-444455556666')).toBe(false);
+    });
+});
+
+describe('subtitle that has to be burned in', () => {
+    const tracks = [{ id: 'pgs', codec: 'hdmv_pgs_subtitle' }, { id: 'srt', codec: 'subrip' }];
+
+    it('is the selected image subtitle', () => {
+        expect(burnInSubtitleId(tracks, 'pgs')).toBe('pgs');
+    });
+
+    it.each(['srt', NoSubtitle, undefined, 'another-version'])('is nothing for %s', selection => {
+        expect(burnInSubtitleId(tracks, selection)).toBeUndefined();
+    });
+
+    it('is nothing when the version has no subtitles', () => {
+        expect(burnInSubtitleId(undefined, 'pgs')).toBeUndefined();
     });
 });

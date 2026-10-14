@@ -10,7 +10,7 @@ namespace Vora.Application.Streaming;
 
 public interface IBestPathDecisionManager
 {
-    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null);
+    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null);
 }
 
 public class BestPathDecisionManager : IBestPathDecisionManager
@@ -22,15 +22,21 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         _settingsRepo = settingsRepo;
     }
 
+    private const int ConvertedVideoPenaltyWhenAnotherVersionMayPlayUntouched = 25000;
+
     private class StreamOption
     {
         public StreamDecisionDto Decision { get; set; } = new();
         public int PenaltyScore { get; set; }
     }
 
-    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null)
+    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
+        var audioLimits = AudioOutputLimits.Resolve(client.MaxAudioChannels, audioOutput, settings.StreamingProfile);
+        bool clientSwitchesTracks = audioOutput is { CanSwitchTracks: true };
+        bool clientPlaysDolbyDigital = client.DeviceType != "Browser" && client.SupportedAudioCodecs.Contains(AudioPlayback.DolbyDigital);
+        bool prefersUntouchedVideo = settings.StreamingProfile != StreamingProfile.ClientPreference;
         var options = new List<StreamOption>();
         var decisionLogs = new List<StreamOptionLogDto>();
 
@@ -81,7 +87,9 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             }
             int outputHeight = Math.Min(trackHeight, effectiveTargetHeight);
 
-            var primaryAudioTrack = part.AudioTracks.FirstOrDefault(t => t.IsDefault) ?? part.AudioTracks.FirstOrDefault();
+            var audioInFileOrder = part.AudioTracks.OrderBy(t => t.StreamIndex ?? int.MaxValue).ToList();
+            var primaryAudioTrack = audioInFileOrder.FirstOrDefault(t => t.IsDefault) ?? audioInFileOrder.FirstOrDefault();
+            bool everyPlayerStartsOnPrimary = primaryAudioTrack?.Id == audioInFileOrder.FirstOrDefault()?.Id;
 
             SubtitleStreamInfoDto? subTrack = null;
             if (requestedSubtitleId.HasValue)
@@ -137,18 +145,16 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             {
                 var audioCodec = audioTrack.Codec?.ToLower() ?? "";
                 int trackChannels = audioTrack.Channels is > 0 ? audioTrack.Channels.Value : 2;
-                int outputChannels = client.MaxAudioChannels > 0 ? client.MaxAudioChannels : 2;
                 bool isPrimaryAudio = audioTrack.Id == primaryAudioTrack?.Id;
 
                 bool codecUnsupported = !string.IsNullOrEmpty(videoCodec) && !client.SupportedVideoCodecs.Contains(videoCodec);
                 bool needsVideoTranscode = codecUnsupported || requiresBurnIn || exceedsBandwidth || hdrNotRenderable || bitDepthTooHigh;
-                bool needsAudioDownmix = trackChannels > outputChannels;
-                bool needsAudioTranscode = (!string.IsNullOrEmpty(audioCodec) && !client.SupportedAudioCodecs.Contains(audioCodec)) || needsAudioDownmix;
+                bool needsAudioDownmix = audioLimits.NeedsDownmix(trackChannels);
+                bool audioCodecUnsupported = !string.IsNullOrEmpty(audioCodec) && !client.SupportedAudioCodecs.Contains(audioCodec);
+                bool needsAudioTranscode = audioCodecUnsupported || needsAudioDownmix;
                 bool containerUnsupported = !string.IsNullOrEmpty(container) && !client.SupportedContainers.Contains(container);
-                bool needsRemux = containerUnsupported || !isPrimaryAudio;
-                bool audioUnsupportedInHls = (needsVideoTranscode || needsAudioTranscode || needsRemux)
-                    && !AudioPlayback.CanCopyToHls(audioCodec);
-                needsAudioTranscode |= audioUnsupportedInHls;
+                bool serverDeliversTrack = !clientSwitchesTracks && !(isPrimaryAudio && everyPlayerStartsOnPrimary);
+                bool needsRemux = containerUnsupported || serverDeliversTrack;
 
                 var reasons = new List<string>();
 
@@ -158,10 +164,21 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     reasons.Add($"Video Transcode: Track resolution ({trackHeight}p) exceeds client maximum ({clientMaxRes}p).");
                 }
 
+                bool videoReencodedForAudio = false;
                 if ((needsVideoTranscode || needsAudioTranscode) && videoCodec == "hevc" && client.DeviceType == "Browser")
                 {
+                    videoReencodedForAudio = !needsVideoTranscode;
                     needsVideoTranscode = true;
                 }
+
+                bool audioUnsupportedInHls = !needsAudioTranscode
+                    && (needsVideoTranscode || needsRemux)
+                    && !AudioPlayback.CanCopyToHls(audioCodec);
+                needsAudioTranscode |= audioUnsupportedInHls;
+
+                var conversion = audioLimits.ConversionOf(trackChannels, clientPlaysDolbyDigital);
+                int heardChannels = needsAudioTranscode ? conversion.Channels : trackChannels;
+                string heardCodec = needsAudioTranscode ? conversion.Codec : audioCodec;
 
                 var option = new StreamOption
                 {
@@ -170,9 +187,10 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                         SelectedMediaPartId = part.Id,
                         SelectedVideoTrackId = videoTrack.Id,
                         SelectedAudioTrackId = audioTrack.Id,
+                        SelectedAudioTrackPosition = audioInFileOrder.IndexOf(audioTrack),
                         SelectedSubtitleTrackId = subTrack?.Id,
                         RequiresSubtitleBurnIn = requiresBurnIn,
-                        TargetAudioChannels = needsAudioDownmix ? outputChannels : trackChannels,
+                        TargetAudioChannels = heardChannels,
                         SubtitleStrategy = subTrack == null ? "None" : (requiresBurnIn ? "BurnIn" : "DirectPlay")
                     }
                 };
@@ -191,9 +209,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     option.Decision.Strategy = StreamStrategy.Transcode;
                     option.Decision.TargetContainer = "hls";
 
-                    if (settings.StreamingProfile == StreamingProfile.DirectStreamPreference) currentScore += 50000;
-                    else if (settings.StreamingProfile == StreamingProfile.ClientPreference) currentScore += 100;
-                    else if (settings.StreamingProfile == StreamingProfile.BandwidthOptimized) currentScore += (100 + bitrateKbps);
+                    currentScore += settings.StreamingProfile == StreamingProfile.DirectStreamPreference ? 50000 : 100;
 
                     if (needsVideoTranscode)
                     {
@@ -210,6 +226,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                         if (bitDepthTooHigh) reasons.Add($"Video Transcode: Source bit depth ({videoTrack.BitDepth}-bit) exceeds client maximum ({client.MaxVideoBitDepth}-bit).");
 
                         currentScore += is4k ? 200 : 50;
+                        if (prefersUntouchedVideo) currentScore += ConvertedVideoPenaltyWhenAnotherVersionMayPlayUntouched;
                     }
                     else
                     {
@@ -221,13 +238,13 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     if (needsAudioTranscode)
                     {
                         option.Decision.AudioStrategy = "Transcode";
-                        option.Decision.TargetAudioCodec = "aac";
+                        option.Decision.TargetAudioCodec = conversion.Codec;
 
-                        if (needsAudioDownmix) reasons.Add($"Audio Transcode: Downmix required ({trackChannels}ch > {outputChannels}ch).");
-                        else if (audioUnsupportedInHls) reasons.Add($"Audio Transcode: '{audioCodec}' cannot be copied to HLS MPEG-TS.");
-                        else reasons.Add($"Audio Transcode: '{audioCodec}' unsupported.");
+                        if (needsAudioDownmix) reasons.Add($"Audio Transcode: Downmix required ({trackChannels}ch > {audioLimits.Hard}ch).");
+                        else if (audioCodecUnsupported) reasons.Add($"Audio Transcode: '{audioCodec}' unsupported.");
+                        else reasons.Add($"Audio Transcode: '{audioCodec}' cannot be copied to HLS MPEG-TS.");
 
-                        currentScore += 1000;
+                        currentScore += AudioPlayback.ConversionPenalty;
                     }
                     else
                     {
@@ -245,10 +262,8 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     option.Decision.TargetAudioCodec = audioCodec;
                     option.Decision.TargetContainer = "hls";
                     if (containerUnsupported) reasons.Add($"Remux: Container '{container}' unsupported. Copying streams to HLS.");
-                    if (!isPrimaryAudio) reasons.Add("Audio Direct Stream: Copying the selected non-default track to HLS.");
-                    currentScore += 5;
-
-                    if (settings.StreamingProfile == StreamingProfile.BandwidthOptimized) currentScore += bitrateKbps;
+                    if (serverDeliversTrack) reasons.Add("Audio Direct Stream: Copying the selected track to HLS because this client cannot switch tracks.");
+                    currentScore += AudioPlayback.RemuxPenalty;
                 }
                 else
                 {
@@ -259,13 +274,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     option.Decision.TargetAudioCodec = audioCodec;
                     option.Decision.TargetContainer = container;
                     reasons.Add("Direct Play: Native support for all streams.");
-
-                    if (settings.StreamingProfile == StreamingProfile.BandwidthOptimized) currentScore += bitrateKbps;
-                }
-
-                if (settings.StreamingProfile == StreamingProfile.BandwidthOptimized && trackHeight >= 2160)
-                {
-                    currentScore += 20000;
+                    if (!(isPrimaryAudio && everyPlayerStartsOnPrimary)) reasons.Add("Audio: The client switches to the selected track.");
                 }
 
                 // Resolution-fit penalty. Two components added to the
@@ -296,14 +305,15 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 //     it wins on the work penalty. Same idea for
                 //     1440p + 4K when target is 1080p: 1440p wins
                 //     because it's closer to the target source-side.
-                int qualityLossPenalty = Math.Max(0, deliverableMaxRes - outputHeight) * 10;
-                int downscaleWorkPenalty = Math.Max(0, trackHeight - outputHeight);
+                int deliveredHeight = needsVideoTranscode ? outputHeight : trackHeight;
+                int qualityLossPenalty = Math.Max(0, deliverableMaxRes - deliveredHeight) * 10;
+                int downscaleWorkPenalty = Math.Max(0, trackHeight - deliveredHeight);
                 currentScore += qualityLossPenalty + downscaleWorkPenalty;
 
                 if (audioTrack.IsDefault) currentScore -= 2;
 
-                currentScore += Math.Abs(outputChannels - trackChannels) * 10;
-                currentScore -= AudioPlayback.QualityRank(audioCodec) * 5;
+                currentScore += audioLimits.FitPenalty(trackChannels, heardChannels, heardCodec, needsAudioTranscode);
+                if (videoReencodedForAudio) currentScore += AudioPlayback.VideoReencodedForAudioPenalty;
 
                 if (IsCommentary(audioTrack))
                 {
@@ -353,7 +363,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     Reason = option.Decision.Reason,
                     ClientMaxHeight = clientMaxRes,
                     DeliverableHeight = deliverableMaxRes,
-                    OutputHeight = outputHeight
+                    OutputHeight = deliveredHeight
                 });
             }
         }

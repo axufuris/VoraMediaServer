@@ -34,6 +34,10 @@ const languageCode = (language?: string): string => {
     }
 };
 
+// The local stand-in for the server's choice, used until the server answers
+// and when it cannot. It follows the same order of preference: a track that
+// plays as it is, in the layout the viewer picked or the output has, without
+// giving up surround, then the better codec, then the file's default.
 export function pickBestAudioTrack<T extends AudioTrackChoice>(tracks: T[] | undefined, caps: DeviceCapabilities): T | undefined {
     if (!tracks?.length) return undefined;
     const primary = tracks.find(track => track.isDefault) ?? tracks[0];
@@ -44,12 +48,13 @@ export function pickBestAudioTrack<T extends AudioTrackChoice>(tracks: T[] | und
         const sameLanguage = pool.filter(track => languageCode(track.language) === primaryLanguage);
         if (sameLanguage.length) pool = sameLanguage;
     }
-    const outputChannels = caps.maxAudioChannels > 0 ? caps.maxAudioChannels : 2;
+    const wanted = caps.pickedAudioChannels || caps.detectedAudioChannels || 2;
     const penalty = (track: T): number => {
         const channels = track.channels && track.channels > 0 ? track.channels : 2;
         return (isAudioDirectPlayable(track, caps) ? 0 : 1000)
-            + Math.abs(outputChannels - channels) * 10
-            - codecQuality(track.codec) * 5
+            + Math.abs(wanted - channels) * 5
+            + (wanted > 2 && channels <= 2 ? 200 : 0)
+            - codecQuality(track.codec)
             - (track.isDefault ? 2 : 0);
     };
     return [...pool].sort((a, b) => penalty(a) - penalty(b))[0];

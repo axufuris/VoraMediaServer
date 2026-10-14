@@ -5,6 +5,10 @@ export interface DeviceCapabilities {
     audioCodecs: string[];
     containers: string[];
     maxAudioChannels: number;
+    detectedAudioChannels: number;
+    pickedAudioChannels: number;
+    playsAnyAudioLayout: boolean;
+    canSwitchAudioTracks: boolean;
     clientBandwidthKbps: number;
     requestedClientBitrateKbps: number;
     requestedMaxResolution: number;
@@ -223,7 +227,7 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
         console.warn("Could not auto-detect display resolution.", error);
     }
 
-    return { videoCodecs, audioCodecs, containers, maxAudioChannels, clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, supportedHdrFormats, maxVideoBitDepth };
+    return { videoCodecs, audioCodecs, containers, maxAudioChannels, detectedAudioChannels: maxAudioChannels, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, supportedHdrFormats, maxVideoBitDepth };
 };
 
 export interface PlaybackPrefs {
@@ -261,14 +265,19 @@ export function readPlaybackPrefs(profileId: string, deviceId: string): Playback
     return { maxResolution: 0, maxAudioChannels: 0 };
 }
 
+// The detected output and the viewer's pick travel to the server separately,
+// because the server's streaming profile decides how far a pick may go.
+// maxAudioChannels keeps the older single value (the lower of the two) for a
+// server that predates the separate fields.
 export function applyUserCaps(device: DeviceCapabilities, prefs: PlaybackPrefs): DeviceCapabilities {
     const effRes = prefs.maxResolution > 0
         ? Math.min(prefs.maxResolution, device.requestedMaxResolution)
         : device.requestedMaxResolution;
-    const effCh = Number.isInteger(prefs.maxAudioChannels) && prefs.maxAudioChannels > 0 && prefs.maxAudioChannels <= 8
+    const picked = Number.isInteger(prefs.maxAudioChannels) && prefs.maxAudioChannels > 0 && prefs.maxAudioChannels <= 8
         ? prefs.maxAudioChannels
-        : device.maxAudioChannels;
-    return { ...device, requestedMaxResolution: effRes, maxAudioChannels: effCh };
+        : 0;
+    const maxAudioChannels = picked > 0 ? Math.min(picked, device.detectedAudioChannels) : device.detectedAudioChannels;
+    return { ...device, requestedMaxResolution: effRes, pickedAudioChannels: picked, maxAudioChannels };
 }
 
 // Single entry point for client-side track selection: raw device scan with the

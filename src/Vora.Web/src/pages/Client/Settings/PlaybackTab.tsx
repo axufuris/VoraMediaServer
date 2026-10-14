@@ -83,7 +83,7 @@ export default function PlaybackTab({ activeProfileId, serverId, onSaved }: { ac
                             <option value={6}>5.1 surround</option>
                             <option value={8}>7.1 surround</option>
                         </select>
-                        <p className="mb-0 mt-2 text-xs" style={{ color: 'var(--vora-text-muted)' }}>Automatic uses the browser's reported output. Choose your speaker layout if detection is wrong. Playback prefers a compatible original audio track; unsupported codecs may still need conversion.</p>
+                        <p className="mb-0 mt-2 text-xs" style={{ color: 'var(--vora-text-muted)' }}>Automatic uses the output your browser reports. Pick a layout to prefer audio tracks in that layout. Whether the server converts audio to match your pick depends on its streaming profile.</p>
                     </div>
                 </div>
             </section>

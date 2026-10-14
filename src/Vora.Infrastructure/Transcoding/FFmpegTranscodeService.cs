@@ -795,8 +795,7 @@ public class FFmpegTranscodeService : ITranscodeService
         }
         else
         {
-            Flag(decision.TargetAudioCodec == AudioCodec.Aac ? "-c:a aac" : "-c:a ac3");
-            Flag(decision.TargetAudioChannels > 2 ? $"-ac {decision.TargetAudioChannels} -b:a 384k" : "-ac 2 -b:a 192k");
+            Flag(ConvertedAudioArguments(decision.TargetAudioCodec, decision.TargetAudioChannels));
         }
 
         // CRITICAL: when -ss seeks the input, FFmpeg by default resets
@@ -959,6 +958,14 @@ public class FFmpegTranscodeService : ITranscodeService
         graph.Append("[base][sub]overlay=x=(W-w)/2:y=H-h:eof_action=pass:repeatlast=0");
         if (after.Count > 0) graph.Append(',').AppendJoin(',', after);
         return graph.Append("[v]").ToString();
+    }
+
+    internal static string ConvertedAudioArguments(AudioCodec codec, int channels)
+    {
+        if (codec == AudioCodec.Aac) return channels > 2 ? $"-c:a aac -ac {channels} -b:a 384k" : "-c:a aac -ac 2 -b:a 192k";
+        return channels > 2
+            ? $"-c:a ac3 -ac {Math.Min(channels, AudioPlayback.DolbyDigitalChannels)} -b:a 640k"
+            : "-c:a ac3 -ac 2 -b:a 192k";
     }
 
     internal static string? SubtitleInput(string? externalPath)

@@ -41,7 +41,8 @@ public record StreamDecisionResponse(
     int BandwidthKbps,
     string OutputResolution,
     string OutputHdrType,
-    string Quality);
+    string Quality,
+    int AudioTrackPosition);
 
 public static class StreamingEndpoints
 {
@@ -120,6 +121,7 @@ public static class StreamingEndpoints
                 StreamUrl = result.StreamUrl,
                 VideoTrackId = result.Session.VideoTrackId,
                 AudioTrackId = result.Session.AudioTrackId,
+                AudioTrackPosition = result.AudioTrackPosition,
                 SubtitleTrackId = result.Session.SubtitleTrackId,
                 Strategy = result.Session.Strategy,
                 VideoStrategy = result.Session.VideoStrategy,
@@ -185,7 +187,8 @@ public static class StreamingEndpoints
                 d.BandwidthKbps,
                 d.OutputResolution,
                 d.OutputHdrType,
-                d.Quality));
+                d.Quality,
+                d.SelectedAudioTrackPosition));
         }
         catch (Exception ex)
         {
@@ -218,6 +221,7 @@ public static class StreamingEndpoints
                 StreamUrl = result.StreamUrl,
                 VideoTrackId = result.Session.VideoTrackId,
                 AudioTrackId = result.Session.AudioTrackId,
+                AudioTrackPosition = result.AudioTrackPosition,
                 SubtitleTrackId = result.Session.SubtitleTrackId,
                 Strategy = result.Session.Strategy,
                 VideoStrategy = result.Session.VideoStrategy,

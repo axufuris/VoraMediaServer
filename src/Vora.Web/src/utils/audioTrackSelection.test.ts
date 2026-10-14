@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { DeviceCapabilities } from './hardwareScanner';
 import { pickBestAudioTrack } from './audioTrackSelection';
 
-const capabilities = (channels: number, codecs = ['aac', 'eac3']): DeviceCapabilities => ({
+const capabilities = (channels: number, codecs = ['aac', 'eac3'], picked = 0): DeviceCapabilities => ({
     videoCodecs: ['h264'], audioCodecs: codecs, containers: ['mp4'], maxAudioChannels: channels,
+    detectedAudioChannels: channels, pickedAudioChannels: picked, playsAnyAudioLayout: true, canSwitchAudioTracks: false,
     clientBandwidthKbps: 100000, requestedClientBitrateKbps: 0, requestedMaxResolution: 1080,
     supportedHdrFormats: [], maxVideoBitDepth: 8,
 });
@@ -32,9 +33,18 @@ describe('automatic audio selection', () => {
         expect(pickBestAudioTrack(choices, capabilities(6))?.id).toBe('surround');
     });
 
-    it('prefers a higher quality compatible codec within the same layout', () => {
-        const choices = [{ id: 'aac', codec: 'aac', channels: 6, isDefault: true }, { id: 'eac3', codec: 'eac3', channels: 6 }];
+    it('prefers the better codec among tracks in the same layout', () => {
+        const choices = [{ id: 'aac', codec: 'aac', channels: 6 }, { id: 'eac3', codec: 'eac3', channels: 6 }];
         expect(pickBestAudioTrack(choices, capabilities(6))?.id).toBe('eac3');
+    });
+
+    it.each([[2, 'stereo'], [6, 'surround'], [8, '7.1']] as const)('follows a %i channel pick over the stereo the browser detected', (picked, id) => {
+        expect(pickBestAudioTrack(tracks, capabilities(2, ['aac', 'eac3'], picked))?.id).toBe(id);
+    });
+
+    it('keeps surround rather than a closer stereo track when the output has surround', () => {
+        const choices = [{ id: 'stereo', codec: 'aac', channels: 2, isDefault: true }, { id: '7.1', codec: 'eac3', channels: 8 }];
+        expect(pickBestAudioTrack(choices, capabilities(6))?.id).toBe('7.1');
     });
 
     it('preserves dialogue language while switching channel layouts', () => {
