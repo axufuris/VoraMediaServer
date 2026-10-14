@@ -2,9 +2,11 @@ using Vora.Domain.Enums;
 
 namespace Vora.Application.Tests.Streaming.Matrix;
 
-public sealed record MatrixClient(string Name, string DeviceType, string[] Video, string[] Audio, string[] Containers, int Speakers, int MaxHeight, string[]? Hdr, int BitDepth, bool SwitchesTracks = false, bool OldApp = false)
+public sealed record MatrixClient(string Name, string DeviceType, string[] Video, string[] Audio, string[] Containers, int Speakers, int MaxHeight, string[]? Hdr, int BitDepth, bool SwitchesTracks = false, bool OldApp = false, string[]? HlsVideo = null)
 {
     public bool IsBrowser => DeviceType == "Browser";
+
+    public bool HlsCarries(string videoCodec) => (HlsVideo ?? (IsBrowser ? ["h264"] : ["h264", "hevc", "mpeg2video"])).Contains(videoCodec);
 
     public int OlderSingleValue(int pick) => pick > 0 ? Math.Min(pick, Speakers) : Speakers;
 }

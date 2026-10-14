@@ -75,7 +75,7 @@ The rules above are weights in `AudioPlayback`, added to the option's penalty by
 | `RemuxPenalty` | 50 | Copying streams into HLS. |
 | `ConversionPenalty` | 40 | Converting audio, on top of the profile's 100 (or 50,000 under Direct). Kept below the 50 a video conversion costs. |
 | `SurroundLostPenalty` | 200 | Stereo when the target is surround. More than an audio conversion costs outside Direct, so surround is kept by converting. |
-| `VideoReencodedForAudioPenalty` | 1,000 | The video is re-encoded only because the audio is converted. More than any audio preference. |
+| `HlsVideoCarriage.ReencodePenalty` | 1,000 | The video is re-encoded only because the stream has to be HLS and the client's HLS player cannot take its codec. More than any audio preference. |
 | `ConvertedVideoPenaltyWhenAnotherVersionMayPlayUntouched` | 25,000 | Under Direct and Bitrate, more than the largest resolution penalty, so an untouched smaller version beats a re-encoded larger one. |
 
 The quality rank of the codec and the default flag only break ties. A version that plays without converting its video is scored at its own height; the HDR downscale setting only lowers the height of a version that is being converted.
@@ -89,15 +89,19 @@ The "default and first" test exists because players disagree. Measured in Edge: 
 
 HLS MPEG-TS carries only AAC, MP3, AC3 and EAC3 (`AudioPlayback.CanCopyToHls`, shared with FFmpeg). Any other codec in an HLS session is converted and reported as converted.
 
-## HEVC in a browser
+## Video the HLS player cannot take
 
-`BestPathDecisionManager` re-encodes HEVC video for a browser whenever the audio has to be converted because the client cannot decode it or it has too many channels. That rule predates this work and is unchanged. `VideoReencodedForAudioPenalty` keeps it from firing when another track avoids it.
+An HLS session copies the video only when the client's HLS player can take that codec out of MPEG-TS. The client reports the list as `hlsVideoCodecs`. `HlsVideoCarriage.For` falls back to H.264 alone for a browser that sends none, and to H.264, HEVC and MPEG-2 for an app. When the stream has to be HLS (the audio is converted, or the file is repackaged) and the codec is not on the list, the video is re-encoded. `ReencodePenalty` keeps that from happening when another track plays without HLS.
 
-Audio that is converted only because HLS cannot carry it does **not** trigger the rule. That matches what the server has always done for a repackaged stream. Removing the rule needs HEVC delivered in fragmented MP4 segments, or proof on Safari that MPEG-TS works there.
+- **The web** reports `['h264', 'hevc']` when Media Source takes HEVC (`detectHlsVideoCodecs`). hls.js plays every HLS stream when Media Source exists; it reads HEVC from MPEG-TS and repackages it for Media Source. So a browser that plays HEVC gets the video copied while only the audio is converted, or the file is repackaged for a track switch.
+- **Without Media Source** (older iPhones) the browser's own HLS player is used, which plays HEVC only from fMP4, so the list is H.264 alone and HEVC is re-encoded whenever the stream is HLS.
+- **AV1 and VP9** are on no default list: neither hls.js nor ExoPlayer reads them from MPEG-TS, so they are re-encoded rather than copied into a stream that would not play.
+
+The rule used to apply only to HEVC in a browser, only when audio was converted, and never to a repackaged stream. A repackaged HEVC file went to Safari as HEVC in MPEG-TS.
 
 ## The web client
 
-- `hardwareScanner.ts` reports `detectedAudioChannels` from `AudioContext.destination.maxChannelCount`, `pickedAudioChannels` from the saved `maxAudioChannels` preference, `playsAnyAudioLayout: true` and `canSwitchAudioTracks: false`.
+- `hardwareScanner.ts` reports `detectedAudioChannels` from `AudioContext.destination.maxChannelCount`, `pickedAudioChannels` from the saved `maxAudioChannels` preference, `playsAnyAudioLayout: true`, `canSwitchAudioTracks: false` and `hlsVideoCodecs`.
 - The details page asks `POST /api/streaming/decision` (`useServerPlaybackChoice`) and shows the version and audio track the server answers with. A local pick (`pickBestAudioTrack`) shows until the answer arrives and stays if the server cannot answer.
 - Play sends the version on screen, and an audio track id only when the viewer picked one by hand. Asking again after a version or burned-in subtitle change keeps the shown track honest.
 
@@ -107,12 +111,12 @@ Audio that is converted only because HLS cannot carry it does **not** trigger th
 
 | File | Holds |
 |---|---|
-| `MatrixCatalog.cs` | Clients, audio layouts, video files, situations (bitrate limits, subtitles, HDR downscale). |
+| `MatrixCatalog.cs` | Clients (with the codecs their HLS player takes), audio layouts, video files, situations (bitrate limits, subtitles, HDR downscale). |
 | `MatrixRunner.cs` | Builds the request the way a client would and records what the viewer would hear. |
 | `MatrixRules.cs` | The rules, written from what a client can play rather than from the scoring. |
 | `StreamDecisionMatrixTests.cs` | One test per rule; a failure lists the combinations that break it. |
 
-The normal run covers about 206,000 combinations in a few seconds. Set `VORA_STREAM_MATRIX=full` to run every one-, two- and three-track mix of 14 codec and layout types: about 8.4 million combinations in a couple of minutes. **Run the full set before changing a weight or a rule**, because the hand-picked set has missed real problems that the full set found.
+The normal run covers about 277,000 combinations in a few seconds. Set `VORA_STREAM_MATRIX=full` to run every one-, two- and three-track mix of 14 codec and layout types: about 11.4 million combinations in a few minutes. **Run the full set before changing a weight or a rule**, because the hand-picked set has missed real problems that the full set found.
 
 The last rule fails when two different kinds of outcome are within ten points of each other. It is there to catch a weight change that leaves a decision to chance.
 

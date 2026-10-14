@@ -11,7 +11,7 @@ using Vora.Domain.Entities.Users;
 
 namespace Vora.Application.Streaming;
 
-public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[] Containers, int MaxAudioChannels, int ClientBandwidthKbps, int RequestedClientBitrateKbps, int RequestedMaxResolution = 0, string[]? SupportedHdrFormats = null, int MaxVideoBitDepth = 0, int DetectedAudioChannels = 0, int PickedAudioChannels = 0, bool PlaysAnyAudioLayout = false, bool CanSwitchAudioTracks = false)
+public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[] Containers, int MaxAudioChannels, int ClientBandwidthKbps, int RequestedClientBitrateKbps, int RequestedMaxResolution = 0, string[]? SupportedHdrFormats = null, int MaxVideoBitDepth = 0, int DetectedAudioChannels = 0, int PickedAudioChannels = 0, bool PlaysAnyAudioLayout = false, bool CanSwitchAudioTracks = false, string[]? HlsVideoCodecs = null)
 {
     public AudioOutputRequest AudioOutput => new(DetectedAudioChannels, PickedAudioChannels, PlaysAnyAudioLayout, CanSwitchAudioTracks);
 }
@@ -183,7 +183,7 @@ public class StreamManager : IStreamManager
             }
         }
 
-        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput);
+        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput, capabilities?.HlsVideoCodecs);
 
         return (decision, mediaInfo, client, mediaId);
     }
@@ -211,7 +211,7 @@ public class StreamManager : IStreamManager
 
         await _repository.EndActiveSessionsForDeviceAsync(client.Id);
 
-        var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, 0, "None", null, null, null, capabilities?.RequestedMaxResolution ?? 0, audioOutput: capabilities?.AudioOutput);
+        var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, 0, "None", null, null, null, capabilities?.RequestedMaxResolution ?? 0, audioOutput: capabilities?.AudioOutput, hlsVideoCodecs: capabilities?.HlsVideoCodecs);
         var (address, location) = await WhereFromAsync(client, clientAddress);
 
         var selectedPart = streamInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);

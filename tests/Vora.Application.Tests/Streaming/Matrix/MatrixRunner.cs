@@ -60,7 +60,7 @@ public static class MatrixRunner
         };
 
         var decision = await new BestPathDecisionManager(settings).DetermineBestPathAsync(device, media, scenario.Situation.LimitKbps, scenario.Situation.LimitSource,
-            requestedAudioId: manualTrack, requestedSubtitleId: subtitle, requestedMaxResolution: scenario.MaxHeight, audioOutput: audioOutput);
+            requestedAudioId: manualTrack, requestedSubtitleId: subtitle, requestedMaxResolution: scenario.MaxHeight, audioOutput: audioOutput, hlsVideoCodecs: client.HlsVideo);
 
         var chosenVersion = versions[decision.SelectedMediaPartId];
         var selected = tracks[decision.SelectedAudioTrackId];

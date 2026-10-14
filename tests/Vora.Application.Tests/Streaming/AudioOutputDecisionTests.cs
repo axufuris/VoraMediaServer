@@ -31,7 +31,7 @@ public class AudioOutputDecisionTests
 
     private static MediaStreamInfoDto Film(params MediaPartStreamInfoDto[] versions) => new() { Id = Guid.NewGuid(), Parts = versions.ToList() };
 
-    private static Task<StreamDecisionDto> DecideAsync(MediaStreamInfoDto film, StreamingProfile profile, AudioOutputRequest output, string deviceType, string[]? audioCodecs = null, string[]? videoCodecs = null, int bitrateLimitKbps = 0)
+    private static Task<StreamDecisionDto> DecideAsync(MediaStreamInfoDto film, StreamingProfile profile, AudioOutputRequest output, string deviceType, string[]? audioCodecs = null, string[]? videoCodecs = null, int bitrateLimitKbps = 0, string[]? containers = null, string[]? hlsVideoCodecs = null)
     {
         var settings = Substitute.For<ISystemSettingsRepository>();
         settings.GetSettingsAsync().Returns(new ServerSetting { StreamingProfile = profile });
@@ -39,17 +39,17 @@ public class AudioOutputDecisionTests
         {
             DeviceType = deviceType, MaxAudioChannels = output.PickedChannels > 0 ? Math.Min(output.PickedChannels, output.DetectedChannels) : output.DetectedChannels,
             SupportedVideoCodecs = (videoCodecs ?? ["h264", "hevc"]).ToList(), SupportedAudioCodecs = (audioCodecs ?? TvCodecs).ToList(),
-            SupportedContainers = ["mp4", "mkv", "hls"]
+            SupportedContainers = (containers ?? ["mp4", "mkv", "hls"]).ToList()
         };
         return new BestPathDecisionManager(settings).DetermineBestPathAsync(device, film, bitrateLimitKbps, bitrateLimitKbps > 0 ? "Client Limit" : "None",
-            requestedSubtitleId: Guid.Empty, requestedMaxResolution: 2160, audioOutput: output);
+            requestedSubtitleId: Guid.Empty, requestedMaxResolution: 2160, audioOutput: output, hlsVideoCodecs: hlsVideoCodecs);
     }
 
     private static Task<StreamDecisionDto> TvAppAsync(MediaStreamInfoDto film, StreamingProfile profile, int detected, int picked = 0, string[]? audioCodecs = null, string[]? videoCodecs = null, int bitrateLimitKbps = 0) =>
         DecideAsync(film, profile, new AudioOutputRequest(detected, picked, PlaysAnyLayout: false, CanSwitchTracks: true), "AndroidTV", audioCodecs, videoCodecs, bitrateLimitKbps);
 
-    private static Task<StreamDecisionDto> BrowserAsync(MediaStreamInfoDto film, StreamingProfile profile, int detected, int picked = 0, string[]? audioCodecs = null) =>
-        DecideAsync(film, profile, new AudioOutputRequest(detected, picked, PlaysAnyLayout: true, CanSwitchTracks: false), "Browser", audioCodecs);
+    private static Task<StreamDecisionDto> BrowserAsync(MediaStreamInfoDto film, StreamingProfile profile, int detected, int picked = 0, string[]? audioCodecs = null, string[]? containers = null, string[]? hlsVideoCodecs = null) =>
+        DecideAsync(film, profile, new AudioOutputRequest(detected, picked, PlaysAnyLayout: true, CanSwitchTracks: false), "Browser", audioCodecs, containers: containers, hlsVideoCodecs: hlsVideoCodecs);
 
     [Fact]
     public async Task A_TV_app_plays_the_file_directly_and_is_told_which_track_to_switch_to()
@@ -252,13 +252,67 @@ public class AudioOutputDecisionTests
     }
 
     [Fact]
-    public async Task A_browser_plays_another_track_rather_than_re_encode_HEVC_video_for_the_sake_of_the_audio()
+    public async Task A_browser_whose_HLS_player_cannot_take_HEVC_plays_the_file_rather_than_re_encode_the_video_for_the_audio()
     {
-        var playable = Audio(2, "aac", 2);
-        var film = Film(Version("2160p", "hevc", "mkv", Audio(1, "eac3", 6, isDefault: true), playable));
-        var decision = await BrowserAsync(film, ClientPreference, detected: 6, audioCodecs: ["aac"]);
+        var playable = Audio(1, "aac", 2, isDefault: true);
+        var film = Film(Version("2160p", "hevc", "mkv", playable, Audio(2, "eac3", 6)));
+        var decision = await BrowserAsync(film, ClientPreference, detected: 6, audioCodecs: ["aac"], hlsVideoCodecs: ["h264"]);
 
         decision.SelectedAudioTrackId.Should().Be(playable.Id);
+        decision.Strategy.Should().Be(StreamStrategy.DirectPlay);
+    }
+
+    [Fact]
+    public async Task A_browser_whose_HLS_player_takes_HEVC_keeps_the_video_and_converts_only_the_audio()
+    {
+        var surround = Audio(1, "eac3", 6, isDefault: true);
+        var film = Film(Version("2160p", "hevc", "mkv", surround, Audio(2, "aac", 2)));
+        var decision = await BrowserAsync(film, ClientPreference, detected: 6, audioCodecs: ["aac"], hlsVideoCodecs: ["h264", "hevc"]);
+
+        decision.SelectedAudioTrackId.Should().Be(surround.Id);
+        decision.VideoStrategy.Should().Be("DirectStream");
+        decision.AudioStrategy.Should().Be("Transcode");
+        decision.TargetAudioChannels.Should().Be(6);
+    }
+
+    [Theory]
+    [InlineData(new[] { "h264", "hevc" }, StreamStrategy.Remux, "DirectStream")]
+    [InlineData(new[] { "h264" }, StreamStrategy.Transcode, "Transcode")]
+    public async Task HEVC_repackaged_for_a_browser_is_copied_only_when_its_HLS_player_takes_HEVC(string[] hlsVideoCodecs, StreamStrategy strategy, string videoStrategy)
+    {
+        var film = Film(Version("1080p", "hevc", "mkv", Audio(1, "aac", 2, isDefault: true)));
+        var decision = await BrowserAsync(film, Direct, detected: 2, containers: ["mp4", "hls"], hlsVideoCodecs: hlsVideoCodecs);
+
+        decision.Strategy.Should().Be(strategy);
+        decision.VideoStrategy.Should().Be(videoStrategy);
+    }
+
+    [Fact]
+    public async Task A_web_app_that_does_not_report_its_HLS_codecs_gets_HEVC_re_encoded_when_the_stream_is_HLS()
+    {
+        var film = Film(Version("1080p", "hevc", "mkv", Audio(1, "aac", 2, isDefault: true)));
+        var decision = await BrowserAsync(film, Direct, detected: 2, containers: ["mp4", "hls"]);
+
+        decision.VideoStrategy.Should().Be("Transcode");
+    }
+
+    [Fact]
+    public async Task A_TV_app_gets_AV1_re_encoded_rather_than_copied_into_HLS()
+    {
+        var film = Film(Version("1080p", "av1", "mkv", Audio(1, "dts", 6, isDefault: true)));
+        var decision = await TvAppAsync(film, ClientPreference, detected: 6, audioCodecs: ["aac", "ac3"], videoCodecs: ["h264", "hevc", "av1"]);
+
+        decision.AudioStrategy.Should().Be("Transcode");
+        decision.VideoStrategy.Should().Be("Transcode");
+    }
+
+    [Fact]
+    public async Task A_TV_app_keeps_HEVC_when_only_the_audio_is_converted()
+    {
+        var film = Film(Version("1080p", "hevc", "mkv", Audio(1, "dts", 6, isDefault: true)));
+        var decision = await TvAppAsync(film, ClientPreference, detected: 6, audioCodecs: ["aac", "ac3"]);
+
+        decision.AudioStrategy.Should().Be("Transcode");
         decision.VideoStrategy.Should().Be("DirectStream");
     }
 

@@ -9,6 +9,7 @@ export interface DeviceCapabilities {
     pickedAudioChannels: number;
     playsAnyAudioLayout: boolean;
     canSwitchAudioTracks: boolean;
+    hlsVideoCodecs: string[];
     clientBandwidthKbps: number;
     requestedClientBitrateKbps: number;
     requestedMaxResolution: number;
@@ -60,6 +61,16 @@ const HEVC_MAIN10 = 'video/mp4; codecs="hev1.2.4.L153.B0"';
 const DOLBY_VISION = 'video/mp4; codecs="dvh1.05.06"';
 
 const supportsDolbyVision = (): boolean => mseSupports(DOLBY_VISION);
+
+// The server's HLS is MPEG-TS. hls.js plays it whenever Media Source can take
+// H.264, and repackages each segment for Media Source, so HEVC copied into a
+// segment plays only when Media Source takes HEVC too. Without Media Source the
+// browser's own HLS player is used, and it plays HEVC only from fMP4.
+const HLS_JS_BASELINE = 'video/mp4; codecs="avc1.42E01E,mp4a.40.2"';
+const HEVC_IN_MEDIA_SOURCE = 'video/mp4; codecs="hvc1.1.6.L93.B0"';
+
+export const detectHlsVideoCodecs = (): string[] =>
+    mseSupports(HLS_JS_BASELINE) && mseSupports(HEVC_IN_MEDIA_SOURCE) ? ['h264', 'hevc'] : ['h264'];
 
 // Best-effort synchronous HDR detection: gates on the display actually being
 // able to render HDR (dynamic-range: high), then assumes HDR10/HLG. Used by
@@ -227,7 +238,7 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
         console.warn("Could not auto-detect display resolution.", error);
     }
 
-    return { videoCodecs, audioCodecs, containers, maxAudioChannels, detectedAudioChannels: maxAudioChannels, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, supportedHdrFormats, maxVideoBitDepth };
+    return { videoCodecs, audioCodecs, containers, maxAudioChannels, detectedAudioChannels: maxAudioChannels, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: detectHlsVideoCodecs(), clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, supportedHdrFormats, maxVideoBitDepth };
 };
 
 export interface PlaybackPrefs {

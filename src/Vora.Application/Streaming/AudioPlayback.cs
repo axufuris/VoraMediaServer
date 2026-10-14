@@ -57,7 +57,6 @@ public static class AudioPlayback
     public const int LayoutPenaltyPerChannel = 5;
     public const int PickMissedPenalty = 60;
     public const int SurroundLostPenalty = 200;
-    public const int VideoReencodedForAudioPenalty = 1000;
 
     public static bool CanCopyToHls(string? codec) =>
         codec?.ToLowerInvariant() is "aac" or "mp3" or "ac3" or "eac3";

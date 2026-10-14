@@ -13,16 +13,21 @@ public static class MatrixCatalog
     private static readonly string[] NoHdr = [];
     private static readonly string[] Hdr10 = ["HDR10", "HLG"];
     private static readonly string[] DolbyVision = ["HDR10", "HLG", "DolbyVision"];
+    private static readonly string[] HlsWithHevc = ["h264", "hevc"];
+    private static readonly string[] HlsWithoutHevc = ["h264"];
+    private static readonly string[] SafariAudio = ["aac", "ac3", "eac3", "flac", "mp3"];
 
     public static readonly MatrixClient[] Clients =
     [
-        new("Chrome with stereo speakers", "Browser", AllVideo, ChromeAudio, ChromiumContainers, 2, 2160, NoHdr, 10),
-        new("Chrome on a 5.1 PC", "Browser", AllVideo, ChromeAudio, ChromiumContainers, 6, 2160, NoHdr, 10),
-        new("Edge with stereo speakers", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 2, 2160, NoHdr, 10),
-        new("Edge on a 5.1 PC", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 6, 2160, NoHdr, 10),
-        new("Edge on an HDR display", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 2, 2160, Hdr10, 10),
-        new("Firefox with stereo speakers", "Browser", ["h264", "vp9", "av1"], ChromeAudio, ["mp4", "webm"], 2, 2160, NoHdr, 10),
-        new("Safari with stereo speakers", "Browser", ["h264", "hevc"], ["aac", "ac3", "eac3", "flac", "mp3"], ["mp4", "hls"], 2, 2160, NoHdr, 10),
+        new("Chrome with stereo speakers", "Browser", AllVideo, ChromeAudio, ChromiumContainers, 2, 2160, NoHdr, 10, HlsVideo: HlsWithHevc),
+        new("Chrome on a 5.1 PC", "Browser", AllVideo, ChromeAudio, ChromiumContainers, 6, 2160, NoHdr, 10, HlsVideo: HlsWithHevc),
+        new("Edge with stereo speakers", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 2, 2160, NoHdr, 10, HlsVideo: HlsWithHevc),
+        new("Edge on a 5.1 PC", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 6, 2160, NoHdr, 10, HlsVideo: HlsWithHevc),
+        new("Edge on an HDR display", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 2, 2160, Hdr10, 10, HlsVideo: HlsWithHevc),
+        new("Edge on a 5.1 PC with a web app that predates HLS codecs", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 6, 2160, NoHdr, 10),
+        new("Firefox with stereo speakers", "Browser", ["h264", "vp9", "av1"], ChromeAudio, ["mp4", "webm"], 2, 2160, NoHdr, 10, HlsVideo: HlsWithoutHevc),
+        new("Safari on a Mac", "Browser", ["h264", "hevc"], SafariAudio, ["mp4", "hls"], 2, 2160, NoHdr, 10, HlsVideo: HlsWithHevc),
+        new("Safari on an iPhone without Media Source", "Browser", ["h264", "hevc"], SafariAudio, ["mp4", "hls"], 2, 1080, NoHdr, 10, HlsVideo: HlsWithoutHevc),
         new("Android TV with a 7.1 receiver", "AndroidTV", AllVideo, ["aac", "ac3", "eac3", "dts", "truehd", "opus", "flac", "mp3"], TvContainers, 8, 2160, DolbyVision, 10, SwitchesTracks: true),
         new("Android TV with a 5.1 soundbar", "AndroidTV", AllVideo, TvAudio, TvContainers, 6, 2160, Hdr10, 10, SwitchesTracks: true),
         new("Android TV on TV speakers", "AndroidTV", AllVideo, TvAudio, TvContainers, 2, 2160, DolbyVision, 10, SwitchesTracks: true),
@@ -102,6 +107,8 @@ public static class MatrixCatalog
             yield return new($"1080p H.264 AVI with {label}", [new("1080p", "h264", 1080, "avi", 8000, tracks)]);
             yield return new($"1080p HEVC MKV with {label}", [new("1080p", "hevc", 1080, "mkv", 6000, tracks)]);
             yield return new($"1080p HEVC 10-bit MKV with {label}", [new("1080p", "hevc", 1080, "mkv", 6000, tracks, BitDepth: 10)]);
+            yield return new($"1080p HEVC MP4 with {label}", [new("1080p", "hevc", 1080, "mp4", 6000, tracks)]);
+            yield return new($"1080p AV1 MKV with {label}", [new("1080p", "av1", 1080, "mkv", 4000, tracks)]);
             yield return new($"4K HEVC MKV with {label}", [new("4K", "hevc", 2160, "mkv", 50000, tracks)]);
             yield return new($"4K HEVC HDR10 MKV with {label}", [new("4K", "hevc", 2160, "mkv", 60000, tracks, "HDR10", 10)]);
             yield return new($"4K HEVC Dolby Vision MKV with {label}", [new("4K", "hevc", 2160, "mkv", 60000, tracks, "DoVi", 10)]);

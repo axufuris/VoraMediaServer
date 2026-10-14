@@ -10,7 +10,7 @@ namespace Vora.Application.Streaming;
 
 public interface IBestPathDecisionManager
 {
-    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null);
+    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null);
 }
 
 public class BestPathDecisionManager : IBestPathDecisionManager
@@ -30,11 +30,12 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         public int PenaltyScore { get; set; }
     }
 
-    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null)
+    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
         var audioLimits = AudioOutputLimits.Resolve(client.MaxAudioChannels, audioOutput, settings.StreamingProfile);
         bool clientSwitchesTracks = audioOutput is { CanSwitchTracks: true };
+        var hlsVideo = HlsVideoCarriage.For(client.DeviceType, hlsVideoCodecs);
         bool clientPlaysDolbyDigital = client.DeviceType != "Browser" && client.SupportedAudioCodecs.Contains(AudioPlayback.DolbyDigital);
         bool prefersUntouchedVideo = settings.StreamingProfile != StreamingProfile.ClientPreference;
         var options = new List<StreamOption>();
@@ -164,17 +165,16 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     reasons.Add($"Video Transcode: Track resolution ({trackHeight}p) exceeds client maximum ({clientMaxRes}p).");
                 }
 
-                bool videoReencodedForAudio = false;
-                if ((needsVideoTranscode || needsAudioTranscode) && videoCodec == "hevc" && client.DeviceType == "Browser")
-                {
-                    videoReencodedForAudio = !needsVideoTranscode;
-                    needsVideoTranscode = true;
-                }
-
                 bool audioUnsupportedInHls = !needsAudioTranscode
                     && (needsVideoTranscode || needsRemux)
                     && !AudioPlayback.CanCopyToHls(audioCodec);
                 needsAudioTranscode |= audioUnsupportedInHls;
+
+                bool videoReencodedForHls = !needsVideoTranscode
+                    && (needsAudioTranscode || needsRemux)
+                    && !string.IsNullOrEmpty(videoCodec)
+                    && !hlsVideo.Contains(videoCodec);
+                needsVideoTranscode |= videoReencodedForHls;
 
                 var conversion = audioLimits.ConversionOf(trackChannels, clientPlaysDolbyDigital);
                 int heardChannels = needsAudioTranscode ? conversion.Channels : trackChannels;
@@ -218,7 +218,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
 
                         if (requiresBurnIn) reasons.Add($"Video Transcode: Subtitle burn-in required ({subCodec}).");
                         else if (exceedsBandwidth) reasons.Add($"Video Transcode: Bitrate ({(bitrateKbps / 1000.0):F1} Mbps) exceeds {bandwidthLimitSource} ({(maxAllowedBandwidthKbps / 1000.0):F1} Mbps).");
-                        else if (videoCodec == "hevc" && client.DeviceType == "Browser") reasons.Add("Video Transcode: HEVC unsupported in HLS for Browsers.");
+                        else if (videoReencodedForHls) reasons.Add($"Video Transcode: This client's HLS player cannot take '{videoCodec}', and the stream has to be HLS.");
                         else if (trackHeight > clientMaxRes) { }
                         else if (codecUnsupported) reasons.Add($"Video Transcode: '{videoCodec}' unsupported.");
 
@@ -313,7 +313,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 if (audioTrack.IsDefault) currentScore -= 2;
 
                 currentScore += audioLimits.FitPenalty(trackChannels, heardChannels, heardCodec, needsAudioTranscode);
-                if (videoReencodedForAudio) currentScore += AudioPlayback.VideoReencodedForAudioPenalty;
+                if (videoReencodedForHls) currentScore += HlsVideoCarriage.ReencodePenalty;
 
                 if (IsCommentary(audioTrack))
                 {

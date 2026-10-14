@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyUserCaps, detectAudioOutputChannels, getEffectiveCapabilities, scanDeviceCapabilities, type DeviceCapabilities } from './hardwareScanner';
+import { applyUserCaps, detectAudioOutputChannels, detectHlsVideoCodecs, getEffectiveCapabilities, scanDeviceCapabilities, type DeviceCapabilities } from './hardwareScanner';
 import { StorageKeys } from './storageKeys';
 
 const close = vi.fn().mockResolvedValue(undefined);
@@ -7,7 +7,7 @@ let outputChannels = 2;
 
 const device: DeviceCapabilities = {
     videoCodecs: ['h264'], audioCodecs: ['aac'], containers: ['mp4'], maxAudioChannels: 2,
-    detectedAudioChannels: 2, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false,
+    detectedAudioChannels: 2, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: ['h264'],
     clientBandwidthKbps: 100000, requestedClientBitrateKbps: 0, requestedMaxResolution: 2160,
     supportedHdrFormats: ['HDR10'], maxVideoBitDepth: 10,
 };
@@ -61,6 +61,27 @@ describe('audio output detection', () => {
         const capabilities = await scanDeviceCapabilities();
         expect(capabilities.playsAnyAudioLayout).toBe(true);
         expect(capabilities.canSwitchAudioTracks).toBe(false);
+    });
+});
+
+describe('video codecs the HLS player takes', () => {
+    const mediaSourceTaking = (supported: (type: string) => boolean) =>
+        vi.stubGlobal('MediaSource', { isTypeSupported: supported });
+
+    it('reports HEVC when Media Source takes it, since hls.js repackages the segments for Media Source', async () => {
+        mediaSourceTaking(() => true);
+        expect(detectHlsVideoCodecs()).toEqual(['h264', 'hevc']);
+        expect((await scanDeviceCapabilities()).hlsVideoCodecs).toEqual(['h264', 'hevc']);
+    });
+
+    it('reports only H.264 when Media Source cannot take HEVC', () => {
+        mediaSourceTaking(type => !type.includes('hvc1'));
+        expect(detectHlsVideoCodecs()).toEqual(['h264']);
+    });
+
+    it('reports only H.264 without Media Source, where the browser plays HLS itself', () => {
+        vi.stubGlobal('MediaSource', undefined);
+        expect(detectHlsVideoCodecs()).toEqual(['h264']);
     });
 });
 

@@ -4,7 +4,7 @@ import { pickBestAudioTrack } from './audioTrackSelection';
 
 const capabilities = (channels: number, codecs = ['aac', 'eac3'], picked = 0): DeviceCapabilities => ({
     videoCodecs: ['h264'], audioCodecs: codecs, containers: ['mp4'], maxAudioChannels: channels,
-    detectedAudioChannels: channels, pickedAudioChannels: picked, playsAnyAudioLayout: true, canSwitchAudioTracks: false,
+    detectedAudioChannels: channels, pickedAudioChannels: picked, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: ['h264'],
     clientBandwidthKbps: 100000, requestedClientBitrateKbps: 0, requestedMaxResolution: 1080,
     supportedHdrFormats: [], maxVideoBitDepth: 8,
 });

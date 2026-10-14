@@ -39,7 +39,8 @@ public static class MatrixRules
             (s, o) => s.Profile == Bitrate
                 && s.Title.Versions.Any(version => version.Height > o.Version.Height && VideoPlaysAsIs(version, s) && Eligible(version, s).Any(track => !ReencodesVideo(version, track, s)))),
         Rule("Direct and Bitrate do not convert the video when another version plays with its video untouched",
-            (s, o) => s.Profile != ClientPreference && o.VideoConverted && s.Title.Versions.Any(version => version != o.Version && VideoPlaysAsIs(version, s))),
+            (s, o) => s.Profile != ClientPreference && o.VideoConverted
+                && s.Title.Versions.Any(version => version != o.Version && VideoPlaysAsIs(version, s) && Eligible(version, s).Any(track => !ReencodesVideo(version, track, s)))),
         Rule("Client Preference and Bitrate honour a pick above what was detected",
             (s, o) => s.Profile != Direct && HasPick(s) && s.ChannelPick > s.Client.Speakers
                 && Eligible(o.Version, s).Any(track => track.Channels > s.Client.Speakers && track.Channels <= s.ChannelPick && PlaysWithoutConversion(o.Version, track, s))
@@ -82,10 +83,12 @@ public static class MatrixRules
             (s, o) => !o.VideoConverted && (!HdrShows(o.Version, s.Client) || !BitDepthShows(o.Version, s.Client))),
         Rule("An image subtitle is burned into the picture and a text subtitle never is",
             (s, o) => s.Situation.BurnsSubtitleIn != o.BurnsSubtitleIn || (o.BurnsSubtitleIn && !o.VideoConverted)),
-        Rule("Video is converted only when it cannot play as it is, or it is HEVC in a browser and the audio has to be converted",
+        Rule("Video is converted only when it cannot play as it is, or the stream has to be HLS and the client's HLS player cannot take the codec",
             (s, o) => o.VideoConverted && VideoPlaysAsIs(o.Version, s) && !ReencodesVideo(o.Version, o.Selected, s)),
-        Rule("Never re-encodes the video for the sake of audio when another track avoids it",
-            (s, o) => o.VideoConverted && VideoPlaysAsIs(o.Version, s) && Eligible(o.Version, s).Any(track => AudioPlaysAsIs(track, s))),
+        Rule("Never copies video into HLS that the client's HLS player cannot take",
+            (s, o) => !o.VideoConverted && o.Strategy != StreamStrategy.DirectPlay && !s.Client.HlsCarries(o.Version.VideoCodec)),
+        Rule("Never re-encodes the video for the sake of the stream when another track avoids it",
+            (s, o) => o.VideoConverted && VideoPlaysAsIs(o.Version, s) && Eligible(o.Version, s).Any(track => !ReencodesVideo(o.Version, track, s))),
         Rule("No choice between different kinds of outcome is decided by fewer than ten points",
             (_, o) => o.Margin < KnifeEdge),
     ];
@@ -151,9 +154,6 @@ public static class MatrixRules
         s.Client.Video.Contains(version.VideoCodec) && version.Height <= s.MaxHeight
         && !OverBitrateLimit(version, s) && HdrShows(version, s.Client) && BitDepthShows(version, s.Client) && !s.Situation.BurnsSubtitleIn;
 
-    private static bool ConvertingAudioReencodesVideo(MatrixVersion version, MatrixScenario s) =>
-        s.Client.IsBrowser && version.VideoCodec == "hevc" && VideoPlaysAsIs(version, s);
-
     private static bool AudioPlaysAsIs(MatrixTrack track, MatrixScenario s) =>
         s.Client.Audio.Contains(track.Codec) && track.Channels <= HardLimit(s);
 
@@ -166,10 +166,11 @@ public static class MatrixRules
         || ((!VideoPlaysAsIs(version, s) || NeedsServerStream(version, track, s)) && !CanCopyToHls(track.Codec));
 
     private static bool ReencodesVideo(MatrixVersion version, MatrixTrack track, MatrixScenario s) =>
-        ConvertingAudioReencodesVideo(version, s) && !AudioPlaysAsIs(track, s);
+        VideoPlaysAsIs(version, s) && !s.Client.HlsCarries(version.VideoCodec)
+        && (!AudioPlaysAsIs(track, s) || NeedsServerStream(version, track, s));
 
     private static bool PlaysWithoutConversion(MatrixVersion version, MatrixTrack track, MatrixScenario s) =>
-        VideoPlaysAsIs(version, s) && !AudioMustConvert(version, track, s);
+        VideoPlaysAsIs(version, s) && !AudioMustConvert(version, track, s) && !ReencodesVideo(version, track, s);
 
     private static bool PlaysDirectly(MatrixVersion version, MatrixTrack track, MatrixScenario s) =>
         VideoPlaysAsIs(version, s) && AudioPlaysAsIs(track, s) && !NeedsServerStream(version, track, s);
