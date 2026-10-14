@@ -22,17 +22,25 @@ beforeEach(() => {
 });
 
 describe('asking the server what it would play', () => {
-    it('returns the version and audio track the server picked', async () => {
-        preview.mockResolvedValue(decision('part-1080', 'audio-surround'));
+    it('returns the version, audio track and subtitle the server picked, leaving the subtitle to the server', async () => {
+        preview.mockResolvedValue({ ...decision('part-1080', 'audio-surround'), subtitleTrackId: 'english-sdh' });
         const { result } = renderHook(() => useServerPlaybackChoice('server'));
 
         const choice = await result.current.ask('movie');
 
-        expect(choice).toEqual({ mediaPartId: 'part-1080', videoTrackId: 'part-1080-video', audioTrackId: 'audio-surround' });
-        expect(preview).toHaveBeenCalledWith('movie', 'device', {
-            serverId: 'server', mediaPartId: undefined, videoTrackId: undefined,
-            subtitleTrackId: '00000000-0000-0000-0000-000000000000',
+        expect(choice).toEqual({
+            mediaPartId: 'part-1080', videoTrackId: 'part-1080-video', audioTrackId: 'audio-surround', subtitleTrackId: 'english-sdh', pickReplaced: false,
         });
+        expect(preview).toHaveBeenCalledWith('movie', 'device', {
+            serverId: 'server', mediaPartId: undefined, videoTrackId: undefined, subtitleTrackId: undefined,
+        });
+    });
+
+    it('says when the server played something other than the pick because the pick would be converted', async () => {
+        preview.mockResolvedValue({ ...decision('part-1080', 'audio-ac3'), pickReplaced: true });
+        const { result } = renderHook(() => useServerPlaybackChoice());
+
+        expect((await result.current.ask('movie'))?.pickReplaced).toBe(true);
     });
 
     it('asks about the version the viewer chose, and a subtitle that has to be burned in', async () => {

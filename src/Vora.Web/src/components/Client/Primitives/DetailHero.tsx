@@ -1,5 +1,7 @@
-import { type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import CinematicBackdrop from './CinematicBackdrop';
+import ActionMenu from './ActionMenu';
+import type { MenuEntry, MenuPoint } from './menuEntries';
 import ArtImage from './ArtImage';
 import { thumbUrl } from '../../../utils/thumbnails';
 
@@ -41,6 +43,48 @@ export function HeroChip({ children, tone = 'neutral' }: { children: ReactNode; 
         >
             {children}
         </span>
+    );
+}
+
+// A hero chip that opens a menu of choices, like Plex's version, audio and
+// subtitle pickers: the chip shows what is in use and the menu changes it. With
+// nothing else to choose it stays a plain chip.
+export function HeroChoiceChip({ label, title, entries, tone = 'neutral' }: {
+    label: ReactNode;
+    title: string;
+    entries: MenuEntry[];
+    tone?: 'neutral' | 'accent';
+}) {
+    const button = useRef<HTMLButtonElement>(null);
+    const [openAt, setOpenAt] = useState<MenuPoint | null>(null);
+
+    if (entries.filter(entry => entry.kind === 'choice').length < 2) return <HeroChip tone={tone}>{label}</HeroChip>;
+
+    const open = () => {
+        const box = button.current?.getBoundingClientRect();
+        if (box) setOpenAt({ x: box.left, y: box.bottom + 6 });
+    };
+
+    return (
+        <>
+            <button
+                ref={button}
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={openAt !== null}
+                aria-label={title}
+                data-tone={tone}
+                data-open={openAt !== null}
+                onClick={open}
+                className="vora-hero-chip-button inline-flex cursor-pointer items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium backdrop-blur-md"
+            >
+                {label}
+                <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m6 9 6 6 6-6" />
+                </svg>
+            </button>
+            {openAt && <ActionMenu at={openAt} title={title} entries={entries} onClose={() => setOpenAt(null)} />}
+        </>
     );
 }
 

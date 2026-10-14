@@ -131,7 +131,7 @@ New folder, mirrors `components/Admin/Primitives/`. Authored once, used everywhe
 | `Tabs` | Underlined tab bar. Replaces hand-rolled `border-b-2` patterns. An optional `actions` slot puts page-level controls (e.g. Home's Customize button) flush right on the tab line rather than in the page header. |
 | `EmptyState` | Centered glyph + title + body + optional CTA. |
 | `Glass` | A frosted-surface wrapper (`backdrop-filter: blur(18px)` + `bg-glass`). Used by topbar, the player chrome panel, and popovers. |
-| `QualityPanel` | Slide-in right panel for video track/quality selection. Replaces raw `<select>`s in player. |
+| `QualityPanel` | Slide-in right panel for video track/quality selection on the TV apps. The web's title page uses `HeroChoiceChip` menus on the resolution, audio and subtitle chips instead. |
 | `NowPlayingBar` | The persistent bottom-of-screen music bar. Tappable to expand into full-screen Now Playing. |
 | `LetterRail` | Vertical right-edge A–Z index for `LibraryPage` (refactored out of inline implementation). |
 

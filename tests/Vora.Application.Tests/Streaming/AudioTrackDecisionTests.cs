@@ -124,14 +124,38 @@ public class AudioTrackDecisionTests
     }
 
     [Fact]
-    public async Task A_manual_track_choice_is_preserved_even_when_conversion_is_required()
+    public async Task Client_Preference_keeps_a_track_picked_by_hand_even_when_it_has_to_be_converted()
     {
         var surround = Audio(6, "eac3", true);
-        var decision = await DecideAsync(Media(surround, Audio(2)), 2, requestedAudio: surround.Id);
+        var decision = await DecideAsync(Media(surround, Audio(2)), 2, StreamingProfile.ClientPreference, requestedAudio: surround.Id);
         decision.SelectedAudioTrackId.Should().Be(surround.Id);
         decision.AudioStrategy.Should().Be("Transcode");
         decision.TargetAudioChannels.Should().Be(2);
         decision.Reason.Should().Contain("Downmix required");
+    }
+
+    [Theory]
+    [InlineData(StreamingProfile.DirectStreamPreference)]
+    [InlineData(StreamingProfile.BandwidthOptimized)]
+    public async Task Direct_and_Bitrate_play_a_track_in_the_picked_language_that_needs_no_conversion_instead_of_converting_the_pick(StreamingProfile profile)
+    {
+        var surround = Audio(6, "eac3", true);
+        var stereo = Audio(2);
+        var decision = await DecideAsync(Media(surround, stereo, Audio(2, language: "fra")), 2, profile, requestedAudio: surround.Id);
+        decision.SelectedAudioTrackId.Should().Be(stereo.Id);
+        decision.AudioStrategy.Should().NotBe("Transcode");
+        decision.Reason.Should().Contain("closest one that plays");
+    }
+
+    [Theory]
+    [InlineData(StreamingProfile.DirectStreamPreference)]
+    [InlineData(StreamingProfile.BandwidthOptimized)]
+    public async Task Direct_and_Bitrate_never_change_the_language_of_a_pick_to_avoid_converting_it(StreamingProfile profile)
+    {
+        var french = Audio(6, "eac3", language: "fra");
+        var decision = await DecideAsync(Media(Audio(2, isDefault: true), french), 2, profile, requestedAudio: french.Id);
+        decision.SelectedAudioTrackId.Should().Be(french.Id);
+        decision.AudioStrategy.Should().Be("Transcode");
     }
 
     [Fact]

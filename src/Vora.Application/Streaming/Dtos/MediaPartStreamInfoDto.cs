@@ -4,6 +4,7 @@ public class MediaPartStreamInfoDto
 {
     public Guid Id { get; set; }
     public string? Resolution { get; set; }
+    public string? Edition { get; set; }
     public string? Container { get; set; }
     public long? OverallBitrate { get; set; }
     public List<TrackStreamInfoDto> VideoTracks { get; set; } = new();

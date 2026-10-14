@@ -37,6 +37,39 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
         return episodeId ?? mediaId;
     }
 
+    public async Task<Guid> ResolveTitleIdAsync(Guid mediaId)
+    {
+        var episodeShow = await context.Set<Episode>().AsNoTracking()
+            .Where(e => e.Id == mediaId)
+            .Select(e => (Guid?)e.Season.TvShowId)
+            .FirstOrDefaultAsync();
+        if (episodeShow.HasValue) return episodeShow.Value;
+
+        var seasonShow = await context.Set<Season>().AsNoTracking()
+            .Where(s => s.Id == mediaId)
+            .Select(s => (Guid?)s.TvShowId)
+            .FirstOrDefaultAsync();
+        return seasonShow ?? mediaId;
+    }
+
+    public Task<ProfileTitlePlaybackChoice?> GetRememberedChoiceAsync(Guid profileId, string deviceId, Guid titleId) =>
+        context.ProfileTitlePlaybackChoices.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.ProfileId == profileId && c.DeviceId == deviceId && c.TitleId == titleId);
+
+    public async Task SaveRememberedChoiceAsync(ProfileTitlePlaybackChoice choice)
+    {
+        var stored = await context.ProfileTitlePlaybackChoices
+            .FirstOrDefaultAsync(c => c.ProfileId == choice.ProfileId && c.DeviceId == choice.DeviceId && c.TitleId == choice.TitleId);
+        if (stored == null) context.ProfileTitlePlaybackChoices.Add(choice);
+        else context.Entry(stored).CurrentValues.SetValues(choice);
+        await context.SaveChangesAsync();
+    }
+
+    public Task ForgetRememberedChoiceAsync(Guid profileId, string deviceId, Guid titleId) =>
+        context.ProfileTitlePlaybackChoices
+            .Where(c => c.ProfileId == profileId && c.DeviceId == deviceId && c.TitleId == titleId)
+            .ExecuteDeleteAsync();
+
     public Task<MediaStreamInfoDto?> GetMediaStreamInfoAsync(Guid mediaId) =>
         context.MediaItems
             .AsNoTracking()
@@ -49,6 +82,7 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                 {
                     Id = p.Id,
                     Resolution = p.Resolution,
+                    Edition = p.Edition,
                     Container = p.Container,
                     OverallBitrate = p.OverallBitrate,
                     VideoTracks = p.VideoTracks.Select(vt => new TrackStreamInfoDto

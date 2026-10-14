@@ -147,11 +147,41 @@ CREATE TABLE IF NOT EXISTS ""PendingTasks"" (
 );
 
 CREATE INDEX IF NOT EXISTS ""IX_PendingTasks_Sequence"" ON ""PendingTasks"" (""Sequence"");");
+
+            migrationBuilder.Sql(@"
+CREATE TABLE IF NOT EXISTS ""ProfileTitlePlaybackChoices"" (
+    ""ProfileId"" uuid NOT NULL,
+    ""DeviceId"" character varying(128) NOT NULL,
+    ""TitleId"" uuid NOT NULL,
+    ""RemembersVersion"" boolean NOT NULL,
+    ""Edition"" character varying(128),
+    ""VersionHeight"" integer NOT NULL,
+    ""VideoCodec"" character varying(32),
+    ""HdrType"" character varying(32),
+    ""RemembersAudio"" boolean NOT NULL,
+    ""AudioLanguage"" character varying(16),
+    ""AudioIsCommentary"" boolean NOT NULL,
+    ""AudioCodec"" character varying(32),
+    ""AudioChannels"" integer NOT NULL,
+    ""Subtitle"" integer NOT NULL,
+    ""SubtitleLanguage"" character varying(16),
+    ""SubtitleIsForced"" boolean NOT NULL,
+    ""SubtitleIsHearingImpaired"" boolean NOT NULL,
+    ""UpdatedAt"" timestamp with time zone NOT NULL,
+    CONSTRAINT ""PK_ProfileTitlePlaybackChoices"" PRIMARY KEY (""ProfileId"", ""DeviceId"", ""TitleId""),
+    CONSTRAINT ""FK_ProfileTitlePlaybackChoices_MediaItems_TitleId"" FOREIGN KEY (""TitleId"") REFERENCES ""MediaItems"" (""Id"") ON DELETE CASCADE,
+    CONSTRAINT ""FK_ProfileTitlePlaybackChoices_UserProfiles_ProfileId"" FOREIGN KEY (""ProfileId"") REFERENCES ""UserProfiles"" (""Id"") ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ""IX_ProfileTitlePlaybackChoices_TitleId"" ON ""ProfileTitlePlaybackChoices"" (""TitleId"");");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "ProfileTitlePlaybackChoices");
+
             migrationBuilder.DropTable(
                 name: "PendingTasks");
 

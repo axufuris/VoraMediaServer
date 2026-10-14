@@ -26,6 +26,7 @@ public class BackupCoverageTests : IClassFixture<VoraApiTestFactory>
         ["ProfileAccessSchedules"] = "users.profiles",
         ["ClientDevices"] = "users.devices",
         ["ProfileDeviceSettings"] = "users.devices",
+        ["ProfileTitlePlaybackChoices"] = "users.playback-choices",
         ["Collections"] = "library.collections",
         ["CollectionItems"] = "library.collections",
         ["CollectionArtwork"] = "library.collections",

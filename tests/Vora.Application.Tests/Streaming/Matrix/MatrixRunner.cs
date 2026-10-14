@@ -51,6 +51,7 @@ public static class MatrixRunner
         };
         var audioOutput = client.OldApp ? null : new AudioOutputRequest(client.Speakers, scenario.ChannelPick, client.IsBrowser, client.SwitchesTracks);
         Guid? manualTrack = scenario.ManualTrack == null ? null : tracks.First(pair => pair.Value.Label == scenario.ManualTrack).Key;
+        Guid? manualVersion = scenario.ManualVersion == null ? null : versions.First(pair => pair.Value.Label == scenario.ManualVersion).Key;
         Guid? subtitle = scenario.Situation.Subtitle switch
         {
             MatrixSituation.TextSubtitle => TextSubtitle,
@@ -60,7 +61,7 @@ public static class MatrixRunner
         };
 
         var decision = await new BestPathDecisionManager(settings).DetermineBestPathAsync(device, media, scenario.Situation.LimitKbps, scenario.Situation.LimitSource,
-            requestedAudioId: manualTrack, requestedSubtitleId: subtitle, requestedMaxResolution: scenario.MaxHeight, audioOutput: audioOutput, hlsVideoCodecs: client.HlsVideo);
+            requestedAudioId: manualTrack, requestedSubtitleId: subtitle, requestedMaxResolution: scenario.MaxHeight, requestedMediaPartId: manualVersion, audioOutput: audioOutput, hlsVideoCodecs: client.HlsVideo);
 
         var chosenVersion = versions[decision.SelectedMediaPartId];
         var selected = tracks[decision.SelectedAudioTrackId];
@@ -89,7 +90,7 @@ public static class MatrixRunner
 
     private static int MarginOverADifferentKindOfOutcome(StreamDecisionDto decision)
     {
-        var ranked = decision.EvaluatedOptions.OrderBy(option => option.PenaltyScore).ToList();
+        var ranked = decision.EvaluatedOptions.Where(option => option.Considered).OrderBy(option => option.PenaltyScore).ToList();
         var rival = ranked.Skip(1).FirstOrDefault(option =>
             option.Strategy != ranked[0].Strategy || option.AudioStrategy != ranked[0].AudioStrategy || option.VideoStrategy != ranked[0].VideoStrategy);
         return rival == null ? int.MaxValue : rival.PenaltyScore - ranked[0].PenaltyScore;

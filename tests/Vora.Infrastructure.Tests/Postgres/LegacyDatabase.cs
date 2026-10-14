@@ -86,10 +86,16 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string StreamOriginMigration = "20261012232953_ChangesSinceInitial";
 
+    public const string LocalMetadataMigration = "20261013214138_ChangesSinceInitial";
+
+    private const string TablesSinceLocalMetadata = """
+        DROP TABLE "ProfileTitlePlaybackChoices";
+        """;
+
     private const string ColumnsSinceStreamOrigin = """
         ALTER TABLE "MediaLibraries" DROP COLUMN "LocalMetadataMode";
         ALTER TABLE "MediaLibraries" DROP COLUMN "PreferLocalArtwork";
-        """;
+        """ + TablesSinceLocalMetadata;
 
     private const string ColumnsSinceHardwareAcceleration = """
         ALTER TABLE "StreamSessions" DROP COLUMN "IpAddress";
@@ -157,6 +163,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceStreamOrigin, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, StreamOriginMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildLocalMetadataStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(TablesSinceLocalMetadata, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, LocalMetadataMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

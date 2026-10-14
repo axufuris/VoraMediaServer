@@ -48,7 +48,7 @@ A frosted-surface wrapper used by the topbar, the player chrome panel, and popov
 
 ### QualityPanel
 
-Slide-in right panel for video track / quality / subtitle / audio selection. Replaces raw `<select>`s in the player.
+Slide-in right panel for video track / quality / subtitle / audio selection. Replaces raw `<select>`s in the player. The TV apps use it on a title page; the web shows the same choices as menus on the hero's resolution, audio and subtitle chips (`HeroChoiceChip`). Either way the first choice is **Automatic**, a pick is remembered for the title on this device through `PUT /api/streaming/choices/{mediaId}`, and the panel then shows what the server answers (see `docs/track-selection.md`).
 
 **Props:**
 - `isOpen: boolean`

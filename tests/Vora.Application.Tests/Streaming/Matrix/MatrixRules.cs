@@ -34,13 +34,13 @@ public static class MatrixRules
                 && o.HeardChannels != s.ChannelPick),
         Rule("Direct plays the largest version that plays without converting",
             (s, o) => s.Profile == Direct
-                && s.Title.Versions.Any(version => version.Height > o.Version.Height && Eligible(version, s).Any(track => PlaysWithoutConversion(version, track, s)))),
+                && Versions(s).Any(version => version.Height > o.Version.Height && Eligible(version, s).Any(track => PlaysWithoutConversion(version, track, s)))),
         Rule("Bitrate plays the largest version whose video plays as it is within the bitrate",
             (s, o) => s.Profile == Bitrate
-                && s.Title.Versions.Any(version => version.Height > o.Version.Height && VideoPlaysAsIs(version, s) && Eligible(version, s).Any(track => !ReencodesVideo(version, track, s)))),
+                && Versions(s).Any(version => version.Height > o.Version.Height && VideoPlaysAsIs(version, s) && Eligible(version, s).Any(track => !ReencodesVideo(version, track, s)))),
         Rule("Direct and Bitrate do not convert the video when another version plays with its video untouched",
             (s, o) => s.Profile != ClientPreference && o.VideoConverted
-                && s.Title.Versions.Any(version => version != o.Version && VideoPlaysAsIs(version, s) && Eligible(version, s).Any(track => !ReencodesVideo(version, track, s)))),
+                && Versions(s).Any(version => version != o.Version && VideoPlaysAsIs(version, s) && Eligible(version, s).Any(track => !ReencodesVideo(version, track, s)))),
         Rule("Client Preference and Bitrate honour a pick above what was detected",
             (s, o) => s.Profile != Direct && HasPick(s) && s.ChannelPick > s.Client.Speakers
                 && Eligible(o.Version, s).Any(track => track.Channels > s.Client.Speakers && track.Channels <= s.ChannelPick && PlaysWithoutConversion(o.Version, track, s))
@@ -62,8 +62,10 @@ public static class MatrixRules
             (s, o) => o.Heard != o.Selected),
         Rule("Automatic stays in the dialogue language and off the commentary",
             (s, o) => s.PicksTrackAutomatically && !Eligible(o.Version, s).Contains(o.Selected)),
-        Rule("A track picked by hand is the one played",
-            (s, o) => s.ManualTrack != null && o.Heard.Label != s.ManualTrack),
+        Rule("A track picked by hand plays, except that Direct and Bitrate play one in its language that needs no conversion when it would need one",
+            (s, o) => s.ManualTrack != null && !Eligible(o.Version, s).Contains(o.Selected)),
+        Rule("A version picked by hand plays, except that Direct and Bitrate play one that needs no conversion when it would need one",
+            (s, o) => s.ManualVersion != null && !Versions(s).Contains(o.Version)),
         Rule("Never sends more channels than the limit",
             (s, o) => o.HeardChannels > HardLimit(s)),
         Rule("Never copies audio the client cannot decode or the stream cannot carry",
@@ -123,9 +125,33 @@ public static class MatrixRules
     private static int Fit(MatrixScenario s, int channels) =>
         (Wanted(s) > 2 && channels <= 2 ? 100 : 0) + Math.Abs(Wanted(s) - channels);
 
+    private static List<MatrixVersion> Versions(MatrixScenario s)
+    {
+        if (s.ManualVersion == null) return s.Title.Versions.ToList();
+
+        var picked = s.Title.Versions.Where(version => version.Label == s.ManualVersion).ToList();
+        if (s.Profile == ClientPreference || picked.Any(version => VideoPlaysAsPicked(version, s))) return picked;
+        var playing = s.Title.Versions.Where(version => VideoPlaysAsPicked(version, s)).ToList();
+        return playing.Count > 0 ? playing : picked;
+    }
+
+    private static bool VideoPlaysAsPicked(MatrixVersion version, MatrixScenario s) =>
+        VideoPlaysAsIs(version, s) && Eligible(version, s).Any(track => !ReencodesVideo(version, track, s));
+
+    private static bool TrackPlaysAsPicked(MatrixVersion version, MatrixTrack track, MatrixScenario s) =>
+        !AudioMustConvert(version, track, s) && !ReencodesVideo(version, track, s);
+
     private static List<MatrixTrack> Eligible(MatrixVersion version, MatrixScenario s)
     {
-        if (s.ManualTrack != null) return version.Tracks.Where(track => track.Label == s.ManualTrack).ToList();
+        if (s.ManualTrack != null)
+        {
+            var picked = version.Tracks.Where(track => track.Label == s.ManualTrack).ToList();
+            if (s.Profile == ClientPreference || picked.Count == 0 || picked.Any(track => TrackPlaysAsPicked(version, track, s))) return picked;
+            var inItsLanguage = version.Tracks
+                .Where(track => track.Language == picked[0].Language && track.Commentary == picked[0].Commentary && TrackPlaysAsPicked(version, track, s))
+                .ToList();
+            return inItsLanguage.Count > 0 ? inItsLanguage : picked;
+        }
 
         var tracks = version.Tracks.Where(track => !track.Commentary).ToList();
         if (tracks.Count == 0) tracks = version.Tracks.ToList();
@@ -176,5 +202,5 @@ public static class MatrixRules
         VideoPlaysAsIs(version, s) && AudioPlaysAsIs(track, s) && !NeedsServerStream(version, track, s);
 
     private static bool Any(MatrixScenario s, Func<MatrixVersion, MatrixTrack, MatrixScenario, bool> test) =>
-        s.Title.Versions.Any(version => Eligible(version, s).Any(track => test(version, track, s)));
+        Versions(s).Any(version => Eligible(version, s).Any(track => test(version, track, s)));
 }

@@ -4,6 +4,7 @@ using Vora.Domain.Entities.Discovery;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Playlists;
 using Vora.Domain.Entities.Requests;
+using Vora.Domain.Entities.Users;
 using Vora.Infrastructure.Persistence;
 
 namespace Vora.Infrastructure.Backups.Sections;
@@ -166,6 +167,59 @@ public sealed class WatchlistsBackupSection : EntityTableBackupSection<UserWatch
 
     private static BackupItemReferences References(List<UserWatchlistItem> rows) =>
         new BackupItemReferences().AddRange(BackupItemKind.MediaItem, rows.Select(r => r.MediaItemId).OfType<Guid>());
+}
+
+public sealed class PlaybackChoicesBackupSection : EntityTableBackupSection<ProfileTitlePlaybackChoice>
+{
+    private static readonly BackupRowNoun Noun = new("remembered playback choice", "remembered playback choices");
+
+    private readonly BackupReferenceMapper _references;
+
+    public PlaybackChoicesBackupSection(VoraDbContext db, BackupReferenceMapper references) : base(db)
+    {
+        _references = references;
+    }
+
+    public override string Key => "users.playback-choices";
+    public override string DisplayName => "Remembered playback choices";
+    public override BackupSectionGroup Group => BackupSectionGroup.UserData;
+    public override bool RequiresExplicitConfirm => true;
+    public override string? DestructiveWarning => "Replaces the version, audio and subtitle choices every profile has made on each device.";
+    protected override DbSet<ProfileTitlePlaybackChoice> Set(VoraDbContext db) => db.ProfileTitlePlaybackChoices;
+
+    protected override Task WriteReferencesAsync(IBackupWriter writer, List<ProfileTitlePlaybackChoice> rows, CancellationToken ct) =>
+        _references.WriteIdentitiesAsync(writer, Key, References(rows), ct);
+
+    protected override async Task<List<ProfileTitlePlaybackChoice>> PrepareRowsAsync(IBackupReader reader, List<ProfileTitlePlaybackChoice> rows, BackupSkipTally tally, CancellationToken ct)
+    {
+        var resolver = await _references.ReadResolverAsync(reader, Key, References(rows), ct);
+        var profileIds = await Db.UserProfiles.Select(p => p.Id).ToHashSetAsync(ct);
+
+        var restorable = new List<ProfileTitlePlaybackChoice>();
+        foreach (var row in rows)
+        {
+            if (!profileIds.Contains(row.ProfileId))
+            {
+                tally.Skip(Noun, BackupSkipReason.MissingProfile);
+                continue;
+            }
+
+            var titleId = resolver.Resolve(BackupItemKind.MediaItem, row.TitleId);
+            if (titleId == null)
+            {
+                tally.Skip(Noun, BackupSkipReason.MissingItem);
+                continue;
+            }
+
+            row.TitleId = titleId.Value;
+            restorable.Add(row);
+        }
+
+        return BackupTableSync.KeepOnePer(restorable, r => (r.ProfileId, r.DeviceId, r.TitleId), r => r.UpdatedAt, tally, Noun);
+    }
+
+    private static BackupItemReferences References(List<ProfileTitlePlaybackChoice> rows) =>
+        new BackupItemReferences().AddRange(BackupItemKind.MediaItem, rows.Select(r => r.TitleId));
 }
 
 public sealed class StationsBackupSection : EntityTableBackupSection<Station>

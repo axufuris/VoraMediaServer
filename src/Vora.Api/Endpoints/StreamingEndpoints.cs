@@ -5,6 +5,7 @@ using Vora.Api.Extensions;
 using Vora.Application.FileSystem;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
+using Vora.Application.Streaming.Requests;
 using Vora.Application.Streaming.ViewModels;
 using Vora.Domain.Enums;
 using Vora.Infrastructure.Transcoding;
@@ -42,7 +43,8 @@ public record StreamDecisionResponse(
     string OutputResolution,
     string OutputHdrType,
     string Quality,
-    int AudioTrackPosition);
+    int AudioTrackPosition,
+    bool PickReplaced);
 
 public static class StreamingEndpoints
 {
@@ -61,6 +63,18 @@ public static class StreamingEndpoints
         group.MapPost("/decision", PreviewDecisionAsync)
             .WithName("PreviewStreamDecision")
             .Produces<StreamDecisionResponse>(StatusCodes.Status200OK)
+            .RequireAuthorization();
+        group.MapGet("/choices/{mediaId:guid}", GetRememberedChoiceAsync)
+            .WithName("GetRememberedPlaybackChoice")
+            .Produces<RememberedChoiceVM>(StatusCodes.Status200OK)
+            .RequireAuthorization();
+        group.MapPut("/choices/{mediaId:guid}", RememberChoiceAsync)
+            .WithName("RememberPlaybackChoice")
+            .Produces<RememberedChoiceVM>(StatusCodes.Status200OK)
+            .RequireAuthorization();
+        group.MapDelete("/choices/{mediaId:guid}", ForgetChoicesAsync)
+            .WithName("ForgetPlaybackChoices")
+            .Produces(StatusCodes.Status204NoContent)
             .RequireAuthorization();
         group.MapPost("/start-extra", StartExtraSessionAsync)
             .WithName("StartExtraStream")
@@ -142,6 +156,41 @@ public static class StreamingEndpoints
         }
     }
 
+    private static async Task<IResult> GetRememberedChoiceAsync(Guid mediaId, HttpContext context, ClaimsPrincipal user, IPlaybackChoiceManager choices)
+    {
+        if (ChoiceScope(context, user) is not { } scope) return Results.BadRequest(MissingChoiceScope);
+        return Results.Ok(await choices.GetAsync(scope.ProfileId, scope.DeviceId, mediaId));
+    }
+
+    private static async Task<IResult> RememberChoiceAsync(Guid mediaId, HttpContext context, ClaimsPrincipal user, IPlaybackChoiceManager choices, [FromBody] RememberChoiceRequest request)
+    {
+        if (ChoiceScope(context, user) is not { } scope) return Results.BadRequest(MissingChoiceScope);
+        try
+        {
+            return Results.Ok(await choices.RememberAsync(scope.ProfileId, scope.DeviceId, mediaId, request));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(ex.Message);
+        }
+    }
+
+    private static async Task<IResult> ForgetChoicesAsync(Guid mediaId, HttpContext context, ClaimsPrincipal user, IPlaybackChoiceManager choices)
+    {
+        if (ChoiceScope(context, user) is not { } scope) return Results.BadRequest(MissingChoiceScope);
+        await choices.ForgetAsync(scope.ProfileId, scope.DeviceId, mediaId);
+        return Results.NoContent();
+    }
+
+    private const string MissingChoiceScope = "Remembered choices need a signed-in profile and the X-Vora-Device-Id header.";
+
+    private static (Guid ProfileId, string DeviceId)? ChoiceScope(HttpContext context, ClaimsPrincipal user)
+    {
+        var profileId = user.GetProfileId();
+        var deviceId = context.Request.Headers["X-Vora-Device-Id"].FirstOrDefault();
+        return profileId.HasValue && !string.IsNullOrEmpty(deviceId) ? (profileId.Value, deviceId) : null;
+    }
+
     private static async Task<IResult> PreviewDecisionAsync(
         HttpContext context,
         ClaimsPrincipal user,
@@ -188,7 +237,8 @@ public static class StreamingEndpoints
                 d.OutputResolution,
                 d.OutputHdrType,
                 d.Quality,
-                d.SelectedAudioTrackPosition));
+                d.SelectedAudioTrackPosition,
+                d.PickReplaced));
         }
         catch (Exception ex)
         {

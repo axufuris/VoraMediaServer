@@ -119,6 +119,13 @@ public static class MatrixCatalog
 
     private static readonly MatrixSituation Plain = new("no limit and no subtitle");
 
+    private static readonly MatrixSituation[] VersionPickSituations =
+    [
+        Plain,
+        new("20 Mbps bitrate pick", 20000, "Client Limit"),
+        new("4 Mbps remote limit", 4000, "Server Limit"),
+    ];
+
     private static readonly MatrixSituation[] Situations =
     [
         new("20 Mbps bitrate pick", 20000, "Client Limit"),
@@ -148,6 +155,15 @@ public static class MatrixCatalog
 
             var tracks = title.Versions[0].Tracks;
             if (tracks.Length > 1 && title.Versions.Length == 1) yield return new(title, client, profile, 0, 0, tracks[^1].Label, Plain);
+
+            if (title.Versions.Length > 1)
+            {
+                foreach (var version in title.Versions)
+                foreach (var situation in VersionPickSituations)
+                {
+                    yield return new(title, client, profile, 0, 0, null, situation, version.Label);
+                }
+            }
 
             foreach (var situation in Situations)
             {

@@ -9,6 +9,7 @@ public class StreamOptionLogDto
     public string AudioStrategy { get; set; } = string.Empty;
     public string SubtitleStrategy { get; set; } = string.Empty;
     public string Reason { get; set; } = string.Empty;
+    public bool Considered { get; set; } = true;
 
     // The three heights the resolution-fit score is built from. A client ceiling
     // that is not a rung the encoder can emit (a 1344p phone panel) used to be

@@ -416,6 +416,35 @@
     appearance: none;
 }
 
+[data-vora-client] .vora-hero-chip-button {
+    background: color-mix(in srgb, var(--vora-bg-canvas) 60%, transparent);
+    border: 1px solid var(--vora-border-strong);
+    color: var(--vora-text-primary);
+    transition: background-color var(--vora-duration-fast) var(--vora-ease-out),
+                border-color var(--vora-duration-fast) var(--vora-ease-out),
+                box-shadow var(--vora-duration-fast) var(--vora-ease-out);
+}
+
+[data-vora-client] .vora-hero-chip-button[data-tone="accent"] {
+    background: var(--vora-accent-500);
+    border-color: var(--vora-accent-500);
+    color: var(--vora-accent-contrast);
+    font-weight: 600;
+}
+
+[data-vora-client] .vora-hero-chip-button[data-tone="neutral"]:hover,
+[data-vora-client] .vora-hero-chip-button[data-tone="neutral"]:focus-visible,
+[data-vora-client] .vora-hero-chip-button[data-tone="neutral"][data-open="true"] {
+    background: var(--vora-accent-soft);
+    border-color: var(--vora-accent-soft-hover);
+}
+
+[data-vora-client] .vora-hero-chip-button[data-tone="accent"]:hover,
+[data-vora-client] .vora-hero-chip-button[data-tone="accent"]:focus-visible,
+[data-vora-client] .vora-hero-chip-button[data-tone="accent"][data-open="true"] {
+    box-shadow: 0 0 0 2px var(--vora-accent-soft-hover);
+}
+
 [data-vora-client] .vora-pill {
     background: transparent;
     color: var(--vora-text-secondary);
