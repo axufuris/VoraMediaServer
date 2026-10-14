@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { mediaService, type MediaItem, type MediaPart, type UpNextItemVM, type UpNextResultVM, type MediaMarker } from '../../api/Media/mediaService';
 import { profileService, type PlaybackPreferencesVM } from '../../api/Users/profileService';
-import { streamingService } from '../../api/Streaming/streamingService';
+import { streamingService, type RememberChoiceChange } from '../../api/Streaming/streamingService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { getEffectiveCapabilities } from '../../utils/hardwareScanner';
 import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
@@ -526,8 +526,29 @@ export default function GlobalVideoPlayer() {
         }
     };
 
+    // A pick made while watching is remembered for the title on this device,
+    // like a pick on its page, so the next episode plays the same way.
+    const rememberPick = (change: RememberChoiceChange) => {
+        if (!currentMedia || currentMedia.isExtra || currentMedia.playbackContextType === 'LiveTv' || currentMedia.playbackContextType === 'Dvr') return;
+        if (!change.mediaPartId && !change.audioTrackId && !change.subtitleTrackId && !change.subtitlesOff) return;
+        streamingService.rememberChoice(currentMedia.id, change, serverId)
+            .catch((error: unknown) => console.error('Could not remember the playback choice', error));
+    };
+
+    const subtitlePick = (subtitleId: string): RememberChoiceChange =>
+        isNoSubtitle(subtitleId) ? { subtitlesOff: true } : { subtitleTrackId: subtitleId };
+
     const handleApplyStreams = async () => {
         setShowSettings(false);
+
+        const shownSubtitle = currentMedia.subtitleStrategy === 'BurnIn' ? currentMedia.subtitleTrackId : textSubtitleId;
+        rememberPick({
+            mediaPartId: selVideo !== currentMedia.videoTrackId
+                ? mediaDetails?.mediaParts?.find((p: MediaPart) => p.videoTracks?.some((vt: VideoTrackType) => vt.id === selVideo))?.id
+                : undefined,
+            audioTrackId: selAudio !== currentMedia.audioTrackId ? selAudio : undefined,
+            ...((isNoSubtitle(selSub) ? null : selSub) !== (shownSubtitle ?? null) ? subtitlePick(selSub) : {}),
+        });
 
         const chosenTrack = mediaDetails?.mediaParts
             ?.flatMap((p: MediaPart) => p.subtitleTracks ?? [])
@@ -562,6 +583,7 @@ export default function GlobalVideoPlayer() {
 
         setSelSub(subtitleTrackId);
         desiredTextSubRef.current = wantsBurnIn || isNoSubtitle(subtitleTrackId) ? null : subtitleTrackId;
+        rememberPick(subtitlePick(subtitleTrackId));
 
         // Adding a burned-in subtitle, or dropping one that is already burned
         // into the picture, both need a new encode — nothing the client can undo.
@@ -587,6 +609,7 @@ export default function GlobalVideoPlayer() {
 
         setSelSub(subtitleTrackId);
         desiredTextSubRef.current = subtitleTrackId;
+        rememberPick({ subtitleTrackId });
         await sideloadSubtitle(subtitleTrackId);
     };
 

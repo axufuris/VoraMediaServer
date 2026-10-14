@@ -20,6 +20,25 @@ export function ActionMenuList({ entries, onSelected, roomy }: ActionMenuListPro
         <>
             {entries.map(entry => entry.kind === 'separator' ? (
                 <div key={entry.key} role="separator" className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />
+            ) : entry.kind === 'choice' ? (
+                <button
+                    key={entry.key}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={entry.selected}
+                    onClick={() => { onSelected(); entry.onSelect(); }}
+                    className={`vora-row-interactive flex w-full cursor-pointer items-start gap-2.5 px-4 text-left text-sm ${roomy ? 'py-3.5' : 'py-2.5'}`}
+                    style={{ color: 'var(--vora-text-primary)' }}
+                >
+                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                        className="mt-0.5 shrink-0" style={{ color: 'var(--vora-accent-text)', visibility: entry.selected ? 'visible' : 'hidden' }}>
+                        <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                    <span className="min-w-0">
+                        <span className={`block ${entry.selected ? 'font-semibold' : ''}`}>{entry.label}</span>
+                        {entry.detail && <span className="mt-0.5 block text-xs" style={{ color: 'var(--vora-text-muted)' }}>{entry.detail}</span>}
+                    </span>
+                </button>
             ) : (
                 <button
                     key={entry.key}
@@ -46,7 +65,7 @@ interface ActionMenuProps {
     onClose: () => void;
 }
 
-const menuButtons = (menu: HTMLElement) => Array.from(menu.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]'));
+const menuButtons = (menu: HTMLElement) => Array.from(menu.querySelectorAll<HTMLButtonElement>('button[role="menuitem"], button[role="menuitemradio"]'));
 
 // A menu opened at a point: beside the pointer on a desktop, and as a sheet
 // rising from the bottom edge on a phone, where a small box under a thumb is

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ActionMenu, { ActionMenuList } from './ActionMenu';
-import { menuAction, menuSeparator, tidyMenu, type MenuEntry } from './menuEntries';
+import { menuAction, menuChoice, menuSeparator, tidyMenu, type MenuEntry } from './menuEntries';
 import { PHONE_MEDIA_QUERY } from '../../../hooks/useIsPhone';
 
 const onPhone = (matches: boolean) => {
@@ -21,6 +21,21 @@ const entries = (calls: string[] = []): MenuEntry[] => [
 ];
 
 describe('ActionMenuList', () => {
+    it('marks the choice in use and shows what each one is', () => {
+        const calls: string[] = [];
+        render(<ActionMenuList entries={[
+            menuChoice('auto', 'Automatic', false, () => calls.push('auto')),
+            menuChoice('jpn', 'Japanese · AAC 2.0', true, () => calls.push('jpn'), 'Direct Play'),
+        ]} onSelected={() => calls.push('closed')} />);
+
+        expect(screen.getByRole('menuitemradio', { name: /Japanese/ })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('menuitemradio', { name: 'Automatic' })).toHaveAttribute('aria-checked', 'false');
+        expect(screen.getByText('Direct Play')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Automatic' }));
+        expect(calls).toEqual(['closed', 'auto']);
+    });
+
     it('closes the menu before running what was picked', () => {
         const calls: string[] = [];
         render(<ActionMenuList entries={entries(calls)} onSelected={() => calls.push('closed')} />);

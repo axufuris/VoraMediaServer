@@ -6,7 +6,7 @@ interface AudioTrackLike {
 }
 
 // The audio chip on a details page has to name the track that will actually
-// play, which is the one selected in Quality & tracks. Naming the "best" track
+// play: the one the server will play or the viewer picked. Naming the "best" track
 // on the version instead said TRUEHD 8ch over a file that was about to play
 // AAC 2ch.
 export function pickChipAudioTrack<T extends AudioTrackLike>(tracks: T[] | undefined, selectedAudioId?: string | null): T | undefined {

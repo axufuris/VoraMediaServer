@@ -31,6 +31,28 @@ export interface StreamDecisionPreview {
     videoStrategy: string;
     audioStrategy: string;
     targetAudioChannels: number;
+    // The version or track picked (now or remembered) would have had to be
+    // converted on this device, so the server plays the closest one that doesn't.
+    pickReplaced?: boolean;
+}
+
+export type PlaybackChoiceKind = 'Version' | 'Audio' | 'Subtitles';
+
+// What this profile picked for a movie or show on this device. The server
+// applies it to every episode by language, edition and format, so it carries
+// no track ids.
+export interface RememberedChoice {
+    remembersVersion: boolean;
+    remembersAudio: boolean;
+    subtitle: 'Automatic' | 'Off' | 'Language';
+}
+
+export interface RememberChoiceChange {
+    mediaPartId?: string;
+    audioTrackId?: string;
+    subtitleTrackId?: string;
+    subtitlesOff?: boolean;
+    forget?: PlaybackChoiceKind[];
 }
 
 export interface StreamDecisionQuestion {
@@ -79,6 +101,16 @@ export const streamingService = {
         }, { serverId });
 
         return response.data as StreamDecisionPreview;
+    },
+    getRememberedChoice: async (mediaId: string, serverId?: string) => {
+        const response = await apiClient.get(`/streaming/choices/${mediaId}`, { serverId });
+        return response.data as RememberedChoice;
+    },
+    // mediaId is the item whose tracks were picked from (the episode on a
+    // show's page); the choice is kept for its movie or show.
+    rememberChoice: async (mediaId: string, change: RememberChoiceChange, serverId?: string) => {
+        const response = await apiClient.put(`/streaming/choices/${mediaId}`, change, { serverId });
+        return response.data as RememberedChoice;
     },
     startExtraSession: async (extraId: string, startPosition: number = 0, serverId?: string) => {
         const capabilities = await scanDeviceCapabilities();

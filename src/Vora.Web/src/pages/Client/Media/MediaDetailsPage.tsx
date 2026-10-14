@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mediaService, type MediaItem, type MediaPart } from '../../../api/Media/mediaService';
+import { mediaService, type MediaItem } from '../../../api/Media/mediaService';
 import CastRow from '../../../components/Client/Primitives/CastRow';
 import MediaExtrasRow from '../../../components/Media/MediaExtrasRow';
 import MediaEpisodesList from '../../../components/Media/MediaEpisodesList';
@@ -8,8 +8,6 @@ import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { streamingService } from '../../../api/Streaming/streamingService';
 import { getEffectiveCapabilities } from '../../../utils/hardwareScanner';
-import { pickBestAudioTrack } from '../../../utils/audioTrackSelection';
-import { isVideoDirectPlayable, isAudioDirectPlayable, parseResolutionHeight } from '../../../utils/playbackDecision';
 import { useDialog } from '../../../dialogs';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import DetailHero, { HeroChip, HeroCredits, HeroIconButton } from '../../../components/Client/Primitives/DetailHero';
@@ -19,22 +17,22 @@ import { PlayIcon, RestartIcon, FilmReelIcon, BookmarkIcon, CheckIcon, MoreIcon,
 import { watchlistService } from '../../../api/Watchlist/watchlistService';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
-import QualityPanel, { QualityPanelSection, type QualityOption } from '../../../components/Client/Primitives/QualityPanel';
 import StarRating from '../../../components/Client/Primitives/StarRating';
 import RateDialog from '../../../components/Client/Primitives/RateDialog';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { formatRuntime } from '../../../utils/formatRuntime';
 import { isFullyWatched } from '../../../utils/watchState';
 import { burnInSubtitleId, isNoSubtitle } from '../../../utils/subtitleKind';
-import { useServerPlaybackChoice } from '../../../hooks/useServerPlaybackChoice';
+import { useTitleTrackChoices } from '../../../hooks/useTitleTrackChoices';
+import TrackChoiceChips from '../../../components/Media/TrackChoiceChips';
 import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
-import { audioChipLabel, heroFactsLine, pickChipAudioTrack, resolutionChipLabel, subtitleChipLabel } from '../../../utils/heroQualityChips';
+import { heroFactsLine, pickChipAudioTrack } from '../../../utils/heroQualityChips';
 import { playTargetFor } from '../../../utils/playTarget';
 import { formatDate, serverTimeMs, yearOf } from '../../../utils/serverTime';
 import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
 import { errorDetail, isMissingOrForbidden } from '../../../utils/apiError';
 import { ActionMenuList } from '../../../components/Client/Primitives/ActionMenu';
-import { menuAction, tidyMenu } from '../../../components/Client/Primitives/menuEntries';
+import { tidyMenu } from '../../../components/Client/Primitives/menuEntries';
 import { mediaMenuTarget } from '../../../components/Media/ItemMenu/mediaItemMenu';
 import { useMediaItemActions } from '../../../components/Media/ItemMenu/useMediaItemActions';
 import { toggleWatched, toggleWatchlist } from '../../../components/Media/ItemMenu/watchActions';
@@ -58,13 +56,7 @@ export default function MediaDetailsPage() {
     const [showMenu, setShowMenu] = useState(false);
     const [playingTrailer, setPlayingTrailer] = useState<TrailerSource | null>(null);
     const [inWatchlist, setInWatchlist] = useState(false);
-    const [isQualityPanelOpen, setIsQualityPanelOpen] = useState(false);
     const [isRateOpen, setIsRateOpen] = useState(false);
-
-    const [selectedVideoId, setSelectedVideoId] = useState<string>('');
-    const [selectedAudioId, setSelectedAudioId] = useState<string>('');
-    const [hasManualAudioSelection, setHasManualAudioSelection] = useState(false);
-    const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>('none');
 
     const [upNextQuality, setUpNextQuality] = useState<{ showId: string; episode: MediaItem | null } | null>(null);
     const qualityMedia = !media
@@ -79,7 +71,6 @@ export default function MediaDetailsPage() {
     const [overlaysForId, setOverlaysForId] = useState(id);
     if (overlaysForId !== id) {
         setOverlaysForId(id);
-        setIsQualityPanelOpen(false);
         setShowMenu(false);
         setInWatchlist(false);
     }
@@ -92,15 +83,7 @@ export default function MediaDetailsPage() {
         return getEffectiveCapabilities(profileId, deviceId);
     }, []);
     const { playMedia, isPlaying } = usePlayer();
-    const serverChoice = useServerPlaybackChoice(serverId);
-
-    // Pick the audio track the client can play directly under the effective
-    // caps: prefer a directly-playable track (codec + channels within the
-    // Max Audio Channels cap), then prefer more channels among the playable
-    // ones (commentary tracks deprioritized). Never picks on IsDefault alone.
-    const pickBestAudioId = useCallback((part?: MediaPart): string => {
-        return pickBestAudioTrack(part?.audioTracks, caps)?.id ?? '';
-    }, [caps]);
+    const tracks = useTitleTrackChoices(qualityMedia, caps, serverId);
 
     const reloadMedia = useCallback(async () => {
         if (!id) return;
@@ -184,64 +167,6 @@ export default function MediaDetailsPage() {
     }, [media, serverId]);
 
     useEffect(() => {
-        let replaced = false;
-        if (qualityMedia?.mediaParts?.length) {
-            const parts = qualityMedia.mediaParts;
-            const partHeight = (p: MediaPart) => parseResolutionHeight(p.resolution);
-
-            // Prefer the highest-resolution part that fits under the effective
-            // Max Resolution cap (unknown height counts as fitting). If every
-            // part exceeds the cap, still pick the highest — the server will
-            // transcode it down.
-            const withinCap = parts.filter(p => partHeight(p) === 0 || partHeight(p) <= caps.requestedMaxResolution);
-            const pool = withinCap.length ? withinCap : parts;
-            let winningPart = pool[0];
-            for (const p of pool) {
-                if (partHeight(p) > partHeight(winningPart)) winningPart = p;
-            }
-
-            const videoTracks = winningPart.videoTracks || [];
-            const directVideo = videoTracks.find(t => isVideoDirectPlayable(t, winningPart, caps));
-            const defaultVideo = videoTracks.find(t => t.isDefault) || videoTracks[0];
-            const bestVideoId = (directVideo || defaultVideo)?.id || '';
-
-            const bestAudioId = pickBestAudioId(winningPart);
-
-            let bestSubId = 'none';
-            if (winningPart.subtitleTracks?.length) {
-                const bestSub = winningPart.subtitleTracks.find(s => s.isForced || s.isDefault);
-                if (bestSub) bestSubId = bestSub.id;
-            }
-
-            setTimeout(() => {
-                setSelectedVideoId(prev => prev !== bestVideoId ? bestVideoId : prev);
-                setSelectedAudioId(prev => prev !== bestAudioId ? bestAudioId : prev);
-                setHasManualAudioSelection(false);
-                setSelectedSubtitleId(prev => prev !== bestSubId ? bestSubId : prev);
-            }, 0);
-
-            // The picks above are a local guess that shows at once. The server
-            // makes the real choice, so ask it and show its answer. A subtitle
-            // that has to be burned in belongs to one version, so that version
-            // is the one asked about.
-            const burnIn = burnInSubtitleId(winningPart.subtitleTracks, bestSubId);
-            const pinned = burnIn ? { mediaPartId: winningPart.id, videoTrackId: bestVideoId, subtitleTrackId: burnIn } : undefined;
-            serverChoice.ask(qualityMedia.id, pinned).then(choice => {
-                if (replaced || !choice) return;
-                const chosenPart = parts.find(p => p.id === choice.mediaPartId);
-                if (!chosenPart) return;
-                setSelectedVideoId(choice.videoTrackId);
-                setSelectedAudioId(choice.audioTrackId);
-                setHasManualAudioSelection(false);
-                if (chosenPart.id !== winningPart.id) {
-                    setSelectedSubtitleId(chosenPart.subtitleTracks?.find(s => s.isForced || s.isDefault)?.id ?? 'none');
-                }
-            });
-        }
-        return () => { replaced = true; };
-    }, [qualityMedia, caps, pickBestAudioId, serverChoice]);
-
-    useEffect(() => {
         if (!isPlaying && id) {
             const timer = setTimeout(() => reloadMedia(), 500);
             return () => clearTimeout(timer);
@@ -275,20 +200,20 @@ export default function MediaDetailsPage() {
 
         try {
 
-            const activePart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === selectedVideoId)) || qualityMedia?.mediaParts?.[0];
+            const activePart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === tracks.videoId)) || qualityMedia?.mediaParts?.[0];
 
             // Only a burn-in (image) subtitle is the server's business — it has
             // to re-encode for one. A text subtitle is sideloaded by the player
             // after playback starts, so sending it here would only make the play
             // request wait on an extraction it doesn't need.
-            const wantsBurnIn = burnInSubtitleId(activePart?.subtitleTracks, selectedSubtitleId) !== undefined;
-            const textSubtitleTrackId = !isNoSubtitle(selectedSubtitleId) && !wantsBurnIn ? selectedSubtitleId : null;
-            const subId = wantsBurnIn ? selectedSubtitleId : '00000000-0000-0000-0000-000000000000';
+            const wantsBurnIn = burnInSubtitleId(activePart?.subtitleTracks, tracks.subtitleId) !== undefined;
+            const textSubtitleTrackId = !isNoSubtitle(tracks.subtitleId) && !wantsBurnIn ? tracks.subtitleId : null;
+            const subId = wantsBurnIn ? tracks.subtitleId : '00000000-0000-0000-0000-000000000000';
 
-            const sessionInfo = await streamingService.startSession(item.id, deviceId, startPos, selectedVideoId || undefined,
-                hasManualAudioSelection ? selectedAudioId || undefined : undefined, subId, serverId, activePart?.id);
+            const sessionInfo = await streamingService.startSession(item.id, deviceId, startPos, tracks.videoId || undefined,
+                tracks.audioPickedHere ? tracks.audioId || undefined : undefined, subId, serverId, activePart?.id);
 
-            const activeVideoTrack = activePart?.videoTracks?.find(v => v.id === selectedVideoId) || activePart?.videoTracks?.[0];
+            const activeVideoTrack = activePart?.videoTracks?.find(v => v.id === tracks.videoId) || activePart?.videoTracks?.[0];
             const activeAudioTrack = pickChipAudioTrack(activePart?.audioTracks, sessionInfo.audioTrackId);
 
             playMedia({
@@ -332,59 +257,6 @@ export default function MediaDetailsPage() {
         }
     }, [media, isAdmin, serverId, dialog, reloadMedia]);
 
-    const handleVersionChange = (partId: string) => {
-        const part = qualityMedia?.mediaParts?.find(p => p.id === partId);
-        if (!part) return;
-        const bestVideo = part.videoTracks?.find(v => v.isDefault) || part.videoTracks?.[0];
-        if (bestVideo) handleVideoChange(bestVideo.id);
-    };
-
-    // Shows the audio track the server would play for the version on screen.
-    const showServerAudioFor = (part: MediaPart, videoTrackId: string, subtitleId: string) => {
-        if (!qualityMedia) return;
-        const pinned = { mediaPartId: part.id, videoTrackId, subtitleTrackId: burnInSubtitleId(part.subtitleTracks, subtitleId) };
-        serverChoice.ask(qualityMedia.id, pinned).then(choice => {
-            if (choice?.mediaPartId === part.id) setSelectedAudioId(choice.audioTrackId);
-        });
-    };
-
-    const handleVideoChange = (newVideoId: string) => {
-        setSelectedVideoId(newVideoId);
-        const newPart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === newVideoId));
-
-        if (newPart) {
-            // Switching version/video always re-selects the audio the client can
-            // play; only a manual audio pick keeps a track the client can't.
-            if (newPart.audioTracks?.length) setSelectedAudioId(pickBestAudioId(newPart));
-            setHasManualAudioSelection(false);
-
-            let subtitleId = selectedSubtitleId;
-            const hasCurrentSub = selectedSubtitleId === 'none' || newPart.subtitleTracks?.some(s => s.id === selectedSubtitleId);
-            if (!hasCurrentSub && newPart.subtitleTracks?.length) {
-                const bestSub = newPart.subtitleTracks.find(s => s.isForced || s.isDefault);
-                subtitleId = bestSub ? bestSub.id : 'none';
-                setSelectedSubtitleId(subtitleId);
-            }
-
-            showServerAudioFor(newPart, newVideoId, subtitleId);
-        }
-    };
-
-    const handleAudioChange = (audioId: string) => {
-        serverChoice.forget();
-        setSelectedAudioId(audioId);
-        setHasManualAudioSelection(true);
-    };
-
-    // Burning a subtitle in re-encodes the video, which can change the audio
-    // track that plays, so the server is asked again unless the viewer has
-    // picked the audio track themselves.
-    const handleSubtitleChange = (subtitleId: string) => {
-        setSelectedSubtitleId(subtitleId);
-        const part = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === selectedVideoId));
-        if (part && !hasManualAudioSelection) showServerAudioFor(part, selectedVideoId, subtitleId);
-    };
-
     if (loading) {
         return (
             <div>
@@ -408,62 +280,10 @@ export default function MediaDetailsPage() {
         );
     }
 
-    const activePart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === selectedVideoId)) || qualityMedia?.mediaParts?.[0];
+    const activePart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === tracks.videoId)) || qualityMedia?.mediaParts?.[0];
     const resumePos = media.resumePositionSeconds || 0;
     const inProgress = resumePos > 0 && !media.isPlayed;
     const isFullyPlayed = isFullyWatched(media);
-
-    const sortedVideoTracks = qualityMedia?.mediaParts?.flatMap(p =>
-        (p.videoTracks || []).map(v => ({ part: p, track: v }))
-    ).sort((a, b) => {
-        const aIs4k = a.part.resolution?.toLowerCase().includes('4k') || a.part.resolution?.includes('2160') ? 1 : 0;
-        const bIs4k = b.part.resolution?.toLowerCase().includes('4k') || b.part.resolution?.includes('2160') ? 1 : 0;
-        if (aIs4k !== bIs4k) return bIs4k - aIs4k;
-        return a.track.isDefault === b.track.isDefault ? 0 : a.track.isDefault ? -1 : 1;
-    }) || [];
-
-    const sortedAudioTracks = activePart?.audioTracks
-        ? [...activePart.audioTracks].sort((a, b) => (b.channels || 0) - (a.channels || 0))
-        : [];
-
-    // What the chips advertise is what Quality & tracks has selected, not the
-    // richest track the file happens to carry.
-    const chipAudioLabel = audioChipLabel(pickChipAudioTrack(activePart?.audioTracks, selectedAudioId));
-
-    const videoOptions: QualityOption<string>[] = sortedVideoTracks.map(v => {
-        const displayRes = v.part.resolution === '2160p' ? '4K' : (v.part.resolution || 'Unknown');
-        const playbackBadge = isVideoDirectPlayable(v.track, v.part, caps) ? 'Direct Play' : 'Transcode';
-        return {
-            value: v.track.id,
-            label: `${displayRes} · ${v.track.codec?.toUpperCase() ?? '—'}`,
-            sublabel: [v.track.hdrType, v.track.isDefault ? 'Default' : null, playbackBadge].filter(Boolean).join(' · ') || undefined,
-        };
-    });
-    const audioOptions: QualityOption<string>[] = sortedAudioTracks.map(a => ({
-        value: a.id,
-        label: `${a.language || 'Unknown'} · ${a.codec?.toUpperCase() ?? '—'}${a.channels ? ` · ${a.channels}ch` : ''}`,
-        sublabel: [a.title, a.isDefault ? 'Default' : null, isAudioDirectPlayable(a, caps) ? 'Direct Play' : 'Transcode'].filter(Boolean).join(' · ') || undefined,
-    }));
-    const subtitleOptions: QualityOption<string>[] = [
-        { value: 'none', label: 'Off' },
-        ...(activePart?.subtitleTracks ?? []).map(s => ({
-            value: s.id,
-            label: s.language || 'Unknown',
-            sublabel: [s.title, s.isForced ? 'Forced' : null, s.isHearingImpaired ? 'SDH' : null, s.isDefault ? 'Default' : null].filter(Boolean).join(' · ') || undefined,
-        })),
-    ];
-    const versionOptions: QualityOption<string>[] = [...(qualityMedia?.mediaParts ?? [])]
-        .sort((a, b) => parseResolutionHeight(b.resolution) - parseResolutionHeight(a.resolution) || (b.bitrateKbps ?? 0) - (a.bitrateKbps ?? 0))
-        .map((p, i) => {
-            const displayRes = p.resolution === '2160p' ? '4K' : (p.resolution || `Version ${i + 1}`);
-            const partVideo = (p.videoTracks || []).find(t => t.isDefault) || (p.videoTracks || [])[0];
-            const playbackBadge = partVideo && isVideoDirectPlayable(partVideo, p, caps) ? 'Direct Play' : 'Transcode';
-            return {
-                value: p.id,
-                label: p.edition || displayRes,
-                sublabel: [p.edition ? displayRes : null, p.bitrateKbps ? `${Math.round(p.bitrateKbps / 1000)} Mbps` : null, playbackBadge].filter(Boolean).join(' · ') || undefined,
-            };
-        });
 
     let nextEpisode: UpcomingEpisodeParsed | null = null;
     if (media.upcomingEpisodesJson && media.upcomingEpisodesJson !== '[]') {
@@ -484,11 +304,7 @@ export default function MediaDetailsPage() {
     const isSeason = media.type === 'Season';
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = isSeason ? seasonName(media.seasonNumber, media.title) : isEpisode ? media.title : undefined;
-    const showQualityButton = (media.type === 'Movie' || isEpisode || media.type === 'TvShow') && (versionOptions.length > 1 || sortedVideoTracks.length > 1 || sortedAudioTracks.length > 1 || (activePart?.subtitleTracks?.length ?? 0) > 0);
-    const moreEntries = tidyMenu([
-        ...(showQualityButton ? [menuAction('quality', 'Quality & tracks', () => setIsQualityPanelOpen(true))] : []),
-        ...itemActions.entries,
-    ]);
+    const moreEntries = tidyMenu(itemActions.entries);
     const playLabel = media.type === 'TvShow' ? 'Play next' : inProgress ? 'Resume' : 'Play';
     const playRuntime = formatRuntime(media.durationMinutes);
 
@@ -506,14 +322,16 @@ export default function MediaDetailsPage() {
         </>
     ) : null;
 
-    const resolutionLabel = resolutionChipLabel(activePart?.resolution);
-    const subtitleLabel = subtitleChipLabel(activePart?.subtitleTracks, selectedSubtitleId);
-    const heroTechChips = (resolutionLabel || chipAudioLabel || subtitleLabel) ? (
-        <>
-            {resolutionLabel && <HeroChip tone="accent">{resolutionLabel}</HeroChip>}
-            {chipAudioLabel && <HeroChip>{chipAudioLabel}</HeroChip>}
-            {subtitleLabel && <HeroChip>{subtitleLabel}</HeroChip>}
-        </>
+    const heroTechChips = qualityMedia ? (
+        <TrackChoiceChips
+            item={qualityMedia} activePart={activePart} caps={caps}
+            videoId={tracks.videoId} audioId={tracks.audioId} subtitleId={tracks.subtitleId}
+            remembered={tracks.remembered} pickReplaced={tracks.pickReplaced}
+            onPickVersion={partId => { void tracks.pickVersion(partId); }}
+            onPickAudio={audioId => { void tracks.pickAudio(audioId); }}
+            onPickSubtitle={subtitleId => { void tracks.pickSubtitle(subtitleId); }}
+            onChooseAutomatically={kind => { void tracks.chooseAutomatically(kind); }}
+        />
     ) : null;
 
     const heroRatings = (
@@ -641,19 +459,6 @@ export default function MediaDetailsPage() {
             )}
             {itemActions.dialogs}
             <TrailerOverlay trailer={playingTrailer} onClose={() => setPlayingTrailer(null)} />
-
-            <QualityPanel open={isQualityPanelOpen} onClose={() => setIsQualityPanelOpen(false)}>
-                {versionOptions.length > 1 && (
-                    <QualityPanelSection title="Version" options={versionOptions} value={activePart?.id ?? ''} onChange={handleVersionChange} />
-                )}
-                {videoOptions.length > 0 && (
-                    <QualityPanelSection title="Video" options={videoOptions} value={selectedVideoId} onChange={handleVideoChange} />
-                )}
-                {audioOptions.length > 0 && (
-                    <QualityPanelSection title="Audio" options={audioOptions} value={selectedAudioId} onChange={handleAudioChange} />
-                )}
-                <QualityPanelSection title="Subtitles" options={subtitleOptions} value={selectedSubtitleId} onChange={handleSubtitleChange} />
-            </QualityPanel>
 
             <DetailHero
                 backdropSrc={media.backgroundUrl || media.posterUrl}
