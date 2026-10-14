@@ -55,6 +55,7 @@ public class BackupSectionsTests : IClassFixture<VoraApiTestFactory>
     [InlineData("users.profiles", "users.playlists")]
     [InlineData("users.profiles", "podcasts.listening")]
     [InlineData("users.devices", "users.watch-history")]
+    [InlineData("users.profiles", "users.playback-choices")]
     [InlineData("library.collections", "library.smart-lists")]
     [InlineData("iptv.playlists", "iptv.tuner-profiles")]
     [InlineData("iptv.playlists", "iptv.channel-settings")]

@@ -183,7 +183,7 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
     }
 
     [Fact]
-    public async Task A_database_on_the_migration_before_this_one_only_gains_the_local_metadata_choices_switched_off()
+    public async Task A_database_from_before_local_metadata_gains_the_local_metadata_choices_switched_off()
     {
         Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -211,6 +211,40 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         kept.LocalMetadataMode.Should().Be(LocalMetadataMode.Off);
         kept.PreferLocalArtwork.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task A_database_on_the_migration_before_this_one_only_gains_the_table_of_remembered_playback_choices()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var libraryId = Guid.NewGuid();
+        await legacy.BuildLocalMetadataStateAsync(async db =>
+        {
+            db.Add(new MediaLibrary { Id = libraryId, Name = "Shows", Type = LibraryType.TvShow, FolderPaths = ["/shows"], LocalMetadataMode = LocalMetadataMode.Prefer });
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await TablesAsync(before, cancellationToken)).Should().NotContain("ProfileTitlePlaybackChoices");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        (await TablesAsync(after, cancellationToken)).Should().Contain("ProfileTitlePlaybackChoices");
+        (await after.ProfileTitlePlaybackChoices.CountAsync(cancellationToken)).Should().Be(0);
+        var kept = await after.Set<MediaLibrary>().AsNoTracking().SingleAsync(l => l.Id == libraryId, cancellationToken);
+        kept.LocalMetadataMode.Should().Be(LocalMetadataMode.Prefer);
+    }
+
+    private static Task<List<string>> TablesAsync(VoraDbContext db, CancellationToken cancellationToken) =>
+        db.Database
+            .SqlQueryRaw<string>("SELECT table_name AS \"Value\" FROM information_schema.tables WHERE table_schema = current_schema()")
+            .ToListAsync(cancellationToken);
 
     private static Task<List<string>> LibraryColumnsAsync(VoraDbContext db, CancellationToken cancellationToken) =>
         db.Database

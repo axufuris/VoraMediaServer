@@ -10,7 +10,7 @@ namespace Vora.Application.Streaming;
 
 public interface IBestPathDecisionManager
 {
-    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null);
+    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null);
 }
 
 public class BestPathDecisionManager : IBestPathDecisionManager
@@ -28,9 +28,14 @@ public class BestPathDecisionManager : IBestPathDecisionManager
     {
         public StreamDecisionDto Decision { get; set; } = new();
         public int PenaltyScore { get; set; }
+        public bool Exact { get; set; }
+        public bool Family { get; set; }
+        public bool VideoUntouched { get; set; }
+        public bool AudioUntouched { get; set; }
+        public StreamOptionLogDto? Log { get; set; }
     }
 
-    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null)
+    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
         var audioLimits = AudioOutputLimits.Resolve(client.MaxAudioChannels, audioOutput, settings.StreamingProfile);
@@ -41,18 +46,14 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         var options = new List<StreamOption>();
         var decisionLogs = new List<StreamOptionLogDto>();
 
-        var partsToEvaluate = (requestedMediaPartId.HasValue
-            ? mediaItem.Parts.Where(p => p.Id == requestedMediaPartId.Value)
-            : mediaItem.Parts).ToList();
-        if (partsToEvaluate.Count == 0) partsToEvaluate = mediaItem.Parts.ToList();
+        var wish = PlaybackWish.For(mediaItem, requestedMediaPartId, requestedVideoId, requestedAudioId, requestedSubtitleId, remembered);
 
-        foreach (var part in partsToEvaluate)
+        foreach (var part in mediaItem.Parts)
         {
-            var videoTracksToEvaluate = requestedVideoId.HasValue
-                ? part.VideoTracks.Where(v => v.Id == requestedVideoId.Value).ToList()
-                : CoverImageTracks.Without(part.VideoTracks, track => track.Codec);
-
-            var videoTrack = videoTracksToEvaluate.FirstOrDefault(t => t.IsDefault) ?? videoTracksToEvaluate.FirstOrDefault();
+            var videoTracksToEvaluate = CoverImageTracks.Without(part.VideoTracks, track => track.Codec);
+            var videoTrack = part.VideoTracks.FirstOrDefault(t => wish.Version?.VideoTrackId == t.Id)
+                ?? videoTracksToEvaluate.FirstOrDefault(t => t.IsDefault)
+                ?? videoTracksToEvaluate.FirstOrDefault();
             if (videoTrack == null) continue;
 
             var videoCodec = videoTrack.Codec?.ToLower() ?? "";
@@ -92,28 +93,16 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             var primaryAudioTrack = audioInFileOrder.FirstOrDefault(t => t.IsDefault) ?? audioInFileOrder.FirstOrDefault();
             bool everyPlayerStartsOnPrimary = primaryAudioTrack?.Id == audioInFileOrder.FirstOrDefault()?.Id;
 
-            SubtitleStreamInfoDto? subTrack = null;
-            if (requestedSubtitleId.HasValue)
-            {
-                if (requestedSubtitleId.Value != Guid.Empty)
-                    subTrack = part.SubtitleTracks.FirstOrDefault(s => s.Id == requestedSubtitleId.Value);
-            }
-            else
-            {
-                subTrack = PickAutomaticSubtitle(part.SubtitleTracks, primaryAudioTrack?.Language, settings);
-            }
+            var subTrack = wish.SubtitleFor(part, () => PickAutomaticSubtitle(part.SubtitleTracks, primaryAudioTrack?.Language, settings));
 
             var subCodec = subTrack?.Codec?.ToLower() ?? "";
             bool requiresBurnIn = subTrack != null && IsImageSubtitleCodec(subCodec);
 
-            var audioTracksToEvaluate = requestedAudioId.HasValue
-                ? part.AudioTracks.Where(a => a.Id == requestedAudioId.Value).ToList()
-                : part.AudioTracks;
-
-            if (!audioTracksToEvaluate.Any() && requestedAudioId.HasValue) audioTracksToEvaluate = part.AudioTracks;
-            if (!requestedAudioId.HasValue)
+            var wishedAudio = wish.Audio == null ? [] : part.AudioTracks.Where(wish.AudioFamily).ToList();
+            var audioTracksToEvaluate = wishedAudio.Count > 0 ? wishedAudio : part.AudioTracks;
+            if (wishedAudio.Count == 0)
             {
-                var mainTracks = audioTracksToEvaluate.Where(track => !IsCommentary(track)).ToList();
+                var mainTracks = audioTracksToEvaluate.Where(track => !PlaybackWish.IsCommentary(track)).ToList();
                 if (mainTracks.Count > 0) audioTracksToEvaluate = mainTracks;
                 if (MetadataLanguageCodes.Normalize(primaryAudioTrack?.Language) != null)
                 {
@@ -175,6 +164,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     && !string.IsNullOrEmpty(videoCodec)
                     && !hlsVideo.Contains(videoCodec);
                 needsVideoTranscode |= videoReencodedForHls;
+                bool videoConvertsForItself = codecUnsupported || exceedsBandwidth || hdrNotRenderable || bitDepthTooHigh || trackHeight > clientMaxRes || videoReencodedForHls;
 
                 var conversion = audioLimits.ConversionOf(trackChannels, clientPlaysDolbyDigital);
                 int heardChannels = needsAudioTranscode ? conversion.Channels : trackChannels;
@@ -182,6 +172,10 @@ public class BestPathDecisionManager : IBestPathDecisionManager
 
                 var option = new StreamOption
                 {
+                    Exact = wish.VersionExact(part, videoTrack) && wish.AudioExact(audioTrack),
+                    Family = wish.VersionFamily(part) && wish.AudioFamily(audioTrack),
+                    VideoUntouched = !videoConvertsForItself,
+                    AudioUntouched = !needsAudioTranscode && !videoReencodedForHls,
                     Decision = new StreamDecisionDto
                     {
                         SelectedMediaPartId = part.Id,
@@ -315,7 +309,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 currentScore += audioLimits.FitPenalty(trackChannels, heardChannels, heardCodec, needsAudioTranscode);
                 if (videoReencodedForHls) currentScore += HlsVideoCarriage.ReencodePenalty;
 
-                if (IsCommentary(audioTrack))
+                if (PlaybackWish.IsCommentary(audioTrack))
                 {
                     currentScore += 500;
                     reasons.Add("[Commentary Track Penalized]");
@@ -352,7 +346,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
 
                 options.Add(option);
 
-                decisionLogs.Add(new StreamOptionLogDto
+                var log = new StreamOptionLogDto
                 {
                     MediaPartId = part.Id,
                     PenaltyScore = option.PenaltyScore,
@@ -364,19 +358,47 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     ClientMaxHeight = clientMaxRes,
                     DeliverableHeight = deliverableMaxRes,
                     OutputHeight = deliveredHeight
-                });
+                };
+                option.Log = log;
+                decisionLogs.Add(log);
             }
         }
 
         if (!options.Any()) throw new InvalidOperationException("No valid media parts or tracks found to stream.");
 
-        var bestOption = options.OrderBy(o => o.PenaltyScore).First();
+        var pool = PoolFor(options, wish, settings.StreamingProfile);
+        foreach (var option in options)
+        {
+            if (option.Log != null) option.Log.Considered = pool.Contains(option);
+        }
+
+        var bestOption = pool.OrderBy(o => o.PenaltyScore).First();
+        if (wish.NarrowsChoice && !bestOption.Exact)
+        {
+            bestOption.Decision.PickReplaced = true;
+            bestOption.Decision.Reason += " Pick: the chosen version or track is not here as it is or would have to be converted, so the closest one that plays was chosen.";
+        }
         bestOption.Decision.EvaluatedOptions = decisionLogs;
         return bestOption.Decision;
     }
 
-    private static bool IsCommentary(TrackStreamInfoDto track) =>
-        track.Title?.Contains("commentary", StringComparison.OrdinalIgnoreCase) == true;
+    private static List<StreamOption> PoolFor(List<StreamOption> options, PlaybackWish wish, StreamingProfile profile)
+    {
+        if (!wish.NarrowsChoice) return options;
+
+        var exact = options.Where(o => o.Exact).ToList();
+        var family = options.Where(o => o.Family).ToList();
+        if (profile != StreamingProfile.ClientPreference)
+        {
+            bool PlaysAsPicked(StreamOption o) => (wish.Version == null || o.VideoUntouched) && (wish.Audio == null || o.AudioUntouched);
+            if (exact.Any(PlaysAsPicked)) return exact;
+            var familyThatPlays = family.Where(PlaysAsPicked).ToList();
+            if (familyThatPlays.Count > 0) return familyThatPlays;
+        }
+
+        if (exact.Count > 0) return exact;
+        return family.Count > 0 ? family : options;
+    }
 
     // Parse a video height from MediaPart.Resolution, which is a
     // freeform string that the analyzer produces. Supports common

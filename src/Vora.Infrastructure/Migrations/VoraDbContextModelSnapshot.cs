@@ -4021,6 +4021,76 @@ namespace Vora.Infrastructure.Migrations
                     b.ToTable("ProfileDeviceSettings");
                 });
 
+            modelBuilder.Entity("Vora.Domain.Entities.Users.ProfileTitlePlaybackChoice", b =>
+                {
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("TitleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AudioChannels")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AudioCodec")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("AudioIsCommentary")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("AudioLanguage")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Edition")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("HdrType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("RemembersAudio")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RemembersVersion")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Subtitle")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("SubtitleIsForced")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("SubtitleIsHearingImpaired")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("SubtitleLanguage")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("VersionHeight")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("VideoCodec")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("ProfileId", "DeviceId", "TitleId");
+
+                    b.HasIndex("TitleId");
+
+                    b.ToTable("ProfileTitlePlaybackChoices");
+                });
+
             modelBuilder.Entity("Vora.Domain.Entities.Users.RegistrationTicket", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5234,6 +5304,21 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.ProfileTitlePlaybackChoice", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Users.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vora.Domain.Entities.Media.MediaItem", null)
+                        .WithMany()
+                        .HasForeignKey("TitleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Vora.Domain.Entities.Users.UserAlbumRating", b =>

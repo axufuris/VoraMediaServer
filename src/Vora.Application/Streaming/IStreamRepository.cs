@@ -11,6 +11,10 @@ public interface IStreamRepository
     Task<List<NowPlayingSessionDto>> GetNowPlayingSessionsAsync(DateTime cutoffTime);
     Task<MediaStreamInfoDto?> GetMediaStreamInfoAsync(Guid mediaId);
     Task<Guid> ResolvePlayableMediaIdAsync(Guid mediaId, Guid? profileId);
+    Task<Guid> ResolveTitleIdAsync(Guid mediaId);
+    Task<ProfileTitlePlaybackChoice?> GetRememberedChoiceAsync(Guid profileId, string deviceId, Guid titleId);
+    Task SaveRememberedChoiceAsync(ProfileTitlePlaybackChoice choice);
+    Task ForgetRememberedChoiceAsync(Guid profileId, string deviceId, Guid titleId);
     Task<ClientDevice?> GetClientDeviceAsync(string deviceId);
     Task<StreamSession> CreateSessionAsync(StreamSession session);
     Task<StreamSession?> GetSessionAsync(Guid sessionId);

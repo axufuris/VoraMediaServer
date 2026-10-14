@@ -18,6 +18,7 @@ public class StreamDecisionDto
     public Guid SelectedVideoTrackId { get; set; }
     public Guid SelectedAudioTrackId { get; set; }
     public int SelectedAudioTrackPosition { get; set; }
+    public bool PickReplaced { get; set; }
     public int TargetAudioChannels { get; set; }
     public Guid? SelectedSubtitleTrackId { get; set; }
     public bool RequiresSubtitleBurnIn { get; set; }

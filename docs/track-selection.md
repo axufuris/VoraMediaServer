@@ -42,7 +42,7 @@ A pick above what was detected is honoured in every profile whenever a track in 
 
 In every profile:
 
-- Automatic stays in the default track's language and off commentary tracks. A track the viewer picked by hand is always the one played, converted if it has to be.
+- Automatic stays in the default track's language and off commentary tracks. What happens to a version or track the viewer picked is under **Picks** below.
 - Audio is converted only when the client cannot decode it, it has more channels than the hard limit, or the HLS stream cannot carry it.
 - The server never converts just to move between 5.1 and 7.1. Conversion is worth it to make a track playable or to keep surround instead of stereo.
 - The video is never re-encoded for the sake of audio when another track avoids it.
@@ -54,6 +54,28 @@ By profile:
 - **Bitrate.** Audio follows Client Preference. For the version it follows Direct: the largest version whose video plays as it is within the bitrate wins, and a version is converted only when none does. A conversion under this profile is encoded at the ladder bitrate for its height rather than at the limit.
 
 Direct and Bitrate both prefer a version whose video is untouched over re-encoding a larger one. Client Preference is the profile that re-encodes the larger one.
+
+## Picks
+
+A pick is a version, audio track or subtitle the viewer chose, either for this play (sent with the request) or remembered for the title (below). A pick sent with the request outranks a remembered one of the same kind. `PlaybackWish` turns both into what was picked (edition, height, codec and HDR of a version; language, commentary or not, codec and layout of a track; language and forced/SDH of a subtitle), so a pick also finds its match in another episode or another version.
+
+| Profile | The pick plays without converting | The pick would have to be converted |
+|---|---|---|
+| **Direct** | It plays. | The best option that plays without converting, in the same language and edition. Only if none does is the pick converted. |
+| **Bitrate** | It plays, if it is also within the bitrate. | The same, within the bitrate. |
+| **Client Preference** | It plays. | It plays, converted. |
+
+Whether a pick plays is judged only by what was picked: a version by its video, a track by its audio (and by whether it forces the video to be re-encoded for HLS). Whatever was not picked follows the profile's usual rules, so Bitrate still converts automatic audio to keep surround. A burned-in subtitle never counts against a pick. `BestPathDecisionManager.PoolFor` holds the rule; the decision says `pickReplaced` when it played something other than the pick, and the reason says why.
+
+## Remembered choices
+
+What a viewer picks on a title page or while watching is remembered **per profile, per device and per title** (`ProfileTitlePlaybackChoices`, keyed by profile, `X-Vora-Device-Id` and the movie or show; an episode or season counts as its show). Per device, because the same person's TV and phone play different codecs.
+
+- **What is kept:** the picked version's edition, height, codec and HDR; the audio track's language, commentary flag, codec and layout; subtitles off, or a language with its forced and SDH flags. No track ids, so a show's choice carries to every episode.
+- **Applied by the server** to every `/start` and `/decision` that does not name that kind itself, so next-episode autoplay, playlists and every client that leaves the choice to the server get it with no extra work.
+- **Missing in an episode:** a language or edition the episode does not have is ignored for that kind, and the automatic choice is used (for subtitles too, so forced subtitles still show).
+- **API:** `GET /api/streaming/choices/{mediaId}`, `PUT` with `mediaPartId`, `audioTrackId`, `subtitleTrackId` or `subtitlesOff` to remember a pick and `forget: ["Version" | "Audio" | "Subtitles"]` to hand a kind back to Automatic, `DELETE` to forget the title on this device. `mediaId` is the item whose tracks were picked from. `PlaybackChoiceManager` builds the row from the track; a track that is not part of the title is refused.
+- **Backups:** `users.playback-choices`, titles matched by identity on restore.
 
 ## Converted audio
 
@@ -102,8 +124,10 @@ The rule used to apply only to HEVC in a browser, only when audio was converted,
 ## The web client
 
 - `hardwareScanner.ts` reports `detectedAudioChannels` from `AudioContext.destination.maxChannelCount`, `pickedAudioChannels` from the saved `maxAudioChannels` preference, `playsAnyAudioLayout: true`, `canSwitchAudioTracks: false` and `hlsVideoCodecs`.
-- The details page asks `POST /api/streaming/decision` (`useServerPlaybackChoice`) and shows the version and audio track the server answers with. A local pick (`pickBestAudioTrack`) shows until the answer arrives and stays if the server cannot answer.
-- Play sends the version on screen, and an audio track id only when the viewer picked one by hand. Asking again after a version or burned-in subtitle change keeps the shown track honest.
+- The details page's resolution, audio and subtitle chips are menus (`TrackChoiceChips`, `HeroChoiceChip`), Plex style: **Automatic** plus each version or track, with what it would do here (Direct Play or Transcode). `useTitleTrackChoices` shows a local guess (`localTrackGuess`) at once, then asks `POST /api/streaming/decision` with no tracks named, so the server applies what was remembered and answers with the version, audio track and subtitle it will play. A pick is saved with `PUT /choices` and the server asked again; if it cannot be saved it still applies to this play.
+- When the server swapped a pick for one that plays (`pickReplaced`), a line under the chips says so.
+- Play sends the version on screen, the subtitle (a burned-in one by id, a text one is drawn by the player), and an audio track id only when a pick could not be saved.
+- A version, track or subtitle changed in the player is remembered the same way, as long as it is not an extra, Live TV or a recording.
 
 ## The matrix test
 
@@ -112,11 +136,11 @@ The rule used to apply only to HEVC in a browser, only when audio was converted,
 | File | Holds |
 |---|---|
 | `MatrixCatalog.cs` | Clients (with the codecs their HLS player takes), audio layouts, video files, situations (bitrate limits, subtitles, HDR downscale). |
-| `MatrixRunner.cs` | Builds the request the way a client would and records what the viewer would hear. |
+| `MatrixRunner.cs` | Builds the request the way a client would, including a track or version picked by hand, and records what the viewer would hear. Margins count only the options a pick allows (`StreamOptionLogDto.Considered`). |
 | `MatrixRules.cs` | The rules, written from what a client can play rather than from the scoring. |
 | `StreamDecisionMatrixTests.cs` | One test per rule; a failure lists the combinations that break it. |
 
-The normal run covers about 277,000 combinations in a few seconds. Set `VORA_STREAM_MATRIX=full` to run every one-, two- and three-track mix of 14 codec and layout types: about 11.4 million combinations in a few minutes. **Run the full set before changing a weight or a rule**, because the hand-picked set has missed real problems that the full set found.
+The normal run covers about 290,000 combinations in a few seconds. Set `VORA_STREAM_MATRIX=full` to run every one-, two- and three-track mix of 14 codec and layout types: about 12.3 million combinations in a few minutes. **Run the full set before changing a weight or a rule**, because the hand-picked set has missed real problems that the full set found.
 
 The last rule fails when two different kinds of outcome are within ten points of each other. It is there to catch a weight change that leaves a decision to chance.
 

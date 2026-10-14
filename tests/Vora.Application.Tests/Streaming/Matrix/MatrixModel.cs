@@ -36,9 +36,9 @@ public sealed record MatrixSituation(string Label, int LimitKbps = 0, string Lim
     public bool BurnsSubtitleIn => Subtitle is ImageSubtitle or ForcedImageSubtitle;
 }
 
-public sealed record MatrixScenario(MatrixTitle Title, MatrixClient Client, StreamingProfile Profile, int ChannelPick, int ResolutionPick, string? ManualTrack, MatrixSituation Situation)
+public sealed record MatrixScenario(MatrixTitle Title, MatrixClient Client, StreamingProfile Profile, int ChannelPick, int ResolutionPick, string? ManualTrack, MatrixSituation Situation, string? ManualVersion = null)
 {
-    public string Key => $"{Profile} | {Client.Name} | {Title.Label} | channels {(ChannelPick == 0 ? "Automatic" : ChannelPick)} | resolution {(ResolutionPick == 0 ? "Automatic" : ResolutionPick)} | track {ManualTrack ?? "Automatic"} | {Situation.Label}";
+    public string Key => $"{Profile} | {Client.Name} | {Title.Label} | channels {(ChannelPick == 0 ? "Automatic" : ChannelPick)} | resolution {(ResolutionPick == 0 ? "Automatic" : ResolutionPick)} | track {ManualTrack ?? "Automatic"} | version {ManualVersion ?? "Automatic"} | {Situation.Label}";
 
     public int MaxHeight => ResolutionPick > 0 ? Math.Min(ResolutionPick, Client.MaxHeight) : Client.MaxHeight;
 

@@ -81,6 +81,7 @@ public class VoraDbContext : DbContext
     public DbSet<UserProviderConnection> UserProviderConnections { get; set; }
     public DbSet<ProfileAccessSchedule> ProfileAccessSchedules { get; set; }
     public DbSet<ProfileDeviceSetting> ProfileDeviceSettings { get; set; }
+    public DbSet<ProfileTitlePlaybackChoice> ProfileTitlePlaybackChoices { get; set; }
     public DbSet<RegistrationTicket> RegistrationTickets { get; set; }
     public DbSet<PasswordResetTicket> PasswordResetTickets { get; set; }
     public DbSet<EmailChangeTicket> EmailChangeTickets { get; set; }
@@ -177,6 +178,7 @@ public class VoraDbContext : DbContext
         ConfigureProfiles(modelBuilder, converters);
         ConfigureProfileSchedules(modelBuilder);
         ConfigureProfileDeviceSettings(modelBuilder);
+        ConfigureProfileTitlePlaybackChoices(modelBuilder);
         ConfigureRegistrationTickets(modelBuilder);
         ConfigurePasswordResetTickets(modelBuilder);
         ConfigureEmailChangeTickets(modelBuilder);
@@ -887,6 +889,33 @@ public class VoraDbContext : DbContext
             entity.HasOne(e => e.Profile)
                   .WithMany(p => p.DeviceSettings)
                   .HasForeignKey(e => e.ProfileId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureProfileTitlePlaybackChoices(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ProfileTitlePlaybackChoice>(entity =>
+        {
+            entity.HasKey(e => new { e.ProfileId, e.DeviceId, e.TitleId });
+            entity.Property(e => e.DeviceId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.Edition).HasMaxLength(128);
+            entity.Property(e => e.VideoCodec).HasMaxLength(32);
+            entity.Property(e => e.HdrType).HasMaxLength(32);
+            entity.Property(e => e.AudioLanguage).HasMaxLength(16);
+            entity.Property(e => e.AudioCodec).HasMaxLength(32);
+            entity.Property(e => e.SubtitleLanguage).HasMaxLength(16);
+
+            entity.HasIndex(e => e.TitleId);
+
+            entity.HasOne<UserProfile>()
+                  .WithMany()
+                  .HasForeignKey(e => e.ProfileId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne<MediaItem>()
+                  .WithMany()
+                  .HasForeignKey(e => e.TitleId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

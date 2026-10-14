@@ -122,6 +122,10 @@ public class StreamManager : IStreamManager
         var client = await _repository.GetClientDeviceAsync(deviceId);
         if (client == null) throw new InvalidOperationException("Unknown Device.");
 
+        var remembered = profileId.HasValue
+            ? await _repository.GetRememberedChoiceAsync(profileId.Value, deviceId, await _repository.ResolveTitleIdAsync(mediaId))
+            : null;
+
         var settings = await _settingsRepo.GetSettingsAsync();
 
         if (capabilities != null)
@@ -183,7 +187,7 @@ public class StreamManager : IStreamManager
             }
         }
 
-        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput, capabilities?.HlsVideoCodecs);
+        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput, capabilities?.HlsVideoCodecs, remembered);
 
         return (decision, mediaInfo, client, mediaId);
     }

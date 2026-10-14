@@ -30,6 +30,7 @@ Implementations live in `Vora.Infrastructure/Backups/Sections/`. `EntityTableBac
 | `templates.client-schedules`, `templates.email`, `templates.overlay` | template schedules, email overrides, overlay templates |
 | `users.profiles` | `Users`, `UserProfiles`, `ProfileAccessSchedules` |
 | `users.devices` | `ClientDevices`, `ProfileDeviceSettings` |
+| `users.playback-choices` | `ProfileTitlePlaybackChoices`: the version, audio and subtitle each profile picked for a title on each device, matched to the title by identity |
 | `library.media-edits` | hand-made changes on rows a scan rebuilds — see **Metadata edits** below |
 | `library.collections` | admin-made `Collections` (`SystemGenerated = false`), their `CollectionItems` and the images uploaded for them (`CollectionArtwork` with `IsUserUploaded`; the image files are not in the zip) |
 | `library.smart-lists` | `SmartLists` (home rows) |

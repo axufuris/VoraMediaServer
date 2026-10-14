@@ -5,6 +5,7 @@ using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Playlists;
 using Vora.Domain.Entities.Streaming;
 using Vora.Domain.Entities.Users;
+using Vora.Domain.Enums;
 using Vora.Infrastructure.Backups.Sections;
 
 namespace Vora.Infrastructure.Tests.Backups;
@@ -185,6 +186,27 @@ public class MediaReferenceRestoreTests
         entries.Single(e => e.ExternalId == "603").MediaItemId.Should().Be(target.Matrix);
         entries.Single(e => e.ExternalId == "999").MediaItemId.Should().BeNull();
         entries.Should().HaveCount(2);
+        result.RowsSkipped.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Remembered_playback_choices_follow_their_title_and_are_skipped_when_it_is_gone()
+    {
+        using var source = BackupTestWorld.Source();
+        using var target = BackupTestWorld.RebuiltTarget();
+        source.Db.ProfileTitlePlaybackChoices.AddRange(
+            new ProfileTitlePlaybackChoice { ProfileId = Profile, DeviceId = "living-room", TitleId = source.Matrix, RemembersAudio = true, AudioLanguage = "jpn", AudioCodec = "aac", AudioChannels = 2 },
+            new ProfileTitlePlaybackChoice { ProfileId = Profile, DeviceId = "living-room", TitleId = source.OnlyOnSource, Subtitle = RememberedSubtitle.Off });
+        await source.Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var (_, result) = await BackupTestWorld.CopyAsync(
+            new PlaybackChoicesBackupSection(source.Db, source.References),
+            new PlaybackChoicesBackupSection(target.Db, target.References));
+
+        var choice = await target.Db.ProfileTitlePlaybackChoices.SingleAsync(TestContext.Current.CancellationToken);
+        choice.TitleId.Should().Be(target.Matrix);
+        choice.DeviceId.Should().Be("living-room");
+        choice.AudioLanguage.Should().Be("jpn");
         result.RowsSkipped.Should().Be(1);
     }
 
