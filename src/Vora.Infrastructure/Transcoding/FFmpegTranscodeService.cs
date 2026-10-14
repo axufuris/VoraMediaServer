@@ -784,7 +784,7 @@ public class FFmpegTranscodeService : ITranscodeService
             || decision.AudioStrategy == "Copy"
             || decision.AudioStrategy == "DirectStream";
 
-        if (shouldCopyAudio && !IsAudioCodecSafeForMpegTs(decision.SourceAudioCodec))
+        if (shouldCopyAudio && !AudioPlayback.CanCopyToHls(decision.SourceAudioCodec))
         {
             shouldCopyAudio = false;
         }
@@ -795,8 +795,7 @@ public class FFmpegTranscodeService : ITranscodeService
         }
         else
         {
-            Flag(decision.TargetAudioCodec == AudioCodec.Aac ? "-c:a aac" : "-c:a ac3");
-            Flag(decision.TargetAudioChannels > 2 ? $"-ac {decision.TargetAudioChannels} -b:a 384k" : "-ac 2 -b:a 192k");
+            Flag(ConvertedAudioArguments(decision.TargetAudioCodec, decision.TargetAudioChannels));
         }
 
         // CRITICAL: when -ss seeks the input, FFmpeg by default resets
@@ -961,6 +960,14 @@ public class FFmpegTranscodeService : ITranscodeService
         return graph.Append("[v]").ToString();
     }
 
+    internal static string ConvertedAudioArguments(AudioCodec codec, int channels)
+    {
+        if (codec == AudioCodec.Aac) return channels > 2 ? $"-c:a aac -ac {channels} -b:a 384k" : "-c:a aac -ac 2 -b:a 192k";
+        return channels > 2
+            ? $"-c:a ac3 -ac {Math.Min(channels, AudioPlayback.DolbyDigitalChannels)} -b:a 640k"
+            : "-c:a ac3 -ac 2 -b:a 192k";
+    }
+
     internal static string? SubtitleInput(string? externalPath)
     {
         if (string.IsNullOrWhiteSpace(externalPath)) return null;
@@ -969,13 +976,6 @@ public class FFmpegTranscodeService : ITranscodeService
         return new[] { ".idx", ".IDX" }
             .Select(extension => Path.ChangeExtension(externalPath, extension))
             .FirstOrDefault(File.Exists) ?? externalPath;
-    }
-
-    private static bool IsAudioCodecSafeForMpegTs(string? codec)
-    {
-        if (string.IsNullOrWhiteSpace(codec)) return false;
-        var c = codec.ToLowerInvariant();
-        return c is "aac" or "mp3" or "ac3" or "eac3";
     }
 
     // Resolve HdrTonemapQuality from the server setting (which may be

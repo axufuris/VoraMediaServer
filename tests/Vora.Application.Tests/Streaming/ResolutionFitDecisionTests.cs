@@ -119,16 +119,30 @@ public class ResolutionFitDecisionTests
         decision.SelectedMediaPartId.Should().Be(FourKPartId);
     }
 
-    // The HDR downscale rule clamps the 4K option to 1080p, so both options
-    // deliver 1080p and the one needing no downscale work wins.
+    // The HDR downscale rule clamps a converted 4K option to 1080p, so for a
+    // client that cannot show HDR both options deliver 1080p and the one
+    // needing no downscale work wins.
     [Fact]
     public async Task With_hdr_downscale_always_the_sdr_1080p_part_still_wins()
+    {
+        var item = Item(Part(FourKPartId, "2160p", hdrType: "HDR10"), Part(FullHdPartId, "1080p"));
+        var sdrPhone = Phone();
+        sdrPhone.SupportedHdrFormats = [];
+
+        var decision = await DecideAsync(item, maxResolution: 2160, client: sdrPhone, hdrDownscale: "Always");
+
+        decision.SelectedMediaPartId.Should().Be(FullHdPartId);
+    }
+
+    [Fact]
+    public async Task With_hdr_downscale_always_a_client_that_plays_the_4k_hdr_part_as_it_is_still_gets_it()
     {
         var item = Item(Part(FourKPartId, "2160p", hdrType: "HDR10"), Part(FullHdPartId, "1080p"));
 
         var decision = await DecideAsync(item, maxResolution: 2160, hdrDownscale: "Always");
 
-        decision.SelectedMediaPartId.Should().Be(FullHdPartId);
+        decision.SelectedMediaPartId.Should().Be(FourKPartId);
+        decision.Strategy.Should().Be(StreamStrategy.DirectPlay);
     }
 
     // Quality & Tracks hands back a track id. That must still pin the choice,

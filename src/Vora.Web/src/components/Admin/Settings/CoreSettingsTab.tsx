@@ -184,9 +184,9 @@ export default function CoreSettingsTab({ serverId, scanners, hardware, showModa
                     onChange={e => setServerSettings({ ...serverSettings, streamingProfile: parseInt(e.target.value, 10) })}
                     className="vora-input max-w-xl cursor-pointer"
                 >
-                    <option value={0}>Client Preference (transcode when requested by client)</option>
-                    <option value={1}>Direct Stream Preference (avoid transcoding at all costs)</option>
-                    <option value={2}>Bandwidth Optimized (aggressively compress to save upload speed)</option>
+                    <option value={0}>Client Preference (the best each client can handle, or what the viewer picked, converting when needed)</option>
+                    <option value={1}>Direct Stream Preference (the best that plays without converting)</option>
+                    <option value={2}>Bitrate Preference (the best that fits the bitrate limit)</option>
                 </select>
                 <FieldHint>Determines how the server mathematically prioritizes video and audio tracks for clients.</FieldHint>
             </SettingsCard>

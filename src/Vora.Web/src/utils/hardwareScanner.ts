@@ -5,6 +5,11 @@ export interface DeviceCapabilities {
     audioCodecs: string[];
     containers: string[];
     maxAudioChannels: number;
+    detectedAudioChannels: number;
+    pickedAudioChannels: number;
+    playsAnyAudioLayout: boolean;
+    canSwitchAudioTracks: boolean;
+    hlsVideoCodecs: string[];
     clientBandwidthKbps: number;
     requestedClientBitrateKbps: number;
     requestedMaxResolution: number;
@@ -57,6 +62,16 @@ const DOLBY_VISION = 'video/mp4; codecs="dvh1.05.06"';
 
 const supportsDolbyVision = (): boolean => mseSupports(DOLBY_VISION);
 
+// The server's HLS is MPEG-TS. hls.js plays it whenever Media Source can take
+// H.264, and repackages each segment for Media Source, so HEVC copied into a
+// segment plays only when Media Source takes HEVC too. Without Media Source the
+// browser's own HLS player is used, and it plays HEVC only from fMP4.
+const HLS_JS_BASELINE = 'video/mp4; codecs="avc1.42E01E,mp4a.40.2"';
+const HEVC_IN_MEDIA_SOURCE = 'video/mp4; codecs="hvc1.1.6.L93.B0"';
+
+export const detectHlsVideoCodecs = (): string[] =>
+    mseSupports(HLS_JS_BASELINE) && mseSupports(HEVC_IN_MEDIA_SOURCE) ? ['h264', 'hevc'] : ['h264'];
+
 // Best-effort synchronous HDR detection: gates on the display actually being
 // able to render HDR (dynamic-range: high), then assumes HDR10/HLG. Used by
 // the synchronous scan (render-time consumers, which only read codec/channel
@@ -107,7 +122,7 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
     const videoCodecs: string[] = [];
     const audioCodecs: string[] = [];
     const containers: string[] = [];
-    let maxAudioChannels = 2;
+    const maxAudioChannels = detectAudioOutputChannels();
     let clientBandwidthKbps = 100000;
 
     let requestedClientBitrateKbps = 0;
@@ -141,18 +156,6 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
         }
     } catch (error: unknown) {
         console.warn("Could not check client bandwidth.", error);
-    }
-
-    try {
-        const extWindow = window as ExtendedWindow;
-        const AudioCtx = window.AudioContext || extWindow.webkitAudioContext;
-        if (AudioCtx) {
-            const ctx = new AudioCtx();
-            maxAudioChannels = ctx.destination.maxChannelCount || 2;
-            ctx.close().catch((err: unknown) => console.warn("Failed to close audio context", err));
-        }
-    } catch (error: unknown) {
-        console.warn("Could not check audio capabilities.", error);
     }
 
     const videoTests = {
@@ -235,7 +238,7 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
         console.warn("Could not auto-detect display resolution.", error);
     }
 
-    return { videoCodecs, audioCodecs, containers, maxAudioChannels, clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, supportedHdrFormats, maxVideoBitDepth };
+    return { videoCodecs, audioCodecs, containers, maxAudioChannels, detectedAudioChannels: maxAudioChannels, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: detectHlsVideoCodecs(), clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, supportedHdrFormats, maxVideoBitDepth };
 };
 
 export interface PlaybackPrefs {
@@ -273,19 +276,19 @@ export function readPlaybackPrefs(profileId: string, deviceId: string): Playback
     return { maxResolution: 0, maxAudioChannels: 0 };
 }
 
-// Apply the user's caps to a raw device profile. A value of 0 means
-// "Original / device limit" (use the device value); a specific value caps to
-// min(userVal, deviceVal) so a preference can only lower capability. HDR
-// formats and bit depth pass through unchanged. requestedMaxResolution holds
-// the resolution height. Matches the Android semantics exactly.
+// The detected output and the viewer's pick travel to the server separately,
+// because the server's streaming profile decides how far a pick may go.
+// maxAudioChannels keeps the older single value (the lower of the two) for a
+// server that predates the separate fields.
 export function applyUserCaps(device: DeviceCapabilities, prefs: PlaybackPrefs): DeviceCapabilities {
     const effRes = prefs.maxResolution > 0
         ? Math.min(prefs.maxResolution, device.requestedMaxResolution)
         : device.requestedMaxResolution;
-    const effCh = prefs.maxAudioChannels > 0
-        ? Math.min(prefs.maxAudioChannels, device.maxAudioChannels)
-        : device.maxAudioChannels;
-    return { ...device, requestedMaxResolution: effRes, maxAudioChannels: effCh };
+    const picked = Number.isInteger(prefs.maxAudioChannels) && prefs.maxAudioChannels > 0 && prefs.maxAudioChannels <= 8
+        ? prefs.maxAudioChannels
+        : 0;
+    const maxAudioChannels = picked > 0 ? Math.min(picked, device.detectedAudioChannels) : device.detectedAudioChannels;
+    return { ...device, requestedMaxResolution: effRes, pickedAudioChannels: picked, maxAudioChannels };
 }
 
 // Single entry point for client-side track selection: raw device scan with the
@@ -305,3 +308,17 @@ export const scanDeviceCapabilities = async (): Promise<DeviceCapabilities> => {
     const { profileId, deviceId } = getCurrentProfileDeviceIds();
     return applyUserCaps({ ...base, supportedHdrFormats }, readPlaybackPrefs(profileId, deviceId));
 };
+
+export function detectAudioOutputChannels(): number {
+    try {
+        const extWindow = window as ExtendedWindow;
+        const AudioCtx = window.AudioContext || extWindow.webkitAudioContext;
+        if (!AudioCtx) return 2;
+        const ctx = new AudioCtx();
+        const channels = ctx.destination.maxChannelCount;
+        void ctx.close().catch(() => undefined);
+        return Number.isInteger(channels) && channels > 0 ? Math.min(channels, 8) : 2;
+    } catch {
+        return 2;
+    }
+}

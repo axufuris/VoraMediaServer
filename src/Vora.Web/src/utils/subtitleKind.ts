@@ -37,6 +37,19 @@ export function isTextSubtitleCodec(codec?: string | null): boolean {
 
 export const NoSubtitle = 'none';
 
+interface SubtitleChoice {
+    id: string;
+    codec?: string | null;
+}
+
+// The selected subtitle's id when the server has to burn it into the picture,
+// which is the only time a subtitle changes how the stream is delivered.
+export function burnInSubtitleId(tracks: SubtitleChoice[] | undefined, selection?: string | null): string | undefined {
+    if (isNoSubtitle(selection)) return undefined;
+    const track = tracks?.find(candidate => candidate.id === selection);
+    return track && isImageSubtitleCodec(track.codec) ? track.id : undefined;
+}
+
 export function isNoSubtitle(selection?: string | null): boolean {
     return !selection || selection === NoSubtitle || selection === '00000000-0000-0000-0000-000000000000';
 }

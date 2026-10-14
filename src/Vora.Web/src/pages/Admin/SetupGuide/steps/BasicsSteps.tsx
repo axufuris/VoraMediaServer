@@ -82,8 +82,8 @@ export function ServerStep({ settings, onSettings }: SetupStepProps) {
 
 const PROFILES: { value: number; title: string; description: string; recommended?: boolean }[] = [
     { value: 1, title: 'Direct stream', description: "Play files exactly as they are and only convert when a device can't play them. Best quality, least work for the server.", recommended: true },
-    { value: 0, title: 'Follow the app', description: 'Convert whenever an app asks, for example when someone picks a lower quality in the player.' },
-    { value: 2, title: 'Save bandwidth', description: 'Compress more to save upload speed. Good for slow home internet and lots of viewers away from home.' },
+    { value: 0, title: 'Follow the app', description: 'Give each app the best it can handle, or what the viewer picked, converting when that is what it takes.' },
+    { value: 2, title: 'Fit the bitrate', description: 'Play the best version that fits your bitrate limits. A smaller version is used only when the larger one is over the limit or cannot play directly.' },
 ];
 
 export function PlaybackStep({ serverId, settings, onSettings, hardware }: SetupStepProps) {
