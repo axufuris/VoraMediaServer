@@ -91,9 +91,9 @@ public class OmdbRottenTomatoesRatingsProvider : IRatingsProvider
     private readonly IServiceScopeFactory _scopeFactory;
 
     public string Id => "omdb_rotten_tomatoes";
-    public string Name => "OMDb - Rotten Tomatoes";
+    public string Name => "OMDb - Rotten Tomatoes (Critic)";
     public string Version => "1.0.0";
-    public string Description => "Fetches Rotten Tomatoes ratings from the OMDb API.";
+    public string Description => "Fetches the Rotten Tomatoes critic score (Tomatometer) from the OMDb API. OMDb has no audience score.";
     public bool IsSystemPlugin => true;
     public string Type => "Ratings";
     public string DeveloperName => "Andy Xufuris";
@@ -130,9 +130,9 @@ public class OmdbMetacriticRatingsProvider : IRatingsProvider
     private readonly IServiceScopeFactory _scopeFactory;
 
     public string Id => "omdb_metacritic";
-    public string Name => "OMDb - Metacritic";
+    public string Name => "OMDb - Metacritic (Critic)";
     public string Version => "1.0.0";
-    public string Description => "Fetches Metacritic ratings from the OMDb API.";
+    public string Description => "Fetches the Metacritic critic score (Metascore) from the OMDb API.";
     public bool IsSystemPlugin => true;
     public string Type => "Ratings";
     public string DeveloperName => "Andy Xufuris";
