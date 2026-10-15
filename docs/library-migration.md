@@ -2,6 +2,15 @@
 
 Admin → Library Migration copies each mapped Plex account's watch state and ratings onto a Vora profile. `LibraryMigrationJobRunner` runs the job in the background and pushes progress over SignalR. The Plex side is `PlexLibrarySyncProvider` (an `ILibrarySyncProvider`), and the database side is `LibraryMigrationRepository`.
 
+## Reaching the Plex server
+
+plex.tv lists several addresses for each server: local ones (`https://192-168-0-10.<hash>.plex.direct:32400`), remote ones and a Plex relay. Vora has to reach one of them from where it runs, which in Docker is the container, not the browser. `PlexLibrarySyncProvider.FindReachableConnectionAsync` re-reads the server's addresses from plex.tv and tries them all at once.
+
+- **Order.** Local addresses come first (HTTPS before HTTP), then each local IPv4 address over plain HTTP by its IP, then remote addresses, then the relay (`PlexServerAddresses.InTryOrder`). Trying the plain IP gets past a router or DNS filter that blocks `plex.direct` names. Plain HTTP is never tried over the internet.
+- **Probe.** Each address gets one `GET /library/sections` with the account's token, through the `PlexLibrarySyncProbe` client: 5 seconds and no retries. The standard client retries each failure three times, which took about 10 seconds for one refused address in the issue's log, and can take its whole 30-second budget on one that never answers. The best address in that order that answers wins, even when a later one answered first.
+- **Nothing answers.** `RemoteServerUnreachableException` becomes a 502 whose detail names every address and why it failed ("connection refused", "its name did not resolve", "no answer within 5 seconds", "Plex refused this account, status 401"). Both import pages show it. Before this, the page sent only the first address Plex listed, and a refused connection came back as a bare 500 (issue #104).
+- **Who picks.** The browser sends the Plex server's id, never an address. Listing libraries and the job itself (`LibraryMigrationJobRunner.FindConnectionAsync`) each find the address on the server, so the self-service `/api/library-import` routes can't be pointed at an arbitrary URL. A job that can't reach the server fails with the same message.
+
 ## Matching
 
 Nothing is matched by title or file path. Plex and Vora agree on provider ids, so:

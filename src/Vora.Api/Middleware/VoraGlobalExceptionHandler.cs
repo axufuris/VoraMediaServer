@@ -31,6 +31,7 @@ public class VoraGlobalExceptionHandler : IExceptionHandler
             KeyNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
             Vora.Plugins.Dtos.SubtitleProviderException { IsQuotaExhausted: true } => (StatusCodes.Status429TooManyRequests, "Subtitle provider limit reached"),
             Vora.Plugins.Dtos.SubtitleProviderException => (StatusCodes.Status502BadGateway, "Subtitle provider unavailable"),
+            Vora.Plugins.Dtos.RemoteServerUnreachableException => (StatusCodes.Status502BadGateway, "Media server unreachable"),
             OperationCanceledException => (499, "Client closed request"),
             _ => (StatusCodes.Status500InternalServerError, "Internal server error")
         };
@@ -73,7 +74,7 @@ public class VoraGlobalExceptionHandler : IExceptionHandler
     {
         // A provider's own explanation is the whole point of raising it, and it
         // carries nothing internal — it survives the 5xx redaction below.
-        if (exception is Vora.Plugins.Dtos.SubtitleProviderException) return exception.Message;
+        if (exception is Vora.Plugins.Dtos.SubtitleProviderException or Vora.Plugins.Dtos.RemoteServerUnreachableException) return exception.Message;
 
         if (status >= 500 && !_environment.IsDevelopment())
         {

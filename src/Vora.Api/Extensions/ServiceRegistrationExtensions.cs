@@ -630,6 +630,11 @@ public static class ServiceRegistrationExtensions
             client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Library Migration)");
         }).AddVoraResilience(totalTimeoutSeconds: 60);
+        services.AddHttpClient(PlexLibrarySyncProvider.ProbeHttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(5);
+            client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Library Migration)");
+        });
         services.AddMemoryCache();
         return services;
     }

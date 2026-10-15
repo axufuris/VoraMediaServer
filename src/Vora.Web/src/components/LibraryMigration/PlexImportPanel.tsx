@@ -11,6 +11,7 @@ import type {
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { StorageKeys } from '../../utils/storageKeys';
 import { migrationSummary, sharedTitleNote } from '../../utils/migrationSummary';
+import { errorDetail } from '../../utils/apiError';
 
 interface PlexImportPanelProps {
     serverId?: string;
@@ -53,23 +54,18 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
     const selectServer = useCallback(async (server: RemoteServerVM, accessToken: string) => {
         if (!provider) return;
         setSelectedServer(server);
-        const connection = server.connections[0];
-        if (!connection) {
-            setError('That server has no usable connection.');
-            return;
-        }
         setLoadingLibraries(true);
         setError(null);
         try {
-            const libs = await libraryImportService.listLibraries(provider.id, accessToken, connection.uri, serverId);
+            const libs = await libraryImportService.listLibraries(provider.id, accessToken, server.clientIdentifier, serverId);
             setLibraries(libs);
             const defaults: Record<string, boolean> = {};
             for (const lib of libs) {
                 if (lib.kind === 'Movie' || lib.kind === 'Show') defaults[lib.key] = true;
             }
             setSelectedKeys(defaults);
-        } catch {
-            setError('Could not load the libraries on that server.');
+        } catch (err) {
+            setError(errorDetail(err, 'Could not load the libraries on that server'));
         } finally {
             setLoadingLibraries(false);
         }
@@ -110,11 +106,6 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
 
     const runImport = async () => {
         if (!provider || !selectedServer || !token) return;
-        const connection = selectedServer.connections[0];
-        if (!connection) {
-            setError('That server has no usable connection.');
-            return;
-        }
         setBusy(true);
         setError(null);
         try {
@@ -122,7 +113,6 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
                 accessToken: token,
                 serverClientIdentifier: selectedServer.clientIdentifier,
                 serverName: selectedServer.name,
-                connectionUri: connection.uri,
                 includeWatchState: includeWatch,
                 includeRatings: includeRatings,
                 librarySectionKeys: chosenKeys,
@@ -130,8 +120,8 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
                 setAdminRatings: isAdmin && includeRatings && setAsAdminRatings
             }, serverId);
             setJob(created);
-        } catch {
-            setError('Failed to start the import.');
+        } catch (err) {
+            setError(errorDetail(err, 'Failed to start the import'));
         } finally {
             setBusy(false);
         }

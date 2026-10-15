@@ -11,7 +11,7 @@ public interface ILibraryMigrationManager
     Task<LibrarySyncPinStatusVM> PollPinAsync(string providerId, string pinId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RemoteServerVM>> ListServersAsync(string providerId, string accessToken, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RemoteAccountVM>> ListAccountsAsync(string providerId, string accessToken, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<RemoteLibraryVM>> ListLibrariesAsync(string providerId, string accessToken, string connectionUri, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<RemoteLibraryVM>> ListLibrariesAsync(string providerId, string accessToken, string serverClientIdentifier, CancellationToken cancellationToken = default);
 }
 
 public class LibraryMigrationManager(
@@ -117,9 +117,10 @@ public class LibraryMigrationManager(
             .ToList();
     }
 
-    public async Task<IReadOnlyList<RemoteLibraryVM>> ListLibrariesAsync(string providerId, string accessToken, string connectionUri, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<RemoteLibraryVM>> ListLibrariesAsync(string providerId, string accessToken, string serverClientIdentifier, CancellationToken cancellationToken = default)
     {
         var provider = ResolveProvider(providerId);
+        var connectionUri = await provider.FindReachableConnectionAsync(serverClientIdentifier, accessToken, cancellationToken);
         var libraries = await provider.ListLibrariesAsync(connectionUri, accessToken, cancellationToken);
 
         logger.LogInformation("Fetched {Count} library section(s) from {ProviderId}.", libraries.Count, providerId);

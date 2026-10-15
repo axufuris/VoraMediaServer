@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Vora.Plugins.Dtos;
@@ -11,6 +12,7 @@ namespace Vora.Plugins.Providers.Plex;
 public class PlexLibrarySyncProvider : ILibrarySyncProvider
 {
     public const string HttpClientName = "PlexLibrarySync";
+    public const string ProbeHttpClientName = "PlexLibrarySyncProbe";
 
     private static readonly SemaphoreSlim ClientIdentifierLock = new(1, 1);
 
@@ -271,6 +273,102 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
 
         return token;
     }
+
+    public async Task<string> FindReachableConnectionAsync(string serverClientIdentifier, string accessToken, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(serverClientIdentifier))
+        {
+            throw new ArgumentException("Server id is required.", nameof(serverClientIdentifier));
+        }
+
+        var servers = await ListServersAsync(accessToken, cancellationToken);
+        var server = servers.FirstOrDefault(s => string.Equals(s.ClientIdentifier, serverClientIdentifier, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException("Plex no longer lists that server for this account. Pick the server again.");
+
+        var addresses = PlexServerAddresses.InTryOrder(server.Connections);
+        if (addresses.Count == 0)
+        {
+            throw new RemoteServerUnreachableException($"Plex lists no addresses for the server \"{server.Name}\". Check that the Plex server is running and signed in to Plex.");
+        }
+
+        var clientIdentifier = await GetOrCreateClientIdentifierAsync();
+        var client = _httpClientFactory.CreateClient(ProbeHttpClientName);
+        using var stopProbes = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var probes = addresses
+            .Select(address => (Address: address, WhyUnreachable: WhyUnreachableAsync(client, address.Uri, accessToken, clientIdentifier, stopProbes.Token)))
+            .ToList();
+
+        var tried = new List<string>();
+        foreach (var probe in probes)
+        {
+            var why = await probe.WhyUnreachable;
+            if (why is null)
+            {
+                await stopProbes.CancelAsync();
+                _logger.LogInformation("Reached the Plex server {ServerName} at {Address}.", server.Name, probe.Address.Label);
+                return probe.Address.Uri;
+            }
+            tried.Add($"{probe.Address.Label} ({why})");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var summary = string.Join("; ", tried);
+        _logger.LogWarning("Could not reach the Plex server {ServerName}. Tried {Addresses}.", server.Name, summary);
+        throw new RemoteServerUnreachableException(
+            $"Vora couldn't reach the Plex server \"{server.Name}\". Tried {summary}. The Vora server has to be able to open one of these addresses; if Vora runs in Docker, try them from inside the container.");
+    }
+
+    private static async Task<string?> WhyUnreachableAsync(HttpClient client, string baseUri, string accessToken, string clientIdentifier, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUri}/library/sections");
+            ApplyPlexHeaders(request, clientIdentifier);
+            request.Headers.Add("X-Plex-Token", accessToken);
+
+            using var response = await client.SendAsync(request, cancellationToken);
+            if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+            {
+                return $"Plex refused this account, status {(int)response.StatusCode}";
+            }
+            if (!response.IsSuccessStatusCode)
+            {
+                return $"answered with status {(int)response.StatusCode}";
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            return doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("MediaContainer", out _)
+                ? null
+                : "the answer did not come from Plex";
+        }
+        catch (HttpRequestException ex)
+        {
+            return DescribeFailure(ex);
+        }
+        catch (JsonException)
+        {
+            return "the answer did not come from Plex";
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return $"no answer within {client.Timeout.TotalSeconds:0} seconds";
+        }
+        catch (OperationCanceledException)
+        {
+            return "stopped";
+        }
+    }
+
+    private static string DescribeFailure(HttpRequestException ex) => ex switch
+    {
+        { HttpRequestError: HttpRequestError.NameResolutionError } => "its name did not resolve, often because a router or DNS filter blocks plex.direct names",
+        { InnerException: SocketException { SocketErrorCode: SocketError.ConnectionRefused } } => "connection refused",
+        { InnerException: SocketException { SocketErrorCode: SocketError.HostUnreachable or SocketError.NetworkUnreachable } } => "no route to that address",
+        { InnerException: SocketException { SocketErrorCode: SocketError.TimedOut } } => "the connection timed out",
+        { HttpRequestError: HttpRequestError.SecureConnectionError } => "the secure connection failed",
+        _ => ex.Message
+    };
 
     public async Task<IReadOnlyList<RemoteLibraryDto>> ListLibrariesAsync(string connectionUri, string accessToken, CancellationToken cancellationToken = default)
     {
@@ -779,6 +877,8 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
                 connections.Add(new RemoteConnectionDto
                 {
                     Uri = uri,
+                    Address = ReadStringProperty(connEl, "address"),
+                    Port = ReadIntProperty(connEl, "port"),
                     IsLocal = isLocal,
                     IsHttps = isHttps,
                     IsRelay = isRelay
