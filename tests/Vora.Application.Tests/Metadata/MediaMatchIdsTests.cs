@@ -108,11 +108,24 @@ public class MediaMatchIdsTests
     [InlineData("Severance [tvdbid-371980]", "Severance")]
     [InlineData("Arrival (2016)", "Arrival")]
     [InlineData("Blade Runner 2049", "Blade Runner 2049")]
+    [InlineData("Lee.2024.1080p", "Lee")]
+    [InlineData("R.I.P.D.", "R.I.P.D.")]
     [InlineData("   ", "")]
     [InlineData(null, "")]
     public void A_title_is_cleaned_of_id_tags_and_a_trailing_year(string? title, string expected)
     {
         MediaMatchIds.CleanSearchTitle(title).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("Lee.2024.1080p", null, "Lee", 2024)]
+    [InlineData("Lee.2024.1080p", 2023, "Lee", 2023)]
+    [InlineData("Arrival (2016)", 2016, "Arrival", 2016)]
+    [InlineData("Wonder Woman 1984", 2020, "Wonder Woman 1984", 2020)]
+    [InlineData("Severance.2022.1080p.WEB-DL [tvdbid-371980]", null, "Severance", 2022)]
+    public void A_release_name_title_is_searched_as_its_title_and_year(string title, int? year, string query, int? searchYear)
+    {
+        MediaMatchIds.SearchTerms(title, year).Should().Be((query, searchYear));
     }
 
     [Theory]

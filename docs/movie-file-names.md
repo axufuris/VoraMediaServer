@@ -7,14 +7,21 @@ How a movie file becomes a film in a library, how a new file finds the film it b
 `VoraLocalMediaScannerProvider.ResolveMovieIdentity` reads a file in this order. Every movie file goes through it: the full scan (`ProcessMovieDirectoriesAsync`), a library scan's units (`ScanMovieUnitAsync`), and the folder watcher's single files.
 
 1. **The file name**, through the library's pattern or the default `Title (Year) {imdb-tt…}` pattern (`BuildMovieRegexes`). This gives the title, the year and a `{tmdb-…}` / `{imdb-…}` / `{tvdb-…}` id.
-2. **The movie folder**, when the file name has no year (`MovieFolderNaming`). This applies when the file's folder is named `Title (Year)`, is not a library folder itself, and either:
+2. **The movie folder**, when the file name has no year (`MovieFolderNaming`). This applies when the file's folder is named `Title (Year)` or is a release name with a year (`The.Mummy.2004.1080p.BluRay`, read as below), is not a library folder itself, and either:
    - holds one film (`LocalMediaAssets.HoldsOneFilm`: every non-extra video shares the file's `FilmKey`), or
    - has the same title as the file (`FilmKey`).
 
    The file then takes the folder's title and year. It also takes any ids the file name leaves out, from `{imdb-…}` or `[tmdbid-…]` tags in the folder name (`LocalIdentity.TaggedIds`); ids in the file name win. So `Heat (1995)/heat.1995.1080p.bluray.mkv` is Heat (1995). In `Heat (1995)/` holding `Heat.mkv` and `Heat Bonus Disc.mkv`, only `Heat.mkv` gets 1995.
-3. **An NFO**, when the library reads them. `LocalIdentity.Trusted` drops a document whose year is more than a year away from the year found so far, or whose ids contradict the name's.
+3. **A release name**, when there is still no year (`ReleaseNames.Read`). `Lee.2024.1080p` was searched on TMDB as that whole string and matched nothing. Now:
+   - **Separators.** A name with no spaces has its dots and underscores read as spaces.
+   - **Where the title ends.** The title runs up to the first release tag (`1080p`, `4k`, `BluRay`, `WEB-DL`, `x264`, `HEVC`, `S01`, …) or the last real year before it. The year must be between 1900 and next year, and can't be the first word: `Blade.Runner.2049.2017` is Blade Runner 2049 (2017), `2001.A.Space.Odyssey.1968` and `1917.2019` keep their numbers.
+   - **Acronyms.** A run of single letters is joined back up: `S.W.A.T.2003` is S.W.A.T. (2003), `A.I.Artificial.Intelligence.2001` is A.I. Artificial Intelligence.
+   - **Names that aren't release names are left alone.** A dotted name needs a year or a tag, so `A.C.O.D.`, `Slasher.com` and `Waiting...` stay as they are. A name with spaces needs a release tag, so `Heat 1995 1080p` is Heat (1995) but `Wonder Woman 1984` and `Death Race 2000` keep their titles.
 
-A year in the file name always wins over the folder's.
+   The same reading applies to a film's extras folder (`IngestMovieExtraAsync`) and to TV show folders (`ResolveShowIdentity`, so `Severance.2022.1080p.WEB-DL` is Severance (2022)). It also applies to the metadata search (`MediaMatchIds.SearchTerms`, used by `MetadataFetchService` and the Fix-match default query). That way an item an older scan saved under its whole release name is matched on its next refresh, and its title is then replaced by the provider's.
+4. **An NFO**, when the library reads them. `LocalIdentity.Trusted` drops a document whose year is more than a year away from the year found so far, or whose ids contradict the name's.
+
+A year in the file name always wins over the folder's, and a `Title (Year)` folder wins over a release name in the file.
 
 ## Finding the film
 
@@ -46,6 +53,8 @@ It leaves a film alone when:
 | What | Where |
 | --- | --- |
 | Folder fallback, repair pass | `tests/Vora.Application.Tests/Scanner/MovieIdentityScanTests.cs` |
+| Release names (films, release folders, show folders, names left alone) | `tests/Vora.Application.Tests/Scanner/ReleaseNameTests.cs` |
+| Searching an item saved under its release name | `tests/Vora.Application.Tests/Metadata/ReleaseNameSearchTests.cs`, `MediaMatchIdsTests` |
 | NFO identity, hand-matched siblings | `tests/Vora.Application.Tests/Scanner/LocalMetadataScanTests.cs` |
 | Title + year with ids, no-year ambiguity, files of films with several | `tests/Vora.Infrastructure.Tests/MediaRepositoryMovieMatchTests.cs` |
 | `EnsureMovieAsync` passes the file's ids | `tests/Vora.Application.Tests/Media/MediaIngestionServiceTests.cs` |

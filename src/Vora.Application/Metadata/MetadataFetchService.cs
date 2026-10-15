@@ -223,7 +223,8 @@ public class MetadataFetchService : IMetadataFetchService
                 if (res != null) return res;
             }
 
-            return await provider.FetchMovieMetadataAsync(MediaMatchIds.CleanSearchTitle(searchTitle ?? movie.Title), searchYear ?? movie.ReleaseDate?.Year);
+            var (movieQuery, movieYear) = MediaMatchIds.SearchTerms(searchTitle ?? movie.Title, searchYear ?? movie.ReleaseDate?.Year);
+            return await provider.FetchMovieMetadataAsync(movieQuery, movieYear);
         }
 
         if (item is TvShow tvShow)
@@ -252,7 +253,8 @@ public class MetadataFetchService : IMetadataFetchService
                 if (res != null) return res;
             }
 
-            return await provider.FetchTvShowMetadataAsync(MediaMatchIds.CleanSearchTitle(searchTitle ?? tvShow.Title), searchYear ?? tvShow.ReleaseDate?.Year);
+            var (showQuery, showYear) = MediaMatchIds.SearchTerms(searchTitle ?? tvShow.Title, searchYear ?? tvShow.ReleaseDate?.Year);
+            return await provider.FetchTvShowMetadataAsync(showQuery, showYear);
         }
 
         if (item is Season season)
