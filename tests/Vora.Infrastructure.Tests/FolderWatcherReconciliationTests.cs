@@ -40,6 +40,18 @@ public class FolderWatcherReconciliationTests
     }
 
     [Fact]
+    public void A_home_video_library_takes_camera_formats_a_movie_library_leaves_alone()
+    {
+        var disk = new[] { "/media/family/IMG_0001.MOV", "/media/family/00001.MTS", "/media/family/clip.3gp", "/media/family/IMG_0001.jpg" };
+        var ingested = new HashSet<string>();
+
+        FolderWatcherService.FindUningestedFiles(disk, ingested, new List<string>(), LibraryType.HomeVideo)
+            .Should().BeEquivalentTo("/media/family/IMG_0001.MOV", "/media/family/00001.MTS", "/media/family/clip.3gp");
+        FolderWatcherService.FindUningestedFiles(disk, ingested, new List<string>(), LibraryType.Movie)
+            .Should().BeEmpty();
+    }
+
+    [Fact]
     public void FindUningestedFiles_skips_files_matching_an_exclude_filter()
     {
         var disk = new[] { "/media/shows/Real.mkv", "/media/shows/Dune (2021).TDARR.mkv" };

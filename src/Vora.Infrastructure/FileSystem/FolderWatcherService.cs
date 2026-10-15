@@ -272,11 +272,15 @@ public class FolderWatcherService : IFolderWatcherService
         return result;
     }
 
-    // Which of the two shared sets applies is the library's type, not the file's:
+    // Which of the shared sets applies is the library's type, not the file's:
     // the single-file scanners are dispatched by type, so a stray .mp3 in a movie
     // library would otherwise be handed to the movie parser.
-    internal static IReadOnlyList<string> ExtensionsFor(LibraryType libraryType) =>
-        libraryType == LibraryType.Music ? MediaFileExtensions.Audio : MediaFileExtensions.Video;
+    internal static IReadOnlyList<string> ExtensionsFor(LibraryType libraryType) => libraryType switch
+    {
+        LibraryType.Music => MediaFileExtensions.Audio,
+        LibraryType.HomeVideo => MediaFileExtensions.HomeVideo,
+        _ => MediaFileExtensions.Video
+    };
 
     private static bool IsSupportedFor(string filePath, LibraryType libraryType) =>
         ExtensionsFor(libraryType).Contains(Path.GetExtension(filePath).ToLowerInvariant());

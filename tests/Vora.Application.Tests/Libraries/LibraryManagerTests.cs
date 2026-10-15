@@ -293,6 +293,29 @@ public class LibraryManagerTests
     }
 
     [Fact]
+    public async Task A_home_video_library_never_looks_for_intros_or_credits()
+    {
+        Domain.Entities.Library.MediaLibrary? saved = null;
+        _repo.CreateLibraryAsync(Arg.Do<Domain.Entities.Library.MediaLibrary>(l => saved = l)).Returns(Guid.NewGuid());
+
+        await _manager.CreateLibraryAsync(new CreateLibraryRequest
+        {
+            Name = "Family",
+            Type = LibraryType.HomeVideo,
+            EnableIntroDetection = true,
+            EnableCreditsDetection = true,
+            EnablePreviewDetection = true,
+            EnableVideoPreviewThumbnails = true,
+        });
+
+        saved.Should().NotBeNull();
+        saved?.EnableIntroDetection.Should().BeFalse();
+        saved?.EnableCreditsDetection.Should().BeFalse();
+        saved?.EnablePreviewDetection.Should().BeFalse();
+        saved?.EnableVideoPreviewThumbnails.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task A_new_tv_library_reads_episode_names_automatically()
     {
         Domain.Entities.Library.MediaLibrary? saved = null;

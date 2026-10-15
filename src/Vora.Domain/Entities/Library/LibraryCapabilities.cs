@@ -20,4 +20,10 @@ public static class LibraryCapabilities
 
     public static bool ReadsLocalMetadata(this LibraryType type) =>
         type is LibraryType.Movie or LibraryType.TvShow;
+
+    public static bool LooksUpMetadataOnline(this LibraryType type) =>
+        type is not LibraryType.HomeVideo;
+
+    public static bool DetectsMarkers(this LibraryType type) =>
+        type is LibraryType.Movie or LibraryType.TvShow;
 }

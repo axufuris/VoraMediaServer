@@ -186,6 +186,43 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         await ProcessMusicDirectoriesAsync(library, details.FolderPaths, details.ExcludeFilters);
     }
 
+    public async Task ScanHomeVideoLibraryAsync(Guid libraryId)
+    {
+        var library = LibraryHandle.FromGuid(libraryId);
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        var files = GetNewFilesInDirectories(details.FolderPaths, existing, MediaFileExtensions.HomeVideo)
+            .Where(f => !IsExcluded(f, details.ExcludeFilters))
+            .ToList();
+
+        for (var i = 0; i < files.Count; i++)
+        {
+            _progress.Report($"Scanning {Path.GetFileNameWithoutExtension(files[i])} ({i + 1}/{files.Count})");
+            await IngestHomeVideoFileAsync(library, files[i]);
+        }
+    }
+
+    public async Task<Guid?> ScanHomeVideoFileAsync(Guid libraryId, string filePath)
+    {
+        if (!MediaFileExtensions.IsHomeVideo(filePath)) return null;
+
+        var library = LibraryHandle.FromGuid(libraryId);
+        var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        if (existing.Contains(filePath) || !File.Exists(filePath)) return null;
+
+        var details = await _ingestionService.GetLibraryDetailsAsync(library);
+        if (IsExcluded(filePath, details.ExcludeFilters)) return null;
+
+        return await IngestHomeVideoFileAsync(library, filePath);
+    }
+
+    private async Task<Guid> IngestHomeVideoFileAsync(LibraryHandle library, string filePath)
+    {
+        var video = await _ingestionService.AddHomeVideoAsync(library, HomeVideoNames.Title(filePath), HomeVideoNames.Date(filePath));
+        await _ingestionService.AddMediaPartAsync(video, filePath, HomeVideoNames.Resolution(filePath));
+        return video.Value;
+    }
+
     public async Task ScanMovieAsync(Guid movieId)
     {
         var item = new MediaItemHandle(movieId);

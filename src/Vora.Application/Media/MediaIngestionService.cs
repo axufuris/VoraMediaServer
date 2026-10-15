@@ -184,6 +184,20 @@ public class MediaIngestionService : IMediaIngestionService
         return new MediaItemHandle(movie.Id);
     }
 
+    public async Task<MediaItemHandle> AddHomeVideoAsync(LibraryHandle library, string title, DateOnly? date)
+    {
+        var video = new Movie
+        {
+            Title = title,
+            SortTitle = title,
+            LibraryId = library.Value,
+            AddedAt = DateTime.UtcNow,
+            ReleaseDate = date
+        };
+        await _repository.AddMediaItemAsync(video);
+        return new MediaItemHandle(video.Id);
+    }
+
     public async Task<MediaItemHandle> EnsureTvShowAsync(LibraryHandle library, string title, int? year, string? tmdbId, string? imdbId, string? tvdbId = null)
     {
         var libraryId = library.Value;

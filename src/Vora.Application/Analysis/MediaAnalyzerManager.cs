@@ -5,6 +5,7 @@ using Vora.Application.Analysis.Results;
 using Vora.Application.Media;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
+using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
@@ -219,10 +220,10 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // disabled. The per-item path also checks these flags, but only after
         // loading each item — this skips the work and the misleading progress.
         var markerFlags = await _mediaRepository.GetProjectedAsync(mediaIds[0],
-            m => new { m.Library.EnableIntroDetection, m.Library.EnableCreditsDetection });
-        if (markerFlags != null && !markerFlags.EnableIntroDetection && !markerFlags.EnableCreditsDetection)
+            m => new { m.Library.EnableIntroDetection, m.Library.EnableCreditsDetection, m.Library.Type });
+        if (markerFlags != null && (!markerFlags.Type.DetectsMarkers() || (!markerFlags.EnableIntroDetection && !markerFlags.EnableCreditsDetection)))
         {
-            _logger.LogInformation("Skipping intro/credit marker detection for library {LibraryId}: both toggles are disabled.", libraryId);
+            _logger.LogInformation("Skipping intro/credit marker detection for library {LibraryId}: detection is off for this library.", libraryId);
             return;
         }
 
@@ -546,8 +547,8 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             // manual per-item/library force re-runs by passing forceOverride.
             if (gate.MarkersAnalyzedAt != null) return;
 
-            detectIntro = gate.EnableIntroDetection;
-            detectCredits = gate.EnableCreditsDetection;
+            detectIntro = gate.DetectsIntro;
+            detectCredits = gate.DetectsCredits;
             if (!detectIntro && !detectCredits) return;
         }
         else if (gate.MarkersAnalyzedAt >= analyzedBefore)

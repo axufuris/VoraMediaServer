@@ -85,7 +85,8 @@ public class LocalMetadataImportTests : IDisposable
         [_remote, new LocalMetadataProvider(NullLogger<LocalMetadataProvider>.Instance)],
         [],
         [_remoteArtwork, new LocalArtworkProvider(NullLogger<LocalArtworkProvider>.Instance)],
-        new LocalMediaReader(_repository, _log));
+        new LocalMediaReader(_repository, _log),
+        Substitute.For<IVideoFrameArtworkService>());
 
     private void OnlineAnswers(MetadataResult? result)
     {
