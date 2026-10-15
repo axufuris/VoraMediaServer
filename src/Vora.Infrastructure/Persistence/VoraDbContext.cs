@@ -340,7 +340,7 @@ public class VoraDbContext : DbContext
                   .HasForeignKey(e => e.LibraryId)
                   .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasIndex(e => new { e.ArtistId, e.Title }).IsUnique();
+            entity.HasIndex(e => new { e.ArtistId, e.Title });
         });
 
         modelBuilder.Entity<GeneratedMix>(entity =>

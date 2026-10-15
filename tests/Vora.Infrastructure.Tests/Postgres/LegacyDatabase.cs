@@ -104,9 +104,18 @@ public sealed class LegacyDatabase : IAsyncDisposable
         ALTER TABLE "UserProfiles" DROP COLUMN "PreferHearingImpairedSubtitles";
         """;
 
+    public const string TrackPreferencesMigration = "20261015010727_ChangesSinceInitial";
+
+    private const string IndexesSinceTrackPreferences = """
+        DROP INDEX "IX_Albums_ArtistId_Title";
+        CREATE UNIQUE INDEX "IX_Albums_ArtistId_Title" ON "Albums" ("ArtistId", "Title");
+        """;
+
+    private const string SinceRememberedChoices = ColumnsSinceRememberedChoices + IndexesSinceTrackPreferences;
+
     private const string TablesSinceLocalMetadata = """
         DROP TABLE "ProfileTitlePlaybackChoices";
-        """ + ColumnsSinceRememberedChoices;
+        """ + SinceRememberedChoices;
 
     private const string ColumnsSinceStreamOrigin = """
         ALTER TABLE "MediaLibraries" DROP COLUMN "LocalMetadataMode";
@@ -203,8 +212,17 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await using var db = NewContext();
         await db.Database.MigrateAsync(cancellationToken);
         await seed(db);
-        await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(SinceRememberedChoices, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, RememberedChoicesMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildTrackPreferencesStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(IndexesSinceTrackPreferences, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, TrackPreferencesMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

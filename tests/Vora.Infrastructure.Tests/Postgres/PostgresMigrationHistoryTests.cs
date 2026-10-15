@@ -277,6 +277,45 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         kept.PreferHearingImpairedSubtitles.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task A_database_on_the_track_preferences_migration_only_lets_an_artist_have_two_albums_of_one_title()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var libraryId = Guid.NewGuid();
+        var artistId = Guid.NewGuid();
+        var blueId = Guid.NewGuid();
+        await legacy.BuildTrackPreferencesStateAsync(async db =>
+        {
+            db.Add(new MediaLibrary { Id = libraryId, Name = "Music", Type = LibraryType.Music, FolderPaths = ["/music"] });
+            db.Add(new Artist { Id = artistId, Name = "Weezer", LibraryId = libraryId });
+            db.Add(new Album { Id = blueId, Title = "Weezer", ArtistId = artistId, LibraryId = libraryId, Year = 1994 });
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await AlbumTitleIndexAsync(before, cancellationToken)).Should().Contain("UNIQUE");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        (await AlbumTitleIndexAsync(after, cancellationToken)).Should().NotContain("UNIQUE");
+        after.Add(new Album { Title = "Weezer", ArtistId = artistId, LibraryId = libraryId, Year = 2001 });
+        await after.SaveChangesAsync(cancellationToken);
+        (await after.Albums.CountAsync(a => a.ArtistId == artistId && a.Title == "Weezer", cancellationToken)).Should().Be(2);
+        (await after.Albums.AsNoTracking().SingleAsync(a => a.Id == blueId, cancellationToken)).Year.Should().Be(1994);
+    }
+
+    private static Task<string> AlbumTitleIndexAsync(VoraDbContext db, CancellationToken cancellationToken) =>
+        db.Database
+            .SqlQueryRaw<string>("SELECT indexdef AS \"Value\" FROM pg_indexes WHERE tablename = 'Albums' AND indexname = 'IX_Albums_ArtistId_Title'")
+            .SingleAsync(cancellationToken);
+
     private static Task<List<string>> TablesAsync(VoraDbContext db, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT table_name AS \"Value\" FROM information_schema.tables WHERE table_schema = current_schema()")

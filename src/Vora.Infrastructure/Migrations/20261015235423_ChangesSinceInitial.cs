@@ -178,11 +178,19 @@ CREATE TABLE IF NOT EXISTS ""ProfileTitlePlaybackChoices"" (
 );
 
 CREATE INDEX IF NOT EXISTS ""IX_ProfileTitlePlaybackChoices_TitleId"" ON ""ProfileTitlePlaybackChoices"" (""TitleId"");");
+
+            migrationBuilder.Sql(@"
+DROP INDEX IF EXISTS ""IX_Albums_ArtistId_Title"";
+CREATE INDEX ""IX_Albums_ArtistId_Title"" ON ""Albums"" (""ArtistId"", ""Title"");");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(@"
+DROP INDEX IF EXISTS ""IX_Albums_ArtistId_Title"";
+CREATE UNIQUE INDEX ""IX_Albums_ArtistId_Title"" ON ""Albums"" (""ArtistId"", ""Title"");");
+
             migrationBuilder.DropColumn(
                 name: "PreferredAudioLanguage",
                 table: "UserProfiles");

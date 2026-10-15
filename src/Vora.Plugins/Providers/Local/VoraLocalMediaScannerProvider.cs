@@ -1003,10 +1003,10 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var misplaced = new HashSet<string>(StringComparer.Ordinal);
         foreach (var track in placements.GroupBy(p => p.TrackId).Where(g => g.Count() > 1))
         {
-            var titled = track.Select(p => (Placement: p, Title: TagTitle(p.FilePath))).ToList();
-            if (titled.Any(t => t.Title == null)) continue;
+            var tagged = track.Select(p => (Placement: p, Tags: TagsOf(p.FilePath))).ToList();
+            if (tagged.Any(t => t.Tags == null)) continue;
 
-            var byTitle = titled.GroupBy(t => TrackTitles.Normalize(t.Title)).ToList();
+            var byTitle = tagged.GroupBy(t => TrackTitles.Normalize(t.Tags?.Title)).ToList();
             if (byTitle.Count < 2) continue;
 
             var first = track.First();
@@ -1014,6 +1014,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
             if (own.Count != 1) continue;
 
             misplaced.UnionWith(byTitle.Where(g => g != own[0]).SelectMany(g => g).Select(t => t.Placement.FilePath));
+            await _ingestionService.SetTrackIsrcAsync(first.TrackId, own[0].Select(t => t.Tags?.Isrc).FirstOrDefault(isrc => !string.IsNullOrWhiteSpace(isrc)));
         }
 
         var splitAlbums = new List<(Guid AlbumId, string KeptFolder)>();
@@ -1050,12 +1051,13 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         }
     }
 
-    private string? TagTitle(string filePath)
+    private (string Title, string? Isrc)? TagsOf(string filePath)
     {
         try
         {
             using var tagFile = TagLib.File.Create(filePath);
-            return string.IsNullOrWhiteSpace(tagFile.Tag.Title) ? Path.GetFileNameWithoutExtension(filePath) : tagFile.Tag.Title;
+            var title = string.IsNullOrWhiteSpace(tagFile.Tag.Title) ? Path.GetFileNameWithoutExtension(filePath) : tagFile.Tag.Title;
+            return (title, tagFile.Tag.ISRC);
         }
         catch (Exception ex)
         {
@@ -1220,132 +1222,143 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
                 foreach (var albumGroup in AlbumsOf(artistGroup))
                 {
-                    var sample = albumGroup.FirstOrDefault(p => p.ArtworkBytes != null);
-                    byte[]? albumArtworkBytes = sample?.ArtworkBytes;
-                    string? albumArtworkMime = sample?.ArtworkMimeType;
-                    byte[]? albumBackgroundBytes = null;
-                    string? albumBackgroundMime = null;
-
-                    var albumFolders = albumGroup
-                        .Select(p => Path.GetDirectoryName(p.FilePath))
-                        .Where(d => !string.IsNullOrEmpty(d))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-
-                    if (albumArtworkBytes == null)
+                    try
                     {
+                        var sample = albumGroup.FirstOrDefault(p => p.ArtworkBytes != null);
+                        byte[]? albumArtworkBytes = sample?.ArtworkBytes;
+                        string? albumArtworkMime = sample?.ArtworkMimeType;
+                        byte[]? albumBackgroundBytes = null;
+                        string? albumBackgroundMime = null;
+
+                        var albumFolders = albumGroup
+                            .Select(p => Path.GetDirectoryName(p.FilePath))
+                            .Where(d => !string.IsNullOrEmpty(d))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+
+                        if (albumArtworkBytes == null)
+                        {
+                            foreach (var folder in albumFolders)
+                            {
+                                var local = TryReadFolderArtwork(folder!, AlbumFolderArtworkNames, folderArtworkCache);
+                                if (local != null)
+                                {
+                                    albumArtworkBytes = local.Value.Bytes;
+                                    albumArtworkMime = local.Value.Mime;
+                                    break;
+                                }
+                            }
+                        }
+
                         foreach (var folder in albumFolders)
                         {
-                            var local = TryReadFolderArtwork(folder!, AlbumFolderArtworkNames, folderArtworkCache);
+                            var local = TryReadFolderArtwork(folder!, FolderBackgroundNames, folderArtworkCache);
                             if (local != null)
                             {
-                                albumArtworkBytes = local.Value.Bytes;
-                                albumArtworkMime = local.Value.Mime;
+                                albumBackgroundBytes = local.Value.Bytes;
+                                albumBackgroundMime = local.Value.Mime;
                                 break;
                             }
                         }
-                    }
 
-                    foreach (var folder in albumFolders)
+                        byte[]? albumDiscArtBytes = null;
+                        string? albumDiscArtMime = null;
+                        foreach (var folder in albumFolders)
+                        {
+                            var local = TryReadFolderArtwork(folder!, AlbumDiscArtNames, folderArtworkCache);
+                            if (local != null)
+                            {
+                                albumDiscArtBytes = local.Value.Bytes;
+                                albumDiscArtMime = local.Value.Mime;
+                                break;
+                            }
+                        }
+
+                        var albumArtistDisplay = albumGroup
+                            .Select(t => t.AlbumArtistTag)
+                            .FirstOrDefault(a => !string.IsNullOrWhiteSpace(a))
+                            ?? artistGroup.Key;
+                        var compilationFromTag = albumGroup.Any(t => t.IsCompilationFlag);
+                        var distinctTrackArtists = albumGroup
+                            .Select(t => t.TrackArtist)
+                            .Where(a => !string.IsNullOrWhiteSpace(a))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .Count();
+                        var isCompilation = compilationFromTag || distinctTrackArtists > 1;
+
+                        var albumId = await _ingestionService.EnsureAlbumAsync(
+                            library,
+                            artistId,
+                            albumGroup.Key,
+                            year: albumGroup.Select(t => t.Year).FirstOrDefault(y => y > 0) is int yr && yr > 0 ? yr : null,
+                            genre: albumGroup.Select(t => t.Genre).FirstOrDefault(g => !string.IsNullOrWhiteSpace(g)),
+                            artworkBytes: albumArtworkBytes,
+                            artworkMimeType: albumArtworkMime,
+                            backgroundBytes: albumBackgroundBytes,
+                            backgroundMimeType: albumBackgroundMime,
+                            discArtBytes: albumDiscArtBytes,
+                            discArtMimeType: albumDiscArtMime,
+                            albumArtist: albumArtistDisplay,
+                            isCompilation: isCompilation,
+                            albumFolders: albumGroup.Select(t => MusicAlbumFolders.AlbumFolder(t.FilePath)).Distinct(StringComparer.Ordinal).ToList());
+
+                        foreach (var track in albumGroup.OrderBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber))
+                        {
+                            written++;
+                            _progress.Report($"Saving {artistGroup.Key} - {albumGroup.Key} ({written}/{filesToProcess.Count})");
+
+                            // One unwritable track must not cost the library every track
+                            // queued behind it. This loop used to be unguarded, so a
+                            // single row the database rejected aborted the whole scan
+                            // task and left the library holding whatever happened to be
+                            // written first — an arbitrary subset, because the file order
+                            // is the filesystem's, not alphabetical.
+                            try
+                            {
+                                var trackId = await _ingestionService.EnsureTrackAsync(
+                                    library,
+                                    albumId,
+                                    track.TrackTitle,
+                                    track.TrackNumber,
+                                    track.DiscNumber > 0 ? track.DiscNumber : null,
+                                    track.DurationSeconds,
+                                    track.AudioCodec,
+                                    track.SampleRate,
+                                    track.Bitrate,
+                                    track.ContentRating,
+                                    trackArtist: track.TrackArtist,
+                                    isrc: track.Isrc);
+
+                                await _ingestionService.AddMediaPartAsync(trackId, track.FilePath, resolution: null, syncEdition: false);
+                                lastTrackId = trackId.Value;
+                            }
+                            catch (Exception ex)
+                            {
+                                failures++;
+                                _logger.LogError(ex, "Failed to ingest track {FilePath}; continuing with the rest of the library.", track.FilePath);
+                                await _ingestionService.ReleaseTrackedEntitiesAsync();
+                            }
+                        }
+
+                        // Every save re-runs change detection over everything tracked
+                        // so far, so a library-sized ingest on one DbContext gets
+                        // slower with each album. Nothing here holds an entity across
+                        // albums — only ids — so releasing them keeps that cost flat.
+                        await _ingestionService.ReleaseTrackedEntitiesAsync();
+                    }
+                    catch (Exception ex)
                     {
-                        var local = TryReadFolderArtwork(folder!, FolderBackgroundNames, folderArtworkCache);
-                        if (local != null)
-                        {
-                            albumBackgroundBytes = local.Value.Bytes;
-                            albumBackgroundMime = local.Value.Mime;
-                            break;
-                        }
+                        failures++;
+                        _logger.LogError(ex, "Failed to ingest album {Album} by {Artist}; continuing with the rest of the library.", albumGroup.Key, artistGroup.Key);
+                        await _ingestionService.ReleaseTrackedEntitiesAsync();
                     }
-
-                    byte[]? albumDiscArtBytes = null;
-                    string? albumDiscArtMime = null;
-                    foreach (var folder in albumFolders)
-                    {
-                        var local = TryReadFolderArtwork(folder!, AlbumDiscArtNames, folderArtworkCache);
-                        if (local != null)
-                        {
-                            albumDiscArtBytes = local.Value.Bytes;
-                            albumDiscArtMime = local.Value.Mime;
-                            break;
-                        }
-                    }
-
-                    var albumArtistDisplay = albumGroup
-                        .Select(t => t.AlbumArtistTag)
-                        .FirstOrDefault(a => !string.IsNullOrWhiteSpace(a))
-                        ?? artistGroup.Key;
-                    var compilationFromTag = albumGroup.Any(t => t.IsCompilationFlag);
-                    var distinctTrackArtists = albumGroup
-                        .Select(t => t.TrackArtist)
-                        .Where(a => !string.IsNullOrWhiteSpace(a))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .Count();
-                    var isCompilation = compilationFromTag || distinctTrackArtists > 1;
-
-                    var albumId = await _ingestionService.EnsureAlbumAsync(
-                        library,
-                        artistId,
-                        albumGroup.Key,
-                        year: albumGroup.Select(t => t.Year).FirstOrDefault(y => y > 0) is int yr && yr > 0 ? yr : null,
-                        genre: albumGroup.Select(t => t.Genre).FirstOrDefault(g => !string.IsNullOrWhiteSpace(g)),
-                        artworkBytes: albumArtworkBytes,
-                        artworkMimeType: albumArtworkMime,
-                        backgroundBytes: albumBackgroundBytes,
-                        backgroundMimeType: albumBackgroundMime,
-                        discArtBytes: albumDiscArtBytes,
-                        discArtMimeType: albumDiscArtMime,
-                        albumArtist: albumArtistDisplay,
-                        isCompilation: isCompilation,
-                        albumFolders: albumGroup.Select(t => MusicAlbumFolders.AlbumFolder(t.FilePath)).Distinct(StringComparer.Ordinal).ToList());
-
-                    foreach (var track in albumGroup.OrderBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber))
-                    {
-                        written++;
-                        _progress.Report($"Saving {artistGroup.Key} - {albumGroup.Key} ({written}/{filesToProcess.Count})");
-
-                        // One unwritable track must not cost the library every track
-                        // queued behind it. This loop used to be unguarded, so a
-                        // single row the database rejected aborted the whole scan
-                        // task and left the library holding whatever happened to be
-                        // written first — an arbitrary subset, because the file order
-                        // is the filesystem's, not alphabetical.
-                        try
-                        {
-                            var trackId = await _ingestionService.EnsureTrackAsync(
-                                library,
-                                albumId,
-                                track.TrackTitle,
-                                track.TrackNumber,
-                                track.DiscNumber > 0 ? track.DiscNumber : null,
-                                track.DurationSeconds,
-                                track.AudioCodec,
-                                track.SampleRate,
-                                track.Bitrate,
-                                track.ContentRating,
-                                trackArtist: track.TrackArtist,
-                                isrc: track.Isrc);
-
-                            await _ingestionService.AddMediaPartAsync(trackId, track.FilePath, resolution: null, syncEdition: false);
-                            lastTrackId = trackId.Value;
-                        }
-                        catch (Exception ex)
-                        {
-                            failures++;
-                            _logger.LogError(ex, "Failed to ingest track {FilePath}; continuing with the rest of the library.", track.FilePath);
-                        }
-                    }
-
-                    // Every save re-runs change detection over everything tracked
-                    // so far, so a library-sized ingest on one DbContext gets
-                    // slower with each album. Nothing here holds an entity across
-                    // albums — only ids — so releasing them keeps that cost flat.
-                    await _ingestionService.ReleaseTrackedEntitiesAsync();
                 }
             }
             catch (Exception ex)
             {
                 failures++;
                 _logger.LogError(ex, "Failed to ingest artist {Artist}; continuing with the rest of the library.", artistGroup.Key);
+                await _ingestionService.ReleaseTrackedEntitiesAsync();
             }
         }
 
