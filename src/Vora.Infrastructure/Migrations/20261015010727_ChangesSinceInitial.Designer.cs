@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261014181817_ChangesSinceInitial")]
+    [Migration("20261015010727_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -4400,6 +4400,17 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<bool>("PreferHearingImpairedSubtitles")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("PreferredAudioLanguage")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("PreferredSubtitleLanguage")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<string>("ProfileImageUrl")
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
@@ -4421,6 +4432,9 @@ namespace Vora.Infrastructure.Migrations
 
                     b.Property<string>("ShowtimesLocation")
                         .HasColumnType("text");
+
+                    b.Property<int?>("SubtitleMode")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");

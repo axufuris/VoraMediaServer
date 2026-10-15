@@ -10,11 +10,12 @@ namespace Vora.Application.Tests.Streaming;
 // on top of it.
 public class ForeignAudioSubtitleTests
 {
-    private static ServerSetting Settings(bool foreignAudioRule, string language = "eng") => new()
-    {
-        AutoEnableSubtitlesForForeignAudio = foreignAudioRule,
-        MetadataLanguage = language
-    };
+    private static SubtitlePreference Settings(bool foreignAudioRule, string language = "eng") =>
+        TrackPreferences.Automatic.SubtitlesOn(new ServerSetting
+        {
+            AutoEnableSubtitlesForForeignAudio = foreignAudioRule,
+            MetadataLanguage = language
+        });
 
     private static SubtitleStreamInfoDto Sub(string name, string? language, bool forced = false, bool sdh = false) => new()
     {

@@ -52,6 +52,12 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
         return seasonShow ?? mediaId;
     }
 
+    public Task<TrackPreferences?> GetTrackPreferencesAsync(Guid profileId) =>
+        context.Set<UserProfile>().AsNoTracking()
+            .Where(p => p.Id == profileId)
+            .Select(p => new TrackPreferences(p.PreferredAudioLanguage, p.SubtitleMode, p.PreferredSubtitleLanguage, p.PreferHearingImpairedSubtitles))
+            .FirstOrDefaultAsync();
+
     public Task<ProfileTitlePlaybackChoice?> GetRememberedChoiceAsync(Guid profileId, string deviceId, Guid titleId) =>
         context.ProfileTitlePlaybackChoices.AsNoTracking()
             .FirstOrDefaultAsync(c => c.ProfileId == profileId && c.DeviceId == deviceId && c.TitleId == titleId);

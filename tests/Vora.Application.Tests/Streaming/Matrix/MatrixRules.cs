@@ -60,7 +60,7 @@ public static class MatrixRules
             (s, o) => s.Client.IsBrowser && o.Reason.Contains("Downmix", StringComparison.Ordinal)),
         Rule("The track the server picked is the track heard",
             (s, o) => o.Heard != o.Selected),
-        Rule("Automatic stays in the dialogue language and off the commentary",
+        Rule("Automatic stays in the profile's audio language when the file has it, otherwise the dialogue language, and off the commentary",
             (s, o) => s.PicksTrackAutomatically && !Eligible(o.Version, s).Contains(o.Selected)),
         Rule("A track picked by hand plays, except that Direct and Bitrate play one in its language that needs no conversion when it would need one",
             (s, o) => s.ManualTrack != null && !Eligible(o.Version, s).Contains(o.Selected)),
@@ -155,6 +155,8 @@ public static class MatrixRules
 
         var tracks = version.Tracks.Where(track => !track.Commentary).ToList();
         if (tracks.Count == 0) tracks = version.Tracks.ToList();
+        var preferred = tracks.Where(track => track.Language == s.PreferredLanguage).ToList();
+        if (preferred.Count > 0) return preferred;
         var sameLanguage = tracks.Where(track => track.Language == version.Default.Language).ToList();
         return sameLanguage.Count > 0 ? sameLanguage : tracks;
     }

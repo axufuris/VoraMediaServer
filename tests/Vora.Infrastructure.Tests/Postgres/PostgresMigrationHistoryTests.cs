@@ -241,9 +241,47 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         kept.LocalMetadataMode.Should().Be(LocalMetadataMode.Prefer);
     }
 
+    [Fact]
+    public async Task A_database_on_the_remembered_choices_migration_only_gains_the_profile_track_preferences_set_to_automatic()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var userId = Guid.NewGuid();
+        var profileId = Guid.NewGuid();
+        await legacy.BuildRememberedChoicesStateAsync(async db =>
+        {
+            db.Add(new User { Id = userId, Email = "viewer@example.com", DisplayName = "Viewer" });
+            db.Add(new UserProfile { Id = profileId, Name = "Viewer", UserId = userId, AutoSkipIntro = true });
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ProfileColumnsAsync(before, cancellationToken)).Should().NotContain("PreferredAudioLanguage").And.NotContain("SubtitleMode");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var kept = await after.UserProfiles.AsNoTracking().SingleAsync(p => p.Id == profileId, cancellationToken);
+        kept.AutoSkipIntro.Should().BeTrue();
+        kept.PreferredAudioLanguage.Should().BeNull();
+        kept.PreferredSubtitleLanguage.Should().BeNull();
+        kept.SubtitleMode.Should().BeNull();
+        kept.PreferHearingImpairedSubtitles.Should().BeFalse();
+    }
+
     private static Task<List<string>> TablesAsync(VoraDbContext db, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT table_name AS \"Value\" FROM information_schema.tables WHERE table_schema = current_schema()")
+            .ToListAsync(cancellationToken);
+
+    private static Task<List<string>> ProfileColumnsAsync(VoraDbContext db, CancellationToken cancellationToken) =>
+        db.Database
+            .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'UserProfiles'")
             .ToListAsync(cancellationToken);
 
     private static Task<List<string>> LibraryColumnsAsync(VoraDbContext db, CancellationToken cancellationToken) =>

@@ -61,7 +61,8 @@ public static class MatrixRunner
         };
 
         var decision = await new BestPathDecisionManager(settings).DetermineBestPathAsync(device, media, scenario.Situation.LimitKbps, scenario.Situation.LimitSource,
-            requestedAudioId: manualTrack, requestedSubtitleId: subtitle, requestedMaxResolution: scenario.MaxHeight, requestedMediaPartId: manualVersion, audioOutput: audioOutput, hlsVideoCodecs: client.HlsVideo);
+            requestedAudioId: manualTrack, requestedSubtitleId: subtitle, requestedMaxResolution: scenario.MaxHeight, requestedMediaPartId: manualVersion, audioOutput: audioOutput, hlsVideoCodecs: client.HlsVideo,
+            preferences: scenario.PreferredLanguage == null ? null : new TrackPreferences(scenario.PreferredLanguage, null, null, false));
 
         var chosenVersion = versions[decision.SelectedMediaPartId];
         var selected = tracks[decision.SelectedAudioTrackId];

@@ -136,6 +136,12 @@ public static class MatrixCatalog
         new("HDR downscale set to Always", HdrDownscaleAlways: true),
     ];
 
+    private static IEnumerable<string> PreferredLanguages(MatrixVersion version)
+    {
+        var others = version.Tracks.Select(track => track.Language).Where(language => language != version.Default.Language).Distinct().ToList();
+        return others.Count > 0 ? others : ["deu"];
+    }
+
     private static readonly StreamingProfile[] Profiles =
         [StreamingProfile.DirectStreamPreference, StreamingProfile.ClientPreference, StreamingProfile.BandwidthOptimized];
 
@@ -155,6 +161,12 @@ public static class MatrixCatalog
 
             var tracks = title.Versions[0].Tracks;
             if (tracks.Length > 1 && title.Versions.Length == 1) yield return new(title, client, profile, 0, 0, tracks[^1].Label, Plain);
+
+            foreach (var language in PreferredLanguages(title.Versions[0]))
+            {
+                yield return new(title, client, profile, 0, 0, null, Plain, PreferredLanguage: language);
+                yield return new(title, client, profile, 2, 0, null, Plain, PreferredLanguage: language);
+            }
 
             if (title.Versions.Length > 1)
             {

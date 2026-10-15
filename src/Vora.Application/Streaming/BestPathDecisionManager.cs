@@ -10,7 +10,7 @@ namespace Vora.Application.Streaming;
 
 public interface IBestPathDecisionManager
 {
-    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null);
+    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null, TrackPreferences? preferences = null);
 }
 
 public class BestPathDecisionManager : IBestPathDecisionManager
@@ -35,9 +35,11 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         public StreamOptionLogDto? Log { get; set; }
     }
 
-    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null)
+    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null, TrackPreferences? preferences = null)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
+        var trackPreferences = preferences ?? TrackPreferences.Automatic;
+        var subtitlePreference = trackPreferences.SubtitlesOn(settings);
         var audioLimits = AudioOutputLimits.Resolve(client.MaxAudioChannels, audioOutput, settings.StreamingProfile);
         bool clientSwitchesTracks = audioOutput is { CanSwitchTracks: true };
         var hlsVideo = HlsVideoCarriage.For(client.DeviceType, hlsVideoCodecs);
@@ -93,24 +95,14 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             var primaryAudioTrack = audioInFileOrder.FirstOrDefault(t => t.IsDefault) ?? audioInFileOrder.FirstOrDefault();
             bool everyPlayerStartsOnPrimary = primaryAudioTrack?.Id == audioInFileOrder.FirstOrDefault()?.Id;
 
-            var subTrack = wish.SubtitleFor(part, () => PickAutomaticSubtitle(part.SubtitleTracks, primaryAudioTrack?.Language, settings));
+            var wishedAudio = wish.Audio == null ? [] : part.AudioTracks.Where(wish.AudioFamily).ToList();
+            var audioTracksToEvaluate = wishedAudio.Count > 0 ? wishedAudio : AutomaticAudioTracks(part.AudioTracks, trackPreferences.AudioLanguage, primaryAudioTrack);
+            var heardLanguage = (audioTracksToEvaluate.FirstOrDefault(track => track.Id == primaryAudioTrack?.Id) ?? audioTracksToEvaluate.FirstOrDefault())?.Language;
+
+            var subTrack = wish.SubtitleFor(part, () => PickAutomaticSubtitle(part.SubtitleTracks, heardLanguage, subtitlePreference));
 
             var subCodec = subTrack?.Codec?.ToLower() ?? "";
             bool requiresBurnIn = subTrack != null && IsImageSubtitleCodec(subCodec);
-
-            var wishedAudio = wish.Audio == null ? [] : part.AudioTracks.Where(wish.AudioFamily).ToList();
-            var audioTracksToEvaluate = wishedAudio.Count > 0 ? wishedAudio : part.AudioTracks;
-            if (wishedAudio.Count == 0)
-            {
-                var mainTracks = audioTracksToEvaluate.Where(track => !PlaybackWish.IsCommentary(track)).ToList();
-                if (mainTracks.Count > 0) audioTracksToEvaluate = mainTracks;
-                if (MetadataLanguageCodes.Normalize(primaryAudioTrack?.Language) != null)
-                {
-                    var sameLanguage = audioTracksToEvaluate
-                        .Where(track => MetadataLanguageCodes.SameLanguage(track.Language, primaryAudioTrack?.Language)).ToList();
-                    if (sameLanguage.Count > 0) audioTracksToEvaluate = sameLanguage;
-                }
-            }
 
             int bitrateKbps = (int)((part.OverallBitrate ?? 3000000) / 1000);
             bool exceedsBandwidth = maxAllowedBandwidthKbps > 0 && bitrateKbps > maxAllowedBandwidthKbps;
@@ -495,32 +487,46 @@ public class BestPathDecisionManager : IBestPathDecisionManager
     }
 
     // What plays when the client asked for a part but not for a subtitle. The
-    // flag-driven pick is the baseline; AutoEnableSubtitlesForForeignAudio adds
-    // the case a flag cannot express — a title whose own audio is in a language
-    // this server does not read, where the right track is the one in the
-    // server's language even though nothing in the file marks it as special.
+    // flag-driven pick is the baseline (Default); Smart adds the case a flag
+    // cannot express — a title whose own audio is in a language other than the
+    // profile's subtitle language, where the right track is the one in that
+    // language even though nothing in the file marks it as special. A profile
+    // that has not chosen a mode gets Smart when the server's
+    // AutoEnableSubtitlesForForeignAudio is on.
     //
     // An audio track with no language tag is left to the baseline. Most of those
     // are ordinary local rips in the server's own language, and reading "no tag"
     // as "foreign" would put subtitles on half a library.
-    public static SubtitleStreamInfoDto? PickAutomaticSubtitle(List<SubtitleStreamInfoDto> tracks, string? audioLanguage, ServerSetting settings)
+    public static SubtitleStreamInfoDto? PickAutomaticSubtitle(List<SubtitleStreamInfoDto> tracks, string? audioLanguage, SubtitlePreference preference)
     {
-        var flagged = tracks.FirstOrDefault(s => s.IsForced) ?? tracks.FirstOrDefault(s => s.IsDefault);
+        var inLanguage = tracks.Where(s => MetadataLanguageCodes.SameLanguage(s.Language, preference.Language)).ToList();
+        IEnumerable<SubtitleStreamInfoDto> ByHearing(IEnumerable<SubtitleStreamInfoDto> candidates) =>
+            candidates.OrderBy(s => s.IsHearingImpaired != preference.PreferHearingImpaired);
 
-        if (!settings.AutoEnableSubtitlesForForeignAudio) return flagged;
-        if (MetadataLanguageCodes.Normalize(audioLanguage) == null) return flagged;
-        if (MetadataLanguageCodes.SameLanguage(audioLanguage, settings.MetadataLanguage)) return flagged;
+        var forced = ByHearing(inLanguage.Where(s => s.IsForced)).FirstOrDefault() ?? tracks.FirstOrDefault(s => s.IsForced);
+        var flagged = forced ?? tracks.FirstOrDefault(s => s.IsDefault);
+        var audioIsForeign = MetadataLanguageCodes.Normalize(audioLanguage) != null && !MetadataLanguageCodes.SameLanguage(audioLanguage, preference.Language);
 
-        var inServerLanguage = tracks
-            .Where(s => MetadataLanguageCodes.SameLanguage(s.Language, settings.MetadataLanguage))
-            .ToList();
+        return preference.Mode switch
+        {
+            SubtitleMode.Off => null,
+            SubtitleMode.ForcedOnly => forced,
+            SubtitleMode.Always => ByHearing(inLanguage.Where(s => !s.IsForced)).FirstOrDefault() ?? ByHearing(inLanguage).FirstOrDefault() ?? flagged,
+            SubtitleMode.Smart when audioIsForeign => ByHearing(inLanguage.Where(s => s.IsForced)).FirstOrDefault() ?? ByHearing(inLanguage).FirstOrDefault() ?? flagged,
+            _ => flagged
+        };
+    }
 
-        if (inServerLanguage.Count == 0) return flagged;
+    private static List<TrackStreamInfoDto> AutomaticAudioTracks(List<TrackStreamInfoDto> tracks, string? preferredLanguage, TrackStreamInfoDto? primary)
+    {
+        var mainTracks = tracks.Where(track => !PlaybackWish.IsCommentary(track)).ToList();
+        var candidates = mainTracks.Count > 0 ? mainTracks : tracks;
 
-        return inServerLanguage.FirstOrDefault(s => s.IsForced && !s.IsHearingImpaired)
-            ?? inServerLanguage.FirstOrDefault(s => s.IsForced)
-            ?? inServerLanguage.FirstOrDefault(s => !s.IsHearingImpaired)
-            ?? inServerLanguage[0];
+        var preferred = candidates.Where(track => MetadataLanguageCodes.SameLanguage(track.Language, preferredLanguage)).ToList();
+        if (preferred.Count > 0) return preferred;
+
+        var primaryLanguage = candidates.Where(track => MetadataLanguageCodes.SameLanguage(track.Language, primary?.Language)).ToList();
+        return primaryLanguage.Count > 0 ? primaryLanguage : candidates;
     }
 
     public static bool IsImageSubtitleCodec(string? codec)

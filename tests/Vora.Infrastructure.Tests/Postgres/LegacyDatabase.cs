@@ -88,9 +88,18 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string LocalMetadataMigration = "20261013214138_ChangesSinceInitial";
 
+    public const string RememberedChoicesMigration = "20261014181817_ChangesSinceInitial";
+
+    private const string ColumnsSinceRememberedChoices = """
+        ALTER TABLE "UserProfiles" DROP COLUMN "PreferredAudioLanguage";
+        ALTER TABLE "UserProfiles" DROP COLUMN "PreferredSubtitleLanguage";
+        ALTER TABLE "UserProfiles" DROP COLUMN "SubtitleMode";
+        ALTER TABLE "UserProfiles" DROP COLUMN "PreferHearingImpairedSubtitles";
+        """;
+
     private const string TablesSinceLocalMetadata = """
         DROP TABLE "ProfileTitlePlaybackChoices";
-        """;
+        """ + ColumnsSinceRememberedChoices;
 
     private const string ColumnsSinceStreamOrigin = """
         ALTER TABLE "MediaLibraries" DROP COLUMN "LocalMetadataMode";
@@ -172,6 +181,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(TablesSinceLocalMetadata, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, LocalMetadataMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildRememberedChoicesStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, RememberedChoicesMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

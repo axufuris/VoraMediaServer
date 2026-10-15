@@ -1,3 +1,5 @@
+using Vora.Domain.Enums;
+
 namespace Vora.Domain.Entities.Users;
 
 public class UserProfile
@@ -39,6 +41,11 @@ public class UserProfile
     public bool AutoSkipIntro { get; set; }
     public bool AutoSkipCredits { get; set; }
     public int MinimumCreditsSceneSeconds { get; set; } = 15;
+
+    public string? PreferredAudioLanguage { get; set; }
+    public string? PreferredSubtitleLanguage { get; set; }
+    public SubtitleMode? SubtitleMode { get; set; }
+    public bool PreferHearingImpairedSubtitles { get; set; }
 
     public string? ClientTemplateId { get; set; }
     public string? ScheduleOverrideTemplateId { get; set; }

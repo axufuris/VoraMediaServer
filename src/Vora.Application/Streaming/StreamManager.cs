@@ -125,6 +125,7 @@ public class StreamManager : IStreamManager
         var remembered = profileId.HasValue
             ? await _repository.GetRememberedChoiceAsync(profileId.Value, deviceId, await _repository.ResolveTitleIdAsync(mediaId))
             : null;
+        var preferences = profileId.HasValue ? await _repository.GetTrackPreferencesAsync(profileId.Value) : null;
 
         var settings = await _settingsRepo.GetSettingsAsync();
 
@@ -187,7 +188,7 @@ public class StreamManager : IStreamManager
             }
         }
 
-        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput, capabilities?.HlsVideoCodecs, remembered);
+        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput, capabilities?.HlsVideoCodecs, remembered, preferences);
 
         return (decision, mediaInfo, client, mediaId);
     }
@@ -215,7 +216,8 @@ public class StreamManager : IStreamManager
 
         await _repository.EndActiveSessionsForDeviceAsync(client.Id);
 
-        var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, 0, "None", null, null, null, capabilities?.RequestedMaxResolution ?? 0, audioOutput: capabilities?.AudioOutput, hlsVideoCodecs: capabilities?.HlsVideoCodecs);
+        var preferences = profileId.HasValue ? await _repository.GetTrackPreferencesAsync(profileId.Value) : null;
+        var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, 0, "None", null, null, null, capabilities?.RequestedMaxResolution ?? 0, audioOutput: capabilities?.AudioOutput, hlsVideoCodecs: capabilities?.HlsVideoCodecs, preferences: preferences);
         var (address, location) = await WhereFromAsync(client, clientAddress);
 
         var selectedPart = streamInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);
