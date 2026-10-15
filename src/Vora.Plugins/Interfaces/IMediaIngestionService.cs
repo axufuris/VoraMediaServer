@@ -11,6 +11,7 @@ public interface IMediaIngestionService
     Task<HashSet<string>> GetExistingLibraryPathsAsync(LibraryHandle library);
     Task SetEpisodeRangesAsync(LibraryHandle library, IReadOnlyDictionary<string, EpisodeRange> rangeByFile);
     Task<List<string>> GetFirstEpisodeFilePathsAsync(LibraryHandle library);
+    Task ReportUnreadableEpisodeFilesAsync(LibraryHandle library, IReadOnlyList<string> filePaths);
     Task<List<string>> GetLibraryItemFilePathsAsync(LibraryHandle library);
     Task RemoveMediaItemByPathAsync(string filePath);
     Task ReleaseTrackedEntitiesAsync();

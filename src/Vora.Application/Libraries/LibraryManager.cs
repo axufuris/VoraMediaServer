@@ -28,6 +28,7 @@ public interface ILibraryManager
     Task<Guid?> TriggerMusicFileScanAsync(Guid libraryId, string filePath, CancellationToken cancellationToken = default);
     Task DeleteLibraryAsync(Guid id, CancellationToken cancellationToken = default);
     Task ToggleWatchingAsync(Guid libraryId, bool enable);
+    Task<EpisodeNamePreviewVM> PreviewEpisodeFileNamesAsync(PreviewEpisodeFileNamesRequest request);
 }
 
 public class LibraryManager : ILibraryManager
@@ -113,12 +114,36 @@ public class LibraryManager : ILibraryManager
         if (library == null) return null;
 
         library.IsBeingWatched = _folderWatcher.IsWatching(library.Id);
+        if (library.Type == nameof(LibraryType.TvShow) && LocalScannerPatterns.IsBuiltInTvEpisode(library.ScannerRegex))
+        {
+            library.ScannerRegex = null;
+        }
         return library;
     }
 
-    private static string ResolveScannerRegex(LibraryType type, string? requested)
+    private const int EpisodeNamePreviewSample = 150;
+
+    public async Task<EpisodeNamePreviewVM> PreviewEpisodeFileNamesAsync(PreviewEpisodeFileNamesRequest request)
     {
-        if (type == LibraryType.TvShow) return LocalScannerPatterns.EffectiveTvEpisode(requested);
+        var folders = request.FolderPaths.Where(path => !string.IsNullOrWhiteSpace(path)).ToList();
+        if (folders.Count == 0) throw new ArgumentException("Add a folder to the library to check its file names.");
+
+        using var scope = _serviceProvider.CreateScope();
+        var scanner = await ResolveScannerAsync(scope.ServiceProvider)
+            ?? throw new InvalidOperationException("No local media scanner is installed.");
+        var pattern = LocalScannerPatterns.IsBuiltInTvEpisode(request.ScannerRegex) ? null : request.ScannerRegex;
+        var preview = await scanner.PreviewEpisodeFileNamesAsync(folders, pattern, request.ExcludeFilters ?? [], EpisodeNamePreviewSample);
+        return EpisodeNamePreviewVM.From(preview);
+    }
+
+    private static string? ResolveScannerRegex(LibraryType type, string? requested)
+    {
+        if (type == LibraryType.TvShow)
+        {
+            if (LocalScannerPatterns.IsBuiltInTvEpisode(requested)) return null;
+            if (EpisodeFileNames.ProblemWith(requested) is { } problem) throw new ArgumentException(problem);
+            return requested?.Trim();
+        }
         return string.IsNullOrWhiteSpace(requested) ? DefaultScannerRegex(type) : requested;
     }
 

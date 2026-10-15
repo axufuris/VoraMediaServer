@@ -659,4 +659,98 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
         units.SelectMany(unit => unit.FilePaths).Should().Equal(biscuits);
         await _ingestion.Received(1).RemoveMediaItemByPathAsync(biscuits);
     }
+
+    [Fact]
+    public async Task A_library_scan_reports_the_files_it_cannot_place_once_and_leaves_them_out()
+    {
+        var pilot = WriteFile(Path.Combine("Ted Lasso", "Season 1", "Ted Lasso.1x1 - Pilot.mkv"), "");
+        var bonus = WriteFile(Path.Combine("Some Show", "Season 1", "Bonus Material Final.mkv"), "");
+        var behind = WriteFile(Path.Combine("Some Show", "Season 1", "Behind It All.mkv"), "");
+
+        var units = await _scanner.DiscoverTvScanUnitsAsync(_library.Value);
+
+        units.SelectMany(unit => unit.FilePaths).Should().Equal(pilot);
+        await _ingestion.Received(1).ReportUnreadableEpisodeFilesAsync(Arg.Any<LibraryHandle>(),
+            Arg.Is<IReadOnlyList<string>>(files => files.SequenceEqual(new[] { behind, bonus })));
+    }
+
+    [Fact]
+    public async Task A_folder_scan_reports_the_files_it_left_out()
+    {
+        var bonus = WriteFile(Path.Combine("Some Show", "Season 1", "Bonus Material Final.mkv"), "");
+        TouchFile(Path.Combine("Some Show", "Season 1", "Some Show - S01E01 - Pilot.mkv"));
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).ReportUnreadableEpisodeFilesAsync(Arg.Any<LibraryHandle>(), Arg.Is<IReadOnlyList<string>>(files => files.Single() == bonus));
+    }
+
+    [Fact]
+    public async Task The_folder_watcher_reports_a_new_file_it_cannot_place()
+    {
+        var bonus = WriteFile(Path.Combine("Some Show", "Season 1", "Bonus Material Final.mkv"), "");
+
+        var result = await _scanner.ScanTvFileAsync(_library.Value, bonus);
+
+        result.Should().Be(ScanFileResult.None);
+        await _ingestion.Received(1).ReportUnreadableEpisodeFilesAsync(Arg.Any<LibraryHandle>(), Arg.Is<IReadOnlyList<string>>(files => files.Single() == bonus));
+    }
+
+    [Fact]
+    public async Task A_scan_that_places_every_file_reports_nothing()
+    {
+        TouchFile(Path.Combine("Ted Lasso", "Season 1", "Ted Lasso.1x1 - Pilot.mkv"));
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.DidNotReceive().ReportUnreadableEpisodeFilesAsync(Arg.Any<LibraryHandle>(), Arg.Any<IReadOnlyList<string>>());
+    }
+
+    [Fact]
+    public async Task The_file_name_check_says_how_each_file_is_read_with_the_unreadable_ones_first()
+    {
+        TouchFile(Path.Combine("Ted Lasso", "Season 1", "Ted Lasso.1x1 - Pilot.mkv"));
+        TouchFile(Path.Combine("1883 (2021)", "Season 01", "1883 (2021) - S01E02 - Behind Us A Cliff [Bluray-1080p][TrueHD 5.1]-MJOLNiR.mkv"));
+        TouchFile(Path.Combine("Some Show", "Season 2", "The Long Way Home.mkv"));
+        WriteFile(Path.Combine("Some Show", "Season 2", "The Long Way Home.nfo"), "<episodedetails><season>2</season><episode>5</episode></episodedetails>");
+        TouchFile(Path.Combine("Some Show", "Season 2", "07 - Lucky Seven.mkv"));
+        TouchFile(Path.Combine("Some Show", "Season 1", "Bonus Material Final.mkv"));
+        TouchFile(Path.Combine("Some Show", "Season 1", "Some Show - S01E01 - Pilot-trailer.mkv"));
+        TouchFile(Path.Combine("Some Show", "Season 1", "Some Show - S01E03 - Draft.TDARR.mkv"));
+
+        var preview = await _scanner.PreviewEpisodeFileNamesAsync([_tempRoot], null, [".TDARR"], 10);
+
+        preview.FilesFound.Should().Be(5);
+        (preview.ReadFromName, preview.ReadFromDocument, preview.Guessed, preview.Unreadable).Should().Be((2, 1, 1, 1));
+        preview.PatternProblem.Should().BeNull();
+        preview.AutomaticUnreadable.Should().BeNull();
+        preview.Files[0].Should().Be(new EpisodeNamePreviewFileDto(Path.Combine("Some Show", "Season 1", "Bonus Material Final.mkv"), EpisodeNamePreviewOutcome.Unreadable, null, null, null, null));
+        preview.Files.Should().ContainEquivalentOf(new EpisodeNamePreviewFileDto(Path.Combine("Some Show", "Season 2", "The Long Way Home.mkv"), EpisodeNamePreviewOutcome.Document, 2, 5, null, null));
+        preview.Files.Should().ContainEquivalentOf(new EpisodeNamePreviewFileDto(Path.Combine("Ted Lasso", "Season 1", "Ted Lasso.1x1 - Pilot.mkv"), EpisodeNamePreviewOutcome.Name, 1, 1, null, "Pilot"));
+    }
+
+    [Fact]
+    public async Task The_file_name_check_compares_a_custom_pattern_with_reading_automatically()
+    {
+        TouchFile(Path.Combine("Some Show", "Season 1", "Pilot [2.07].mkv"));
+        TouchFile(Path.Combine("Some Show", "Season 1", "Some Show - S01E02 - Second.mkv"));
+        TouchFile(Path.Combine("Some Show", "Season 1", "Bonus Material Final.mkv"));
+
+        var preview = await _scanner.PreviewEpisodeFileNamesAsync([_tempRoot], @"^(?<EpisodeTitle>.+?) \[(?<Season>\d+)\.(?<Episode>\d+)\]$", [], 10);
+
+        preview.Unreadable.Should().Be(1);
+        preview.AutomaticUnreadable.Should().Be(2);
+        preview.AutomaticReadsDifferently.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task The_file_name_check_reports_a_pattern_that_cannot_be_used_and_reads_automatically()
+    {
+        TouchFile(Path.Combine("Ted Lasso", "Season 1", "Ted Lasso.1x1 - Pilot.mkv"));
+
+        var preview = await _scanner.PreviewEpisodeFileNamesAsync([_tempRoot], @"(?<Episode>\d+", [], 10);
+
+        preview.PatternProblem.Should().Contain("isn't a valid regular expression");
+        preview.ReadFromName.Should().Be(1);
+    }
 }

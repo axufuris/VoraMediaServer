@@ -25,4 +25,6 @@ public interface ILocalMediaScannerProvider : IVoraPlugin
     Task<Guid?> ScanMovieFileAsync(Guid libraryId, string filePath);
     Task<ScanFileResult> ScanTvFileAsync(Guid libraryId, string filePath);
     Task<Guid?> ScanMusicFileAsync(Guid libraryId, string filePath);
+
+    Task<EpisodeNamePreviewDto> PreviewEpisodeFileNamesAsync(IReadOnlyList<string> folderPaths, string? scannerRegex, IReadOnlyList<string> excludeFilters, int sampleSize);
 }
