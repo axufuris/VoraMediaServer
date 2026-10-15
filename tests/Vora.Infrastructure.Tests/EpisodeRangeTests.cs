@@ -6,6 +6,7 @@ using Vora.Domain.Entities.Media;
 using Vora.Domain.Enums;
 using Vora.Infrastructure.Persistence;
 using Vora.Infrastructure.Persistence.Repositories;
+using Vora.Plugins.Dtos;
 
 namespace Vora.Infrastructure.Tests;
 
@@ -46,7 +47,7 @@ public class EpisodeRangeTests
         var christmas = AddEpisode(9, DoubleEpisode);
         var spirit = AddEpisode(11, SingleEpisode);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
-        var ranges = new Dictionary<string, int> { [DoubleEpisode] = 10 };
+        var ranges = new Dictionary<string, EpisodeRange> { [DoubleEpisode] = new(9, 10) };
 
         (await Repo().SetEpisodeEndNumbersAsync(_libraryId, ranges)).Should().Be(1);
         (await Repo().SetEpisodeEndNumbersAsync(_libraryId, ranges)).Should().Be(0);
@@ -61,9 +62,40 @@ public class EpisodeRangeTests
         var christmas = AddEpisode(9, DoubleEpisode);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        (await Repo().SetEpisodeEndNumbersAsync(Guid.NewGuid(), new Dictionary<string, int> { [DoubleEpisode] = 10 })).Should().Be(0);
+        (await Repo().SetEpisodeEndNumbersAsync(Guid.NewGuid(), new Dictionary<string, EpisodeRange> { [DoubleEpisode] = new(9, 10) })).Should().Be(0);
 
         christmas.EndEpisodeNumber.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_range_is_only_recorded_on_the_episode_its_file_starts_at()
+    {
+        var stacked = AddEpisode(1, DoubleEpisode);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        (await Repo().SetEpisodeEndNumbersAsync(_libraryId, new Dictionary<string, EpisodeRange> { [DoubleEpisode] = new(9, 10) })).Should().Be(0);
+
+        stacked.EndEpisodeNumber.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task The_files_on_the_first_episode_of_the_first_season_are_found_and_no_others()
+    {
+        var show = new TvShow { Title = "Ted Lasso", LibraryId = _libraryId };
+        var firstSeason = new Season { Title = "Season 1", SeasonNumber = 1, TvShowId = show.Id, LibraryId = _libraryId };
+        var pilot = new Episode { Title = "Pilot", EpisodeNumber = 1, SeasonId = firstSeason.Id, LibraryId = _libraryId };
+        pilot.MediaParts.Add(new MediaPart { FilePath = "/media/tv/Ted Lasso/Season 1/Ted Lasso.1x1 - Pilot.mkv", MediaItemId = pilot.Id });
+        pilot.MediaParts.Add(new MediaPart { FilePath = "/media/tv/Ted Lasso/Season 1/Ted Lasso.1x2 - Biscuits.mkv", MediaItemId = pilot.Id });
+        var biscuits = new Episode { Title = "Biscuits", EpisodeNumber = 2, SeasonId = firstSeason.Id, LibraryId = _libraryId };
+        biscuits.MediaParts.Add(new MediaPart { FilePath = "/media/tv/Ted Lasso/Season 1/Ted Lasso - S01E02 - Biscuits.mkv", MediaItemId = biscuits.Id });
+        _db.AddRange(show, firstSeason, pilot, biscuits);
+        AddEpisode(1, "/media/tv/Ghosts (US) (2021)/Season 05/Ghosts (US) (2021) - S05E01 - Hello.mkv");
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        (await Repo().GetFirstEpisodeFilePathsAsync(_libraryId)).Should().BeEquivalentTo(
+            "/media/tv/Ted Lasso/Season 1/Ted Lasso.1x1 - Pilot.mkv",
+            "/media/tv/Ted Lasso/Season 1/Ted Lasso.1x2 - Biscuits.mkv");
+        (await Repo().GetFirstEpisodeFilePathsAsync(Guid.NewGuid())).Should().BeEmpty();
     }
 
     [Fact]

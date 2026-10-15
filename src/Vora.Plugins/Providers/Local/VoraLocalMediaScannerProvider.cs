@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 using Vora.Plugins.Dtos;
@@ -93,8 +92,9 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var library = LibraryHandle.FromGuid(libraryId);
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
         var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
-        var (episodeRegex, _, _, _) = BuildTvRegexes(details.ScannerRegex);
-        await RepairEpisodeRangesAsync(library, details.FolderPaths, existing, episodeRegex);
+        var (episodeNames, _, _, _) = BuildTvRegexes(details.ScannerRegex);
+        await SeparateFilesStackedOnTheFirstEpisodeAsync(library, details.FolderPaths, existing, episodeNames, new LocalMediaFolders(_logger));
+        await RepairEpisodeRangesAsync(library, details.FolderPaths, existing, episodeNames);
         var newFiles = GetNewFilesInDirectories(details.FolderPaths, existing)
             .Where(f => !IsExcluded(f, details.ExcludeFilters))
             .ToList();
@@ -132,7 +132,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
     {
         var library = LibraryHandle.FromGuid(libraryId);
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
-        var (episodeRegex, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(details.ScannerRegex);
+        var (episodeNames, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(details.ScannerRegex);
         var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
         var local = await BeginLocalScanAsync(library, existing, details.FolderPaths);
 
@@ -146,7 +146,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                 // abort the rest of the show (which left the show created but with
                 // no episodes — an orphan) and must be logged with its path so the
                 // failure is diagnosable instead of silently swallowed upstream.
-                var result = await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex, local);
+                var result = await IngestTvFileAsync(library, filePath, episodeNames, showFolderRegex, resolutionRegex, editionRegex, local);
                 if (result.ParentShowId.HasValue) showId ??= result.ParentShowId;
             }
             catch (Exception ex)
@@ -440,27 +440,28 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
             provider == "imdb" ? providerId : null,
             provider == "tvdb" ? providerId : null);
 
-    private (Regex episodeRegex, Regex showFolderRegex, Regex resolutionRegex, Regex editionRegex) BuildTvRegexes(string? customRegex)
+    private (EpisodeFileNames episodeNames, Regex showFolderRegex, Regex resolutionRegex, Regex editionRegex) BuildTvRegexes(string? customRegex)
     {
-        var episodeRegexPattern = LocalScannerPatterns.EffectiveTvEpisode(customRegex);
-        var episodeRegex = new Regex(episodeRegexPattern, RegexOptions.IgnoreCase);
+        var episodeNames = new EpisodeFileNames(customRegex);
         var showFolderRegex = new Regex(@"^(?<SeriesTitle>.+?)(?:\s*\((?<Year>\d{4})\))?(?:\s*\[(?<Provider>imdb|tmdb|tvdb)-(?<ProviderId>[^\]]+)\])?$", RegexOptions.IgnoreCase);
         var resolutionRegex = new Regex(@"(?<Resolution>480p|720p|1080p|4k|2160p)", RegexOptions.IgnoreCase);
         var editionRegex = new Regex(@"(?i)\b(Extended|Director'?s\s*Cut|Unrated|Theatrical|Remastered|Ultimate|Final\s*Cut|Special\s*Edition|Collector'?s\s*Edition|Uncut|IMAX\s*Enhanced|IMAX|Alternate|Criterion|Anniversary|Black\s*Chrome|Coda|Definitive|Diamond|Platinum|Producer'?s\s*Cut|Richard\s*Donner|Ulysses|Open\s*Matte)\b", RegexOptions.IgnoreCase);
-        return (episodeRegex, showFolderRegex, resolutionRegex, editionRegex);
+        return (episodeNames, showFolderRegex, resolutionRegex, editionRegex);
     }
 
     private async Task ProcessTvDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, string? customRegex, IReadOnlyList<string> excludeFilters, IReadOnlyList<string> libraryRoots)
     {
-        var (episodeRegex, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(customRegex);
+        var (episodeNames, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(customRegex);
 
         await CleanupLegacyExtrasAsync(library);
 
         var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
         var local = await BeginLocalScanAsync(library, existingPathsSet, libraryRoots);
-        await RepairEpisodeRangesAsync(library, directories, existingPathsSet, episodeRegex);
+        var roots = directories.ToList();
+        await SeparateFilesStackedOnTheFirstEpisodeAsync(library, roots, existingPathsSet, episodeNames, local.Folders);
+        await RepairEpisodeRangesAsync(library, roots, existingPathsSet, episodeNames);
 
-        var newFiles = GetNewFilesInDirectories(directories, existingPathsSet)
+        var newFiles = GetNewFilesInDirectories(roots, existingPathsSet)
             .Where(f => !IsExcluded(f, excludeFilters))
             .ToList();
         var episodeFiles = newFiles.Where(f => !IsExtraFile(f)).ToList();
@@ -470,7 +471,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         {
             var filePath = episodeFiles[i];
             _progress.Report($"Scanning {Path.GetFileNameWithoutExtension(filePath)} ({i + 1}/{episodeFiles.Count})");
-            await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex, local);
+            await IngestTvFileAsync(library, filePath, episodeNames, showFolderRegex, resolutionRegex, editionRegex, local);
         }
 
         foreach (var extraPath in extraFiles)
@@ -479,33 +480,50 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         }
     }
 
-    private async Task RepairEpisodeRangesAsync(LibraryHandle library, IEnumerable<string> directories, HashSet<string> knownFiles, Regex episodeRegex)
+    private async Task SeparateFilesStackedOnTheFirstEpisodeAsync(LibraryHandle library, IReadOnlyList<string> roots, HashSet<string> knownFiles, EpisodeFileNames episodeNames, LocalMediaFolders folders)
     {
-        var roots = directories.ToList();
-        var lastEpisodeByFile = new Dictionary<string, int>(StringComparer.Ordinal);
+        var separated = new List<string>();
+        foreach (var file in await _ingestionService.GetFirstEpisodeFilePathsAsync(library))
+        {
+            if (IsExtraFile(file) || !knownFiles.Contains(file) || !roots.Any(root => IsInside(file, root)) || !File.Exists(file)) continue;
+
+            var placement = episodeNames.Place(Path.GetFileNameWithoutExtension(file), Path.GetFileName(Path.GetDirectoryName(file)),
+                () => LocalNfoReader.ReadEpisodeNumbers(file, folders));
+            if (placement is null or { Season: 1, Episode: 1 }) continue;
+
+            await _ingestionService.RemoveMediaItemByPathAsync(file);
+            knownFiles.Remove(file);
+            separated.Add(file);
+        }
+
+        if (separated.Count > 0)
+        {
+            _logger.LogInformation("Took {Count} file(s) off episode 1 of season 1, where an older scan had put them because it could not read their names; they are added again as the episodes they are.", separated.Count);
+        }
+    }
+
+    private async Task RepairEpisodeRangesAsync(LibraryHandle library, IReadOnlyList<string> roots, HashSet<string> knownFiles, EpisodeFileNames episodeNames)
+    {
+        var rangeByFile = new Dictionary<string, EpisodeRange>(StringComparer.Ordinal);
         foreach (var file in knownFiles)
         {
             if (IsExtraFile(file) || !roots.Any(root => IsInside(file, root))) continue;
-            if (LastEpisodeOfRange(Path.GetFileNameWithoutExtension(file), episodeRegex) is { } lastEpisode)
+            if (EpisodeRangeOf(Path.GetFileNameWithoutExtension(file), episodeNames) is { } range)
             {
-                lastEpisodeByFile[file] = lastEpisode;
+                rangeByFile[file] = range;
             }
         }
 
-        if (lastEpisodeByFile.Count > 0)
+        if (rangeByFile.Count > 0)
         {
-            await _ingestionService.SetEpisodeRangesAsync(library, lastEpisodeByFile);
+            await _ingestionService.SetEpisodeRangesAsync(library, rangeByFile);
         }
     }
 
-    internal static int? LastEpisodeOfRange(string fileName, Regex episodeRegex)
-    {
-        var match = episodeRegex.Match(fileName);
-        if (!match.Success) return null;
-        if (!int.TryParse(match.Groups["Episode"].Value, out var first)) return null;
-        if (!int.TryParse(match.Groups["EndEpisode"].Value, out var last)) return null;
-        return last > first ? last : null;
-    }
+    internal static EpisodeRange? EpisodeRangeOf(string fileName, EpisodeFileNames episodeNames) =>
+        episodeNames.Read(fileName) is { NumbersGuessed: false, Episode: int first, EndEpisode: int last } && last > first
+            ? new EpisodeRange(first, last)
+            : null;
 
     private static bool IsInside(string file, string root)
     {
@@ -587,10 +605,17 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
     private static bool SameFolder(string left, string right) =>
         left.TrimEnd('/', '\\').Equals(right.TrimEnd('/', '\\'), StringComparison.OrdinalIgnoreCase);
 
-    private async Task<ScanFileResult> IngestTvFileAsync(LibraryHandle library, string filePath, Regex episodeRegex, Regex showFolderRegex, Regex resolutionRegex, Regex editionRegex, LocalScan local)
+    private async Task<ScanFileResult> IngestTvFileAsync(LibraryHandle library, string filePath, EpisodeFileNames episodeNames, Regex showFolderRegex, Regex resolutionRegex, Regex editionRegex, LocalScan local)
     {
         var fileName = Path.GetFileNameWithoutExtension(filePath);
         var directoryInfo = new DirectoryInfo(Path.GetDirectoryName(filePath)!);
+
+        var placement = episodeNames.Place(fileName, directoryInfo.Name, () => LocalNfoReader.ReadEpisodeNumbers(filePath, local.Folders));
+        if (placement == null)
+        {
+            _logger.LogWarning("Left {FilePath} out of the library: its name has no season and episode Vora can read, and no .nfo beside it gives them.", filePath);
+            return ScanFileResult.None;
+        }
 
         // A "Specials" (Season 0) subfolder is a season, not the show — walk up to
         // the show folder just like a "Season NN" folder. Missing this made every
@@ -607,28 +632,10 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var show = ResolveShowIdentity(seriesFolderName, showMatchedByHand == null ? showDirectory : null, showFolderRegex, local);
         var showTitle = show.Title;
 
-        var epMatch = episodeRegex.Match(fileName);
-        int seasonNumber = 1, episodeNumber = 1;
-        int? endEpisodeNumber = null;
-        string? episodeTitle = null;
-        DateOnly? airDate = null;
-
-        if (epMatch.Success)
-        {
-            if (epMatch.Groups["Season"].Success && int.TryParse(epMatch.Groups["Season"].Value, out int s)) seasonNumber = s;
-            if (epMatch.Groups["Episode"].Success && int.TryParse(epMatch.Groups["Episode"].Value, out int e)) episodeNumber = e;
-            if (epMatch.Groups["EndEpisode"].Success && int.TryParse(epMatch.Groups["EndEpisode"].Value, out int ee) && ee > episodeNumber) endEpisodeNumber = ee;
-
-            if (epMatch.Groups["EpisodeTitle"].Success && !string.IsNullOrWhiteSpace(epMatch.Groups["EpisodeTitle"].Value))
-            {
-                episodeTitle = epMatch.Groups["EpisodeTitle"].Value.Trim(' ', '.', '-');
-            }
-
-            if (epMatch.Groups["AirDate"].Success && DateOnly.TryParse(epMatch.Groups["AirDate"].Value, CultureInfo.InvariantCulture, out DateOnly parsedDate))
-            {
-                airDate = parsedDate;
-            }
-        }
+        int seasonNumber = placement.Season, episodeNumber = placement.Episode;
+        int? endEpisodeNumber = placement.EndEpisode;
+        string? episodeTitle = placement.Title;
+        DateOnly? airDate = placement.AirDate;
 
         var resMatch = resolutionRegex.Match(fileName);
         string? resolution = resMatch.Success ? resMatch.Groups["Resolution"].Value.ToLower() : null;
@@ -696,7 +703,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
         if (IsExcluded(filePath, details.ExcludeFilters)) return ScanFileResult.None;
 
-        var (episodeRegex, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(details.ScannerRegex);
+        var (episodeNames, showFolderRegex, resolutionRegex, editionRegex) = BuildTvRegexes(details.ScannerRegex);
 
         var local = await BeginLocalScanAsync(library, existing, details.FolderPaths);
 
@@ -706,7 +713,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
             return ScanFileResult.None;
         }
 
-        return await IngestTvFileAsync(library, filePath, episodeRegex, showFolderRegex, resolutionRegex, editionRegex, local);
+        return await IngestTvFileAsync(library, filePath, episodeNames, showFolderRegex, resolutionRegex, editionRegex, local);
     }
 
     public async Task<Guid?> ScanMusicFileAsync(Guid libraryId, string filePath)

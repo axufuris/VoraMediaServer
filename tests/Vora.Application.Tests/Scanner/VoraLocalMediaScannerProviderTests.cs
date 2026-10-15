@@ -26,6 +26,7 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
 
         _ingestion.GetExistingLibraryPathsAsync(Arg.Any<LibraryHandle>())
             .Returns(new HashSet<string>());
+        _ingestion.GetFirstEpisodeFilePathsAsync(Arg.Any<LibraryHandle>()).Returns(new List<string>());
 
         _ingestion.EnsureMovieAsync(
                 Arg.Any<LibraryHandle>(),
@@ -67,12 +68,14 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
         }
     }
 
-    private void TouchFile(string relative)
+    private void TouchFile(string relative) => WriteFile(relative, "");
+
+    private string WriteFile(string relative, string content)
     {
         var full = Path.Combine(_tempRoot, relative);
-        var dir = Path.GetDirectoryName(full)!;
-        Directory.CreateDirectory(dir);
-        File.WriteAllText(full, "");
+        Directory.CreateDirectory(Path.GetDirectoryName(full) ?? _tempRoot);
+        File.WriteAllText(full, content);
+        return full;
     }
 
     [Fact]
@@ -497,7 +500,7 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
 
         await _ingestion.Received(1).SetEpisodeRangesAsync(
             Arg.Any<LibraryHandle>(),
-            Arg.Is<IReadOnlyDictionary<string, int>>(ranges => ranges.Count == 1 && ranges[doubleEpisode] == 10));
+            Arg.Is<IReadOnlyDictionary<string, EpisodeRange>>(ranges => ranges.Count == 1 && ranges[doubleEpisode] == new EpisodeRange(9, 10)));
     }
 
     [Fact]
@@ -515,7 +518,7 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
         units.Should().BeEmpty();
         await _ingestion.Received(1).SetEpisodeRangesAsync(
             Arg.Any<LibraryHandle>(),
-            Arg.Is<IReadOnlyDictionary<string, int>>(ranges => ranges.Count == 1 && ranges[doubleEpisode] == 10));
+            Arg.Is<IReadOnlyDictionary<string, EpisodeRange>>(ranges => ranges.Count == 1 && ranges[doubleEpisode] == new EpisodeRange(9, 10)));
     }
 
     private const string RetiredTvPattern = @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*(?<Absolute>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$";
@@ -582,5 +585,78 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
             tmdbId: "70523",
             imdbId: null,
             tvdbId: null);
+    }
+
+    [Fact]
+    public async Task A_season_named_the_way_Sonarr_names_by_default_becomes_one_episode_per_file()
+    {
+        TouchFile(Path.Combine("Ted Lasso", "Season 1", "Ted Lasso.1x1 - Pilot.mkv"));
+        TouchFile(Path.Combine("Ted Lasso", "Season 1", "Ted Lasso.1x2 - Biscuits.mkv"));
+        TouchFile(Path.Combine("Ted Lasso", "Season 2", "Ted Lasso.2x9 - Beard After Hours.mp4"));
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).EnsureEpisodeAsync(Arg.Any<LibraryHandle>(), Arg.Any<SeasonHandle>(), 1, "Pilot", Arg.Any<DateOnly?>(), Arg.Any<string?>(), null);
+        await _ingestion.Received(1).EnsureEpisodeAsync(Arg.Any<LibraryHandle>(), Arg.Any<SeasonHandle>(), 2, "Biscuits", Arg.Any<DateOnly?>(), Arg.Any<string?>(), null);
+        await _ingestion.Received(1).EnsureEpisodeAsync(Arg.Any<LibraryHandle>(), Arg.Any<SeasonHandle>(), 9, "Beard After Hours", Arg.Any<DateOnly?>(), Arg.Any<string?>(), null);
+        await _ingestion.Received().EnsureSeasonAsync(Arg.Any<LibraryHandle>(), Arg.Any<MediaItemHandle>(), 2);
+    }
+
+    [Fact]
+    public async Task A_name_without_episode_numbers_takes_them_from_the_nfo_beside_it_even_with_local_metadata_off()
+    {
+        TouchFile(Path.Combine("Some Show", "Season 2", "The Long Way Home.mkv"));
+        WriteFile(Path.Combine("Some Show", "Season 2", "The Long Way Home.nfo"),
+            "<episodedetails><title>The Long Way Home</title><season>2</season><episode>5</episode></episodedetails>");
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.Received().EnsureSeasonAsync(Arg.Any<LibraryHandle>(), Arg.Any<MediaItemHandle>(), 2);
+        await _ingestion.Received(1).EnsureEpisodeAsync(Arg.Any<LibraryHandle>(), Arg.Any<SeasonHandle>(), 5, Arg.Any<string>(), Arg.Any<DateOnly?>(), Arg.Any<string?>(), null);
+    }
+
+    [Fact]
+    public async Task A_file_Vora_cannot_place_is_left_out_instead_of_being_put_on_the_first_episode()
+    {
+        TouchFile(Path.Combine("Some Show", "Season 1", "Bonus Material Final.mkv"));
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.DidNotReceive().EnsureTvShowAsync(Arg.Any<LibraryHandle>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>());
+        await _ingestion.DidNotReceive().EnsureEpisodeAsync(Arg.Any<LibraryHandle>(), Arg.Any<SeasonHandle>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<DateOnly?>(), Arg.Any<string?>(), Arg.Any<int?>());
+    }
+
+    [Fact]
+    public async Task Files_an_older_scan_stacked_on_the_first_episode_are_added_again_as_their_own_episodes()
+    {
+        var pilot = WriteFile(Path.Combine("Ted Lasso", "Season 1", "Ted Lasso.1x1 - Pilot.mkv"), "");
+        var biscuits = WriteFile(Path.Combine("Ted Lasso", "Season 1", "Ted Lasso.1x2 - Biscuits.mkv"), "");
+        var sonarr = WriteFile(Path.Combine("1883 (2021)", "Season 01", "1883 (2021) - S01E01 - 1883 [Bluray-1080p Remux][TrueHD 5.1][AVC]-MJOLNiR.mkv"), "");
+        var unreadable = WriteFile(Path.Combine("Some Show", "Season 1", "Bonus Material Final.mkv"), "");
+        var stacked = new[] { pilot, biscuits, sonarr, unreadable };
+        _ingestion.GetExistingLibraryPathsAsync(Arg.Any<LibraryHandle>()).Returns(_ => new HashSet<string>(stacked));
+        _ingestion.GetFirstEpisodeFilePathsAsync(Arg.Any<LibraryHandle>()).Returns(stacked.ToList());
+
+        await _scanner.ScanTvShowLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).RemoveMediaItemByPathAsync(biscuits);
+        await _ingestion.DidNotReceive().RemoveMediaItemByPathAsync(pilot);
+        await _ingestion.DidNotReceive().RemoveMediaItemByPathAsync(sonarr);
+        await _ingestion.DidNotReceive().RemoveMediaItemByPathAsync(unreadable);
+        await _ingestion.Received(1).EnsureEpisodeAsync(Arg.Any<LibraryHandle>(), Arg.Any<SeasonHandle>(), 2, "Biscuits", Arg.Any<DateOnly?>(), Arg.Any<string?>(), null);
+    }
+
+    [Fact]
+    public async Task A_library_scan_hands_the_separated_files_to_the_scan_as_new_files()
+    {
+        var pilot = WriteFile(Path.Combine("Ted Lasso", "Season 1", "Ted Lasso.1x1 - Pilot.mkv"), "");
+        var biscuits = WriteFile(Path.Combine("Ted Lasso", "Season 1", "Ted Lasso.1x2 - Biscuits.mkv"), "");
+        _ingestion.GetExistingLibraryPathsAsync(Arg.Any<LibraryHandle>()).Returns(_ => new HashSet<string> { pilot, biscuits });
+        _ingestion.GetFirstEpisodeFilePathsAsync(Arg.Any<LibraryHandle>()).Returns([pilot, biscuits]);
+
+        var units = await _scanner.DiscoverTvScanUnitsAsync(_library.Value);
+
+        units.SelectMany(unit => unit.FilePaths).Should().Equal(biscuits);
+        await _ingestion.Received(1).RemoveMediaItemByPathAsync(biscuits);
     }
 }

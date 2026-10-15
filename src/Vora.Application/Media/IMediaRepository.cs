@@ -4,6 +4,7 @@ using Vora.Application.Media.Dtos;
 using Vora.Application.Media.ViewModels;
 using Vora.Domain.Entities.Actors;
 using Vora.Domain.Entities.Media;
+using Vora.Plugins.Dtos;
 
 namespace Vora.Application.Media;
 
@@ -25,7 +26,8 @@ public interface IMediaRepository
     Task<bool> MediaItemExistsAsync(Guid id);
     Task<Guid?> GetSeasonIdByNumberAsync(Guid tvShowId, int seasonNumber);
     Task<Guid?> GetEpisodeIdByNumberAsync(Guid seasonId, int episodeNumber);
-    Task<int> SetEpisodeEndNumbersAsync(Guid libraryId, IReadOnlyDictionary<string, int> lastEpisodeByFile);
+    Task<int> SetEpisodeEndNumbersAsync(Guid libraryId, IReadOnlyDictionary<string, EpisodeRange> rangeByFile);
+    Task<List<string>> GetFirstEpisodeFilePathsAsync(Guid libraryId);
     Task WidenEpisodeRangeAsync(Guid episodeId, int endEpisodeNumber);
     Task<List<Guid>> GetMediaIdsByExternalIdsAsync(List<string> tmdbIds, List<string> imdbIds);
     Task<CollectionMatchCandidatesDto> GetCollectionMatchCandidatesAsync(Guid? libraryId);

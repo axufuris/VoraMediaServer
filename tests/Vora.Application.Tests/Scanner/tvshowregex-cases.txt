@@ -1,0 +1,102 @@
+Ted Lasso.1x1 - Pilot.mkv | S=1 E=1 T=Pilot
+Ted Lasso.S1E1 - Pilot.mkv | S=1 E=1 T=Pilot
+The Rookie.8x18 - The Bandit.mkv | S=8 E=18 T=The Bandit
+12 Monkeys.4x11 - The Beginning (1).mkv | S=4 E=11 T=The Beginning (1)
+12 Monkeys.4x11 - The Beginning (2).avi | S=4 E=11 T=The Beginning (2)
+Example Show - 1x1 - Pilot.mkv | S=1 E=1 T=Pilot
+Example Show - 1x01 - Pilot.mkv | S=1 E=01 T=Pilot
+Example Show - 01x01 - Pilot.mkv | S=01 E=01 T=Pilot
+Example Show - S01E01 - Pilot.mkv | S=01 E=01 T=Pilot
+Example Show - s01e01 - Pilot.mkv | S=01 E=01 T=Pilot
+Example Show - S01x01 - Pilot.mkv | S=01 E=01 T=Pilot
+Example Show - s01x01 - Pilot.mkv | S=01 E=01 T=Pilot
+Example Show 101 Pilot.mp4 | S=1 E=01 T=Pilot
+Example Show 1.01 Pilot.avi | S=1 E=01 T=Pilot
+Example.Show.S01E01.Pilot.1080p.WEB-DL.mkv | S=01 E=01 T=Pilot
+Example_Show_-_S01E01_-_Pilot.mkv | S=01 E=01 T=Pilot
+Example Show - S01E01E02 - Pilot Part 1 and Part 2.mkv | S=01 E=01 EE=02 T=Pilot Part 1 and Part 2
+Example Show - S01E01-E02 - Pilot Parts 1-2.mkv | S=01 E=01 EE=02 T=Pilot Parts 1-2
+Example Show - S01E01-02 - Double Episode.mkv | S=01 E=01 EE=02 T=Double Episode
+Example Show - S01E01-S01E02 - Double Episode.mkv | S=01 E=01 EE=02 T=Double Episode
+Example Show - 1x01-1x02 - Double Episode.mkv | S=1 E=01 EE=02 T=Double Episode
+Example Show - 1x01-02 - Double Episode.mkv | S=1 E=01 EE=02 T=Double Episode
+Example Show - 01x01-01x02 - Double Episode.mkv | S=01 E=01 EE=02 T=Double Episode
+Example Show - s01x01-s01x02 - Double Episode.mkv | S=01 E=01 EE=02 T=Double Episode
+Example Show - s01x01-02 - Double Episode.mkv | S=01 E=01 EE=02 T=Double Episode
+Example Show - S01E01 & S01E02 - Double Episode.mkv | S=01 E=01 EE=02 T=Double Episode
+Example Show - S01E01+E02 - Double Episode.mkv | S=01 E=01 EE=02 T=Double Episode
+Example Show - S01E01_E02 - Double Episode.mkv | S=01 E=01 EE=02 T=Double Episode
+Example Show - S01E01E02E03 - Episodes 1 to 3.mkv | S=01 E=01 EE=03 T=Episodes 1 to 3
+Example Show - S01E01-E03 - Episodes 1 to 3.mkv | S=01 E=01 EE=03 T=Episodes 1 to 3
+Example Show - S01E01-03 - Episodes 1 to 3.mkv | S=01 E=01 EE=03 T=Episodes 1 to 3
+Example Show - 1x01-03 - Episodes 1 to 3.mkv | S=1 E=01 EE=03 T=Episodes 1 to 3
+Example Show - s01x01-03 - Episodes 1 to 3.mkv | S=01 E=01 EE=03 T=Episodes 1 to 3
+Example Show - S01E01 & S01E02 & S01E03.mkv | S=01 E=01 EE=03
+Example Show - Season 1 Episode 1 - Pilot.mkv | S=1 E=1 T=Pilot
+Example Show - Season 01 Episode 01 - Pilot.mkv | S=01 E=01 T=Pilot
+Example Show - Series 1 Episode 1 - Pilot.mkv | S=1 E=1 T=Pilot
+Example Show - Ep01 - Pilot.mkv | A=01 T=Pilot
+Example Show - Episode 01 - Pilot.mkv | A=01 T=Pilot
+Example Show - S1E1 - Pilot.mkv | S=1 E=1 T=Pilot
+Example Show - S01 EP01 - Pilot.mkv | S=01 E=01 T=Pilot
+Example Show - 0x01 - Special Episode.mkv | S=0 E=01 T=Special Episode
+Example Show - S00E01 - Special Episode.mkv | S=00 E=01 T=Special Episode
+Example Show - 2024-01-15 - Pilot.mkv | D=2024-01-15 T=Pilot
+Example Show - 2024.01.15 - Pilot.mkv | D=2024.01.15 T=Pilot
+Example Show - 2024_01_15 - Pilot.mkv | D=2024_01_15 T=Pilot
+Example Show - 15-01-2024 - Pilot.mkv | D=15-01-2024 T=Pilot
+Example Show - 01-15-2024 - Pilot.mkv | D=01-15-2024 T=Pilot
+Example Show - Jan 15 2024 - Pilot.mkv | D=Jan 15 2024 T=Pilot
+Example Show - January 15, 2024 - Pilot.mkv | D=January 15, 2024 T=Pilot
+Example.Show.2024.01.15.Pilot.1080p.WEB-DL.mkv | D=2024.01.15 T=Pilot
+Example_Show_-_2024-01-15_-_Pilot.mkv | D=2024-01-15 T=Pilot
+Example Show - S01E01 - 2024-01-15 - Pilot.mkv | S=01 E=01 D=2024-01-15 T=Pilot
+Example Show - 2024-01-15 - S01E01 - Pilot.mkv | S=01 E=01 D=2024-01-15 T=Pilot
+Example Show - 1x01 - 2024-01-15 - Pilot.mkv | S=1 E=01 D=2024-01-15 T=Pilot
+Example Show - s01x01 - 2024.01.15 - Pilot.mkv | S=01 E=01 D=2024.01.15 T=Pilot
+Example.Show.S01E01.2024.01.15.Pilot.mkv | S=01 E=01 D=2024.01.15 T=Pilot
+Example Show - Season 1 Episode 1 - 2024-01-15.mkv | S=1 E=1 D=2024-01-15
+Example Show - 001 - The Beginning.mkv | A=001 T=The Beginning
+Example Show - 01 - The Beginning.mkv | A=01 T=The Beginning
+Example Show - 1 - The Beginning.mkv | A=1 T=The Beginning
+Example Show - Episode 001 - The Beginning.mkv | A=001 T=The Beginning
+Example Show - Ep001 - The Beginning.mkv | A=001 T=The Beginning
+Example Show - E001 - The Beginning.mkv | A=001 T=The Beginning
+Example.Show.001.The.Beginning.1080p.BluRay.mkv | A=001 T=The.Beginning
+Example_Show_-_001_-_The_Beginning.mkv | A=001 T=The_Beginning
+Example Show - S01E01 - 001 - The Beginning.mkv | S=01 E=01 A=001 T=The Beginning
+Example Show - 001 - S01E01 - The Beginning.mkv | S=01 E=01 A=001 T=The Beginning
+Example Show - 1x01 - 001 - The Beginning.mkv | S=1 E=01 A=001 T=The Beginning
+Example Show - s01x01 - Absolute 001 - The Beginning.mkv | S=01 E=01 A=001 T=The Beginning
+Example Show - Season 1 Episode 1 - Absolute 001.mkv | S=1 E=1 A=001
+Example.Show.S01E01.Absolute.001.The.Beginning.mkv | S=01 E=01 A=001 T=The.Beginning
+Example Show - 001 - 2024-01-15 - The Beginning.mkv | A=001 D=2024-01-15 T=The Beginning
+Example Show - 2024-01-15 - 001 - The Beginning.mkv | A=001 D=2024-01-15 T=The Beginning
+Example Show - Episode 001 - 2024.01.15 - The Beginning.mkv | A=001 D=2024.01.15 T=The Beginning
+Example Show - Ep001 - Jan 15 2024 - The Beginning.mkv | A=001 D=Jan 15 2024 T=The Beginning
+Example.Show.001.2024.01.15.The.Beginning.mkv | A=001 D=2024.01.15 T=The.Beginning
+Example Show - S01E01 - 001 - 2024-01-15 - The Beginning.mkv | S=01 E=01 A=001 D=2024-01-15 T=The Beginning
+Example Show - 2024-01-15 - S01E01 - 001 - The Beginning.mkv | S=01 E=01 A=001 D=2024-01-15 T=The Beginning
+Example Show - 001 - S01E01 - 2024.01.15 - The Beginning.mkv | S=01 E=01 A=001 D=2024.01.15 T=The Beginning
+Example Show - 1x01 - Absolute 001 - 2024-01-15.mkv | S=1 E=01 A=001 D=2024-01-15
+Example.Show.S01E01.001.2024.01.15.The.Beginning.1080p.WEB-DL.mkv | S=01 E=01 A=001 D=2024.01.15 T=The.Beginning
+Example Show - 001-002 - Double Episode.mkv | EE=002 A=001 T=Double Episode
+Example Show - 001-003 - Episodes 1 to 3.mkv | EE=003 A=001 T=Episodes 1 to 3
+Example Show - 001 & 002 - Double Episode.mkv | EE=002 A=001 T=Double Episode
+Example Show - 001+002 - Double Episode.mkv | EE=002 A=001 T=Double Episode
+Example Show - Episodes 001-002 - Double Episode.mkv | EE=002 A=001 T=Double Episode
+Example Show - Ep001-Ep002 - Double Episode.mkv | EE=002 A=001 T=Double Episode
+Example Show - E001-E002 - Double Episode.mkv | EE=002 A=001 T=Double Episode
+Example.Show.001-002.Double.Episode.mkv | EE=002 A=001 T=Double.Episode
+Example Show - S01E01E02 - 2024-01-15 - Double Episode.mkv | S=01 E=01 EE=02 D=2024-01-15 T=Double Episode
+Example Show - S01E01-E02 - 2024-01-15 - Double Episode.mkv | S=01 E=01 EE=02 D=2024-01-15 T=Double Episode
+Example Show - 1x01-02 - 2024-01-15 - Double Episode.mkv | S=1 E=01 EE=02 D=2024-01-15 T=Double Episode
+Example Show - 2024-01-15 - S01E01-E02 - Double Episode.mkv | S=01 E=01 EE=02 D=2024-01-15 T=Double Episode
+Example Show - 2024.01.15 - 001-002 - Double Episode.mkv | EE=002 A=001 D=2024.01.15 T=Double Episode
+Example Show - 001-002 - 2024-01-15 - Double Episode.mkv | EE=002 A=001 D=2024-01-15 T=Double Episode
+Daily Show Example - 2024-01-15 - Guest Name.mkv | D=2024-01-15 T=Guest Name
+Daily Show Example - 2024.01.15 - Interview With Someone.mkv | D=2024.01.15 T=Interview With Someone
+Daily Show Example - January 15 2024 - Monday Episode.mkv | D=January 15 2024 T=Monday Episode
+Late Night Example - 2024-01-15 - Celebrity Guest.mkv | D=2024-01-15 T=Celebrity Guest
+News Example - 2024-01-15 - Evening Broadcast.mp4 | D=2024-01-15 T=Evening Broadcast
+Panel Show Example - 2024-01-15 - Topic Title.mkv | D=2024-01-15 T=Topic Title

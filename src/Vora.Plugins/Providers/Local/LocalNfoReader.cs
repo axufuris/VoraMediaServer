@@ -54,6 +54,25 @@ public static partial class LocalNfoReader
         return sidecar == null ? null : Episode(folders, sidecar, seasonNumber, episodeNumber);
     }
 
+    public static EpisodeNumbers? ReadEpisodeNumbers(string videoPath, LocalMediaFolders folders)
+    {
+        var sidecar = Sidecar(videoPath, folders);
+        if (sidecar == null) return null;
+
+        var numbered = Roots(folders, sidecar, EpisodeRoot)
+            .Select(root => Number(root, "season") is int season and >= 0 && Number(root, "episode") is int episode and > 0
+                ? new EpisodeNumbers(season, episode, null)
+                : null)
+            .OfType<EpisodeNumbers>()
+            .ToList();
+        if (numbered.Count == 0) return null;
+
+        var inFirstSeason = numbered.Where(n => n.Season == numbered[0].Season).Select(n => n.Episode).ToList();
+        var first = inFirstSeason.Min();
+        var last = inFirstSeason.Max();
+        return new EpisodeNumbers(numbered[0].Season, first, last > first ? last : null);
+    }
+
     public static IEnumerable<string> MovieDocuments(string videoPath, LocalMediaFolders folders)
     {
         var files = folders.Files(Path.GetDirectoryName(videoPath));
