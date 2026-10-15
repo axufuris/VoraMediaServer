@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { MediaItem } from '../../../api/Media/mediaService';
 import type { LibraryItem } from '../../../api/Media/libraryService';
@@ -169,6 +169,7 @@ describe('the menu on a poster', () => {
     });
 
     afterEach(() => {
+        cleanup();
         vi.clearAllMocks();
         vi.useRealTimers();
         localStorage.clear();
@@ -549,6 +550,7 @@ describe('the menu on the title page', () => {
     }
 
     afterEach(() => {
+        cleanup();
         vi.clearAllMocks();
         localStorage.clear();
     });
@@ -572,6 +574,7 @@ describe('a recommendation row', () => {
     afterAll(() => vi.unstubAllGlobals());
 
     afterEach(() => {
+        cleanup();
         vi.clearAllMocks();
         localStorage.clear();
     });
