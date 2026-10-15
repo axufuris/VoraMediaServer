@@ -25,14 +25,17 @@ public sealed class PostgresChannelFavoritesMigrationTests
 
         await using var legacy = new LegacyDatabase();
         await legacy.BuildQaStateAsync(withSetupGuide: false, cancellationToken);
-        await using (var before = legacy.NewContext())
+        await legacy.SeedAsync(db =>
         {
-            before.AddRange(user, playlist, radioList, cnn, bbc, jazz, profile, otherProfile);
-            before.AddRange(
+            db.AddRange(user, playlist, radioList, cnn, bbc, jazz, profile, otherProfile);
+            db.AddRange(
                 new ProfileDeviceSetting { ProfileId = profile.Id, DeviceId = "tv", IptvPrefsJson = "{\"favoriteChannels\":[\"CNN.US\"],\"hideEmpty\":true}" },
                 new ProfileDeviceSetting { ProfileId = profile.Id, DeviceId = "phone", IptvPrefsJson = "{\"favoriteChannels\":[\"bbc.uk\",\"cnn.us\",\"gone.channel\"]}" },
                 new ProfileDeviceSetting { ProfileId = otherProfile.Id, DeviceId = "tablet", IptvPrefsJson = "[\"provider-1\"]", RadioPrefsJson = "oops" });
-            await before.SaveChangesAsync(cancellationToken);
+            return db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+        await using (var before = legacy.NewContext())
+        {
             var holidayId = Guid.NewGuid();
             const string noRules = "{}";
             await before.Database.ExecuteSqlAsync(

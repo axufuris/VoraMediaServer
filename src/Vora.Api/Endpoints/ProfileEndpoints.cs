@@ -2,6 +2,9 @@
 using System.Text.Json;
 using Vora.Api.Extensions;
 using Vora.Application.Iptv;
+using Vora.Application.Streaming;
+using Vora.Application.Streaming.Requests;
+using Vora.Application.Streaming.ViewModels;
 using Vora.Application.Users;
 using Vora.Application.Users.ViewModels;
 
@@ -172,6 +175,13 @@ public static class ProfileEndpoints
         group.MapPut("/profiles/me/playback-preferences", SaveMyPlaybackPreferencesAsync)
             .WithName("SaveMyPlaybackPreferences")
             .Produces<PlaybackPreferencesVM>(StatusCodes.Status200OK);
+
+        group.MapGet("/profiles/me/track-preferences", GetMyTrackPreferencesAsync)
+            .WithName("GetMyTrackPreferences")
+            .Produces<TrackPreferencesVM>(StatusCodes.Status200OK);
+        group.MapPut("/profiles/me/track-preferences", SaveMyTrackPreferencesAsync)
+            .WithName("SaveMyTrackPreferences")
+            .Produces<TrackPreferencesVM>(StatusCodes.Status200OK);
 
         group.MapGet("/profiles/{profileId:guid}/radio-prefs", GetProfileRadioPrefsAsync)
             .WithName("GetProfileRadioPrefs")
@@ -346,6 +356,20 @@ public static class ProfileEndpoints
         if (!profileId.HasValue) return Results.Unauthorized();
         var saved = await manager.SavePlaybackPreferencesAsync(profileId.Value, body);
         return Results.Ok(saved);
+    }
+
+    private static async Task<IResult> GetMyTrackPreferencesAsync(HttpContext ctx, ITrackPreferenceManager manager)
+    {
+        var profileId = ctx.User.GetProfileId();
+        if (!profileId.HasValue) return Results.Unauthorized();
+        return Results.Ok(await manager.GetAsync(profileId.Value));
+    }
+
+    private static async Task<IResult> SaveMyTrackPreferencesAsync(HttpContext ctx, [FromBody] SaveTrackPreferencesRequest body, ITrackPreferenceManager manager)
+    {
+        var profileId = ctx.User.GetProfileId();
+        if (!profileId.HasValue) return Results.Unauthorized();
+        return Results.Ok(await manager.SaveAsync(profileId.Value, body));
     }
 
     private static async Task<IResult> GetNavPrefsAsync(Guid profileId, string deviceId, IUserManager manager)

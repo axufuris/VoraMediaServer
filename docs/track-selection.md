@@ -42,7 +42,7 @@ A pick above what was detected is honoured in every profile whenever a track in 
 
 In every profile:
 
-- Automatic stays in the default track's language and off commentary tracks. What happens to a version or track the viewer picked is under **Picks** below.
+- Automatic stays in the profile's audio language when the file has it, otherwise in the default track's language, and off commentary tracks (**Profile preferences** below). What happens to a version or track the viewer picked is under **Picks** below.
 - Audio is converted only when the client cannot decode it, it has more channels than the hard limit, or the HLS stream cannot carry it.
 - The server never converts just to move between 5.1 and 7.1. Conversion is worth it to make a track playable or to keep surround instead of stereo.
 - The video is never re-encoded for the sake of audio when another track avoids it.
@@ -76,6 +76,21 @@ What a viewer picks on a title page or while watching is remembered **per profil
 - **Missing in an episode:** a language or edition the episode does not have is ignored for that kind, and the automatic choice is used (for subtitles too, so forced subtitles still show).
 - **API:** `GET /api/streaming/choices/{mediaId}`, `PUT` with `mediaPartId`, `audioTrackId`, `subtitleTrackId` or `subtitlesOff` to remember a pick and `forget: ["Version" | "Audio" | "Subtitles"]` to hand a kind back to Automatic, `DELETE` to forget the title on this device. `mediaId` is the item whose tracks were picked from. `PlaybackChoiceManager` builds the row from the track; a track that is not part of the title is refused.
 - **Backups:** `users.playback-choices`, titles matched by identity on restore.
+
+## Profile preferences
+
+Set once per **profile** (not per device: a language does not depend on what the device decodes) on the client's Settings → Playback → **Audio & subtitles**, stored on `UserProfile`, and read by `/start`, `/decision` and `/start-extra` through `TrackPreferences`. Each choice starts on **Automatic**, which keeps the server's behaviour.
+
+| Setting | Automatic | Otherwise |
+|---|---|---|
+| Audio language (`PreferredAudioLanguage`) | The file's default track's language. | Tracks in that language, then ranked as usual; a file without it falls back to Automatic. |
+| Subtitles (`SubtitleMode`) | Smart when the server's **Turn on subtitles when the audio is in another language** is on, else Default. | `Default`, `Smart`, `ForcedOnly`, `Always`, `Off` (`docs/subtitles.md`). |
+| Subtitle language (`PreferredSubtitleLanguage`) | The server's `MetadataLanguage`. | That language. |
+| Prefer SDH (`PreferHearingImpairedSubtitles`) | Off: an SDH track is a last resort. | SDH first among the tracks in the subtitle language. |
+
+- **Order:** a pick sent with the request, then a remembered choice for the title, then the profile preference, then the file's flags. The language narrows the tracks before the profile ranks them, so Direct and Bitrate still pick the best-playing track in that language.
+- **Subtitles follow the audio that plays:** Smart compares the subtitle language with the language of the track the decision will use (preferred, remembered or default), not always the default track's.
+- **API:** `GET` and `PUT /api/users/profiles/me/track-preferences` (`TrackPreferenceManager`). It has its own route rather than fields on `playback-preferences`, so an app that saves auto-skip with an older body cannot clear these. Languages are stored as `MetadataLanguageCodes.Normalize` codes (`ja` and `Japanese` both become `jpn`); `null` is Automatic. `GET` also returns `serverLanguage` and `serverSubtitleMode`, so a client can say what Automatic means.
 
 ## Converted audio
 
@@ -136,11 +151,11 @@ The rule used to apply only to HEVC in a browser, only when audio was converted,
 | File | Holds |
 |---|---|
 | `MatrixCatalog.cs` | Clients (with the codecs their HLS player takes), audio layouts, video files, situations (bitrate limits, subtitles, HDR downscale). |
-| `MatrixRunner.cs` | Builds the request the way a client would, including a track or version picked by hand, and records what the viewer would hear. Margins count only the options a pick allows (`StreamOptionLogDto.Considered`). |
+| `MatrixRunner.cs` | Builds the request the way a client would, including a track or version picked by hand and a profile audio language, and records what the viewer would hear. Margins count only the options a pick allows (`StreamOptionLogDto.Considered`). |
 | `MatrixRules.cs` | The rules, written from what a client can play rather than from the scoring. |
 | `StreamDecisionMatrixTests.cs` | One test per rule; a failure lists the combinations that break it. |
 
-The normal run covers about 290,000 combinations in a few seconds. Set `VORA_STREAM_MATRIX=full` to run every one-, two- and three-track mix of 14 codec and layout types: about 12.3 million combinations in a few minutes. **Run the full set before changing a weight or a rule**, because the hand-picked set has missed real problems that the full set found.
+The normal run covers about 314,000 combinations in a few seconds, including a profile audio language the file has and one it lacks. Set `VORA_STREAM_MATRIX=full` to run every one-, two- and three-track mix of 14 codec and layout types: more than 12 million combinations in a few minutes. **Run the full set before changing a weight or a rule**, because the hand-picked set has missed real problems that the full set found.
 
 The last rule fails when two different kinds of outcome are within ten points of each other. It is there to catch a weight change that leaves a decision to chance.
 

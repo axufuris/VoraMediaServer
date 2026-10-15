@@ -29,7 +29,11 @@ ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""HardwareAccelerationTy
 ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""IpAddress"" character varying(45);
 ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""Location"" character varying(128);
 ALTER TABLE ""MediaLibraries"" ADD COLUMN IF NOT EXISTS ""LocalMetadataMode"" integer NOT NULL DEFAULT 0;
-ALTER TABLE ""MediaLibraries"" ADD COLUMN IF NOT EXISTS ""PreferLocalArtwork"" boolean NOT NULL DEFAULT FALSE;");
+ALTER TABLE ""MediaLibraries"" ADD COLUMN IF NOT EXISTS ""PreferLocalArtwork"" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""PreferredAudioLanguage"" character varying(16);
+ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""PreferredSubtitleLanguage"" character varying(16);
+ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""SubtitleMode"" integer;
+ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""PreferHearingImpairedSubtitles"" boolean NOT NULL DEFAULT FALSE;");
 
             migrationBuilder.Sql(@"
 DO $$
@@ -179,6 +183,22 @@ CREATE INDEX IF NOT EXISTS ""IX_ProfileTitlePlaybackChoices_TitleId"" ON ""Profi
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "PreferredAudioLanguage",
+                table: "UserProfiles");
+
+            migrationBuilder.DropColumn(
+                name: "PreferredSubtitleLanguage",
+                table: "UserProfiles");
+
+            migrationBuilder.DropColumn(
+                name: "SubtitleMode",
+                table: "UserProfiles");
+
+            migrationBuilder.DropColumn(
+                name: "PreferHearingImpairedSubtitles",
+                table: "UserProfiles");
+
             migrationBuilder.DropTable(
                 name: "ProfileTitlePlaybackChoices");
 

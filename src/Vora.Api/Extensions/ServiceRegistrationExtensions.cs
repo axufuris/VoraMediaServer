@@ -450,6 +450,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ISmartListSourceResolver, SmartListSourceResolver>();
         services.AddScoped<IStreamManager, StreamManager>();
         services.AddScoped<IPlaybackChoiceManager, PlaybackChoiceManager>();
+        services.AddScoped<ITrackPreferenceManager, TrackPreferenceManager>();
         services.AddScoped<ISyncAndStateManager, SyncAndStateManager>();
         services.AddScoped<ISystemSettingsManager, SystemSettingsManager>();
         services.AddSingleton<ITaskQueueManager, TaskQueueManager>();

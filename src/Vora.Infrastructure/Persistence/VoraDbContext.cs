@@ -839,6 +839,8 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.SecurityStamp).IsRequired().HasMaxLength(32);
             entity.Property(e => e.LastFmSessionKey).HasMaxLength(128);
             entity.Property(e => e.LastFmUsername).HasMaxLength(128);
+            entity.Property(e => e.PreferredAudioLanguage).HasMaxLength(16);
+            entity.Property(e => e.PreferredSubtitleLanguage).HasMaxLength(16);
 
             entity.HasIndex(e => e.SecurityStamp);
 

@@ -13,6 +13,7 @@ public interface IStreamRepository
     Task<Guid> ResolvePlayableMediaIdAsync(Guid mediaId, Guid? profileId);
     Task<Guid> ResolveTitleIdAsync(Guid mediaId);
     Task<ProfileTitlePlaybackChoice?> GetRememberedChoiceAsync(Guid profileId, string deviceId, Guid titleId);
+    Task<TrackPreferences?> GetTrackPreferencesAsync(Guid profileId);
     Task SaveRememberedChoiceAsync(ProfileTitlePlaybackChoice choice);
     Task ForgetRememberedChoiceAsync(Guid profileId, string deviceId, Guid titleId);
     Task<ClientDevice?> GetClientDeviceAsync(string deviceId);

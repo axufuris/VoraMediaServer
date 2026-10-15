@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
 import { StorageKeys } from '../../../utils/storageKeys';
 import { detectAudioOutputChannels } from '../../../utils/hardwareScanner';
+import AudioSubtitleSection from './AudioSubtitleSection';
 
 export default function PlaybackTab({ activeProfileId, serverId, onSaved }: { activeProfileId: string, serverId?: string, onSaved: () => void }) {
     const [clientBitrateLimit, setClientBitrateLimit] = useState(0);
@@ -52,6 +53,8 @@ export default function PlaybackTab({ activeProfileId, serverId, onSaved }: { ac
 
     return (
         <div className="space-y-6">
+            <AudioSubtitleSection serverId={serverId} />
+
             <section className="vora-card p-6">
                 <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Bandwidth &amp; quality</h2>
                 <p className="m-0 mb-5 text-sm" style={{ color: 'var(--vora-text-muted)' }}>Cap how much your device pulls per stream. Lower values help on mobile or slow connections.</p>
