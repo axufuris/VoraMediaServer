@@ -186,6 +186,7 @@ public class MetadataMappingService : IMetadataMappingService
     public Task<bool> ApplyRatingsAsync(MediaItem item, (decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) ratingsData, bool forceOverride)
     {
         bool updated = false;
+        var drawnOnOverlay = (item.ThirdPartyRating1, item.ThirdPartyRating1Name, item.ThirdPartyRating2, item.ThirdPartyRating2Name);
 
         // A non-null Name means the library has a provider configured for that
         // slot. When configured, this slot is owned by that provider: use its
@@ -221,6 +222,11 @@ public class MetadataMappingService : IMetadataMappingService
                 item.ThirdPartyRating2Name = null;
                 updated = true;
             }
+        }
+
+        if (drawnOnOverlay != (item.ThirdPartyRating1, item.ThirdPartyRating1Name, item.ThirdPartyRating2, item.ThirdPartyRating2Name))
+        {
+            item.LastOverlayGeneratedAt = null;
         }
 
         return Task.FromResult(updated);

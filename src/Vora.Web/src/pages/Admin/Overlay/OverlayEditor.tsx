@@ -447,17 +447,20 @@ export default function OverlayEditor() {
 
                                         {el.type === 'composite_ratings' ? (
                                             <div className="flex flex-col gap-2 border-t border-[var(--vora-border-subtle)] pt-2">
-                                                <span className="text-[10px] text-[var(--vora-text-muted)] uppercase">Top (Admin)</span>
+                                                <p className="text-xs leading-snug text-[var(--vora-text-muted)]">
+                                                    Posters show the server rating, then each library's Third Party Rating 1 and 2 (Libraries → the library → General). A score appears once its source has one for the title. The choices below only change this preview.
+                                                </p>
+                                                <span className="text-[10px] text-[var(--vora-text-muted)] uppercase">Top · server rating (preview)</span>
                                                 <select value={el.previewImages?.[0] || ''} onChange={(e) => updateCompositePreview(el.id, 0, e.target.value)} className="vora-input !py-1 text-xs">
                                                     {PREVIEW_OPTIONS['critic_rating'].map(opt => <option key={opt.path} value={opt.path}>{opt.label}</option>)}
                                                 </select>
 
-                                                <span className="text-[10px] text-[var(--vora-text-muted)] uppercase">Middle (3rd Party 1)</span>
+                                                <span className="text-[10px] text-[var(--vora-text-muted)] uppercase">Middle · library rating 1 (preview)</span>
                                                 <select value={el.previewImages?.[1] || ''} onChange={(e) => updateCompositePreview(el.id, 1, e.target.value)} className="vora-input !py-1 text-xs">
                                                     {PREVIEW_OPTIONS['critic_rating'].map(opt => <option key={opt.path} value={opt.path}>{opt.label}</option>)}
                                                 </select>
 
-                                                <span className="text-[10px] text-[var(--vora-text-muted)] uppercase">Bottom (3rd Party 2)</span>
+                                                <span className="text-[10px] text-[var(--vora-text-muted)] uppercase">Bottom · library rating 2 (preview)</span>
                                                 <select value={el.previewImages?.[2] || ''} onChange={(e) => updateCompositePreview(el.id, 2, e.target.value)} className="vora-input !py-1 text-xs">
                                                     {PREVIEW_OPTIONS['critic_rating'].map(opt => <option key={opt.path} value={opt.path}>{opt.label}</option>)}
                                                 </select>
