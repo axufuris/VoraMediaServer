@@ -19,7 +19,7 @@ public class ListSyncAccountsRequest
 public class ListSyncLibrariesRequest
 {
     public required string AccessToken { get; set; }
-    public required string ConnectionUri { get; set; }
+    public required string ServerClientIdentifier { get; set; }
 }
 
 public class RunLibraryMigrationRequest
@@ -27,7 +27,6 @@ public class RunLibraryMigrationRequest
     public required string AccessToken { get; set; }
     public required string ServerClientIdentifier { get; set; }
     public required string ServerName { get; set; }
-    public required string ConnectionUri { get; set; }
     public bool IncludeWatchState { get; set; } = true;
     public bool IncludeRatings { get; set; } = true;
     public required List<string> LibrarySectionKeys { get; set; }
@@ -49,7 +48,6 @@ public class RunSelfLibraryImportRequest
     public required string AccessToken { get; set; }
     public required string ServerClientIdentifier { get; set; }
     public required string ServerName { get; set; }
-    public required string ConnectionUri { get; set; }
     public bool IncludeWatchState { get; set; } = true;
     public bool IncludeRatings { get; set; } = true;
     public required List<string> LibrarySectionKeys { get; set; }
@@ -219,14 +217,14 @@ public static class LibraryMigrationEndpoints
         {
             return Results.BadRequest(new { error = "accessToken is required." });
         }
-        if (string.IsNullOrWhiteSpace(request.ConnectionUri))
+        if (string.IsNullOrWhiteSpace(request.ServerClientIdentifier))
         {
-            return Results.BadRequest(new { error = "connectionUri is required." });
+            return Results.BadRequest(new { error = "serverClientIdentifier is required." });
         }
 
         try
         {
-            var libraries = await manager.ListLibrariesAsync(providerId, request.AccessToken, request.ConnectionUri, cancellationToken);
+            var libraries = await manager.ListLibrariesAsync(providerId, request.AccessToken, request.ServerClientIdentifier, cancellationToken);
             return Results.Ok(libraries);
         }
         catch (KeyNotFoundException)
@@ -245,9 +243,9 @@ public static class LibraryMigrationEndpoints
         {
             return Results.BadRequest(new { error = "accessToken is required." });
         }
-        if (string.IsNullOrWhiteSpace(request.ConnectionUri))
+        if (string.IsNullOrWhiteSpace(request.ServerClientIdentifier))
         {
-            return Results.BadRequest(new { error = "connectionUri is required." });
+            return Results.BadRequest(new { error = "serverClientIdentifier is required." });
         }
         if (request.Mappings.Count == 0)
         {
@@ -268,7 +266,6 @@ public static class LibraryMigrationEndpoints
             AdminAccessToken = request.AccessToken,
             ServerClientIdentifier = request.ServerClientIdentifier,
             ServerName = request.ServerName,
-            ConnectionUri = request.ConnectionUri,
             IncludeWatchState = request.IncludeWatchState,
             IncludeRatings = request.IncludeRatings,
             LibrarySectionKeys = request.LibrarySectionKeys,
@@ -300,9 +297,9 @@ public static class LibraryMigrationEndpoints
         {
             return Results.BadRequest(new { error = "accessToken is required." });
         }
-        if (string.IsNullOrWhiteSpace(request.ConnectionUri))
+        if (string.IsNullOrWhiteSpace(request.ServerClientIdentifier))
         {
-            return Results.BadRequest(new { error = "connectionUri is required." });
+            return Results.BadRequest(new { error = "serverClientIdentifier is required." });
         }
         if (!request.IncludeWatchState && !request.IncludeRatings)
         {
@@ -321,7 +318,6 @@ public static class LibraryMigrationEndpoints
             AdminAccessToken = request.AccessToken,
             ServerClientIdentifier = request.ServerClientIdentifier,
             ServerName = request.ServerName,
-            ConnectionUri = request.ConnectionUri,
             IncludeWatchState = request.IncludeWatchState,
             IncludeRatings = request.IncludeRatings,
             LibrarySectionKeys = request.LibrarySectionKeys,

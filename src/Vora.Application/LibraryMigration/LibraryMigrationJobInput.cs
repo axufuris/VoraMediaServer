@@ -6,7 +6,6 @@ public class LibraryMigrationJobInput
     public required string AdminAccessToken { get; set; }
     public required string ServerClientIdentifier { get; set; }
     public required string ServerName { get; set; }
-    public required string ConnectionUri { get; set; }
     public required bool IncludeWatchState { get; set; }
     public required bool IncludeRatings { get; set; }
     public required IReadOnlyList<string> LibrarySectionKeys { get; set; }

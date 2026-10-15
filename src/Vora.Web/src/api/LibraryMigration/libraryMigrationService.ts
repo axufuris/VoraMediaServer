@@ -107,7 +107,6 @@ export interface RunLibraryMigrationRequest {
     accessToken: string;
     serverClientIdentifier: string;
     serverName: string;
-    connectionUri: string;
     includeWatchState: boolean;
     includeRatings: boolean;
     librarySectionKeys: string[];
@@ -138,8 +137,8 @@ export const libraryMigrationService = {
         const response = await apiClient.post<RemoteAccountVM[]>(BASE + '/' + providerId + '/accounts', { accessToken }, { serverId });
         return response.data;
     },
-    listLibraries: async (providerId: string, accessToken: string, connectionUri: string, serverId?: string): Promise<RemoteLibraryVM[]> => {
-        const response = await apiClient.post<RemoteLibraryVM[]>(BASE + '/' + providerId + '/libraries', { accessToken, connectionUri }, { serverId });
+    listLibraries: async (providerId: string, accessToken: string, serverClientIdentifier: string, serverId?: string): Promise<RemoteLibraryVM[]> => {
+        const response = await apiClient.post<RemoteLibraryVM[]>(BASE + '/' + providerId + '/libraries', { accessToken, serverClientIdentifier }, { serverId });
         return response.data;
     },
     runMigration: async (providerId: string, request: RunLibraryMigrationRequest, serverId?: string): Promise<LibraryMigrationJobVM> => {

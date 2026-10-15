@@ -44,6 +44,18 @@ public class GlobalExceptionHandlerTests
     }
 
     [Fact]
+    public async Task A_media_server_Vora_cannot_reach_is_a_bad_gateway_that_keeps_its_explanation()
+    {
+        var unreachable = new Vora.Plugins.Dtos.RemoteServerUnreachableException(
+            "Vora couldn't reach the Plex server \"Home\". Tried the local address 192.168.0.10:32400 (connection refused).");
+
+        var (status, written) = await HandleAsync(unreachable);
+
+        status.Should().Be(StatusCodes.Status502BadGateway);
+        written.ProblemDetails.Detail.Should().Be(unreachable.Message);
+    }
+
+    [Fact]
     public async Task A_caller_who_is_not_allowed_is_still_refused()
     {
         var (status, written) = await HandleAsync(new UnauthorizedAccessException("You can't edit this playlist."));

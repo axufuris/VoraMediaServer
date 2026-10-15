@@ -9,6 +9,7 @@ public interface ILibrarySyncProvider : IVoraPlugin
     Task<IReadOnlyList<RemoteServerDto>> ListServersAsync(string accessToken, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RemoteAccountDto>> ListAccountsAsync(string accessToken, CancellationToken cancellationToken = default);
     Task<string> ResolveUserTokenAsync(string adminAccessToken, string accountId, string? pin, CancellationToken cancellationToken = default);
+    Task<string> FindReachableConnectionAsync(string serverClientIdentifier, string accessToken, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RemoteLibraryDto>> ListLibrariesAsync(string connectionUri, string accessToken, CancellationToken cancellationToken = default);
     Task<RemoteUserDataDto> FetchUserDataAsync(string connectionUri, string userAccessToken, RemoteSyncScopeDto scope, CancellationToken cancellationToken = default);
 }

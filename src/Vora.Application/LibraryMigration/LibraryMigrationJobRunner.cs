@@ -120,6 +120,12 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
         UpdateJob(jobId, j => j.State = LibraryMigrationJobState.Running);
         await notifier.NotifyLibraryMigrationUpdatedAsync(GetSnapshot(jobId));
 
+        var connectionUri = await FindConnectionAsync(jobId, input, notifier);
+        if (connectionUri is null)
+        {
+            return;
+        }
+
         var scopeDto = new RemoteSyncScopeDto
         {
             IncludeWatchState = input.IncludeWatchState,
@@ -139,7 +145,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
                     .GetRequiredService<IEnumerable<ILibrarySyncProvider>>()
                     .First(p => p.Id.Equals(input.ProviderId, StringComparison.OrdinalIgnoreCase));
 
-                await ProcessUserAsync(userScope.ServiceProvider, userProvider, input, scopeDto, mapping, jobId, notifier);
+                await ProcessUserAsync(userScope.ServiceProvider, userProvider, input, connectionUri, scopeDto, mapping, jobId, notifier);
             }
             catch (Exception ex)
             {
@@ -161,10 +167,35 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
         await notifier.NotifyLibraryMigrationUpdatedAsync(GetSnapshot(jobId));
     }
 
+    private async Task<string?> FindConnectionAsync(Guid jobId, LibraryMigrationJobInput input, IClientNotifier notifier)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var provider = scope.ServiceProvider
+                .GetRequiredService<IEnumerable<ILibrarySyncProvider>>()
+                .First(p => p.Id.Equals(input.ProviderId, StringComparison.OrdinalIgnoreCase));
+            return await provider.FindReachableConnectionAsync(input.ServerClientIdentifier, input.AdminAccessToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Library migration job {JobId} could not reach the server {ServerName}.", jobId, input.ServerName);
+            UpdateJob(jobId, j =>
+            {
+                j.State = LibraryMigrationJobState.Failed;
+                j.CompletedAt = DateTime.UtcNow;
+                j.ErrorMessage = ex.Message;
+            });
+            await notifier.NotifyLibraryMigrationUpdatedAsync(GetSnapshot(jobId));
+            return null;
+        }
+    }
+
     private async Task ProcessUserAsync(
         IServiceProvider scopedServices,
         ILibrarySyncProvider provider,
         LibraryMigrationJobInput input,
+        string connectionUri,
         RemoteSyncScopeDto scope,
         LibraryMigrationMappingInput mapping,
         Guid jobId,
@@ -175,7 +206,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
         var userToken = input.SelfService
             ? input.AdminAccessToken
             : await provider.ResolveUserTokenAsync(input.AdminAccessToken, mapping.AccountId, mapping.Pin);
-        var userData = await provider.FetchUserDataAsync(input.ConnectionUri, userToken, scope);
+        var userData = await provider.FetchUserDataAsync(connectionUri, userToken, scope);
 
         UpdateUser(jobId, mapping.AccountId, u =>
         {

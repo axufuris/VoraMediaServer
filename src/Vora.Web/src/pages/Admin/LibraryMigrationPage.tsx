@@ -15,6 +15,7 @@ import {
 } from '../../api/LibraryMigration/libraryMigrationService';
 import { userService, type UserVM } from '../../api/Users/userService';
 import { migrationSummary, sharedTitleNote } from '../../utils/migrationSummary';
+import { errorDetail } from '../../utils/apiError';
 
 const JOB_STORAGE_KEY = 'vora_library_migration_job_id';
 
@@ -142,26 +143,23 @@ export default function LibraryMigrationPage() {
             .catch(err => { if (!cancelled) setVoraUsersError(err instanceof Error ? err.message : 'Failed to load Vora users.'); })
             .finally(() => { if (!cancelled) setLoadingVoraUsers(false); });
 
-        const connection = selectedServer.connections[0];
-        if (connection) {
-            setLoadingLibraries(true);
-            setLibrariesError(null);
-            setLibraries([]);
-            setSelectedLibraryKeys({});
-            libraryMigrationService
-                .listLibraries(connected.provider.id, connected.accessToken, connection.uri, serverId)
-                .then(list => {
-                    if (cancelled) return;
-                    setLibraries(list);
-                    const defaults: Record<string, boolean> = {};
-                    for (const lib of list) {
-                        if (lib.kind === 'Movie' || lib.kind === 'Show') defaults[lib.key] = true;
-                    }
-                    setSelectedLibraryKeys(defaults);
-                })
-                .catch(err => { if (!cancelled) setLibrariesError(err instanceof Error ? err.message : 'Failed to load libraries.'); })
-                .finally(() => { if (!cancelled) setLoadingLibraries(false); });
-        }
+        setLoadingLibraries(true);
+        setLibrariesError(null);
+        setLibraries([]);
+        setSelectedLibraryKeys({});
+        libraryMigrationService
+            .listLibraries(connected.provider.id, connected.accessToken, selectedServer.clientIdentifier, serverId)
+            .then(list => {
+                if (cancelled) return;
+                setLibraries(list);
+                const defaults: Record<string, boolean> = {};
+                for (const lib of list) {
+                    if (lib.kind === 'Movie' || lib.kind === 'Show') defaults[lib.key] = true;
+                }
+                setSelectedLibraryKeys(defaults);
+            })
+            .catch(err => { if (!cancelled) setLibrariesError(errorDetail(err, 'Failed to load libraries')); })
+            .finally(() => { if (!cancelled) setLoadingLibraries(false); });
 
         return () => { cancelled = true; };
     }, [connected, selectedServer, serverId]);
@@ -243,13 +241,6 @@ export default function LibraryMigrationPage() {
         setRunStarting(true);
         setRunError(null);
 
-        const connection = selectedServer.connections[0];
-        if (!connection) {
-            setRunError('The selected server has no usable connection.');
-            setRunStarting(false);
-            return;
-        }
-
         const profileLabelById: Record<string, string> = {};
         for (const opt of profileOptions) profileLabelById[opt.profileId] = opt.label;
 
@@ -266,7 +257,6 @@ export default function LibraryMigrationPage() {
                 accessToken: connected.accessToken,
                 serverClientIdentifier: selectedServer.clientIdentifier,
                 serverName: selectedServer.name,
-                connectionUri: connection.uri,
                 includeWatchState: scope.includeWatchState,
                 includeRatings: scope.includeRatings,
                 librarySectionKeys: chosenLibraryKeys,
@@ -276,7 +266,7 @@ export default function LibraryMigrationPage() {
             setActiveJob(job);
             localStorage.setItem(JOB_STORAGE_KEY, job.jobId);
         } catch (err) {
-            setRunError(err instanceof Error ? err.message : 'Failed to start the migration.');
+            setRunError(errorDetail(err, 'Failed to start the migration'));
         } finally {
             setRunStarting(false);
         }

@@ -10,6 +10,8 @@ namespace Vora.Application.Tests.LibraryMigration;
 
 public class LibraryMigrationJobRunnerTests
 {
+    private const string PlexAddress = "https://198-51-100-7.abc123.plex.direct:32400";
+
     private readonly Guid _doubleEpisodeId = Guid.NewGuid();
     private readonly Guid _libraryId = Guid.NewGuid();
     private readonly Guid _profileId = Guid.NewGuid();
@@ -21,6 +23,7 @@ public class LibraryMigrationJobRunnerTests
     {
         _plex.Id.Returns("plex");
         _plex.ResolveUserTokenAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns("user-token");
+        _plex.FindReachableConnectionAsync("server", "admin-token", Arg.Any<CancellationToken>()).Returns(PlexAddress);
 
         var showIds = new RemoteExternalIdsDto { TmdbId = "126027" };
         var secondHalf = new RemoteExternalIdsDto { TvdbId = "11401561" };
@@ -54,7 +57,6 @@ public class LibraryMigrationJobRunnerTests
             AdminAccessToken = "admin-token",
             ServerClientIdentifier = "server",
             ServerName = "AXMediaServer",
-            ConnectionUri = "http://plex.example.com:32400",
             IncludeWatchState = true,
             IncludeRatings = true,
             SetAdminRatings = setAdminRatings,
@@ -78,6 +80,7 @@ public class LibraryMigrationJobRunnerTests
         var job = await RunAsync(setAdminRatings: false);
 
         job.Users.Single().Skipped.Should().Be(0);
+        await _plex.Received(1).FetchUserDataAsync(PlexAddress, "user-token", Arg.Any<RemoteSyncScopeDto>(), Arg.Any<CancellationToken>());
         await _repository.Received(1).BulkUpsertWatchStatesAsync(_profileId, Arg.Is<IReadOnlyCollection<WatchStateUpsert>>(w => w.Single().MediaItemId == _doubleEpisodeId && w.Single().IsPlayed));
         await _repository.Received(1).BulkUpsertRatingsAsync(_profileId, Arg.Is<IReadOnlyCollection<RatingUpsert>>(r => r.Single().MediaItemId == _doubleEpisodeId));
         _taskQueue.DidNotReceive().QueueGenerateLibraryPosterOverlays(Arg.Any<Guid>(), Arg.Any<string?>());
@@ -106,6 +109,19 @@ public class LibraryMigrationJobRunnerTests
         user.RatingsImported.Should().Be(1);
         user.RatingsMerged.Should().Be(0);
         user.Skipped.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_Plex_server_Vora_cannot_reach_fails_the_job_with_the_reason()
+    {
+        _plex.FindReachableConnectionAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<string>(new RemoteServerUnreachableException("Vora couldn't reach the Plex server \"AXMediaServer\".")));
+
+        var job = await RunAsync(setAdminRatings: false);
+
+        job.State.Should().Be(LibraryMigrationJobState.Failed);
+        job.ErrorMessage.Should().Be("Vora couldn't reach the Plex server \"AXMediaServer\".");
+        await _plex.DidNotReceive().FetchUserDataAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<RemoteSyncScopeDto>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
