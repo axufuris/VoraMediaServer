@@ -6,6 +6,7 @@ using Vora.Domain.Enums;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 using Vora.Plugins.Providers.Local;
+using ArtworkKind = Vora.Domain.Enums.ArtworkKind;
 
 namespace Vora.Application.Tests.Metadata;
 
@@ -16,6 +17,7 @@ public class HomeVideoMetadataTests
     private readonly IArtworkProvider _tmdbArtwork = Substitute.For<IArtworkProvider>();
     private readonly IRatingsProvider _imdbRatings = Substitute.For<IRatingsProvider>();
     private readonly ILocalMediaReader _localMedia = Substitute.For<ILocalMediaReader>();
+    private readonly IVideoFrameArtworkService _frames = Substitute.For<IVideoFrameArtworkService>();
     private readonly MetadataFetchService _service;
 
     public HomeVideoMetadataTests()
@@ -25,10 +27,11 @@ public class HomeVideoMetadataTests
         _tmdbArtwork.Id.Returns("tmdb_artwork");
         _imdbRatings.Id.Returns("omdb_imdb");
         _localMedia.FindArtworkAsync(Arg.Any<Guid>()).Returns([]);
-        _service = new MetadataFetchService([_tmdb, _local], [_imdbRatings], [_tmdbArtwork], _localMedia);
+        _frames.GetFrameArtworkAsync(Arg.Any<MediaItem>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns([]);
+        _service = new MetadataFetchService([_tmdb, _local], [_imdbRatings], [_tmdbArtwork], _localMedia, _frames);
     }
 
-    private static Movie Video(LibraryType type) => new()
+    private static Movie Video(LibraryType type, string artworkProviderId = "tmdb_artwork") => new()
     {
         Id = Guid.NewGuid(),
         Title = "Beach Day",
@@ -38,7 +41,7 @@ public class HomeVideoMetadataTests
             Name = "Family",
             Type = type,
             MetadataProviderId = "tmdb_metadata",
-            ArtworkProviderId = "tmdb_artwork",
+            ArtworkProviderId = artworkProviderId,
             ThirdPartyRating1ProviderId = "omdb_imdb",
         },
     };
@@ -57,6 +60,37 @@ public class HomeVideoMetadataTests
         await _tmdbArtwork.DidNotReceive().GetArtworkAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await _imdbRatings.DidNotReceive().FetchRatingAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _localMedia.Received(1).FindArtworkAsync(video.Id);
+    }
+
+    [Fact]
+    public async Task A_home_video_with_nothing_beside_it_gets_a_poster_and_backdrop_from_its_own_picture()
+    {
+        var video = Video(LibraryType.HomeVideo);
+        var frame = new MediaArtwork { Url = "/api/artwork/custom/frame_poster.jpg", Kind = ArtworkKind.Poster, ProviderId = VideoFrameArtworkService.ProviderId };
+        _frames.GetFrameArtworkAsync(video, true, true, Arg.Any<CancellationToken>()).Returns([frame]);
+
+        var artwork = await _service.GetArtworkAsync(video);
+
+        artwork.Should().ContainSingle().Which.Should().BeSameAs(frame);
+    }
+
+    [Fact]
+    public async Task A_poster_beside_a_home_video_wins_and_only_the_backdrop_comes_from_the_video()
+    {
+        var video = Video(LibraryType.HomeVideo);
+        _localMedia.FindArtworkAsync(video.Id).Returns([new MediaArtwork { Url = "/local/poster.jpg", Kind = ArtworkKind.Poster, ProviderId = LocalArtworkProvider.ProviderId }]);
+
+        await _service.GetArtworkAsync(video);
+
+        await _frames.Received(1).GetFrameArtworkAsync(video, false, true, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_film_never_gets_a_poster_from_its_own_picture()
+    {
+        await _service.GetArtworkAsync(Video(LibraryType.Movie, LocalArtworkProvider.ProviderId));
+
+        await _frames.DidNotReceive().GetFrameArtworkAsync(Arg.Any<MediaItem>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

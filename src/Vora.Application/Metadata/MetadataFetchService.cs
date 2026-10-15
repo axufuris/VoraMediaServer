@@ -28,18 +28,21 @@ public class MetadataFetchService : IMetadataFetchService
     private readonly IEnumerable<IRatingsProvider> _ratingsProviders;
     private readonly IEnumerable<IArtworkProvider> _artworkProviders;
     private readonly ILocalMediaReader _localMedia;
+    private readonly IVideoFrameArtworkService _frames;
     private readonly Dictionary<Guid, bool> _trustedShowDocuments = new();
 
     public MetadataFetchService(
         IEnumerable<IMetadataProvider> providers,
         IEnumerable<IRatingsProvider> ratingsProviders,
         IEnumerable<IArtworkProvider> artworkProviders,
-        ILocalMediaReader localMedia)
+        ILocalMediaReader localMedia,
+        IVideoFrameArtworkService frames)
     {
         _providers = providers;
         _ratingsProviders = ratingsProviders;
         _artworkProviders = artworkProviders;
         _localMedia = localMedia;
+        _frames = frames;
     }
 
     public async Task<(MetadataResult? Metadata, string ProviderId, string ProviderName)> GetTextMetadataAsync(MediaItem item)
@@ -324,7 +327,13 @@ public class MetadataFetchService : IMetadataFetchService
         if (item?.Library == null) return [];
         if (!item.Library.PreferLocalArtwork && !UsesLocalArtworkProvider(item)) return [];
 
-        return await _localMedia.FindArtworkAsync(item.Id);
+        var found = await _localMedia.FindArtworkAsync(item.Id);
+        if (!StaysLocal(item)) return found;
+
+        var frames = await _frames.GetFrameArtworkAsync(item,
+            needsPoster: found.All(a => a.Kind != Vora.Domain.Enums.ArtworkKind.Poster),
+            needsBackdrop: found.All(a => a.Kind != Vora.Domain.Enums.ArtworkKind.Backdrop));
+        return [.. found, .. frames];
     }
 
     private async Task<List<MediaArtwork>> FetchProviderArtworkAsync(MediaItem item)
