@@ -84,6 +84,31 @@ public class LibraryMigrationJobRunnerTests
     }
 
     [Fact]
+    public async Task Both_halves_of_a_double_episode_count_as_merged_into_one_title_rather_than_missing()
+    {
+        var showIds = new RemoteExternalIdsDto { TmdbId = "126027" };
+        _plex.FetchUserDataAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<RemoteSyncScopeDto>(), Arg.Any<CancellationToken>())
+            .Returns(new RemoteUserDataDto
+            {
+                WatchStates =
+                [
+                    new RemoteWatchStateDto { Kind = RemoteMediaKind.Episode, ExternalIds = showIds, SeasonNumber = 5, EpisodeNumber = 9, IsPlayed = true },
+                    new RemoteWatchStateDto { Kind = RemoteMediaKind.Episode, ExternalIds = showIds, SeasonNumber = 5, EpisodeNumber = 10, IsPlayed = true },
+                ],
+                Ratings = [new RemoteRatingDto { Kind = RemoteMediaKind.Episode, ExternalIds = showIds, SeasonNumber = 5, EpisodeNumber = 9, Rating = 8m }],
+            });
+
+        var user = (await RunAsync(setAdminRatings: false)).Users.Single();
+
+        user.WatchStatesFetched.Should().Be(2);
+        user.WatchStatesImported.Should().Be(1);
+        user.WatchStatesMerged.Should().Be(1);
+        user.RatingsImported.Should().Be(1);
+        user.RatingsMerged.Should().Be(0);
+        user.Skipped.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Server_ratings_set_by_the_import_redraw_the_poster_overlays_of_the_libraries_they_changed()
     {
         await RunAsync(setAdminRatings: true);
