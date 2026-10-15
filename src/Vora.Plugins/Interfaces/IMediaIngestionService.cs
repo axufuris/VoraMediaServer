@@ -13,6 +13,7 @@ public interface IMediaIngestionService
     Task<List<string>> GetFirstEpisodeFilePathsAsync(LibraryHandle library);
     Task<List<MusicFilePlacement>> GetMusicFilePlacementsAsync(LibraryHandle library);
     Task ForgetAlbumArtAndYearAsync(Guid albumId);
+    Task<List<MovieFilePlacement>> GetFilesOfMoviesWithSeveralFilesAsync(LibraryHandle library);
     Task ReportUnreadableEpisodeFilesAsync(LibraryHandle library, IReadOnlyList<string> filePaths);
     Task<List<string>> GetLibraryItemFilePathsAsync(LibraryHandle library);
     Task RemoveMediaItemByPathAsync(string filePath);

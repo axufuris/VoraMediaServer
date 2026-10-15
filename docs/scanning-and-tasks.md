@@ -158,7 +158,7 @@ That makes the common add-a-season case self-heal. By hand, a library's Manage p
 
 ### Duplicate-item prevention
 
-`IMediaIngestionService.EnsureMovieAsync` must not create a second `MediaItem` for a movie that's already in the library under a differently-cased or metadata-rewritten title. It resolves an existing item by, in order: **external id** (`GetMovieIdByExternalIdAsync` — TMDB, then IMDB, within the library), then **normalized title + year** (`GetMovieIdByTitleAndYearAsync`, which lower-cases and strips punctuation via `NormalizeTitle` and compares in memory). Only if both miss is a new item created. The old code compared the raw, case-sensitive `Title`, so a file scanned before metadata mapping and one scanned after (metadata rewrote the title) produced two rows sharing the same TmdbId/ImdbId.
+`IMediaIngestionService.EnsureMovieAsync` must not create a second `MediaItem` for a movie that's already in the library under a differently-cased or metadata-rewritten title. It resolves an existing item by **external id**, then **normalized title + year**, skipping a film whose stored ids contradict the file's. The full order, the movie-folder fallback for file names without a year, and the repair pass that takes another film's file off a movie are in [`movie-file-names.md`](movie-file-names.md).
 
 ### Editions live on the part
 

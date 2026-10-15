@@ -91,7 +91,7 @@ public partial class MediaRepository : IMediaRepository
         });
     }
 
-    public async Task<Guid?> GetMovieIdByTitleAndYearAsync(string title, int? year, Guid libraryId)
+    public async Task<Guid?> GetMovieIdByTitleAndYearAsync(string title, int? year, Guid libraryId, string? tmdbId = null, string? imdbId = null)
     {
         // Match on a normalized title (lowercased, punctuation stripped) so a
         // freshly-parsed filename title still matches an existing item whose
@@ -102,10 +102,30 @@ public partial class MediaRepository : IMediaRepository
         var candidates = await _context.Set<Movie>()
             .AsNoTracking()
             .Where(m => m.LibraryId == libraryId && (year == null || (m.ReleaseDate != null && m.ReleaseDate.Value.Year == year)))
-            .Select(m => new { m.Id, m.Title })
+            .Select(m => new { m.Id, m.Title, m.TmdbId, m.ImdbId })
             .ToListAsync();
 
-        return candidates.FirstOrDefault(c => NormalizeTitle(c.Title) == normalized)?.Id;
+        var fileIds = ExternalIdSet.From(tmdbId, imdbId);
+        var matches = candidates
+            .Where(c => NormalizeTitle(c.Title) == normalized
+                && !Vora.Plugins.Providers.Local.LocalIdentity.Contradicts(fileIds, ExternalIdSet.From(c.TmdbId, c.ImdbId)))
+            .ToList();
+
+        return year != null || matches.Count == 1 ? matches.FirstOrDefault()?.Id : null;
+    }
+
+    public async Task<List<MovieFilePlacement>> GetFilesOfMoviesWithSeveralFilesAsync(Guid libraryId)
+    {
+        var movies = await _context.Set<Movie>()
+            .AsNoTracking()
+            .Where(m => m.LibraryId == libraryId && m.MediaParts.Count > 1)
+            .Select(m => new { m.Id, m.TmdbId, m.ImdbId, m.LockedFields, Files = m.MediaParts.Select(p => p.FilePath).ToList() })
+            .ToListAsync();
+
+        return movies
+            .SelectMany(m => m.Files.Select(file => new MovieFilePlacement(file, m.Id, m.TmdbId, m.ImdbId,
+                m.LockedFields.Contains(Vora.Application.Metadata.MediaMatchManager.MatchLock, StringComparer.OrdinalIgnoreCase))))
+            .ToList();
     }
 
     public Task<Guid?> GetMovieIdByExternalIdAsync(string? tmdbId, string? imdbId, Guid libraryId)
