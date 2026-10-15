@@ -348,6 +348,11 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var match = titleRegex.Match(folderName);
         string parentTitle = match.Success && match.Groups["Title"].Success ? match.Groups["Title"].Value.Trim() : folderName;
         int? parentYear = match.Groups["Year"].Success && int.TryParse(match.Groups["Year"].Value, out int year) ? year : null;
+        if (parentYear == null && ReleaseNames.Read(parentTitle) is { } release)
+        {
+            parentTitle = release.Title;
+            parentYear = release.Year;
+        }
 
         if (local.ReadsDocuments && FeatureIn(rootFolder, local) is { } feature)
         {
@@ -481,6 +486,12 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
             tagged = LocalIdentity.Merge(tagged, folder.Ids);
         }
 
+        if (year == null && ReleaseNames.Read(title) is { } release)
+        {
+            title = release.Title;
+            year = release.Year;
+        }
+
         var document = local.ReadsDocuments
             ? LocalIdentity.Trusted(LocalNfoReader.ReadMovie(filePath, local.Folders), year, tagged)
             : null;
@@ -496,12 +507,17 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         if (string.IsNullOrEmpty(folder) || local.LibraryRoots.Any(root => SameFolder(root, folder))) return null;
 
         var folderName = Path.GetFileName(folder);
-        if (LocalIdentity.YearIn(folderName) is not int year) return null;
+        if (FolderTitleAndYear(folderName) is not { } named) return null;
 
-        var folderTitle = LocalIdentity.TitleIn(folderName);
         var sameFilm = LocalMediaAssets.HoldsOneFilm(local.Folders.Files(folder), filePath)
-            || LocalMediaAssets.FilmKey(folderTitle) == LocalMediaAssets.FilmKey(fileTitle);
-        return sameFilm ? (folderTitle, year, LocalIdentity.TaggedIds(folderName)) : null;
+            || LocalMediaAssets.FilmKey(named.Title) == LocalMediaAssets.FilmKey(fileTitle);
+        return sameFilm ? (named.Title, named.Year, LocalIdentity.TaggedIds(folderName)) : null;
+    }
+
+    private static (string Title, int Year)? FolderTitleAndYear(string folderName)
+    {
+        if (LocalIdentity.YearIn(folderName) is int year) return (LocalIdentity.TitleIn(folderName), year);
+        return ReleaseNames.Read(folderName) is { Year: int releaseYear } release ? (release.Title, releaseYear) : null;
     }
 
     private async Task SeparateFilesOfOtherFilmsAsync(LibraryHandle library, IReadOnlyList<string> roots, HashSet<string> knownFiles, Regex regex, LocalScan local)
@@ -692,6 +708,11 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         int? showYear = showMatch.Groups["Year"].Success && int.TryParse(showMatch.Groups["Year"].Value, out int y) ? y : null;
         string? provider = showMatch.Groups["Provider"].Success ? showMatch.Groups["Provider"].Value.ToLower() : null;
         string? providerId = showMatch.Groups["ProviderId"].Success ? showMatch.Groups["ProviderId"].Value : null;
+        if (showYear == null && ReleaseNames.Read(showTitle) is { } release)
+        {
+            showTitle = release.Title;
+            showYear = release.Year;
+        }
 
         var tagged = TaggedIds(provider, providerId);
         var document = local.ReadsDocuments && !string.IsNullOrEmpty(showDirectory)

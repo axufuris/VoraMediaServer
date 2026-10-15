@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Vora.Domain.Entities.Media;
+using Vora.Plugins.Providers.Local;
 
 namespace Vora.Application.Metadata;
 
@@ -76,12 +77,14 @@ public static partial class MediaMatchIds
         return null;
     }
 
-    public static string CleanSearchTitle(string? title)
+    public static string CleanSearchTitle(string? title) => SearchTerms(title, null).Query;
+
+    public static (string Query, int? Year) SearchTerms(string? title, int? year)
     {
-        if (string.IsNullOrWhiteSpace(title)) return string.Empty;
+        if (string.IsNullOrWhiteSpace(title)) return (string.Empty, year);
         var cleaned = ExternalIdTagPattern().Replace(title, string.Empty);
-        cleaned = TrailingYearPattern().Replace(cleaned, string.Empty);
-        return cleaned.Trim();
+        cleaned = TrailingYearPattern().Replace(cleaned, string.Empty).Trim();
+        return ReleaseNames.Read(cleaned) is { } release ? (release.Title, year ?? release.Year) : (cleaned, year);
     }
 
     public static string Label(string source) => source switch
