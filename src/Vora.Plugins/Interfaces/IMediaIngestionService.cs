@@ -11,6 +11,8 @@ public interface IMediaIngestionService
     Task<HashSet<string>> GetExistingLibraryPathsAsync(LibraryHandle library);
     Task SetEpisodeRangesAsync(LibraryHandle library, IReadOnlyDictionary<string, EpisodeRange> rangeByFile);
     Task<List<string>> GetFirstEpisodeFilePathsAsync(LibraryHandle library);
+    Task<List<MusicFilePlacement>> GetMusicFilePlacementsAsync(LibraryHandle library);
+    Task ForgetAlbumArtAndYearAsync(Guid albumId);
     Task ReportUnreadableEpisodeFilesAsync(LibraryHandle library, IReadOnlyList<string> filePaths);
     Task<List<string>> GetLibraryItemFilePathsAsync(LibraryHandle library);
     Task RemoveMediaItemByPathAsync(string filePath);
@@ -31,7 +33,7 @@ public interface IMediaIngestionService
     Task<MediaItemHandle> EnsureEpisodeAsync(LibraryHandle library, SeasonHandle season, int episodeNumber, string title, DateOnly? airDate, string? edition = null, int? endEpisodeNumber = null);
 
     Task<ArtistHandle> EnsureArtistAsync(LibraryHandle library, string name, string? sortName, byte[]? artworkBytes, string? artworkMimeType, byte[]? backgroundBytes = null, string? backgroundMimeType = null, byte[]? bannerBytes = null, string? bannerMimeType = null, byte[]? clearLogoBytes = null, string? clearLogoMimeType = null);
-    Task<AlbumHandle> EnsureAlbumAsync(LibraryHandle library, ArtistHandle artist, string title, int? year, string? genre, byte[]? artworkBytes, string? artworkMimeType, byte[]? backgroundBytes = null, string? backgroundMimeType = null, byte[]? discArtBytes = null, string? discArtMimeType = null, string? albumArtist = null, bool isCompilation = false);
+    Task<AlbumHandle> EnsureAlbumAsync(LibraryHandle library, ArtistHandle artist, string title, int? year, string? genre, byte[]? artworkBytes, string? artworkMimeType, byte[]? backgroundBytes = null, string? backgroundMimeType = null, byte[]? discArtBytes = null, string? discArtMimeType = null, string? albumArtist = null, bool isCompilation = false, IReadOnlyList<string>? albumFolders = null);
     Task<MediaItemHandle> EnsureTrackAsync(LibraryHandle library, AlbumHandle album, string title, int trackNumber, int? discNumber, int? durationSeconds, string? audioCodec, int? sampleRate, int? bitrate, string? contentRating, string? trackArtist = null, string? isrc = null);
 
     Task AddMediaPartAsync(MediaItemHandle item, string filePath, string? resolution, string? edition = null, bool syncEdition = true);

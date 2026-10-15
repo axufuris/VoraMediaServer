@@ -59,8 +59,10 @@ public class MusicIngestProgressTests : IDisposable
         _ingestion.EnsureAlbumAsync(
                 Arg.Any<LibraryHandle>(), Arg.Any<ArtistHandle>(), Arg.Any<string>(), Arg.Any<int?>(),
                 Arg.Any<string?>(), Arg.Any<byte[]?>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
-                Arg.Any<string?>(), Arg.Any<byte[]?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<bool>())
+                Arg.Any<string?>(), Arg.Any<byte[]?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<bool>(),
+                Arg.Any<IReadOnlyList<string>?>())
             .Returns(_ => new AlbumHandle(Guid.NewGuid()));
+        _ingestion.GetMusicFilePlacementsAsync(Arg.Any<LibraryHandle>()).Returns(new List<MusicFilePlacement>());
         _ingestion.EnsureTrackAsync(
                 Arg.Any<LibraryHandle>(), Arg.Any<AlbumHandle>(), Arg.Any<string>(), Arg.Any<int>(),
                 Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<int?>(), Arg.Any<int?>(),
@@ -132,8 +134,8 @@ public class MusicIngestProgressTests : IDisposable
         _progress.Reports.Should().Contain(r => r.StartsWith("Saving ") && r.EndsWith("(2/2)"));
     }
 
-    // Albums are grouped by TAG, not by folder — two folders with identical tags
-    // are one album — so these carry real tags.
+    // Albums are grouped by their album tag within each album folder, so these
+    // carry real tags.
     //
     // Every save re-runs change detection over everything tracked so far, so a
     // library-sized ingest on one DbContext slows down with each album.

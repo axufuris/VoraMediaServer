@@ -870,11 +870,83 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
     private async Task ProcessMusicDirectoriesAsync(LibraryHandle library, IEnumerable<string> directories, IReadOnlyList<string> excludeFilters)
     {
         var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
-        var filesToProcess = GetNewFilesInDirectories(directories, existingPathsSet, MediaFileExtensions.Audio)
+        var roots = directories.ToList();
+        await SeparateMisplacedMusicFilesAsync(library, roots, existingPathsSet);
+        var filesToProcess = GetNewFilesInDirectories(roots, existingPathsSet, MediaFileExtensions.Audio)
             .Where(f => !IsExcluded(f, excludeFilters))
             .ToList();
 
         await IngestMusicFilesAsync(library, filesToProcess);
+    }
+
+    private async Task SeparateMisplacedMusicFilesAsync(LibraryHandle library, IReadOnlyList<string> roots, HashSet<string> knownFiles)
+    {
+        var placements = (await _ingestionService.GetMusicFilePlacementsAsync(library))
+            .Where(p => knownFiles.Contains(p.FilePath) && roots.Any(root => IsInside(p.FilePath, root)) && File.Exists(p.FilePath))
+            .ToList();
+
+        var misplaced = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var track in placements.GroupBy(p => p.TrackId).Where(g => g.Count() > 1))
+        {
+            var titled = track.Select(p => (Placement: p, Title: TagTitle(p.FilePath))).ToList();
+            if (titled.Any(t => t.Title == null)) continue;
+
+            var byTitle = titled.GroupBy(t => TrackTitles.Normalize(t.Title)).ToList();
+            if (byTitle.Count < 2) continue;
+
+            var first = track.First();
+            var own = byTitle.Where(g => TrackTitles.Same(g.Key, first.TrackTitle) || TrackTitles.Same(g.Key, first.OriginalTitle)).ToList();
+            if (own.Count != 1) continue;
+
+            misplaced.UnionWith(byTitle.Where(g => g != own[0]).SelectMany(g => g).Select(t => t.Placement.FilePath));
+        }
+
+        var splitAlbums = new List<(Guid AlbumId, string KeptFolder)>();
+        foreach (var album in placements.Where(p => !misplaced.Contains(p.FilePath)).GroupBy(p => p.AlbumId))
+        {
+            var albums = MusicAlbumFolders.Albums(album.ToList(), p => p.FilePath, p => p.DiscNumber ?? 0);
+            if (albums.Count < 2) continue;
+
+            var kept = albums
+                .OrderByDescending(files => files.Count)
+                .ThenBy(files => MusicAlbumFolders.AlbumFolder(files[0].FilePath), StringComparer.Ordinal)
+                .First();
+            misplaced.UnionWith(albums.Where(files => files != kept).SelectMany(files => files).Select(p => p.FilePath));
+            splitAlbums.Add((album.Key, MusicAlbumFolders.AlbumFolder(kept[0].FilePath)));
+        }
+
+        foreach (var (albumId, keptFolder) in splitAlbums)
+        {
+            if (misplaced.Any(file => MusicAlbumFolders.AlbumFolder(file) == keptFolder))
+            {
+                await _ingestionService.ForgetAlbumArtAndYearAsync(albumId);
+            }
+        }
+
+        foreach (var file in misplaced)
+        {
+            await _ingestionService.RemoveMediaItemByPathAsync(file);
+            knownFiles.Remove(file);
+        }
+
+        if (misplaced.Count > 0)
+        {
+            _logger.LogInformation("Took {Count} music file(s) off an album or track an older scan had put them on; they are added again where they belong.", misplaced.Count);
+        }
+    }
+
+    private string? TagTitle(string filePath)
+    {
+        try
+        {
+            using var tagFile = TagLib.File.Create(filePath);
+            return string.IsNullOrWhiteSpace(tagFile.Tag.Title) ? Path.GetFileNameWithoutExtension(filePath) : tagFile.Tag.Title;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not read the tags of {FilePath}", filePath);
+            return null;
+        }
     }
 
     private async Task<Guid?> IngestMusicFilesAsync(LibraryHandle library, IReadOnlyList<string> filesToProcess)
@@ -931,7 +1003,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                     Year = (int)tag.Year,
                     Genre = tag.FirstGenre,
                     DurationSeconds = (int?)tagFile.Properties?.Duration.TotalSeconds,
-                    AudioCodec = ResolveAudioCodec(filePath, tagFile.Properties?.Description),
+                    AudioCodec = AudioFileCodecs.Of(filePath, tagFile.Properties?.Description),
                     SampleRate = tagFile.Properties?.AudioSampleRate,
                     Bitrate = tagFile.Properties?.AudioBitrate,
                     ArtworkBytes = artworkBytes,
@@ -1031,8 +1103,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                     clearLogoBytes: artistLogoBytes,
                     clearLogoMimeType: artistLogoMime);
 
-                var byAlbum = artistGroup.GroupBy(p => p.AlbumTitle, StringComparer.OrdinalIgnoreCase);
-                foreach (var albumGroup in byAlbum)
+                foreach (var albumGroup in AlbumsOf(artistGroup))
                 {
                     var sample = albumGroup.FirstOrDefault(p => p.ArtworkBytes != null);
                     byte[]? albumArtworkBytes = sample?.ArtworkBytes;
@@ -1109,7 +1180,8 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
                         discArtBytes: albumDiscArtBytes,
                         discArtMimeType: albumDiscArtMime,
                         albumArtist: albumArtistDisplay,
-                        isCompilation: isCompilation);
+                        isCompilation: isCompilation,
+                        albumFolders: albumGroup.Select(t => MusicAlbumFolders.AlbumFolder(t.FilePath)).Distinct(StringComparer.Ordinal).ToList());
 
                     foreach (var track in albumGroup.OrderBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber))
                     {
@@ -1173,39 +1245,11 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         return lastTrackId;
     }
 
-    // TagLib's Properties.Description is prose ("MPEG Version 1 Audio, Layer 3
-    // VBR"), and Track.AudioCodec is varchar(32). The VBR form is 33 characters,
-    // so storing it raw threw 22001 and — because the ingest loop had no
-    // isolation — killed the whole library scan at the first VBR mp3.
-    //
-    // Length was only half of it. Every consumer substring-matches a short codec
-    // token (BadgeResolver picks mp3.png/flac.png; MediaDedupeManager scores
-    // lossless vs lossy), and the prose form matches none of them, so even the
-    // tracks that did fit got no audio badge and the wrong dedupe score. The
-    // container is the reliable signal; the description only disambiguates the
-    // two codecs that share the .m4a container.
-    internal static string? ResolveAudioCodec(string filePath, string? description)
-    {
-        var lossless = description != null
-            && (description.Contains("lossless", StringComparison.OrdinalIgnoreCase)
-                || description.Contains("alac", StringComparison.OrdinalIgnoreCase));
-
-        return Path.GetExtension(filePath).ToLowerInvariant() switch
-        {
-            ".mp3" => "mp3",
-            ".flac" => "flac",
-            ".m4a" => lossless ? "alac" : "aac",
-            ".aac" => "aac",
-            ".ogg" => "vorbis",
-            ".opus" => "opus",
-            ".wav" => "pcm",
-            ".wma" => "wma",
-            _ => Truncate(description, 32)
-        };
-    }
-
-    private static string? Truncate(string? value, int maxLength) =>
-        value != null && value.Length > maxLength ? value[..maxLength] : value;
+    private static IEnumerable<IGrouping<string, MusicFileMeta>> AlbumsOf(IEnumerable<MusicFileMeta> artistFiles) =>
+        artistFiles
+            .GroupBy(p => p.AlbumTitle, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(sameTitle => MusicAlbumFolders.Albums(sameTitle.ToList(), p => p.FilePath, p => p.DiscNumber))
+            .Select(files => files.GroupBy(_ => files[0].AlbumTitle, StringComparer.OrdinalIgnoreCase).Single());
 
     private static string FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v)) ?? string.Empty;

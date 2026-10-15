@@ -28,8 +28,10 @@ public interface IMusicRepository
     Task<Artist?> GetArtistByNameAsync(Guid libraryId, string name);
     Task<Artist?> FindArtistByNameAsync(string name);
     Task<Album?> FindAlbumByArtistAndTitleAsync(string artistName, string albumTitle);
-    Task<Album?> GetAlbumByTitleAsync(Guid artistId, string title);
-    Task<Track?> GetTrackByAlbumAndNumberAsync(Guid albumId, int trackNumber, int? discNumber);
+    Task<List<Album>> GetAlbumsByTitleAsync(Guid artistId, string title);
+    Task<List<(Guid AlbumId, string FilePath)>> GetAlbumFilePathsAsync(IReadOnlyCollection<Guid> albumIds);
+    Task<List<Track>> GetTracksByAlbumAndNumberAsync(Guid albumId, int trackNumber, int? discNumber);
+    Task<List<Vora.Plugins.Dtos.MusicFilePlacement>> GetMusicFilePlacementsAsync(Guid libraryId);
     Task AddArtistAsync(Artist artist);
     Task AddAlbumAsync(Album album);
     Task UpdateArtistAsync(Artist artist);

@@ -30,14 +30,35 @@ public class MusicRepository : IMusicRepository
     public Task<Artist?> GetArtistByNameAsync(Guid libraryId, string name) =>
         _context.Artists.FirstOrDefaultAsync(a => a.LibraryId == libraryId && a.Name == name);
 
-    public Task<Album?> GetAlbumByTitleAsync(Guid artistId, string title) =>
-        _context.Albums.FirstOrDefaultAsync(a => a.ArtistId == artistId && a.Title == title);
+    public Task<List<Album>> GetAlbumsByTitleAsync(Guid artistId, string title)
+    {
+        var lowered = title.ToLower();
+        return _context.Albums.Where(a => a.ArtistId == artistId && a.Title.ToLower() == lowered).ToListAsync();
+    }
 
-    public Task<Track?> GetTrackByAlbumAndNumberAsync(Guid albumId, int trackNumber, int? discNumber) =>
-        _context.Tracks.FirstOrDefaultAsync(t =>
+    public async Task<List<(Guid AlbumId, string FilePath)>> GetAlbumFilePathsAsync(IReadOnlyCollection<Guid> albumIds)
+    {
+        var rows = await _context.Tracks.AsNoTracking()
+            .Where(t => t.AlbumId != null && albumIds.Contains(t.AlbumId ?? Guid.Empty))
+            .SelectMany(t => t.MediaParts.Select(p => new { AlbumId = t.AlbumId ?? Guid.Empty, p.FilePath }))
+            .ToListAsync();
+        return rows.Select(r => (r.AlbumId, r.FilePath)).ToList();
+    }
+
+    public Task<List<Track>> GetTracksByAlbumAndNumberAsync(Guid albumId, int trackNumber, int? discNumber) =>
+        _context.Tracks.Where(t =>
             t.AlbumId == albumId
             && t.TrackNumber == trackNumber
-            && t.DiscNumber == discNumber);
+            && t.DiscNumber == discNumber).ToListAsync();
+
+    public async Task<List<Vora.Plugins.Dtos.MusicFilePlacement>> GetMusicFilePlacementsAsync(Guid libraryId)
+    {
+        var rows = await _context.Tracks.AsNoTracking()
+            .Where(t => t.LibraryId == libraryId && t.AlbumId != null)
+            .SelectMany(t => t.MediaParts.Select(p => new { p.FilePath, AlbumId = t.AlbumId ?? Guid.Empty, t.Id, t.Title, t.OriginalTitle, t.DiscNumber }))
+            .ToListAsync();
+        return rows.Select(r => new Vora.Plugins.Dtos.MusicFilePlacement(r.FilePath, r.AlbumId, r.Id, r.Title, r.OriginalTitle, r.DiscNumber)).ToList();
+    }
 
     public async Task AddArtistAsync(Artist artist)
     {
