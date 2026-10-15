@@ -33,6 +33,27 @@ How the TV scanner decides which episode a file is. `EpisodeFileNames` (`Vora.Pl
 | `2024-01-15 - Title` | that date, "Title" |
 | `2024-01-15 - 001 - Title` | that date, absolute 1, "Title" (new: "001 - Title" used to be the title) |
 
+## The library setting: Automatic or a custom pattern
+
+Admin → Libraries → a TV library → **Episode file names** (`EpisodeFileNamesFields`; movie and music libraries keep the plain regex box).
+
+- **Automatic** stores no pattern (`ScannerRegex` null) and reads with the current default, so a later change to the default reaches the library without a migration. `LibraryManager` stores null for a blank pattern and for any built-in one (`LocalScannerPatterns.IsBuiltInTvEpisode`, the current default or a retired one), and `GetLibraryByIdAsync` shows a stored built-in pattern as null, so those libraries open on Automatic.
+- **Custom pattern** is tried first; a name it doesn't read still goes through the automatic steps. Saving one the scanner couldn't use is refused with the reason (`EpisodeFileNames.ProblemWith`): not a valid regular expression, or no `Episode` or `AirDate` group. A stored pattern that fails anyway (saved before the check) is skipped with a warning and the library reads automatically.
+
+## Check my files
+
+`POST /api/libraries/episode-names/preview` (admin, `{ folderPaths, scannerRegex, excludeFilters }`) runs the reading over the folders without changing anything (`ILocalMediaScannerProvider.PreviewEpisodeFileNamesAsync`). It skips extras and excluded files, checks up to 50,000 files, and returns:
+
+- counts read from the name, from the `.nfo`, guessed, and unplaceable, plus any `patternProblem`;
+- for a custom pattern, how many files Automatic would leave out and how many it would place differently, so the page can offer **Use Automatic**;
+- up to 150 files with their episode, title and how they were read, unplaceable ones first, paths relative to the library folder.
+
+The page's form is checked, not the saved library, so a pattern can be tried before saving. Episode numbers made from an air date show as the date.
+
+## When a scan leaves files out
+
+A file nothing can place is left out (above), and the scan tells the admin once: `IMediaIngestionService.ReportUnreadableEpisodeFilesAsync` raises a warning in the admin notification bell naming the library, the count and one file, pointing at **Check my files**. It is deduplicated per library while unread (`{"kind":"unreadable-episode-files","libraryId":...}`), so nightly scans don't pile up notices. The library scan's discovery reports every such file once and leaves them out of the scan units; show, season and episode scans report after their pass; the folder watcher reports the one file.
+
 ## Files an older scan stacked on S01E01
 
 Every TV scan (library, show, season, episode and the parallel library scan's discovery) runs `SeparateFilesStackedOnTheFirstEpisodeAsync` before it repairs ranges and lists new files:

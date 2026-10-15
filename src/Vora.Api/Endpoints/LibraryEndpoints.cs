@@ -64,6 +64,10 @@ public static class LibraryEndpoints
         group.MapPut("/{id:guid}", UpdateLibraryAsync)
             .Produces(StatusCodes.Status204NoContent);
 
+        group.MapPost("/episode-names/preview", PreviewEpisodeFileNamesAsync)
+            .WithName("PreviewEpisodeFileNames")
+            .Produces<EpisodeNamePreviewVM>(StatusCodes.Status200OK);
+
         group.MapDelete("/{id:guid}", DeleteLibraryAsync)
             .Produces(StatusCodes.Status204NoContent);
     }
@@ -137,6 +141,9 @@ public static class LibraryEndpoints
         await manager.ToggleWatchingAsync(id, enable);
         return Results.Ok();
     }
+
+    private static async Task<IResult> PreviewEpisodeFileNamesAsync([FromBody] PreviewEpisodeFileNamesRequest request, ILibraryManager manager) =>
+        Results.Ok(await manager.PreviewEpisodeFileNamesAsync(request));
 
     private static async Task<IResult> UpdateLibraryAsync(Guid id, [FromBody] UpdateLibraryRequest request, ILibraryManager manager)
     {

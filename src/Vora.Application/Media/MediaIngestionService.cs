@@ -1,9 +1,11 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vora.Application.Analysis;
 using Vora.Application.Libraries;
+using Vora.Application.Notifications;
 using Vora.Application.Requests;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
@@ -27,6 +29,7 @@ public class MediaIngestionService : IMediaIngestionService
     private readonly IMediaAnalyzerService _analyzerService;
     private readonly Vora.Application.Metadata.ReferenceWriteGate _writeGate;
     private readonly ISystemSettingsRepository _settingsRepo;
+    private readonly IAdminNotificationManager _adminNotifications;
     private readonly ILogger<MediaIngestionService> _logger;
     private readonly string _artworkBasePath;
 
@@ -39,9 +42,11 @@ public class MediaIngestionService : IMediaIngestionService
         IMediaAnalyzerService analyzerService,
         Vora.Application.Metadata.ReferenceWriteGate writeGate,
         ISystemSettingsRepository settingsRepo,
+        IAdminNotificationManager adminNotifications,
         IOptions<StoragePathsOptions> storagePaths,
         ILogger<MediaIngestionService> logger)
     {
+        _adminNotifications = adminNotifications;
         _repository = repository;
         _libraryRepository = libraryRepository;
         _requestManager = requestManager;
@@ -100,6 +105,21 @@ public class MediaIngestionService : IMediaIngestionService
         {
             _logger.LogInformation("Recorded the episode range of {Count} multi-episode file(s) in library {LibraryId}.", updated, library.Value);
         }
+    }
+
+    public async Task ReportUnreadableEpisodeFilesAsync(LibraryHandle library, IReadOnlyList<string> filePaths)
+    {
+        if (filePaths.Count == 0) return;
+
+        var name = await _libraryRepository.GetProjectedByIdAsync(library.Value, l => l.Name) ?? "a TV library";
+        var example = Path.GetFileName(filePaths[0]);
+        _logger.LogWarning("Left {Count} file(s) in {Library} out because their names give no episode Vora can read, for example {Example}.", filePaths.Count, name, example);
+
+        var message = filePaths.Count == 1
+            ? $"\"{example}\" in {name} wasn't added because Vora couldn't tell which episode it is. Libraries → {name} → Episode file names → Check my files shows how Vora reads each file."
+            : $"{filePaths.Count} files in {name} weren't added because Vora couldn't tell which episode each one is, for example \"{example}\". Libraries → {name} → Episode file names → Check my files lists them and how Vora reads the rest.";
+        var context = JsonSerializer.Serialize(new { kind = "unreadable-episode-files", libraryId = library.Value });
+        await _adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning, "Some episode files weren't added", message, context, deduplicateByContext: true);
     }
 
     public Task<List<string>> GetFirstEpisodeFilePathsAsync(LibraryHandle library) =>

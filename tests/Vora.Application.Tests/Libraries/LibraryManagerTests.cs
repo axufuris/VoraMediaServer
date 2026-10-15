@@ -2,10 +2,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Vora.Application.Analysis;
 using Vora.Application.Libraries;
 using Vora.Application.Libraries.Requests;
+using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Tasks;
 using Vora.Application.Watchers;
 using Vora.Application.Thumbnails;
 using Vora.Domain.Enums;
+using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Tests.Libraries;
 
@@ -191,7 +193,7 @@ public class LibraryManagerTests
     }
 
     [Fact]
-    public async Task CreateLibraryAsync_applies_default_tv_regex_when_none_supplied()
+    public async Task CreateLibraryAsync_scans_a_tv_library_with_the_default_pattern_when_none_is_supplied()
     {
         Domain.Entities.Library.MediaLibrary? captured = null;
         _repo.CreateLibraryAsync(Arg.Do<Domain.Entities.Library.MediaLibrary>(l => captured = l))
@@ -206,8 +208,9 @@ public class LibraryManagerTests
 
         await _manager.CreateLibraryAsync(request);
 
-        captured!.ScannerRegex.Should().Contain("Season");
-        captured.ScannerRegex.Should().Contain("Episode");
+        captured.Should().NotBeNull();
+        var scanned = Vora.Plugins.Providers.Local.LocalScannerPatterns.EffectiveTvEpisode(captured?.ScannerRegex);
+        scanned.Should().Contain("Season").And.Contain("Episode");
     }
 
     [Fact]
@@ -290,18 +293,19 @@ public class LibraryManagerTests
     }
 
     [Fact]
-    public async Task A_new_tv_library_gets_the_pattern_that_reads_multi_episode_files()
+    public async Task A_new_tv_library_reads_episode_names_automatically()
     {
         Domain.Entities.Library.MediaLibrary? saved = null;
         _repo.CreateLibraryAsync(Arg.Do<Domain.Entities.Library.MediaLibrary>(l => saved = l)).Returns(Guid.NewGuid());
 
         await _manager.CreateLibraryAsync(new CreateLibraryRequest { Name = "Shows", Type = LibraryType.TvShow });
 
-        saved?.ScannerRegex.Should().Be(Vora.Plugins.Providers.Local.LocalScannerPatterns.TvEpisode);
+        saved.Should().NotBeNull();
+        saved?.ScannerRegex.Should().BeNull();
     }
 
     [Fact]
-    public async Task Saving_a_tv_library_that_kept_an_old_default_pattern_moves_it_to_the_current_one()
+    public async Task Saving_a_tv_library_that_kept_an_old_default_pattern_moves_it_to_automatic()
     {
         const string oldDefault = @"(?:[sS](?<Season>\d{1,4})[eE](?<Episode>\d{1,4})(?:\s*-\s*(?<Absolute>\d{1,4}))?|(?<AirDate>\d{4}-\d{2}-\d{2}))\s*-\s*(?<EpisodeTitle>.*?)(?:\s*\[.*)?$";
         var library = new Domain.Entities.Library.MediaLibrary { Id = Guid.NewGuid(), Name = "Shows", Type = LibraryType.TvShow, ScannerRegex = oldDefault, FolderPaths = new List<string> { "/media/tv" } };
@@ -309,7 +313,69 @@ public class LibraryManagerTests
 
         await _manager.UpdateLibraryAsync(library.Id, new UpdateLibraryRequest { Name = "Shows", FolderPaths = new List<string> { "/media/tv" }, ScannerRegex = oldDefault });
 
-        library.ScannerRegex.Should().Be(Vora.Plugins.Providers.Local.LocalScannerPatterns.TvEpisode);
+        library.ScannerRegex.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(@"(?<Season>\d+)x(?<Episode>\d+", "isn't a valid regular expression")]
+    [InlineData(@"(?<Season>\d+)x(?<Number>\d+)", "needs an Episode or AirDate group")]
+    public async Task A_tv_pattern_the_scanner_could_not_use_is_refused_with_the_reason(string pattern, string reason)
+    {
+        const string kept = @"(?<Season>\d+)x(?<Episode>\d+) - (?<EpisodeTitle>.*)";
+        var library = new Domain.Entities.Library.MediaLibrary { Id = Guid.NewGuid(), Name = "Shows", Type = LibraryType.TvShow, ScannerRegex = kept, FolderPaths = new List<string> { "/media/tv" } };
+        _repo.GetForUpdateAsync(library.Id).Returns(library);
+
+        var save = () => _manager.UpdateLibraryAsync(library.Id, new UpdateLibraryRequest { Name = "Shows", FolderPaths = new List<string> { "/media/tv" }, ScannerRegex = pattern });
+
+        (await save.Should().ThrowAsync<ArgumentException>()).Which.Message.Should().Contain(reason);
+        library.ScannerRegex.Should().Be(kept);
+    }
+
+    [Fact]
+    public async Task A_tv_library_on_a_built_in_pattern_shows_as_automatic()
+    {
+        var id = Guid.NewGuid();
+        _repo.GetProjectedByIdAsync(id, Arg.Any<System.Linq.Expressions.Expression<Func<Domain.Entities.Library.MediaLibrary, MediaLibraryVM>>>())
+            .Returns(new MediaLibraryVM { Id = id, Type = "TvShow", ScannerRegex = Vora.Plugins.Providers.Local.LocalScannerPatterns.TvEpisode });
+
+        (await _manager.GetLibraryByIdAsync(id))?.ScannerRegex.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task The_file_name_check_asks_the_scanner_with_no_pattern_for_a_built_in_one()
+    {
+        var scanner = Substitute.For<ILocalMediaScannerProvider>();
+        scanner.Id.Returns("vora_local_scanner");
+        scanner.PreviewEpisodeFileNamesAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<string?>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>())
+            .Returns(new Vora.Plugins.Dtos.EpisodeNamePreviewDto { FilesFound = 1, ReadFromName = 1, Files = [new Vora.Plugins.Dtos.EpisodeNamePreviewFileDto("Show/Season 1/Show.1x01 - Pilot.mkv", Vora.Plugins.Dtos.EpisodeNamePreviewOutcome.Name, 1, 1, null, "Pilot")] });
+        var scope = Substitute.For<IServiceScope>();
+        var scopeProvider = Substitute.For<IServiceProvider>();
+        var factory = Substitute.For<IServiceScopeFactory>();
+        var settings = Substitute.For<Vora.Application.Settings.ISystemSettingsRepository>();
+        settings.GetSettingsAsync().Returns(new Domain.Entities.Settings.ServerSetting());
+        scopeProvider.GetService(typeof(Vora.Application.Settings.ISystemSettingsRepository)).Returns(settings);
+        scopeProvider.GetService(typeof(IEnumerable<ILocalMediaScannerProvider>)).Returns(new[] { scanner });
+        scope.ServiceProvider.Returns(scopeProvider);
+        factory.CreateScope().Returns(scope);
+        _services.GetService(typeof(IServiceScopeFactory)).Returns(factory);
+
+        var preview = await _manager.PreviewEpisodeFileNamesAsync(new PreviewEpisodeFileNamesRequest
+        {
+            FolderPaths = ["/media/tv"],
+            ScannerRegex = Vora.Plugins.Providers.Local.LocalScannerPatterns.TvEpisode
+        });
+
+        await scanner.Received(1).PreviewEpisodeFileNamesAsync(Arg.Is<IReadOnlyList<string>>(f => f.Single() == "/media/tv"), null, Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>());
+        preview.Files.Single().Outcome.Should().Be(EpisodeNameOutcome.Name);
+        preview.Files.Single().Episode.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task The_file_name_check_needs_a_folder()
+    {
+        var check = () => _manager.PreviewEpisodeFileNamesAsync(new PreviewEpisodeFileNamesRequest { FolderPaths = [] });
+
+        await check.Should().ThrowAsync<ArgumentException>();
     }
 
     [Fact]

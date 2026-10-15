@@ -7,7 +7,14 @@ public sealed record EpisodeFileName(int? Season, int? Episode, int? EndEpisode,
 
 public sealed record EpisodeNumbers(int Season, int Episode, int? EndEpisode);
 
-public sealed record EpisodePlacement(int Season, int Episode, int? EndEpisode, string? Title, DateOnly? AirDate);
+public enum EpisodePlacementSource
+{
+    Name,
+    Document,
+    Guess
+}
+
+public sealed record EpisodePlacement(int Season, int Episode, int? EndEpisode, string? Title, DateOnly? AirDate, EpisodePlacementSource Source);
 
 public sealed partial class EpisodeFileNames
 {
@@ -19,7 +26,26 @@ public sealed partial class EpisodeFileNames
 
     public EpisodeFileNames(string? libraryPattern)
     {
-        _library = new Regex(LocalScannerPatterns.EffectiveTvEpisode(libraryPattern), RegexOptions.IgnoreCase);
+        PatternProblem = ProblemWith(libraryPattern);
+        _library = new Regex(PatternProblem == null ? LocalScannerPatterns.EffectiveTvEpisode(libraryPattern) : LocalScannerPatterns.TvEpisode, RegexOptions.IgnoreCase);
+    }
+
+    public string? PatternProblem { get; }
+
+    public static string? ProblemWith(string? pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern)) return null;
+        try
+        {
+            var groups = new Regex(pattern, RegexOptions.IgnoreCase).GetGroupNames();
+            return groups.Contains("Episode") || groups.Contains("AirDate")
+                ? null
+                : @"The pattern needs an Episode or AirDate group, like (?<Episode>\d+), so Vora knows which episode a file is.";
+        }
+        catch (ArgumentException ex)
+        {
+            return $"The pattern isn't a valid regular expression: {ex.Message}";
+        }
     }
 
     public EpisodeFileName? Read(string fileName)
@@ -47,33 +73,33 @@ public sealed partial class EpisodeFileNames
 
         if (name is { NumbersGuessed: false, Episode: int episode })
         {
-            return new EpisodePlacement(name.Season ?? folderSeason ?? 1, episode, name.EndEpisode, name.Title, name.AirDate);
+            return new EpisodePlacement(name.Season ?? folderSeason ?? 1, episode, name.EndEpisode, name.Title, name.AirDate, EpisodePlacementSource.Name);
         }
 
         if (fromDocument() is { } document)
         {
-            return new EpisodePlacement(document.Season, document.Episode, document.EndEpisode, name?.Title, name?.AirDate);
+            return new EpisodePlacement(document.Season, document.Episode, document.EndEpisode, name?.Title, name?.AirDate, EpisodePlacementSource.Document);
         }
 
         if (name?.Episode is int guessed)
         {
-            return new EpisodePlacement(name.Season ?? folderSeason ?? 1, guessed, name.EndEpisode, name.Title, name.AirDate);
+            return new EpisodePlacement(name.Season ?? folderSeason ?? 1, guessed, name.EndEpisode, name.Title, name.AirDate, EpisodePlacementSource.Guess);
         }
 
         if (name?.Absolute is int absolute)
         {
-            return new EpisodePlacement(folderSeason ?? 1, absolute, name.EndEpisode, name.Title, name.AirDate);
+            return new EpisodePlacement(folderSeason ?? 1, absolute, name.EndEpisode, name.Title, name.AirDate, EpisodePlacementSource.Guess);
         }
 
         if (name?.AirDate is DateOnly date)
         {
-            return new EpisodePlacement(folderSeason ?? date.Year, date.Year * 10000 + date.Month * 100 + date.Day, null, name.Title, date);
+            return new EpisodePlacement(folderSeason ?? date.Year, date.Year * 10000 + date.Month * 100 + date.Day, null, name.Title, date, EpisodePlacementSource.Guess);
         }
 
         if (folderSeason is int season && NumberFirst.Match(fileName) is { Success: true } numbered
             && int.TryParse(numbered.Groups["Episode"].Value, out var first) && first > 0)
         {
-            return new EpisodePlacement(season, first, null, Title(numbered.Groups["EpisodeTitle"]), null);
+            return new EpisodePlacement(season, first, null, Title(numbered.Groups["EpisodeTitle"]), null, EpisodePlacementSource.Guess);
         }
 
         return null;

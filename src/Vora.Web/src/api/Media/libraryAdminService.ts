@@ -95,7 +95,42 @@ export interface MarkerCoverageVM {
     itemsMissingDuration: number;
 }
 
+export type EpisodeNameOutcome = 'Name' | 'Document' | 'Guess' | 'Unreadable';
+
+export interface EpisodeNamePreviewFileVM {
+    path: string;
+    outcome: EpisodeNameOutcome;
+    season?: number | null;
+    episode?: number | null;
+    endEpisode?: number | null;
+    title?: string | null;
+}
+
+export interface EpisodeNamePreviewVM {
+    patternProblem?: string | null;
+    filesFound: number;
+    moreFilesThanChecked: boolean;
+    readFromName: number;
+    readFromDocument: number;
+    guessed: number;
+    unreadable: number;
+    automaticUnreadable?: number | null;
+    automaticReadsDifferently?: number | null;
+    files: EpisodeNamePreviewFileVM[];
+}
+
+export interface PreviewEpisodeFileNamesRequest {
+    folderPaths: string[];
+    scannerRegex?: string | null;
+    excludeFilters?: string[];
+}
+
 export const libraryAdminService = {
+    previewEpisodeFileNames: async (request: PreviewEpisodeFileNamesRequest, serverId?: string): Promise<EpisodeNamePreviewVM> => {
+        const response = await apiClient.post<EpisodeNamePreviewVM, PreviewEpisodeFileNamesRequest>('/libraries/episode-names/preview', request, { serverId });
+        return response.data;
+    },
+
     createLibrary: async (request: CreateLibraryRequest, serverId?: string): Promise<string> => {
         const response = await apiClient.post<string>('/libraries', request, { serverId });
         return response.data;

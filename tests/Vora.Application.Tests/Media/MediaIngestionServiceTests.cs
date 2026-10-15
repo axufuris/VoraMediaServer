@@ -35,6 +35,7 @@ public class MediaIngestionServiceTests : IDisposable
         _taskQueue = Substitute.For<ITaskQueueManager>();
         _analyzerService = Substitute.For<IMediaAnalyzerService>();
         _settingsRepo = Substitute.For<ISystemSettingsRepository>();
+        _adminNotifications = Substitute.For<Vora.Application.Notifications.IAdminNotificationManager>();
         _settingsRepo.GetSettingsAsync().Returns(new Vora.Domain.Entities.Settings.ServerSetting { ScanIgnoredFolders = new List<string>() });
 
         var options = Options.Create(new StoragePathsOptions { CustomArtwork = _tempArtwork });
@@ -48,8 +49,35 @@ public class MediaIngestionServiceTests : IDisposable
             _analyzerService,
             new ReferenceWriteGate(),
             _settingsRepo,
+            _adminNotifications,
             options,
             NullLogger<MediaIngestionService>.Instance);
+    }
+
+    private readonly Vora.Application.Notifications.IAdminNotificationManager _adminNotifications;
+
+    [Fact]
+    public async Task Files_a_scan_left_out_raise_one_notice_per_library_until_it_is_read()
+    {
+        var libraryId = Guid.NewGuid();
+        _libraryRepo.GetProjectedByIdAsync(libraryId, Arg.Any<System.Linq.Expressions.Expression<Func<Vora.Domain.Entities.Library.MediaLibrary, string>>>()).Returns("TV Shows");
+
+        await _service.ReportUnreadableEpisodeFilesAsync(LibraryHandle.FromGuid(libraryId), ["/tv/Show/Season 1/Bonus Material.mkv", "/tv/Show/Season 1/Extra Bit.mkv"]);
+
+        await _adminNotifications.Received(1).RaiseAsync(
+            Vora.Domain.Enums.AdminNotificationSeverity.Warning,
+            "Some episode files weren't added",
+            Arg.Is<string>(message => message.StartsWith("2 files in TV Shows weren't added") && message.Contains("\"Bonus Material.mkv\"") && message.Contains("Check my files")),
+            $"{{\"kind\":\"unreadable-episode-files\",\"libraryId\":\"{libraryId}\"}}",
+            true);
+    }
+
+    [Fact]
+    public async Task Nothing_left_out_raises_nothing()
+    {
+        await _service.ReportUnreadableEpisodeFilesAsync(LibraryHandle.FromGuid(Guid.NewGuid()), []);
+
+        await _adminNotifications.DidNotReceive().RaiseAsync(Arg.Any<Vora.Domain.Enums.AdminNotificationSeverity>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<bool>());
     }
 
     public void Dispose()
