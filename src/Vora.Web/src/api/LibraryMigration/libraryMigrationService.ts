@@ -75,8 +75,10 @@ export interface LibraryMigrationUserStatusVM {
     state: LibraryMigrationUserState;
     watchStatesFetched: number;
     watchStatesImported: number;
+    watchStatesMerged: number;
     ratingsFetched: number;
     ratingsImported: number;
+    ratingsMerged: number;
     skipped: number;
     skippedSamples: string[];
     errorMessage?: string | null;

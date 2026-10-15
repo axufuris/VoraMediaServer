@@ -10,6 +10,7 @@ Nothing is matched by title or file path. Plex and Vora agree on provider ids, s
 - **Episodes** match on the **show's** id plus season and episode number (`FindEpisodeMatchesAsync`), then fall back to the episode's own TVDB / IMDb / TMDB id (`FindEpisodeMatchesByOwnIdsAsync`).
 - A Vora episode that covers a range (`Episode.EndEpisodeNumber`, a multi-episode file) answers for every number in it. Plex lists `S05E09` and `S05E10` separately; both land on the one Vora episode for `S05E09-E10`, and their watch states and ratings are merged (played if either was, the latest rating).
 - Anything left over is counted as skipped, and up to 40 are listed on the job as `watch episode tmdb:<show> S<n>E<n> ep-tvdb:<id>`.
+- **Reported counts.** Per kind the job reports the Plex entries (`WatchStatesFetched`), the Vora titles they landed on (`WatchStatesImported`) and the entries that landed on a title another entry also matched (`WatchStatesMerged`): both halves of a multi-episode file, or the same title in two Plex libraries. Those are imported, not missing; only entries with no match are skipped. The page used to show "13273 imported / 13360 fetched", which read as 87 failures when every entry had matched (84 were halves of multi-episode files). A kind that wasn't selected reports 0 fetched.
 
 ## Multi-episode files
 

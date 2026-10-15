@@ -179,8 +179,8 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
 
         UpdateUser(jobId, mapping.AccountId, u =>
         {
-            u.WatchStatesFetched = userData.WatchStates.Count;
-            u.RatingsFetched = userData.Ratings.Count;
+            u.WatchStatesFetched = input.IncludeWatchState ? userData.WatchStates.Count : 0;
+            u.RatingsFetched = input.IncludeRatings ? userData.Ratings.Count : 0;
         });
 
         var movieTmdbIds = CollectIds(userData, RemoteMediaKind.Movie, e => e.TmdbId);
@@ -260,6 +260,8 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
 
         var watchSkipped = 0;
         var ratingsSkipped = 0;
+        var watchMerged = 0;
+        var ratingsMerged = 0;
         var skippedSamples = new List<string>();
         var watchUpserts = new List<WatchStateUpsert>();
         var ratingUpserts = new List<RatingUpsert>();
@@ -276,6 +278,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             watchUpserts.AddRange(matchedWatch
                 .GroupBy(p => p.MediaItemId)
                 .Select(g => MergeWatchStates(g.Key, g.Select(x => x.State))));
+            watchMerged = matchedWatch.Count - watchUpserts.Count;
             await repository.BulkUpsertWatchStatesAsync(mapping.ProfileId, watchUpserts);
         }
 
@@ -291,6 +294,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             ratingUpserts.AddRange(matchedRatings
                 .GroupBy(p => p.MediaItemId)
                 .Select(g => MergeRatings(g.Key, g.Select(x => x.Rating))));
+            ratingsMerged = matchedRatings.Count - ratingUpserts.Count;
             await repository.BulkUpsertRatingsAsync(mapping.ProfileId, ratingUpserts);
             if (input.SetAdminRatings)
             {
@@ -314,7 +318,9 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
         {
             u.State = LibraryMigrationUserState.Completed;
             u.WatchStatesImported = watchUpserts.Count;
+            u.WatchStatesMerged = watchMerged;
             u.RatingsImported = ratingUpserts.Count;
+            u.RatingsMerged = ratingsMerged;
             u.Skipped = watchSkipped + ratingsSkipped;
             u.SkippedSamples = skippedSamples;
         });
@@ -522,8 +528,10 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
                 State = u.State,
                 WatchStatesFetched = u.WatchStatesFetched,
                 WatchStatesImported = u.WatchStatesImported,
+                WatchStatesMerged = u.WatchStatesMerged,
                 RatingsFetched = u.RatingsFetched,
                 RatingsImported = u.RatingsImported,
+                RatingsMerged = u.RatingsMerged,
                 Skipped = u.Skipped,
                 SkippedSamples = u.SkippedSamples.ToList(),
                 ErrorMessage = u.ErrorMessage

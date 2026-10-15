@@ -14,6 +14,7 @@ import {
     type RunLibraryMigrationMappingInput
 } from '../../api/LibraryMigration/libraryMigrationService';
 import { userService, type UserVM } from '../../api/Users/userService';
+import { migrationSummary, sharedTitleNote } from '../../utils/migrationSummary';
 
 const JOB_STORAGE_KEY = 'vora_library_migration_job_id';
 
@@ -332,11 +333,9 @@ export default function LibraryMigrationPage() {
                         </div>
                     </div>
                     <div className="text-xs text-[var(--vora-text-muted)] mt-1">
-                        Watch states: {user.watchStatesImported} imported / {user.watchStatesFetched} fetched
-                        {' · '}
-                        Ratings: {user.ratingsImported} imported / {user.ratingsFetched} fetched
-                        {user.skipped > 0 && (' · ' + user.skipped + ' skipped (no match)')}
+                        {migrationSummary(user)}
                     </div>
+                    {sharedTitleNote(user) && <div className="text-xs text-[var(--vora-text-muted)] mt-0.5">{sharedTitleNote(user)}</div>}
                     {user.skippedSamples && user.skippedSamples.length > 0 && (
                         <details className="mt-1">
                             <summary className="text-xs cursor-pointer text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)]">

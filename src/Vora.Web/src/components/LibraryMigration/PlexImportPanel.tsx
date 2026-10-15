@@ -10,6 +10,7 @@ import type {
 } from '../../api/LibraryMigration/libraryMigrationService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { StorageKeys } from '../../utils/storageKeys';
+import { migrationSummary, sharedTitleNote } from '../../utils/migrationSummary';
 
 interface PlexImportPanelProps {
     serverId?: string;
@@ -285,10 +286,8 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
                             </div>
                             {jobUser && (
                                 <div className="mt-1 text-xs" style={{ color: 'var(--vora-text-muted)' }}>
-                                    Watch history: {jobUser.watchStatesImported} imported / {jobUser.watchStatesFetched} found
-                                    {' · '}
-                                    Ratings: {jobUser.ratingsImported} imported / {jobUser.ratingsFetched} found
-                                    {jobUser.skipped > 0 && (' · ' + jobUser.skipped + ' skipped (not in your Vora library)')}
+                                    {migrationSummary(jobUser, 'Watch history')}
+                                    {sharedTitleNote(jobUser) && <div className="mt-0.5">{sharedTitleNote(jobUser)}</div>}
                                 </div>
                             )}
                             {jobUser && jobUser.skippedSamples && jobUser.skippedSamples.length > 0 && (
