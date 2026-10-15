@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import LibraryPage from './LibraryPage';
 import { DialogProvider } from '../../dialogs';
 import type { LibraryItem, MediaLibrary } from '../../api/Media/libraryService';
+import { StorageKeys } from '../../utils/storageKeys';
 
 const mocks = vi.hoisted(() => ({
     getLibraryById: vi.fn(),
@@ -101,5 +102,18 @@ describe('LibraryPage sort', () => {
 
         const sort = await screen.findByRole('button', { name: /^Title/ });
         expect(within(sort).queryByText('Date')).toBeNull();
+    });
+});
+
+describe('LibraryPage posters', () => {
+    it('gives an admin no delete button on a poster, since the poster menu has Delete', async () => {
+        localStorage.setItem(StorageKeys.isServerAdmin, 'true');
+        mocks.getLibraryById.mockResolvedValue(library('Movie'));
+
+        renderPage();
+
+        expect(await screen.findByText('Wedding')).toBeInTheDocument();
+        expect(screen.queryByTitle('Delete')).toBeNull();
+        expect(screen.queryByRole('button', { name: /^Delete / })).toBeNull();
     });
 });

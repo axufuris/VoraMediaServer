@@ -87,14 +87,12 @@ function filterLabel(f: Filter): string {
 function renderLibraryCard(
     item: LibraryItem,
     ctx: {
-        isAdmin: boolean;
         navigate: (to: string) => void;
         serverId?: string;
-        handleDeleteMedia: (e: React.MouseEvent, id: string) => void;
         reload: () => void;
     }
 ) {
-    const { isAdmin, navigate, serverId, handleDeleteMedia, reload } = ctx;
+    const { navigate, serverId, reload } = ctx;
     return (
         <div key={item.id} className="[content-visibility:auto] [contain-intrinsic-size:11rem_20rem]">
             <MediaCard
@@ -103,8 +101,7 @@ function renderLibraryCard(
                 isPlayed={item.isPlayed}
                 unplayedCount={item.unplayedItemCount}
                 onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
-                onDelete={isAdmin ? (e) => handleDeleteMedia(e, item.id) : undefined}
-                menu={mediaMenuTarget(item, serverId, { onChanged: reload })}
+                menu={mediaMenuTarget(item, serverId, { onChanged: reload, onDeleted: reload })}
                 fill
             />
         </div>
@@ -683,23 +680,6 @@ export default function LibraryPage() {
         setShowMenu(false);
     };
 
-    const handleDeleteMedia = async (e: React.MouseEvent, mediaId: string) => {
-        e.stopPropagation();
-        if (await dialog.confirm({
-            title: 'Delete media item?',
-            message: 'This removes it from the database. Your physical files are safe.',
-            confirmText: 'Delete',
-            tone: 'danger',
-        })) {
-            try {
-                await libraryAdminService.deleteMediaItem(mediaId);
-            } catch (error) {
-                console.error(error);
-                await dialog.alert('Failed to delete media item.');
-            }
-        }
-    };
-
     if (loading) {
         return (
             <div>
@@ -820,13 +800,13 @@ export default function LibraryPage() {
                                     <section key={letter} id={`letter-${letter}`} className="mb-10 scroll-mt-24">
                                         <h2 className="m-0 mb-4 text-base font-semibold" style={{ color: 'var(--vora-text-muted)', letterSpacing: '0.04em' }}>{letter}</h2>
                                         <MediaGrid>
-                                            {groupedItems[letter].map(item => renderLibraryCard(item, { isAdmin, navigate, serverId, handleDeleteMedia, reload: reloadQuietly }))}
+                                            {groupedItems[letter].map(item => renderLibraryCard(item, { navigate, serverId, reload: reloadQuietly }))}
                                         </MediaGrid>
                                     </section>
                                 ))
                             ) : (
                                 <MediaGrid>
-                                    {visibleItems.map(item => renderLibraryCard(item, { isAdmin, navigate, serverId, handleDeleteMedia, reload: reloadQuietly }))}
+                                    {visibleItems.map(item => renderLibraryCard(item, { navigate, serverId, reload: reloadQuietly }))}
                                 </MediaGrid>
                             )}
                         </>
