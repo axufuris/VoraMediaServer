@@ -77,6 +77,9 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         var library = LibraryHandle.FromGuid(libraryId);
         var details = await _ingestionService.GetLibraryDetailsAsync(library);
         var existing = await _ingestionService.GetExistingLibraryPathsAsync(library);
+        var (regex, _, _) = BuildMovieRegexes(details.ScannerRegex);
+        var local = await BeginLocalScanAsync(library, existing, details.FolderPaths);
+        await SeparateFilesOfOtherFilmsAsync(library, details.FolderPaths, existing, regex, local);
         var newFiles = GetNewFilesInDirectories(details.FolderPaths, existing)
             .Where(f => !IsExcluded(f, details.ExcludeFilters))
             .ToList();
@@ -278,7 +281,9 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
 
         var existingPathsSet = await _ingestionService.GetExistingLibraryPathsAsync(library);
         var local = await BeginLocalScanAsync(library, existingPathsSet, libraryRoots);
-        var newFiles = GetNewFilesInDirectories(directories, existingPathsSet)
+        var roots = directories.ToList();
+        await SeparateFilesOfOtherFilmsAsync(library, roots, existingPathsSet, regex, local);
+        var newFiles = GetNewFilesInDirectories(roots, existingPathsSet)
             .Where(f => !IsExcluded(f, excludeFilters))
             .ToList();
         var movieFiles = newFiles.Where(f => !IsExtraFile(f)).ToList();
@@ -432,6 +437,13 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         }
 
         var tagged = TaggedIds(provider, providerId);
+        if (year == null && MovieFolderNaming(filePath, title, local) is { } folder)
+        {
+            title = folder.Title;
+            year = folder.Year;
+            tagged = LocalIdentity.Merge(tagged, folder.Ids);
+        }
+
         var document = local.ReadsDocuments
             ? LocalIdentity.Trusted(LocalNfoReader.ReadMovie(filePath, local.Folders), year, tagged)
             : null;
@@ -439,6 +451,51 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
         return document == null
             ? new TitleIdentity(title, year, tagged, false)
             : new TitleIdentity(document.Title ?? title, document.ReleaseDate?.Year ?? year, LocalIdentity.Merge(tagged, LocalIdentity.Ids(document)), true);
+    }
+
+    private static (string Title, int Year, ExternalIdSet Ids)? MovieFolderNaming(string filePath, string fileTitle, LocalScan local)
+    {
+        var folder = Path.GetDirectoryName(filePath);
+        if (string.IsNullOrEmpty(folder) || local.LibraryRoots.Any(root => SameFolder(root, folder))) return null;
+
+        var folderName = Path.GetFileName(folder);
+        if (LocalIdentity.YearIn(folderName) is not int year) return null;
+
+        var folderTitle = LocalIdentity.TitleIn(folderName);
+        var sameFilm = LocalMediaAssets.HoldsOneFilm(local.Folders.Files(folder), filePath)
+            || LocalMediaAssets.FilmKey(folderTitle) == LocalMediaAssets.FilmKey(fileTitle);
+        return sameFilm ? (folderTitle, year, LocalIdentity.TaggedIds(folderName)) : null;
+    }
+
+    private async Task SeparateFilesOfOtherFilmsAsync(LibraryHandle library, IReadOnlyList<string> roots, HashSet<string> knownFiles, Regex regex, LocalScan local)
+    {
+        var separated = new List<string>();
+        var movies = (await _ingestionService.GetFilesOfMoviesWithSeveralFilesAsync(library))
+            .Where(p => !p.MatchedByHand && !ExternalIdSet.From(p.TmdbId, p.ImdbId).IsEmpty)
+            .Where(p => knownFiles.Contains(p.FilePath) && roots.Any(root => IsInside(p.FilePath, root)) && File.Exists(p.FilePath))
+            .GroupBy(p => p.MovieId);
+        foreach (var movie in movies)
+        {
+            var files = movie.ToList();
+            if (files.Count < 2) continue;
+
+            var others = files
+                .Where(p => LocalIdentity.Contradicts(ResolveMovieIdentity(p.FilePath, regex, local).Ids, ExternalIdSet.From(p.TmdbId, p.ImdbId)))
+                .ToList();
+            if (others.Count == 0 || others.Count == files.Count) continue;
+
+            foreach (var file in others)
+            {
+                await _ingestionService.RemoveMediaItemByPathAsync(file.FilePath);
+                knownFiles.Remove(file.FilePath);
+                separated.Add(file.FilePath);
+            }
+        }
+
+        if (separated.Count > 0)
+        {
+            _logger.LogInformation("Took {Count} file(s) off a movie whose ids they don't share; they are added again as the films their names say they are.", separated.Count);
+        }
     }
 
     private static ExternalIdSet TaggedIds(string? provider, string? providerId) =>

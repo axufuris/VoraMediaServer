@@ -144,6 +144,9 @@ public class MediaIngestionService : IMediaIngestionService
     public Task<List<string>> GetFirstEpisodeFilePathsAsync(LibraryHandle library) =>
         _repository.GetFirstEpisodeFilePathsAsync(library.Value);
 
+    public Task<List<MovieFilePlacement>> GetFilesOfMoviesWithSeveralFilesAsync(LibraryHandle library) =>
+        _repository.GetFilesOfMoviesWithSeveralFilesAsync(library.Value);
+
     public Task<List<string>> GetLibraryItemFilePathsAsync(LibraryHandle library) =>
         _repository.GetLibraryItemFilePathsAsync(library.Value);
 
@@ -157,7 +160,7 @@ public class MediaIngestionService : IMediaIngestionService
     {
         var libraryId = library.Value;
         var movieId = await _repository.GetMovieIdByExternalIdAsync(tmdbId, imdbId, libraryId)
-            ?? await _repository.GetMovieIdByTitleAndYearAsync(title, year, libraryId);
+            ?? await _repository.GetMovieIdByTitleAndYearAsync(title, year, libraryId, tmdbId, imdbId);
         if (movieId.HasValue) return new MediaItemHandle(movieId.Value);
 
         var movie = new Movie

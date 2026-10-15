@@ -102,6 +102,15 @@ public class MediaIngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task EnsureMovieAsync_looks_up_the_title_with_the_files_ids_so_another_film_of_that_name_is_not_taken()
+    {
+        await _service.EnsureMovieAsync(LibraryHandle.FromGuid(Guid.NewGuid()), "The Princess", 2022, null, "tt13393128");
+
+        await _mediaRepo.Received(1).GetMovieIdByTitleAndYearAsync("The Princess", 2022, Arg.Any<Guid>(), null, "tt13393128");
+        await _mediaRepo.Received(1).AddMediaItemAsync(Arg.Is<Movie>(m => m.ImdbId == "tt13393128"));
+    }
+
+    [Fact]
     public async Task EnsureMovieAsync_creates_new_movie_when_absent()
     {
         _mediaRepo.GetMovieIdByTitleAndYearAsync(Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<Guid>())

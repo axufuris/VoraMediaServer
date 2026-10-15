@@ -27,6 +27,7 @@ public class VoraLocalMediaScannerProviderTests : IDisposable
         _ingestion.GetExistingLibraryPathsAsync(Arg.Any<LibraryHandle>())
             .Returns(new HashSet<string>());
         _ingestion.GetFirstEpisodeFilePathsAsync(Arg.Any<LibraryHandle>()).Returns(new List<string>());
+        _ingestion.GetFilesOfMoviesWithSeveralFilesAsync(Arg.Any<LibraryHandle>()).Returns(new List<MovieFilePlacement>());
 
         _ingestion.EnsureMovieAsync(
                 Arg.Any<LibraryHandle>(),
