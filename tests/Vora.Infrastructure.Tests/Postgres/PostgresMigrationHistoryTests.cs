@@ -53,10 +53,13 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         var profile = new UserProfile { Id = Guid.NewGuid(), Name = "Kid", UserId = user.Id };
         var playlist = new IptvPlaylist { Id = Guid.NewGuid(), Name = "Cable" };
         List<(Guid Id, int Order, string? Key)> listsBefore;
+        await legacy.SeedAsync(db =>
+        {
+            db.AddRange(user, profile, playlist, new ProfileChannelFavorite { ProfileId = profile.Id, PlaylistId = playlist.Id, ExternalChannelId = "cnn.us" });
+            return db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
         await using (var before = legacy.NewContext())
         {
-            before.AddRange(user, profile, playlist, new ProfileChannelFavorite { ProfileId = profile.Id, PlaylistId = playlist.Id, ExternalChannelId = "cnn.us" });
-            await before.SaveChangesAsync(cancellationToken);
             await before.Database.ExecuteSqlRawAsync("UPDATE \"SmartLists\" SET \"DisplayOrder\" = 0 WHERE \"DefaultKey\" = 'favorite-channels'", cancellationToken);
             (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
             listsBefore = await SmartListOrderAsync(before, cancellationToken);

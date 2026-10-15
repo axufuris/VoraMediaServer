@@ -90,6 +90,13 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string RememberedChoicesMigration = "20261014181817_ChangesSinceInitial";
 
+    private const string RememberedChoicesProfileColumns = """
+        ALTER TABLE "UserProfiles" ADD COLUMN IF NOT EXISTS "PreferredAudioLanguage" character varying(16);
+        ALTER TABLE "UserProfiles" ADD COLUMN IF NOT EXISTS "PreferredSubtitleLanguage" character varying(16);
+        ALTER TABLE "UserProfiles" ADD COLUMN IF NOT EXISTS "SubtitleMode" integer;
+        ALTER TABLE "UserProfiles" ADD COLUMN IF NOT EXISTS "PreferHearingImpairedSubtitles" boolean NOT NULL DEFAULT FALSE;
+        """;
+
     private const string ColumnsSinceRememberedChoices = """
         ALTER TABLE "UserProfiles" DROP COLUMN "PreferredAudioLanguage";
         ALTER TABLE "UserProfiles" DROP COLUMN "PreferredSubtitleLanguage";
@@ -181,6 +188,14 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(TablesSinceLocalMetadata, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, LocalMetadataMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task SeedAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns, cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices, cancellationToken);
     }
 
     public async Task BuildRememberedChoicesStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
