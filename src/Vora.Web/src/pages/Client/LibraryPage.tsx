@@ -53,6 +53,8 @@ const SORT_LABELS: Record<SortKey, string> = {
     resolution: 'Resolution',
 };
 
+const HOME_VIDEO_SORT_LABELS: Record<SortKey, string> = { ...SORT_LABELS, releaseDate: 'Date' };
+
 const FILTER_PRESET_LABELS: Record<FilterPreset, string> = {
     all: 'All',
     unwatched: 'Unwatched',
@@ -119,6 +121,7 @@ function LibraryToolbar({
     onCloseMenus,
     filterValues,
     filterSubmenu, onFilterSubmenuChange,
+    sortLabels,
 }: {
     filter: Filter;
     onFilterChange: (f: Filter) => void;
@@ -135,6 +138,7 @@ function LibraryToolbar({
     filterValues: Record<FilterCategory, string[]>;
     filterSubmenu: FilterCategory | null;
     onFilterSubmenuChange: (c: FilterCategory | null) => void;
+    sortLabels: Record<SortKey, string>;
 }) {
     const pillBase = "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium cursor-pointer transition-colors";
     const pillStyle: React.CSSProperties = {
@@ -237,7 +241,7 @@ function LibraryToolbar({
 
             <div className="relative inline-block">
                 <button type="button" className={pillBase} style={pillStyle} onClick={onToggleSortMenu}>
-                    {SORT_LABELS[sortBy]}
+                    {sortLabels[sortBy]}
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z" /></svg>
                 </button>
                 {showSortMenu && (
@@ -253,7 +257,7 @@ function LibraryToolbar({
                                         className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-left text-sm vora-row-interactive"
                                         style={{ color: sortBy === opt ? 'var(--vora-accent-text)' : 'var(--vora-text-primary)' }}
                                     >
-                                        <span>{SORT_LABELS[opt]}</span>
+                                        <span>{sortLabels[opt]}</span>
                                         {sortBy === opt && (
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
                                         )}
@@ -451,6 +455,13 @@ export default function LibraryPage() {
         const saved = sortDirKey ? localStorage.getItem(sortDirKey) : null;
         return (saved as SortDir) || 'asc';
     });
+    const [hadSavedSort] = useState(() => !!sortKey && localStorage.getItem(sortKey) !== null);
+    const libraryType = library?.type;
+    useEffect(() => {
+        if (hadSavedSort || libraryType !== 'HomeVideo') return;
+        setSortBy('releaseDate');
+        setSortDir('desc');
+    }, [hadSavedSort, libraryType]);
     useEffect(() => { if (filterKey) localStorage.setItem(filterKey, JSON.stringify(filter)); }, [filter, filterKey]);
     useEffect(() => { if (sortKey) localStorage.setItem(sortKey, sortBy); }, [sortBy, sortKey]);
     useEffect(() => { if (sortDirKey) localStorage.setItem(sortDirKey, sortDir); }, [sortDir, sortDirKey]);
@@ -797,6 +808,7 @@ export default function LibraryPage() {
                                 filterValues={filterValues}
                                 filterSubmenu={filterSubmenu}
                                 onFilterSubmenuChange={setFilterSubmenu}
+                                sortLabels={libraryType === 'HomeVideo' ? HOME_VIDEO_SORT_LABELS : SORT_LABELS}
                             />
                             {visibleItems.length === 0 ? (
                                 <EmptyState

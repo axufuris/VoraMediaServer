@@ -152,6 +152,21 @@ public class MediaAnalyzerManagerDetectionTests
         await _analyzer.DidNotReceiveWithAnyArgs().ProbeMeanVolumeDbAsync(string.Empty, TestContext.Current.CancellationToken);
     }
 
+    [Theory]
+    [InlineData(LibraryType.HomeVideo, false)]
+    [InlineData(LibraryType.Movie, true)]
+    public async Task A_scan_looks_for_markers_only_in_libraries_that_have_them(LibraryType type, bool detects)
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/a.mkv", TimeSpan.FromMinutes(90), meanDb: -20);
+        _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
+        { EnableIntroDetection = true, EnableCreditsDetection = true, LibraryType = type });
+
+        await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: false, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _analyzer.Received(detects ? 1 : 0).AnalyzeSilenceDetectionsAsync("/m/a.mkv", Arg.Any<SilenceDetectionParameters>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task RunMediaItemSilenceDetectionAsync_skips_when_no_file_paths_found()
     {

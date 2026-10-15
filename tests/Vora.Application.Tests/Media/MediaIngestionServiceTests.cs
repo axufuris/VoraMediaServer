@@ -111,6 +111,19 @@ public class MediaIngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_home_video_is_always_a_new_video_dated_as_given()
+    {
+        var library = LibraryHandle.FromGuid(Guid.NewGuid());
+
+        await _service.AddHomeVideoAsync(library, "IMG_0001", new DateOnly(2019, 7, 4));
+        await _service.AddHomeVideoAsync(library, "IMG_0001", null);
+
+        await _mediaRepo.Received(2).AddMediaItemAsync(Arg.Is<Movie>(m => m.Title == "IMG_0001" && m.LibraryId == library.Value));
+        await _mediaRepo.Received(1).AddMediaItemAsync(Arg.Is<Movie>(m => m.ReleaseDate == new DateOnly(2019, 7, 4)));
+        await _mediaRepo.DidNotReceive().GetMovieIdByTitleAndYearAsync(Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<string?>());
+    }
+
+    [Fact]
     public async Task EnsureMovieAsync_creates_new_movie_when_absent()
     {
         _mediaRepo.GetMovieIdByTitleAndYearAsync(Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<Guid>())

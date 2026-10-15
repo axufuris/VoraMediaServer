@@ -21,6 +21,7 @@ public interface IMediaIngestionService
     Task<List<string>> GetMediaFilePathsAsync(MediaItemHandle item);
 
     Task<MediaItemHandle> EnsureMovieAsync(LibraryHandle library, string title, int? year, string? tmdbId, string? imdbId, string? tvdbId = null, string? edition = null);
+    Task<MediaItemHandle> AddHomeVideoAsync(LibraryHandle library, string title, DateOnly? date);
     Task<MediaItemHandle> EnsureTvShowAsync(LibraryHandle library, string title, int? year, string? tmdbId, string? imdbId, string? tvdbId = null);
 
     Task<MediaItemHandle> EnsureMovieAsync(LibraryHandle library, string title, int? year, ExternalIdSet externalIds, string? edition = null)

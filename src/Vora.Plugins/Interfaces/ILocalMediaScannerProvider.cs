@@ -7,6 +7,7 @@ public interface ILocalMediaScannerProvider : IVoraPlugin
     Task ScanMovieLibraryAsync(Guid libraryId);
     Task ScanTvShowLibraryAsync(Guid libraryId);
     Task ScanMusicLibraryAsync(Guid libraryId);
+    Task ScanHomeVideoLibraryAsync(Guid libraryId);
 
     // Discovery + per-unit ingest, so the workflow can scan and enrich each
     // show/movie as an isolated unit (in parallel). A "unit" is one show (all
@@ -25,6 +26,7 @@ public interface ILocalMediaScannerProvider : IVoraPlugin
     Task<Guid?> ScanMovieFileAsync(Guid libraryId, string filePath);
     Task<ScanFileResult> ScanTvFileAsync(Guid libraryId, string filePath);
     Task<Guid?> ScanMusicFileAsync(Guid libraryId, string filePath);
+    Task<Guid?> ScanHomeVideoFileAsync(Guid libraryId, string filePath);
 
     Task<EpisodeNamePreviewDto> PreviewEpisodeFileNamesAsync(IReadOnlyList<string> folderPaths, string? scannerRegex, IReadOnlyList<string> excludeFilters, int sampleSize);
 }

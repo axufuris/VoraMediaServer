@@ -1,4 +1,5 @@
 ﻿using Vora.Application.Metadata.Local;
+using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
 using Vora.Plugins;
 using Vora.Plugins.Dtos;
@@ -43,7 +44,7 @@ public class MetadataFetchService : IMetadataFetchService
 
     public async Task<(MetadataResult? Metadata, string ProviderId, string ProviderName)> GetTextMetadataAsync(MediaItem item)
     {
-        var providerIdToUse = item.Library?.MetadataProviderId ?? TmdbMetadataProviderId;
+        var providerIdToUse = StaysLocal(item) ? LocalMetadataProvider.ProviderId : item.Library?.MetadataProviderId ?? TmdbMetadataProviderId;
         var primaryProvider = _providers.FirstOrDefault(p => p.Id == providerIdToUse) ?? _providers.FirstOrDefault();
 
         if (primaryProvider == null) return (null, string.Empty, string.Empty);
@@ -161,7 +162,7 @@ public class MetadataFetchService : IMetadataFetchService
 
     public async Task<((decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) Ratings, List<MediaArtwork> Artwork)> GetSecondaryDataAsync(MediaItem item, bool forceOverride, CancellationToken cancellationToken = default)
     {
-        var artworkProviderIdToUse = item.Library?.ArtworkProviderId ?? TmdbArtworkProviderId;
+        var artworkProviderIdToUse = StaysLocal(item) ? LocalArtworkProvider.ProviderId : item.Library?.ArtworkProviderId ?? TmdbArtworkProviderId;
         var needsArtworkRefresh = forceOverride || item.Artwork == null || !item.Artwork.Any() || !item.Artwork.Any(a => a.ProviderId == artworkProviderIdToUse);
 
         var localArtwork = needsArtworkRefresh ? await FindLocalArtworkAsync(item) : [];
@@ -283,7 +284,7 @@ public class MetadataFetchService : IMetadataFetchService
 
     private async Task<(decimal? Rating1, string? Name1, decimal? Rating2, string? Name2)> FetchRatingsDataAsync(MediaItem item, CancellationToken cancellationToken = default)
     {
-        if (item.Library == null) return (null, null, null, null);
+        if (item.Library == null || StaysLocal(item)) return (null, null, null, null);
 
         var provider1 = !string.IsNullOrEmpty(item.Library.ThirdPartyRating1ProviderId)
             ? _ratingsProviders.FirstOrDefault(p => p.Id == item.Library.ThirdPartyRating1ProviderId) : null;
@@ -313,7 +314,10 @@ public class MetadataFetchService : IMetadataFetchService
     }
 
     private static bool UsesLocalArtworkProvider(MediaItem item) =>
-        item.Library?.ArtworkProviderId == LocalArtworkProvider.ProviderId;
+        StaysLocal(item) || item.Library?.ArtworkProviderId == LocalArtworkProvider.ProviderId;
+
+    private static bool StaysLocal(MediaItem item) =>
+        item.Library is { } library && !library.Type.LooksUpMetadataOnline();
 
     private async Task<List<MediaArtwork>> FindLocalArtworkAsync(MediaItem item)
     {

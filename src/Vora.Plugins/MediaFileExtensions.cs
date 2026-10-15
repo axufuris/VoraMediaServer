@@ -11,13 +11,17 @@ public static class MediaFileExtensions
 {
     public static readonly IReadOnlyList<string> Video = new[] { ".mkv", ".mp4", ".avi", ".m4v" };
 
+    public static readonly IReadOnlyList<string> HomeVideo = [.. Video, ".mov", ".mts", ".m2ts", ".3gp", ".mpg", ".mpeg", ".wmv", ".webm"];
+
     public static readonly IReadOnlyList<string> Audio = new[] { ".mp3", ".flac", ".m4a", ".ogg", ".opus", ".wav", ".aac", ".wma" };
 
     public static bool IsVideo(string filePath) => Matches(Video, filePath);
 
+    public static bool IsHomeVideo(string filePath) => Matches(HomeVideo, filePath);
+
     public static bool IsAudio(string filePath) => Matches(Audio, filePath);
 
-    public static bool IsMedia(string filePath) => IsVideo(filePath) || IsAudio(filePath);
+    public static bool IsMedia(string filePath) => IsHomeVideo(filePath) || IsAudio(filePath);
 
     private static bool Matches(IReadOnlyList<string> extensions, string filePath) =>
         extensions.Contains(Path.GetExtension(filePath).ToLowerInvariant());

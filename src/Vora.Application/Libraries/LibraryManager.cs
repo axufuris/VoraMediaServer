@@ -70,8 +70,8 @@ public class LibraryManager : ILibraryManager
             FindExtras = request.FindExtras,
             OnlyShowTrailers = request.OnlyShowTrailers,
             EnableVideoPreviewThumbnails = request.EnableVideoPreviewThumbnails && request.Type.HasVideoContent(),
-            EnableCreditsDetection = request.EnableCreditsDetection,
-            EnablePreviewDetection = request.EnablePreviewDetection,
+            EnableCreditsDetection = request.EnableCreditsDetection && request.Type.DetectsMarkers(),
+            EnablePreviewDetection = request.EnablePreviewDetection && request.Type.DetectsMarkers(),
             MinimumCollectionSize = Vora.Application.Collections.CollectionVisibility.Clamp(request.MinimumCollectionSize, Vora.Application.Collections.CollectionVisibility.DefaultMinimum),
             EnableRealTimeWatching = request.EnableRealTimeWatching,
 
@@ -79,7 +79,7 @@ public class LibraryManager : ILibraryManager
             EpisodeOrder = (Domain.Enums.EpisodeOrdering)request.EpisodeOrder,
             UseSeasonTitles = request.UseSeasonTitles,
             SeasonsDisplay = (Domain.Enums.SeasonDisplayMode)request.SeasonsDisplay,
-            EnableIntroDetection = request.EnableIntroDetection
+            EnableIntroDetection = request.EnableIntroDetection && request.Type.DetectsMarkers()
         };
 
         var id = await _repository.CreateLibraryAsync(library);
@@ -186,15 +186,15 @@ public class LibraryManager : ILibraryManager
         library.FindExtras = request.FindExtras;
         library.OnlyShowTrailers = request.OnlyShowTrailers;
         library.EnableVideoPreviewThumbnails = requestedThumbnails;
-        library.EnableCreditsDetection = request.EnableCreditsDetection;
-        library.EnablePreviewDetection = request.EnablePreviewDetection;
+        library.EnableCreditsDetection = request.EnableCreditsDetection && library.Type.DetectsMarkers();
+        library.EnablePreviewDetection = request.EnablePreviewDetection && library.Type.DetectsMarkers();
         library.MinimumCollectionSize = Vora.Application.Collections.CollectionVisibility.Clamp(request.MinimumCollectionSize, library.MinimumCollectionSize);
 
         library.EpisodeSorting = (Domain.Enums.EpisodeSortOrder)request.EpisodeSorting;
         library.EpisodeOrder = (Domain.Enums.EpisodeOrdering)request.EpisodeOrder;
         library.UseSeasonTitles = request.UseSeasonTitles;
         library.SeasonsDisplay = (Domain.Enums.SeasonDisplayMode)request.SeasonsDisplay;
-        library.EnableIntroDetection = request.EnableIntroDetection;
+        library.EnableIntroDetection = request.EnableIntroDetection && library.Type.DetectsMarkers();
         library.ThirdPartyRating1ProviderId = request.ThirdPartyRating1ProviderId;
         library.ThirdPartyRating2ProviderId = request.ThirdPartyRating2ProviderId;
         library.ArtworkProviderId = request.ArtworkProviderId;
@@ -288,6 +288,8 @@ public class LibraryManager : ILibraryManager
             await scanner.ScanTvShowLibraryAsync(library.Id);
         else if (library.Type == LibraryType.Music)
             await scanner.ScanMusicLibraryAsync(library.Id);
+        else if (library.Type == LibraryType.HomeVideo)
+            await scanner.ScanHomeVideoLibraryAsync(library.Id);
 
         await notifier.NotifyLibraryUpdatedAsync(library.Id);
     }
@@ -384,6 +386,10 @@ public class LibraryManager : ILibraryManager
         else if (library.Type == LibraryType.TvShow)
         {
             result = await scanner.ScanTvFileAsync(libraryId, filePath);
+        }
+        else if (library.Type == LibraryType.HomeVideo)
+        {
+            result = new ScanFileResult(await scanner.ScanHomeVideoFileAsync(libraryId, filePath), null, false);
         }
         else
         {

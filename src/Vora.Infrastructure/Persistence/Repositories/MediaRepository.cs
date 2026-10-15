@@ -694,7 +694,8 @@ public partial class MediaRepository : IMediaRepository
                 LockedFields = m.LockedFields,
                 MarkersAnalyzedAt = m.MarkersAnalyzedAt,
                 EnableIntroDetection = m.Library.EnableIntroDetection,
-                EnableCreditsDetection = m.Library.EnableCreditsDetection
+                EnableCreditsDetection = m.Library.EnableCreditsDetection,
+                LibraryType = m.Library.Type
             })
             .FirstOrDefaultAsync();
     }
