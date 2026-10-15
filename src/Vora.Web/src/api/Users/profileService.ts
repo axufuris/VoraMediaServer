@@ -39,6 +39,24 @@ export interface PlaybackPreferencesVM {
     minimumCreditsSceneSeconds: number;
 }
 
+export type SubtitleMode = 'Default' | 'Smart' | 'ForcedOnly' | 'Always' | 'Off';
+
+export interface TrackPreferencesVM {
+    audioLanguage?: string | null;
+    subtitleLanguage?: string | null;
+    subtitleMode?: SubtitleMode | null;
+    preferHearingImpairedSubtitles: boolean;
+    serverLanguage: string;
+    serverSubtitleMode: SubtitleMode;
+}
+
+export interface SaveTrackPreferencesRequest {
+    audioLanguage: string | null;
+    subtitleLanguage: string | null;
+    subtitleMode: SubtitleMode | null;
+    preferHearingImpairedSubtitles: boolean;
+}
+
 export const profileService = {
     // Account owner only. Off means nothing about this profile's listening is
     // sent to OpenAI, and no one can Blend with it.
@@ -104,6 +122,20 @@ export const profileService = {
     saveMyPlaybackPreferences: async (prefs: PlaybackPreferencesVM, serverId?: string): Promise<PlaybackPreferencesVM> => {
         const response = await apiClient.put<PlaybackPreferencesVM, PlaybackPreferencesVM>(
             '/users/profiles/me/playback-preferences',
+            prefs,
+            { serverId }
+        );
+        return response.data;
+    },
+
+    getMyTrackPreferences: async (serverId?: string): Promise<TrackPreferencesVM> => {
+        const response = await apiClient.get<TrackPreferencesVM>('/users/profiles/me/track-preferences', { serverId });
+        return response.data;
+    },
+
+    saveMyTrackPreferences: async (prefs: SaveTrackPreferencesRequest, serverId?: string): Promise<TrackPreferencesVM> => {
+        const response = await apiClient.put<TrackPreferencesVM, SaveTrackPreferencesRequest>(
+            '/users/profiles/me/track-preferences',
             prefs,
             { serverId }
         );
