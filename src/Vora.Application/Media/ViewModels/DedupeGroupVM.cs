@@ -8,4 +8,5 @@ public class DedupeGroupVM
     public string MediaKind { get; set; } = "video";
     public string Resolution { get; set; } = string.Empty;
     public List<DedupeItemVM> Parts { get; set; } = new();
+    public List<string> EpisodesInFileNames { get; set; } = new();
 }

@@ -22,7 +22,7 @@ public static class LibraryFileFilter
     // is a macOS resource fork.
     public static bool IsExcluded(string filePath, IReadOnlyList<string>? excludeFilters)
     {
-        if (IsMacResourceFork(filePath)) return true;
+        if (IsMacResourceFork(filePath) || IsPlexOptimizedCopy(filePath)) return true;
         if (excludeFilters == null || excludeFilters.Count == 0) return false;
 
         var name = Path.GetFileName(filePath);
@@ -41,6 +41,11 @@ public static class LibraryFileFilter
     // Finder writes "._Song.mp3" beside "Song.mp3" on shares that don't store
     // extended attributes. It carries the media extension but is a few-kilobyte
     // metadata stub, so the music scanner's tag read fails on it every time.
+    public static bool IsPlexOptimizedCopy(string filePath) =>
+        (Path.GetDirectoryName(filePath) ?? string.Empty)
+            .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Any(segment => segment.Equals("Plex Versions", StringComparison.OrdinalIgnoreCase));
+
     public static bool IsMacResourceFork(string filePath) =>
         Path.GetFileName(filePath).StartsWith("._", StringComparison.Ordinal);
 }
