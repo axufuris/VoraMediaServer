@@ -441,7 +441,7 @@ public class MediaDedupeManager : IMediaDedupeManager
     {
         long score = 0;
 
-        var codec = (track.AudioCodec ?? part.Container ?? string.Empty).ToLowerInvariant();
+        var codec = (FileCodec(part, track) ?? string.Empty).ToLowerInvariant();
         if (IsLosslessAudioCodec(codec)) score += settings.ScoreCodecMusicLossless;
         else if (IsLossyHighAudioCodec(codec)) score += settings.ScoreCodecMusicLossyHigh;
         else score += settings.ScoreCodecMusicLossyStandard;
@@ -498,11 +498,22 @@ public class MediaDedupeManager : IMediaDedupeManager
         }
     }
 
+    public static string? FileCodec(MediaPart part, Track track)
+    {
+        var fromName = AudioFileCodecs.Of(part.FilePath, null);
+        if (fromName == "aac" && track.AudioCodec is "alac") return "alac";
+        return fromName ?? track.AudioCodec ?? part.Container;
+    }
+
     private static long ResolveAudioBitrateBps(MediaPart part, Track track)
     {
         if (part.OverallBitrate.HasValue && part.OverallBitrate > 0)
         {
             return part.OverallBitrate.Value;
+        }
+        if (part.FileSizeBytes is > 0 && track.DurationSeconds is > 0)
+        {
+            return part.FileSizeBytes.Value * 8 / track.DurationSeconds.Value;
         }
         if (track.Bitrate.HasValue && track.Bitrate > 0)
         {

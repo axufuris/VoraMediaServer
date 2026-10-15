@@ -14,6 +14,7 @@ using Vora.Domain.Enums;
 using Vora.Plugins;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
+using Vora.Plugins.Providers.Local;
 
 namespace Vora.Application.Media;
 
@@ -121,6 +122,24 @@ public class MediaIngestionService : IMediaIngestionService
         var context = JsonSerializer.Serialize(new { kind = "unreadable-episode-files", libraryId = library.Value });
         await _adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning, "Some episode files weren't added", message, context, deduplicateByContext: true);
     }
+
+    public async Task ForgetAlbumArtAndYearAsync(Guid albumId)
+    {
+        var album = await _musicRepository.GetAlbumForUpdateAsync(albumId);
+        if (album == null) return;
+
+        if (!album.IsLocked(nameof(album.ArtworkUrl))) album.ArtworkUrl = null;
+        if (!album.IsLocked(nameof(album.BackgroundUrl))) album.BackgroundUrl = null;
+        if (!album.IsLocked(nameof(album.DiscArtUrl))) album.DiscArtUrl = null;
+        if (!album.IsLocked(nameof(album.Year))) album.Year = null;
+        if (!album.IsLocked(nameof(album.MusicBrainzId))) album.MusicBrainzId = null;
+        album.ArtworkCheckedAt = null;
+        await _musicRepository.UpdateAlbumAsync(album);
+        _taskQueue.QueueRefreshAlbumArtwork(album.Id, album.Title);
+    }
+
+    public Task<List<MusicFilePlacement>> GetMusicFilePlacementsAsync(LibraryHandle library) =>
+        _musicRepository.GetMusicFilePlacementsAsync(library.Value);
 
     public Task<List<string>> GetFirstEpisodeFilePathsAsync(LibraryHandle library) =>
         _repository.GetFirstEpisodeFilePathsAsync(library.Value);
@@ -327,11 +346,11 @@ public class MediaIngestionService : IMediaIngestionService
         return new ArtistHandle(artist.Id);
     }
 
-    public async Task<AlbumHandle> EnsureAlbumAsync(LibraryHandle library, ArtistHandle artist, string title, int? year, string? genre, byte[]? artworkBytes, string? artworkMimeType, byte[]? backgroundBytes = null, string? backgroundMimeType = null, byte[]? discArtBytes = null, string? discArtMimeType = null, string? albumArtist = null, bool isCompilation = false)
+    public async Task<AlbumHandle> EnsureAlbumAsync(LibraryHandle library, ArtistHandle artist, string title, int? year, string? genre, byte[]? artworkBytes, string? artworkMimeType, byte[]? backgroundBytes = null, string? backgroundMimeType = null, byte[]? discArtBytes = null, string? discArtMimeType = null, string? albumArtist = null, bool isCompilation = false, IReadOnlyList<string>? albumFolders = null)
     {
         var libraryId = library.Value;
         var artistId = artist.Value;
-        var existing = await _musicRepository.GetAlbumByTitleAsync(artistId, title);
+        var existing = await FindAlbumAsync(artistId, title, albumFolders);
         if (existing != null)
         {
             bool changed = false;
@@ -353,6 +372,11 @@ public class MediaIngestionService : IMediaIngestionService
             if (string.IsNullOrEmpty(existing.AlbumArtist) && !string.IsNullOrWhiteSpace(albumArtist) && !existing.IsLocked(nameof(existing.AlbumArtist)))
             {
                 existing.AlbumArtist = albumArtist;
+                changed = true;
+            }
+            if (existing.Year == null && year != null && !existing.IsLocked(nameof(existing.Year)))
+            {
+                existing.Year = year;
                 changed = true;
             }
             if (!existing.IsCompilation && isCompilation && !existing.IsLocked(nameof(existing.IsCompilation)))
@@ -391,11 +415,30 @@ public class MediaIngestionService : IMediaIngestionService
         return new AlbumHandle(album.Id);
     }
 
+    private async Task<Album?> FindAlbumAsync(Guid artistId, string title, IReadOnlyList<string>? albumFolders)
+    {
+        var sameTitle = await _musicRepository.GetAlbumsByTitleAsync(artistId, title);
+        if (sameTitle.Count == 0) return null;
+
+        var exact = sameTitle.FirstOrDefault(a => a.Title == title) ?? sameTitle[0];
+        if (albumFolders is not { Count: > 0 }) return exact;
+
+        var files = await _musicRepository.GetAlbumFilePathsAsync(sameTitle.Select(a => a.Id).ToList());
+        var holder = files.FirstOrDefault(f => albumFolders.Contains(MusicAlbumFolders.AlbumFolder(f.FilePath), StringComparer.Ordinal));
+        if (holder.FilePath != null) return sameTitle.First(a => a.Id == holder.AlbumId);
+
+        var stillOnDisk = files.Where(f => File.Exists(f.FilePath)).Select(f => f.AlbumId).ToHashSet();
+        return sameTitle.FirstOrDefault(a => !stillOnDisk.Contains(a.Id));
+    }
+
     public async Task<MediaItemHandle> EnsureTrackAsync(LibraryHandle library, AlbumHandle album, string title, int trackNumber, int? discNumber, int? durationSeconds, string? audioCodec, int? sampleRate, int? bitrate, string? contentRating, string? trackArtist = null, string? isrc = null)
     {
         var libraryId = library.Value;
         var albumId = album.Value;
-        var existing = await _musicRepository.GetTrackByAlbumAndNumberAsync(albumId, trackNumber, discNumber);
+        var sameNumber = await _musicRepository.GetTracksByAlbumAndNumberAsync(albumId, trackNumber, discNumber);
+        var fileIsrc = NormalizeIsrc(isrc);
+        var existing = sameNumber.FirstOrDefault(t => TrackTitles.Same(t.Title, title) || TrackTitles.Same(t.OriginalTitle, title))
+            ?? (fileIsrc == null ? null : sameNumber.FirstOrDefault(t => t.Isrc == fileIsrc));
         if (existing != null)
         {
             bool changed = false;

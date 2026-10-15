@@ -19,7 +19,7 @@ public class AudioCodecResolutionTests
     [InlineData("/media/music/a/b/01.WMA", null, "wma")]
     public void Resolves_a_short_codec_token_from_the_container(string path, string? description, string expected)
     {
-        VoraLocalMediaScannerProvider.ResolveAudioCodec(path, description).Should().Be(expected);
+        AudioFileCodecs.Of(path, description).Should().Be(expected);
     }
 
     [Theory]
@@ -27,7 +27,7 @@ public class AudioCodecResolutionTests
     [InlineData("MPEG-4 Audio (mp4a)", "aac")]
     public void Disambiguates_the_two_codecs_that_share_the_m4a_container(string description, string expected)
     {
-        VoraLocalMediaScannerProvider.ResolveAudioCodec("/media/music/a/b/01.m4a", description).Should().Be(expected);
+        AudioFileCodecs.Of("/media/music/a/b/01.m4a", description).Should().Be(expected);
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public class AudioCodecResolutionTests
         {
             foreach (var description in descriptions)
             {
-                var codec = VoraLocalMediaScannerProvider.ResolveAudioCodec(path, description);
+                var codec = AudioFileCodecs.Of(path, description);
                 (codec?.Length ?? 0).Should().BeLessThanOrEqualTo(AudioCodecColumnLength,
                     $"'{path}' with description '{description}' must fit Track.AudioCodec");
             }
@@ -66,7 +66,7 @@ public class AudioCodecResolutionTests
     [InlineData("/m/01.m4a", "aac")]
     public void Produces_a_token_the_badge_and_dedupe_matchers_recognise(string path, string expectedSubstring)
     {
-        var codec = VoraLocalMediaScannerProvider.ResolveAudioCodec(path, null);
+        var codec = AudioFileCodecs.Of(path, null);
 
         codec.Should().NotBeNull();
         codec!.ToLowerInvariant().Should().Contain(expectedSubstring);

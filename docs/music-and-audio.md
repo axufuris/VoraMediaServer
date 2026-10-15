@@ -12,7 +12,7 @@ Music sits inside the regular `MediaItem` TPH hierarchy:
 - **`TrackLike`** — per-profile heart.
 - **`TrackPlayHistory`** — every play that crosses the Spotify "long enough to count" threshold (≥30s or ≥50% of track). Drives Recently Played, Top Tracks, On Repeat heuristics, recommendation seeding, scrobbles.
 
-Music libraries are filtered out of the left nav (they're surfaced via the Music tab instead).
+Music libraries are filtered out of the left nav (they're surfaced via the Music tab instead). How a scanned file finds its album and track is in [`music-library-scanning.md`](music-library-scanning.md).
 
 ## Access filtering
 
