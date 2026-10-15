@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Vora.Application.Media.ViewModels;
 using Vora.Domain.Entities.Media;
+using Vora.Plugins.Providers.Local;
 
 namespace Vora.Application.Media;
 
@@ -136,10 +137,25 @@ public class MediaDedupeManager : IMediaDedupeManager
                     Resolution = groupResolutionLabel,
                     Parts = bucket.Select(p => MapAndScoreVideoPart(p, settings))
                         .OrderByDescending(p => p.QualityScore)
-                        .ToList()
+                        .ToList(),
+                    EpisodesInFileNames = item is Episode ? DifferentEpisodesNamed(bucket.Select(p => p.FilePath)) : []
                 });
             }
         }
+    }
+
+    private static readonly EpisodeFileNames AutomaticEpisodeNames = new(null);
+
+    public static List<string> DifferentEpisodesNamed(IEnumerable<string> filePaths)
+    {
+        var named = filePaths
+            .Select(path => AutomaticEpisodeNames.Read(Path.GetFileNameWithoutExtension(path)))
+            .Select(name => name is { NumbersGuessed: false, Episode: int episode } ? $"S{name.Season ?? 1:D2}E{episode:D2}" : null)
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        return named.Count > 1 ? named : [];
     }
 
     private void BuildAudioGroup(Track track, List<MediaPart> eligibleParts, MediaDedupeSettings settings, HashSet<string> ignoredKeys, List<DedupeGroupVM> result)

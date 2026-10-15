@@ -24,6 +24,7 @@ export interface DedupeGroupVM {
     mediaKind: 'video' | 'audio';
     resolution: string;
     parts: DedupeItemVM[];
+    episodesInFileNames?: string[];
 }
 
 export interface DedupeSettingsVM {

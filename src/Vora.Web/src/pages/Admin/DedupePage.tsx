@@ -255,6 +255,11 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
                                         <Chip tone="highlight">{group.type}</Chip>
                                         {group.mediaKind === 'video' && <Chip tone="highlight">{group.resolution}</Chip>}
                                     </div>
+                                    {(group.episodesInFileNames?.length ?? 0) > 1 && (
+                                        <p className="mt-2 max-w-2xl text-xs text-[var(--vora-warning-text)]">
+                                            These aren't copies: the files are named as {group.episodesInFileNames?.join(', ')}. An older scan couldn't read their names and put them on one episode. The next library scan adds each one as its own episode, so don't delete them.
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="flex gap-2 items-center">
                                     <HealthBadge tone="warn">{group.parts.length} versions</HealthBadge>

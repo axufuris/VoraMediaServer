@@ -64,6 +64,14 @@ Every TV scan (library, show, season, episode and the parallel library scan's di
 
 A library scanned before this change is repaired by its next scan, with nothing to delete or re-add.
 
+## Plex's optimized copies
+
+Files under a `Plex Versions` folder (Plex's Optimize copies, `Plex Versions/Original Quality/…`, `Plex Versions/Optimized for TV/…`) are left alone by every scan and by the folder watcher, in any library and whatever the exclude filters say (`LibraryFileFilter.IsPlexOptimizedCopy`). They are re-encodes Plex makes and deletes on its own, and they turned up as extra versions of an episode or a film. One added before this stays until it is removed; one an older scan stacked on S01E01 is taken off by the repair and not added again.
+
+## Duplicates that are stacked episodes
+
+The duplicates page groups the files of one item. When an episode's files are named as different episodes (`MediaDedupeManager.DifferentEpisodesNamed`, read the automatic way, explicit markers only), the group carries `EpisodesInFileNames` and the page says they aren't copies and that the next library scan adds each as its own episode, rather than leaving the admin to delete the "extra" ones.
+
 ## Ranges of known files
 
 `RepairEpisodeRangesAsync` reads the range of every known file (explicit markers only) and `SetEpisodeEndNumbersAsync` records it only on the episode the file **starts** at (`EpisodeRange(FirstEpisode, LastEpisode)`), so a file still stacked on S01E01 cannot stretch that episode's range.

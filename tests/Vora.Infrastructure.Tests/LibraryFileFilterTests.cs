@@ -33,4 +33,14 @@ public class LibraryFileFilterTests
         LibraryFileFilter.IsExcluded("/music/._Song.flac", null).Should().BeTrue();
         LibraryFileFilter.IsExcluded("/music/Song.flac", null).Should().BeFalse();
     }
+
+    [Theory]
+    [InlineData("/tv/Ted Lasso/Season 2/Plex Versions/Original Quality/Ted Lasso/S02E09.mp4", true)]
+    [InlineData("/movies/Heat (1995)/Plex Versions/Optimized for TV/Heat (1995).mp4", true)]
+    [InlineData("/tv/Plex Versions Fan Club/Season 1/Show - S01E01 - Pilot.mkv", false)]
+    [InlineData("/tv/Ted Lasso/Season 2/Ted Lasso.2x9 - Beard After Hours.mp4", false)]
+    public void Plexs_own_optimized_copies_are_left_alone_with_no_filter_set(string path, bool excluded)
+    {
+        LibraryFileFilter.IsExcluded(path, null).Should().Be(excluded);
+    }
 }
