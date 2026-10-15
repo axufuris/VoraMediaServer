@@ -21,6 +21,7 @@ public class LocalMetadataScanTests : IDisposable
         _ingestion.GetLibraryDetailsAsync(Arg.Any<LibraryHandle>())
             .Returns(Task.FromResult<(List<string> FolderPaths, string? ScannerRegex, List<string> ExcludeFilters)>((new List<string> { _root }, null, new List<string>())));
         _ingestion.GetExistingLibraryPathsAsync(Arg.Any<LibraryHandle>()).Returns(_known);
+        _ingestion.GetFirstEpisodeFilePathsAsync(Arg.Any<LibraryHandle>()).Returns(new List<string>());
         _ingestion.EnsureMovieAsync(Arg.Any<LibraryHandle>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>())
             .Returns(_ => new MediaItemHandle(Guid.NewGuid()));
         _ingestion.EnsureTvShowAsync(Arg.Any<LibraryHandle>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>())

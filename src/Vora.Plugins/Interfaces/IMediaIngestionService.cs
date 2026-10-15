@@ -9,7 +9,8 @@ public interface IMediaIngestionService
     Task<MediaItemHandle?> FindHandMatchedOwnerAsync(LibraryHandle library, string knownFilePath);
     Task<LibraryHandle?> GetLibraryForMediaAsync(MediaItemHandle item);
     Task<HashSet<string>> GetExistingLibraryPathsAsync(LibraryHandle library);
-    Task SetEpisodeRangesAsync(LibraryHandle library, IReadOnlyDictionary<string, int> lastEpisodeByFile);
+    Task SetEpisodeRangesAsync(LibraryHandle library, IReadOnlyDictionary<string, EpisodeRange> rangeByFile);
+    Task<List<string>> GetFirstEpisodeFilePathsAsync(LibraryHandle library);
     Task<List<string>> GetLibraryItemFilePathsAsync(LibraryHandle library);
     Task RemoveMediaItemByPathAsync(string filePath);
     Task ReleaseTrackedEntitiesAsync();

@@ -11,6 +11,7 @@ using Vora.Application.Subtitles.ViewModels;
 using Vora.Domain.Entities.Actors;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Users;
+using Vora.Plugins.Dtos;
 using Vora.Infrastructure.Persistence.Extensions;
 
 namespace Vora.Infrastructure.Persistence.Repositories;
@@ -222,21 +223,21 @@ public partial class MediaRepository : IMediaRepository
             .FirstOrDefaultAsync();
     }
 
-    public async Task<int> SetEpisodeEndNumbersAsync(Guid libraryId, IReadOnlyDictionary<string, int> lastEpisodeByFile)
+    public async Task<int> SetEpisodeEndNumbersAsync(Guid libraryId, IReadOnlyDictionary<string, EpisodeRange> rangeByFile)
     {
-        if (lastEpisodeByFile.Count == 0) return 0;
+        if (rangeByFile.Count == 0) return 0;
 
-        var paths = lastEpisodeByFile.Keys.ToList();
+        var paths = rangeByFile.Keys.ToList();
         var parts = await _context.MediaParts
             .AsNoTracking()
             .Where(p => p.MediaItemId != null && paths.Contains(p.FilePath) && p.MediaItem != null && p.MediaItem.LibraryId == libraryId)
             .Select(p => new { p.FilePath, p.MediaItemId })
             .ToListAsync();
 
-        var lastByEpisode = parts
+        var rangesByEpisode = parts
             .GroupBy(p => p.MediaItemId.GetValueOrDefault())
-            .ToDictionary(g => g.Key, g => g.Max(p => lastEpisodeByFile[p.FilePath]));
-        var episodeIds = lastByEpisode.Keys.ToList();
+            .ToDictionary(g => g.Key, g => g.Select(p => rangeByFile[p.FilePath]).ToList());
+        var episodeIds = rangesByEpisode.Keys.ToList();
 
         var episodes = await _context.Set<Episode>()
             .Where(e => episodeIds.Contains(e.Id))
@@ -245,7 +246,9 @@ public partial class MediaRepository : IMediaRepository
         var updated = 0;
         foreach (var episode in episodes)
         {
-            var last = lastByEpisode[episode.Id];
+            var startingHere = rangesByEpisode[episode.Id].Where(range => range.FirstEpisode == episode.EpisodeNumber).ToList();
+            if (startingHere.Count == 0) continue;
+            var last = startingHere.Max(range => range.LastEpisode);
             if (last <= episode.EpisodeNumber || episode.EndEpisodeNumber == last) continue;
             episode.EndEpisodeNumber = last;
             updated++;
@@ -1228,6 +1231,13 @@ public partial class MediaRepository : IMediaRepository
         await _context.MediaExtras.AddAsync(extra);
         await _context.SaveChangesAsync();
     }
+
+    public Task<List<string>> GetFirstEpisodeFilePathsAsync(Guid libraryId) =>
+        _context.Set<Episode>()
+            .AsNoTracking()
+            .Where(e => e.LibraryId == libraryId && e.EpisodeNumber == 1 && e.Season.SeasonNumber == 1)
+            .SelectMany(e => e.MediaParts.Select(p => p.FilePath))
+            .ToListAsync();
 
     public async Task DeleteMediaByFilePathAsync(string filePath)
     {
