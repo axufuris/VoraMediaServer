@@ -184,24 +184,26 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const ensureAudioGraph = useCallback(() => {
         const video = videoRef.current;
         if (!video) return;
-        if (audioContextRef.current) return;
+        if (audioContextRef.current && audioSourceRef.current?.mediaElement === video) return;
         try {
-            const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-            if (!Ctx) return;
-            const ctx = new Ctx();
-            const source = ctx.createMediaElementSource(video);
-            const gain = ctx.createGain();
-            gain.gain.value = 1;
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 2048;
-            analyser.smoothingTimeConstant = 0.8;
-            source.connect(gain);
-            gain.connect(analyser);
-            analyser.connect(ctx.destination);
-            audioContextRef.current = ctx;
-            audioSourceRef.current = source;
-            audioGainRef.current = gain;
-            audioAnalyserRef.current = analyser;
+            let ctx = audioContextRef.current;
+            if (!ctx) {
+                const Ctx = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+                if (!Ctx) return;
+                ctx = new Ctx();
+                const gain = ctx.createGain();
+                gain.gain.value = 1;
+                const analyser = ctx.createAnalyser();
+                analyser.fftSize = 2048;
+                analyser.smoothingTimeConstant = 0.8;
+                gain.connect(analyser);
+                analyser.connect(ctx.destination);
+                audioContextRef.current = ctx;
+                audioGainRef.current = gain;
+                audioAnalyserRef.current = analyser;
+            }
+            try { audioSourceRef.current?.disconnect(); } catch { /* ignore */ }
+            audioSourceRef.current = ctx.createMediaElementSource(video);
             applyEqPreset(eqPresetStore.get());
         } catch (err) {
             console.warn('AudioContext setup failed', err);
