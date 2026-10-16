@@ -1,11 +1,24 @@
-// "jpn" and "ja" read as "Japanese"; a missing or unreadable code is shown as it is.
+// "jpn" and "ja" read as "Japanese". The scanner stores English as the name
+// "English" rather than a code, and Intl would lower-case a name it cannot
+// read as a code, so a spelled-out name keeps its own spelling. A missing or
+// unreadable code is shown as it is.
 export function languageName(code?: string): string {
-    if (!code) return 'Unknown';
+    const trimmed = code?.trim();
+    if (!trimmed) return 'Unknown';
+    if (/^[a-z]{4,}$/i.test(trimmed)) return trimmed[0].toUpperCase() + trimmed.slice(1).toLowerCase();
     try {
-        return new Intl.DisplayNames(['en'], { type: 'language' }).of(new Intl.Locale(code).language) ?? code;
+        return new Intl.DisplayNames(['en'], { type: 'language' }).of(new Intl.Locale(trimmed).language) ?? trimmed;
     } catch {
-        return code;
+        return trimmed;
     }
+}
+
+// The language a track is in, or null when the file does not say ("und" is
+// how a muxer writes "not set").
+export function knownLanguageName(code?: string): string | null {
+    const trimmed = code?.trim();
+    if (!trimmed || trimmed.toLowerCase() === 'und') return null;
+    return languageName(trimmed);
 }
 
 export function audioLayout(channels?: number): string {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { MediaItem, MediaPart } from '../../../api/Media/mediaService';
 import { isImageSubtitleCodec, isNoSubtitle, NoSubtitle } from '../../../utils/subtitleKind';
 import FindSubtitlesPanel from './FindSubtitlesPanel';
+import { languageName } from '../../../utils/trackLabels';
 
 type SubtitleTrackType = NonNullable<MediaPart['subtitleTracks']>[number];
 
@@ -21,7 +22,7 @@ interface SubtitleTracksPanelProps {
 }
 
 function trackLabel(track: SubtitleTrackType): string {
-    return track.title || track.language || 'Unknown';
+    return track.title || languageName(track.language);
 }
 
 const mutedStyle: React.CSSProperties = { color: 'var(--vora-text-muted)' };
