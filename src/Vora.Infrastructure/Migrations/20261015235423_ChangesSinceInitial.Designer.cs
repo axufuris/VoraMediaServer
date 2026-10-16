@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261015010727_ChangesSinceInitial")]
+    [Migration("20261015235423_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -1041,8 +1041,7 @@ namespace Vora.Infrastructure.Migrations
 
                     b.HasIndex("LibraryId");
 
-                    b.HasIndex("ArtistId", "Title")
-                        .IsUnique();
+                    b.HasIndex("ArtistId", "Title");
 
                     b.ToTable("Albums");
                 });

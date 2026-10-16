@@ -43,7 +43,7 @@ public class MusicLibraryRepairTests : IDisposable
         if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
     }
 
-    private string Song(string folder, string fileName, string title, string album = "Weezer", uint track = 1, uint disc = 0)
+    private string Song(string folder, string fileName, string title, string album = "Weezer", uint track = 1, uint disc = 0, string? isrc = null)
     {
         var full = Path.Combine(_root, "Weezer", folder, fileName);
         Directory.CreateDirectory(Path.GetDirectoryName(full) ?? _root);
@@ -61,6 +61,7 @@ public class MusicLibraryRepairTests : IDisposable
         tagFile.Tag.AlbumArtists = ["Weezer"];
         tagFile.Tag.Track = track;
         tagFile.Tag.Disc = disc;
+        if (isrc != null) tagFile.Tag.ISRC = isrc;
         tagFile.Save();
         return full;
     }
@@ -109,6 +110,46 @@ public class MusicLibraryRepairTests : IDisposable
         await _ingestion.DidNotReceive().RemoveMediaItemByPathAsync(own);
         await _ingestion.DidNotReceive().RemoveMediaItemByPathAsync(flac);
         await _ingestion.Received(1).EnsureTrackAsync(Arg.Any<LibraryHandle>(), Arg.Any<AlbumHandle>(), "Circus (acoustic version)", Arg.Any<int>(), Arg.Any<int?>(),
+            Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task A_split_track_keeps_its_own_songs_isrc_so_the_song_taken_off_cannot_match_it_again()
+    {
+        var album = Guid.NewGuid();
+        var track = Guid.NewGuid();
+        var own = Song("True Blue", "03.wav", "Ain’t No Big Deal", album: "True Blue", track: 3, isrc: "USWB19903348");
+        var stacked = Song("True Blue", "03b.wav", "White Heat", album: "True Blue", track: 3, isrc: "USWB18600123");
+        _known = [own, stacked];
+        _ingestion.GetMusicFilePlacementsAsync(Arg.Any<LibraryHandle>()).Returns([On(own, album, track, "Ain’t No Big Deal"), On(stacked, album, track, "Ain’t No Big Deal")]);
+
+        await _scanner.ScanMusicLibraryAsync(_libraryId);
+
+        await _ingestion.Received(1).SetTrackIsrcAsync(track, "USWB19903348");
+        await _ingestion.Received(1).RemoveMediaItemByPathAsync(stacked);
+        Received.InOrder(() =>
+        {
+            _ingestion.SetTrackIsrcAsync(track, "USWB19903348");
+            _ingestion.EnsureTrackAsync(Arg.Any<LibraryHandle>(), Arg.Any<AlbumHandle>(), "White Heat", Arg.Any<int>(), Arg.Any<int?>(),
+                Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>());
+        });
+    }
+
+    [Fact]
+    public async Task An_album_the_database_refuses_costs_only_that_album()
+    {
+        Song("Make Believe", "01.wav", "Beverly Hills", album: "Make Believe");
+        Song("Maladroit", "01.wav", "American Gigolo", album: "Maladroit");
+        var albums = 0;
+        _ingestion.EnsureAlbumAsync(Arg.Any<LibraryHandle>(), Arg.Any<ArtistHandle>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<string?>(),
+                Arg.Any<byte[]?>(), Arg.Any<string?>(), Arg.Any<byte[]?>(), Arg.Any<string?>(), Arg.Any<byte[]?>(), Arg.Any<string?>(),
+                Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<IReadOnlyList<string>?>())
+            .Returns(_ => ++albums == 1 ? throw new InvalidOperationException("duplicate key value violates unique constraint") : new AlbumHandle(Guid.NewGuid()));
+
+        await _scanner.ScanMusicLibraryAsync(_libraryId);
+
+        await _ingestion.ReceivedWithAnyArgs(2).EnsureAlbumAsync(default, default, string.Empty, default, default, default, default);
+        await _ingestion.Received(1).EnsureTrackAsync(Arg.Any<LibraryHandle>(), Arg.Any<AlbumHandle>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int?>(),
             Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>());
     }
 

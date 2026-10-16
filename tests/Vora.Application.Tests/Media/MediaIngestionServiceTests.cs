@@ -368,6 +368,31 @@ public class MediaIngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_split_track_takes_its_own_songs_isrc_and_forgets_what_a_provider_said_about_the_other()
+    {
+        var track = new Track { Id = Guid.NewGuid(), Title = "Ain’t No Big Deal", Isrc = "USWB18600123", ContentRating = "Explicit", ContentRatingProvider = "deezer", ContentRatingCheckedAt = DateTime.UtcNow };
+        _musicRepo.GetTrackForUpdateAsync(track.Id).Returns(track);
+
+        await _service.SetTrackIsrcAsync(track.Id, "us-wb1-99-03348");
+
+        track.Isrc.Should().Be("USWB19903348");
+        track.ContentRating.Should().BeNull();
+        track.ContentRatingCheckedAt.Should().BeNull();
+        await _musicRepo.Received(1).UpdateTrackAsync(track);
+    }
+
+    [Fact]
+    public async Task A_split_track_whose_isrc_is_already_its_own_is_left_alone()
+    {
+        var track = new Track { Id = Guid.NewGuid(), Title = "Ain’t No Big Deal", Isrc = "USWB19903348" };
+        _musicRepo.GetTrackForUpdateAsync(track.Id).Returns(track);
+
+        await _service.SetTrackIsrcAsync(track.Id, "USWB19903348");
+
+        await _musicRepo.DidNotReceive().UpdateTrackAsync(Arg.Any<Track>());
+    }
+
+    [Fact]
     public async Task Forgetting_a_split_albums_art_and_year_keeps_what_was_locked_and_fetches_art_again()
     {
         var album = new Album { Id = Guid.NewGuid(), Title = "Weezer", ArtworkUrl = "/art/teal.jpg", BackgroundUrl = "/art/bg.jpg", Year = 2019 };

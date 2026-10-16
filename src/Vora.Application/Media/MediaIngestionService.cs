@@ -469,18 +469,8 @@ public class MediaIngestionService : IMediaIngestionService
                 existing.ContentRatingProvider = null;
                 changed = true;
             }
-            // A different ISRC is a different recording, so whatever a provider
-            // said about the old one no longer applies.
-            var normalizedIsrc = NormalizeIsrc(isrc);
-            if (normalizedIsrc != null && normalizedIsrc != existing.Isrc)
+            if (fileIsrc != null && ApplyIsrc(existing, fileIsrc))
             {
-                existing.Isrc = normalizedIsrc;
-                existing.ContentRatingCheckedAt = null;
-                if (existing.ContentRatingProvider != null && !existing.IsLocked(nameof(existing.ContentRating)))
-                {
-                    existing.ContentRating = null;
-                    existing.ContentRatingProvider = null;
-                }
                 changed = true;
             }
             if (string.IsNullOrEmpty(existing.Artist) && !string.IsNullOrWhiteSpace(trackArtist) && !existing.IsLocked(nameof(existing.Artist)))
@@ -514,6 +504,31 @@ public class MediaIngestionService : IMediaIngestionService
         };
         await _repository.AddMediaItemAsync(track);
         return new MediaItemHandle(track.Id);
+    }
+
+    public async Task SetTrackIsrcAsync(Guid trackId, string? isrc)
+    {
+        var track = await _musicRepository.GetTrackForUpdateAsync(trackId);
+        if (track != null && ApplyIsrc(track, NormalizeIsrc(isrc)))
+        {
+            await _musicRepository.UpdateTrackAsync(track);
+        }
+    }
+
+    // A different ISRC is a different recording, so whatever a provider said
+    // about the old one no longer applies.
+    private static bool ApplyIsrc(Track track, string? isrc)
+    {
+        if (isrc == track.Isrc) return false;
+
+        track.Isrc = isrc;
+        track.ContentRatingCheckedAt = null;
+        if (track.ContentRatingProvider != null && !track.IsLocked(nameof(track.ContentRating)))
+        {
+            track.ContentRating = null;
+            track.ContentRatingProvider = null;
+        }
+        return true;
     }
 
     // Twelve letters and digits. Taggers write it with hyphens or spaces, in

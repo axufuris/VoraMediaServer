@@ -1038,8 +1038,7 @@ namespace Vora.Infrastructure.Migrations
 
                     b.HasIndex("LibraryId");
 
-                    b.HasIndex("ArtistId", "Title")
-                        .IsUnique();
+                    b.HasIndex("ArtistId", "Title");
 
                     b.ToTable("Albums");
                 });

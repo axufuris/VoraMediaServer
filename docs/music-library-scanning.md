@@ -17,6 +17,10 @@ How a scanned music file finds its album and its track, how a scan repairs files
 
 Callers that pass no folders get the old rule: the exact-case title, else the first album with that title. An existing album also gets a missing `Year` from the tags, unless `Year` is locked.
 
+An artist can therefore have several albums of one title, so `IX_Albums_ArtistId_Title` is a plain index, not a unique one. It used to be unique. The first scan after the change took Weezer's six other self-titled albums off the one album they had been merged into, and could not create them again: the database refused each new "Weezer" album.
+
+**One album the database refuses costs only that album.** `IngestMusicFilesAsync` catches a failure per album, logs it, and clears the change tracker (`ReleaseTrackedEntitiesAsync`), as it does after a failed track. Before, an album failure abandoned the rest of that artist. The rejected insert also stayed tracked, so later saves in the same scan tried it again and failed too.
+
 ## How a file finds its track
 
 `EnsureTrackAsync` looks at the album's tracks with the same track and disc number and takes:
@@ -33,7 +37,7 @@ The match used to be album title + track number alone, so a deluxe edition's aco
 
 `SeparateMisplacedMusicFilesAsync` runs at the start of every music library scan (`ProcessMusicDirectoriesAsync`). It only looks at files that are already in the library, inside the folders being scanned, and still on disk (`IMediaIngestionService.GetMusicFilePlacementsAsync` → `MusicRepository.GetMusicFilePlacementsAsync`).
 
-1. **Tracks first.** For a track with several files, it reads each file's tag title (the file name when the title tag is empty). When exactly one group of titles is the track's own (`Title` or `OriginalTitle`), the other files are taken off. The track is left alone when:
+1. **Tracks first.** For a track with several files, it reads each file's tag title (the file name when the title tag is empty) and ISRC. When exactly one group of titles is the track's own (`Title` or `OriginalTitle`), the other files are taken off. The track's ISRC is then set to its own files' (`SetTrackIsrcAsync`), because the old ingest gave a track the ISRC of whichever file it saw last. If the stacked file's ISRC were left on the track, `EnsureTrackAsync` would match that file straight back to it on the ISRC; that is what kept True Blue's *White Heat* on *Ain't No Big Deal*. The track is left alone when:
    - no group matches, or more than one does (for example a title edited by hand);
    - any of its files can't be read.
 2. **Then albums.** It groups each album's remaining files by album folder, using the disc rule above. The folder with the most files keeps the album (ties go to the first folder path in ordinal order), and the files in the other folders are taken off.
