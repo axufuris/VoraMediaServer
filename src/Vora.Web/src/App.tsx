@@ -185,6 +185,8 @@ export default function App() {
                         <Route path="discovery/:providerId/actor/:externalId" element={<ClientDiscoveryActorPage />} />
 
                         <Route path="server/:serverId" element={<ServerContextWrapper />}>
+                            <Route path="account" element={<AccountSettingsPage />} />
+                            <Route path="history" element={<ProfileHistoryPage />} />
                             <Route path="search" element={<SearchPage />} />
                             <Route path="library/:id" element={<ClientLibraryPage />} />
                             <Route path="media/:id" element={<ClientMediaDetailsPage />} />

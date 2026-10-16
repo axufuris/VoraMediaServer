@@ -26,7 +26,7 @@ export default function ServerSwitcher() {
     const switchTo = (s: VoraServer) => {
         serverVault.setActiveServerId(s.id);
         setOpen(false);
-        navigate(serverId ? `/server/${s.id}/admin` : '/admin');
+        navigate(serverId ? `/admin/server/${s.id}` : '/admin');
         // Reload so all server-scoped state (active token, hub connection, in-memory caches) resets.
         window.location.reload();
     };
