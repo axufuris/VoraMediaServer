@@ -1,7 +1,10 @@
+import { audioLayout, knownLanguageName } from './trackLabels';
+
 interface AudioTrackLike {
     id: string;
     codec?: string;
     channels?: number;
+    language?: string;
     isDefault?: boolean;
 }
 
@@ -20,9 +23,14 @@ export function pickChipAudioTrack<T extends AudioTrackLike>(tracks: T[] | undef
     return tracks.find(t => t.isDefault) ?? tracks[0];
 }
 
+// Reads the same as the track's line in the Audio menu, "Telugu · EAC3 5.1",
+// so a file with several dubs says which one will play. The language is left
+// out when the file does not name one.
 export function audioChipLabel(track?: AudioTrackLike): string | null {
-    if (!track?.codec) return null;
-    return `${track.codec.toUpperCase()}${track.channels ? ` ${track.channels}ch` : ''}`;
+    if (!track) return null;
+    const layout = audioLayout(track.channels);
+    const format = track.codec ? `${track.codec.toUpperCase()}${layout ? ` ${layout}` : ''}` : null;
+    return [knownLanguageName(track.language), format].filter(Boolean).join(' · ') || null;
 }
 
 export function resolutionChipLabel(resolution?: string | null): string | null {
@@ -42,7 +50,7 @@ export function subtitleChipLabel(tracks: SubtitleTrackLike[] | undefined, selec
     if (!tracks?.length) return null;
     const picked = tracks.find(t => t.id === selectedId);
     if (!picked) return 'CC Off';
-    return `CC ${picked.language?.trim() || picked.title?.trim() || 'On'}`;
+    return `CC ${knownLanguageName(picked.language) || picked.title?.trim() || 'On'}`;
 }
 
 // The one facts line under the title: year · runtime · genres. The content

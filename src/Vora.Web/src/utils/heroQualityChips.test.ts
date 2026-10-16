@@ -15,7 +15,7 @@ describe('pickChipAudioTrack', () => {
         const track = pickChipAudioTrack(tracks, 'aac-2');
 
         expect(track?.id).toBe('aac-2');
-        expect(audioChipLabel(track)).toBe('AAC 2ch');
+        expect(audioChipLabel(track)).toBe('AAC 2.0');
     });
 
     it('falls back to the default track before any selection is made', () => {
@@ -38,15 +38,31 @@ describe('pickChipAudioTrack', () => {
 });
 
 describe('audioChipLabel', () => {
-    it('reads codec then channel count', () => {
-        expect(audioChipLabel({ id: 'x', codec: 'truehd', channels: 8 })).toBe('TRUEHD 8ch');
+    it('reads codec then channel layout', () => {
+        expect(audioChipLabel({ id: 'x', codec: 'truehd', channels: 8 })).toBe('TRUEHD 7.1');
     });
 
-    it('drops the channel count when it is unknown', () => {
+    // Issue #132: a film with English, Tamil, Telugu and Hindi dubs said only
+    // "EAC3 6ch", not which of the four would play.
+    it('names the language first, the way the Audio menu does', () => {
+        expect(audioChipLabel({ id: 'x', codec: 'eac3', channels: 6, language: 'Tel' })).toBe('Telugu · EAC3 5.1');
+        expect(audioChipLabel({ id: 'x', codec: 'eac3', channels: 6, language: 'English' })).toBe('English · EAC3 5.1');
+    });
+
+    it('leaves the language out when the file does not set one', () => {
+        expect(audioChipLabel({ id: 'x', codec: 'ac3', channels: 6 })).toBe('AC3 5.1');
+        expect(audioChipLabel({ id: 'x', codec: 'ac3', channels: 6, language: 'Und' })).toBe('AC3 5.1');
+    });
+
+    it('drops the channel layout when it is unknown', () => {
         expect(audioChipLabel({ id: 'x', codec: 'flac' })).toBe('FLAC');
     });
 
-    it('shows nothing without a codec', () => {
+    it('shows the language alone when the codec is unknown', () => {
+        expect(audioChipLabel({ id: 'x', channels: 6, language: 'Jpn' })).toBe('Japanese');
+    });
+
+    it('shows nothing when there is neither a codec nor a language', () => {
         expect(audioChipLabel({ id: 'x', channels: 6 })).toBeNull();
         expect(audioChipLabel(undefined)).toBeNull();
     });
@@ -80,6 +96,15 @@ describe('subtitleChipLabel', () => {
         expect(subtitleChipLabel(tracks, 's1')).toBe('CC English');
         expect(subtitleChipLabel(tracks, 's2')).toBe('CC Commentary');
         expect(subtitleChipLabel(tracks, 's3')).toBe('CC On');
+    });
+
+    it('names a language stored as a code, as a sidecar file name gives it', () => {
+        expect(subtitleChipLabel([{ id: 'srt', language: 'en' }], 'srt')).toBe('CC English');
+        expect(subtitleChipLabel([{ id: 'pgs', language: 'Jpn' }], 'pgs')).toBe('CC Japanese');
+    });
+
+    it('falls back to the title when the language is undetermined', () => {
+        expect(subtitleChipLabel([{ id: 'u', language: 'und', title: 'Signs' }], 'u')).toBe('CC Signs');
     });
 });
 
