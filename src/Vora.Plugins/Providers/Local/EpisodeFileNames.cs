@@ -66,7 +66,12 @@ public sealed partial class EpisodeFileNames
         return fromLibrary ?? fromAnyNaming;
     }
 
-    public EpisodePlacement? Place(string fileName, string? folderName, Func<EpisodeNumbers?> fromDocument)
+    public EpisodePlacement? Place(string fileName, string? folderName, Func<EpisodeNumbers?> fromDocument) =>
+        PlaceByName(fileName, folderName, fromDocument) is { } placement
+            ? placement with { Title = ReleaseNames.EpisodeTitle(fileName, placement.Title) }
+            : null;
+
+    private EpisodePlacement? PlaceByName(string fileName, string? folderName, Func<EpisodeNumbers?> fromDocument)
     {
         var name = Read(fileName);
         var folderSeason = SeasonOfFolder(folderName);
