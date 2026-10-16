@@ -13,6 +13,8 @@ import LiveTvGuide from '../../pages/Client/LiveTv/LiveTvGuide';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { useAutoHideControls } from './Controls/useAutoHideControls';
 import { useFullscreen } from './Controls/useFullscreen';
+import { usePlayerKeyboard } from './Controls/usePlayerKeyboard';
+import PlayerKeyIndicator from './Controls/PlayerKeyIndicator';
 import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeButton, CloseButton } from './Controls/PlayerButtons';
 import LiveTvInfoPanel from './Panels/LiveTvInfoPanel';
 import LiveTvRecordModal from './Panels/LiveTvRecordModal';
@@ -334,6 +336,15 @@ export default function LiveTvPlayer() {
         keepVisibleWhen: showInfo || showOverlayGuide
     });
 
+    const keyIndicator = usePlayerKeyboard({
+        enabled: !!currentMedia && !isMinimized && !showOverlayGuide && !showInfo && !showRecordModal,
+        canSeek: canTimeshift,
+        volume,
+        onSkipForward: skipForward,
+        onSkipBackward: skipBackward,
+        onVolume: setVolume,
+    });
+
     const toggleCc = () => {
         setCcEnabled(prev => !prev);
     };
@@ -637,6 +648,8 @@ export default function LiveTvPlayer() {
                     </div>
                 </div>
             )}
+
+            {!isMinimized && !showOverlayGuide && <PlayerKeyIndicator indicator={keyIndicator} />}
 
             {showInfo && !isMinimized && (
                 <LiveTvInfoPanel activeProgram={activeProgram} streamUrl={currentMedia.streamUrl} formatTime={formatTime} />

@@ -246,7 +246,7 @@ export interface PlaybackPrefs {
     maxAudioChannels: number;
 }
 
-function getCurrentProfileDeviceIds(): { profileId: string; deviceId: string } {
+export function getCurrentProfileDeviceIds(): { profileId: string; deviceId: string } {
     let profileId = 'unknown';
     try {
         const token = localStorage.getItem(StorageKeys.profileToken);

@@ -113,7 +113,15 @@ Right-clicking a movie, show, season or episode, or holding it on a touch screen
 
 `components/Player/Controls/PlayerButtons.tsx` exports `PlayPauseButton`, `SkipButton`, `VolumeControl`, `FullscreenButton`, `MaximizeButton`, `CloseButton`. Both `GlobalVideoPlayer` and `LiveTvPlayer` use these.
 
-`useAutoHideControls({ isMinimized, isPlaying, keepVisibleWhen })` and `useFullscreen(containerRef)` factor out the mousemove auto-hide effect and fullscreen toggle. Use them in any future player surface.
+`useAutoHideControls({ isMinimized, isPlaying, keepVisibleWhen })` and `useFullscreen(containerRef)` factor out the auto-hide effect (a mouse move or a key press shows the controls) and fullscreen toggle. Use them in any future player surface.
+
+`usePlayerKeyboard` (`Controls/`) gives a full-size video player its arrow keys: Left and Right skip back and forward through the same `skipBackward` / `skipForward` the buttons call, and Up and Down change the volume. `GlobalVideoPlayer` and `LiveTvPlayer` use it; Live TV passes `canSeek` only when it can timeshift, so there the arrows only change the volume. Rules it keeps (pure parts in `utils/playerKeys.ts`, tested on their own):
+
+- It takes the key from the page (`preventDefault`), so the page behind does not scroll. A key with Alt, Ctrl, Meta or Shift is left to the browser.
+- A text field, a `<select>` or an editable region keeps its arrows (`isTypingTarget`). A focused slider does not: the volume slider would otherwise move by its own step.
+- It stands down while the player is minimised or one of its panels is open, and whenever any `[aria-modal="true"]` element is on the page. A hand-built overlay therefore has to carry `aria-modal`, as `LiveTvRecordModal` does.
+- The steps are the viewer's Settings → Playback → Keyboard picks, read from `playback_prefs` on every press (default 10 s and 5%).
+- It returns what `PlayerKeyIndicator` shows in the middle of the picture for 0.9 s. Presses in one direction add up while it shows (+30s after three Rights). Its `role="status"` region stays mounted so a screen reader hears each change.
 
 ## Remote-control (D-pad) navigation
 
