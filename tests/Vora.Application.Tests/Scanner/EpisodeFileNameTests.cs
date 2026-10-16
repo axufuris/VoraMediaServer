@@ -56,6 +56,32 @@ public class EpisodeFileNameTests
     }
 
     [Theory]
+    [InlineData("Severance.S01E01.Good.News.About.Hell", 1, "Good News About Hell")]
+    [InlineData("severance.s01e01.good.news.about.hell", 1, "good news about hell")]
+    [InlineData("Severance_S01E01_Good_News_About_Hell", 1, "Good News About Hell")]
+    [InlineData("Severance.S01E01.Good.News.About.Hell.1080p.WEB-DL.x264-GROUP", 1, "Good News About Hell")]
+    [InlineData("Manifest.S01E07.S.N.A.F.U.1080p.AMZN.WEB-DL", 7, "S.N.A.F.U.")]
+    [InlineData("Severance.S01E01.1080p.WEB-DL.x264-GROUP", 1, null)]
+    public void An_episode_named_like_a_release_keeps_its_whole_title_with_spaces(string fileName, int episode, string? title)
+    {
+        var placement = Automatic.Place(fileName, "Season 1", () => null);
+
+        placement.Should().NotBeNull();
+        placement?.Season.Should().Be(1);
+        placement?.Episode.Should().Be(episode);
+        placement?.Title.Should().Be(title);
+    }
+
+    [Theory]
+    [InlineData("Mr. Robot (2015) - S01E01 - eps1.0_hellofriend.mov [Bluray-1080p Remux][DTS-HD MA 5.1][AVC]-FraMeSToR", "eps1.0_hellofriend.mov")]
+    [InlineData("American Dad! (2005) - S15E07 - Klaustastrophe.tv [iT WEBDL-1080p][AC3 5.1][h264]-ViSUM", "Klaustastrophe.tv")]
+    [InlineData("Lost (2004) - S02E19 - S.O.S [Bluray-1080p Remux][DTS-HD MA 5.1][AVC]-FraMeSToR", "S.O.S")]
+    public void A_title_in_a_name_with_spaces_is_kept_as_written(string fileName, string title)
+    {
+        Automatic.Place(fileName, "Season 1", () => null)?.Title.Should().Be(title);
+    }
+
+    [Theory]
     [InlineData("Example Show - S01E01-S01E02 - Double Episode", 1, 2)]
     [InlineData("Example Show - S01E01-02 - Double Episode", 1, 2)]
     [InlineData("Example Show - S01E01 & S01E02 - Double Episode", 1, 2)]

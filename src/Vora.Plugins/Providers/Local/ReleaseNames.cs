@@ -43,6 +43,19 @@ public static partial class ReleaseNames
         return string.Join(' ', words);
     }
 
+    public static string? EpisodeTitle(string fileName, string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return null;
+
+        var trimmed = title.Trim();
+        if (fileName.Contains(' ') || trimmed.Contains(' ') || !Separator().IsMatch(trimmed)) return trimmed;
+
+        var tokens = Separator().Replace(trimmed, " ").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var tag = Array.FindIndex(tokens, token => ReleaseTag().IsMatch(token));
+        var cleaned = JoinDotted(tag >= 0 ? tokens[..tag] : tokens);
+        return cleaned.Length == 0 ? null : cleaned;
+    }
+
     private static int? LastYearBefore(string[] tokens, int end)
     {
         for (var i = end - 1; i >= 1; i--)

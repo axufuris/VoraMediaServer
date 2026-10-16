@@ -16,6 +16,8 @@ How the TV scanner decides which episode a file is. `EpisodeFileNames` (`Vora.Pl
 
 **Season**: from the name; otherwise from the folder (`Season 2`, `Season 02`, `season.3`, `Series 4`, `Specials` is 0, `SeasonOfFolder`); otherwise 1.
 
+**Titles of release names**: `Place` cleans the title only when the whole file name has no spaces (`ReleaseNames.EpisodeTitle`). Dots and underscores become spaces, the title ends at a release tag (`1080p`, `WEB-DL`, `x264`, …), and single letters are joined back (`S.N.A.F.U.`). So `Severance.S01E01.Good.News.About.Hell.1080p.WEB-DL` is titled "Good News About Hell". A name with spaces keeps its title exactly as written: `Mr. Robot (2015) - S01E01 - eps1.0_hellofriend.mov` stays `eps1.0_hellofriend.mov`. `Read` itself returns the raw title, which the jc21 cases compare against. The scanner reads names without their extension, so the any-naming pattern's optional extension is limited to video extensions; it used to be any 2–4 characters, which took the last word of `Severance.S01E01.Good.News.About.Hell` ("Hell") for an extension.
+
 **Air dates** (`ParseAirDate`): `2024-01-15`, `2024.01.15`, `2024_01_15`, `15-01-2024` and `01-15-2024` (a day over 12 decides which is which; `03-04-2024` cannot be told apart and is not used), `Jan 15 2024`, `January 15, 2024`. A file with only a date becomes episode `yyyymmdd` (20240115) of its folder's season, or of the year outside a season folder. Every day is its own episode, sorted by date, and a provider never matches it to a numbered episode by mistake.
 
 ## What the default pattern reads
