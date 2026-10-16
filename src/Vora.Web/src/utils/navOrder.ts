@@ -12,6 +12,20 @@ export function moveNavItem<T extends { order: number }>(items: T[], from: numbe
     return sorted.map((item, index) => ({ ...item, order: index }));
 }
 
+// The sidebar editor lists only the items whose feature is on (Radio, Podcasts,
+// Live TV, Discover and Calendar can be off), so the positions it reports count
+// only those. Moving by those positions in the full list shifted every row
+// below a hidden item, and the item landed off the drop line. The move is made
+// among the shown items; a hidden item keeps its place for when it comes back.
+export function moveShownNavItem<T extends { order: number }>(items: T[], isShown: (item: T) => boolean, from: number, to: number): T[] {
+    const sorted = [...items].sort((a, b) => a.order - b.order);
+    const shown = moveNavItem(sorted.filter(isShown), from, to);
+    let next = 0;
+    return sorted
+        .map(item => isShown(item) ? shown[next++] : item)
+        .map((item, index) => ({ ...item, order: index }));
+}
+
 // Where a dragged row lands, given the row it's over and whether the pointer is
 // in that row's lower half. The insertion point is counted before the dragged
 // row is lifted out, so it's shifted back by one when it lies below it.

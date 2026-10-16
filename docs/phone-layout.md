@@ -72,6 +72,7 @@ To add it to a list:
 - Spread `reorderListProps` on the list container and `reorderRowProps(index)` on each row.
 - Spread `handleProps(index)` on the row's drag handle, and give the handle the `touch-none` class so a drag on it doesn't scroll the page.
 - Pass the list's move function to the hook. It is called once on release with `(from, to)`, the final index, the same move the mouse drop performs.
+- `from` and `to` are positions in the list as drawn. If the list hides some items, apply the move to those positions, not to the full list. Edit Navigation hides the sections whose feature is off, so `MainLayout` moves with `moveShownNavItem` (`utils/navOrder.ts`), and a hidden section keeps its slot. Moving by the full list's positions picked up the wrong item whenever a section was hidden (issue #144).
 - `rowStyle(index)` fades the dragged row and draws the accent drop line. Lists that already draw their own line (Edit Navigation) can read `drag` instead.
 
 The hook:
