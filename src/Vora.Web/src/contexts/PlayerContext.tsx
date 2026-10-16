@@ -34,6 +34,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [volume, setVolumeState] = useState(1);
+    const volumeRef = useRef(1);
     const [sessionId, setSessionId] = useState<string | null>(null);
 
     const [adminMessage, setAdminMessage] = useState<string | null>(null);
@@ -381,6 +382,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     useEffect(() => { playMediaRef.current = playMedia; }, [playMedia]);
 
     const currentMediaId = currentMedia?.id;
+
+    // Closing the player unmounts its <video>, and a new session re-keys the
+    // video player's, so the next one starts at the browser's full volume
+    // while the slider still shows the level picked before. Each new element
+    // is given that level as soon as it is there.
+    useEffect(() => {
+        if (videoRef.current) videoRef.current.volume = volumeRef.current;
+    }, [currentMediaId, currentMedia?.sessionId]);
+
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
@@ -821,10 +831,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const setVolume = useCallback((vol: number) => {
-        if (videoRef.current) {
-            videoRef.current.volume = vol;
-            setVolumeState(vol);
-        }
+        volumeRef.current = vol;
+        setVolumeState(vol);
+        if (videoRef.current) videoRef.current.volume = vol;
     }, []);
 
     const toggleFullscreen = useCallback(() => {
