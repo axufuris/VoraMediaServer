@@ -264,16 +264,19 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
     }
 
     private static readonly Regex TmdbSizeSegment = new(@"(https?://image\.tmdb\.org/t/p/)[wh]\d+(/)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex TmdbOriginalSegment = new(@"(https?://image\.tmdb\.org/t/p/)original(/)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly int[] TmdbWidths = [300, 500, 780, 1280];
 
     // For the large (hero) bucket, pull TMDB's full-resolution "original" backdrop
     // rather than the stored w1280, so the downscale to the bucket stays sharp on
-    // wide screens. Smaller buckets keep the stored size to avoid oversized
-    // downloads; the cache key still uses the requested `src`, so nothing else
-    // needs to know about the upgrade.
-    private static string ResolveDownloadSource(string src, int width)
+    // wide screens. Smaller buckets download the smallest TMDB size that still
+    // covers them: an "original" logo can be a 12 MB PNG, over the downloader's
+    // cap, while its w780 is 200 KB. The cache key still uses the requested
+    // `src`, so nothing else needs to know about either swap.
+    internal static string ResolveDownloadSource(string src, int width)
     {
-        if (width <= 1280) return src;
-        return TmdbSizeSegment.Replace(src, "$1original$2");
+        if (width > TmdbWidths[^1]) return TmdbSizeSegment.Replace(src, "$1original$2");
+        return TmdbOriginalSegment.Replace(src, $"$1w{TmdbWidths.First(size => size >= width)}$2");
     }
 
     private async Task<byte[]?> LoadSourceAsync(string src, CancellationToken cancellationToken)

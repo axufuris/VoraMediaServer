@@ -157,7 +157,8 @@ const PREVIEW_OPTIONS: Record<BadgeType, { label: string, path: string }[]> = {
         { label: 'Rotten Tomatoes (Certified)', path: '/Overlays/Rating/RT-Crit-Top.png' },
         { label: 'Star', path: '/Overlays/Rating/Star.png' },
         { label: 'TMDb', path: '/Overlays/Rating/TMDb.png' },
-        { label: 'Trakt', path: '/Overlays/Rating/Trakt.png' }
+        { label: 'Trakt', path: '/Overlays/Rating/Trakt.png' },
+        { label: 'Vora', path: '/Overlays/Rating/Vora.png' }
     ],
     composite_ratings: []
 };
@@ -234,7 +235,7 @@ export default function OverlayEditor() {
                             return {
                                 ...base,
                                 previewImages: [
-                                    '/Overlays/Rating/Star.png',
+                                    '/Overlays/Rating/Vora.png',
                                     '/Overlays/Rating/RT-Aud-Fresh.png',
                                     '/Overlays/Rating/RT-Crit-Fresh.png'
                                 ]
@@ -272,7 +273,7 @@ export default function OverlayEditor() {
                 id: nextElementId(),
                 type,
                 previewImages: [
-                    '/Overlays/Rating/Star.png',
+                    '/Overlays/Rating/Vora.png',
                     '/Overlays/Rating/RT-Aud-Fresh.png',
                     '/Overlays/Rating/RT-Crit-Fresh.png'
                 ],

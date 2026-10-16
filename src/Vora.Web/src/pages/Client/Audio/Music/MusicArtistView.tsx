@@ -3,6 +3,7 @@ import LastFmMark from '../../../../components/Media/LastFmMark';
 import MusicTrackRow from './MusicTrackRow';
 import { formatCompactCount } from '../../../../utils/compactCount';
 import StarRating from '../../../../components/Client/Primitives/StarRating';
+import { VoraRatingBadge } from '../../../../components/Client/Primitives/RatingBadge';
 import RatedBadge from '../../../../components/Client/Primitives/RatedBadge';
 import { type MusicNavState } from './musicNavState';
 import { albumCover } from '../../../../utils/albumCover';
@@ -147,7 +148,7 @@ export default function MusicArtistView({
                                     {currentArtist.serverAdminRating != null && !isServerAdmin && (
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-secondary)]">Server admin</span>
-                                            <StarRating value={currentArtist.serverAdminRating} readOnly showNumeric color="var(--vora-accent-text)" />
+                                            <VoraRatingBadge value={currentArtist.serverAdminRating} label="Server admin's rating" />
                                         </div>
                                     )}
                                 </div>

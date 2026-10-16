@@ -314,6 +314,9 @@
     <None Update="Assets\Overlays\Rating\Trakt.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="Assets\Overlays\Rating\Vora.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="Assets\Overlays\Resolution\1080p.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

@@ -156,6 +156,30 @@ public class LogoThumbnailCacheTests : IDisposable
     }
 
     [Fact]
+    public async Task A_logo_is_fetched_at_the_tmdb_size_that_covers_the_request_not_at_its_original_size()
+    {
+        _downloader.DownloadAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(TransparentLogoPng());
+
+        var path = await _service.GetOrCreateThumbnailAsync(LogoSource, 780, "logo", TestContext.Current.CancellationToken);
+
+        path.Should().NotBeNull();
+        await _downloader.Received(1).DownloadAsync("https://image.tmdb.org/t/p/w780/logo.png", Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("https://image.tmdb.org/t/p/original/a.png", 200, "https://image.tmdb.org/t/p/w300/a.png")]
+    [InlineData("https://image.tmdb.org/t/p/original/a.png", 500, "https://image.tmdb.org/t/p/w500/a.png")]
+    [InlineData("https://image.tmdb.org/t/p/original/a.png", 780, "https://image.tmdb.org/t/p/w780/a.png")]
+    [InlineData("https://image.tmdb.org/t/p/original/a.png", 1280, "https://image.tmdb.org/t/p/w1280/a.png")]
+    [InlineData("https://image.tmdb.org/t/p/w1280/b.jpg", 1920, "https://image.tmdb.org/t/p/original/b.jpg")]
+    [InlineData("https://image.tmdb.org/t/p/w500/c.jpg", 360, "https://image.tmdb.org/t/p/w500/c.jpg")]
+    [InlineData("https://assets.fanart.tv/fanart/logo.png", 780, "https://assets.fanart.tv/fanart/logo.png")]
+    public void Each_bucket_downloads_the_smallest_tmdb_size_that_covers_it(string src, int width, string downloaded)
+    {
+        ArtworkThumbnailService.ResolveDownloadSource(src, width).Should().Be(downloaded);
+    }
+
+    [Fact]
     public async Task Removing_a_source_clears_the_png_it_was_cached_as()
     {
         _downloader.DownloadAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(TransparentLogoPng());

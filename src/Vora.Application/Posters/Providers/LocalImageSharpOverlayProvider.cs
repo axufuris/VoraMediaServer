@@ -142,7 +142,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         image.Mutate(x => x.Crop(new Rectangle(cropX, cropY, cropWidth, cropHeight)));
     }
 
-    private const string CacheKeyVersion = "v9-redraw-with-current-ratings";
+    private const string CacheKeyVersion = "v10-vora-mark-for-the-server-rating";
 
     // Derived from CacheKeyVersion's leading "vN" so a single bump (which authors
     // already do when the compositing output changes) both busts the cached files
@@ -378,7 +378,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         {
             scoreText = $"{Math.Round(rating.Score)}%";
         }
-        else if (BadgeResolver.IsVoraStarLogo(rating.ImagePath))
+        else if (BadgeResolver.IsVoraRatingLogo(rating.ImagePath))
         {
             scoreText = rating.Score.ToString("0");
         }
