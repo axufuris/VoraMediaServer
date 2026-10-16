@@ -22,7 +22,7 @@ export function useAutoHideControls({
         }
 
         let timeoutId: number;
-        const handleMouseMove = () => {
+        const handleActivity = () => {
             setShowControls(true);
             window.clearTimeout(timeoutId);
             timeoutId = window.setTimeout(() => {
@@ -30,9 +30,11 @@ export function useAutoHideControls({
             }, delayMs);
         };
 
-        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mousemove', handleActivity);
+        window.addEventListener('keydown', handleActivity);
         return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mousemove', handleActivity);
+            window.removeEventListener('keydown', handleActivity);
             window.clearTimeout(timeoutId);
         };
     }, [isMinimized, isPlaying, keepVisibleWhen, delayMs]);

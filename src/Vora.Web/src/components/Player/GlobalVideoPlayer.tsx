@@ -13,6 +13,8 @@ import { useDialog } from '../../dialogs';
 import { useAutoHideControls } from './Controls/useAutoHideControls';
 import { useUpNextEnding } from './useUpNextEnding';
 import { useFullscreen } from './Controls/useFullscreen';
+import { usePlayerKeyboard } from './Controls/usePlayerKeyboard';
+import PlayerKeyIndicator from './Controls/PlayerKeyIndicator';
 import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeButton, CloseButton, EpisodeNavButton, SubtitlesButton } from './Controls/PlayerButtons';
 import PlayerSettingsPanel from './Panels/PlayerSettingsPanel';
 import SubtitleTracksPanel from './Panels/SubtitleTracksPanel';
@@ -448,6 +450,15 @@ export default function GlobalVideoPlayer() {
     });
 
     const toggleFullScreen = useFullscreen(playerContainerRef);
+
+    const keyIndicator = usePlayerKeyboard({
+        enabled: !!currentMedia && !isMinimized && !showSettings && !showSubtitles && !showInfo,
+        canSeek: true,
+        volume,
+        onSkipForward: skipForward,
+        onSkipBackward: skipBackward,
+        onVolume: setVolume,
+    });
 
     const thumbnailsEligible = currentMedia?.playbackContextType !== 'LiveTv' && currentMedia?.playbackContextType !== 'Dvr';
     // Thumbnails are per media part (different cuts get their own sprite). Resolve
@@ -939,6 +950,8 @@ export default function GlobalVideoPlayer() {
                     </div>
                 </div>
             )}
+
+            {!isMinimized && <PlayerKeyIndicator indicator={keyIndicator} />}
 
             {showSettings && (
                 <PlayerSettingsPanel

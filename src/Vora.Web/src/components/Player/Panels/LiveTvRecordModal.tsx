@@ -28,6 +28,9 @@ export default function LiveTvRecordModal({
             style={{ background: 'var(--vora-bg-overlay)' }}
         >
             <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Record ${program.title}`}
                 className="w-full max-w-md overflow-hidden rounded-2xl p-6"
                 style={{
                     background: 'var(--vora-bg-raised)',
