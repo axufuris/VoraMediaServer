@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mediaService, type Episode } from '../../api/Media/mediaService';
 import StarRating from '../Client/Primitives/StarRating';
+import { VoraRatingBadge } from '../Client/Primitives/RatingBadge';
 import ArtImage from '../Client/Primitives/ArtImage';
 import { CornerChip, PosterCorner } from '../Client/Primitives/WatchedBadge';
 import { episodeCornerLabel } from '../../utils/posterCaption';
@@ -87,8 +88,9 @@ export default function MediaEpisodesList({ episodes, serverId, onChanged }: Pro
                                         />
                                     </div>
                                     {ep.serverAdminRating != null && !isAdmin && (
-                                        <span style={{ color: 'var(--vora-accent-text)' }} title={`Server admin: ${Math.round(ep.serverAdminRating)} of 10`}>
-                                            ★ Admin {Math.round(ep.serverAdminRating)}
+                                        <span className="inline-flex items-center gap-1.5">
+                                            Admin
+                                            <VoraRatingBadge value={ep.serverAdminRating} label="Server admin's rating" />
                                         </span>
                                     )}
                                 </div>

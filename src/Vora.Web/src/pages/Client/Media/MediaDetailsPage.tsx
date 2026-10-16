@@ -11,13 +11,12 @@ import { getEffectiveCapabilities } from '../../../utils/hardwareScanner';
 import { useDialog } from '../../../dialogs';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import DetailHero, { HeroChip, HeroCredits, HeroIconButton } from '../../../components/Client/Primitives/DetailHero';
-import RatingBadge from '../../../components/Client/Primitives/RatingBadge';
+import RatingBadge, { VoraRatingBadge } from '../../../components/Client/Primitives/RatingBadge';
 import TrailerOverlay, { type TrailerSource } from '../../../components/Client/Primitives/TrailerOverlay';
 import { PlayIcon, RestartIcon, FilmReelIcon, BookmarkIcon, CheckIcon, MoreIcon, StarIcon } from '../../../components/Client/Primitives/ActionIcons';
 import { watchlistService } from '../../../api/Watchlist/watchlistService';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
-import StarRating from '../../../components/Client/Primitives/StarRating';
 import RateDialog from '../../../components/Client/Primitives/RateDialog';
 import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
 import { formatRuntime } from '../../../utils/formatRuntime';
@@ -336,15 +335,11 @@ export default function MediaDetailsPage() {
 
     const heroRatings = (
         <>
-            {media.myRating != null && (
-                <div className="flex items-center gap-2" title="Your rating">
-                    <StarRating value={media.myRating} readOnly showNumeric ariaLabel="Your rating" />
-                </div>
-            )}
+            {media.myRating != null && <VoraRatingBadge value={media.myRating} label="Your rating" />}
             {media.serverAdminRating != null && !isAdmin && (
                 <div className="flex items-center gap-2">
                     <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Server admin</span>
-                    <StarRating value={media.serverAdminRating} readOnly showNumeric color="var(--vora-accent-text)" />
+                    <VoraRatingBadge value={media.serverAdminRating} label="Server admin's rating" />
                 </div>
             )}
             {media.thirdPartyRating1 != null && <RatingBadge value={media.thirdPartyRating1} name={media.thirdPartyRating1Name} />}

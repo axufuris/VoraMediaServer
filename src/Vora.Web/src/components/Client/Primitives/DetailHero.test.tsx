@@ -1,5 +1,5 @@
 import { beforeAll, describe, it, expect } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import DetailHero, { HeroCredits } from './DetailHero';
 import { directorsFrom } from '../../../utils/credits';
 
@@ -128,6 +128,16 @@ describe('DetailHero', () => {
         // Through the cache, in the logo bucket, so it keeps its transparency.
         expect(logo.getAttribute('src')).toContain('kind=logo');
         expect(heading).toHaveTextContent('');
+    });
+
+    it('shows the text title when the logo fails to load', () => {
+        render(<DetailHero title="Spider-Man: Brand New Day" logoUrl="https://image.tmdb.org/t/p/original/logo.png" />);
+
+        const heading = screen.getByRole('heading', { level: 1 });
+        fireEvent.error(within(heading).getByRole('img'));
+
+        expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Spider-Man: Brand New Day');
+        expect(within(screen.getByRole('heading', { level: 1 })).queryByRole('img')).toBeNull();
     });
 
     it('falls back to the text title when there is no logo', () => {

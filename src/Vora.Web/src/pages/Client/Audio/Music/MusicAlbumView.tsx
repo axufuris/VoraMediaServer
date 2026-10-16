@@ -6,6 +6,7 @@ import ContentRatingBadge from '../../../../components/Media/ContentRatingBadge'
 import { hasExplicitTrack } from '../../../../utils/musicContentRating';
 import { formatCompactCount } from '../../../../utils/compactCount';
 import StarRating from '../../../../components/Client/Primitives/StarRating';
+import { VoraRatingBadge } from '../../../../components/Client/Primitives/RatingBadge';
 import { albumCover } from '../../../../utils/albumCover';
 import AudioQualityChip from '../../../../components/Media/AudioQualityChip';
 
@@ -128,7 +129,7 @@ export default function MusicAlbumView({
                                 {currentAlbum.serverAdminRating != null && !isServerAdmin && (
                                     <div className="flex items-center gap-2">
                                         <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">Server admin</span>
-                                        <StarRating value={currentAlbum.serverAdminRating} readOnly showNumeric color="var(--vora-accent-text)" />
+                                        <VoraRatingBadge value={currentAlbum.serverAdminRating} label="Server admin's rating" />
                                     </div>
                                 )}
                             </div>

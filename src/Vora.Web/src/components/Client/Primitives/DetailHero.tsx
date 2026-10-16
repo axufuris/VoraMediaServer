@@ -177,6 +177,8 @@ export default function DetailHero({
     chips, ratings, credits, actions, notice, overview, techChips,
 }: DetailHeroProps) {
     const isStill = posterShape === 'still';
+    const [failedLogo, setFailedLogo] = useState<string | null>(null);
+    const logo = logoUrl && logoUrl !== failedLogo ? logoUrl : null;
 
     return (
         <header className="relative grid" style={{ minHeight: '22rem' }}>
@@ -229,11 +231,12 @@ export default function DetailHero({
                             </div>
                         )}
 
-                        {logoUrl ? (
+                        {logo ? (
                             <h1 className="m-0 mt-2">
                                 <img
-                                    src={thumbUrl(logoUrl, 780, 'logo')}
+                                    src={thumbUrl(logo, 780, 'logo')}
                                     alt={title}
+                                    onError={() => setFailedLogo(logo)}
                                     className="block w-auto max-w-full object-contain object-left"
                                     style={{ maxHeight: 'clamp(3.5rem, 7vw, 5.5rem)' }}
                                 />

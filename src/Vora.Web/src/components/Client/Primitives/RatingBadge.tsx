@@ -9,6 +9,7 @@
 // below it. Anything unrecognised falls back to the provider's own name so a
 // new ratings plugin still renders something sensible.
 
+import { useId } from 'react';
 import { resolveRatingPlatform, formatRatingValue, ROTTEN_TOMATOES_FRESH_THRESHOLD, type RatingPlatform } from '../../../utils/ratings';
 
 function FreshTomato() {
@@ -92,6 +93,31 @@ function PlatformMark({ platform, score }: { platform: RatingPlatform; score: nu
         case 'anidb': return <DotMark color="var(--vora-anidb-blue)" />;
         case 'mdblist': return <DotMark color="var(--vora-mdblist-gold)" />;
     }
+}
+
+export function VoraMark({ size = 16 }: { size?: number }) {
+    const gradientId = useId();
+    return (
+        <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+            <defs>
+                <linearGradient id={gradientId} x1="0.1" y1="0" x2="0.55" y2="1">
+                    <stop offset="0" stopColor="var(--vora-accent-text, var(--vora-accent-400))" />
+                    <stop offset="1" stopColor="var(--vora-accent-500)" />
+                </linearGradient>
+            </defs>
+            <path d="M6 8 L18 8 L32 40 L46 8 L58 8 L32 60 Z" fill={`url(#${gradientId})`} />
+        </svg>
+    );
+}
+
+export function VoraRatingBadge({ value, label }: { value: number; label: string }) {
+    const text = `${label}: ${value}`;
+    return (
+        <div className="flex items-center gap-1.5" title={text} aria-label={text}>
+            <VoraMark />
+            <span className="text-sm font-semibold tabular-nums" style={{ color: 'var(--vora-text-primary)' }}>{value}</span>
+        </div>
+    );
 }
 
 export default function RatingBadge({ value, name }: { value: number; name?: string }) {
