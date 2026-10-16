@@ -9,6 +9,7 @@ using Vora.Application.Streaming;
 using Vora.Application.Streaming.ViewModels;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
+using Vora.Infrastructure.Analysis;
 using Vora.Infrastructure.Transcoding.Keyframes;
 
 namespace Vora.Infrastructure.Transcoding;
@@ -48,6 +49,11 @@ public class FFmpegTranscodeService : ITranscodeService
         if (settings.DisableVideoTranscoding && decision.VideoStrategy == "Transcode")
         {
             throw new InvalidOperationException("Video stream transcoding is disabled on this server.");
+        }
+
+        if (!CopiesVideo(decision) && HdrClassifier.HasNoKnownBaseLayer(decision.SourceHdrType))
+        {
+            await RecheckDynamicRangeAsync(sourceFilePath, decision, cancellationToken);
         }
 
         var targetDir = string.IsNullOrWhiteSpace(settings.TranscoderTempDirectory) ? outputDirectory : settings.TranscoderTempDirectory;
@@ -106,6 +112,16 @@ public class FFmpegTranscodeService : ITranscodeService
 
         await WaitForSegmentSealedAsync(decision.MediaItemId, startSegment, ctx, TimeSpan.FromSeconds(30), cancellationToken);
         return outputPath;
+    }
+
+    private async Task RecheckDynamicRangeAsync(string sourceFilePath, PlaybackDecisionVM decision, CancellationToken cancellationToken)
+    {
+        var probe = await HdrClassifier.ProbeAsync(sourceFilePath, decision.SelectedVideoStreamIndex, _logger, cancellationToken);
+        if (probe is null || string.Equals(probe.HdrType, decision.SourceHdrType, StringComparison.OrdinalIgnoreCase)) return;
+
+        _logger.LogInformation("{MediaItemId} was scanned as {Scanned}, but its video is {Actual}; transcoding it as {Actual}.",
+            decision.MediaItemId, decision.SourceHdrType, probe.HdrType ?? "SDR", probe.HdrType ?? "SDR");
+        decision.SourceHdrType = probe.HdrType;
     }
 
     private SegmentPlan PlanSegments(string sourceFilePath, PlaybackDecisionVM decision, double durationSeconds)

@@ -446,26 +446,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
                             else videoTrack.BitDepth = 8;
                         }
 
-                        string? hdrType = null;
-                        if (stream.TryGetProperty("color_transfer", out var ctProp))
-                        {
-                            var colorTransfer = ctProp.GetString();
-                            if (colorTransfer == "smpte2084") hdrType = "HDR10";
-                            else if (colorTransfer == "arib-std-b67") hdrType = "HLG";
-                        }
-
-                        if (stream.TryGetProperty("side_data_list", out var sideDataList) && sideDataList.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var sideData in sideDataList.EnumerateArray())
-                            {
-                                if (sideData.TryGetProperty("side_data_type", out var sdt) && sdt.GetString() == "DOVI configuration record")
-                                {
-                                    hdrType = hdrType == "HDR10" ? "DoVi/HDR10" : "DoVi";
-                                    break;
-                                }
-                            }
-                        }
-                        videoTrack.HdrType = hdrType;
+                        videoTrack.HdrType = HdrClassifier.Classify(stream);
 
                         if (stream.TryGetProperty("bit_rate", out var vbrProp) && long.TryParse(vbrProp.GetString(), out var vbr))
                         {
