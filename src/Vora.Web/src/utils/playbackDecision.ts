@@ -49,18 +49,35 @@ export function normalizeHdr(raw?: string | null): string | null {
     return null;
 }
 
-function hdrRenderable(sourceHdr: string | null, clientFormats: string[] | null | undefined): boolean {
-    if (sourceHdr === null) return true;
-    if (clientFormats == null) return true;
-    const set = new Set(clientFormats.map(normalizeHdr).filter((x): x is string => x !== null));
-    return set.has(sourceHdr);
+// The client formats that can show a source. A Dolby Vision profile 8 file
+// ("DoVi/HDR10", "DoVi/HLG") carries an HDR10 or HLG picture underneath, so a
+// screen with that format shows it without Dolby Vision; a bare "DoVi" needs
+// Dolby Vision itself. HDR10+ falls back to HDR10. Mirrors the server's
+// RenderableHdrFormats, which makes the actual decision.
+export function renderableHdrFormats(raw?: string | null): string[] {
+    if (!raw) return [];
+    const v = raw.trim().toUpperCase().replace(/[\s_-]/g, '');
+    if (v === 'SDR' || v === 'NONE') return [];
+
+    const formats = v.includes('DOVI') || v.includes('DOLBY') ? ['DOLBYVISION'] : [];
+    if (v.includes('HDR10PLUS') || v.includes('HDR10+')) formats.push('HDR10PLUS', 'HDR10');
+    else if (v.includes('HDR10')) formats.push('HDR10');
+    if (v.includes('HLG')) formats.push('HLG');
+    return formats;
+}
+
+function hdrRenderable(sourceHdr: string | undefined, clientFormats: string[] | null | undefined): boolean {
+    const renderable = renderableHdrFormats(sourceHdr);
+    if (renderable.length === 0 || clientFormats == null) return true;
+    const supported = new Set(clientFormats.map(normalizeHdr).filter((x): x is string => x !== null));
+    return renderable.some(format => supported.has(format));
 }
 
 export function isVideoDirectPlayable(track: VideoTrackLike, part: PartLike, caps: DeviceCapabilities): boolean {
     const codec = track.codec?.toLowerCase() || '';
     if (codec && !caps.videoCodecs.includes(codec)) return false;
     if (caps.maxVideoBitDepth > 0 && (track.bitDepth ?? 0) > caps.maxVideoBitDepth) return false;
-    if (!hdrRenderable(normalizeHdr(track.hdrType), caps.supportedHdrFormats)) return false;
+    if (!hdrRenderable(track.hdrType, caps.supportedHdrFormats)) return false;
     const height = parseResolutionHeight(part.resolution);
     if (caps.requestedMaxResolution > 0 && height > caps.requestedMaxResolution) return false;
     if (caps.requestedClientBitrateKbps > 0 && (part.bitrateKbps ?? 0) > caps.requestedClientBitrateKbps) return false;

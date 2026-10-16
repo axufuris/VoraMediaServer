@@ -55,6 +55,17 @@ Quick Sync decodes and scales through VAAPI and maps to QSV only for the encoder
 
 `HdrTonemapQuality` / `HdrTranscodeDownscale` on Auto follow where the tone map runs: on the GPU they mean Quality and no downscale; on the CPU, Fast and a 1080p downscale.
 
+**What gets tone-mapped** is decided by the video track's `HdrType`, which `HdrClassifier` (`Vora.Infrastructure/Analysis/`) sets when a file is scanned. It looks at the stream's transfer and, for Dolby Vision, at the configuration record's base layer (`dv_bl_signal_compatibility_id`):
+
+| Stream | `HdrType` |
+|---|---|
+| PQ (`smpte2084`) | `HDR10`, or `DoVi/HDR10` with Dolby Vision (profile 8.1, 7) |
+| HLG (`arib-std-b67`) | `HLG`, or `DoVi/HLG` with Dolby Vision (profile 8.4, e.g. iPhone video) |
+| Tagged SDR (`bt709`, `smpte170m`, …) with a Dolby Vision base layer | none: the picture is SDR, nothing to tone-map |
+| Dolby Vision profile 5 (compatibility 0), or untagged | `DoVi` |
+
+The SDR row is issue #145. A YTS re-encode kept the Dolby Vision record but not the Dolby Vision data, and its picture is tagged `bt709`. Labelled `DoVi`, it was sent to `tonemap_cuda`, which refused it ("No DOVI metadata and unsupported input transfer characteristic: bt709"), and no frame came out. Because a file is only re-read when it changes, a source still labelled plain `DoVi` is probed again (`HdrClassifier.ProbeAsync`) when a transcode starts, and that run uses what the probe finds. A `DoVi/HLG` file used to be labelled `DoVi`, so screens that show HLG but not Dolby Vision transcoded it for nothing.
+
 **Burned-in subtitles** keep decode and encode on the GPU but draw on the CPU: the decoder hands frames to system memory, a `-filter_complex` graph scales, tone-maps and overlays the subtitle (`docs/subtitles.md`), and VAAPI gets `format=nv12,hwupload` back while QSV takes the CPU frames directly.
 
 A **remux** (`-c:v copy`) never touches the GPU.
