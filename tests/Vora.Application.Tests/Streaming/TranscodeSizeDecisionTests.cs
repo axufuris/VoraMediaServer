@@ -82,7 +82,7 @@ public class TranscodeSizeDecisionTests
         var decision = await DecideAsync(Film(resolution: null, 3840, 2160), maxWidth: 1920, maxHeight: 1080);
 
         decision.VideoStrategy.Should().Be("Transcode");
-        decision.Reason.Should().Contain("exceeds the client's screen (1920x1080)");
+        decision.Reason.Should().Contain("exceeds what the client plays (1920x1080)");
         decision.OutputWidth.Should().Be(1920);
         decision.OutputHeight.Should().Be(1080);
     }

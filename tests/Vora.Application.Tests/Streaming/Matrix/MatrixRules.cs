@@ -91,6 +91,14 @@ public static class MatrixRules
             (s, o) => !o.VideoConverted && o.Strategy != StreamStrategy.DirectPlay && !s.Client.HlsCarries(o.Version.VideoCodec)),
         Rule("Never re-encodes the video for the sake of the stream when another track avoids it",
             (s, o) => o.VideoConverted && VideoPlaysAsIs(o.Version, s) && Eligible(o.Version, s).Any(track => !ReencodesVideo(o.Version, track, s))),
+        Rule("A conversion is never larger than the screen",
+            (s, o) => o.VideoConverted && s.Client.Display > 0 && o.OutputHeight > s.Client.Display),
+        Rule("Never sends HDR to a client that cannot show it, converted or not",
+            (s, o) => o.OutputHdr != "SDR" && !(s.Client.ShowsHdr(o.OutputHdr) || (o.OutputHdr == "DoVi" && s.Client.ShowsHdr("DolbyVision")))),
+        Rule("A conversion keeps HDR10 when the server's GPU encodes it, the player shows it and takes HEVC, and nothing is burned in",
+            (s, o) => s.Situation.GpuKeepsHdr && o.VideoConverted && o.Version.Hdr == "HDR10" && !s.Situation.BurnsSubtitleIn
+                && s.Client.ShowsHdr("HDR10") && s.Client.Video.Contains("hevc") && s.Client.HlsCarries("hevc") && s.Client.BitDepth >= 10
+                && o.OutputHdr != "HDR10"),
         Rule("No choice between different kinds of outcome is decided by fewer than ten points",
             (_, o) => o.Margin < KnifeEdge),
     ];

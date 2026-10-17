@@ -48,7 +48,8 @@ public class StreamSessionAddressTests
         Substitute.For<ITranscodeService>(),
         Options.Create(new StoragePathsOptions()),
         _locations,
-        Substitute.For<IMediaAnalyzerService>());
+        Substitute.For<IMediaAnalyzerService>(),
+        Substitute.For<Vora.Application.Settings.IHardwareCapabilityService>());
 
     private async Task<(StreamSession Session, string StreamUrl)> StartAsync(string? clientAddress)
     {

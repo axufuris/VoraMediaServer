@@ -5,6 +5,8 @@ import { authService } from '../api/Auth/authService';
 import { useSignalREvent, disconnectSignalR } from '../hooks/useSignalREvent';
 import GlobalVideoPlayer from '../components/Player/GlobalVideoPlayer';
 import { scanDeviceCapabilities } from '../utils/hardwareScanner';
+import { CONNECTION_SPEED_TTL_MS } from '../utils/connectionSpeed';
+import { streamingService } from '../api/Streaming/streamingService';
 import { deviceService } from '../api/Users/deviceService';
 import { usePlayer } from '../contexts/usePlayer';
 import { serverVault } from '../utils/serverVault';
@@ -303,6 +305,13 @@ export default function MainLayout() {
         };
 
         checkCapabilities();
+    }, [serverId]);
+
+    useEffect(() => {
+        const measure = () => { void streamingService.measureConnection(serverId); };
+        measure();
+        const timer = window.setInterval(measure, CONNECTION_SPEED_TTL_MS);
+        return () => window.clearInterval(timer);
     }, [serverId]);
 
     const handleSignOut = async () => {

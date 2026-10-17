@@ -16,6 +16,7 @@ public class PlaybackDecisionVM
     public int BandwidthKbps { get; set; }
     public int TargetAudioChannels { get; set; }
     public string? SourceHdrType { get; set; }
+    public string? OutputHdrType { get; set; }
     public int OutputWidth { get; set; }
     public int OutputHeight { get; set; }
     public int SourceWidth { get; set; }

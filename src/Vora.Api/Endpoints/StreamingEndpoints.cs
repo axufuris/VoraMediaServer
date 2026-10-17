@@ -86,6 +86,10 @@ public static class StreamingEndpoints
         group.MapDelete("/sessions/{sessionId:guid}", StopSessionAsync)
             .WithName("StopStream")
             .RequireAuthorization();
+        group.MapGet("/bandwidth-sample", GetBandwidthSample)
+            .WithName("GetBandwidthSample")
+            .Produces(StatusCodes.Status200OK, contentType: "application/octet-stream")
+            .RequireAuthorization();
         group.MapGet("/sessions/{sessionId:guid}/stats", GetSessionStatsAsync)
             .WithName("GetPlaybackStats")
             .Produces<PlaybackStatsVM>(StatusCodes.Status200OK)
@@ -160,6 +164,13 @@ public static class StreamingEndpoints
         {
             return Results.BadRequest(ex.Message);
         }
+    }
+
+    private static IResult GetBandwidthSample([FromQuery] int kb, HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.ContentLength = BandwidthSample.ClampKilobytes(kb) * 1024L;
+        return Results.Stream(stream => BandwidthSample.WriteAsync(stream, kb, context.RequestAborted), "application/octet-stream");
     }
 
     private static async Task<IResult> GetSessionStatsAsync(Guid sessionId, ClaimsPrincipal user, IPlaybackStatsManager stats, CancellationToken cancellationToken)
@@ -648,6 +659,7 @@ public static class StreamingEndpoints
         TargetAudioChannels = session.TargetAudioChannels,
         TranscodeReason = session.DecisionLog ?? string.Empty,
         SourceHdrType = session.HdrType,
+        OutputHdrType = session.OutputHdrType,
         OutputWidth = session.OutputWidth is > 0 && session.OutputHeight is > 0 ? session.OutputWidth.Value : 0,
         OutputHeight = session.OutputWidth is > 0 && session.OutputHeight is > 0 ? session.OutputHeight.Value : ResolveOutputHeight(session),
     };

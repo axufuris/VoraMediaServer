@@ -14,6 +14,14 @@ export interface DeviceCapabilities {
     requestedClientBitrateKbps: number;
     requestedMaxResolution: number;
     requestedMaxWidth: number;
+    // The screen, in physical pixels and landscape. A hint, not a limit: the
+    // server never transcodes because the screen is smaller than the file, but
+    // a transcode it has to make anyway is sized to it.
+    displayWidth: number;
+    displayHeight: number;
+    // The connection to the server as measured by utils/connectionSpeed (0 when
+    // not measured). Client Preference and Bitrate keep a stream within it.
+    measuredBandwidthKbps: number;
     supportedHdrFormats: string[];
     maxVideoBitDepth: number;
 }
@@ -229,7 +237,17 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
         || mseSupports('video/mp4; codecs="av01.0.08M.10"');
     const maxVideoBitDepth = supports10Bit ? 10 : 8;
 
-    return { videoCodecs, audioCodecs, containers, maxAudioChannels, detectedAudioChannels: maxAudioChannels, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: detectHlsVideoCodecs(), clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, requestedMaxWidth, supportedHdrFormats, maxVideoBitDepth };
+    let displayWidth = 0;
+    let displayHeight = 0;
+    try {
+        const pixelRatio = window.devicePixelRatio || 1;
+        displayWidth = Math.round(Math.max(screen.width, screen.height) * pixelRatio);
+        displayHeight = Math.round(Math.min(screen.width, screen.height) * pixelRatio);
+    } catch (error: unknown) {
+        console.warn("Could not read the screen size.", error);
+    }
+
+    return { videoCodecs, audioCodecs, containers, maxAudioChannels, detectedAudioChannels: maxAudioChannels, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: detectHlsVideoCodecs(), clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, requestedMaxWidth, displayWidth, displayHeight, measuredBandwidthKbps: 0, supportedHdrFormats, maxVideoBitDepth };
 };
 
 export interface PlaybackPrefs {

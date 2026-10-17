@@ -401,6 +401,38 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         profile.LibrarySortDescending.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task A_database_on_the_library_sort_migration_only_gains_keeping_hdr_in_transcodes_switched_on()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var profileId = Guid.NewGuid();
+        await legacy.BuildLibrarySortStateAsync(async db =>
+        {
+            var account = new User { Email = "viewer@example.com", DisplayName = "Viewer" };
+            db.AddRange(account, new UserProfile { Id = profileId, Name = "Viewer", UserId = account.Id, LibrarySort = LibrarySortField.ReleaseDate, LibrarySortDescending = true });
+            await db.SaveChangesAsync(cancellationToken);
+            await db.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"EnableHdrToneMapping\" = FALSE", cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "ServerSettings", cancellationToken)).Should().NotContain("PreserveHdrInTranscodes");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var settings = await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
+        settings.PreserveHdrInTranscodes.Should().BeTrue();
+        settings.EnableHdrToneMapping.Should().BeFalse();
+        var profile = await after.UserProfiles.AsNoTracking().SingleAsync(p => p.Id == profileId, cancellationToken);
+        (profile.LibrarySort, profile.LibrarySortDescending).Should().Be((LibrarySortField.ReleaseDate, true));
+    }
+
     private static Task<List<string>> ColumnsAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = {0}", table)

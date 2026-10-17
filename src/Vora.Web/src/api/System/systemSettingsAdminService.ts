@@ -65,6 +65,8 @@ export interface ServerSettings {
     transcoderTempDirectory: string;
     backgroundX264Preset: number;
     enableHdrToneMapping: boolean;
+    // A transcode keeps HDR as 10-bit HEVC for a player that shows it, when the GPU can encode it.
+    preserveHdrInTranscodes: boolean;
     disableVideoTranscoding: boolean;
     useHardwareAcceleration: boolean;
     useHardwareEncoding: boolean;

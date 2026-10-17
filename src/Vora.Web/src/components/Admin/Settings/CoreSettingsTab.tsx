@@ -357,6 +357,14 @@ export default function CoreSettingsTab({ serverId, scanners, hardware, showModa
                             </select>
                         </div>
                         <Checkbox
+                            checked={serverSettings.preserveHdrInTranscodes}
+                            onChange={v => setServerSettings({ ...serverSettings, preserveHdrInTranscodes: v })}
+                            label="Keep HDR when transcoding, for players that show it"
+                        />
+                        <FieldHint>
+                            When a transcode is needed for size, bitrate or codec and the player shows HDR, Vora encodes 10-bit HEVC and keeps the HDR instead of tone-mapping to SDR. It needs a GPU that passes the 10-bit HEVC test and HEVC Video Encoding not set to Never.
+                        </FieldHint>
+                        <Checkbox
                             checked={serverSettings.enableHevcOptimization}
                             onChange={v => setServerSettings({ ...serverSettings, enableHevcOptimization: v })}
                             label="Enable HEVC optimization"

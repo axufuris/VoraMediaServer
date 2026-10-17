@@ -24,6 +24,9 @@ public static class MatrixCatalog
         new("Edge with stereo speakers", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 2, 2160, NoHdr, 10, HlsVideo: HlsWithHevc),
         new("Edge on a 5.1 PC", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 6, 2160, NoHdr, 10, HlsVideo: HlsWithHevc),
         new("Edge on an HDR display", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 2, 2160, Hdr10, 10, HlsVideo: HlsWithHevc),
+        new("Edge on a 1440p HDR screen", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 2, 2160, Hdr10, 10, HlsVideo: HlsWithHevc, Display: 1440),
+        new("Chrome on a 1080p screen", "Browser", AllVideo, ChromeAudio, ChromiumContainers, 2, 2160, NoHdr, 10, HlsVideo: HlsWithHevc, Display: 1080),
+        new("Firefox on a 1080p screen", "Browser", ["h264", "vp9", "av1"], ChromeAudio, ["mp4", "webm"], 2, 2160, NoHdr, 10, HlsVideo: HlsWithoutHevc, Display: 1080),
         new("Edge on a 5.1 PC with a web app that predates HLS codecs", "Browser", AllVideo, EdgeAudio, ChromiumContainers, 6, 2160, NoHdr, 10),
         new("Firefox with stereo speakers", "Browser", ["h264", "vp9", "av1"], ChromeAudio, ["mp4", "webm"], 2, 2160, NoHdr, 10, HlsVideo: HlsWithoutHevc),
         new("Safari on a Mac", "Browser", ["h264", "hevc"], SafariAudio, ["mp4", "hls"], 2, 2160, NoHdr, 10, HlsVideo: HlsWithHevc),
@@ -134,6 +137,8 @@ public static class MatrixCatalog
         new("text subtitle chosen", Subtitle: MatrixSituation.TextSubtitle),
         new("forced image subtitle on Automatic", Subtitle: MatrixSituation.ForcedImageSubtitle),
         new("HDR downscale set to Always", HdrDownscaleAlways: true),
+        new("a GPU that keeps HDR", GpuKeepsHdr: true),
+        new("a GPU that keeps HDR and a 20 Mbps bitrate pick", 20000, "Client Limit", GpuKeepsHdr: true),
     ];
 
     private static IEnumerable<string> PreferredLanguages(MatrixVersion version)
@@ -179,7 +184,7 @@ public static class MatrixCatalog
 
             foreach (var situation in Situations)
             {
-                if (situation.HdrDownscaleAlways && title.Versions.All(version => version.Hdr == null)) continue;
+                if ((situation.HdrDownscaleAlways || situation.GpuKeepsHdr) && title.Versions.All(version => version.Hdr == null)) continue;
                 yield return new(title, client, profile, 0, 0, null, situation);
                 if (exhaustive) continue;
                 yield return new(title, client, profile, 2, 0, null, situation);

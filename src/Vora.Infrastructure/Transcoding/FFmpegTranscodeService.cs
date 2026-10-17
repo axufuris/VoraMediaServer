@@ -101,6 +101,11 @@ public class FFmpegTranscodeService : ITranscodeService
             WriteVodPlaylist(outputPath, decision.MediaItemId, plan, startSegment);
 
             var hardware = accelerator is null ? null : new TranscodeHardware(accelerator, Encode: willUseGpu);
+            if (!CopiesVideo(decision) && KeepsDynamicRange(decision.OutputHdrType) && KeepsDynamicRange(decision.SourceHdrType) && !KeepsHdr(decision, hardware))
+            {
+                _logger.LogInformation("{MediaItemId} was to keep {Hdr}, but this transcode runs on the CPU or a GPU without 10-bit HEVC, so it is tone-mapped to SDR H.264.",
+                    decision.MediaItemId, decision.OutputHdrType);
+            }
             ctx = new TranscodeContext(sourceFilePath, decision, targetDir, plan, startSegment, hardware);
             _transcodeContexts[decision.MediaItemId] = ctx;
 
@@ -160,7 +165,7 @@ public class FFmpegTranscodeService : ITranscodeService
         // size as Content-Length, then more bytes get appended while
         // streaming, producing "Response Content-Length mismatch: too many
         // bytes written" and a corrupt segment for the player.
-        if (await IsSegmentSealedAsync(mediaItemId, segmentIndex, ctx, cancellationToken))
+        if (IsSegmentSealed(mediaItemId, segmentIndex, ctx))
         {
             return true;
         }
@@ -225,45 +230,11 @@ public class FFmpegTranscodeService : ITranscodeService
         return await WaitForSegmentSealedAsync(mediaItemId, segmentIndex, ctx, TimeSpan.FromSeconds(30), cancellationToken);
     }
 
-    // A segment is "sealed" (safe to serve) when FFmpeg has either moved
-    // on to the next segment (the next .ts file exists) or finished the
-    // movie entirely (last segment, no successor). Until then the size on
-    // disk is still growing.
-    private static async Task<bool> IsSegmentSealedAsync(Guid mediaItemId, int segmentIndex, TranscodeContext ctx, CancellationToken ct)
+    private static bool IsSegmentSealed(Guid mediaItemId, int segmentIndex, TranscodeContext ctx)
     {
-        var targetDir = ctx.TargetDir;
-        var segmentPath = SegmentPath(targetDir, mediaItemId, segmentIndex);
-        var nextSegmentPath = SegmentPath(targetDir, mediaItemId, segmentIndex + 1);
-
-        if (ctx.Plan.FollowsKeyframes)
-        {
-            PublishFinishedSegments(targetDir, SegmentListPath(targetDir, mediaItemId));
-            return File.Exists(segmentPath);
-        }
-
-        if (!File.Exists(segmentPath)) return false;
-
-        if (File.Exists(nextSegmentPath))
-        {
-            return true;
-        }
-
-        // Successor not yet on disk — confirm via size stability. Read the
-        // file size twice with a small gap; if it hasn't grown, FFmpeg is
-        // done with it (we're at the end of the movie or between writes).
-        try
-        {
-            long sizeA = new FileInfo(segmentPath).Length;
-            if (sizeA <= 0) return false;
-            await Task.Delay(250, ct);
-            if (File.Exists(nextSegmentPath)) return true;
-            long sizeB = new FileInfo(segmentPath).Length;
-            return sizeA == sizeB;
-        }
-        catch
-        {
-            return false;
-        }
+        var segmentPath = SegmentPath(ctx.TargetDir, mediaItemId, segmentIndex);
+        if (ctx.Plan.FollowsKeyframes) PublishFinishedSegments(ctx.TargetDir, SegmentListPath(ctx.TargetDir, mediaItemId));
+        return File.Exists(segmentPath);
     }
 
     private async Task<bool> WaitForSegmentSealedAsync(Guid mediaItemId, int segmentIndex, TranscodeContext ctx, TimeSpan timeout, CancellationToken ct)
@@ -272,14 +243,14 @@ public class FFmpegTranscodeService : ITranscodeService
         while (DateTime.UtcNow < deadline)
         {
             if (ct.IsCancellationRequested) return false;
-            if (await IsSegmentSealedAsync(mediaItemId, segmentIndex, ctx, ct)) return true;
+            if (IsSegmentSealed(mediaItemId, segmentIndex, ctx)) return true;
             if (!IsEncoding(mediaItemId))
             {
                 // FFmpeg exited — give the OS a tick to flush, check once
                 // more, then fail. Without this we'd race the buffer flush
                 // on the very last segment of the movie.
                 await Task.Delay(200, ct);
-                return await IsSegmentSealedAsync(mediaItemId, segmentIndex, ctx, ct);
+                return IsSegmentSealed(mediaItemId, segmentIndex, ctx);
             }
             await Task.Delay(150, ct);
         }
@@ -864,12 +835,15 @@ public class FFmpegTranscodeService : ITranscodeService
         bool isHdrSource = !string.IsNullOrWhiteSpace(hdrType)
             && !string.Equals(hdrType, "SDR", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(hdrType, "None", StringComparison.OrdinalIgnoreCase);
-        bool needsTonemap = encodingVideo && settings.EnableHdrToneMapping && isHdrSource;
-
         bool burnIn = encodingVideo && decision.RequiresSubtitleBurnIn;
         var decoder = encodingVideo ? hardware?.Accelerator : null;
         var encoder = encodingVideo && hardware is { Encode: true } ? hardware.Accelerator : null;
         var gpuPipeline = burnIn ? null : encoder;
+
+        bool wantsHdr = encodingVideo && isHdrSource && KeepsDynamicRange(decision.OutputHdrType);
+        bool keepsHdr = KeepsHdr(decision, hardware);
+        bool needsTonemap = encodingVideo && settings.EnableHdrToneMapping && isHdrSource && !keepsHdr;
+        bool encodeHevc = decision.TargetVideoCodec == VideoCodec.Hevc && (!wantsHdr || keepsHdr);
 
         bool canTonemapOnGpu = gpuPipeline is { Type: not HardwareAccelerationType.Nvidia }
             ? gpuPipeline.TonemapsOnGpu
@@ -928,11 +902,10 @@ public class FFmpegTranscodeService : ITranscodeService
         }
         else
         {
-            bool encodeHevc = decision.TargetVideoCodec == VideoCodec.Hevc;
-
             if (encoder is not null)
             {
                 args.AddRange(EncoderArguments(encoder, encodeHevc, settings, decision));
+                if (keepsHdr) args.AddRange(HdrOutputArguments(decision.OutputHdrType));
             }
             else
             {
@@ -1050,6 +1023,28 @@ public class FFmpegTranscodeService : ITranscodeService
     }
 
     private static string Seconds(double seconds) => seconds.ToString("0.000", CultureInfo.InvariantCulture);
+
+    internal static bool KeepsHdr(PlaybackDecisionVM decision, TranscodeHardware? hardware) =>
+        !CopiesVideo(decision)
+        && !decision.RequiresSubtitleBurnIn
+        && decision.TargetVideoCodec == VideoCodec.Hevc
+        && KeepsDynamicRange(decision.OutputHdrType)
+        && KeepsDynamicRange(decision.SourceHdrType)
+        && hardware is { Encode: true, Accelerator.EncodesHdr: true };
+
+    private static bool KeepsDynamicRange(string? hdrType) =>
+        !string.IsNullOrWhiteSpace(hdrType)
+        && !string.Equals(hdrType, "SDR", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(hdrType, "None", StringComparison.OrdinalIgnoreCase);
+
+    private static List<string> HdrOutputArguments(string? outputHdr) =>
+    [
+        "-profile:v", "main10",
+        "-color_primaries", "bt2020",
+        "-color_trc", outputHdr?.Contains("HLG", StringComparison.OrdinalIgnoreCase) == true ? "arib-std-b67" : "smpte2084",
+        "-colorspace", "bt2020nc",
+        "-color_range", "tv",
+    ];
 
     private static List<string> EncoderArguments(HardwareAccelerator encoder, bool encodeHevc, ServerSetting settings, PlaybackDecisionVM decision)
     {

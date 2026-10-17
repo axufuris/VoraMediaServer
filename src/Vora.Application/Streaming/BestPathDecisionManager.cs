@@ -10,7 +10,7 @@ namespace Vora.Application.Streaming;
 
 public interface IBestPathDecisionManager
 {
-    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null, TrackPreferences? preferences = null, int requestedMaxWidth = 0);
+    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null, TrackPreferences? preferences = null, int requestedMaxWidth = 0, DisplayHint? display = null, bool gpuEncodesHdr = false);
 }
 
 public class BestPathDecisionManager : IBestPathDecisionManager
@@ -35,7 +35,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         public StreamOptionLogDto? Log { get; set; }
     }
 
-    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null, TrackPreferences? preferences = null, int requestedMaxWidth = 0)
+    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null, TrackPreferences? preferences = null, int requestedMaxWidth = 0, DisplayHint? display = null, bool gpuEncodesHdr = false)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
         var trackPreferences = preferences ?? TrackPreferences.Automatic;
@@ -63,6 +63,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
 
             var sourceSize = OutputSize.Source(videoTrack.Width, videoTrack.Height, part.Resolution);
             var clientBox = OutputSize.ClientBox(requestedMaxWidth, requestedMaxResolution);
+            var screenBox = OutputSize.ScreenBox(clientBox, display);
             int trackHeight = sourceSize is { } knownSource ? OutputSize.HeightClass(knownSource) : 0;
             bool is4k = trackHeight >= 2160;
             int clientMaxRes = clientBox.Height;
@@ -76,7 +77,8 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             // and no encoder can produce. clientMaxRes stays raw for the
             // capability test below: that one is about the device's limit, and
             // snapping it would let a 1440p source through to this panel.
-            int deliverableMaxRes = SnapToDeliverableHeight(clientMaxRes);
+            int deliverableMaxRes = SnapToDeliverableHeight(screenBox.Height);
+            int ceilingDeliverableRes = SnapToDeliverableHeight(clientMaxRes);
 
             // Effective output height for THIS part once any auto-downscale
             // rules fire. Used by the resolution-fit penalty below so the
@@ -87,20 +89,6 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             bool isHdrPart = !string.IsNullOrWhiteSpace(videoTrack.HdrType)
                 && !string.Equals(videoTrack.HdrType, "SDR", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(videoTrack.HdrType, "None", StringComparison.OrdinalIgnoreCase);
-            int effectiveTargetHeight = deliverableMaxRes;
-            var outputBox = clientBox;
-            if (isHdrPart && string.Equals(settings.HdrTranscodeDownscale, "Always", StringComparison.OrdinalIgnoreCase))
-            {
-                effectiveTargetHeight = Math.Min(effectiveTargetHeight, 1080);
-                outputBox = OutputSize.Within(outputBox, OutputSize.HdrDownscaleBox);
-            }
-            if (maxAllowedBandwidthKbps > 0)
-            {
-                outputBox = outputBox with { Width = Math.Min(outputBox.Width, OutputSize.MaxWidthForBitrate(maxAllowedBandwidthKbps, videoTrack.FrameRate, VideoCodec.H264)) };
-            }
-            FrameSize? outputSize = sourceSize is { } fitted ? OutputSize.Fit(fitted, outputBox) : null;
-            int outputHeight = outputSize is { } output ? OutputSize.HeightClass(output) : Math.Min(trackHeight, effectiveTargetHeight);
-
             var audioInFileOrder = part.AudioTracks.OrderBy(t => t.StreamIndex ?? int.MaxValue).ToList();
             var primaryAudioTrack = audioInFileOrder.FirstOrDefault(t => t.IsDefault) ?? audioInFileOrder.FirstOrDefault();
             bool everyPlayerStartsOnPrimary = primaryAudioTrack?.Id == audioInFileOrder.FirstOrDefault()?.Id;
@@ -134,6 +122,24 @@ public class BestPathDecisionManager : IBestPathDecisionManager
 
             bool bitDepthTooHigh = client.MaxVideoBitDepth > 0 && (videoTrack.BitDepth ?? 8) > client.MaxVideoBitDepth;
 
+            var hdrKeepsOff = isHdrPart && !hdrNotRenderable ? WhyHdrIsNotKept(client, hlsVideo, renderable, requiresBurnIn, gpuEncodesHdr, settings, videoCodec) : null;
+            var keptHdr = isHdrPart && !hdrNotRenderable && hdrKeepsOff == null ? HdrKeptInConversion(renderable, client) : null;
+            var outputCodec = keptHdr != null ? VideoCodec.Hevc : VideoCodec.H264;
+
+            int effectiveTargetHeight = deliverableMaxRes;
+            var outputBox = screenBox;
+            if (isHdrPart && keptHdr == null && string.Equals(settings.HdrTranscodeDownscale, "Always", StringComparison.OrdinalIgnoreCase))
+            {
+                effectiveTargetHeight = Math.Min(effectiveTargetHeight, 1080);
+                outputBox = OutputSize.Within(outputBox, OutputSize.HdrDownscaleBox);
+            }
+            if (maxAllowedBandwidthKbps > 0)
+            {
+                outputBox = outputBox with { Width = Math.Min(outputBox.Width, OutputSize.MaxWidthForBitrate(maxAllowedBandwidthKbps, videoTrack.FrameRate, outputCodec)) };
+            }
+            FrameSize? outputSize = sourceSize is { } fitted ? OutputSize.Fit(fitted, outputBox) : null;
+            int outputHeight = outputSize is { } output ? OutputSize.HeightClass(output) : Math.Min(trackHeight, effectiveTargetHeight);
+
             foreach (var audioTrack in audioTracksToEvaluate)
             {
                 var audioCodec = audioTrack.Codec?.ToLower() ?? "";
@@ -154,7 +160,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 if (exceedsClientSize)
                 {
                     needsVideoTranscode = true;
-                    reasons.Add($"Video Transcode: Track resolution ({FrameText(sourceSize)}) exceeds the client's screen ({clientBox.Width}x{clientBox.Height}).");
+                    reasons.Add($"Video Transcode: Track resolution ({FrameText(sourceSize)}) exceeds what the client plays ({clientBox.Width}x{clientBox.Height}).");
                 }
 
                 bool audioUnsupportedInHls = !needsAudioTranscode
@@ -211,7 +217,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     if (needsVideoTranscode)
                     {
                         option.Decision.VideoStrategy = "Transcode";
-                        option.Decision.TargetVideoCodec = "h264";
+                        option.Decision.TargetVideoCodec = keptHdr != null ? "hevc" : "h264";
 
                         if (requiresBurnIn) reasons.Add($"Video Transcode: Subtitle burn-in required ({subCodec}).");
                         else if (exceedsBandwidth) reasons.Add($"Video Transcode: Bitrate ({(bitrateKbps / 1000.0):F1} Mbps) exceeds {bandwidthLimitSource} ({(maxAllowedBandwidthKbps / 1000.0):F1} Mbps).");
@@ -220,6 +226,8 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                         else if (codecUnsupported) reasons.Add($"Video Transcode: '{videoCodec}' unsupported.");
 
                         if (hdrNotRenderable) reasons.Add($"Video Transcode: Source HDR ({videoTrack.HdrType}) not supported by client; tonemapping to SDR.");
+                        else if (keptHdr != null) reasons.Add($"Video Transcode: Keeping {keptHdr} by encoding 10-bit HEVC.");
+                        else if (hdrKeepsOff != null) reasons.Add($"Video Transcode: {videoTrack.HdrType} is tone-mapped to SDR because {hdrKeepsOff}.");
                         if (bitDepthTooHigh) reasons.Add($"Video Transcode: Source bit depth ({videoTrack.BitDepth}-bit) exceeds client maximum ({client.MaxVideoBitDepth}-bit).");
 
                         currentScore += is4k ? 200 : 50;
@@ -304,8 +312,9 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 //     because it's closer to the target source-side.
                 int deliveredHeight = needsVideoTranscode ? outputHeight : trackHeight;
                 int qualityLossPenalty = Math.Max(0, deliverableMaxRes - deliveredHeight) * 10;
+                int beyondScreenPenalty = Math.Max(0, ceilingDeliverableRes - Math.Max(deliveredHeight, deliverableMaxRes));
                 int downscaleWorkPenalty = Math.Max(0, trackHeight - deliveredHeight);
-                currentScore += qualityLossPenalty + downscaleWorkPenalty;
+                currentScore += qualityLossPenalty + beyondScreenPenalty + downscaleWorkPenalty;
 
                 if (audioTrack.IsDefault) currentScore -= 2;
 
@@ -323,7 +332,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 int averageKbps;
                 if (needsVideoTranscode)
                 {
-                    var rate = VideoBitrate.For(sourceVideoKbps, videoCodec, videoTrack.BitDepth, sourceSize, outputSize, VideoCodec.H264, maxAllowedBandwidthKbps, profileCapKbps);
+                    var rate = VideoBitrate.For(sourceVideoKbps, videoCodec, videoTrack.BitDepth, sourceSize, outputSize, outputCodec, maxAllowedBandwidthKbps, profileCapKbps);
                     finalBandwidthKbps = rate.MaxKbps;
                     averageKbps = rate.TargetKbps;
                 }
@@ -347,7 +356,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 if (needsVideoTranscode)
                 {
                     option.Decision.OutputResolution = FormatHeightAsResolution(outputHeight);
-                    option.Decision.OutputHdrType = "SDR";
+                    option.Decision.OutputHdrType = keptHdr ?? "SDR";
                     if (outputSize is { } size)
                     {
                         option.Decision.OutputWidth = size.Width;
@@ -487,6 +496,28 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         if (v.Contains("HDR10PLUS") || v.Contains("HDR10+")) return "HDR10PLUS";
         if (v.Contains("HDR10")) return "HDR10";
         if (v.Contains("HLG")) return "HLG";
+        return null;
+    }
+
+    private static string? WhyHdrIsNotKept(ClientDevice client, IReadOnlySet<string> hlsVideo, HashSet<string> renderable, bool burnsSubtitleIn, bool gpuEncodesHdr, ServerSetting settings, string sourceCodec)
+    {
+        if (!settings.PreserveHdrInTranscodes) return "keeping HDR in a transcode is turned off on the server";
+        if (settings.EnableHevcEncoding <= 0) return "HEVC encoding is set to Never on the server";
+        if (settings.EnableHevcEncoding == 1 && sourceCodec is not ("hevc" or "h265")) return "HEVC encoding is set to HEVC sources only on the server";
+        if (burnsSubtitleIn) return "a subtitle is burned into the picture";
+        if (!gpuEncodesHdr) return "the server has no GPU that encodes 10-bit HEVC";
+        if (!client.SupportedVideoCodecs.Contains("hevc") || !hlsVideo.Contains("hevc")) return "this player cannot take HEVC in a stream";
+        if (client.MaxVideoBitDepth is > 0 and < 10) return "this player shows 8-bit video only";
+        if (HdrKeptInConversion(renderable, client) == null) return "this player does not say it shows HDR10 or HLG";
+        return null;
+    }
+
+    private static string? HdrKeptInConversion(HashSet<string> renderable, ClientDevice client)
+    {
+        if (client.SupportedHdrFormats is not { Count: > 0 } formats) return null;
+        var shown = formats.Select(NormalizeHdr).OfType<string>().ToHashSet();
+        if (renderable.Contains("HDR10") && (shown.Contains("HDR10") || shown.Contains("HDR10PLUS"))) return "HDR10";
+        if (renderable.Contains("HLG") && shown.Contains("HLG")) return "HLG";
         return null;
     }
 

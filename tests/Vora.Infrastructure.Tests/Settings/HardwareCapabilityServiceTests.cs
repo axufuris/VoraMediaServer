@@ -32,7 +32,7 @@ public class HardwareCapabilityServiceTests
     {
         var resolved = await Service(IntelGpu).ResolveAsync(HardwareAccelerationType.Auto, "Auto", Ct);
 
-        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.QuickSync, IntelNode, GpuVendor.Intel));
+        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.QuickSync, IntelNode, GpuVendor.Intel, EncodesHdr: true));
         _runs.Should().NotContain(run => run.Contains("nvenc"));
     }
 
@@ -41,7 +41,7 @@ public class HardwareCapabilityServiceTests
     {
         var resolved = await Service(NvidiaGpu, IntelGpu).ResolveAsync(HardwareAccelerationType.Auto, "Auto", Ct);
 
-        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.Nvidia, null, GpuVendor.Nvidia));
+        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.Nvidia, null, GpuVendor.Nvidia, EncodesHdr: true));
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public class HardwareCapabilityServiceTests
 
         var resolved = await Service(IntelGpu).ResolveAsync(HardwareAccelerationType.Auto, "Auto", Ct);
 
-        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.Vaapi, IntelNode, GpuVendor.Intel));
+        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.Vaapi, IntelNode, GpuVendor.Intel, EncodesHdr: true));
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class HardwareCapabilityServiceTests
     {
         var resolved = await Service(IntelGpu, AmdGpu).ResolveAsync(HardwareAccelerationType.Auto, AmdNode, Ct);
 
-        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.Vaapi, AmdNode, GpuVendor.Amd, HasVulkanInterop: true));
+        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.Vaapi, AmdNode, GpuVendor.Amd, HasVulkanInterop: true, EncodesHdr: true));
         _runs.Should().OnlyContain(run => run.Contains(AmdNode));
     }
 
@@ -88,7 +88,7 @@ public class HardwareCapabilityServiceTests
     {
         var resolved = await Service(NvidiaGpu, IntelGpu).ResolveAsync(HardwareAccelerationType.Nvidia, IntelNode, Ct);
 
-        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.Nvidia, null, GpuVendor.Nvidia));
+        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.Nvidia, null, GpuVendor.Nvidia, EncodesHdr: true));
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class HardwareCapabilityServiceTests
     {
         var resolved = await Service(AmdGpu, IntelGpu).ResolveAsync(HardwareAccelerationType.QuickSync, "Auto", Ct);
 
-        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.QuickSync, IntelNode, GpuVendor.Intel));
+        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.QuickSync, IntelNode, GpuVendor.Intel, EncodesHdr: true));
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public class HardwareCapabilityServiceTests
 
         var resolved = await Service(AmdGpu).ResolveAsync(HardwareAccelerationType.Vaapi, "Auto", Ct);
 
-        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.Vaapi, AmdNode, GpuVendor.Amd, HasVulkanInterop: false));
+        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.Vaapi, AmdNode, GpuVendor.Amd, HasVulkanInterop: false, EncodesHdr: true));
         resolved?.TonemapsOnGpu.Should().BeFalse();
     }
 
@@ -124,11 +124,11 @@ public class HardwareCapabilityServiceTests
         var service = Service(IntelGpu);
         await service.ResolveAsync(HardwareAccelerationType.Auto, "Auto", Ct);
         await service.ResolveAsync(HardwareAccelerationType.Auto, "Auto", Ct);
-        _runs.Should().HaveCount(1);
+        _runs.Should().HaveCount(2);
 
         await service.TestAsync(HardwareAccelerationType.QuickSync, "Auto", Ct);
 
-        _runs.Should().HaveCount(2);
+        _runs.Should().HaveCount(4);
     }
 
     [Fact]
@@ -139,7 +139,21 @@ public class HardwareCapabilityServiceTests
         result.Success.Should().BeTrue();
         result.Type.Should().Be(HardwareAccelerationType.QuickSync);
         result.Device.Should().Be(IntelNode);
-        result.Message.Should().Be("Intel Quick Sync on /dev/dri/renderD128. It encoded a 2-second test clip in 0.5 s.");
+        result.Message.Should().Be("Intel Quick Sync on /dev/dri/renderD128. It encoded a 2-second test clip in 0.5 s. It encodes 10-bit HEVC, so a transcode can keep HDR for a player that shows it.");
+    }
+
+    [Fact]
+    public async Task A_gpu_that_cannot_encode_10_bit_hevc_still_transcodes_but_tone_maps_hdr()
+    {
+        _works = command => !command.Contains("main10");
+
+        var service = Service(NvidiaGpu);
+        var resolved = await service.ResolveAsync(HardwareAccelerationType.Nvidia, "Auto", Ct);
+        var result = await service.TestAsync(HardwareAccelerationType.Nvidia, "Auto", Ct);
+
+        resolved.Should().Be(new HardwareAccelerator(HardwareAccelerationType.Nvidia, null, GpuVendor.Nvidia, EncodesHdr: false));
+        result.Success.Should().BeTrue();
+        result.Message.Should().EndWith("It didn't encode 10-bit HEVC, so a transcode tone-maps HDR to SDR.");
     }
 
     [Fact]

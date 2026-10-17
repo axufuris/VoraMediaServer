@@ -147,6 +147,19 @@ describe('browser resolution preference', () => {
         expect(result.requestedMaxWidth).toBe(0);
     });
 
+    it.each([[2560, 1440, 1, 2560, 1440], [1920, 1080, 2, 3840, 2160], [390, 844, 3, 2532, 1170]])(
+        'reports a %ix%i display at %ix scale as a %ix%i screen hint, landscape',
+        (width, height, pixelRatio, hintWidth, hintHeight) => {
+            vi.stubGlobal('screen', { width, height });
+            vi.stubGlobal('devicePixelRatio', pixelRatio);
+
+            const result = scanDeviceCapabilitiesSync();
+
+            expect(result.displayWidth).toBe(hintWidth);
+            expect(result.displayHeight).toBe(hintHeight);
+            expect(applyUserCaps(result, { maxResolution: 0, maxAudioChannels: 0 }).displayHeight).toBe(hintHeight);
+        });
+
     it.each([720, 1080, 2160])('applies an explicit %ip limit when the decoder limit is unknown', maxResolution => {
         const result = applyUserCaps(scanDeviceCapabilitiesSync(), { maxResolution, maxAudioChannels: 0 });
 

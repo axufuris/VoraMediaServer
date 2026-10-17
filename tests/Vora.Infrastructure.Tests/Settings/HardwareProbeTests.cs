@@ -37,6 +37,17 @@ public class HardwareProbeTests
     }
 
     [Fact]
+    public void The_hdr_test_encodes_10_bit_hevc_the_way_a_transcode_that_keeps_hdr_does()
+    {
+        string.Join(" ", new HardwareProbe(HardwareAccelerationType.Nvidia, "1", Hdr10Bit: true).Arguments())
+            .Should().Be($"{Clip} {TestSource} -vf format=p010le -c:v hevc_nvenc -profile:v main10 -gpu 1 -f null -");
+        string.Join(" ", new HardwareProbe(HardwareAccelerationType.QuickSync, "/dev/dri/renderD128", Hdr10Bit: true).Arguments())
+            .Should().Be($"{Clip} -init_hw_device vaapi=va:/dev/dri/renderD128 -init_hw_device qsv=qs@va -filter_hw_device va {TestSource} -vf format=p010le,hwupload,hwmap=derive_device=qsv,format=qsv -c:v hevc_qsv -profile:v main10 -f null -");
+        string.Join(" ", new HardwareProbe(HardwareAccelerationType.Vaapi, "/dev/dri/renderD129", Hdr10Bit: true).Arguments())
+            .Should().Be($"{Clip} -init_hw_device vaapi=va:/dev/dri/renderD129 -filter_hw_device va {TestSource} -vf format=p010le,hwupload -c:v hevc_vaapi -profile:v main10 -f null -");
+    }
+
+    [Fact]
     public void A_failure_keeps_the_last_three_lines_ffmpeg_printed()
     {
         ProbeOutcome.LastLines("line one\nNo VA display found for device /dev/dri/renderD128.\nDevice creation failed: -22.\n\nError parsing global options: Invalid argument\n")

@@ -48,6 +48,7 @@ public class ServerSettingsVM
     public string TranscoderTempDirectory { get; set; } = "/transcode";
     public int BackgroundX264Preset { get; set; } = 2;
     public bool EnableHdrToneMapping { get; set; } = true;
+    public bool PreserveHdrInTranscodes { get; set; } = true;
     public bool DisableVideoTranscoding { get; set; }
     public bool UseHardwareAcceleration { get; set; } = true;
     public bool UseHardwareEncoding { get; set; } = true;
@@ -133,6 +134,7 @@ public class ServerSettingsVM
             TranscoderTempDirectory = s.TranscoderTempDirectory,
             BackgroundX264Preset = s.BackgroundX264Preset,
             EnableHdrToneMapping = s.EnableHdrToneMapping,
+            PreserveHdrInTranscodes = s.PreserveHdrInTranscodes,
             DisableVideoTranscoding = s.DisableVideoTranscoding,
             UseHardwareAcceleration = s.UseHardwareAcceleration,
             UseHardwareEncoding = s.UseHardwareEncoding,

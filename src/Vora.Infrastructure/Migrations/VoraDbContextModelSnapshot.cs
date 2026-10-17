@@ -3078,6 +3078,9 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<bool>("PreExtractSubtitlesOnScan")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("PreserveHdrInTranscodes")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("PublicPort")
                         .HasColumnType("integer");
 

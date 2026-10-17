@@ -115,10 +115,16 @@ public sealed class LegacyDatabase : IAsyncDisposable
         ALTER TABLE "UserProfiles" ADD COLUMN IF NOT EXISTS "LibrarySortDescending" boolean NOT NULL DEFAULT FALSE;
         """;
 
+    public const string LibrarySortMigration = "20261017011545_ChangesSinceInitial";
+
+    private const string ColumnsSinceLibrarySort = """
+        ALTER TABLE "ServerSettings" DROP COLUMN "PreserveHdrInTranscodes";
+        """;
+
     private const string ColumnsSinceVideoDimensions = """
         ALTER TABLE "UserProfiles" DROP COLUMN "LibrarySort";
         ALTER TABLE "UserProfiles" DROP COLUMN "LibrarySortDescending";
-        """;
+        """ + ColumnsSinceLibrarySort;
 
     private const string ColumnsSinceAlbumIndex = """
         ALTER TABLE "MediaVideoTracks" DROP COLUMN "Width";
@@ -263,6 +269,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceVideoDimensions, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, VideoDimensionsMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildLibrarySortStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceLibrarySort, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, LibrarySortMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

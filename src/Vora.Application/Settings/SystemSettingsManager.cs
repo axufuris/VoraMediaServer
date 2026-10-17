@@ -150,6 +150,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.TranscoderTempDirectory = string.IsNullOrWhiteSpace(request.TranscoderTempDirectory) ? "/transcode" : request.TranscoderTempDirectory;
         settings.BackgroundX264Preset = request.BackgroundX264Preset;
         settings.EnableHdrToneMapping = request.EnableHdrToneMapping;
+        settings.PreserveHdrInTranscodes = request.PreserveHdrInTranscodes;
         settings.DisableVideoTranscoding = request.DisableVideoTranscoding;
         settings.UseHardwareAcceleration = request.UseHardwareAcceleration;
         settings.UseHardwareEncoding = request.UseHardwareEncoding;

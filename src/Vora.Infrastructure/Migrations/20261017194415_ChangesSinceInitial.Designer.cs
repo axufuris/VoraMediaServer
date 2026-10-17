@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261017011545_ChangesSinceInitial")]
+    [Migration("20261017194415_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -3079,6 +3079,9 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("interval");
 
                     b.Property<bool>("PreExtractSubtitlesOnScan")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("PreserveHdrInTranscodes")
                         .HasColumnType("boolean");
 
                     b.Property<int>("PublicPort")
