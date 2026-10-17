@@ -113,6 +113,8 @@ Right-clicking a movie, show, season or episode, or holding it on a touch screen
 
 `components/Player/Controls/PlayerButtons.tsx` exports `PlayPauseButton`, `SkipButton`, `VolumeControl`, `FullscreenButton`, `MaximizeButton`, `CloseButton`. Both `GlobalVideoPlayer` and `LiveTvPlayer` use these.
 
+The volume lives in `PlayerContext`, not in the media element: `setVolume` keeps the level even when no element exists, and every new element gets it when it appears (a new item, or a new session re-keying the video player's `<video>`). Closing a player unmounts its element, and the next one used to start at the browser's full volume under a slider still showing the old level (issue #141).
+
 `useAutoHideControls({ isMinimized, isPlaying, keepVisibleWhen })` and `useFullscreen(containerRef)` factor out the auto-hide effect (a mouse move or a key press shows the controls) and fullscreen toggle. Use them in any future player surface.
 
 `usePlayerKeyboard` (`Controls/`) gives a full-size video player its arrow keys: Left and Right skip back and forward through the same `skipBackward` / `skipForward` the buttons call, and Up and Down change the volume. `GlobalVideoPlayer` and `LiveTvPlayer` use it; Live TV passes `canSeek` only when it can timeshift, so there the arrows only change the volume. Rules it keeps (pure parts in `utils/playerKeys.ts`, tested on their own):
