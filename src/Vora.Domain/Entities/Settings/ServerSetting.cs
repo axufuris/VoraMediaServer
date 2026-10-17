@@ -119,6 +119,7 @@ public class ServerSetting
     public bool EnableHevcOptimization { get; set; } = true;
     public bool EnableHdrToneMapping { get; set; } = true;
     public string TonemappingAlgorithm { get; set; } = "hable";
+    public bool PreserveHdrInTranscodes { get; set; } = true;
 
     // HDR tonemap quality / downscale resolution mode.
     //

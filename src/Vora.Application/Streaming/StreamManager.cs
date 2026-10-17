@@ -11,9 +11,11 @@ using Vora.Domain.Entities.Users;
 
 namespace Vora.Application.Streaming;
 
-public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[] Containers, int MaxAudioChannels, int ClientBandwidthKbps, int RequestedClientBitrateKbps, int RequestedMaxResolution = 0, string[]? SupportedHdrFormats = null, int MaxVideoBitDepth = 0, int DetectedAudioChannels = 0, int PickedAudioChannels = 0, bool PlaysAnyAudioLayout = false, bool CanSwitchAudioTracks = false, string[]? HlsVideoCodecs = null, int RequestedMaxWidth = 0)
+public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[] Containers, int MaxAudioChannels, int ClientBandwidthKbps, int RequestedClientBitrateKbps, int RequestedMaxResolution = 0, string[]? SupportedHdrFormats = null, int MaxVideoBitDepth = 0, int DetectedAudioChannels = 0, int PickedAudioChannels = 0, bool PlaysAnyAudioLayout = false, bool CanSwitchAudioTracks = false, string[]? HlsVideoCodecs = null, int RequestedMaxWidth = 0, int DisplayWidth = 0, int DisplayHeight = 0, int MeasuredBandwidthKbps = 0)
 {
     public AudioOutputRequest AudioOutput => new(DetectedAudioChannels, PickedAudioChannels, PlaysAnyAudioLayout, CanSwitchAudioTracks);
+
+    public DisplayHint? Display => DisplayWidth > 0 && DisplayHeight > 0 ? new DisplayHint(DisplayWidth, DisplayHeight) : null;
 }
 
 public interface IStreamManager
@@ -46,9 +48,11 @@ public class StreamManager : IStreamManager
     private readonly StoragePathsOptions _storagePaths;
     private readonly IClientLocationResolver _locations;
     private readonly IMediaAnalyzerService _analyzer;
+    private readonly IHardwareCapabilityService _hardware;
 
-    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths, IClientLocationResolver locations, IMediaAnalyzerService analyzer)
+    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths, IClientLocationResolver locations, IMediaAnalyzerService analyzer, IHardwareCapabilityService hardware)
     {
+        _hardware = hardware;
         _locations = locations;
         _analyzer = analyzer;
         _repository = repository;
@@ -193,9 +197,23 @@ public class StreamManager : IStreamManager
             }
         }
 
-        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput, capabilities?.HlsVideoCodecs, remembered, preferences, capabilities?.RequestedMaxWidth ?? 0);
+        int connectionKbps = ConnectionLimit.For(capabilities?.MeasuredBandwidthKbps ?? 0, settings.StreamingProfile);
+        if (connectionKbps > 0 && (maxAllowedBandwidthKbps == 0 || connectionKbps < maxAllowedBandwidthKbps))
+        {
+            maxAllowedBandwidthKbps = connectionKbps;
+            bandwidthLimitSource = ConnectionLimit.Source;
+        }
+
+        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput, capabilities?.HlsVideoCodecs, remembered, preferences, capabilities?.RequestedMaxWidth ?? 0, capabilities?.Display, await GpuEncodesHdrAsync(settings));
 
         return (decision, mediaInfo, client, mediaId);
+    }
+
+    private async Task<bool> GpuEncodesHdrAsync(ServerSetting settings)
+    {
+        if (!settings.UseHardwareAcceleration || !settings.UseHardwareEncoding || !settings.PreserveHdrInTranscodes) return false;
+        var accelerator = await _hardware.ResolveAsync(settings.HardwareAccelerationType, settings.HardwareTranscodingDevice);
+        return accelerator?.EncodesHdr == true;
     }
 
     private async Task FillVideoGeometryAsync(MediaStreamInfoDto media)
@@ -234,7 +252,8 @@ public class StreamManager : IStreamManager
         await _repository.EndActiveSessionsForDeviceAsync(client.Id);
 
         var preferences = profileId.HasValue ? await _repository.GetTrackPreferencesAsync(profileId.Value) : null;
-        var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, 0, "None", null, null, null, capabilities?.RequestedMaxResolution ?? 0, audioOutput: capabilities?.AudioOutput, hlsVideoCodecs: capabilities?.HlsVideoCodecs, preferences: preferences, requestedMaxWidth: capabilities?.RequestedMaxWidth ?? 0);
+        var settings = await _settingsRepo.GetSettingsAsync();
+        var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, 0, "None", null, null, null, capabilities?.RequestedMaxResolution ?? 0, audioOutput: capabilities?.AudioOutput, hlsVideoCodecs: capabilities?.HlsVideoCodecs, preferences: preferences, requestedMaxWidth: capabilities?.RequestedMaxWidth ?? 0, display: capabilities?.Display, gpuEncodesHdr: await GpuEncodesHdrAsync(settings));
         var (address, location) = await WhereFromAsync(client, clientAddress);
 
         var selectedPart = streamInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);

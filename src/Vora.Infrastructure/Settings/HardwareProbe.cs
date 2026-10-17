@@ -7,7 +7,7 @@ using Vora.Infrastructure.Transcoding;
 
 namespace Vora.Infrastructure.Settings;
 
-internal sealed record HardwareProbe(HardwareAccelerationType Type, string? Device, bool VulkanTonemap = false)
+internal sealed record HardwareProbe(HardwareAccelerationType Type, string? Device, bool VulkanTonemap = false, bool Hdr10Bit = false)
 {
     public const string TestClip = "testsrc2=size=1280x720:rate=30";
 
@@ -17,7 +17,7 @@ internal sealed record HardwareProbe(HardwareAccelerationType Type, string? Devi
         var args = new List<string> { "-hide_banner", "-nostdin", "-loglevel", "error" };
         args.AddRange(HardwareArguments.InitDevices(hardware, withVulkan: VulkanTonemap));
         args.AddRange(["-f", "lavfi", "-i", TestClip, "-t", "2"]);
-        args.AddRange(Type switch
+        args.AddRange(Hdr10Bit ? HdrEncode() : Type switch
         {
             HardwareAccelerationType.Nvidia when Device is { } gpu => ["-c:v", "h264_nvenc", "-gpu", gpu],
             HardwareAccelerationType.Nvidia => ["-c:v", "h264_nvenc"],
@@ -27,6 +27,19 @@ internal sealed record HardwareProbe(HardwareAccelerationType Type, string? Devi
         });
         args.AddRange(["-f", "null", "-"]);
         return args;
+    }
+
+    private List<string> HdrEncode()
+    {
+        var encode = Type switch
+        {
+            HardwareAccelerationType.Nvidia => new List<string> { "-vf", "format=p010le", "-c:v", "hevc_nvenc" },
+            HardwareAccelerationType.QuickSync => ["-vf", "format=p010le,hwupload,hwmap=derive_device=qsv,format=qsv", "-c:v", "hevc_qsv"],
+            _ => ["-vf", "format=p010le,hwupload", "-c:v", "hevc_vaapi"]
+        };
+        encode.AddRange(["-profile:v", "main10"]);
+        if (Type == HardwareAccelerationType.Nvidia && Device is { } gpu) encode.AddRange(["-gpu", gpu]);
+        return encode;
     }
 }
 

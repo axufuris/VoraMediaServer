@@ -62,7 +62,9 @@ public static class MatrixRunner
 
         var decision = await new BestPathDecisionManager(settings).DetermineBestPathAsync(device, media, scenario.Situation.LimitKbps, scenario.Situation.LimitSource,
             requestedAudioId: manualTrack, requestedSubtitleId: subtitle, requestedMaxResolution: scenario.MaxHeight, requestedMediaPartId: manualVersion, audioOutput: audioOutput, hlsVideoCodecs: client.HlsVideo,
-            preferences: scenario.PreferredLanguage == null ? null : new TrackPreferences(scenario.PreferredLanguage, null, null, false));
+            preferences: scenario.PreferredLanguage == null ? null : new TrackPreferences(scenario.PreferredLanguage, null, null, false),
+            display: client.Display > 0 ? new DisplayHint((int)Math.Round(client.Display * 16 / 9.0), client.Display) : null,
+            gpuEncodesHdr: scenario.Situation.GpuKeepsHdr);
 
         var chosenVersion = versions[decision.SelectedMediaPartId];
         var selected = tracks[decision.SelectedAudioTrackId];
@@ -74,7 +76,8 @@ public static class MatrixRunner
         int outputHeight = string.IsNullOrEmpty(decision.OutputResolution) ? chosenVersion.Height : BestPathDecisionManager.ParseHeightFromResolution(decision.OutputResolution);
 
         return new MatrixOutcome(decision.Strategy, decision.VideoStrategy, decision.AudioStrategy, chosenVersion, selected, heard, heardChannels, heardCodec, outputHeight,
-            decision.Reason, MarginOverADifferentKindOfOutcome(decision), decision.BandwidthKbps, decision.RequiresSubtitleBurnIn);
+            decision.Reason, MarginOverADifferentKindOfOutcome(decision), decision.BandwidthKbps, decision.RequiresSubtitleBurnIn,
+            string.IsNullOrEmpty(decision.OutputHdrType) ? "SDR" : decision.OutputHdrType);
     }
 
     private static MediaPartStreamInfoDto PartFor(MatrixVersion version, MatrixSituation situation) => new()

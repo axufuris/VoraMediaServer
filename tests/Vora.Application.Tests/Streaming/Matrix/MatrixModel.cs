@@ -2,13 +2,15 @@ using Vora.Domain.Enums;
 
 namespace Vora.Application.Tests.Streaming.Matrix;
 
-public sealed record MatrixClient(string Name, string DeviceType, string[] Video, string[] Audio, string[] Containers, int Speakers, int MaxHeight, string[]? Hdr, int BitDepth, bool SwitchesTracks = false, bool OldApp = false, string[]? HlsVideo = null)
+public sealed record MatrixClient(string Name, string DeviceType, string[] Video, string[] Audio, string[] Containers, int Speakers, int MaxHeight, string[]? Hdr, int BitDepth, bool SwitchesTracks = false, bool OldApp = false, string[]? HlsVideo = null, int Display = 0)
 {
     public bool IsBrowser => DeviceType == "Browser";
 
     public bool HlsCarries(string videoCodec) => (HlsVideo ?? (IsBrowser ? ["h264"] : ["h264", "hevc", "mpeg2video"])).Contains(videoCodec);
 
     public int OlderSingleValue(int pick) => pick > 0 ? Math.Min(pick, Speakers) : Speakers;
+
+    public bool ShowsHdr(string format) => Hdr?.Contains(format) == true;
 }
 
 public sealed record MatrixTrack(string Label, string Codec, int Channels, bool IsDefault = false, string Language = "eng", bool Commentary = false);
@@ -26,7 +28,7 @@ public sealed record MatrixVersion(string Label, string VideoCodec, int Height, 
 
 public sealed record MatrixTitle(string Label, MatrixVersion[] Versions);
 
-public sealed record MatrixSituation(string Label, int LimitKbps = 0, string LimitSource = "None", string Subtitle = MatrixSituation.NoSubtitle, bool HdrDownscaleAlways = false)
+public sealed record MatrixSituation(string Label, int LimitKbps = 0, string LimitSource = "None", string Subtitle = MatrixSituation.NoSubtitle, bool HdrDownscaleAlways = false, bool GpuKeepsHdr = false)
 {
     public const string NoSubtitle = "off";
     public const string TextSubtitle = "text";
@@ -46,7 +48,7 @@ public sealed record MatrixScenario(MatrixTitle Title, MatrixClient Client, Stre
     public bool PicksTrackAutomatically => ManualTrack == null;
 }
 
-public sealed record MatrixOutcome(StreamStrategy Strategy, string VideoStrategy, string AudioStrategy, MatrixVersion Version, MatrixTrack Selected, MatrixTrack Heard, int HeardChannels, string HeardCodec, int OutputHeight, string Reason, int Margin, int BandwidthKbps, bool BurnsSubtitleIn)
+public sealed record MatrixOutcome(StreamStrategy Strategy, string VideoStrategy, string AudioStrategy, MatrixVersion Version, MatrixTrack Selected, MatrixTrack Heard, int HeardChannels, string HeardCodec, int OutputHeight, string Reason, int Margin, int BandwidthKbps, bool BurnsSubtitleIn, string OutputHdr = "SDR")
 {
     public bool AudioConverted => AudioStrategy == "Transcode";
 

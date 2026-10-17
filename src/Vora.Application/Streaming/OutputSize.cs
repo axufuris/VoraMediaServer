@@ -7,6 +7,8 @@ public readonly record struct FrameSize(int Width, int Height)
     public long Pixels => (long)Width * Height;
 }
 
+public readonly record struct DisplayHint(int Width, int Height);
+
 public static class OutputSize
 {
     public const int DefaultMaxHeight = 2160;
@@ -38,6 +40,12 @@ public static class OutputSize
         var height = requestedMaxHeight > 0 ? requestedMaxHeight : DefaultMaxHeight;
         var width = requestedMaxWidth > 0 ? requestedMaxWidth : Widescreen(height);
         return new FrameSize(width, height);
+    }
+
+    public static FrameSize ScreenBox(FrameSize clientBox, DisplayHint? display)
+    {
+        if (display is not { Width: > 0, Height: > 0 } screen) return clientBox;
+        return Within(clientBox, new FrameSize(Math.Max(screen.Width, screen.Height), Math.Min(screen.Width, screen.Height)));
     }
 
     public static FrameSize Within(FrameSize box, FrameSize other) =>

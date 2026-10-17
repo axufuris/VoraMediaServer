@@ -14,6 +14,14 @@ export interface DeviceCapabilities {
     requestedClientBitrateKbps: number;
     requestedMaxResolution: number;
     requestedMaxWidth: number;
+    // The screen, in physical pixels and landscape. A hint, not a limit: the
+    // server never transcodes because the screen is smaller than the file, but
+    // a transcode it has to make anyway is sized to it.
+    displayWidth: number;
+    displayHeight: number;
+    // The connection to the server as measured by utils/connectionSpeed (0 when
+    // not measured). Client Preference and Bitrate keep a stream within it.
+    measuredBandwidthKbps: number;
     supportedHdrFormats: string[];
     maxVideoBitDepth: number;
 }
@@ -127,8 +135,8 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
     let clientBandwidthKbps = 100000;
 
     let requestedClientBitrateKbps = 0;
-    let requestedMaxResolution = 0;
-    let requestedMaxWidth = 0;
+    const requestedMaxResolution = 0;
+    const requestedMaxWidth = 0;
 
     // Only the bitrate preference is folded into the raw scan (it's a plain
     // request, not a device capability). The Max Resolution / Max Audio
@@ -229,24 +237,17 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
         || mseSupports('video/mp4; codecs="av01.0.08M.10"');
     const maxVideoBitDepth = supports10Bit ? 10 : 8;
 
-    // Auto-detected raw display size (device capability). The user's Max
-    // Resolution preference is applied later in applyUserCaps, never here.
-    // The screen is reported landscape whichever way it is held: the shorter
-    // side is the height, the longer the width. DPR converts CSS px to
-    // physical px. Both travel so the server can fit a transcode to the screen
-    // by width as well as height, which is what keeps a wide film from coming
-    // out wider than the screen.
+    let displayWidth = 0;
+    let displayHeight = 0;
     try {
         const pixelRatio = window.devicePixelRatio || 1;
-        const displayMaxHeight = Math.round(Math.min(screen.width, screen.height) * pixelRatio);
-        const displayMaxWidth = Math.round(Math.max(screen.width, screen.height) * pixelRatio);
-        if (displayMaxHeight > 0) requestedMaxResolution = displayMaxHeight;
-        if (displayMaxWidth > 0) requestedMaxWidth = displayMaxWidth;
+        displayWidth = Math.round(Math.max(screen.width, screen.height) * pixelRatio);
+        displayHeight = Math.round(Math.min(screen.width, screen.height) * pixelRatio);
     } catch (error: unknown) {
-        console.warn("Could not auto-detect display resolution.", error);
+        console.warn("Could not read the screen size.", error);
     }
 
-    return { videoCodecs, audioCodecs, containers, maxAudioChannels, detectedAudioChannels: maxAudioChannels, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: detectHlsVideoCodecs(), clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, requestedMaxWidth, supportedHdrFormats, maxVideoBitDepth };
+    return { videoCodecs, audioCodecs, containers, maxAudioChannels, detectedAudioChannels: maxAudioChannels, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: detectHlsVideoCodecs(), clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, requestedMaxWidth, displayWidth, displayHeight, measuredBandwidthKbps: 0, supportedHdrFormats, maxVideoBitDepth };
 };
 
 export interface PlaybackPrefs {
@@ -290,7 +291,7 @@ export function readPlaybackPrefs(profileId: string, deviceId: string): Playback
 // server that predates the separate fields.
 export function applyUserCaps(device: DeviceCapabilities, prefs: PlaybackPrefs): DeviceCapabilities {
     const effRes = prefs.maxResolution > 0
-        ? Math.min(prefs.maxResolution, device.requestedMaxResolution)
+        ? device.requestedMaxResolution > 0 ? Math.min(prefs.maxResolution, device.requestedMaxResolution) : prefs.maxResolution
         : device.requestedMaxResolution;
     const pickedWidth = Math.round(prefs.maxResolution * 16 / 9);
     const effWidth = prefs.maxResolution > 0 && device.requestedMaxWidth > 0

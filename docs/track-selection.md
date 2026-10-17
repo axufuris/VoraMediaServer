@@ -55,6 +55,8 @@ By profile:
 
 Direct and Bitrate both prefer a version whose video is untouched over re-encoding a larger one. Client Preference is the profile that re-encodes the larger one.
 
+**The screen and the connection** in each profile. The screen (`displayWidth` / `displayHeight`) never makes a version unplayable, in any profile. It only sizes a conversion and decides when a converted larger version gives "the same result" as a smaller one that plays, so even Client Preference plays the 1080p file rather than converting a 4K one for a 1080p screen. The measured connection is a bitrate limit under Client Preference and Bitrate, never under Direct (`docs/streaming.md`).
+
 ## Picks
 
 A pick is a version, audio track or subtitle the viewer chose, either for this play (sent with the request) or remembered for the title (below). A pick sent with the request outranks a remembered one of the same kind. `PlaybackWish` turns both into what was picked (edition, height, codec and HDR of a version; language, commentary or not, codec and layout of a track; language and forced/SDH of a subtitle), so a pick also finds its match in another episode or another version.
@@ -114,6 +116,7 @@ The rules above are weights in `AudioPlayback`, added to the option's penalty by
 | `SurroundLostPenalty` | 200 | Stereo when the target is surround. More than an audio conversion costs outside Direct, so surround is kept by converting. |
 | `HlsVideoCarriage.ReencodePenalty` | 1,000 | The video is re-encoded only because the stream has to be HLS and the client's HLS player cannot take its codec. More than any audio preference. |
 | `ConvertedVideoPenaltyWhenAnotherVersionMayPlayUntouched` | 25,000 | Under Direct and Bitrate, more than the largest resolution penalty, so an untouched smaller version beats a re-encoded larger one. |
+| `beyondScreenPenalty` | 1 per line | From the screen's height up to the client box's, so the larger of two versions that both cover the screen wins by hundreds of points. Zero without a screen hint. |
 
 The quality rank of the codec and the default flag only break ties. A version that plays without converting its video is scored at its own height; the HDR downscale setting only lowers the height of a version that is being converted.
 
@@ -160,6 +163,8 @@ The rule used to apply only to HEVC in a browser, only when audio was converted,
 The normal run covers about 314,000 combinations in a few seconds, including a profile audio language the file has and one it lacks. Set `VORA_STREAM_MATRIX=full` to run every one-, two- and three-track mix of 14 codec and layout types: more than 12 million combinations in a few minutes. **Run the full set before changing a weight or a rule**, because the hand-picked set has missed real problems that the full set found.
 
 The last rule fails when two different kinds of outcome are within ten points of each other. It is there to catch a weight change that leaves a decision to chance.
+
+Three browser clients send a screen hint (a 1440p HDR screen, and 1080p screens with and without HEVC), and two situations have a GPU that keeps HDR. Their rules: a conversion is never larger than the screen, HDR never reaches a client that cannot show it (converted or not), and a conversion keeps HDR10 when the GPU, the player and the stream allow it. The existing rules already check that the screen never causes a conversion, because their "plays as it is" uses only the client's limit.
 
 ## Known limits
 

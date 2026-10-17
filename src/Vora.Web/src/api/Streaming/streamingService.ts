@@ -1,5 +1,6 @@
 import { apiClient } from '../client';
-import { scanDeviceCapabilities } from '../../utils/hardwareScanner';
+import { scanDeviceCapabilities, type DeviceCapabilities } from '../../utils/hardwareScanner';
+import { knownConnectionKbps, measureConnection, type SampleTiming } from '../../utils/connectionSpeed';
 
 export interface StartSessionResponse {
     sessionId: string;
@@ -144,9 +145,13 @@ const subtitleObjectUrls = new Map<string, string>();
 
 const subtitleCacheKey = (sessionId: string, subtitleTrackId: string) => `${sessionId}|${subtitleTrackId}`;
 
+async function capabilitiesFor(serverId?: string): Promise<DeviceCapabilities> {
+    return { ...await scanDeviceCapabilities(), measuredBandwidthKbps: knownConnectionKbps(serverId) };
+}
+
 export const streamingService = {
     startSession: async (mediaId: string, deviceId: string, startPosition: number = 0, videoTrackId?: string, audioTrackId?: string, subtitleTrackId?: string, serverId?: string, mediaPartId?: string) => {
-        const capabilities = await scanDeviceCapabilities();
+        const capabilities = await capabilitiesFor(serverId);
 
         const response = await apiClient.post('/streaming/start', {
             mediaId,
@@ -162,8 +167,8 @@ export const streamingService = {
         return response.data as StartSessionResponse;
     },
     previewDecision: async (mediaId: string, deviceId: string, question: StreamDecisionQuestion = {}) => {
-        const capabilities = await scanDeviceCapabilities();
         const { serverId, ...tracks } = question;
+        const capabilities = await capabilitiesFor(serverId);
 
         const response = await apiClient.post('/streaming/decision', {
             mediaId,
@@ -186,7 +191,7 @@ export const streamingService = {
         return response.data as RememberedChoice;
     },
     startExtraSession: async (extraId: string, startPosition: number = 0, serverId?: string) => {
-        const capabilities = await scanDeviceCapabilities();
+        const capabilities = await capabilitiesFor(serverId);
 
         const response = await apiClient.post('/streaming/start-extra', {
             extraId,
@@ -209,6 +214,14 @@ export const streamingService = {
     stopSession: async (sessionId: string, serverId?: string) => {
         await apiClient.delete(`/streaming/sessions/${sessionId}`, { serverId });
     },
+    downloadBandwidthSample: async (kilobytes: number, serverId?: string): Promise<SampleTiming> => {
+        const started = performance.now();
+        const response = await apiClient.get<ArrayBuffer>('/streaming/bandwidth-sample', { serverId, params: { kb: kilobytes }, responseType: 'arraybuffer' });
+        return { bytes: response.data.byteLength, milliseconds: performance.now() - started };
+    },
+    // Measures the connection to the server once an hour, in the background.
+    measureConnection: (serverId?: string): Promise<number> =>
+        measureConnection(serverId, kilobytes => streamingService.downloadBandwidthSample(kilobytes, serverId)),
     getSessionStats: async (sessionId: string, serverId?: string): Promise<PlaybackStats> => {
         const response = await apiClient.get<PlaybackStats>(`/streaming/sessions/${sessionId}/stats`, { serverId });
         return response.data;

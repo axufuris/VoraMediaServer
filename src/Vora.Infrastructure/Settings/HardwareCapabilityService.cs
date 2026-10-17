@@ -52,7 +52,7 @@ public sealed class HardwareCapabilityService : IHardwareCapabilityService
         if (type == HardwareAccelerationType.Auto) return await DetectAsync(device, cancellationToken);
 
         var target = Target(type, device);
-        return target is null ? null : await WithVulkanAsync(target, fresh: false).WaitAsync(cancellationToken);
+        return target is null ? null : await WithExtrasAsync(target, fresh: false).WaitAsync(cancellationToken);
     }
 
     public async Task<HardwareTestResultVM> TestAsync(HardwareAccelerationType type, string device, CancellationToken cancellationToken = default)
@@ -95,7 +95,7 @@ public sealed class HardwareCapabilityService : IHardwareCapabilityService
             };
         }
 
-        var resolved = await WithVulkanAsync(target, fresh: true).WaitAsync(cancellationToken);
+        var resolved = await WithExtrasAsync(target, fresh: true).WaitAsync(cancellationToken);
         return Passed(resolved, outcome, prefix: string.Empty);
     }
 
@@ -107,12 +107,15 @@ public sealed class HardwareCapabilityService : IHardwareCapabilityService
                 ? " HDR tone mapping runs on the GPU through Vulkan."
                 : " HDR tone mapping runs on the CPU because Vulkan isn't available for this GPU."
             : string.Empty;
+        var hdr = hardware.EncodesHdr
+            ? " It encodes 10-bit HEVC, so a transcode can keep HDR for a player that shows it."
+            : " It didn't encode 10-bit HEVC, so a transcode tone-maps HDR to SDR.";
         return new HardwareTestResultVM
         {
             Success = true,
             Type = hardware.Type,
             Device = hardware.Device,
-            Message = $"{prefix}{HardwareArguments.Label(hardware.Type)} on {DeviceText(hardware.Device)}. It encoded a 2-second test clip in {seconds} s.{tonemap}"
+            Message = $"{prefix}{HardwareArguments.Label(hardware.Type)} on {DeviceText(hardware.Device)}. It encoded a 2-second test clip in {seconds} s.{tonemap}{hdr}"
         };
     }
 
@@ -124,7 +127,7 @@ public sealed class HardwareCapabilityService : IHardwareCapabilityService
         foreach (var candidate in DetectionCandidates(device))
         {
             var outcome = await ProbeAsync(new HardwareProbe(candidate.Type, candidate.Device), fresh);
-            if (outcome.Success) return await WithVulkanAsync(candidate, fresh);
+            if (outcome.Success) return await WithExtrasAsync(candidate, fresh);
         }
         return null;
     }
@@ -179,8 +182,10 @@ public sealed class HardwareCapabilityService : IHardwareCapabilityService
     private GpuDevice Node(string path) =>
         Devices.FirstOrDefault(d => d.Id == path) ?? new GpuDevice(path, "GPU", GpuVendor.Unknown);
 
-    private async Task<HardwareAccelerator> WithVulkanAsync(HardwareAccelerator hardware, bool fresh)
+    private async Task<HardwareAccelerator> WithExtrasAsync(HardwareAccelerator hardware, bool fresh)
     {
+        var hdr = await ProbeAsync(new HardwareProbe(hardware.Type, hardware.Device, Hdr10Bit: true), fresh);
+        hardware = hardware with { EncodesHdr = hdr.Success };
         if (hardware is not { Type: HardwareAccelerationType.Vaapi, Vendor: GpuVendor.Amd }) return hardware;
         var outcome = await ProbeAsync(new HardwareProbe(hardware.Type, hardware.Device, VulkanTonemap: true), fresh);
         return hardware with { HasVulkanInterop = outcome.Success };
@@ -208,7 +213,7 @@ public sealed class HardwareCapabilityService : IHardwareCapabilityService
         {
             outcome = new ProbeOutcome(false, ex.Message, TimeSpan.Zero);
         }
-        var what = probe.VulkanTonemap ? "Vulkan tone mapping" : HardwareArguments.Label(probe.Type);
+        var what = probe.VulkanTonemap ? "Vulkan tone mapping" : probe.Hdr10Bit ? $"{HardwareArguments.Label(probe.Type)} 10-bit HEVC" : HardwareArguments.Label(probe.Type);
         if (outcome.Success)
         {
             _logger.LogInformation("Hardware test: {Hardware} on {Device} encoded a test clip in {Elapsed:0.0}s.", what, DeviceText(probe.Device), outcome.Elapsed.TotalSeconds);

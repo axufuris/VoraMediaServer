@@ -66,6 +66,11 @@ NVENC used to get no `-b:v`, and FFmpeg's `h264_nvenc` then aims at its default 
 
 `HdrTonemapQuality` / `HdrTranscodeDownscale` on Auto follow where the tone map runs: on the GPU they mean Quality and no downscale; on the CPU, Fast and a 1080p downscale.
 
+**Keeping HDR instead** (when to is in `docs/streaming.md`) needs a GPU that encodes 10-bit HEVC.
+- **The test:** after the H.264 test passes, a second 2-second probe encodes `format=p010le` with `hevc_nvenc` / `hevc_qsv` / `hevc_vaapi -profile:v main10` (`HardwareProbe.Hdr10Bit`). Its result is `HardwareAccelerator.EncodesHdr`, cached like the others. **Test hardware** says whether it passed. Older GPUs that encode H.264 but not 10-bit HEVC keep tone-mapping.
+- **The pipeline** stays 10-bit on the GPU and skips the tone map: `scale_cuda=…:format=p010le` (NVIDIA), `scale_vaapi=…:format=p010` then `hwmap` to QSV (Intel), `scale_vaapi=…:format=p010` (AMD, with no Vulkan device). The encoder gets `-profile:v main10 -color_primaries bt2020 -color_trc smpte2084` (`arib-std-b67` for HLG) `-colorspace bt2020nc -color_range tv`, so the player sees an HDR stream. Static HDR10 metadata and Dolby Vision or HDR10+ dynamic metadata are not carried over.
+- **Pinned by** `HdrKeepingArgumentTests`: all three GPUs, plus the fallbacks to tone-mapped H.264 (a GPU that failed the test, the CPU, decode-only).
+
 **What gets tone-mapped** is decided by the video track's `HdrType`, which `HdrClassifier` (`Vora.Infrastructure/Analysis/`) sets when a file is scanned. It looks at the stream's transfer and, for Dolby Vision, at the configuration record's base layer (`dv_bl_signal_compatibility_id`):
 
 | Stream | `HdrType` |
