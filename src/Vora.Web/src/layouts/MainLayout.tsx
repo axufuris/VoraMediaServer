@@ -19,6 +19,7 @@ import { profileDeviceSettingsService } from '../api/Users/profileDeviceSettings
 import MainLayoutSidebar from './parts/MainLayoutSidebar';
 import MainLayoutUserMenu from './parts/MainLayoutUserMenu';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
+import { useScrollRestoration } from '../hooks/useScrollRestoration';
 import type { FeatureFlagsVM } from '../api/System/featureFlagsService';
 import { moveShownNavItem } from '../utils/navOrder';
 import MediaItemMenuProvider from '../components/Media/ItemMenu/MediaItemMenuProvider';
@@ -88,6 +89,7 @@ export default function MainLayout() {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
+    const scrollContainerRef = useScrollRestoration();
 
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const isServerAdmin = localStorage.getItem('is_server_admin') === 'true';
@@ -384,7 +386,7 @@ export default function MainLayout() {
                     onSignOut={handleSignOut}
                 />
 
-                <main className="flex-1 overflow-y-auto">
+                <main ref={scrollContainerRef} className="flex-1 overflow-y-auto">
                     <Outlet />
                 </main>
             </div>

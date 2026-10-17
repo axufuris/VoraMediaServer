@@ -1,6 +1,6 @@
 # Client UI patterns (`Vora.Web`)
 
-How the client pages are put together: tab-host pages, the media tile system, the player's shared primitives, remote-control (D-pad) navigation, and row hover. The folder layout, dialogs, and the rules every frontend change follows are in [`docs/frontend-conventions.md`](frontend-conventions.md).
+How the client pages are put together: tab-host pages, the media tile system, the player's shared primitives, remote-control (D-pad) navigation, row hover, and the scroll position kept across Back and Forward. The folder layout, dialogs, and the rules every frontend change follows are in [`docs/frontend-conventions.md`](frontend-conventions.md).
 
 ## Tab-host pages and the `embedded` prop
 
@@ -148,3 +148,13 @@ Clickable list rows (tracks, episodes, table rows) take `vora-row-interactive` f
 Buttons follow the same rule. `vora-icon-button` fills with `--vora-accent-soft` on hover and `:focus-visible`; `vora-pill` is a bordered pill that takes the accent fill and `--vora-accent-soft-hover` border when hovered, focused or `data-active="true"`. The now-playing screens use both, replacing the fixed `rgba(255,255,255,0.06)` pills and `hover:bg-white/5` buttons they had.
 
 Hover fills in the client are the accent, not a neutral tint. Don't hover a row to `--vora-bg-sunken` (near-black in every dark template, so the row darkens into the page), to `hover:bg-white/5` (invisible on the light theme), or to any fixed colour that a template can't change.
+
+## Scroll position
+
+The client scrolls inside `MainLayout`'s `<main>`, not the window, so the browser never restored a position: Back from a title to a long library landed at the top. `useScrollRestoration` (its callback ref is on `<main>`) remembers where each history entry was left, keyed on `location.key`:
+
+- **Back and Forward** put it back once the page is tall enough to reach it, so a library that reloads its items behind a skeleton still returns to the same row. A wheel, touch, click or key press first leaves the page where the viewer put it; after 8 seconds it goes as far as the page reaches.
+- **A new page** starts at the top. The one `<main>` outlives every page, so a title opened from far down a library used to open part-way down.
+- **Only the query string changing** (a tab or filter in the URL) keeps the position.
+
+Positions live in memory, so a reload forgets them. Sort and filter were already kept per library (`vora_library_sort_*`, `vora_library_filter_*`).
