@@ -78,11 +78,12 @@ export default function PlaybackTab({ activeProfileId, serverId, onSaved }: { ac
                     <div>
                         <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Maximum resolution</label>
                         <select value={maxResolution} onChange={e => setMaxResolution(parseInt(e.target.value, 10))} className="w-full cursor-pointer rounded-md p-2.5 text-sm outline-none" style={{ background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-primary)' }}>
-                            <option value={0}>Original (device limit)</option>
+                            <option value={0}>Original</option>
                             <option value={2160}>4K (2160p)</option>
                             <option value={1080}>HD (1080p)</option>
                             <option value={720}>HD (720p)</option>
                         </select>
+                        <p className="mb-0 mt-2 text-xs" style={{ color: 'var(--vora-text-muted)' }}>Original keeps compatible video at its source resolution. Choose a limit to reduce resolution; codec, HDR and bandwidth requirements still apply.</p>
                     </div>
                     <div>
                         <label htmlFor="playback-audio-output" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Audio output</label>

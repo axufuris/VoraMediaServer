@@ -114,25 +114,15 @@ describe('per-device audio output preference', () => {
         expect(result.requestedMaxResolution).toBe(1080);
     });
 
-    it('narrows the screen width to the picked resolution as a widescreen box', () => {
+    it('narrows the decoding width limit to the picked resolution as a widescreen box', () => {
         const result = applyUserCaps({ ...device, requestedMaxResolution: 1440, requestedMaxWidth: 3440 }, { maxResolution: 1080, maxAudioChannels: 0 });
 
         expect(result.requestedMaxResolution).toBe(1080);
         expect(result.requestedMaxWidth).toBe(1920);
     });
 
-    it('keeps the measured screen when no resolution is picked', () => {
+    it('keeps an explicit decoding limit when no resolution is picked', () => {
         const result = applyUserCaps({ ...device, requestedMaxResolution: 1440, requestedMaxWidth: 3440 }, { maxResolution: 0, maxAudioChannels: 0 });
-
-        expect(result.requestedMaxResolution).toBe(1440);
-        expect(result.requestedMaxWidth).toBe(3440);
-    });
-
-    it('reports the screen landscape with its width and height in physical pixels', () => {
-        vi.stubGlobal('screen', { width: 1440, height: 3440 });
-        vi.stubGlobal('devicePixelRatio', 1);
-
-        const result = scanDeviceCapabilitiesSync();
 
         expect(result.requestedMaxResolution).toBe(1440);
         expect(result.requestedMaxWidth).toBe(3440);
@@ -143,5 +133,67 @@ describe('per-device audio output preference', () => {
         localStorage.setItem('playback_prefs_unknown_test-device', JSON.stringify({ maxAudioChannels: 6 }));
         expect(getEffectiveCapabilities('unknown', 'test-device').pickedAudioChannels).toBe(6);
         expect((await scanDeviceCapabilities()).pickedAudioChannels).toBe(6);
+    });
+});
+
+describe('browser resolution preference', () => {
+    it.each([[2560, 1440, 1], [1920, 1080, 1], [390, 844, 3]])('does not treat a %ix%i display at %ix scale as a decoding limit', (width, height, pixelRatio) => {
+        vi.stubGlobal('screen', { width, height });
+        vi.stubGlobal('devicePixelRatio', pixelRatio);
+
+        const result = scanDeviceCapabilitiesSync();
+
+        expect(result.requestedMaxResolution).toBe(0);
+        expect(result.requestedMaxWidth).toBe(0);
+    });
+
+    it.each([720, 1080, 2160])('applies an explicit %ip limit when the decoder limit is unknown', maxResolution => {
+        const result = applyUserCaps(scanDeviceCapabilitiesSync(), { maxResolution, maxAudioChannels: 0 });
+
+        expect(result.requestedMaxResolution).toBe(maxResolution);
+        expect(result.requestedMaxWidth).toBe(Math.round(maxResolution * 16 / 9));
+    });
+
+    it('does not raise a known decoding limit to match a higher preference', () => {
+        const result = applyUserCaps({ ...device, requestedMaxResolution: 1080, requestedMaxWidth: 1920 }, { maxResolution: 2160, maxAudioChannels: 0 });
+
+        expect(result.requestedMaxResolution).toBe(1080);
+        expect(result.requestedMaxWidth).toBe(1920);
+    });
+
+    it.each([0, 1080, 2160])('reports the same saved resolution (%i) for the picker and stream start', async maxResolution => {
+        vi.stubGlobal('screen', { width: 2560, height: 1440 });
+        localStorage.setItem(StorageKeys.deviceId, 'test-device');
+        localStorage.setItem('playback_prefs_unknown_test-device', JSON.stringify({ maxResolution }));
+
+        const picker = getEffectiveCapabilities('unknown', 'test-device');
+        const stream = await scanDeviceCapabilities();
+
+        expect(picker.requestedMaxResolution).toBe(maxResolution);
+        expect(stream.requestedMaxResolution).toBe(maxResolution);
+        expect(stream.requestedMaxWidth).toBe(picker.requestedMaxWidth);
+    });
+
+    it('keeps the SDR display restriction even when HEVC Main10 decoding is supported', async () => {
+        vi.stubGlobal('MediaSource', { isTypeSupported: () => true });
+
+        const result = await scanDeviceCapabilities();
+
+        expect(result.videoCodecs).toContain('hevc');
+        expect(result.maxVideoBitDepth).toBe(10);
+        expect(result.supportedHdrFormats).toEqual([]);
+    });
+
+    it('keeps HDR and HEVC HLS support on a smaller HDR display in Original mode', async () => {
+        vi.stubGlobal('screen', { width: 2560, height: 1440 });
+        vi.stubGlobal('MediaSource', { isTypeSupported: () => true });
+        vi.stubGlobal('matchMedia', () => ({ matches: true }));
+
+        const result = await scanDeviceCapabilities();
+
+        expect(result.requestedMaxResolution).toBe(0);
+        expect(result.requestedMaxWidth).toBe(0);
+        expect(result.supportedHdrFormats).toContain('HDR10');
+        expect(result.hlsVideoCodecs).toContain('hevc');
     });
 });
