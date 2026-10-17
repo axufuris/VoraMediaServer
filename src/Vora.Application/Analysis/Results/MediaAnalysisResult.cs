@@ -58,6 +58,8 @@ public class VideoTrackInfo
 
 public sealed record VideoStreamFacts(int StreamIndex, int? Width, int? Height, double? FrameRate, string? HdrType);
 
+public sealed record MediaStreamFacts(int StreamIndex, string Kind, string? Codec, string? Profile, int? Level, int? SampleRate, string? ChannelLayout, long? BitRate);
+
 public class SubtitleTrackInfo
 {
     public int StreamIndex { get; set; }

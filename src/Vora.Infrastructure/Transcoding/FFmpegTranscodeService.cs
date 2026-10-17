@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
+using Vora.Application.Streaming.Dtos;
 using Vora.Application.Streaming.ViewModels;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
@@ -310,6 +311,27 @@ public class FFmpegTranscodeService : ITranscodeService
     }
 
     public int GetActiveTranscodeCount() => _activeTranscodes.Count;
+
+    public TranscodeStatusDto? GetStatus(Guid mediaItemId)
+    {
+        if (!_transcodeContexts.TryGetValue(mediaItemId, out var ctx) || ctx.Summary is not { } summary) return null;
+
+        var progress = ctx.Progress;
+        return new TranscodeStatusDto(
+            summary.VideoEncoder,
+            summary.EncodeHardware,
+            summary.DecodeHardwareName,
+            summary.VideoBitrateKbps,
+            summary.VideoPeakKbps,
+            summary.ToneMapping,
+            summary.AudioEncoder,
+            summary.AudioChannels,
+            summary.AudioBitrateKbps,
+            progress?.Fps,
+            progress?.Speed,
+            IsEncoding(mediaItemId),
+            ctx.RetriedOnCpu);
+    }
     public bool IsMediaTranscoding(Guid mediaItemId) => _activeTranscodes.ContainsKey(mediaItemId);
 
     public void NotifySegmentServed(Guid mediaItemId, int segmentIndex)
@@ -636,6 +658,8 @@ public class FFmpegTranscodeService : ITranscodeService
         var arguments = BuildFFmpegArguments(ctx.SourceFile, segmentPattern, internalPlaylist, ctx.Decision, settings, hardware, ctx.Plan.LaunchAt(startSegment), TranscodeHost.Detect());
         var launch = new TranscodeLaunch(Interlocked.Increment(ref _launchCounter), startSegment, hardware);
         ctx.LaunchId = launch.Id;
+        ctx.Summary = TranscodeSummary.From(arguments);
+        ctx.Progress = null;
 
         var process = new Process
         {
@@ -656,10 +680,13 @@ public class FFmpegTranscodeService : ITranscodeService
         var stderrBuffer = new StringBuilder();
         process.ErrorDataReceived += (_, args) =>
         {
-            if (args.Data != null)
+            if (args.Data == null) return;
+            if (TranscodeProgress.TryRead(args.Data, out var fps, out var speed))
             {
-                lock (stderrBuffer) stderrBuffer.AppendLine(args.Data);
+                if (ctx.LaunchId == launch.Id) ctx.Progress = new TranscodeProgressReading(fps, speed);
+                return;
             }
+            lock (stderrBuffer) stderrBuffer.AppendLine(args.Data);
         };
         var cmdLine = $"ffmpeg {string.Join(" ", arguments)}";
         process.Exited += (_, _) => OnFFmpegExited(mediaItemId, entry, launch, stderrBuffer, cmdLine);
@@ -685,6 +712,7 @@ public class FFmpegTranscodeService : ITranscodeService
             retryContext = ctx;
             ctx.Hardware = null;
             ctx.RetryingOnCpu = true;
+            ctx.RetriedOnCpu = true;
         }
 
         if (!_activeTranscodes.TryRemove(new KeyValuePair<Guid, TranscodeProcess>(mediaItemId, entry)))
@@ -1290,6 +1318,9 @@ public class FFmpegTranscodeService : ITranscodeService
         public int CurrentStartSegment { get; set; }
         public TranscodeHardware? Hardware { get; set; }
         public int LaunchId { get; set; }
+        public TranscodeSummary? Summary { get; set; }
+        public TranscodeProgressReading? Progress { get; set; }
+        public bool RetriedOnCpu { get; set; }
         public bool RetryingOnCpu
         {
             get => _retryingOnCpu;

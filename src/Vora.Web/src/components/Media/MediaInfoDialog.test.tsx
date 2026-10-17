@@ -39,6 +39,18 @@ describe('media info dialog', () => {
         expect(screen.getByRole('dialog', { name: 'Media info' })).toBeInTheDocument();
     });
 
+    it('takes the name and lead-in the player gives it, above the playing file', () => {
+        render(
+            <div data-vora-client="">
+                <MediaInfoDialog title="Playback info" parts={[remux]} placement="absolute" onClose={vi.fn()} lead={<p>How this is playing</p>} />
+            </div>,
+        );
+
+        const dialog = screen.getByRole('dialog', { name: 'Playback info' });
+        expect(within(dialog).getByText('How this is playing')).toBeInTheDocument();
+        expect(within(dialog).getByText(remux.filePath)).toBeInTheDocument();
+    });
+
     it('shows the full file path', () => {
         renderDialog([remux]);
 

@@ -19,6 +19,7 @@ import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeB
 import PlayerSettingsPanel from './Panels/PlayerSettingsPanel';
 import SubtitleTracksPanel from './Panels/SubtitleTracksPanel';
 import MediaInfoDialog from '../Media/MediaInfoDialog';
+import PlaybackStatsSections, { type PlayerReading } from './Panels/PlaybackStatsSections';
 import UpNextOverlay from './Panels/UpNextOverlay';
 import { useVideoThumbnails } from '../../hooks/useVideoThumbnails';
 import { isImageSubtitleCodec, isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
@@ -96,6 +97,28 @@ export default function GlobalVideoPlayer() {
     const [showSubtitles, setShowSubtitles] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
     const closeInfo = useCallback(() => setShowInfo(false), []);
+    const hlsRef = useRef<Hls | null>(null);
+    const engineRef = useRef('');
+    const readPlayer = useCallback((): PlayerReading => {
+        const video = videoRef.current;
+        const quality = video && typeof video.getVideoPlaybackQuality === 'function' ? video.getVideoPlaybackQuality() : null;
+        let bufferedSeconds: number | null = null;
+        if (video) {
+            for (let index = 0; index < video.buffered.length; index++) {
+                if (video.buffered.start(index) <= video.currentTime && video.currentTime <= video.buffered.end(index)) {
+                    bufferedSeconds = Math.max(0, video.buffered.end(index) - video.currentTime);
+                }
+            }
+        }
+        const estimate = hlsRef.current?.bandwidthEstimate;
+        return {
+            engine: engineRef.current,
+            droppedFrames: quality ? quality.droppedVideoFrames : null,
+            totalFrames: quality ? quality.totalVideoFrames : null,
+            bufferedSeconds,
+            bandwidthKbps: estimate && Number.isFinite(estimate) ? estimate / 1000 : null,
+        };
+    }, [videoRef]);
 
     const [selVideo, setSelVideo] = useState('');
     const [selAudio, setSelAudio] = useState('');
@@ -369,6 +392,8 @@ export default function GlobalVideoPlayer() {
 
                     instance.loadSource(streamUrl);
                     instance.attachMedia(video);
+                    hlsRef.current = instance;
+                    engineRef.current = 'hls.js';
                     instance.on(HlsClass.Events.MANIFEST_PARSED, () => {
                         video.play().catch(e => console.error('Auto-play blocked:', e));
                     });
@@ -385,6 +410,7 @@ export default function GlobalVideoPlayer() {
 
                     hls = instance;
                 } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    engineRef.current = 'Native HLS';
                     video.src = streamUrl;
                     video.addEventListener('loadedmetadata', () => {
                         video.play().catch(e => console.error('Auto-play blocked:', e));
@@ -392,12 +418,15 @@ export default function GlobalVideoPlayer() {
                 }
             })();
         } else {
+            engineRef.current = 'The browser, from the file';
             video.src = streamUrl;
             video.play().catch(e => console.error('Auto-play blocked:', e));
         }
 
         return () => {
             cancelled = true;
+            hlsRef.current = null;
+            engineRef.current = '';
             if (hls) {
                 hls.destroy();
             }
@@ -983,9 +1012,21 @@ export default function GlobalVideoPlayer() {
 
             {showInfo && (
                 <MediaInfoDialog
-                    parts={mediaDetails?.mediaParts ?? []}
+                    title="Playback info"
+                    parts={activeStreamPart ? [activeStreamPart] : []}
                     placement="absolute"
                     onClose={closeInfo}
+                    lead={(
+                        <PlaybackStatsSections
+                            sessionId={sessionId}
+                            serverId={serverId}
+                            reasons={currentMedia.reasons}
+                            readPlayer={readPlayer}
+                            sideloadedSubtitle={currentMedia.subtitleStrategy !== 'BurnIn' && !isNoSubtitle(effectiveSubtitleId) && activeSubtitleTrack
+                                ? { language: activeSubtitleTrack.language, title: activeSubtitleTrack.title, codec: activeSubtitleTrack.codec }
+                                : null}
+                        />
+                    )}
                 />
             )}
         </div>

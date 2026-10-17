@@ -24,4 +24,5 @@ public class StartStreamResponse
     // tonemapped via the HDR transcode pipeline).
     public string? OutputResolution { get; set; }
     public string? OutputHdrType { get; set; }
+    public List<string> Reasons { get; set; } = [];
 }

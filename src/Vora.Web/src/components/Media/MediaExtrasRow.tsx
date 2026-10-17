@@ -41,6 +41,7 @@ export default function MediaExtrasRow({ videos, extras = [], serverId }: Props)
                 bandwidthKbps: session.bandwidthKbps,
                 outputResolution: session.outputResolution,
                 outputHdrType: session.outputHdrType,
+                reasons: session.reasons,
                 videoTrackId: session.videoTrackId,
                 audioTrackId: session.audioTrackId,
                 subtitleTrackId: session.subtitleTrackId,

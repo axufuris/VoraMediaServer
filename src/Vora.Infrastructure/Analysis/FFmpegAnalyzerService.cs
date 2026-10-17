@@ -50,7 +50,13 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         return result;
     }
 
-    public async Task<IReadOnlyList<VideoStreamFacts>> ReadVideoStreamsAsync(string filePath, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<VideoStreamFacts>> ReadVideoStreamsAsync(string filePath, CancellationToken cancellationToken = default) =>
+        ReadVideoStreams(await ProbeStreamsAsync(filePath, "v", cancellationToken));
+
+    public async Task<IReadOnlyList<MediaStreamFacts>> ReadStreamFactsAsync(string filePath, CancellationToken cancellationToken = default) =>
+        ReadStreamFacts(await ProbeStreamsAsync(filePath, null, cancellationToken));
+
+    private async Task<string?> ProbeStreamsAsync(string filePath, string? selectStreams, CancellationToken cancellationToken)
     {
         var processInfo = new ProcessStartInfo
         {
@@ -63,19 +69,22 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         processInfo.ArgumentList.Add("quiet");
         processInfo.ArgumentList.Add("-print_format");
         processInfo.ArgumentList.Add("json");
-        processInfo.ArgumentList.Add("-select_streams");
-        processInfo.ArgumentList.Add("v");
+        if (selectStreams != null)
+        {
+            processInfo.ArgumentList.Add("-select_streams");
+            processInfo.ArgumentList.Add(selectStreams);
+        }
         processInfo.ArgumentList.Add("-show_streams");
         processInfo.ArgumentList.Add(filePath);
 
         try
         {
             using var process = Process.Start(processInfo);
-            if (process == null) return [];
+            if (process == null) return null;
 
             var json = await process.StandardOutput.ReadToEndAsync(cancellationToken);
             await process.WaitForExitWithTimeoutAsync(VideoStreamProbeTimeout, _logger, cancellationToken);
-            return ReadVideoStreams(json);
+            return json;
         }
         catch (OperationCanceledException)
         {
@@ -83,9 +92,61 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not read the video streams of {FilePath}.", filePath);
+            _logger.LogWarning(ex, "Could not read the streams of {FilePath}.", filePath);
+            return null;
+        }
+    }
+
+    internal static IReadOnlyList<MediaStreamFacts> ReadStreamFacts(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("streams", out var streams) || streams.ValueKind != JsonValueKind.Array) return [];
+
+            var facts = new List<MediaStreamFacts>();
+            foreach (var stream in streams.EnumerateArray())
+            {
+                if (!stream.TryGetProperty("index", out var indexProperty) || !indexProperty.TryGetInt32(out var index)) continue;
+                facts.Add(new MediaStreamFacts(
+                    index,
+                    Text(stream, "codec_type") ?? "unknown",
+                    Text(stream, "codec_name"),
+                    Text(stream, "profile"),
+                    stream.TryGetProperty("level", out var level) && level.ValueKind == JsonValueKind.Number && level.TryGetInt32(out var levelValue) && levelValue > 0 ? levelValue : null,
+                    int.TryParse(Text(stream, "sample_rate"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var sampleRate) && sampleRate > 0 ? sampleRate : null,
+                    Text(stream, "channel_layout"),
+                    StreamBitRate(stream)));
+            }
+            return facts;
+        }
+        catch (JsonException)
+        {
             return [];
         }
+    }
+
+    private static string? Text(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString())
+            ? value.GetString()
+            : null;
+
+    private static long? StreamBitRate(JsonElement stream)
+    {
+        if (long.TryParse(Text(stream, "bit_rate"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var bitRate) && bitRate > 0) return bitRate;
+        if (!stream.TryGetProperty("tags", out var tags) || tags.ValueKind != JsonValueKind.Object) return null;
+
+        foreach (var tag in tags.EnumerateObject())
+        {
+            if ((tag.Name.Equals("BPS", StringComparison.OrdinalIgnoreCase) || tag.Name.StartsWith("BPS-", StringComparison.OrdinalIgnoreCase))
+                && tag.Value.ValueKind == JsonValueKind.String
+                && long.TryParse(tag.Value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var tagged) && tagged > 0)
+            {
+                return tagged;
+            }
+        }
+        return null;
     }
 
     internal static IReadOnlyList<VideoStreamFacts> ReadVideoStreams(string? json)

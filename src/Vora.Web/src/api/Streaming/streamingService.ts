@@ -19,6 +19,77 @@ export interface StartSessionResponse {
     bandwidthKbps: number;
     outputResolution?: string | null;
     outputHdrType?: string | null;
+    // Why the server chose this way of playing, one sentence per reason.
+    reasons?: string[];
+}
+
+export interface PlaybackVideoStats {
+    codec?: string | null;
+    profile?: string | null;
+    level?: string | null;
+    bitDepth?: number | null;
+    hdrType?: string | null;
+    width?: number | null;
+    height?: number | null;
+    frameRate?: number | null;
+    bitrateKbps?: number | null;
+    strategy: string;
+    outputCodec?: string | null;
+    outputWidth?: number | null;
+    outputHeight?: number | null;
+    outputHdrType?: string | null;
+    outputBitrateKbps?: number | null;
+    outputPeakKbps?: number | null;
+    toneMapping?: string | null;
+}
+
+export interface PlaybackAudioStats {
+    codec?: string | null;
+    profile?: string | null;
+    channels?: number | null;
+    channelLayout?: string | null;
+    sampleRate?: number | null;
+    language?: string | null;
+    title?: string | null;
+    isDefault: boolean;
+    bitrateKbps?: number | null;
+    strategy: string;
+    outputCodec?: string | null;
+    outputChannels?: number | null;
+    outputBitrateKbps?: number | null;
+}
+
+export interface PlaybackSubtitleStats {
+    codec?: string | null;
+    language?: string | null;
+    title?: string | null;
+    isForced: boolean;
+    isExternal: boolean;
+    strategy: string;
+}
+
+export interface PlaybackTranscoderStats {
+    encoder?: string | null;
+    encodeHardware?: string | null;
+    decodeHardware?: string | null;
+    fps?: number | null;
+    speed?: number | null;
+    running: boolean;
+    retriedOnCpu: boolean;
+}
+
+// What the server knows about a playing stream: the source beside what the
+// viewer gets, and the transcoder's live speed. GET /streaming/sessions/{id}/stats.
+export interface PlaybackStats {
+    method: string;
+    delivery: string;
+    sourceContainer?: string | null;
+    sourceBitrateKbps?: number | null;
+    streamBitrateKbps?: number | null;
+    video?: PlaybackVideoStats | null;
+    audio?: PlaybackAudioStats | null;
+    subtitle?: PlaybackSubtitleStats | null;
+    transcoder?: PlaybackTranscoderStats | null;
 }
 
 export interface StreamDecisionPreview {
@@ -135,6 +206,10 @@ export const streamingService = {
     },
     stopSession: async (sessionId: string, serverId?: string) => {
         await apiClient.delete(`/streaming/sessions/${sessionId}`, { serverId });
+    },
+    getSessionStats: async (sessionId: string, serverId?: string): Promise<PlaybackStats> => {
+        const response = await apiClient.get<PlaybackStats>(`/streaming/sessions/${sessionId}/stats`, { serverId });
+        return response.data;
     },
     // Returns an object URL for the track's WebVTT, or null when the server has
     // nothing to give (404: not a text subtitle, or extraction failed). The URL

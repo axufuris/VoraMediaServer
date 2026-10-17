@@ -18,9 +18,9 @@ public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[]
 
 public interface IStreamManager
 {
-    Task<(StreamSession Session, string StreamUrl, int AudioTrackPosition)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null);
+    Task<StartedStream> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null);
     Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null);
-    Task<(StreamSession Session, string StreamUrl, int AudioTrackPosition)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null, string? clientAddress = null);
+    Task<StartedStream> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null, string? clientAddress = null);
     Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search, Guid? profileId = null, IReadOnlyCollection<Guid>? libraryIds = null, IReadOnlyCollection<HistoryDelivery>? deliveries = null);
     Task PingSessionAsync(Guid sessionId, double currentPosition, double duration, bool isPaused);
     Task<List<NowPlayingSessionDto>> GetNowPlayingSessionsAsync();
@@ -60,7 +60,7 @@ public class StreamManager : IStreamManager
         _storagePaths = storagePaths.Value;
     }
 
-    public async Task<(StreamSession Session, string StreamUrl, int AudioTrackPosition)> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null)
+    public async Task<StartedStream> StartSessionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, double startPosition, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null)
     {
         var (decision, mediaInfo, client, resolvedMediaId) = await ComputeDecisionAsync(mediaId, deviceId, profileId, videoTrackId, audioTrackId, subtitleTrackId, capabilities, mediaPartId, clientAddress);
 
@@ -107,7 +107,7 @@ public class StreamManager : IStreamManager
         var createdSession = await _repository.CreateSessionAsync(session);
 
         var playToken = _tokenSigner.Sign(PlayTokenScope, createdSession.Id.ToString(), PlayTokenTtl);
-        return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}", decision.SelectedAudioTrackPosition);
+        return new StartedStream(createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}", decision.SelectedAudioTrackPosition, decision.Reasons);
     }
 
     public async Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null)
@@ -209,7 +209,7 @@ public class StreamManager : IStreamManager
         if (updates.Count > 0) await _repository.SaveVideoTrackGeometryAsync(updates);
     }
 
-    public async Task<(StreamSession Session, string StreamUrl, int AudioTrackPosition)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null, string? clientAddress = null)
+    public async Task<StartedStream> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null, string? clientAddress = null)
     {
         var extra = await _repository.GetMediaExtraAsync(extraId);
         if (extra == null) throw new InvalidOperationException("Extra not found.");
@@ -277,7 +277,7 @@ public class StreamManager : IStreamManager
 
         var createdSession = await _repository.CreateSessionAsync(session);
         var playToken = _tokenSigner.Sign(PlayTokenScope, createdSession.Id.ToString(), PlayTokenTtl);
-        return (createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}", decision.SelectedAudioTrackPosition);
+        return new StartedStream(createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}", decision.SelectedAudioTrackPosition, decision.Reasons);
     }
 
     public async Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search, Guid? profileId = null, IReadOnlyCollection<Guid>? libraryIds = null, IReadOnlyCollection<HistoryDelivery>? deliveries = null)
