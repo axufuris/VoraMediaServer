@@ -87,6 +87,12 @@ public static class MediaEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        adminGroup.MapDelete("/{id:guid}/metadata", RemoveMetadataAsync)
+            .WithName("RemoveMediaMetadata")
+            .Produces(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         adminGroup.MapPost("/{id:guid}/analyze", QueueAnalyzeAsync)
             .Produces(StatusCodes.Status202Accepted);
 
@@ -268,6 +274,12 @@ public static class MediaEndpoints
     private static async Task<IResult> ClearMatchAsync(Guid id, IMediaMatchManager matchManager)
     {
         await matchManager.ClearAsync(id);
+        return Results.Accepted();
+    }
+
+    private static async Task<IResult> RemoveMetadataAsync(Guid id, IMediaMatchManager matchManager)
+    {
+        await matchManager.RemoveMetadataAsync(id);
         return Results.Accepted();
     }
 

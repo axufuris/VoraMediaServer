@@ -32,6 +32,7 @@ const admin = {
     regenerateMediaItemThumbnails: vi.fn<(id: string, serverId?: string) => Promise<void>>(),
     deleteMediaItem: vi.fn<(id: string, serverId?: string) => Promise<void>>(),
     clearMatch: vi.fn<(id: string, serverId?: string) => Promise<void>>(),
+    removeMetadata: vi.fn<(id: string, serverId?: string) => Promise<void>>(),
 };
 
 vi.mock('../../../api/Media/mediaService', () => ({
@@ -58,6 +59,7 @@ vi.mock('../../../api/Media/libraryAdminService', () => ({
         regenerateMediaItemThumbnails: (id: string, serverId?: string) => admin.regenerateMediaItemThumbnails(id, serverId),
         deleteMediaItem: (id: string, serverId?: string) => admin.deleteMediaItem(id, serverId),
         clearMatch: (id: string, serverId?: string) => admin.clearMatch(id, serverId),
+        removeMetadata: (id: string, serverId?: string) => admin.removeMetadata(id, serverId),
     },
 }));
 
@@ -183,7 +185,7 @@ describe('the menu on a poster', () => {
         expect(labels()).toEqual([
             'Mark as watched', 'Add to watchlist',
             'Media info', 'Edit metadata', 'Add to playlist', 'Add to collection',
-            'Fix match…', 'Refresh metadata', 'Scan files', 'Analyze media',
+            'Fix match…', 'Remove metadata…', 'Refresh metadata', 'Scan files', 'Analyze media',
             'Regenerate thumbnails', 'Lock thumbnails', 'Edit markers', 'Delete item',
         ]);
     });
@@ -224,7 +226,7 @@ describe('the menu on a poster', () => {
         expect(labels()).toEqual([
             'Mark as watched', 'Add to watchlist',
             'Edit metadata', 'Add to playlist', 'Add to collection',
-            'Fix match…', 'Refresh metadata', 'Scan files', 'Analyze media', 'Delete item',
+            'Fix match…', 'Remove metadata…', 'Refresh metadata', 'Scan files', 'Analyze media', 'Delete item',
         ]);
     });
 
@@ -334,6 +336,48 @@ describe('the menu on a poster', () => {
 
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
         expect(admin.clearMatch).not.toHaveBeenCalled();
+    });
+
+    it('removes the metadata of a title on that server once confirmed, and tells the page', async () => {
+        const onChanged = vi.fn();
+        await openMenuFor(movie, mediaMenuTarget(movie, 'srv1', { onChanged }));
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Remove metadata…' }));
+        expect(admin.removeMetadata).not.toHaveBeenCalled();
+        const question = await screen.findByRole('dialog');
+        expect(question).toHaveTextContent('Details you locked and artwork you uploaded stay.');
+        fireEvent.click(within(question).getByRole('button', { name: 'Remove metadata' }));
+
+        await waitFor(() => expect(admin.removeMetadata).toHaveBeenCalledWith('movie-1', 'srv1'));
+        expect(await screen.findByText(/^Metadata removed\./)).toBeInTheDocument();
+    });
+
+    it('keeps the metadata when that question is cancelled', async () => {
+        await openMenuFor(movie);
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Remove metadata…' }));
+        fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        expect(admin.removeMetadata).not.toHaveBeenCalled();
+    });
+
+    it('offers a title with no metadata a way to match it again instead', async () => {
+        await openMenuFor(title({ lockedFields: ['Unmatched'] }));
+
+        expect(labels()).not.toContain('Remove metadata…');
+        expect(labels().indexOf('Match automatically')).toBe(labels().indexOf('Fix match…') + 1);
+    });
+
+    it('matches a title with no metadata again on that server once confirmed', async () => {
+        const unmatched = title({ lockedFields: ['Unmatched'] });
+        await openMenuFor(unmatched, mediaMenuTarget(unmatched, 'srv1', {}));
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Match automatically' }));
+        fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Match' }));
+
+        await waitFor(() => expect(admin.clearMatch).toHaveBeenCalledWith('movie-1', 'srv1'));
+        expect(await screen.findByText('The title is being matched in the background.')).toBeInTheDocument();
     });
 
     it('leaves the title alone when the delete is cancelled', async () => {

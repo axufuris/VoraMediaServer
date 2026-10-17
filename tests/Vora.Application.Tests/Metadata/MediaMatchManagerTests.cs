@@ -35,7 +35,7 @@ public class MediaMatchManagerTests
     }
 
     private MediaMatchManager Manager() =>
-        new(_repository, [_tvdb, _tmdb], _dedupe, _taskQueue, _localMedia, NullLogger<MediaMatchManager>.Instance);
+        new(_repository, [_tvdb, _tmdb], _dedupe, _taskQueue, _localMedia, Substitute.For<Vora.Application.Artwork.IMediaArtworkRepository>(), NullLogger<MediaMatchManager>.Instance);
 
     private static TvShow DuplicateShow(string providerId = "tvdb_metadata") => new()
     {

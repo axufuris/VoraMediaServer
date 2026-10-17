@@ -83,4 +83,24 @@ public class MediaMatchEndpointTests : IClassFixture<VoraApiTestFactory>
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task Removing_metadata_is_admin_only()
+    {
+        using var client = Client(isAdmin: false);
+
+        using var response = await client.DeleteAsync($"/api/media/{Guid.NewGuid()}/metadata", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Removing_the_metadata_of_an_item_that_does_not_exist_is_not_found()
+    {
+        using var client = Client(isAdmin: true);
+
+        using var response = await client.DeleteAsync($"/api/media/{Guid.NewGuid()}/metadata", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }

@@ -211,6 +211,10 @@ export const libraryAdminService = {
         await apiClient.delete(`/media/${mediaItemId}/match`, { serverId });
     },
 
+    removeMetadata: async (mediaItemId: string, serverId?: string): Promise<void> => {
+        await apiClient.delete(`/media/${mediaItemId}/metadata`, { serverId });
+    },
+
     analyzeMedia: async (mediaItemId: string, serverId?: string): Promise<void> => {
         await apiClient.post(`/media/${mediaItemId}/analyze`, null, { serverId });
     },

@@ -184,11 +184,11 @@ public class MediaManager : IMediaManager
         item.ContentRating = request.ContentRating;
         item.ReleaseDate = request.ReleaseDate;
 
-        var matchedByHand = item.IsLocked(MediaMatchManager.MatchLock);
+        var identityLocks = item.LockedFields.Where(MediaMatchManager.IsIdentityLock).ToList();
         item.LockedFields = request.LockedFields
-            .Where(field => !field.Equals(MediaMatchManager.MatchLock, StringComparison.OrdinalIgnoreCase))
+            .Where(field => !MediaMatchManager.IsIdentityLock(field))
+            .Concat(identityLocks)
             .ToList();
-        if (matchedByHand) item.LockField(MediaMatchManager.MatchLock);
 
         await _repository.UpdateMediaItemAsync(item);
 

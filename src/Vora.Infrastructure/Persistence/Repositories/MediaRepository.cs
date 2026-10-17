@@ -124,7 +124,7 @@ public partial class MediaRepository : IMediaRepository
 
         return movies
             .SelectMany(m => m.Files.Select(file => new MovieFilePlacement(file, m.Id, m.TmdbId, m.ImdbId,
-                m.LockedFields.Contains(Vora.Application.Metadata.MediaMatchManager.MatchLock, StringComparer.OrdinalIgnoreCase))))
+                Vora.Application.Metadata.MediaMatchManager.IdentityChosenByHand(m.LockedFields))))
             .ToList();
     }
 
@@ -334,7 +334,7 @@ public partial class MediaRepository : IMediaRepository
             .Select(m => m.LockedFields)
             .FirstOrDefaultAsync();
 
-        var matchedByHand = locks != null && locks.Contains(Vora.Application.Metadata.MediaMatchManager.MatchLock, StringComparer.OrdinalIgnoreCase);
+        var matchedByHand = locks != null && Vora.Application.Metadata.MediaMatchManager.IdentityChosenByHand(locks);
         return new Vora.Application.Media.Dtos.TitleOwnerDto(titleId, matchedByHand);
     }
 
@@ -926,6 +926,33 @@ public partial class MediaRepository : IMediaRepository
             .Include(m => ((Episode)m).Season).ThenInclude(s => s.TvShow).ThenInclude(t => t.Cast).ThenInclude(c => c.Actor)
             .AsSplitQuery()
             .FirstOrDefaultAsync(m => m.Id == id);
+    }
+
+    public async Task<List<MediaItem>> GetShowChildrenForMetadataResetAsync(Guid tvShowId)
+    {
+        var seasons = await _context.Set<Season>()
+            .Include(s => s.Genres)
+            .Include(s => s.Cast)
+            .Include(s => s.ProductionCompanies)
+            .Include(s => s.OriginCountries)
+            .Include(s => s.Videos)
+            .Where(s => s.TvShowId == tvShowId)
+            .AsSplitQuery()
+            .ToListAsync();
+
+        var episodes = await _context.Set<Episode>()
+            .Include(e => e.Season)
+            .Include(e => e.MediaParts)
+            .Include(e => e.Genres)
+            .Include(e => e.Cast)
+            .Include(e => e.ProductionCompanies)
+            .Include(e => e.OriginCountries)
+            .Include(e => e.Videos)
+            .Where(e => e.Season.TvShowId == tvShowId)
+            .AsSplitQuery()
+            .ToListAsync();
+
+        return [.. seasons, .. episodes];
     }
 
     // Tracks are deliberately out of scope here, as they already are for ratings.

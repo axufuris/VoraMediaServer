@@ -116,7 +116,7 @@ public class MetadataFetchService : IMetadataFetchService
     }
 
     private static bool HasFixedIdentity(MediaItem title) =>
-        title.IsLocked(MediaMatchManager.MatchLock)
+        MediaMatchManager.IdentityChosenByHand(title.LockedFields)
         || title.IsLocked(nameof(title.TmdbId))
         || title.IsLocked(nameof(title.ImdbId))
         || title.IsLocked(nameof(title.TvdbId));
@@ -322,7 +322,15 @@ public class MetadataFetchService : IMetadataFetchService
         StaysLocal(item) || item.Library?.ArtworkProviderId == LocalArtworkProvider.ProviderId;
 
     private static bool StaysLocal(MediaItem item) =>
-        item.Library is { } library && !library.Type.LooksUpMetadataOnline();
+        (item.Library is { } library && !library.Type.LooksUpMetadataOnline())
+        || TitleOf(item)?.IsLocked(MediaMatchManager.UnmatchedLock) == true;
+
+    private static MediaItem? TitleOf(MediaItem item) => item switch
+    {
+        Episode episode => episode.Season?.TvShow,
+        Season season => season.TvShow,
+        _ => item
+    };
 
     private async Task<List<MediaArtwork>> FindLocalArtworkAsync(MediaItem item)
     {

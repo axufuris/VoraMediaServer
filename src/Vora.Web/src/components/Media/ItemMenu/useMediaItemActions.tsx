@@ -21,6 +21,9 @@ type OpenDialog = 'info' | 'edit' | 'playlist' | 'collection' | 'match' | 'marke
 // Fix match leaves this in a title's locked fields; while it is there, nothing
 // automatic (a scan, a refresh, an NFO file) changes which title this is.
 const MATCH_LOCK = 'match';
+// Remove metadata leaves this one: the title stays as its files name it and is
+// never looked up until it is matched again.
+const UNMATCHED_LOCK = 'unmatched';
 
 export interface MediaItemActionsOptions {
     serverId?: string;
@@ -87,6 +90,7 @@ export function useMediaItemActions(media: MediaItem | null, options: MediaItemA
     const hasFileInfo = hasThumbnails && (media.mediaParts?.length ?? 0) > 0;
     const canFixMatch = media.type === 'Movie' || media.type === 'TvShow';
     const matchedByHand = canFixMatch && (media.lockedFields ?? []).some(field => field.toLowerCase() === MATCH_LOCK);
+    const unmatched = canFixMatch && (media.lockedFields ?? []).some(field => field.toLowerCase() === UNMATCHED_LOCK);
     const pathTo = (id: string) => serverId ? `/server/${serverId}/media/${id}` : `/media/${id}`;
     const close = () => setOpenDialog(null);
 
@@ -176,6 +180,42 @@ export function useMediaItemActions(media: MediaItem | null, options: MediaItemA
         }
     };
 
+    const removeMetadata = async () => {
+        const isShow = media.type === 'TvShow';
+        const confirmed = await dialog.confirm({
+            title: 'Remove metadata?',
+            message: `This clears everything Vora looked up for this ${isShow ? 'show and its seasons and episodes' : 'movie'}: the match, description, artwork, cast, genres, studios, ratings and trailers. ${isShow ? 'Names' : 'The name'} come back from the files. Details you locked and artwork you uploaded stay. Vora won't look it up again until you use Fix match or Match automatically.`,
+            confirmText: 'Remove metadata',
+            tone: 'danger',
+        });
+        if (!confirmed) return;
+
+        try {
+            await libraryAdminService.removeMetadata(media.id, serverId);
+            await dialog.alert('Metadata removed. The title now shows what its files say, with artwork from its folder or a frame of the video.');
+            onChanged();
+        } catch {
+            await dialog.alert('Failed to remove the metadata.');
+        }
+    };
+
+    const matchAutomatically = async () => {
+        const confirmed = await dialog.confirm({
+            title: 'Match automatically?',
+            message: 'Vora will look this title up again from its file name, and from its NFO file if this library reads them. Details you have locked stay as they are.',
+            confirmText: 'Match',
+        });
+        if (!confirmed) return;
+
+        try {
+            await libraryAdminService.clearMatch(media.id, serverId);
+            await dialog.alert('The title is being matched in the background.');
+            onChanged();
+        } catch {
+            await dialog.alert('Failed to start matching the title.');
+        }
+    };
+
     const markWatched = async () => {
         if (await toggleWatched(media, dialog, serverId)) onChanged();
     };
@@ -214,6 +254,8 @@ export function useMediaItemActions(media: MediaItem | null, options: MediaItemA
         entries.push(menuSeparator('before-admin'));
         if (canFixMatch) entries.push(menuAction('match', 'Fix match…', () => setOpenDialog('match')));
         if (matchedByHand) entries.push(menuAction('clear-match', 'Clear manual match', clearMatch));
+        if (unmatched) entries.push(menuAction('match-automatically', 'Match automatically', matchAutomatically));
+        if (canFixMatch && !unmatched) entries.push(menuAction('remove-metadata', 'Remove metadata…', removeMetadata));
         entries.push(menuAction('refresh', 'Refresh metadata', refresh));
         entries.push(menuAction('scan', 'Scan files', scan));
         entries.push(menuAction('analyze', 'Analyze media', analyze));

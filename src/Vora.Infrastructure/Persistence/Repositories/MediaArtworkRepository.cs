@@ -39,6 +39,19 @@ public class MediaArtworkRepository(VoraDbContext context) : IMediaArtworkReposi
             .Where(a => a.MediaItem.LibraryId == libraryId && !a.IsUserUploaded)
             .ExecuteDeleteAsync(cancellationToken);
 
+    public Task ClearProviderArtworkAsync(IReadOnlyCollection<Guid> mediaItemIds) =>
+        context.Set<MediaArtwork>()
+            .Where(a => mediaItemIds.Contains(a.MediaItemId) && !a.IsUserUploaded)
+            .ExecuteDeleteAsync();
+
+    public async Task<HashSet<string>> GetUploadedArtworkUrlsAsync(IReadOnlyCollection<Guid> mediaItemIds) =>
+        (await context.Set<MediaArtwork>()
+            .AsNoTracking()
+            .Where(a => mediaItemIds.Contains(a.MediaItemId) && a.IsUserUploaded)
+            .Select(a => a.Url)
+            .ToListAsync())
+        .ToHashSet(StringComparer.Ordinal);
+
     public async Task AddMediaArtworkAsync(MediaArtwork artwork)
     {
         await context.Set<MediaArtwork>().AddAsync(artwork);
