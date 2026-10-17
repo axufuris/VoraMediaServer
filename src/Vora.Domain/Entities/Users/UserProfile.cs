@@ -47,6 +47,9 @@ public class UserProfile
     public SubtitleMode? SubtitleMode { get; set; }
     public bool PreferHearingImpairedSubtitles { get; set; }
 
+    public LibrarySortField? LibrarySort { get; set; }
+    public bool LibrarySortDescending { get; set; }
+
     public string? ClientTemplateId { get; set; }
     public string? ScheduleOverrideTemplateId { get; set; }
     public Guid? ScheduleOverrideScheduleId { get; set; }

@@ -93,6 +93,16 @@ and falling the whole cast back would replace the guest actors with the show's.
 
 **Sizing.** Card metrics are tokens in `styles/tokens.css`: `--vora-card-w-sm|md|lg`, `--vora-card-min-w`, `--vora-card-gap`, `--vora-card-title-size`, `--vora-card-caption-size`, `--vora-card-badge-size`, `--vora-person-w`, `--vora-video-w`, `--vora-row-title-size`, `--vora-row-gutter`. The widths are `clamp(rem, vw, rem)` so a tile follows both the root font size and the viewport instead of snapping at breakpoints. Change a token and every rail, grid and detail page moves together. Never size a tile in `px`.
 
+## Library sort
+
+A movie, TV or home video library opens on, in order:
+
+1. **A sort picked on that library's page**, remembered on this device for this profile (`vora_library_sort_<profileId>_<libraryId>`), but only while the profile's default is the one it was picked under. Changing the default in Settings moves every library to it.
+2. **The profile's library sort**, from Settings → Account → Library sort order (`UserProfile.LibrarySort` / `LibrarySortDescending`, `GET`/`PUT /api/users/profiles/me/library-sort`). It follows the profile to every device.
+3. **The server default**: titles A to Z, home videos newest first (`serverDefaultSort`).
+
+The keys, labels and these rules live in `utils/librarySort.ts`, shared by `LibraryPage` and `LibrarySortSection`. The page shows its skeleton until the profile's sort has loaded, so it never reorders after the posters appear; if the request fails it opens on the server default. The old per-device keys (`vora_library_sort_<libraryId>`, `vora_library_sortdir_<libraryId>`) are still read while the profile is on the server default, and are removed the next time a sort is picked.
+
 ## The title menu
 
 Right-clicking a movie, show, season or episode, or holding it on a touch screen, opens the same menu as the title page's "more" button. One set of actions feeds both, so they cannot drift.

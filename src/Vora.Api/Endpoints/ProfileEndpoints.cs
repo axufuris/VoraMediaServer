@@ -176,6 +176,14 @@ public static class ProfileEndpoints
             .WithName("SaveMyPlaybackPreferences")
             .Produces<PlaybackPreferencesVM>(StatusCodes.Status200OK);
 
+        group.MapGet("/profiles/me/library-sort", GetMyLibrarySortAsync)
+            .WithName("GetMyLibrarySort")
+            .Produces<LibrarySortVM>(StatusCodes.Status200OK);
+        group.MapPut("/profiles/me/library-sort", SaveMyLibrarySortAsync)
+            .WithName("SaveMyLibrarySort")
+            .Produces<LibrarySortVM>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
         group.MapGet("/profiles/me/track-preferences", GetMyTrackPreferencesAsync)
             .WithName("GetMyTrackPreferences")
             .Produces<TrackPreferencesVM>(StatusCodes.Status200OK);
@@ -356,6 +364,20 @@ public static class ProfileEndpoints
         if (!profileId.HasValue) return Results.Unauthorized();
         var saved = await manager.SavePlaybackPreferencesAsync(profileId.Value, body);
         return Results.Ok(saved);
+    }
+
+    private static async Task<IResult> GetMyLibrarySortAsync(HttpContext ctx, IUserManager manager)
+    {
+        var profileId = ctx.User.GetProfileId();
+        if (!profileId.HasValue) return Results.Unauthorized();
+        return Results.Ok(await manager.GetLibrarySortAsync(profileId.Value));
+    }
+
+    private static async Task<IResult> SaveMyLibrarySortAsync(HttpContext ctx, [FromBody] LibrarySortVM body, IUserManager manager)
+    {
+        var profileId = ctx.User.GetProfileId();
+        if (!profileId.HasValue) return Results.Unauthorized();
+        return Results.Ok(await manager.SaveLibrarySortAsync(profileId.Value, body));
     }
 
     private static async Task<IResult> GetMyTrackPreferencesAsync(HttpContext ctx, ITrackPreferenceManager manager)

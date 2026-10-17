@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261017000904_ChangesSinceInitial")]
+    [Migration("20261017011545_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -4401,6 +4401,12 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<string>("LastFmUsername")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<int?>("LibrarySort")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("LibrarySortDescending")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("MinimumCreditsSceneSeconds")
                         .HasColumnType("integer");

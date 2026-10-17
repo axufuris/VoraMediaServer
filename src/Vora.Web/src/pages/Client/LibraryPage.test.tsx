@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import LibraryPage from './LibraryPage';
 import { DialogProvider } from '../../dialogs';
@@ -10,6 +10,11 @@ const mocks = vi.hoisted(() => ({
     getLibraryById: vi.fn(),
     getLibraryMedia: vi.fn(),
     getLibraryCollections: vi.fn(),
+    getMyLibrarySort: vi.fn(),
+}));
+
+vi.mock('../../api/Users/profileService', () => ({
+    profileService: { getMyLibrarySort: mocks.getMyLibrarySort },
 }));
 
 vi.mock('../../api/Media/libraryService', () => ({
@@ -72,6 +77,7 @@ beforeEach(() => {
     localStorage.clear();
     mocks.getLibraryMedia.mockResolvedValue(videos);
     mocks.getLibraryCollections.mockResolvedValue([]);
+    mocks.getMyLibrarySort.mockResolvedValue({ sort: null, descending: false });
 });
 
 describe('LibraryPage sort', () => {
@@ -102,6 +108,42 @@ describe('LibraryPage sort', () => {
 
         const sort = await screen.findByRole('button', { name: /^Title/ });
         expect(within(sort).queryByText('Date')).toBeNull();
+    });
+
+    it('opens on the sort chosen for the profile in Settings', async () => {
+        mocks.getMyLibrarySort.mockResolvedValue({ sort: 'ReleaseDate', descending: true });
+        mocks.getLibraryById.mockResolvedValue(library('Movie'));
+
+        renderPage();
+
+        expect(await screen.findByRole('button', { name: /^Release Date/ })).toBeInTheDocument();
+        expect(shownTitles(['Beach Day', 'Wedding', 'Birthday'])).toEqual(['Wedding', 'Birthday', 'Beach Day']);
+    });
+
+    it('remembers a sort picked on the page until the profile sort changes', async () => {
+        mocks.getLibraryById.mockResolvedValue(library('Movie'));
+        const first = renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: /^Title/ }));
+        fireEvent.click(screen.getByRole('button', { name: /^Release Date/ }));
+        first.unmount();
+
+        renderPage();
+        expect(await screen.findByRole('button', { name: /^Release Date/ })).toBeInTheDocument();
+        cleanup();
+
+        mocks.getMyLibrarySort.mockResolvedValue({ sort: 'DateAdded', descending: true });
+        renderPage();
+        expect(await screen.findByRole('button', { name: /^Date Added/ })).toBeInTheDocument();
+    });
+
+    it('opens on the server default when the profile sort cannot be read', async () => {
+        mocks.getMyLibrarySort.mockRejectedValue(new Error('offline'));
+        mocks.getLibraryById.mockResolvedValue(library('HomeVideo'));
+
+        renderPage();
+
+        expect(await screen.findByRole('button', { name: /^Date/ })).toBeInTheDocument();
     });
 });
 

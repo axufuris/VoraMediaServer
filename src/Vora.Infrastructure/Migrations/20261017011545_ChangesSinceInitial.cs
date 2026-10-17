@@ -38,7 +38,9 @@ ALTER TABLE ""MediaVideoTracks"" ADD COLUMN IF NOT EXISTS ""Width"" integer;
 ALTER TABLE ""MediaVideoTracks"" ADD COLUMN IF NOT EXISTS ""Height"" integer;
 ALTER TABLE ""MediaVideoTracks"" ADD COLUMN IF NOT EXISTS ""FrameRate"" double precision;
 ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""OutputWidth"" integer;
-ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""OutputHeight"" integer;");
+ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""OutputHeight"" integer;
+ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""LibrarySort"" integer;
+ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""LibrarySortDescending"" boolean NOT NULL DEFAULT FALSE;");
 
             migrationBuilder.Sql(@"
 DO $$
@@ -192,6 +194,14 @@ CREATE INDEX ""IX_Albums_ArtistId_Title"" ON ""Albums"" (""ArtistId"", ""Title""
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "LibrarySort",
+                table: "UserProfiles");
+
+            migrationBuilder.DropColumn(
+                name: "LibrarySortDescending",
+                table: "UserProfiles");
+
             migrationBuilder.DropColumn(
                 name: "Width",
                 table: "MediaVideoTracks");

@@ -48,7 +48,7 @@ An admin's forced **Analyze** on one item still runs, as it does for any library
 
 ## In the client
 
-`LibraryPage` opens a Home Video library sorted by **Date, newest first**, unless the viewer already saved a sort for that library (`vora_library_sort_{id}`). The sort menu calls `releaseDate` "Date" there instead of "Release Date". Cards are the usual `MediaCard`, showing the frame poster above.
+`LibraryPage` opens a Home Video library sorted by **Date, newest first**, unless the profile has a library sort of its own or the viewer picked one for that library (see "Library sort" in `docs/frontend-client-ui.md`). The sort menu calls `releaseDate` "Date" there instead of "Release Date". Cards are the usual `MediaCard`, showing the frame poster above.
 
 ## Tests
 
