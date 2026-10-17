@@ -20,7 +20,7 @@ import MainLayoutSidebar from './parts/MainLayoutSidebar';
 import MainLayoutUserMenu from './parts/MainLayoutUserMenu';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import type { FeatureFlagsVM } from '../api/System/featureFlagsService';
-import { moveNavItem } from '../utils/navOrder';
+import { moveShownNavItem } from '../utils/navOrder';
 import MediaItemMenuProvider from '../components/Media/ItemMenu/MediaItemMenuProvider';
 
 const isNavItemEnabled = (item: NavItem, flags: FeatureFlagsVM): boolean => {
@@ -270,7 +270,7 @@ export default function MainLayout() {
 
     const moveItem = (from: number, to: number) => {
         if (from === to) return;
-        saveNavPrefs(moveNavItem(navItems, from, to));
+        saveNavPrefs(moveShownNavItem(navItems, item => isNavItemEnabled(item, flags), from, to));
     };
 
     useEffect(() => {
