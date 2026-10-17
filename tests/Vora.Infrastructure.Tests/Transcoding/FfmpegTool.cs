@@ -23,6 +23,24 @@ internal static class FfmpegTool
         }
     }
 
+    public const string JellyfinSkipReason = "Needs jellyfin-ffmpeg on PATH, whose command line pauses on p and resumes on u.";
+
+    public static bool IsJellyfinBuild()
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo("ffmpeg", "-hide_banner -version") { RedirectStandardOutput = true, UseShellExecute = false });
+            if (process is null) return false;
+            var version = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            return process.ExitCode == 0 && version.Contains("Jellyfin", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Win32Exception)
+        {
+            return false;
+        }
+    }
+
     public static async Task<byte[]> RunAsync(CancellationToken cancellationToken, params string[] arguments)
     {
         var startInfo = new ProcessStartInfo("ffmpeg") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };

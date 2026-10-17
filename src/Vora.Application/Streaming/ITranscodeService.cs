@@ -10,6 +10,7 @@ public interface ITranscodeService
     void NotifySegmentServed(Guid mediaItemId, int segmentIndex);
     void TouchSession(Guid mediaItemId);
     Task EvictIdleSessionsAsync(TimeSpan maxIdle);
+    Task ThrottleAsync(CancellationToken cancellationToken = default);
     Task ReapOrphanedTranscodeFilesAsync(string targetDir, TimeSpan maxAge);
     int GetActiveTranscodeCount();
     bool IsMediaTranscoding(Guid mediaItemId);

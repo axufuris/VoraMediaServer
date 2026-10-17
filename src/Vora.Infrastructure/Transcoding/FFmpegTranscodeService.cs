@@ -164,6 +164,8 @@ public class FFmpegTranscodeService : ITranscodeService
             return true;
         }
 
+        await ResumeAsync(mediaItemId, "the player asked for a segment it has not written yet");
+
         // What range is the current FFmpeg encoder targeting? It started at
         // ctx.CurrentStartSegment and is producing segments sequentially.
         // The leading edge on disk tells us where it's gotten to.
@@ -315,6 +317,7 @@ public class FFmpegTranscodeService : ITranscodeService
         if (_transcodeContexts.TryGetValue(mediaItemId, out var ctx))
         {
             ctx.LastActivityAt = DateTime.UtcNow;
+            ctx.LastServedSegment = segmentIndex;
             if (segmentIndex > ctx.HighestServedSegment)
             {
                 ctx.HighestServedSegment = segmentIndex;
@@ -329,6 +332,66 @@ public class FFmpegTranscodeService : ITranscodeService
             ctx.LastActivityAt = DateTime.UtcNow;
         }
     }
+
+    public Task ThrottleAsync(CancellationToken cancellationToken = default) => ThrottleAsync(TranscodeHost.Detect(), cancellationToken);
+
+    internal async Task ThrottleAsync(TranscodeHost host, CancellationToken cancellationToken)
+    {
+        if (_activeTranscodes.IsEmpty) return;
+
+        var settings = await LoadSettingsAsync();
+        bool pausable = host.HasJellyfinFfmpeg;
+        foreach (var (mediaItemId, entry) in _activeTranscodes.ToArray())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_transcodeContexts.TryGetValue(mediaItemId, out var ctx)) continue;
+
+            bool canPause = pausable && settings.TranscoderThrottleBuffer > 0 && !CopiesVideo(ctx.Decision);
+            int leadingEdge = canPause ? FirstMissingSegment(mediaItemId, ctx.TargetDir, ctx.CurrentStartSegment) - 1 : -1;
+            switch (TranscodeThrottle.Decide(settings.TranscoderThrottleBuffer, canPause, entry.Paused, ctx.Plan, ctx.LastServedSegment, leadingEdge))
+            {
+                case ThrottleStep.Pause:
+                    await SetPausedAsync(mediaItemId, entry, pause: true,
+                        $"it is {TranscodeThrottle.SecondsAhead(ctx.Plan, ctx.LastServedSegment, leadingEdge):0} s ahead of the player");
+                    break;
+                case ThrottleStep.Resume:
+                    await SetPausedAsync(mediaItemId, entry, pause: false, "the player is catching up");
+                    break;
+            }
+        }
+    }
+
+    private async Task ResumeAsync(Guid mediaItemId, string reason)
+    {
+        if (_activeTranscodes.TryGetValue(mediaItemId, out var entry) && entry.Paused)
+        {
+            await SetPausedAsync(mediaItemId, entry, pause: false, reason);
+        }
+    }
+
+    private async Task SetPausedAsync(Guid mediaItemId, TranscodeProcess entry, bool pause, string reason)
+    {
+        await entry.Control.WaitAsync();
+        try
+        {
+            if (entry.Paused == pause || entry.Stopping || entry.Process.HasExited) return;
+            await entry.Process.StandardInput.WriteAsync(pause ? PauseKey : ResumeKey);
+            await entry.Process.StandardInput.FlushAsync();
+            entry.Paused = pause;
+            _logger.LogInformation(pause ? "Paused the transcode of {MediaItemId}: {Reason}." : "Resumed the transcode of {MediaItemId}: {Reason}.", mediaItemId, reason);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException)
+        {
+            _logger.LogDebug(ex, "Could not {Action} the transcode of {MediaItemId}.", pause ? "pause" : "resume", mediaItemId);
+        }
+        finally
+        {
+            entry.Control.Release();
+        }
+    }
+
+    private const string PauseKey = "p";
+    private const string ResumeKey = "u";
 
     public async Task EvictIdleSessionsAsync(TimeSpan maxIdle)
     {
@@ -579,6 +642,7 @@ public class FFmpegTranscodeService : ITranscodeService
             StartInfo = new ProcessStartInfo
             {
                 FileName = "ffmpeg",
+                RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -1185,13 +1249,20 @@ public class FFmpegTranscodeService : ITranscodeService
     private sealed class TranscodeProcess(Process process, bool isGpu)
     {
         private volatile bool _stopping;
+        private volatile bool _paused;
 
         public Process Process { get; } = process;
         public bool IsGpu { get; } = isGpu;
+        public SemaphoreSlim Control { get; } = new(1, 1);
         public bool Stopping
         {
             get => _stopping;
             set => _stopping = value;
+        }
+        public bool Paused
+        {
+            get => _paused;
+            set => _paused = value;
         }
     }
 
@@ -1210,6 +1281,7 @@ public class FFmpegTranscodeService : ITranscodeService
             LaunchedAt = DateTime.UtcNow;
             LastActivityAt = DateTime.UtcNow;
             HighestServedSegment = -1;
+            LastServedSegment = -1;
         }
         public string SourceFile { get; }
         public PlaybackDecisionVM Decision { get; }
@@ -1230,5 +1302,6 @@ public class FFmpegTranscodeService : ITranscodeService
         // us distinguish player initial-probe requests for segment 0
         // (suppress) from a real user seek backward (allow restart).
         public int HighestServedSegment { get; set; }
+        public int LastServedSegment { get; set; }
     }
 }

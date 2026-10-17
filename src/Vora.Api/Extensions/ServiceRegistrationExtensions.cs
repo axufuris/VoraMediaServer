@@ -533,6 +533,7 @@ public static class ServiceRegistrationExtensions
         services.AddHostedService<TaskProcessingWorker>();
         services.AddHostedService<TimeshiftJanitorWorker>();
         services.AddHostedService<TranscodeJanitorWorker>();
+        services.AddHostedService<TranscodeThrottleWorker>();
         return services;
     }
 

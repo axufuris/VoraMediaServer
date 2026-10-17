@@ -93,6 +93,20 @@ The seek-restart rules count **seconds, not segments**, because copied segments 
 
 Tests: `SegmentPlanTests`, `KeyframeReaderTests` (built EBML and MP4 boxes), `KeyframeSegmentArgumentTests` (pinned FFmpeg arguments), `SegmentPublishingTests`, and `KeyframeSegmentFileTests`, which runs real FFmpeg on H.264 and HEVC in MKV and MP4 with uneven keyframes: the index must match ffprobe, every segment must start on its planned keyframe, and two restarts must write the same segments as a whole run. It is skipped without ffmpeg and ffprobe on PATH.
 
+## Throttling
+
+A transcode stops working ahead of the viewer once it has a buffer written. `TranscodeThrottleWorker` calls `ITranscodeService.ThrottleAsync` every 5 seconds. For each encoding session it measures how far the last finished segment runs past the one the player last fetched (`LastServedSegment`, set by `NotifySegmentServed`), and `TranscodeThrottle.Decide` says what to do:
+
+- **Pause** at `TranscoderThrottleBuffer` seconds ahead (Server Settings → Core → Transcoder → Throttle Buffer, default 60, never under 30). FFmpeg pauses on `p` written to its stdin and resumes on `u`. Only jellyfin-ffmpeg understands them; the Docker image ships it (`HostEnvironmentDetector.HasJellyfinFfmpeg`), and without it nothing pauses.
+- **Resume** when the player is within half the buffer of the edge, so it doesn't flap at the line, and at once when the player asks for a segment that isn't written yet (`EnsureSegmentAvailableAsync`), whether it caught up or seeked.
+- **Leave alone** copied video (cheap to run to the end), a setting of 0, and a session the player hasn't fetched from yet.
+
+A paused FFmpeg keeps its process and decoder state, so resuming costs nothing, and idle eviction still stops it like any other session. Segments are written under a temporary name (`-hls_flags temp_file`) and renamed when finished, so a paused run never leaves a half-written `.ts` for the seal check to take as finished. Every pause and resume is logged with its reason.
+
+Plex throttles this way by default. Jellyfin has the same pause and resume but leaves it off, with a 60-second minimum.
+
+Tests: `TranscodeThrottleTests` (the decision) and `TranscodeThrottlingFileTests`, which runs real jellyfin-ffmpeg: a transcode far ahead pauses and writes nothing, then carries on once the player catches up. It is skipped without jellyfin-ffmpeg on PATH.
+
 ## Watch state
 
 A progress ping writes `UserMediaState` through `StreamRepository.UpdateUserMediaStateAsync`, and `WatchStateTransition` decides what it means:
