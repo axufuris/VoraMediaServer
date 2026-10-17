@@ -76,6 +76,8 @@ export interface PlaybackTranscoderStats {
     speed?: number | null;
     running: boolean;
     retriedOnCpu: boolean;
+    // Throttling has it waiting for the player to catch up.
+    paused: boolean;
 }
 
 // What the server knows about a playing stream: the source beside what the

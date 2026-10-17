@@ -53,7 +53,7 @@ public class PlaybackStatsTests
         new(1, "audio", "dts", "DTS-HD MA", null, 48000, "5.1(side)", 3_812_000),
     ];
 
-    private static readonly TranscodeStatusDto Nvenc = new("h264_nvenc", "NVIDIA NVENC", "NVIDIA NVDEC", 6800, 8000, "hable (GPU, CUDA)", "aac", 2, 192, 96, 4.01, true, false);
+    private static readonly TranscodeStatusDto Nvenc = new("h264_nvenc", "NVIDIA NVENC", "NVIDIA NVDEC", 6800, 8000, "hable (GPU, CUDA)", "aac", 2, 192, 96, 4.01, true, false, false);
 
     [Fact]
     public void Describes_the_source_beside_what_the_viewer_gets()
@@ -98,6 +98,14 @@ public class PlaybackStatsTests
         stats.Transcoder.Should().BeNull();
         stats.Subtitle.Should().BeNull();
         Assert.IsType<PlaybackVideoStatsVM>(stats.Video).OutputBitrateKbps.Should().BeNull();
+    }
+
+    [Fact]
+    public void Says_when_throttling_has_paused_the_transcode()
+    {
+        var stats = PlaybackStats.Build(Transcoding(), Part(), Facts, Nvenc with { Paused = true });
+
+        Assert.IsType<PlaybackTranscoderStatsVM>(stats.Transcoder).Paused.Should().BeTrue();
     }
 
     [Theory]

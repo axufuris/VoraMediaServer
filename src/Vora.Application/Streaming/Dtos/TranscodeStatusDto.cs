@@ -13,4 +13,5 @@ public sealed record TranscodeStatusDto(
     double? Fps,
     double? Speed,
     bool Running,
-    bool RetriedOnCpu);
+    bool RetriedOnCpu,
+    bool Paused);

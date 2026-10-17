@@ -70,4 +70,5 @@ public class PlaybackTranscoderStatsVM
     public double? Speed { get; set; }
     public bool Running { get; set; }
     public bool RetriedOnCpu { get; set; }
+    public bool Paused { get; set; }
 }

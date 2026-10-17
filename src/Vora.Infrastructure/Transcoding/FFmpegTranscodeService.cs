@@ -330,8 +330,10 @@ public class FFmpegTranscodeService : ITranscodeService
             progress?.Fps,
             progress?.Speed,
             IsEncoding(mediaItemId),
-            ctx.RetriedOnCpu);
+            ctx.RetriedOnCpu,
+            _activeTranscodes.TryGetValue(mediaItemId, out var entry) && entry.Paused);
     }
+
     public bool IsMediaTranscoding(Guid mediaItemId) => _activeTranscodes.ContainsKey(mediaItemId);
 
     public void NotifySegmentServed(Guid mediaItemId, int segmentIndex)

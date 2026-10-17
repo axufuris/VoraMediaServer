@@ -50,9 +50,11 @@ const joined = (parts: (string | null | undefined)[]) => parts.filter((part): pa
 function transcoderLine(stats: PlaybackStats): string | null {
     const transcoder = stats.transcoder;
     if (!transcoder) return null;
-    const pace = transcoder.running
-        ? joined([transcoder.fps != null ? `${Math.round(transcoder.fps)} fps` : null, speedText(transcoder.speed)])
-        : 'Finished';
+    const pace = !transcoder.running
+        ? 'Finished'
+        : transcoder.paused
+            ? 'Paused, far enough ahead of the player'
+            : joined([transcoder.fps != null ? `${Math.round(transcoder.fps)} fps` : null, speedText(transcoder.speed)]);
     return joined([transcoder.encodeHardware, pace, transcoder.retriedOnCpu ? 'moved to the CPU after a GPU error' : null]);
 }
 

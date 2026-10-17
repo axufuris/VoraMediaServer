@@ -27,7 +27,7 @@ const transcoding: PlaybackStats = {
         strategy: 'Transcode', outputCodec: 'aac', outputChannels: 2, outputBitrateKbps: 192,
     },
     subtitle: null,
-    transcoder: { encoder: 'h264_nvenc', encodeHardware: 'NVIDIA NVENC', decodeHardware: 'NVIDIA NVDEC', fps: 96.4, speed: 4.01, running: true, retriedOnCpu: false },
+    transcoder: { encoder: 'h264_nvenc', encodeHardware: 'NVIDIA NVENC', decodeHardware: 'NVIDIA NVDEC', fps: 96.4, speed: 4.01, running: true, retriedOnCpu: false, paused: false },
 };
 
 const reading: PlayerReading = { engine: 'hls.js', droppedFrames: 3, totalFrames: 12345, bufferedSeconds: 31.6, bandwidthKbps: 23400 };
@@ -82,18 +82,26 @@ describe('Playback info', () => {
         render(<PlaybackStatsSections sessionId="session-1" readPlayer={() => reading} />);
         await screen.findByText('Transcode');
 
-        getSessionStats.mockResolvedValue({ ...transcoding, transcoder: { ...transcoding.transcoder, speed: 1.2, fps: 28, running: true, retriedOnCpu: false } });
+        getSessionStats.mockResolvedValue({ ...transcoding, transcoder: { ...transcoding.transcoder, speed: 1.2, fps: 28, running: true, retriedOnCpu: false, paused: false } });
         await act(async () => { await vi.advanceTimersByTimeAsync(SERVER_REFRESH_MS); });
 
         expect(statValue(section('Stream'), 'Transcoder')).toBe('NVIDIA NVENC · 28 fps · 1.2×');
     });
 
     it('says when the transcode has finished the whole file', async () => {
-        getSessionStats.mockResolvedValue({ ...transcoding, transcoder: { encodeHardware: 'CPU', running: false, retriedOnCpu: false } });
+        getSessionStats.mockResolvedValue({ ...transcoding, transcoder: { encodeHardware: 'CPU', running: false, retriedOnCpu: false, paused: false } });
         render(<PlaybackStatsSections sessionId="session-1" readPlayer={() => reading} />);
 
         await screen.findByText('Transcode');
         expect(statValue(section('Stream'), 'Transcoder')).toBe('CPU · Finished');
+    });
+
+    it('says when throttling has paused the transcode rather than its last speed', async () => {
+        getSessionStats.mockResolvedValue({ ...transcoding, transcoder: { encodeHardware: 'NVIDIA NVENC', fps: 96, speed: 4, running: true, retriedOnCpu: false, paused: true } });
+        render(<PlaybackStatsSections sessionId="session-1" readPlayer={() => reading} />);
+
+        await screen.findByText('Transcode');
+        expect(statValue(section('Stream'), 'Transcoder')).toBe('NVIDIA NVENC · Paused, far enough ahead of the player');
     });
 
     it('still shows what the player knows when the server cannot answer', async () => {

@@ -80,6 +80,7 @@ public static class PlaybackStats
                 Speed = transcode.Speed,
                 Running = transcode.Running,
                 RetriedOnCpu = transcode.RetriedOnCpu,
+                Paused = transcode.Paused,
             },
         };
     }
