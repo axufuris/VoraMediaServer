@@ -28,6 +28,7 @@ public partial class MediaRepository
             {
                 ex.Codec = inc.Codec; ex.Profile = inc.Profile; ex.HdrType = inc.HdrType;
                 ex.BitDepth = inc.BitDepth; ex.Bitrate = inc.Bitrate; ex.IsDefault = inc.IsDefault;
+                ex.Width = inc.Width; ex.Height = inc.Height; ex.FrameRate = inc.FrameRate;
             }
             else
             {

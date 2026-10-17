@@ -13,6 +13,7 @@ export interface DeviceCapabilities {
     clientBandwidthKbps: number;
     requestedClientBitrateKbps: number;
     requestedMaxResolution: number;
+    requestedMaxWidth: number;
     supportedHdrFormats: string[];
     maxVideoBitDepth: number;
 }
@@ -127,6 +128,7 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
 
     let requestedClientBitrateKbps = 0;
     let requestedMaxResolution = 0;
+    let requestedMaxWidth = 0;
 
     // Only the bitrate preference is folded into the raw scan (it's a plain
     // request, not a device capability). The Max Resolution / Max Audio
@@ -227,18 +229,24 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
         || mseSupports('video/mp4; codecs="av01.0.08M.10"');
     const maxVideoBitDepth = supports10Bit ? 10 : 8;
 
-    // Auto-detected raw display max height (device capability). The user's
-    // Max Resolution preference is applied later in applyUserCaps, never here.
-    // min(width,height) picks the vertical size for both landscape and
-    // portrait; DPR converts CSS px to physical px.
+    // Auto-detected raw display size (device capability). The user's Max
+    // Resolution preference is applied later in applyUserCaps, never here.
+    // The screen is reported landscape whichever way it is held: the shorter
+    // side is the height, the longer the width. DPR converts CSS px to
+    // physical px. Both travel so the server can fit a transcode to the screen
+    // by width as well as height, which is what keeps a wide film from coming
+    // out wider than the screen.
     try {
-        const displayMaxHeight = Math.round(Math.min(screen.width, screen.height) * (window.devicePixelRatio || 1));
+        const pixelRatio = window.devicePixelRatio || 1;
+        const displayMaxHeight = Math.round(Math.min(screen.width, screen.height) * pixelRatio);
+        const displayMaxWidth = Math.round(Math.max(screen.width, screen.height) * pixelRatio);
         if (displayMaxHeight > 0) requestedMaxResolution = displayMaxHeight;
+        if (displayMaxWidth > 0) requestedMaxWidth = displayMaxWidth;
     } catch (error: unknown) {
         console.warn("Could not auto-detect display resolution.", error);
     }
 
-    return { videoCodecs, audioCodecs, containers, maxAudioChannels, detectedAudioChannels: maxAudioChannels, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: detectHlsVideoCodecs(), clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, supportedHdrFormats, maxVideoBitDepth };
+    return { videoCodecs, audioCodecs, containers, maxAudioChannels, detectedAudioChannels: maxAudioChannels, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: detectHlsVideoCodecs(), clientBandwidthKbps, requestedClientBitrateKbps, requestedMaxResolution, requestedMaxWidth, supportedHdrFormats, maxVideoBitDepth };
 };
 
 export interface PlaybackPrefs {
@@ -284,11 +292,15 @@ export function applyUserCaps(device: DeviceCapabilities, prefs: PlaybackPrefs):
     const effRes = prefs.maxResolution > 0
         ? Math.min(prefs.maxResolution, device.requestedMaxResolution)
         : device.requestedMaxResolution;
+    const pickedWidth = Math.round(prefs.maxResolution * 16 / 9);
+    const effWidth = prefs.maxResolution > 0 && device.requestedMaxWidth > 0
+        ? Math.min(pickedWidth, device.requestedMaxWidth)
+        : prefs.maxResolution > 0 ? pickedWidth : device.requestedMaxWidth;
     const picked = Number.isInteger(prefs.maxAudioChannels) && prefs.maxAudioChannels > 0 && prefs.maxAudioChannels <= 8
         ? prefs.maxAudioChannels
         : 0;
     const maxAudioChannels = picked > 0 ? Math.min(picked, device.detectedAudioChannels) : device.detectedAudioChannels;
-    return { ...device, requestedMaxResolution: effRes, pickedAudioChannels: picked, maxAudioChannels };
+    return { ...device, requestedMaxResolution: effRes, requestedMaxWidth: effWidth, pickedAudioChannels: picked, maxAudioChannels };
 }
 
 // Single entry point for client-side track selection: raw device scan with the

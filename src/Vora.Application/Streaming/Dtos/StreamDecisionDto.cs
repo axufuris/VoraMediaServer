@@ -34,6 +34,8 @@ public class StreamDecisionDto
     // the truth about what's being delivered.
     public string OutputResolution { get; set; } = string.Empty;
     public string OutputHdrType { get; set; } = string.Empty;
+    public int OutputWidth { get; set; }
+    public int OutputHeight { get; set; }
 
     public List<StreamOptionLogDto> EvaluatedOptions { get; set; } = new();
 

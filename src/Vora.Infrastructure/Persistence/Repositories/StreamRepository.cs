@@ -76,6 +76,20 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
             .Where(c => c.ProfileId == profileId && c.DeviceId == deviceId && c.TitleId == titleId)
             .ExecuteDeleteAsync();
 
+    public async Task SaveVideoTrackGeometryAsync(IReadOnlyCollection<VideoTrackGeometry> tracks)
+    {
+        foreach (var track in tracks)
+        {
+            await context.MediaVideoTracks
+                .Where(t => t.Id == track.TrackId)
+                .ExecuteUpdateAsync(set => set
+                    .SetProperty(t => t.Width, track.Width)
+                    .SetProperty(t => t.Height, track.Height)
+                    .SetProperty(t => t.FrameRate, track.FrameRate)
+                    .SetProperty(t => t.HdrType, track.HdrType));
+        }
+    }
+
     public Task<MediaStreamInfoDto?> GetMediaStreamInfoAsync(Guid mediaId) =>
         context.MediaItems
             .AsNoTracking()
@@ -87,6 +101,7 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                 Parts = m.MediaParts.Select(p => new MediaPartStreamInfoDto
                 {
                     Id = p.Id,
+                    FilePath = p.FilePath,
                     Resolution = p.Resolution,
                     Edition = p.Edition,
                     Container = p.Container,
@@ -97,7 +112,12 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                         Codec = vt.Codec,
                         IsDefault = vt.IsDefault,
                         HdrType = vt.HdrType,
-                        BitDepth = vt.BitDepth
+                        BitDepth = vt.BitDepth,
+                        Bitrate = vt.Bitrate,
+                        Width = vt.Width,
+                        Height = vt.Height,
+                        FrameRate = vt.FrameRate,
+                        StreamIndex = vt.StreamIndex
                     }).ToList(),
                     AudioTracks = p.AudioTracks.OrderBy(at => at.StreamIndex).Select(at => new TrackStreamInfoDto
                     {
@@ -251,6 +271,7 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                 Parts = e.Parts.Select(p => new MediaPartStreamInfoDto
                 {
                     Id = p.Id,
+                    FilePath = p.FilePath,
                     Resolution = p.Resolution,
                     Container = p.Container,
                     OverallBitrate = p.OverallBitrate,
@@ -260,7 +281,12 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                         Codec = vt.Codec,
                         IsDefault = vt.IsDefault,
                         HdrType = vt.HdrType,
-                        BitDepth = vt.BitDepth
+                        BitDepth = vt.BitDepth,
+                        Bitrate = vt.Bitrate,
+                        Width = vt.Width,
+                        Height = vt.Height,
+                        FrameRate = vt.FrameRate,
+                        StreamIndex = vt.StreamIndex
                     }).ToList(),
                     AudioTracks = p.AudioTracks.OrderBy(at => at.StreamIndex).Select(at => new TrackStreamInfoDto
                     {

@@ -249,6 +249,8 @@ public class MediaDetailsVM
                     HdrType = v.HdrType,
                     BitDepth = v.BitDepth,
                     BitrateKbps = v.Bitrate.HasValue ? (int)(v.Bitrate.Value / 1000) : (int?)null,
+                    Width = v.Width,
+                    Height = v.Height,
                     IsDefault = v.IsDefault
                 }).ToList(),
 
@@ -286,6 +288,8 @@ public class MediaDetailsPartVideoTrackVM
     public string? HdrType { get; set; }
     public int? BitDepth { get; set; }
     public int? BitrateKbps { get; set; }
+    public int? Width { get; set; }
+    public int? Height { get; set; }
     public bool IsDefault { get; set; }
 }
 

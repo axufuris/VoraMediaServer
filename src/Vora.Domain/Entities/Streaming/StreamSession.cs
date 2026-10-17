@@ -27,6 +27,8 @@ public class StreamSession
     // all read from these so the UI tells the truth about the stream.
     public string? OutputResolution { get; set; }
     public string? OutputHdrType { get; set; }
+    public int? OutputWidth { get; set; }
+    public int? OutputHeight { get; set; }
 
     public int TargetAudioChannels { get; set; }
     public bool IsSubtitleBurnIn { get; set; }

@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261015235423_ChangesSinceInitial")]
+    [Migration("20261017000904_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -2141,9 +2141,15 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<double?>("FrameRate")
+                        .HasColumnType("double precision");
+
                     b.Property<string>("HdrType")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("IsDefault")
                         .HasColumnType("boolean");
@@ -2156,6 +2162,9 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("character varying(64)");
 
                     b.Property<int>("StreamIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Width")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
@@ -3501,8 +3510,14 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<string>("OutputHdrType")
                         .HasColumnType("text");
 
+                    b.Property<int?>("OutputHeight")
+                        .HasColumnType("integer");
+
                     b.Property<string>("OutputResolution")
                         .HasColumnType("text");
+
+                    b.Property<int?>("OutputWidth")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Quality")
                         .IsRequired()

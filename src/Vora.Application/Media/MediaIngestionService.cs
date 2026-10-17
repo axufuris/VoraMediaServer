@@ -604,7 +604,7 @@ public class MediaIngestionService : IMediaIngestionService
         if (analysis == null) return;
 
         var incomingVideo = analysis.VideoTracks.Select(v => new MediaVideoTrack
-        { StreamIndex = v.StreamIndex, Codec = v.Codec, Profile = v.Profile, HdrType = v.HdrType, BitDepth = v.BitDepth, Bitrate = v.Bitrate, IsDefault = v.IsDefault }).ToList();
+        { StreamIndex = v.StreamIndex, Codec = v.Codec, Profile = v.Profile, HdrType = v.HdrType, BitDepth = v.BitDepth, Bitrate = v.Bitrate, Width = v.Width, Height = v.Height, FrameRate = v.FrameRate, IsDefault = v.IsDefault }).ToList();
 
         var incomingAudio = analysis.AudioTracks.Select(a => new MediaAudioTrack
         { StreamIndex = a.StreamIndex, Codec = a.Codec, Language = a.Language, Channels = a.Channels, Title = a.Title, IsDefault = a.IsDefault }).ToList();

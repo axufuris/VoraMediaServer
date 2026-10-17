@@ -22,7 +22,7 @@ internal sealed record HardwareProbe(HardwareAccelerationType Type, string? Devi
             HardwareAccelerationType.Nvidia when Device is { } gpu => ["-c:v", "h264_nvenc", "-gpu", gpu],
             HardwareAccelerationType.Nvidia => ["-c:v", "h264_nvenc"],
             HardwareAccelerationType.QuickSync => ["-vf", "format=nv12,hwupload,hwmap=derive_device=qsv,format=qsv", "-c:v", "h264_qsv"],
-            _ when VulkanTonemap => ["-vf", $"format=p010le,hwupload,{HardwareArguments.VulkanTonemap("hable", 0)}", "-c:v", "h264_vaapi"],
+            _ when VulkanTonemap => ["-vf", $"format=p010le,hwupload,{HardwareArguments.VulkanTonemap("hable")}", "-c:v", "h264_vaapi"],
             _ => ["-vf", "format=nv12,hwupload", "-c:v", "h264_vaapi"]
         });
         args.AddRange(["-f", "null", "-"]);

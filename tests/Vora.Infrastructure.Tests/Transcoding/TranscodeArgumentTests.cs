@@ -1,3 +1,4 @@
+using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
 using static Vora.Infrastructure.Tests.Transcoding.TranscodeArgumentScenarios;
 
@@ -39,7 +40,7 @@ public class TranscodeArgumentTests
     public void Nvidia_hevc_scales_on_the_gpu_and_caps_the_bitrate()
     {
         Build(Transcode(VideoCodec.Hevc, outputHeight: 1080, bandwidthKbps: 8000), EncodeOn(Nvidia with { Device = "0" }), JellyfinHost)
-            .Should().Be($"-hwaccel cuda -hwaccel_output_format cuda -hwaccel_device 0 -filter_threads 0 -filter_complex_threads 0 {Input} -c:v hevc_nvenc -preset p4 -tune hq -forced-idr 1 -rc vbr -cq 28 -qmin 28 -qmax 34 {Keyframes} -vf scale_cuda=-2:1080:format=p010le -maxrate 8000k -bufsize 480000k" + HlsTail);
+            .Should().Be($"-hwaccel cuda -hwaccel_output_format cuda -hwaccel_device 0 -filter_threads 0 -filter_complex_threads 0 {Input} -c:v hevc_nvenc -preset p4 -tune hq -forced-idr 1 -rc vbr -cq 28 -qmin 28 -qmax 34 {Keyframes} -vf scale_cuda=-2:1080:format=p010le -b:v 6800k -maxrate 8000k -bufsize 16000k" + HlsTail);
     }
 
     [Fact]
@@ -109,7 +110,7 @@ public class TranscodeArgumentTests
     public void Quick_sync_tonemaps_hdr_on_the_intel_gpu_and_caps_the_bitrate()
     {
         Build(Transcode(hdr: "HDR10", outputHeight: 1080, bandwidthKbps: 8000), EncodeOn(IntelQuickSync), PlainHost)
-            .Should().Be($"{QuickSync} -hwaccel vaapi -hwaccel_output_format vaapi {Input} -c:v h264_qsv -preset medium -forced_idr 1 {Keyframes} -vf scale_vaapi=w=-2:h=1080,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709,hwmap=derive_device=qsv,format=qsv -b:v 8000k -maxrate 8000k -bufsize 480000k" + HlsTail);
+            .Should().Be($"{QuickSync} -hwaccel vaapi -hwaccel_output_format vaapi {Input} -c:v h264_qsv -preset medium -forced_idr 1 {Keyframes} -vf scale_vaapi=w=-2:h=1080,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709,hwmap=derive_device=qsv,format=qsv -b:v 6800k -maxrate 8000k -rc_init_occupancy 13600k -bufsize 27200k" + HlsTail);
     }
 
     [Fact]
@@ -145,6 +146,94 @@ public class TranscodeArgumentTests
     {
         Build(Transcode(outputHeight: 720, burnIn: true), EncodeOn(AmdVaapi), JellyfinHost)
             .Should().Be($"{Vaapi} -hwaccel vaapi {BurnInScaled},format=nv12,hwupload[v] -map [v] -map 0:1 -sn -c:v h264_vaapi {Keyframes}" + HlsTail);
+    }
+
+    private const string Nvenc = "-hwaccel cuda -hwaccel_output_format cuda -filter_threads 0 -filter_complex_threads 0";
+    private const string H264Nvenc = "-c:v h264_nvenc -preset p4 -tune hq -forced-idr 1";
+
+    [Fact]
+    public void Nvidia_scales_a_wide_film_to_the_exact_size_that_fits_the_screen()
+    {
+        Build(Transcode(outputWidth: 2560, outputHeight: 1026, sourceWidth: 3840, sourceHeight: 1540), EncodeOn(Nvidia), JellyfinHost)
+            .Should().Be($"{Nvenc} {Input} {H264Nvenc} {Keyframes} -vf scale_cuda=2560:1026:format=nv12" + HlsTail);
+    }
+
+    [Fact]
+    public void Nvidia_tonemaps_at_the_exact_output_size()
+    {
+        Build(Transcode(hdr: "HDR10", outputWidth: 2560, outputHeight: 1026, sourceWidth: 3840, sourceHeight: 1540), EncodeOn(Nvidia), JellyfinHost)
+            .Should().Be($"{Nvenc} {Input} {H264Nvenc} {Keyframes} -vf scale_cuda=2560:1026:format=p010le,tonemap_cuda=tonemap=hable:format=nv12:peak=1000" + HlsTail);
+    }
+
+    [Fact]
+    public void An_output_the_size_of_the_source_is_not_scaled()
+    {
+        Build(Transcode(outputWidth: 1920, outputHeight: 800, sourceWidth: 1920, sourceHeight: 800), EncodeOn(Nvidia), JellyfinHost)
+            .Should().Be($"{Nvenc} {Input} {H264Nvenc} {Keyframes} -vf scale_cuda=iw:ih:format=nv12" + HlsTail);
+    }
+
+    [Fact]
+    public void The_hdr_downscale_fits_the_exact_size_into_1080p_keeping_its_shape()
+    {
+        Build(Transcode(hdr: "HDR10", outputWidth: 3840, outputHeight: 1600, sourceWidth: 3840, sourceHeight: 1600), EncodeOn(Nvidia), PlainHost)
+            .Should().Be($"{Nvenc} {Input} {H264Nvenc} {Keyframes} -vf scale_cuda=1920:800:format=p010le,hwdownload,format=p010le,zscale=p=bt709:t=bt709:m=bt709:r=tv:d=ordered,format=yuv420p" + HlsTail);
+    }
+
+    [Fact]
+    public void Vaapi_scales_to_the_exact_size()
+    {
+        Build(Transcode(outputWidth: 1920, outputHeight: 800, sourceWidth: 3840, sourceHeight: 1600), EncodeOn(IntelVaapi), JellyfinHost)
+            .Should().Be($"{Vaapi} -hwaccel vaapi -hwaccel_output_format vaapi {Input} -c:v h264_vaapi {Keyframes} -vf scale_vaapi=w=1920:h=800:format=nv12" + HlsTail);
+    }
+
+    [Fact]
+    public void Amd_tonemaps_through_vulkan_at_the_exact_size()
+    {
+        Build(Transcode(hdr: "HDR10", outputWidth: 1920, outputHeight: 800, sourceWidth: 3840, sourceHeight: 1600), EncodeOn(AmdVaapiWithVulkan), PlainHost)
+            .Should().Contain("libplacebo=w=1920:h=800:format=nv12:tonemapping=hable");
+    }
+
+    [Fact]
+    public void The_cpu_scales_to_the_exact_size()
+    {
+        Build(Transcode(outputWidth: 1280, outputHeight: 534, sourceWidth: 3840, sourceHeight: 1600), hardware: null, JellyfinHost)
+            .Should().Be($"{Input} -c:v libx264 -preset veryfast -pix_fmt yuv420p {Keyframes} -vf scale=1280:534" + HlsTail);
+    }
+
+    [Fact]
+    public void Nvidia_aims_below_the_cap_with_a_buffer_of_two_seconds_at_the_cap()
+    {
+        Build(Transcode(bandwidthKbps: 10000), EncodeOn(Nvidia), JellyfinHost)
+            .Should().Contain("-b:v 8500k -maxrate 10000k -bufsize 20000k");
+    }
+
+    [Fact]
+    public void Vaapi_asks_for_variable_bitrate_under_the_cap()
+    {
+        Build(Transcode(bandwidthKbps: 10000), EncodeOn(AmdVaapi), JellyfinHost)
+            .Should().Contain("-rc_mode VBR -b:v 8500k -maxrate 10000k -bufsize 20000k");
+    }
+
+    [Fact]
+    public void Quick_sync_keeps_its_h264_bitrate_at_the_encoders_floor()
+    {
+        Build(Transcode(bandwidthKbps: 800), EncodeOn(IntelQuickSync), JellyfinHost)
+            .Should().Contain("-b:v 1000k -maxrate 1001k -rc_init_occupancy 2000k -bufsize 4000k");
+    }
+
+    [Fact]
+    public void The_cpu_caps_its_quality_based_encode_with_a_two_second_buffer()
+    {
+        Build(Transcode(bandwidthKbps: 10000), hardware: null, JellyfinHost)
+            .Should().Contain("-maxrate 10000k -bufsize 20000k")
+            .And.NotContain("-b:v");
+    }
+
+    [Fact]
+    public void The_buffer_no_longer_follows_the_throttle_setting()
+    {
+        Build(Transcode(bandwidthKbps: 10000), EncodeOn(Nvidia), JellyfinHost, settings: new ServerSetting { TranscoderThrottleBuffer = 300 })
+            .Should().Contain("-bufsize 20000k");
     }
 
     [Fact]

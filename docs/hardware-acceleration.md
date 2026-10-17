@@ -47,6 +47,17 @@ Every caller turns the setting into a concrete `HardwareAccelerator` (type, devi
 
 Quick Sync decodes and scales through VAAPI and maps to QSV only for the encoder; that is jellyfin-ffmpeg's default Linux path and lets both Intel pipelines share one filter chain. `-forced_idr 1` (QSV) and `-forced-idr 1` (NVENC) matter: without them the encoder turns the segment-boundary keyframes into plain I-frames that aren't flagged as keyframes, so the HLS muxer can only cut at the encoder's own GOP (250 frames, about 10 s) under a playlist that promises 4 s segments. NVENC ran that way until the flag was added; players coped by following the timestamps, but the playlist's timing was wrong. VAAPI and x264 turn a forced keyframe into an IDR frame on their own.
 
+**Rate control** follows Jellyfin's per-encoder settings, with a target below the cap (`FFmpegTranscodeService.RateArguments`; the cap is the session's `BandwidthKbps`, the target 85% of it, see `docs/streaming.md`):
+
+| Encoder | Flags |
+|---|---|
+| NVENC | `-b:v target -maxrate cap -bufsize 2xcap` |
+| VAAPI | `-rc_mode VBR -b:v target -maxrate cap -bufsize 2xcap` |
+| Quick Sync | `-b:v target -maxrate cap -rc_init_occupancy 2xtarget -bufsize 4xtarget` (Intel's tuning for scene changes; H.264 at least 1 Mbps) |
+| x264 / x265 | `-maxrate cap -bufsize 2xcap`: the encoder's own quality target (CRF) under the cap |
+
+NVENC used to get no `-b:v`, and FFmpeg's `h264_nvenc` then aims at its default of 2 Mbps whatever the cap. The buffer was the cap times `TranscoderThrottleBuffer` (60 by default): 60 seconds of video, so the cap only held on average over a minute and one 4-second segment could carry many times the connection's speed. A 2-second buffer (Plex and Jellyfin use the same) holds each segment to at most 1.5x the cap.
+
 **HDR tone mapping** depends on the GPU:
 
 - **NVIDIA**: `tonemap_cuda`, or a download and CPU `zscale` chain on a stock FFmpeg.

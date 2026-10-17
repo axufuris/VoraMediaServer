@@ -25,8 +25,11 @@ internal static class TranscodeArgumentScenarios
     public static FFmpegTranscodeService.TranscodeHardware EncodeOn(HardwareAccelerator gpu) => new(gpu, Encode: true);
     public static FFmpegTranscodeService.TranscodeHardware DecodeOn(HardwareAccelerator gpu) => new(gpu, Encode: false);
 
-    public static PlaybackDecisionVM Transcode(VideoCodec target = VideoCodec.H264, string hdr = "SDR", int outputHeight = 0, int bandwidthKbps = 0, bool burnIn = false, string? externalSubtitle = null) => new()
+    public static PlaybackDecisionVM Transcode(VideoCodec target = VideoCodec.H264, string hdr = "SDR", int outputHeight = 0, int bandwidthKbps = 0, bool burnIn = false, string? externalSubtitle = null, int outputWidth = 0, int sourceWidth = 0, int sourceHeight = 0) => new()
     {
+        OutputWidth = outputWidth,
+        SourceWidth = sourceWidth,
+        SourceHeight = sourceHeight,
         MediaItemId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
         Decision = StreamingState.Transcode,
         VideoStrategy = "Transcode",
@@ -57,6 +60,6 @@ internal static class TranscodeArgumentScenarios
         SelectedAudioStreamIndex = 2,
     };
 
-    public static string Build(PlaybackDecisionVM decision, FFmpegTranscodeService.TranscodeHardware? hardware, FFmpegTranscodeService.TranscodeHost host, int startSegment = 0) =>
-        string.Join(" ", FFmpegTranscodeService.BuildFFmpegArguments(Source, Segments, InternalPlaylist, decision, new ServerSetting(), hardware, SegmentLaunch.Uniform(startSegment), host));
+    public static string Build(PlaybackDecisionVM decision, FFmpegTranscodeService.TranscodeHardware? hardware, FFmpegTranscodeService.TranscodeHost host, int startSegment = 0, ServerSetting? settings = null) =>
+        string.Join(" ", FFmpegTranscodeService.BuildFFmpegArguments(Source, Segments, InternalPlaylist, decision, settings ?? new ServerSetting(), hardware, SegmentLaunch.Uniform(startSegment), host));
 }

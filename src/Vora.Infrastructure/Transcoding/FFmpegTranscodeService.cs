@@ -784,11 +784,7 @@ public class FFmpegTranscodeService : ITranscodeService
         var resolvedDownscale = ResolveDownscaleMode(settings.HdrTranscodeDownscale, canTonemapOnGpu);
         bool downscaleForHdr = needsTonemap && resolvedDownscale == "Always";
 
-        int scaleHeight = decision.OutputHeight > 0 ? decision.OutputHeight : 0;
-        if (downscaleForHdr)
-        {
-            scaleHeight = scaleHeight > 0 ? Math.Min(scaleHeight, 1080) : 1080;
-        }
+        var scale = ScaleTarget.For(decision, downscaleForHdr);
 
         if (decoder is not null)
         {
@@ -819,7 +815,7 @@ public class FFmpegTranscodeService : ITranscodeService
         if (burnIn)
         {
             Flag("-filter_complex");
-            args.Add(BurnInGraph(decision, externalSubtitle is not null, CpuFilters(settings, needsTonemap, scaleHeight), UploadFilters(encoder)));
+            args.Add(BurnInGraph(decision, externalSubtitle is not null, CpuFilters(settings, needsTonemap, scale), UploadFilters(encoder)));
             Flag("-map [v]");
         }
         else if (decision.SelectedVideoStreamIndex.HasValue)
@@ -861,8 +857,8 @@ public class FFmpegTranscodeService : ITranscodeService
             if (!burnIn)
             {
                 var filters = gpuPipeline is not null
-                    ? GpuFilters(gpuPipeline, settings, host, needsTonemap, isHdrSource, encodeHevc, scaleHeight, resolvedTonemapQuality)
-                    : [.. CpuFilters(settings, needsTonemap, scaleHeight), .. UploadFilters(encoder)];
+                    ? GpuFilters(gpuPipeline, settings, host, needsTonemap, isHdrSource, encodeHevc, scale, resolvedTonemapQuality)
+                    : [.. CpuFilters(settings, needsTonemap, scale), .. UploadFilters(encoder)];
                 if (filters.Count > 0)
                 {
                     Flag("-vf"); args.Add(string.Join(",", filters));
@@ -871,12 +867,7 @@ public class FFmpegTranscodeService : ITranscodeService
 
             if (decision.BandwidthKbps > 0)
             {
-                int bufferSizeKbps = decision.BandwidthKbps * Math.Max(1, settings.TranscoderThrottleBuffer);
-                if (encoder is { Type: not HardwareAccelerationType.Nvidia })
-                {
-                    Flag($"-b:v {decision.BandwidthKbps}k");
-                }
-                Flag($"-maxrate {decision.BandwidthKbps}k -bufsize {bufferSizeKbps}k");
+                args.AddRange(RateArguments(encoder, decision.BandwidthKbps, encodeHevc));
             }
         }
 
@@ -985,6 +976,27 @@ public class FFmpegTranscodeService : ITranscodeService
         }
     }
 
+    internal static List<string> RateArguments(HardwareAccelerator? encoder, int maxKbps, bool encodeHevc)
+    {
+        int target = VideoBitrate.TargetFromCap(maxKbps);
+        switch (encoder?.Type)
+        {
+            case null:
+                return ["-maxrate", Kbps(maxKbps), "-bufsize", Kbps(maxKbps * 2)];
+            case HardwareAccelerationType.QuickSync:
+                if (!encodeHevc) target = Math.Max(target, QuickSyncMinimumH264Kbps);
+                return ["-b:v", Kbps(target), "-maxrate", Kbps(Math.Max(maxKbps, target + 1)), "-rc_init_occupancy", Kbps(target * 2), "-bufsize", Kbps(target * 4)];
+            case HardwareAccelerationType.Vaapi:
+                return ["-rc_mode", "VBR", "-b:v", Kbps(target), "-maxrate", Kbps(maxKbps), "-bufsize", Kbps(maxKbps * 2)];
+            default:
+                return ["-b:v", Kbps(target), "-maxrate", Kbps(maxKbps), "-bufsize", Kbps(maxKbps * 2)];
+        }
+    }
+
+    private const int QuickSyncMinimumH264Kbps = 1000;
+
+    private static string Kbps(int value) => value.ToString(CultureInfo.InvariantCulture) + "k";
+
     private static bool UsesVulkanTonemap(HardwareAccelerator gpu) =>
         gpu.Type != HardwareAccelerationType.Nvidia && gpu.Vendor != GpuVendor.Intel && gpu.HasVulkanInterop;
 
@@ -995,13 +1007,13 @@ public class FFmpegTranscodeService : ITranscodeService
         bool needsTonemap,
         bool isHdrSource,
         bool encodeHevc,
-        int scaleHeight,
+        ScaleTarget? scale,
         string tonemapQuality)
     {
         var chain = new List<string>();
         if (gpu.Type == HardwareAccelerationType.Nvidia)
         {
-            if (needsTonemap && scaleHeight > 0) chain.Add($"scale_cuda=-2:{scaleHeight}:format=p010le");
+            if (needsTonemap && scale is { } tonemapScale) chain.Add($"scale_cuda={tonemapScale.Cuda}:format=p010le");
             if (needsTonemap && host.HasJellyfinFfmpeg)
             {
                 chain.Add($"tonemap_cuda=tonemap={settings.TonemappingAlgorithm}:format=nv12:peak=1000");
@@ -1012,19 +1024,18 @@ public class FFmpegTranscodeService : ITranscodeService
             }
             else
             {
-                var scaleSpec = scaleHeight > 0 ? $"-2:{scaleHeight}" : "iw:ih";
-                chain.Add($"scale_cuda={scaleSpec}:format={(encodeHevc ? "p010le" : "nv12")}");
+                chain.Add($"scale_cuda={scale?.Cuda ?? "iw:ih"}:format={(encodeHevc ? "p010le" : "nv12")}");
             }
             return chain;
         }
 
         if (needsTonemap && UsesVulkanTonemap(gpu))
         {
-            chain.Add(HardwareArguments.VulkanTonemap(settings.TonemappingAlgorithm, scaleHeight));
+            chain.Add(HardwareArguments.VulkanTonemap(settings.TonemappingAlgorithm, scale?.Sized));
         }
         else if (needsTonemap)
         {
-            if (scaleHeight > 0) chain.Add($"scale_vaapi=w=-2:h={scaleHeight}");
+            if (scale is { } vaapiScale) chain.Add($"scale_vaapi={vaapiScale.Sized}");
             if (gpu.Vendor == GpuVendor.Intel)
             {
                 chain.Add("tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709");
@@ -1037,7 +1048,7 @@ public class FFmpegTranscodeService : ITranscodeService
         else
         {
             var format = encodeHevc && isHdrSource ? "p010" : "nv12";
-            chain.Add(scaleHeight > 0 ? $"scale_vaapi=w=-2:h={scaleHeight}:format={format}" : $"scale_vaapi=format={format}");
+            chain.Add(scale is { } sized ? $"scale_vaapi={sized.Sized}:format={format}" : $"scale_vaapi=format={format}");
         }
 
         if (gpu.Type == HardwareAccelerationType.QuickSync)
@@ -1047,10 +1058,10 @@ public class FFmpegTranscodeService : ITranscodeService
         return chain;
     }
 
-    private static List<string> CpuFilters(ServerSetting settings, bool needsTonemap, int scaleHeight)
+    private static List<string> CpuFilters(ServerSetting settings, bool needsTonemap, ScaleTarget? scale)
     {
         var chain = new List<string>();
-        if (scaleHeight > 0) chain.Add($"scale=-2:{scaleHeight}");
+        if (scale is { } cpuScale) chain.Add(cpuScale.Cpu);
         if (needsTonemap)
         {
             chain.Add($"zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap={settings.TonemappingAlgorithm}:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p");

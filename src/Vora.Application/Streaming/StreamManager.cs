@@ -11,7 +11,7 @@ using Vora.Domain.Entities.Users;
 
 namespace Vora.Application.Streaming;
 
-public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[] Containers, int MaxAudioChannels, int ClientBandwidthKbps, int RequestedClientBitrateKbps, int RequestedMaxResolution = 0, string[]? SupportedHdrFormats = null, int MaxVideoBitDepth = 0, int DetectedAudioChannels = 0, int PickedAudioChannels = 0, bool PlaysAnyAudioLayout = false, bool CanSwitchAudioTracks = false, string[]? HlsVideoCodecs = null)
+public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[] Containers, int MaxAudioChannels, int ClientBandwidthKbps, int RequestedClientBitrateKbps, int RequestedMaxResolution = 0, string[]? SupportedHdrFormats = null, int MaxVideoBitDepth = 0, int DetectedAudioChannels = 0, int PickedAudioChannels = 0, bool PlaysAnyAudioLayout = false, bool CanSwitchAudioTracks = false, string[]? HlsVideoCodecs = null, int RequestedMaxWidth = 0)
 {
     public AudioOutputRequest AudioOutput => new(DetectedAudioChannels, PickedAudioChannels, PlaysAnyAudioLayout, CanSwitchAudioTracks);
 }
@@ -45,10 +45,12 @@ public class StreamManager : IStreamManager
     private readonly ITranscodeService _transcodeService;
     private readonly StoragePathsOptions _storagePaths;
     private readonly IClientLocationResolver _locations;
+    private readonly IMediaAnalyzerService _analyzer;
 
-    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths, IClientLocationResolver locations)
+    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths, IClientLocationResolver locations, IMediaAnalyzerService analyzer)
     {
         _locations = locations;
+        _analyzer = analyzer;
         _repository = repository;
         _decisionManager = decisionManager;
         _settingsRepo = settingsRepo;
@@ -87,6 +89,8 @@ public class StreamManager : IStreamManager
             HdrType = selectedVideo?.HdrType,
             OutputResolution = decision.OutputResolution,
             OutputHdrType = decision.OutputHdrType,
+            OutputWidth = decision.OutputWidth > 0 ? decision.OutputWidth : null,
+            OutputHeight = decision.OutputHeight > 0 ? decision.OutputHeight : null,
             StartPosition = startPosition,
             CurrentPosition = startPosition,
             MediaPartId = decision.SelectedMediaPartId,
@@ -118,6 +122,7 @@ public class StreamManager : IStreamManager
 
         var mediaInfo = await _repository.GetMediaStreamInfoAsync(mediaId);
         if (mediaInfo == null || !mediaInfo.Parts.Any()) throw new InvalidOperationException("Media not found or has no parts.");
+        await FillVideoGeometryAsync(mediaInfo);
 
         var client = await _repository.GetClientDeviceAsync(deviceId);
         if (client == null) throw new InvalidOperationException("Unknown Device.");
@@ -188,9 +193,20 @@ public class StreamManager : IStreamManager
             }
         }
 
-        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput, capabilities?.HlsVideoCodecs, remembered, preferences);
+        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput, capabilities?.HlsVideoCodecs, remembered, preferences, capabilities?.RequestedMaxWidth ?? 0);
 
         return (decision, mediaInfo, client, mediaId);
+    }
+
+    private async Task FillVideoGeometryAsync(MediaStreamInfoDto media)
+    {
+        var updates = new List<VideoTrackGeometry>();
+        foreach (var part in media.Parts.Where(VideoTrackGeometryFill.IsMissing))
+        {
+            var facts = await _analyzer.ReadVideoStreamsAsync(part.FilePath);
+            updates.AddRange(VideoTrackGeometryFill.Apply(part, facts));
+        }
+        if (updates.Count > 0) await _repository.SaveVideoTrackGeometryAsync(updates);
     }
 
     public async Task<(StreamSession Session, string StreamUrl, int AudioTrackPosition)> StartExtraSessionAsync(Guid extraId, string deviceId, Guid userId, Guid? profileId, double startPosition, DeviceCapsDto? capabilities = null, string? clientAddress = null)
@@ -200,6 +216,7 @@ public class StreamManager : IStreamManager
 
         var streamInfo = await _repository.GetExtraStreamInfoAsync(extraId);
         if (streamInfo == null || !streamInfo.Parts.Any()) throw new InvalidOperationException("Extra has not been analyzed yet.");
+        await FillVideoGeometryAsync(streamInfo);
 
         var client = await _repository.GetClientDeviceAsync(deviceId);
         if (client == null) throw new InvalidOperationException("Unknown Device.");
@@ -217,7 +234,7 @@ public class StreamManager : IStreamManager
         await _repository.EndActiveSessionsForDeviceAsync(client.Id);
 
         var preferences = profileId.HasValue ? await _repository.GetTrackPreferencesAsync(profileId.Value) : null;
-        var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, 0, "None", null, null, null, capabilities?.RequestedMaxResolution ?? 0, audioOutput: capabilities?.AudioOutput, hlsVideoCodecs: capabilities?.HlsVideoCodecs, preferences: preferences);
+        var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, 0, "None", null, null, null, capabilities?.RequestedMaxResolution ?? 0, audioOutput: capabilities?.AudioOutput, hlsVideoCodecs: capabilities?.HlsVideoCodecs, preferences: preferences, requestedMaxWidth: capabilities?.RequestedMaxWidth ?? 0);
         var (address, location) = await WhereFromAsync(client, clientAddress);
 
         var selectedPart = streamInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);
@@ -243,6 +260,8 @@ public class StreamManager : IStreamManager
             HdrType = selectedVideo?.HdrType,
             OutputResolution = decision.OutputResolution,
             OutputHdrType = decision.OutputHdrType,
+            OutputWidth = decision.OutputWidth > 0 ? decision.OutputWidth : null,
+            OutputHeight = decision.OutputHeight > 0 ? decision.OutputHeight : null,
             StartPosition = startPosition,
             CurrentPosition = startPosition,
             MediaPartId = decision.SelectedMediaPartId,
