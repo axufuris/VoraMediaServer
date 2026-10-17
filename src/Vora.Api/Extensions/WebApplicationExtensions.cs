@@ -47,7 +47,7 @@ public static class WebApplicationExtensions
         }
         app.UseMiddleware<SecurityHeadersMiddleware>();
         app.UseResponseCompression();
-        app.UseStaticFiles();
+        app.UseStaticFiles(WebClientFileCaching.Options());
         app.UseCors(ServiceRegistrationExtensions.CorsPolicy);
         app.UseRateLimiter();
         app.UseAuthentication();
@@ -166,7 +166,7 @@ public static class WebApplicationExtensions
 
         app.MapHub<VoraHub>("/hubs/Vora").RequireAuthorization();
         app.MapHealthChecks("/health").AllowAnonymous();
-        app.MapFallbackToFile("index.html");
+        app.MapFallbackToFile("index.html", WebClientFileCaching.Options());
 
         return app;
     }

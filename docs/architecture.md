@@ -118,6 +118,8 @@ The API **always** runs in Docker (FFmpeg lives inside the container). Don't try
 
 Ports are baked into the project configs — don't override them.
 
+The image serves the built `Vora.Web` from `wwwroot`, with `MapFallbackToFile("index.html")` for client routes. `WebClientFileCaching` makes the browser check `index.html` with the server on every load (`no-cache`) and keep the hashed files under `assets/` for a year (`immutable`), so a tab picks up a new build on its next load. An old page file is a plain 404, which the client answers by reloading once (`docs/frontend-conventions.md`).
+
 ### Six Labors licence
 
 ImageSharp 4 and ImageSharp.Drawing 3 (poster overlays, the resized artwork cache) check a Six Labors licence when they compile: a Debug build only warns, a **Release build fails** without one. The runtime needs nothing.
