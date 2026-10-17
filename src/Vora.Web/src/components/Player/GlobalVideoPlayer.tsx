@@ -15,6 +15,7 @@ import { useUpNextEnding } from './useUpNextEnding';
 import { useFullscreen } from './Controls/useFullscreen';
 import { usePlayerKeyboard } from './Controls/usePlayerKeyboard';
 import PlayerKeyIndicator from './Controls/PlayerKeyIndicator';
+import VideoSeekBar from './Controls/VideoSeekBar';
 import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeButton, CloseButton, EpisodeNavButton, SubtitlesButton } from './Controls/PlayerButtons';
 import PlayerSettingsPanel from './Panels/PlayerSettingsPanel';
 import SubtitleTracksPanel from './Panels/SubtitleTracksPanel';
@@ -514,24 +515,9 @@ export default function GlobalVideoPlayer() {
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
 
-    const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isFinite(duration) || duration <= 0) return;
-        const bounds = e.currentTarget.getBoundingClientRect();
-        const percent = (e.clientX - bounds.left) / bounds.width;
-        seek(percent * duration);
-    };
-
-    const handleProgressHover = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isFinite(duration) || duration <= 0) return;
-        const bounds = e.currentTarget.getBoundingClientRect();
-        const percent = Math.max(0, Math.min(1, (e.clientX - bounds.left) / bounds.width));
+    const showScrubPreview = (percent: number | null, track: DOMRect | null) => {
         setHoverPercent(percent);
-        setHoverBarRect(bounds);
-    };
-
-    const handleProgressLeave = () => {
-        setHoverPercent(null);
-        setHoverBarRect(null);
+        setHoverBarRect(track);
     };
 
     const hoverCue = hoverPercent !== null ? thumbnails.findCue(hoverPercent * duration) : null;
@@ -655,8 +641,6 @@ export default function GlobalVideoPlayer() {
 
     const canFindSubtitles = flags.subtitleSearch && !currentMedia.isExtra;
 
-    const progressPercent = duration > 0 && isFinite(duration) ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
-
     const activeStreamPart = mediaDetails?.mediaParts?.find((p: MediaPart) =>
         p.videoTracks?.some((vt: VideoTrackType) => vt.id === currentMedia.videoTrackId)
     );
@@ -779,20 +763,9 @@ export default function GlobalVideoPlayer() {
                         </div>
                         <div className="flex w-full items-center gap-3 text-xs font-medium tabular-nums max-md:hidden" style={{ color: 'var(--vora-text-muted)' }}>
                             <span>{formatTime(currentTime)}</span>
-                            <div
-                                className="group relative h-1.5 flex-1 cursor-pointer rounded-full"
-                                onClick={handleProgressClick}
-                                onMouseMove={handleProgressHover}
-                                onMouseLeave={handleProgressLeave}
-                                style={{ background: 'color-mix(in srgb, var(--vora-text-primary) 12%, transparent)' }}
-                            >
+                            <VideoSeekBar variant="mini" currentTime={currentTime} duration={duration} onSeek={seek} onPointAt={showScrubPreview}>
                                 <MarkerBands markers={visibleMarkers} duration={duration} />
-                                <div className="absolute left-0 top-0 h-full rounded-full" style={{ width: `${progressPercent}%`, background: 'var(--vora-accent-500)' }} />
-                                <div
-                                    className="absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full opacity-0 shadow-[var(--vora-shadow-sm)] group-hover:opacity-100"
-                                    style={{ left: `calc(${progressPercent}% - 6px)`, background: 'var(--vora-text-primary)' }}
-                                />
-                            </div>
+                            </VideoSeekBar>
                             <span>{formatTime(duration)}</span>
                         </div>
                     </div>
@@ -902,20 +875,9 @@ export default function GlobalVideoPlayer() {
                     <div className="mx-auto w-full max-w-screen-2xl p-8 pb-12 max-md:px-4 max-md:pt-4 max-md:pb-6">
                         <div className="mb-6 flex items-center gap-4 font-medium tabular-nums max-md:mb-4 max-md:gap-3 max-md:text-sm" style={{ color: 'var(--vora-text-primary)' }}>
                             <span>{formatTime(currentTime)}</span>
-                            <div
-                                className="group relative h-1.5 flex-1 cursor-pointer rounded-full"
-                                onClick={handleProgressClick}
-                                onMouseMove={handleProgressHover}
-                                onMouseLeave={handleProgressLeave}
-                                style={{ background: 'color-mix(in srgb, var(--vora-text-primary) 18%, transparent)' }}
-                            >
+                            <VideoSeekBar variant="full" currentTime={currentTime} duration={duration} onSeek={seek} onPointAt={showScrubPreview}>
                                 <MarkerBands markers={visibleMarkers} duration={duration} />
-                                <div className="absolute left-0 top-0 h-full rounded-full transition-all" style={{ width: `${progressPercent}%`, background: 'var(--vora-accent-500)' }} />
-                                <div
-                                    className="absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full opacity-0 shadow-[var(--vora-shadow-lg)] transition-opacity group-hover:opacity-100"
-                                    style={{ left: `calc(${progressPercent}% - 6px)`, background: 'var(--vora-text-primary)', boxShadow: '0 0 0 1.5px color-mix(in srgb, var(--vora-bg-canvas) 45%, transparent)' }}
-                                />
-                            </div>
+                            </VideoSeekBar>
                             <span>{formatTime(duration)}</span>
                         </div>
 
