@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { profileService } from '../../../api/Users/profileService';
 import { useDialog } from '../../../dialogs';
 import { StorageKeys } from '../../../utils/storageKeys';
@@ -11,14 +10,6 @@ export default function AccountTab({ serverId }: { serverId?: string }) {
             <section className="vora-card p-6">
                 <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Signed in as</h2>
                 <p className="m-0 text-2xl font-semibold" style={{ color: 'var(--vora-accent-text)' }}>{profileName}</p>
-            </section>
-            <section className="vora-card p-6">
-                <h2 className="m-0 mb-3 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Manage your profile</h2>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                    <Link to={serverId ? `/server/${serverId}/account` : '/account'} className="vora-button-secondary cursor-pointer text-center">Account &amp; security</Link>
-                    <Link to={serverId ? `/server/${serverId}/history` : '/history'} className="vora-button-secondary cursor-pointer text-center">Watch history</Link>
-                    <Link to="/profiles" className="vora-button-secondary cursor-pointer text-center">Switch profile</Link>
-                </div>
             </section>
             <ShowtimesLocationSection serverId={serverId} />
             <PlaybackPreferencesSection serverId={serverId} />
