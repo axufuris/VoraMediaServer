@@ -29,9 +29,9 @@ The subtitle route is deliberately **off the video path**. Nothing about startin
 
 `OutputResolution` / `OutputHdrType` are what the client actually receives, distinct from the source part's `Resolution` / `HdrType`. A 4K HDR source under `HdrTranscodeDownscale = Always` becomes 1080p SDR, and the player badges, admin Now Playing, and Watch History all read the output values so the UI doesn't claim 4K.
 
-**Scoring compares ladder heights, not raw ones.** A client's reported ceiling is often not a rung — a phone panel reports 1344, a browser window whatever the user dragged it to. `SnapToDeliverableHeight` reduces it to the rung below (1344 → 1080), and `qualityLossPenalty` scores against that. Scored raw, a 4K transcode looked like a perfect fit while a 1080p part that direct-plays was penalised for missing 1344, so the server burned a GPU transcode to deliver the 1080p already on disk. A part's height for scoring is its widescreen class (`OutputSize.HeightClass`: 3840x1540 is 2160, a 1080x1920 phone video 1080), so a wide film scores like the "4K" its label says.
+**Scoring compares ladder heights, not raw ones.** A client's reported playback ceiling need not be a rung — for example, a native player may report 1344. `SnapToDeliverableHeight` reduces it to the rung below (1344 → 1080), and `qualityLossPenalty` scores against that. Scored raw, a 4K transcode looked like a perfect fit while a 1080p part that direct-plays was penalised for missing 1344, so the server burned a GPU transcode to deliver the 1080p already on disk. A part's height for scoring is its widescreen class (`OutputSize.HeightClass`: 3840x1540 is 2160, a 1080x1920 phone video 1080), so a wide film scores like the "4K" its label says.
 
-The capability test is against the client's **real** screen box (`OutputSize.ClientBox`: `requestedMaxWidth` x `requestedMaxResolution`, widescreen when only the height is sent, 3840x2160 when neither is): a source wider *or* taller than it needs a transcode. Each option logs `ClientMaxHeight` / `DeliverableHeight` / `OutputHeight` in `EvaluatedOptions` so a report of this class answers itself.
+The capability test is against the client's **declared playback box** (`OutputSize.ClientBox`: `requestedMaxWidth` x `requestedMaxResolution`, widescreen when only the height is sent, 3840x2160 when neither is): a source wider *or* taller than it needs a transcode. Each option logs `ClientMaxHeight` / `DeliverableHeight` / `OutputHeight` in `EvaluatedOptions` so a report of this class answers itself.
 
 ## Output size and bitrate
 
@@ -46,7 +46,9 @@ Every decision works from the **measured** picture (`MediaVideoTrack.Width` / `H
 
 The encoder **aims at 85% of any bandwidth limit** and its peak cap is the target / 0.85, never above the limit. Plex and Jellyfin aim at the cap itself, so a segment can run past the connection; the headroom keeps the player's buffer filling. `BandwidthKbps` on the session is the peak cap (what upload accounting adds up); the transcoder recovers the target as 85% of it (`VideoBitrate.TargetFromCap`). Encoder flags are in `docs/hardware-acceleration.md`.
 
-Native clients should send `requestedMaxWidth` beside `requestedMaxResolution` in their capabilities; without it the server assumes a widescreen box.
+Native clients should send `requestedMaxWidth` beside `requestedMaxResolution` in their capabilities; without it the server assumes a widescreen box. These limits describe what the player can decode or what the viewer requested, not merely the display's pixel dimensions.
+
+The web client's **Maximum resolution → Original** sends no resolution cap (`requestedMaxResolution` and `requestedMaxWidth` are both 0); the server's existing default box is 3840x2160. A 1440p monitor does not prove that the browser cannot decode 4K and scale it locally. A picked resolution sends that height and its widescreen width, even when the display is smaller. Codec, HLS carriage, bit-depth, HDR-display and bandwidth checks still apply: an HDR-capable HEVC HLS player can receive the original HDR video with only DTS audio converted, while an SDR display still requests an SDR conversion. The web does not infer a decoder resolution limit from `screen.width`, `screen.height` or device pixel ratio.
 
 Subtitle strategies — `None` / `BurnIn` / `DirectPlay`, which track plays when nobody picked one, and why the HLS output carries no subtitles — are in [`docs/subtitles.md`](subtitles.md).
 
