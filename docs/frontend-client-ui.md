@@ -167,4 +167,4 @@ The client scrolls inside `MainLayout`'s `<main>`, not the window, so the browse
 - **A new page** starts at the top. The one `<main>` outlives every page, so a title opened from far down a library used to open part-way down.
 - **Only the query string changing** (a tab or filter in the URL) keeps the position.
 
-Positions live in memory, so a reload forgets them. Sort and filter were already kept per library (`vora_library_sort_*`, `vora_library_filter_*`).
+Positions live in memory, so a reload forgets them. Sort and filter come back on their own: the sort as described under Library sort, the filter per library (`vora_library_filter_*`).
