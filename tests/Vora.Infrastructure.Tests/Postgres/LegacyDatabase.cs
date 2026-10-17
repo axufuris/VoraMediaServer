@@ -117,6 +117,10 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string LibrarySortMigration = "20261017011545_ChangesSinceInitial";
 
+    private const string KeepHdrSettingColumns = """
+        ALTER TABLE "ServerSettings" ADD COLUMN IF NOT EXISTS "PreserveHdrInTranscodes" boolean NOT NULL DEFAULT TRUE;
+        """;
+
     private const string ColumnsSinceLibrarySort = """
         ALTER TABLE "ServerSettings" DROP COLUMN "PreserveHdrInTranscodes";
         """;
@@ -230,7 +234,7 @@ public sealed class LegacyDatabase : IAsyncDisposable
     public async Task SeedAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
     {
         await using var db = NewContext();
-        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns, cancellationToken);
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices + ColumnsSinceVideoDimensions, cancellationToken);
     }
