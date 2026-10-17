@@ -1,6 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate, useParams, Outlet } from 'react-router-dom';
-import { useEffect, lazy, Suspense, type ReactElement } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useParams, Outlet, useLocation } from 'react-router-dom';
+import { useEffect, Suspense, type ReactElement, type ReactNode } from 'react';
 import { serverVault } from './utils/serverVault';
+import { lazyPage } from './utils/newBuild';
+import PageErrorBoundary from './components/Common/PageErrorBoundary';
 import { StorageKeys, getProfileIdFromToken } from './utils/storageKeys';
 import { getOrCreateDeviceId } from './utils/deviceId';
 import { defaultApiBaseUrl } from './utils/apiBase';
@@ -19,60 +21,60 @@ import ResetPasswordPage from './pages/Auth/ResetPasswordPage';
 import ConfirmEmailPage from './pages/Auth/ConfirmEmailPage';
 import ProfileSelectionPage from './pages/Profile/ProfileSelectionPage';
 
-const ClientLibraryPage = lazy(() => import('./pages/Client/LibraryPage'));
-const LibraryDashboard = lazy(() => import('./pages/Client/LibraryDashboard'));
-const ManageLibrary = lazy(() => import('./pages/Admin/Libraries/ManageLibrary'));
-const ClientMediaDetailsPage = lazy(() => import('./pages/Client/Media/MediaDetailsPage'));
-const ClientCollectionDetailsPage = lazy(() => import('./pages/Client/Collections/CollectionDetailsPage'));
-const TaskDashboard = lazy(() => import('./pages/Admin/Tasks/TaskDashboard'));
-const ClientActorDetailsPage = lazy(() => import('./pages/Client/Media/ActorDetailsPage'));
-const ClientHomePage = lazy(() => import('./pages/Client/HomePage'));
-const AdminSmartListsPage = lazy(() => import('./pages/Admin/SmartLists/SmartListsPage'));
-const AdminPluginsPage = lazy(() => import('./pages/Admin/PluginsPage'));
-const AdminSettingsPage = lazy(() => import('./pages/Admin/SettingsPage'));
-const CreateLibrary = lazy(() => import('./pages/Admin/Libraries/CreateLibrary'));
-const AccountSettingsPage = lazy(() => import('./pages/Profile/AccountSettingsPage'));
-const AdminUserManagementPage = lazy(() => import('./pages/Admin/UserManagementPage'));
-const AdminInvitationsPage = lazy(() => import('./pages/Admin/InvitationsPage'));
-const AuthorizedDevicesPage = lazy(() => import('./pages/Admin/AuthorizedDevicesPage'));
-const AdminDashboardPage = lazy(() => import('./pages/Admin/DashboardPage'));
-const AdminAppearancePage = lazy(() => import('./pages/Admin/AppearancePage'));
-const AdminTemplateSchedulesPage = lazy(() => import('./pages/Admin/Templates/SchedulesPage'));
-const AdminHistoryPage = lazy(() => import('./pages/Admin/HistoryPage'));
-const ProfileHistoryPage = lazy(() => import('./pages/Client/ProfileHistoryPage'));
-const ClientPlaylistsPage = lazy(() => import('./pages/Client/Playlists/PlaylistsPage'));
-const ClientPlaylistDetailsPage = lazy(() => import('./pages/Client/Playlists/PlaylistDetailsPage'));
-const SmartPlaylistDetailsPage = lazy(() => import('./pages/Client/Playlists/SmartPlaylistDetailsPage'));
-const SearchPage = lazy(() => import('./pages/Client/SearchPage'));
-const AdminDiscoveryPage = lazy(() => import('./pages/Admin/Discovery/DiscoveryPage'));
-const ClientDiscoveryDetailsPage = lazy(() => import('./pages/Client/Discovery/DiscoveryDetailsPage'));
-const ClientDiscoveryActorPage = lazy(() => import('./pages/Client/Discovery/DiscoveryActorPage'));
-const ClientDiscoveryViewAllPage = lazy(() => import('./pages/Client/Discovery/DiscoveryViewAllPage'));
-const AdminRequestsPage = lazy(() => import('./pages/Admin/RequestsPage'));
-const AdminAiStatsPage = lazy(() => import('./pages/Admin/AiStatsPage'));
-const AdminAiSettingsPage = lazy(() => import('./pages/Admin/AiSettingsPage'));
-const AdminDedupePage = lazy(() => import('./pages/Admin/DedupePage'));
-const AdminMediaTrashPage = lazy(() => import('./pages/Admin/MediaTrashPage'));
-const OverlayEditor = lazy(() => import('./pages/Admin/Overlay/OverlayEditor'));
-const AdminIptvPage = lazy(() => import('./pages/Admin/Iptv/IptvPage'));
-const AdminForYouPage = lazy(() => import('./pages/Admin/Features/ForYouPage'));
-const AdminReleaseCalendarPage = lazy(() => import('./pages/Admin/Features/ReleaseCalendarPage'));
-const AdminDvrPage = lazy(() => import('./pages/Admin/Features/DvrPage'));
+const ClientLibraryPage = lazyPage(() => import('./pages/Client/LibraryPage'));
+const LibraryDashboard = lazyPage(() => import('./pages/Client/LibraryDashboard'));
+const ManageLibrary = lazyPage(() => import('./pages/Admin/Libraries/ManageLibrary'));
+const ClientMediaDetailsPage = lazyPage(() => import('./pages/Client/Media/MediaDetailsPage'));
+const ClientCollectionDetailsPage = lazyPage(() => import('./pages/Client/Collections/CollectionDetailsPage'));
+const TaskDashboard = lazyPage(() => import('./pages/Admin/Tasks/TaskDashboard'));
+const ClientActorDetailsPage = lazyPage(() => import('./pages/Client/Media/ActorDetailsPage'));
+const ClientHomePage = lazyPage(() => import('./pages/Client/HomePage'));
+const AdminSmartListsPage = lazyPage(() => import('./pages/Admin/SmartLists/SmartListsPage'));
+const AdminPluginsPage = lazyPage(() => import('./pages/Admin/PluginsPage'));
+const AdminSettingsPage = lazyPage(() => import('./pages/Admin/SettingsPage'));
+const CreateLibrary = lazyPage(() => import('./pages/Admin/Libraries/CreateLibrary'));
+const AccountSettingsPage = lazyPage(() => import('./pages/Profile/AccountSettingsPage'));
+const AdminUserManagementPage = lazyPage(() => import('./pages/Admin/UserManagementPage'));
+const AdminInvitationsPage = lazyPage(() => import('./pages/Admin/InvitationsPage'));
+const AuthorizedDevicesPage = lazyPage(() => import('./pages/Admin/AuthorizedDevicesPage'));
+const AdminDashboardPage = lazyPage(() => import('./pages/Admin/DashboardPage'));
+const AdminAppearancePage = lazyPage(() => import('./pages/Admin/AppearancePage'));
+const AdminTemplateSchedulesPage = lazyPage(() => import('./pages/Admin/Templates/SchedulesPage'));
+const AdminHistoryPage = lazyPage(() => import('./pages/Admin/HistoryPage'));
+const ProfileHistoryPage = lazyPage(() => import('./pages/Client/ProfileHistoryPage'));
+const ClientPlaylistsPage = lazyPage(() => import('./pages/Client/Playlists/PlaylistsPage'));
+const ClientPlaylistDetailsPage = lazyPage(() => import('./pages/Client/Playlists/PlaylistDetailsPage'));
+const SmartPlaylistDetailsPage = lazyPage(() => import('./pages/Client/Playlists/SmartPlaylistDetailsPage'));
+const SearchPage = lazyPage(() => import('./pages/Client/SearchPage'));
+const AdminDiscoveryPage = lazyPage(() => import('./pages/Admin/Discovery/DiscoveryPage'));
+const ClientDiscoveryDetailsPage = lazyPage(() => import('./pages/Client/Discovery/DiscoveryDetailsPage'));
+const ClientDiscoveryActorPage = lazyPage(() => import('./pages/Client/Discovery/DiscoveryActorPage'));
+const ClientDiscoveryViewAllPage = lazyPage(() => import('./pages/Client/Discovery/DiscoveryViewAllPage'));
+const AdminRequestsPage = lazyPage(() => import('./pages/Admin/RequestsPage'));
+const AdminAiStatsPage = lazyPage(() => import('./pages/Admin/AiStatsPage'));
+const AdminAiSettingsPage = lazyPage(() => import('./pages/Admin/AiSettingsPage'));
+const AdminDedupePage = lazyPage(() => import('./pages/Admin/DedupePage'));
+const AdminMediaTrashPage = lazyPage(() => import('./pages/Admin/MediaTrashPage'));
+const OverlayEditor = lazyPage(() => import('./pages/Admin/Overlay/OverlayEditor'));
+const AdminIptvPage = lazyPage(() => import('./pages/Admin/Iptv/IptvPage'));
+const AdminForYouPage = lazyPage(() => import('./pages/Admin/Features/ForYouPage'));
+const AdminReleaseCalendarPage = lazyPage(() => import('./pages/Admin/Features/ReleaseCalendarPage'));
+const AdminDvrPage = lazyPage(() => import('./pages/Admin/Features/DvrPage'));
 const AdminLiveTvPage = () => <AdminIptvPage kind="Tv" />;
 const AdminInternetRadioPage = () => <AdminIptvPage kind="Radio" />;
-const AdminPodcastsPage = lazy(() => import('./pages/Admin/Podcasts/PodcastsAdminPage'));
-const AdminMusicHistoryPage = lazy(() => import('./pages/Admin/MusicHistoryPage'));
-const AdminLogsPage = lazy(() => import('./pages/Admin/LogsPage'));
-const AdminBackupsPage = lazy(() => import('./pages/Admin/BackupsPage'));
-const AdminLibraryMigrationPage = lazy(() => import('./pages/Admin/LibraryMigrationPage'));
-const AdminSetupGuidePage = lazy(() => import('./pages/Admin/SetupGuide/SetupGuidePage'));
-const ClientSettingsPage = lazy(() => import('./pages/Client/SettingsPage'));
-const MusicPage = lazy(() => import('./pages/Client/Audio/MusicPage'));
-const PodcastsPage = lazy(() => import('./pages/Client/Audio/PodcastsPage'));
-const RadioPage = lazy(() => import('./pages/Client/Audio/RadioPage'));
-const ClientDiscoveryPage = lazy(() => import('./pages/Client/Discovery/DiscoveryPage'));
-const ClientCalendarPage = lazy(() => import('./pages/Client/CalendarPage'));
-const LiveTvHubPage = lazy(() => import('./pages/Client/LiveTv/LiveTvHubPage'));
+const AdminPodcastsPage = lazyPage(() => import('./pages/Admin/Podcasts/PodcastsAdminPage'));
+const AdminMusicHistoryPage = lazyPage(() => import('./pages/Admin/MusicHistoryPage'));
+const AdminLogsPage = lazyPage(() => import('./pages/Admin/LogsPage'));
+const AdminBackupsPage = lazyPage(() => import('./pages/Admin/BackupsPage'));
+const AdminLibraryMigrationPage = lazyPage(() => import('./pages/Admin/LibraryMigrationPage'));
+const AdminSetupGuidePage = lazyPage(() => import('./pages/Admin/SetupGuide/SetupGuidePage'));
+const ClientSettingsPage = lazyPage(() => import('./pages/Client/SettingsPage'));
+const MusicPage = lazyPage(() => import('./pages/Client/Audio/MusicPage'));
+const PodcastsPage = lazyPage(() => import('./pages/Client/Audio/PodcastsPage'));
+const RadioPage = lazyPage(() => import('./pages/Client/Audio/RadioPage'));
+const ClientDiscoveryPage = lazyPage(() => import('./pages/Client/Discovery/DiscoveryPage'));
+const ClientCalendarPage = lazyPage(() => import('./pages/Client/CalendarPage'));
+const LiveTvHubPage = lazyPage(() => import('./pages/Client/LiveTv/LiveTvHubPage'));
 
 getOrCreateDeviceId();
 
@@ -134,6 +136,11 @@ const RequireAuth = ({ children }: { children: ReactElement }) => {
     return children;
 };
 
+const RouteErrorBoundary = ({ children }: { children: ReactNode }) => {
+    const location = useLocation();
+    return <PageErrorBoundary resetKey={location.pathname}>{children}</PageErrorBoundary>;
+};
+
 const RequireAdmin = ({ children }: { children: ReactElement }) => {
     const isServerAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
     if (!isServerAdmin) {
@@ -149,6 +156,7 @@ export default function App() {
                 <BrowserRouter>
                     <ThemeProvider>
                         <ClientTemplateProvider>
+                        <RouteErrorBoundary>
                         <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center" style={{ background: 'var(--vora-bg-canvas)' }}><div className="vora-skeleton h-12 w-48" /></div>}>
                         <Routes>
                     <Route path="/setup" element={<SetupPage />} />
@@ -185,6 +193,7 @@ export default function App() {
                         <Route path="discovery/:providerId/actor/:externalId" element={<ClientDiscoveryActorPage />} />
 
                         <Route path="server/:serverId" element={<ServerContextWrapper />}>
+                            <Route index element={<ClientHomePage />} />
                             <Route path="account" element={<AccountSettingsPage />} />
                             <Route path="history" element={<ProfileHistoryPage />} />
                             <Route path="search" element={<SearchPage />} />
@@ -282,6 +291,7 @@ export default function App() {
                         <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                         </Suspense>
+                        </RouteErrorBoundary>
                         </ClientTemplateProvider>
                     </ThemeProvider>
                 </BrowserRouter>

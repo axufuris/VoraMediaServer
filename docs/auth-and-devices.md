@@ -112,7 +112,7 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 
 **`is_admin` is dead.** It is never written by any current code. If you find code reading `is_admin`, replace it with `is_server_admin`.
 
-`sessionStorage` is used for **pending pre-vault** state during the login/setup flow (`pending_server_url`, `pending_user_token`, `pending_user_id`, `pending_server_name`), and for `setup_guide_prompted_<serverId|local>`, which stops the Setup Guide pop-up asking twice in one browser session (see `docs/setup-guide.md`).
+`sessionStorage` is used for **pending pre-vault** state during the login/setup flow (`pending_server_url`, `pending_user_token`, `pending_user_id`, `pending_server_name`), and for `setup_guide_prompted_<serverId|local>`, which stops the Setup Guide pop-up asking twice in one browser session (see `docs/setup-guide.md`), and for `new_build_reload_at`, the time a tab last reloaded to pick up a new build, so a page that keeps failing to load reloads once rather than forever (see `docs/frontend-conventions.md`).
 
 ## Times on the wire
 

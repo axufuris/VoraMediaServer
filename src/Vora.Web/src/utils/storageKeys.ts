@@ -24,6 +24,7 @@ export const SessionKeys = {
     musicNavProfile: 'music_nav_profile',
     freshServerSetup: 'fresh_server_setup',
     setupGuidePrompted: (serverKey: string) => `setup_guide_prompted_${serverKey}`,
+    newBuildReloadAt: 'new_build_reload_at',
 } as const;
 
 interface JwtPayload {
