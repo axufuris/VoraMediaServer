@@ -247,6 +247,9 @@ export default function CoreSettingsTab({ serverId, scanners, hardware, showModa
                                 onChange={e => setServerSettings({ ...serverSettings, transcoderThrottleBuffer: parseInt(e.target.value) || 0 })}
                                 className="vora-input"
                             />
+                            <FieldHint>
+                                How far a transcode may run ahead of what the viewer has loaded before it pauses, so a paused or slow viewer does not keep the GPU and disk busy. It picks up again when the viewer is halfway back, or at once if they skip ahead. At least 30 seconds; 0 lets every transcode run to the end.
+                            </FieldHint>
                         </div>
                     </div>
 
