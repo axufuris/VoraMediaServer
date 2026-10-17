@@ -145,6 +145,8 @@ public class AudioTrackDecisionTests
         decision.SelectedAudioTrackId.Should().Be(stereo.Id);
         decision.AudioStrategy.Should().NotBe("Transcode");
         decision.Reason.Should().Contain("closest one that plays");
+        decision.Reasons.Should().HaveCountGreaterThan(1).And.Contain(reason => reason.StartsWith("Pick: "));
+        string.Join(" ", decision.Reasons).Should().Be(decision.Reason);
     }
 
     [Theory]

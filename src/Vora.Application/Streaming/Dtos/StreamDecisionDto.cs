@@ -10,6 +10,7 @@ public class StreamDecisionDto
     public string AudioStrategy { get; set; } = string.Empty;
     public string SubtitleStrategy { get; set; } = string.Empty;
     public string Reason { get; set; } = string.Empty;
+    public List<string> Reasons { get; set; } = new();
     public string TargetVideoCodec { get; set; } = string.Empty;
     public string TargetAudioCodec { get; set; } = string.Empty;
     public string TargetContainer { get; set; } = string.Empty;

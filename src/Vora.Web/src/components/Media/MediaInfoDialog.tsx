@@ -16,16 +16,19 @@ import {
 // in it. One dialog for both the video player and the media details page, so
 // the two never describe the same file differently. The player lays it over the
 // video (`absolute`); the details page lays it over the whole client (`fixed`,
-// above the header).
+// above the header). The player names it Playback info and leads with how the
+// stream is playing (`lead`), then the playing file.
 interface MediaInfoDialogProps {
     parts: MediaPart[];
     placement: 'absolute' | 'fixed';
     onClose: () => void;
+    title?: string;
+    lead?: ReactNode;
 }
 
 type StatValue = string | number | null | undefined;
 
-function Stat({ label, value }: { label: string; value: StatValue }) {
+export function Stat({ label, value }: { label: string; value: StatValue }) {
     if (value === null || value === undefined || value === '') return null;
     return (
         <div className="flex items-baseline justify-between gap-4">
@@ -35,7 +38,7 @@ function Stat({ label, value }: { label: string; value: StatValue }) {
     );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+export function Section({ title, children }: { title: string; children: ReactNode }) {
     return (
         <section className="min-w-0">
             <h4 className="m-0 mb-3 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>{title}</h4>
@@ -44,7 +47,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
     );
 }
 
-function StatList({ children, divided }: { children: ReactNode; divided?: boolean }) {
+export function StatList({ children, divided }: { children: ReactNode; divided?: boolean }) {
     return (
         <dl className={`m-0 space-y-2 ${divided ? 'mt-4 border-t pt-4' : ''}`} style={divided ? { borderColor: 'var(--vora-border-subtle)' } : undefined}>
             {children}
@@ -150,7 +153,7 @@ function Empty() {
     return <p className="m-0 text-sm" style={{ color: 'var(--vora-text-disabled)' }}>None</p>;
 }
 
-export default function MediaInfoDialog({ parts, placement, onClose }: MediaInfoDialogProps) {
+export default function MediaInfoDialog({ parts, placement, onClose, title = 'Media info', lead }: MediaInfoDialogProps) {
     const titleId = useId();
     const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -191,7 +194,7 @@ export default function MediaInfoDialog({ parts, placement, onClose }: MediaInfo
                             <line x1="12" y1="16" x2="12" y2="12" />
                             <line x1="12" y1="8" x2="12.01" y2="8" />
                         </svg>
-                        Media info
+                        {title}
                     </h2>
                     <button
                         ref={closeRef}
@@ -206,10 +209,12 @@ export default function MediaInfoDialog({ parts, placement, onClose }: MediaInfo
                 </div>
 
                 <div className="flex-1 space-y-8 overflow-y-auto pr-3">
-                    {parts.length === 0 && <Empty />}
+                    {lead}
+
+                    {parts.length === 0 && !lead && <Empty />}
 
                     {parts.map((part, index) => (
-                        <div key={part.id} className={index > 0 ? 'border-t pt-8' : undefined} style={index > 0 ? { borderColor: 'var(--vora-border-subtle)' } : undefined}>
+                        <div key={part.id} className={index > 0 || lead ? 'border-t pt-8' : undefined} style={index > 0 || lead ? { borderColor: 'var(--vora-border-subtle)' } : undefined}>
                             <PartInfo part={part} index={index} count={parts.length} />
                         </div>
                     ))}

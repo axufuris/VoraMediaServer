@@ -130,6 +130,20 @@ Admin → Watch History (`GET /api/streaming/admin/history`, `StreamHistoryProje
 - **Duration** is time played: elapsed time minus paused time (`WatchProgress.WatchedSeconds`).
 - **Status** (`WatchProgress.PercentComplete`) trusts where a session stopped only when at least half of the stretch it moved across was actually played; otherwise only the minutes played count, from where it started. Skipping an intro or the credits still finishes a title, while jumping to the end in thirty seconds doesn't. A grouped row shows the furthest any of its sessions got. The length is the played part's (`MediaPartId`), falling back to the item's analysis.
 
+## Playback info
+
+The player's info button opens **Playback info**: how this stream is playing, then the playing file (the same `MediaInfoDialog` as the details page, given a `title` and a `lead`).
+
+- **The server's side:** `GET /api/streaming/sessions/{id}/stats` (`PlaybackStatsManager` → `PlaybackStats.Build`; only the account that started the stream). The panel asks every 2 seconds while open.
+  - **Source:** container and bitrate, then the video's codec, profile, level, bit depth, HDR, size, frame rate and bitrate, and the audio's language, codec profile (`DTS-HD MA`), channels and layout, sample rate and bitrate.
+    - Level, audio profile, sample rate and stream bitrates aren't stored, so `IMediaAnalyzerService.ReadStreamFactsAsync` probes the file the first time it's asked. `StreamFactsCache` keeps 64 files for 30 minutes.
+  - **Output:** each stream's strategy, the output codec, size and HDR from the session, and from the transcoder the target and peak bitrate, tone mapping, encoder and decoder.
+  - **Transcoder:** `ITranscodeService.GetStatus` reads it from the FFmpeg command that was launched (`TranscodeSummary`), so it can't disagree with what runs. FFmpeg's progress lines (`fps=… speed=…x`, `TranscodeProgress`) give the live frame rate and speed, and stay out of the stderr kept for error reports. It also says when the transcode has finished the file, is paused by throttling (so its last speed isn't shown as current), or moved to the CPU after a GPU error.
+- **Why:** `/streaming/start` returns the decision's `reasons` (`StreamDecisionDto.Reasons`, the sentences the joined `Reason` is made of), and the player keeps them on `currentMedia`.
+- **The player's side**, read each second: hls.js, native HLS or the file; hls.js's bandwidth estimate; seconds buffered ahead; dropped frames (`getVideoPlaybackQuality`); and a text subtitle the player draws itself.
+
+The wording is in `utils/playbackStats.ts`. Tests: `PlaybackStatsTests`, `TranscodeSummaryTests` (against real built arguments), `StreamFactsReadingTests`, `playbackStats.test.ts`, `PlaybackStatsSections.test.tsx`.
+
 ## Gotchas
 
 - **Concurrent sessions on the same title share a transcode.** `_activeTranscodes` is keyed by media item id, so two clients playing the same movie collide on the video. Subtitles are not affected — the cache is keyed on (part, track), so two viewers with different subtitle choices get different files.

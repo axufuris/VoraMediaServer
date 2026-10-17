@@ -86,6 +86,11 @@ public static class StreamingEndpoints
         group.MapDelete("/sessions/{sessionId:guid}", StopSessionAsync)
             .WithName("StopStream")
             .RequireAuthorization();
+        group.MapGet("/sessions/{sessionId:guid}/stats", GetSessionStatsAsync)
+            .WithName("GetPlaybackStats")
+            .Produces<PlaybackStatsVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound)
+            .RequireAuthorization();
 
         group.MapGet("/sessions/{sessionId:guid}/subtitle/{subtitleTrackId}.vtt", GetSessionSubtitleAsync)
             .WithName("GetSessionSubtitle")
@@ -148,12 +153,20 @@ public static class StreamingEndpoints
                 TargetAudioChannels = result.Session.TargetAudioChannels,
                 OutputResolution = result.Session.OutputResolution,
                 OutputHdrType = result.Session.OutputHdrType,
+                Reasons = [.. result.Reasons],
             });
         }
         catch (Exception ex)
         {
             return Results.BadRequest(ex.Message);
         }
+    }
+
+    private static async Task<IResult> GetSessionStatsAsync(Guid sessionId, ClaimsPrincipal user, IPlaybackStatsManager stats, CancellationToken cancellationToken)
+    {
+        if (user.GetAccountId() is not Guid accountId) return Results.Unauthorized();
+        var result = await stats.GetAsync(sessionId, accountId, cancellationToken);
+        return result == null ? Results.NotFound() : Results.Ok(result);
     }
 
     private static async Task<IResult> GetRememberedChoiceAsync(Guid mediaId, HttpContext context, ClaimsPrincipal user, IPlaybackChoiceManager choices)
@@ -284,6 +297,7 @@ public static class StreamingEndpoints
                 TargetAudioChannels = result.Session.TargetAudioChannels,
                 OutputResolution = result.Session.OutputResolution,
                 OutputHdrType = result.Session.OutputHdrType,
+                Reasons = [.. result.Reasons],
             });
         }
         catch (Exception ex)

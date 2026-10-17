@@ -1,4 +1,5 @@
-﻿using Vora.Application.Streaming.ViewModels;
+﻿using Vora.Application.Streaming.Dtos;
+using Vora.Application.Streaming.ViewModels;
 
 namespace Vora.Application.Streaming;
 
@@ -14,4 +15,5 @@ public interface ITranscodeService
     Task ReapOrphanedTranscodeFilesAsync(string targetDir, TimeSpan maxAge);
     int GetActiveTranscodeCount();
     bool IsMediaTranscoding(Guid mediaItemId);
+    TranscodeStatusDto? GetStatus(Guid mediaItemId);
 }

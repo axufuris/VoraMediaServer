@@ -335,6 +335,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 double finalMbps = averageKbps / 1000.0;
 
                 option.Decision.Reason = string.Join(" ", reasons);
+                option.Decision.Reasons = [.. reasons];
                 option.Decision.BandwidthKbps = finalBandwidthKbps;
                 option.Decision.Quality = (needsVideoTranscode || needsAudioTranscode) ? $"Transcode ({finalMbps:F1} Mbps)" : $"Original ({finalMbps:F1} Mbps)";
 
@@ -392,8 +393,10 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         var bestOption = pool.OrderBy(o => o.PenaltyScore).First();
         if (wish.NarrowsChoice && !bestOption.Exact)
         {
+            const string pickReplaced = "Pick: the chosen version or track is not here as it is or would have to be converted, so the closest one that plays was chosen.";
             bestOption.Decision.PickReplaced = true;
-            bestOption.Decision.Reason += " Pick: the chosen version or track is not here as it is or would have to be converted, so the closest one that plays was chosen.";
+            bestOption.Decision.Reason += " " + pickReplaced;
+            bestOption.Decision.Reasons.Add(pickReplaced);
         }
         bestOption.Decision.EvaluatedOptions = decisionLogs;
         return bestOption.Decision;

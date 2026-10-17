@@ -39,6 +39,9 @@ export interface PlayableMedia {
     targetAudioChannels?: number;
     container?: string;
     bandwidthKbps?: number;
+    // Why the server chose this way of playing (from /streaming/start), shown
+    // in the player's Playback info.
+    reasons?: string[];
     playbackContextType?: string;
     playbackContextId?: string;
     // True when playing a local movie "extra" (trailer/featurette). Suppresses
