@@ -25,11 +25,13 @@ public class LocalMetadataImportTests : IDisposable
     private readonly IMediaRepository _repository = Substitute.For<IMediaRepository>();
     private readonly IMetadataProvider _remote = Substitute.For<IMetadataProvider>();
     private readonly IArtworkProvider _remoteArtwork = Substitute.For<IArtworkProvider>();
+    private readonly IVideoFrameArtworkService _frames = Substitute.For<IVideoFrameArtworkService>();
     private readonly RecordingLogger _log = new();
 
     public LocalMetadataImportTests()
     {
         Directory.CreateDirectory(_directory);
+        _frames.GetFrameArtworkAsync(Arg.Any<MediaItem>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns([]);
         _remote.Id.Returns(OnlineProvider);
         _remote.ProviderName.Returns("TMDB");
         _remoteArtwork.Id.Returns("tmdb_artwork");
@@ -86,7 +88,7 @@ public class LocalMetadataImportTests : IDisposable
         [],
         [_remoteArtwork, new LocalArtworkProvider(NullLogger<LocalArtworkProvider>.Instance)],
         new LocalMediaReader(_repository, _log),
-        Substitute.For<IVideoFrameArtworkService>());
+        _frames);
 
     private void OnlineAnswers(MetadataResult? result)
     {
@@ -664,5 +666,40 @@ public class LocalMetadataImportTests : IDisposable
         pilot.RuntimeMinutes.Should().Be(52);
         pilot.Cast.Should().Contain(person => person.Name == "Jack Bender" && person.Roles == CastRole.Director
             && person.TmdbId == 28976 && person.TvdbId == 248008);
+    }
+
+    [Fact]
+    public async Task A_title_whose_metadata_was_removed_is_never_looked_up_online_nor_named_by_its_nfo_ids()
+    {
+        Fixture("EmbyMovie.nfo", "movie.nfo");
+        OnlineAnswers(new MetadataResult { Title = "Online title" });
+        OnlineArtworkAnswers(new ArtworkResult { Url = "https://image.tmdb.org/poster.jpg", Kind = Vora.Plugins.Dtos.ArtworkKind.Poster });
+        var movie = Movie(mode: LocalMetadataMode.MatchOnly);
+        movie.LockField(MediaMatchManager.UnmatchedLock);
+
+        var text = await Fetch().GetTextMetadataAsync(movie);
+        var secondary = await Fetch().GetSecondaryDataAsync(movie, forceOverride: true, TestContext.Current.CancellationToken);
+
+        text.Metadata.Should().BeNull();
+        text.ProviderId.Should().Be(LocalMetadataProvider.ProviderId);
+        movie.TmdbId.Should().BeNull();
+        secondary.Artwork.Should().NotContain(artwork => artwork.Url.StartsWith("https://"));
+        await _remote.DidNotReceive().FetchMovieMetadataAsync(Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<CancellationToken>());
+        await _remote.DidNotReceive().FetchMovieMetadataByIdAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _remoteArtwork.DidNotReceive().GetArtworkAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task The_episodes_of_a_show_whose_metadata_was_removed_are_never_looked_up_online()
+    {
+        OnlineAnswers(new MetadataResult { Title = "Online episode" });
+        var (show, _, episode) = Show("Show", "Season 01/Show - S01E01.mkv", LocalMetadataMode.Off, preferLocalArtwork: false);
+        show.TmdbId = "1399";
+        show.LockField(MediaMatchManager.UnmatchedLock);
+
+        var text = await Fetch().GetTextMetadataAsync(episode);
+
+        text.ProviderId.Should().Be(LocalMetadataProvider.ProviderId);
+        await _remote.DidNotReceive().FetchEpisodeMetadataAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 }

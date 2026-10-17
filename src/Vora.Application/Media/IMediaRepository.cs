@@ -58,6 +58,7 @@ public interface IMediaRepository
     Task<MediaItem?> GetForAnalysisAsync(Guid id);
     Task<MediaItem?> GetForPosterOverlayAsync(Guid id);
     Task<MediaItem?> GetForMetadataSyncAsync(Guid id);
+    Task<List<MediaItem>> GetShowChildrenForMetadataResetAsync(Guid tvShowId);
     Task<IEnumerable<Guid>> GetMediaIdsMissingMetadataAsync(Guid libraryId);
     Task<IEnumerable<Guid>> GetMediaIdsMissingArtworkAsync(Guid libraryId);
     Task<IEnumerable<Guid>> GetEnrichableMediaIdsAsync(Guid libraryId, DateTime? fullyRefreshedBefore = null, DateTime? ratingsCheckedBefore = null);

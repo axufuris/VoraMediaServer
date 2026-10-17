@@ -45,6 +45,21 @@ When two copies of a show are merged, the kept one inherits the mark (`MediaDedu
 
 **Clear manual match** (`DELETE /api/media/{id}/match`, admin; the menu entry appears only on a title that has the mark) removes it, sets the ids back to whatever tag is in the file name, sets the title and year back to the ones in the file or folder name unless those fields are locked, and queues an ordinary refresh. For a show the episodes are read again too. From then on the NFO, the tag or a title search decides again.
 
+## Removing a title's metadata
+
+**Remove metadata…** (`DELETE /api/media/{id}/metadata`, admin, movies and shows, `MediaMatchManager.RemoveMetadataAsync`) is for a title that should not be matched at all, such as a home video taken for a film.
+
+- **What goes** (`MetadataReset`): the ids, description, tagline, content rating, ratings, poster, backdrop, logo, genres, studios, countries, networks, cast, trailers and the provider artwork list. For a show, the same goes for every season and episode.
+- **Names come back from the files:**
+  - the title and year from the file or folder name (`ReadNamingAsync`);
+  - seasons as `Season N`;
+  - episodes from their file names, through the library's episode pattern (`EpisodeFileNames`), or as `Show - S01E02` when the name has no title.
+- **What stays:** fields the admin locked, uploaded images (`IsUserUploaded`), watch history, collections, markers and the files.
+- **It stays unmatched:** `"Unmatched"` (`MediaMatchManager.UnmatchedLock`) replaces `"Match"` in `LockedFields`.
+  - `MetadataFetchService.StaysLocal` then treats the title, its seasons and its episodes like a home video: no provider is asked, NFO ids are ignored, and artwork comes from the folder or a frame of the video.
+  - The scan and saving edited details treat the mark like `"Match"` (`IdentityChosenByHand`), so new files join the title and an edit cannot drop the mark.
+- **Undo:** the menu offers **Match automatically** in its place. That is Clear manual match, which now lifts either mark. Fix match replaces it with `"Match"`.
+
 ## How a refresh uses the NFO
 
 `MetadataFetchService.GetTextMetadataAsync`:
@@ -94,4 +109,4 @@ Ratings (the library's rating providers own those slots), watch history, studios
 
 ## Tests
 
-`LocalMetadataImportTests` (modes, trust rules, Fix match, images through the fetch service, the issue #69 and FROM samples), `LocalMetadataScanTests` (scanner), `LocalMetadataChangeFinderTests`, `LocalMetadataMergeTests`, `LocalMetadataSyncTests`, `LocalArtworkSelectionTests`, `LocalArtworkAddressTests`, `PosterOverlaySourceTests`, `MediaMatchManagerTests` (clear), `LibraryManagerTests`; `LocalMediaSourceTests`, `LocalArtworkThumbnailTests`, `MediaEditsRestoreTests` and the Postgres migration test in `Vora.Infrastructure.Tests`; `LocalArtworkEndpointTests` and `MediaMatchEndpointTests` in `Vora.Api.Tests`.
+`LocalMetadataImportTests` (modes, trust rules, Fix match, images through the fetch service, the issue #69 and FROM samples), `LocalMetadataScanTests` (scanner), `LocalMetadataChangeFinderTests`, `LocalMetadataMergeTests`, `LocalMetadataSyncTests`, `LocalArtworkSelectionTests`, `LocalArtworkAddressTests`, `PosterOverlaySourceTests`, `MediaMatchManagerTests` (clear), `MediaMetadataRemovalTests`, `LibraryManagerTests`; `LocalMediaSourceTests`, `LocalArtworkThumbnailTests`, `MediaEditsRestoreTests`, `PostgresMetadataRemovalTests` and the Postgres migration test in `Vora.Infrastructure.Tests`; `LocalArtworkEndpointTests` and `MediaMatchEndpointTests` in `Vora.Api.Tests`.

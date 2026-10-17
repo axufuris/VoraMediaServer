@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Vora.Application.Artwork;
 using Vora.Application.Media;
 using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
@@ -7,6 +8,7 @@ using Vora.Application.Tasks;
 using Vora.Domain.Entities.Media;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
+using Vora.Plugins.Providers.Local;
 
 namespace Vora.Application.Metadata;
 
@@ -16,6 +18,7 @@ public interface IMediaMatchManager
     Task<MediaMatchResultVM> ApplyAsync(Guid mediaItemId, ApplyMediaMatchRequest request, CancellationToken cancellationToken = default);
     Task<MediaMatchFilesVM> GetFilesAsync(Guid mediaItemId);
     Task ClearAsync(Guid mediaItemId);
+    Task RemoveMetadataAsync(Guid mediaItemId);
 }
 
 public class MediaMatchManager(
@@ -24,9 +27,16 @@ public class MediaMatchManager(
     IMediaDedupeManager dedupeManager,
     ITaskQueueManager taskQueue,
     ILocalMediaReader localMedia,
+    IMediaArtworkRepository artwork,
     ILogger<MediaMatchManager> logger) : IMediaMatchManager
 {
     public const string MatchLock = "Match";
+    public const string UnmatchedLock = "Unmatched";
+
+    public static bool IsIdentityLock(string field) =>
+        field.Equals(MatchLock, StringComparison.OrdinalIgnoreCase) || field.Equals(UnmatchedLock, StringComparison.OrdinalIgnoreCase);
+
+    public static bool IdentityChosenByHand(IEnumerable<string> lockedFields) => lockedFields.Any(IsIdentityLock);
     private const string TmdbProviderId = "tmdb_metadata";
     private const string TvdbProviderId = "tvdb_metadata";
 
@@ -100,6 +110,7 @@ public class MediaMatchManager(
         item.ImdbId = null;
         item.TvdbId = null;
         MediaMatchIds.Assign(item, source, externalId);
+        item.UnlockField(UnmatchedLock);
         item.LockField(MatchLock);
 
         if (existing != null)
@@ -136,11 +147,12 @@ public class MediaMatchManager(
     public async Task ClearAsync(Guid mediaItemId)
     {
         var item = await LoadMatchableAsync(mediaItemId);
-        if (!item.IsLocked(MatchLock)) return;
+        if (!IdentityChosenByHand(item.LockedFields)) return;
 
         var naming = await localMedia.ReadNamingAsync(item.Id);
 
         item.UnlockField(MatchLock);
+        item.UnlockField(UnmatchedLock);
         if (!item.IsLocked(nameof(item.TmdbId))) item.TmdbId = naming?.TaggedIds.TmdbId;
         if (!item.IsLocked(nameof(item.ImdbId))) item.ImdbId = naming?.TaggedIds.ImdbId;
         if (!item.IsLocked(nameof(item.TvdbId))) item.TvdbId = naming?.TaggedIds.TvdbId;
@@ -163,6 +175,49 @@ public class MediaMatchManager(
 
         logger.LogInformation("Cleared the manual match on {MediaType} {MediaItemId}; matching it again from its files.",
             item is TvShow ? "show" : "movie", item.Id);
+    }
+
+    public async Task RemoveMetadataAsync(Guid mediaItemId)
+    {
+        var title = await LoadMatchableAsync(mediaItemId);
+        var children = title is TvShow ? await repository.GetShowChildrenForMetadataResetAsync(title.Id) : [];
+        var ids = children.Select(child => child.Id).Prepend(title.Id).ToList();
+        var uploaded = await artwork.GetUploadedArtworkUrlsAsync(ids);
+        var naming = await localMedia.ReadNamingAsync(title.Id);
+
+        MetadataReset.ClearTitle(title, naming?.Title, naming?.Year, uploaded);
+        title.UnlockField(MatchLock);
+        title.LockField(UnmatchedLock);
+
+        var episodeNames = new EpisodeFileNames(title.Library?.ScannerRegex);
+        foreach (var season in children.OfType<Season>())
+        {
+            MetadataReset.ClearSeason(season, uploaded);
+        }
+        foreach (var episode in children.OfType<Episode>())
+        {
+            var placement = PlacementOf(episode, episodeNames);
+            var fileTitle = placement?.Title ?? MetadataReset.EpisodeTitleFallback(title.Title, episode.Season.SeasonNumber, episode.EpisodeNumber);
+            MetadataReset.ClearEpisode(episode, fileTitle, placement?.AirDate, uploaded);
+        }
+
+        var reset = children.Prepend(title).ToList();
+        await repository.RemoveMediaCastMembersAsync(reset.SelectMany(item => item.Cast).ToList());
+        await repository.RemoveMediaVideosAsync(reset.SelectMany(item => item.Videos).ToList());
+        await repository.SaveChangesAsync();
+        await artwork.ClearProviderArtworkAsync(ids);
+        taskQueue.QueueRefreshMediaItemMetadata(title.Id, title.Title, false, title.LibraryId);
+
+        logger.LogInformation("Removed the metadata of {MediaType} {MediaItemId} and {Children} seasons and episodes; it stays unmatched until it is matched again.",
+            title is TvShow ? "show" : "movie", title.Id, children.Count);
+    }
+
+    private static EpisodePlacement? PlacementOf(Episode episode, EpisodeFileNames names)
+    {
+        var path = episode.MediaParts.Select(part => part.FilePath).FirstOrDefault(file => !string.IsNullOrWhiteSpace(file));
+        return path == null
+            ? null
+            : names.Place(Path.GetFileNameWithoutExtension(path), Path.GetFileName(Path.GetDirectoryName(path)), () => null);
     }
 
     private async Task<MediaItem> LoadMatchableAsync(Guid mediaItemId)
