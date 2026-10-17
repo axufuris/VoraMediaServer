@@ -4399,6 +4399,12 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<int?>("LibrarySort")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("LibrarySortDescending")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("MinimumCreditsSceneSeconds")
                         .HasColumnType("integer");
 

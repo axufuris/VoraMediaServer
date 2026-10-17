@@ -18,43 +18,26 @@ import { yearOf } from '../../utils/serverTime';
 import { errorDetail, isMissingOrForbidden } from '../../utils/apiError';
 import LibraryCollectionGrid from '../../components/Collections/LibraryCollectionGrid';
 import { mediaMenuTarget } from '../../components/Media/ItemMenu/mediaItemMenu';
+import { profileService, type LibrarySortVM } from '../../api/Users/profileService';
+import {
+    activeProfileId,
+    HOME_VIDEO_SORT_LABELS,
+    rememberLibrarySort,
+    SORT_KEYS,
+    SORT_LABELS,
+    startingLibrarySort,
+    type LibrarySort,
+    type SortDir,
+    type SortKey,
+} from '../../utils/librarySort';
 
 type LibraryTabKey = 'library' | 'collections' | 'recommendations';
-
-type SortKey =
-    | 'title'
-    | 'releaseDate'
-    | 'dateAdded'
-    | 'adminRating'
-    | 'myRating'
-    | 'criticRating'
-    | 'audienceRating'
-    | 'contentRating'
-    | 'duration'
-    | 'resolution';
 
 type FilterPreset = 'all' | 'unwatched' | 'inProgress' | 'watched';
 type FilterCategory = 'genre' | 'year' | 'decade' | 'contentRating';
 type Filter =
     | { kind: 'preset'; preset: FilterPreset }
     | { kind: 'category'; category: FilterCategory; value: string };
-type SortDir = 'asc' | 'desc';
-
-const SORT_LABELS: Record<SortKey, string> = {
-    title: 'Title',
-    releaseDate: 'Release Date',
-    dateAdded: 'Date Added',
-    adminRating: 'Admin Rating',
-    myRating: 'My Rating',
-    criticRating: 'Critic Rating',
-    audienceRating: 'Audience Rating',
-    contentRating: 'Content Rating',
-    duration: 'Duration',
-    resolution: 'Resolution',
-};
-
-const HOME_VIDEO_SORT_LABELS: Record<SortKey, string> = { ...SORT_LABELS, releaseDate: 'Date' };
-
 const FILTER_PRESET_LABELS: Record<FilterPreset, string> = {
     all: 'All',
     unwatched: 'Unwatched',
@@ -150,7 +133,7 @@ function LibraryToolbar({
     };
     const presetOptions: FilterPreset[] = ['all', 'unwatched', 'inProgress', 'watched'];
     const categoryOptions: FilterCategory[] = ['genre', 'year', 'decade', 'contentRating'];
-    const sortOptions: SortKey[] = ['title', 'releaseDate', 'dateAdded', 'adminRating', 'myRating', 'criticRating', 'audienceRating', 'contentRating', 'duration', 'resolution'];
+    const sortOptions = SORT_KEYS;
 
     const isPresetActive = (p: FilterPreset) => filter.kind === 'preset' && filter.preset === p;
     const isCategoryValueActive = (cat: FilterCategory, value: string) =>
@@ -433,10 +416,7 @@ export default function LibraryPage() {
     const [showMenu, setShowMenu] = useState(false);
     const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
 
-    // Filter and sort state, persisted per-library.
     const filterKey = id ? `vora_library_filter_${id}` : '';
-    const sortKey = id ? `vora_library_sort_${id}` : '';
-    const sortDirKey = id ? `vora_library_sortdir_${id}` : '';
     const [filter, setFilter] = useState<Filter>(() => {
         const saved = filterKey ? localStorage.getItem(filterKey) : null;
         if (saved) {
@@ -444,24 +424,32 @@ export default function LibraryPage() {
         }
         return { kind: 'preset', preset: 'all' };
     });
-    const [sortBy, setSortBy] = useState<SortKey>(() => {
-        const saved = sortKey ? localStorage.getItem(sortKey) : null;
-        return (saved as SortKey) || 'title';
-    });
-    const [sortDir, setSortDir] = useState<SortDir>(() => {
-        const saved = sortDirKey ? localStorage.getItem(sortDirKey) : null;
-        return (saved as SortDir) || 'asc';
-    });
-    const [hadSavedSort] = useState(() => !!sortKey && localStorage.getItem(sortKey) !== null);
     const libraryType = library?.type;
+    const [sortPreference, setSortPreference] = useState<{ serverId?: string; value: LibrarySortVM | null } | null>(null);
+    const sortPreferenceLoaded = sortPreference !== null && sortPreference.serverId === serverId;
     useEffect(() => {
-        if (hadSavedSort || libraryType !== 'HomeVideo') return;
-        setSortBy('releaseDate');
-        setSortDir('desc');
-    }, [hadSavedSort, libraryType]);
+        let current = true;
+        profileService.getMyLibrarySort(serverId)
+            .then(value => { if (current) setSortPreference({ serverId, value }); })
+            .catch(() => { if (current) setSortPreference({ serverId, value: null }); });
+        return () => { current = false; };
+    }, [serverId]);
+    const profileSort = sortPreferenceLoaded ? sortPreference.value : null;
+    const profileId = useMemo(() => activeProfileId(), []);
+    const startingSort = useMemo(
+        () => (id ? startingLibrarySort(profileId, id, profileSort, libraryType) : null),
+        [profileId, id, profileSort, libraryType]
+    );
+    const [chosenSort, setChosenSort] = useState<{ libraryId: string; sort: LibrarySort } | null>(null);
+    const sort = chosenSort && chosenSort.libraryId === id ? chosenSort.sort : startingSort;
+    const sortBy: SortKey = sort?.sortBy ?? 'title';
+    const sortDir: SortDir = sort?.sortDir ?? 'asc';
+    const chooseSort = (next: LibrarySort) => {
+        if (!id) return;
+        setChosenSort({ libraryId: id, sort: next });
+        rememberLibrarySort(profileId, id, next, profileSort);
+    };
     useEffect(() => { if (filterKey) localStorage.setItem(filterKey, JSON.stringify(filter)); }, [filter, filterKey]);
-    useEffect(() => { if (sortKey) localStorage.setItem(sortKey, sortBy); }, [sortBy, sortKey]);
-    useEffect(() => { if (sortDirKey) localStorage.setItem(sortDirKey, sortDir); }, [sortDir, sortDirKey]);
     const [showFilterMenu, setShowFilterMenu] = useState(false);
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [filterSubmenu, setFilterSubmenu] = useState<FilterCategory | null>(null);
@@ -680,7 +668,7 @@ export default function LibraryPage() {
         setShowMenu(false);
     };
 
-    if (loading) {
+    if (loading || !sortPreferenceLoaded) {
         return (
             <div>
                 <div className="vora-skeleton mb-8 h-[280px] w-full" />
@@ -776,9 +764,9 @@ export default function LibraryPage() {
                                 filter={filter}
                                 onFilterChange={setFilter}
                                 sortBy={sortBy}
-                                onSortByChange={setSortBy}
+                                onSortByChange={next => chooseSort({ sortBy: next, sortDir })}
                                 sortDir={sortDir}
-                                onSortDirToggle={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                                onSortDirToggle={() => chooseSort({ sortBy, sortDir: sortDir === 'asc' ? 'desc' : 'asc' })}
                                 count={visibleItems.length}
                                 showFilterMenu={showFilterMenu}
                                 onToggleFilterMenu={() => { setShowFilterMenu(v => !v); setShowSortMenu(false); }}

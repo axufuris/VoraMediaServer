@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { profileService } from '../../../api/Users/profileService';
 import { useDialog } from '../../../dialogs';
 import { StorageKeys } from '../../../utils/storageKeys';
+import LibrarySortSection from './LibrarySortSection';
 
 export default function AccountTab({ serverId }: { serverId?: string }) {
     const profileName = localStorage.getItem(StorageKeys.profileName) || 'You';
@@ -11,6 +12,7 @@ export default function AccountTab({ serverId }: { serverId?: string }) {
                 <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Signed in as</h2>
                 <p className="m-0 text-2xl font-semibold" style={{ color: 'var(--vora-accent-text)' }}>{profileName}</p>
             </section>
+            <LibrarySortSection serverId={serverId} />
             <ShowtimesLocationSection serverId={serverId} />
             <PlaybackPreferencesSection serverId={serverId} />
         </div>

@@ -41,6 +41,9 @@ public interface IUserManager
 
     Task<PlaybackPreferencesVM> GetPlaybackPreferencesAsync(Guid profileId);
     Task<PlaybackPreferencesVM> SavePlaybackPreferencesAsync(Guid profileId, PlaybackPreferencesVM prefs);
+
+    Task<LibrarySortVM> GetLibrarySortAsync(Guid profileId);
+    Task<LibrarySortVM> SaveLibrarySortAsync(Guid profileId, LibrarySortVM sort);
 }
 
 public class UserManager(
@@ -413,6 +416,34 @@ public class UserManager(
             MinimumCreditsSceneSeconds = profile.MinimumCreditsSceneSeconds
         };
     }
+
+    public async Task<LibrarySortVM> GetLibrarySortAsync(Guid profileId)
+    {
+        var profile = await repository.GetProfileByIdAsync(profileId)
+            ?? throw new InvalidOperationException("Profile not found.");
+        return LibrarySortOf(profile);
+    }
+
+    public async Task<LibrarySortVM> SaveLibrarySortAsync(Guid profileId, LibrarySortVM sort)
+    {
+        if (sort.Sort is { } field && !Enum.IsDefined(field))
+        {
+            throw new ArgumentException($"'{field}' is not a library sort.", nameof(sort));
+        }
+
+        var profile = await repository.GetProfileByIdAsync(profileId)
+            ?? throw new InvalidOperationException("Profile not found.");
+        profile.LibrarySort = sort.Sort;
+        profile.LibrarySortDescending = sort.Sort.HasValue && sort.Descending;
+        await repository.UpdateProfileAsync(profile);
+        return LibrarySortOf(profile);
+    }
+
+    private static LibrarySortVM LibrarySortOf(UserProfile profile) => new()
+    {
+        Sort = profile.LibrarySort,
+        Descending = profile.LibrarySortDescending
+    };
 
     private static IEnumerable<ProfileAccessSchedule> BuildScheduleEntities(Guid profileId, IEnumerable<ProfileScheduleVM> schedules)
     {

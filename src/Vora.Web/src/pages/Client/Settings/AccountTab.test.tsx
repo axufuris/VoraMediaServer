@@ -7,6 +7,7 @@ vi.mock('../../../api/Users/profileService', () => ({
     profileService: {
         getMyShowtimesLocation: vi.fn().mockResolvedValue({ location: null }),
         getMyPlaybackPreferences: vi.fn().mockResolvedValue({ autoSkipIntro: false, autoSkipCredits: false, minimumCreditsSceneSeconds: 15 }),
+        getMyLibrarySort: vi.fn().mockResolvedValue({ sort: null, descending: false }),
     },
 }));
 

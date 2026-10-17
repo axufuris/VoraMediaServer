@@ -108,13 +108,25 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string AlbumIndexMigration = "20261015235423_ChangesSinceInitial";
 
+    public const string VideoDimensionsMigration = "20261017000904_ChangesSinceInitial";
+
+    private const string LibrarySortProfileColumns = """
+        ALTER TABLE "UserProfiles" ADD COLUMN IF NOT EXISTS "LibrarySort" integer;
+        ALTER TABLE "UserProfiles" ADD COLUMN IF NOT EXISTS "LibrarySortDescending" boolean NOT NULL DEFAULT FALSE;
+        """;
+
+    private const string ColumnsSinceVideoDimensions = """
+        ALTER TABLE "UserProfiles" DROP COLUMN "LibrarySort";
+        ALTER TABLE "UserProfiles" DROP COLUMN "LibrarySortDescending";
+        """;
+
     private const string ColumnsSinceAlbumIndex = """
         ALTER TABLE "MediaVideoTracks" DROP COLUMN "Width";
         ALTER TABLE "MediaVideoTracks" DROP COLUMN "Height";
         ALTER TABLE "MediaVideoTracks" DROP COLUMN "FrameRate";
         ALTER TABLE "StreamSessions" DROP COLUMN "OutputWidth";
         ALTER TABLE "StreamSessions" DROP COLUMN "OutputHeight";
-        """;
+        """ + ColumnsSinceVideoDimensions;
 
     private const string IndexesSinceTrackPreferences = """
         DROP INDEX "IX_Albums_ArtistId_Title";
@@ -212,9 +224,9 @@ public sealed class LegacyDatabase : IAsyncDisposable
     public async Task SeedAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
     {
         await using var db = NewContext();
-        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns, cancellationToken);
         await seed(db);
-        await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices + ColumnsSinceVideoDimensions, cancellationToken);
     }
 
     public async Task BuildRememberedChoicesStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
@@ -242,6 +254,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceAlbumIndex, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, AlbumIndexMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildVideoDimensionsStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceVideoDimensions, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, VideoDimensionsMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

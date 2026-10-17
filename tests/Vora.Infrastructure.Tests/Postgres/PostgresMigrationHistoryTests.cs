@@ -369,6 +369,38 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         session.OutputHeight.Should().BeNull();
     }
 
+    [Fact]
+    public async Task A_database_on_the_video_dimensions_migration_only_gains_the_library_sort_of_a_profile()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var profileId = Guid.NewGuid();
+        await legacy.BuildVideoDimensionsStateAsync(async db =>
+        {
+            var account = new User { Email = "viewer@example.com", DisplayName = "Viewer" };
+            var profile = new UserProfile { Id = profileId, Name = "Viewer", UserId = account.Id, PreferredAudioLanguage = "en", SubtitleMode = SubtitleMode.Smart };
+            db.AddRange(account, profile);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ProfileColumnsAsync(before, cancellationToken)).Should().NotContain("LibrarySort").And.NotContain("LibrarySortDescending");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var profile = await after.UserProfiles.AsNoTracking().SingleAsync(p => p.Id == profileId, cancellationToken);
+        profile.PreferredAudioLanguage.Should().Be("en");
+        profile.SubtitleMode.Should().Be(SubtitleMode.Smart);
+        profile.LibrarySort.Should().BeNull();
+        profile.LibrarySortDescending.Should().BeFalse();
+    }
+
     private static Task<List<string>> ColumnsAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = {0}", table)

@@ -39,6 +39,23 @@ export interface PlaybackPreferencesVM {
     minimumCreditsSceneSeconds: number;
 }
 
+export type LibrarySortField =
+    | 'Title'
+    | 'ReleaseDate'
+    | 'DateAdded'
+    | 'AdminRating'
+    | 'MyRating'
+    | 'CriticRating'
+    | 'AudienceRating'
+    | 'ContentRating'
+    | 'Duration'
+    | 'Resolution';
+
+export interface LibrarySortVM {
+    sort: LibrarySortField | null;
+    descending: boolean;
+}
+
 export type SubtitleMode = 'Default' | 'Smart' | 'ForcedOnly' | 'Always' | 'Off';
 
 export interface TrackPreferencesVM {
@@ -125,6 +142,16 @@ export const profileService = {
             prefs,
             { serverId }
         );
+        return response.data;
+    },
+
+    getMyLibrarySort: async (serverId?: string): Promise<LibrarySortVM> => {
+        const response = await apiClient.get<LibrarySortVM>('/users/profiles/me/library-sort', { serverId });
+        return response.data;
+    },
+
+    saveMyLibrarySort: async (sort: LibrarySortVM, serverId?: string): Promise<LibrarySortVM> => {
+        const response = await apiClient.put<LibrarySortVM, LibrarySortVM>('/users/profiles/me/library-sort', sort, { serverId });
         return response.data;
     },
 
