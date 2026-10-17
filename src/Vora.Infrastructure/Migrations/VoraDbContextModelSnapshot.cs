@@ -4366,6 +4366,9 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<bool>("AutoApproveRequests")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("AutoPlayNext")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("AutoSkipCredits")
                         .HasColumnType("boolean");
 

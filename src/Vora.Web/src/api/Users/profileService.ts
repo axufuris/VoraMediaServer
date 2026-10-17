@@ -36,6 +36,7 @@ export interface ShowtimesLocationDto {
 export interface PlaybackPreferencesVM {
     autoSkipIntro: boolean;
     autoSkipCredits: boolean;
+    autoPlayNext: boolean;
     minimumCreditsSceneSeconds: number;
 }
 

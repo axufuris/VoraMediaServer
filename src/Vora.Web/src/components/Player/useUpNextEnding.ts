@@ -10,6 +10,9 @@ interface UpNextEndingOptions {
     eligible: boolean;
     currentTime: number;
     duration: number;
+    // The item has finished (`usePlaybackFinished`), even if the clock stopped
+    // short of the end because the stream did.
+    finished?: boolean;
     // Called once each time the last stretch begins, to refresh what comes next.
     onEnterEnding?: () => void;
 }
@@ -21,10 +24,10 @@ interface UpNextEndingOptions {
 // The flag it replaces was shared with the up-next fetch that runs when an item
 // starts. That fetch set the flag first, so the ending branch behind
 // `!flag.current` never ran and the overlay never appeared.
-export function useUpNextEnding({ mediaId, eligible, currentTime, duration, onEnterEnding }: UpNextEndingOptions): boolean {
+export function useUpNextEnding({ mediaId, eligible, currentTime, duration, finished = false, onEnterEnding }: UpNextEndingOptions): boolean {
     // Past the end (remaining <= 0) still counts: the overlay has to stay up
     // while the item finishes, which is exactly when the next one matters.
-    const isEnding = eligible && duration > 0 && currentTime >= duration - EndingThresholdSeconds;
+    const isEnding = eligible && (finished || (duration > 0 && currentTime >= duration - EndingThresholdSeconds));
 
     const refreshedRef = useRef(false);
 

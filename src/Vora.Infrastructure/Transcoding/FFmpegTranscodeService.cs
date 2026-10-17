@@ -67,12 +67,11 @@ public class FFmpegTranscodeService : ITranscodeService
             ? await _hardware.ResolveAsync(settings.HardwareAccelerationType, settings.HardwareTranscodingDevice, cancellationToken)
             : null;
 
-        var durationSeconds = decision.SourceDurationSeconds > 0 ? decision.SourceDurationSeconds : FallbackDurationSeconds;
         if (decision.SourceDurationSeconds <= 0)
         {
-            _logger.LogWarning("Source duration unknown for {MediaItemId}; using {Fallback}s placeholder. Re-analyze the media to populate Duration.",
-                decision.MediaItemId, FallbackDurationSeconds);
+            await MeasureUnknownDurationAsync(sourceFilePath, decision, cancellationToken);
         }
+        var durationSeconds = decision.SourceDurationSeconds > 0 ? decision.SourceDurationSeconds : FallbackDurationSeconds;
         var plan = PlanSegments(sourceFilePath, decision, durationSeconds);
         int startSegment = plan.IndexAt(Math.Max(0, decision.StartPositionSeconds));
 
@@ -120,6 +119,21 @@ public class FFmpegTranscodeService : ITranscodeService
         return outputPath;
     }
 
+    private async Task MeasureUnknownDurationAsync(string sourceFilePath, PlaybackDecisionVM decision, CancellationToken cancellationToken)
+    {
+        var measured = await SourceDuration.ProbeAsync(sourceFilePath, _logger, cancellationToken);
+        if (measured is > 0)
+        {
+            _logger.LogInformation("Source duration unknown for {MediaItemId}; ffprobe measured {Seconds}s. Re-analyze the media to store it.",
+                decision.MediaItemId, measured.Value);
+            decision.SourceDurationSeconds = measured.Value;
+            return;
+        }
+
+        _logger.LogWarning("Source duration unknown for {MediaItemId} and ffprobe could not measure it; using {Fallback}s placeholder. Re-analyze the media to populate Duration.",
+            decision.MediaItemId, FallbackDurationSeconds);
+    }
+
     private async Task RecheckDynamicRangeAsync(string sourceFilePath, PlaybackDecisionVM decision, CancellationToken cancellationToken)
     {
         var probe = await HdrClassifier.ProbeAsync(sourceFilePath, decision.SelectedVideoStreamIndex, _logger, cancellationToken);
@@ -152,12 +166,28 @@ public class FFmpegTranscodeService : ITranscodeService
         || decision.VideoStrategy == "Copy"
         || decision.VideoStrategy == "DirectStream";
 
-    public async Task<bool> EnsureSegmentAvailableAsync(Guid mediaItemId, int segmentIndex, CancellationToken cancellationToken = default)
+    public async Task<SegmentAvailability> EnsureSegmentAvailableAsync(Guid mediaItemId, int segmentIndex, CancellationToken cancellationToken = default)
     {
         if (!_transcodeContexts.TryGetValue(mediaItemId, out var ctx))
         {
-            return false;
+            return SegmentAvailability.NotReady;
         }
+
+        var availability = await EnsureSegmentAsync(mediaItemId, segmentIndex, ctx, cancellationToken);
+        if (availability == SegmentAvailability.PastTheEnd && !ctx.ReportedPastTheEnd)
+        {
+            ctx.ReportedPastTheEnd = true;
+            _logger.LogInformation("{MediaItemId} ends after segment {LastSegment} of the {PlannedSegments} planned; segment {SegmentIndex} and later are answered as past the end.",
+                mediaItemId, ctx.FileEndsAfterSegment, ctx.Plan.Count, segmentIndex);
+        }
+        return availability;
+    }
+
+    private static bool IsPastTheEnd(TranscodeContext ctx, int segmentIndex) =>
+        ctx.FileEndsAfterSegment is int last && segmentIndex > last;
+
+    private async Task<SegmentAvailability> EnsureSegmentAsync(Guid mediaItemId, int segmentIndex, TranscodeContext ctx, CancellationToken cancellationToken)
+    {
 
         // If the segment file is on disk AND sealed (FFmpeg has moved on),
         // serve it. The seal check is critical — if the file exists but
@@ -167,8 +197,10 @@ public class FFmpegTranscodeService : ITranscodeService
         // bytes written" and a corrupt segment for the player.
         if (IsSegmentSealed(mediaItemId, segmentIndex, ctx))
         {
-            return true;
+            return SegmentAvailability.Ready;
         }
+
+        if (IsPastTheEnd(ctx, segmentIndex)) return SegmentAvailability.PastTheEnd;
 
         await ResumeAsync(mediaItemId, "the player asked for a segment it has not written yet");
 
@@ -189,8 +221,9 @@ public class FFmpegTranscodeService : ITranscodeService
         {
             if (await WaitForSegmentSealedAsync(mediaItemId, segmentIndex, ctx, TimeSpan.FromSeconds(15), cancellationToken))
             {
-                return true;
+                return SegmentAvailability.Ready;
             }
+            if (IsPastTheEnd(ctx, segmentIndex)) return SegmentAvailability.PastTheEnd;
         }
 
         // CRITICAL: protect resume-from-position from the player's initial
@@ -215,7 +248,7 @@ public class FFmpegTranscodeService : ITranscodeService
         {
             _logger.LogInformation("Suppressing pre-seek-probe restart for {MediaItemId} segment={SegmentIndex} currentStart={CurrentStart} (no segments served yet)",
                 mediaItemId, segmentIndex, currentStart);
-            return false;
+            return SegmentAvailability.NotReady;
         }
 
         // Far-forward seek (or genuine backward seek into untranscoded
@@ -227,7 +260,11 @@ public class FFmpegTranscodeService : ITranscodeService
 
         await RelaunchAtSegmentAsync(mediaItemId, segmentIndex, cancellationToken);
 
-        return await WaitForSegmentSealedAsync(mediaItemId, segmentIndex, ctx, TimeSpan.FromSeconds(30), cancellationToken);
+        if (await WaitForSegmentSealedAsync(mediaItemId, segmentIndex, ctx, TimeSpan.FromSeconds(30), cancellationToken))
+        {
+            return SegmentAvailability.Ready;
+        }
+        return IsPastTheEnd(ctx, segmentIndex) ? SegmentAvailability.PastTheEnd : SegmentAvailability.NotReady;
     }
 
     private static bool IsSegmentSealed(Guid mediaItemId, int segmentIndex, TranscodeContext ctx)
@@ -678,6 +715,12 @@ public class FFmpegTranscodeService : ITranscodeService
         try { exitCode = entry.Process.ExitCode; } catch (InvalidOperationException) { exitCode = -1; }
         bool failed = exitCode != 0 && !entry.Stopping;
 
+        if (exitCode == 0 && !entry.Stopping
+            && _transcodeContexts.TryGetValue(mediaItemId, out var finished) && finished.LaunchId == launch.Id)
+        {
+            RecordWhereTheFileEnds(mediaItemId, finished, launch.StartSegment);
+        }
+
         TranscodeContext? retryContext = null;
         if (failed && launch.Hardware is not null
             && _transcodeContexts.TryGetValue(mediaItemId, out var ctx) && ctx.LaunchId == launch.Id)
@@ -708,6 +751,12 @@ public class FFmpegTranscodeService : ITranscodeService
         {
             _ = RetryOnCpuAsync(mediaItemId, launch, retryContext);
         }
+    }
+
+    private static void RecordWhereTheFileEnds(Guid mediaItemId, TranscodeContext ctx, int startSegment)
+    {
+        if (ctx.Plan.FollowsKeyframes) PublishFinishedSegments(ctx.TargetDir, SegmentListPath(ctx.TargetDir, mediaItemId));
+        ctx.FileEndsAfterSegment = Math.Max(ComputeLeadingEdge(mediaItemId, ctx.TargetDir), startSegment - 1);
     }
 
     private async Task RetryOnCpuAsync(Guid mediaItemId, TranscodeLaunch launch, TranscodeContext ctx)
@@ -1331,5 +1380,7 @@ public class FFmpegTranscodeService : ITranscodeService
         // (suppress) from a real user seek backward (allow restart).
         public int HighestServedSegment { get; set; }
         public int LastServedSegment { get; set; }
+        public int? FileEndsAfterSegment { get; set; }
+        public bool ReportedPastTheEnd { get; set; }
     }
 }

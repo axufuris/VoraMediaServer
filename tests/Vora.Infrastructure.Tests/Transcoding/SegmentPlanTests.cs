@@ -26,12 +26,35 @@ public class SegmentPlanTests
     }
 
     [Fact]
-    public void A_duration_that_ends_on_a_boundary_does_not_add_an_empty_segment()
+    public void A_final_stretch_shorter_than_half_a_second_joins_the_segment_before_it()
     {
-        var plan = SegmentPlan.Uniform(8.005);
+        var onTheBoundary = SegmentPlan.Uniform(8.005);
+        var audioPastTheVideo = SegmentPlan.Uniform(8.421);
+
+        onTheBoundary.Count.Should().Be(2);
+        onTheBoundary.DurationOf(1).Should().BeApproximately(4.005, 0.0001);
+        audioPastTheVideo.Count.Should().Be(2);
+        audioPastTheVideo.DurationOf(1).Should().BeApproximately(4.421, 0.0001);
+        audioPastTheVideo.TargetDuration.Should().Be(4);
+        audioPastTheVideo.IndexAt(8.3).Should().Be(1);
+    }
+
+    [Fact]
+    public void A_final_stretch_of_half_a_second_or_more_keeps_its_own_segment()
+    {
+        var plan = SegmentPlan.Uniform(8.5);
 
         plan.Count.Should().Be(3);
-        plan.DurationOf(2).Should().Be(4);
+        plan.DurationOf(2).Should().BeApproximately(0.5, 0.0001);
+    }
+
+    [Fact]
+    public void A_stream_shorter_than_half_a_second_is_still_one_segment()
+    {
+        var plan = SegmentPlan.Uniform(0.3);
+
+        plan.Count.Should().Be(1);
+        plan.DurationOf(0).Should().BeApproximately(0.3, 0.0001);
     }
 
     [Fact]

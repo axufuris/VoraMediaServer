@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Vora.Application.Settings;
+using Vora.Application.Streaming;
 using Vora.Application.Streaming.ViewModels;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
@@ -77,7 +78,7 @@ public sealed class ImageSubtitleBurnInTests : IDisposable
 
     private async Task<int> LitPixelsMidSegmentAsync(FFmpegTranscodeService transcoder, Guid mediaItemId, int segment, CancellationToken cancellationToken)
     {
-        (await transcoder.EnsureSegmentAvailableAsync(mediaItemId, segment, cancellationToken)).Should().BeTrue();
+        (await transcoder.EnsureSegmentAvailableAsync(mediaItemId, segment, cancellationToken)).Should().Be(SegmentAvailability.Ready);
         return await FfmpegTool.BrightPixelsAsync(Path.Combine(_output, $"{mediaItemId}_{segment}.ts"), 50, cancellationToken);
     }
 

@@ -19,14 +19,15 @@ const upNext: UpNextResultVM = {
 
 // Stands in for the player: the same inputs the real one passes, and the
 // overlay it renders when the hook says the item is ending.
-function Player({ mediaId, currentTime, duration, eligible = true, onEnterEnding }: {
+function Player({ mediaId, currentTime, duration, eligible = true, finished = false, onEnterEnding }: {
     mediaId: string;
     currentTime: number;
     duration: number;
     eligible?: boolean;
+    finished?: boolean;
     onEnterEnding?: () => void;
 }) {
-    const isEnding = useUpNextEnding({ mediaId, eligible, currentTime, duration, onEnterEnding });
+    const isEnding = useUpNextEnding({ mediaId, eligible, currentTime, duration, finished, onEnterEnding });
     if (!isEnding) return <div>playing</div>;
     return (
         <UpNextOverlay
@@ -80,6 +81,12 @@ describe('useUpNextEnding', () => {
         expect(overlay()).toBeInTheDocument();
 
         rerender(<Player mediaId="ep-1" currentTime={100} duration={100} />);
+        expect(overlay()).toBeInTheDocument();
+    });
+
+    it('opens when the stream ran out before the clock reached the last stretch', () => {
+        render(<Player mediaId="ep-1" currentTime={70} duration={100} finished />);
+
         expect(overlay()).toBeInTheDocument();
     });
 

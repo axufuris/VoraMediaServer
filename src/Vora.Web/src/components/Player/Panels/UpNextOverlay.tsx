@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { UpNextItemVM, UpNextResultVM } from '../../../api/Media/mediaService';
 import MediaCard from '../../Client/Primitives/MediaCard';
 import MediaRow from '../../Client/Primitives/MediaRow';
@@ -12,9 +13,26 @@ interface UpNextOverlayProps {
     upNextData: UpNextResultVM | null;
     onPlayNext: (item: UpNextItemVM) => Promise<void>;
     onClose: () => void;
+    // The profile plays the next episode by itself, and the viewer has not
+    // cancelled it for this one.
+    autoPlay?: boolean;
+    // The item has finished; with autoPlay on, the next one starts now.
+    finished?: boolean;
+    secondsLeft?: number;
+    onCancelAutoPlay?: () => void;
 }
 
-export default function UpNextOverlay({ currentMedia, upNextData, onPlayNext, onClose }: UpNextOverlayProps) {
+export default function UpNextOverlay({ currentMedia, upNextData, onPlayNext, onClose, autoPlay = false, finished = false, secondsLeft = 0, onCancelAutoPlay }: UpNextOverlayProps) {
+    const nextItem = upNextData?.nextItem;
+    const countingDown = autoPlay && !!nextItem;
+    const startedRef = useRef(false);
+
+    useEffect(() => {
+        if (!countingDown || !finished || !nextItem || startedRef.current) return;
+        startedRef.current = true;
+        void onPlayNext(nextItem);
+    }, [countingDown, finished, nextItem, onPlayNext]);
+
     return (
         <div
             className="absolute inset-0 z-10 flex animate-fade-in overflow-hidden px-20 py-0 backdrop-blur-md max-md:px-4"
@@ -34,9 +52,23 @@ export default function UpNextOverlay({ currentMedia, upNextData, onPlayNext, on
             <div className="ml-auto flex h-full w-[60%] flex-col overflow-y-auto pr-4 pt-20 max-md:ml-0 max-md:w-full max-md:pr-0 max-md:pt-32">
                 {upNextData?.nextItem && (
                     <div className="mb-12 max-md:mb-8">
-                        <h2 className="m-0 mb-4 pb-2 text-2xl font-semibold tracking-wide max-md:text-xl" style={{ color: 'var(--vora-text-primary)', borderBottom: '1px solid var(--vora-border-subtle)', letterSpacing: '-0.01em' }}>
-                            Up next
-                        </h2>
+                        <div className="mb-4 flex flex-wrap items-end justify-between gap-3 pb-2" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>
+                            <h2 className="m-0 text-2xl font-semibold tracking-wide max-md:text-xl" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}>
+                                Up next
+                            </h2>
+                            {countingDown && (
+                                <div className="flex items-center gap-3">
+                                    <span role="status" className="text-sm font-medium tabular-nums" style={{ color: 'var(--vora-text-secondary)' }}>
+                                        {finished ? 'Starting…' : `Playing in ${Math.ceil(secondsLeft)}s`}
+                                    </span>
+                                    {!finished && onCancelAutoPlay && (
+                                        <button type="button" onClick={onCancelAutoPlay} className="vora-button-secondary cursor-pointer">
+                                            Cancel
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                         <div
                             className="group flex cursor-pointer overflow-hidden rounded-2xl transition-all max-md:flex-col"
                             onClick={() => upNextData.nextItem && onPlayNext(upNextData.nextItem)}

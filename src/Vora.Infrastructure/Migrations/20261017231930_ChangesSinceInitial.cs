@@ -41,7 +41,8 @@ ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""OutputWidth"" integer;
 ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""OutputHeight"" integer;
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""LibrarySort"" integer;
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""LibrarySortDescending"" boolean NOT NULL DEFAULT FALSE;
-ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""PreserveHdrInTranscodes"" boolean NOT NULL DEFAULT TRUE;");
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""PreserveHdrInTranscodes"" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""AutoPlayNext"" boolean NOT NULL DEFAULT TRUE;");
 
             migrationBuilder.Sql(@"
 DO $$
@@ -195,6 +196,10 @@ CREATE INDEX ""IX_Albums_ArtistId_Title"" ON ""Albums"" (""ArtistId"", ""Title""
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "AutoPlayNext",
+                table: "UserProfiles");
+
             migrationBuilder.DropColumn(
                 name: "PreserveHdrInTranscodes",
                 table: "ServerSettings");

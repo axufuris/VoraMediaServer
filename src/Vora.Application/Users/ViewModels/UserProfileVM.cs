@@ -26,6 +26,7 @@ public class UserProfileVM
     public bool AiMusicPlaylistsEnabled { get; set; } = true;
     public bool AutoSkipIntro { get; set; }
     public bool AutoSkipCredits { get; set; }
+    public bool AutoPlayNext { get; set; } = true;
     public int MinimumCreditsSceneSeconds { get; set; }
 
     public static Expression<Func<UserProfile, UserProfileVM>> Projection =>
@@ -51,6 +52,7 @@ public class UserProfileVM
             AiMusicPlaylistsEnabled = p.AiMusicPlaylistsEnabled,
             AutoSkipIntro = p.AutoSkipIntro,
             AutoSkipCredits = p.AutoSkipCredits,
+            AutoPlayNext = p.AutoPlayNext,
             MinimumCreditsSceneSeconds = p.MinimumCreditsSceneSeconds,
             AccessSchedules = p.AccessSchedules.Select(s => new ProfileScheduleVM
             {

@@ -91,6 +91,8 @@ The contextual skip prompt is derived from `(currentTime, markers, playbackPrefs
 | Inside `Credits` with an upcoming scene ≥ `MinimumCreditsSceneSeconds` away | Skip to Scene / Skip to Preview | seek to that scene's `Start` |
 | Inside `Credits` with no upcoming scene | Skip Credits | seek to near the end (`duration − 2`) |
 
+**Autoplay:** when an episode or a playlist item finishes, Up Next starts the next one (`UserProfile.AutoPlayNext`, on by default, beside the auto-skip flags in Settings → Account). The Up next card counts down ("Playing in 12s") over the last 15 seconds and has Cancel. A film with no next item just shows its related rows. "Finished" is `usePlaybackFinished`, not only the `ended` event (`docs/streaming.md`).
+
 Auto-skip honors per-profile flags `AutoSkipIntro` / `AutoSkipCredits`. **`Skip to Scene` is never auto-skipped** — that would silently bypass the thing the user wanted to see.
 
 The seekbar paints marker bands inline: dim white for Intro/Recap, blue for the Credits roll, accent color for `CreditsScene` / `Preview`. Bands render under the progress fill so they show only on the unwatched portion.
@@ -120,7 +122,7 @@ Read (any authenticated user):
 
 - `GET /api/media/{id}/markers` → `MediaMarkerVM[]` — player fetch
 - `MediaDetailsVM.Markers` — included in the regular details fetch so the details page has markers without a second round-trip
-- `GET / PUT /api/users/profiles/me/playback-preferences` → `PlaybackPreferencesVM` — per-profile auto-skip flags
+- `GET / PUT /api/users/profiles/me/playback-preferences` → `PlaybackPreferencesVM` — per-profile auto-skip flags and `AutoPlayNext` (nullable on PUT: an app that leaves it out keeps the profile's value)
 
 Admin-only:
 
