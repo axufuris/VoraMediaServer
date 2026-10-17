@@ -39,11 +39,11 @@ internal static class HardwareArguments
             ? $"scale_cuda=-2:{height}:format=nv12,hwdownload,format=nv12"
             : $"scale_vaapi=w=-2:h={height}:format=nv12,hwdownload,format=nv12";
 
-    public static string VulkanTonemap(string algorithm, int scaleHeight)
+    public static string VulkanTonemap(string algorithm, string? size = null)
     {
-        var size = scaleHeight > 0 ? $"w=-2:h={scaleHeight}:" : string.Empty;
+        var sized = string.IsNullOrEmpty(size) ? string.Empty : $"{size}:";
         return "hwmap=derive_device=vulkan,format=vulkan," +
-            $"libplacebo={size}format=nv12:tonemapping={algorithm}:colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv," +
+            $"libplacebo={sized}format=nv12:tonemapping={algorithm}:colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv," +
             "hwmap=derive_device=vaapi,format=vaapi,scale_vaapi=format=nv12";
     }
 

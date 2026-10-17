@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyUserCaps, detectAudioOutputChannels, detectHlsVideoCodecs, getEffectiveCapabilities, scanDeviceCapabilities, type DeviceCapabilities } from './hardwareScanner';
+import { applyUserCaps, detectAudioOutputChannels, detectHlsVideoCodecs, getEffectiveCapabilities, scanDeviceCapabilities, scanDeviceCapabilitiesSync, type DeviceCapabilities } from './hardwareScanner';
 import { StorageKeys } from './storageKeys';
 
 const close = vi.fn().mockResolvedValue(undefined);
@@ -8,7 +8,7 @@ let outputChannels = 2;
 const device: DeviceCapabilities = {
     videoCodecs: ['h264'], audioCodecs: ['aac'], containers: ['mp4'], maxAudioChannels: 2,
     detectedAudioChannels: 2, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: ['h264'],
-    clientBandwidthKbps: 100000, requestedClientBitrateKbps: 0, requestedMaxResolution: 2160,
+    clientBandwidthKbps: 100000, requestedClientBitrateKbps: 0, requestedMaxResolution: 2160, requestedMaxWidth: 3840,
     supportedHdrFormats: ['HDR10'], maxVideoBitDepth: 10,
 };
 
@@ -112,6 +112,30 @@ describe('per-device audio output preference', () => {
         expect(result.audioCodecs).toEqual(['aac']);
         expect(result.supportedHdrFormats).toEqual(['HDR10']);
         expect(result.requestedMaxResolution).toBe(1080);
+    });
+
+    it('narrows the screen width to the picked resolution as a widescreen box', () => {
+        const result = applyUserCaps({ ...device, requestedMaxResolution: 1440, requestedMaxWidth: 3440 }, { maxResolution: 1080, maxAudioChannels: 0 });
+
+        expect(result.requestedMaxResolution).toBe(1080);
+        expect(result.requestedMaxWidth).toBe(1920);
+    });
+
+    it('keeps the measured screen when no resolution is picked', () => {
+        const result = applyUserCaps({ ...device, requestedMaxResolution: 1440, requestedMaxWidth: 3440 }, { maxResolution: 0, maxAudioChannels: 0 });
+
+        expect(result.requestedMaxResolution).toBe(1440);
+        expect(result.requestedMaxWidth).toBe(3440);
+    });
+
+    it('reports the screen landscape with its width and height in physical pixels', () => {
+        vi.stubGlobal('screen', { width: 1440, height: 3440 });
+        vi.stubGlobal('devicePixelRatio', 1);
+
+        const result = scanDeviceCapabilitiesSync();
+
+        expect(result.requestedMaxResolution).toBe(1440);
+        expect(result.requestedMaxWidth).toBe(3440);
     });
 
     it('applies the same saved pick to the picker and server capability report', async () => {

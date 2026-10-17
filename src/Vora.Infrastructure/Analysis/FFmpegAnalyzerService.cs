@@ -15,6 +15,7 @@ namespace Vora.Infrastructure.Analysis;
 public class FFmpegAnalyzerService : IMediaAnalyzerService
 {
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromHours(2);
+    private static readonly TimeSpan VideoStreamProbeTimeout = TimeSpan.FromSeconds(30);
     private const int MeanVolumeSampleSeconds = 600;
     // Black-frame detection only needs to know a frame is (nearly) all black, which
     // is resolution-independent. Downscaling to this height on the GPU before
@@ -47,6 +48,69 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         var result = new MediaAnalysisResult();
         await RunFFprobeAsync(filePath, result, cancellationToken);
         return result;
+    }
+
+    public async Task<IReadOnlyList<VideoStreamFacts>> ReadVideoStreamsAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "ffprobe",
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        processInfo.ArgumentList.Add("-v");
+        processInfo.ArgumentList.Add("quiet");
+        processInfo.ArgumentList.Add("-print_format");
+        processInfo.ArgumentList.Add("json");
+        processInfo.ArgumentList.Add("-select_streams");
+        processInfo.ArgumentList.Add("v");
+        processInfo.ArgumentList.Add("-show_streams");
+        processInfo.ArgumentList.Add(filePath);
+
+        try
+        {
+            using var process = Process.Start(processInfo);
+            if (process == null) return [];
+
+            var json = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitWithTimeoutAsync(VideoStreamProbeTimeout, _logger, cancellationToken);
+            return ReadVideoStreams(json);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not read the video streams of {FilePath}.", filePath);
+            return [];
+        }
+    }
+
+    internal static IReadOnlyList<VideoStreamFacts> ReadVideoStreams(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("streams", out var streams) || streams.ValueKind != JsonValueKind.Array) return [];
+
+            var roles = CoverImageStreams.Read(streams);
+            var facts = new List<VideoStreamFacts>();
+            foreach (var stream in streams.EnumerateArray())
+            {
+                var index = stream.TryGetProperty("index", out var indexProperty) ? indexProperty.GetInt32() : 0;
+                if (roles.IsCoverImage(index)) continue;
+                var geometry = VideoGeometry.Read(stream);
+                facts.Add(new VideoStreamFacts(index, geometry.Width, geometry.Height, geometry.FrameRate, HdrClassifier.Classify(stream)));
+            }
+            return facts;
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     public async Task<double?> ProbeMeanVolumeDbAsync(string filePath, CancellationToken cancellationToken = default)
@@ -447,6 +511,10 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
                         }
 
                         videoTrack.HdrType = HdrClassifier.Classify(stream);
+                        var geometry = VideoGeometry.Read(stream);
+                        videoTrack.Width = geometry.Width;
+                        videoTrack.Height = geometry.Height;
+                        videoTrack.FrameRate = geometry.FrameRate;
 
                         if (stream.TryGetProperty("bit_rate", out var vbrProp) && long.TryParse(vbrProp.GetString(), out var vbr))
                         {

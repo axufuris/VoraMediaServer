@@ -22,6 +22,8 @@ export interface VideoTrack {
     hdrType?: string;
     bitDepth?: number;
     bitrateKbps?: number;
+    width?: number;
+    height?: number;
     isDefault?: boolean;
 }
 

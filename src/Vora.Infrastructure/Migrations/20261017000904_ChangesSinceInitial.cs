@@ -33,7 +33,12 @@ ALTER TABLE ""MediaLibraries"" ADD COLUMN IF NOT EXISTS ""PreferLocalArtwork"" b
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""PreferredAudioLanguage"" character varying(16);
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""PreferredSubtitleLanguage"" character varying(16);
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""SubtitleMode"" integer;
-ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""PreferHearingImpairedSubtitles"" boolean NOT NULL DEFAULT FALSE;");
+ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""PreferHearingImpairedSubtitles"" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE ""MediaVideoTracks"" ADD COLUMN IF NOT EXISTS ""Width"" integer;
+ALTER TABLE ""MediaVideoTracks"" ADD COLUMN IF NOT EXISTS ""Height"" integer;
+ALTER TABLE ""MediaVideoTracks"" ADD COLUMN IF NOT EXISTS ""FrameRate"" double precision;
+ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""OutputWidth"" integer;
+ALTER TABLE ""StreamSessions"" ADD COLUMN IF NOT EXISTS ""OutputHeight"" integer;");
 
             migrationBuilder.Sql(@"
 DO $$
@@ -187,6 +192,26 @@ CREATE INDEX ""IX_Albums_ArtistId_Title"" ON ""Albums"" (""ArtistId"", ""Title""
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "Width",
+                table: "MediaVideoTracks");
+
+            migrationBuilder.DropColumn(
+                name: "Height",
+                table: "MediaVideoTracks");
+
+            migrationBuilder.DropColumn(
+                name: "FrameRate",
+                table: "MediaVideoTracks");
+
+            migrationBuilder.DropColumn(
+                name: "OutputWidth",
+                table: "StreamSessions");
+
+            migrationBuilder.DropColumn(
+                name: "OutputHeight",
+                table: "StreamSessions");
+
             migrationBuilder.Sql(@"
 DROP INDEX IF EXISTS ""IX_Albums_ArtistId_Title"";
 CREATE UNIQUE INDEX ""IX_Albums_ArtistId_Title"" ON ""Albums"" (""ArtistId"", ""Title"");");

@@ -437,6 +437,8 @@ public static class StreamingEndpoints
         decision.SelectedSubtitleStreamIndex = pickedSubtitleIdx;
         decision.SelectedSubtitleExternalPath = pickedSubtitle?.ExternalFilePath;
         decision.SourceVideoCodec = pickedVideo?.Codec;
+        decision.SourceWidth = pickedVideo?.Width ?? 0;
+        decision.SourceHeight = pickedVideo?.Height ?? 0;
         decision.SourceAudioCodec = pickedAudio?.Codec;
         decision.SourceDurationSeconds = part?.Duration?.TotalSeconds ?? 0.0;
         decision.StartPositionSeconds = session.StartPosition;
@@ -632,7 +634,8 @@ public static class StreamingEndpoints
         TargetAudioChannels = session.TargetAudioChannels,
         TranscodeReason = session.DecisionLog ?? string.Empty,
         SourceHdrType = session.HdrType,
-        OutputHeight = ResolveOutputHeight(session),
+        OutputWidth = session.OutputWidth is > 0 && session.OutputHeight is > 0 ? session.OutputWidth.Value : 0,
+        OutputHeight = session.OutputWidth is > 0 && session.OutputHeight is > 0 ? session.OutputHeight.Value : ResolveOutputHeight(session),
     };
 
     private static int ResolveOutputHeight(Vora.Domain.Entities.Streaming.StreamSession session)

@@ -106,10 +106,20 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string TrackPreferencesMigration = "20261015010727_ChangesSinceInitial";
 
+    public const string AlbumIndexMigration = "20261015235423_ChangesSinceInitial";
+
+    private const string ColumnsSinceAlbumIndex = """
+        ALTER TABLE "MediaVideoTracks" DROP COLUMN "Width";
+        ALTER TABLE "MediaVideoTracks" DROP COLUMN "Height";
+        ALTER TABLE "MediaVideoTracks" DROP COLUMN "FrameRate";
+        ALTER TABLE "StreamSessions" DROP COLUMN "OutputWidth";
+        ALTER TABLE "StreamSessions" DROP COLUMN "OutputHeight";
+        """;
+
     private const string IndexesSinceTrackPreferences = """
         DROP INDEX "IX_Albums_ArtistId_Title";
         CREATE UNIQUE INDEX "IX_Albums_ArtistId_Title" ON "Albums" ("ArtistId", "Title");
-        """;
+        """ + ColumnsSinceAlbumIndex;
 
     private const string SinceRememberedChoices = ColumnsSinceRememberedChoices + IndexesSinceTrackPreferences;
 
@@ -223,6 +233,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(IndexesSinceTrackPreferences, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, TrackPreferencesMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildAlbumIndexStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceAlbumIndex, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, AlbumIndexMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

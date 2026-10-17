@@ -311,6 +311,69 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         (await after.Albums.AsNoTracking().SingleAsync(a => a.Id == blueId, cancellationToken)).Year.Should().Be(1994);
     }
 
+    [Fact]
+    public async Task A_database_on_the_album_index_migration_only_gains_video_dimensions_and_the_output_size_of_a_stream()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var trackId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        await legacy.BuildAlbumIndexStateAsync(async db =>
+        {
+            var library = new MediaLibrary { Name = "Movies", Type = LibraryType.Movie, FolderPaths = ["/movies"] };
+            var movie = new Movie { Title = "Minions", LibraryId = library.Id };
+            var part = new MediaPart { FilePath = "/movies/minions.mkv", MediaItemId = movie.Id, Resolution = "2160p" };
+            var track = new MediaVideoTrack { Id = trackId, MediaPartId = part.Id, Codec = "hevc", HdrType = "DoVi/HDR10", BitDepth = 10 };
+            var account = new User { Email = "viewer@example.com", DisplayName = "Viewer" };
+            var device = new ClientDevice { DeviceId = "web-1", ClientName = "Vora Web", DeviceName = "Web Browser" };
+            var session = new StreamSession
+            {
+                Id = sessionId,
+                MediaItemId = movie.Id,
+                MediaPartId = part.Id,
+                UserId = account.Id,
+                ClientDeviceId = device.Id,
+                Strategy = "Transcode",
+                VideoStrategy = "Transcode",
+                AudioStrategy = "DirectStream",
+                SubtitleStrategy = "None",
+                OutputResolution = "1440p",
+                BandwidthKbps = 8000,
+            };
+            db.AddRange(library, movie, part, track, account, device, session);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "MediaVideoTracks", cancellationToken)).Should().NotContain("Width").And.NotContain("Height").And.NotContain("FrameRate");
+            (await StreamSessionColumnsAsync(before, cancellationToken)).Should().NotContain("OutputWidth").And.NotContain("OutputHeight");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var track = await after.MediaVideoTracks.AsNoTracking().SingleAsync(t => t.Id == trackId, cancellationToken);
+        track.HdrType.Should().Be("DoVi/HDR10");
+        track.BitDepth.Should().Be(10);
+        track.Width.Should().BeNull();
+        track.Height.Should().BeNull();
+        track.FrameRate.Should().BeNull();
+        var session = await after.StreamSessions.AsNoTracking().SingleAsync(s => s.Id == sessionId, cancellationToken);
+        session.OutputResolution.Should().Be("1440p");
+        session.BandwidthKbps.Should().Be(8000);
+        session.OutputWidth.Should().BeNull();
+        session.OutputHeight.Should().BeNull();
+    }
+
+    private static Task<List<string>> ColumnsAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
+        db.Database
+            .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = {0}", table)
+            .ToListAsync(cancellationToken);
+
     private static Task<string> AlbumTitleIndexAsync(VoraDbContext db, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT indexdef AS \"Value\" FROM pg_indexes WHERE tablename = 'Albums' AND indexname = 'IX_Albums_ArtistId_Title'")

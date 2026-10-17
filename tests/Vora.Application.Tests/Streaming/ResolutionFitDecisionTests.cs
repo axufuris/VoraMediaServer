@@ -7,12 +7,12 @@ using Vora.Domain.Enums;
 
 namespace Vora.Application.Tests.Streaming;
 
-// The scorer compares "what would the viewer actually receive" across parts.
-// That only works if both sides of the comparison are heights the encoder can
-// emit: a phone reporting a 1344p ceiling is served 1080p, so an option that
-// downscales 4K to 1344 has to be scored as the 1080p it really is. Scored
-// raw, it looked like a perfect fit and beat a 1080p file that direct-plays —
-// a GPU transcode to deliver exactly what was already sitting on disk.
+// The scorer compares "what would the viewer actually receive" across parts,
+// against the rung below the client's ceiling: a phone reporting 1344p is
+// scored against 1080p. Scored against the raw 1344, a 4K transcode looked
+// like a perfect fit and beat a 1080p file that direct-plays — a GPU
+// transcode to deliver what was already sitting on disk. A transcode itself
+// is sized to the real screen, so the 4K file reaches that phone at 2388x1344.
 public class ResolutionFitDecisionTests
 {
     private static readonly Guid FourKPartId = Guid.Parse("11111111-1111-1111-1111-111111111111");
@@ -166,7 +166,7 @@ public class ResolutionFitDecisionTests
     {
         var decision = await DecideAsync(Item(Part(FourKPartId, "2160p")), maxResolution: 1344);
 
-        decision.Reason.Should().Contain("exceeds client maximum (1344p)");
+        decision.Reason.Should().Contain("exceeds the client's screen (2389x1344)");
     }
 
     [Fact]
@@ -177,7 +177,16 @@ public class ResolutionFitDecisionTests
         var logged = decision.EvaluatedOptions.Should().ContainSingle().Subject;
         logged.ClientMaxHeight.Should().Be(1344);
         logged.DeliverableHeight.Should().Be(1080);
-        logged.OutputHeight.Should().Be(1080);
+        logged.OutputHeight.Should().Be(1344);
+    }
+
+    [Fact]
+    public async Task A_transcode_is_sized_to_the_screen_rather_than_a_rung_below_it()
+    {
+        var decision = await DecideAsync(Item(Part(FourKPartId, "2160p")), maxResolution: 1344);
+
+        decision.OutputWidth.Should().Be(2388);
+        decision.OutputHeight.Should().Be(1344);
     }
 
     // A ceiling already on the ladder must pass through untouched, or the snap

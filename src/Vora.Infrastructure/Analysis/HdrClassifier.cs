@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using Vora.Application.Streaming;
 using Vora.Infrastructure.Processes;
 
 namespace Vora.Infrastructure.Analysis;
@@ -40,8 +41,7 @@ public static class HdrClassifier
         return HasStandardDynamicRangeBaseLayer(colorTransfer, dolbyVision) ? null : "DoVi";
     }
 
-    public static bool HasNoKnownBaseLayer(string? hdrType) =>
-        string.Equals(hdrType?.Trim(), "DoVi", StringComparison.OrdinalIgnoreCase);
+    public static bool HasNoKnownBaseLayer(string? hdrType) => DynamicRange.HasNoKnownBaseLayer(hdrType);
 
     public static async Task<HdrProbeResult?> ProbeAsync(string filePath, int? streamIndex, ILogger logger, CancellationToken cancellationToken = default)
     {

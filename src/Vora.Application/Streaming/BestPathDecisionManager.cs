@@ -10,7 +10,7 @@ namespace Vora.Application.Streaming;
 
 public interface IBestPathDecisionManager
 {
-    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null, TrackPreferences? preferences = null);
+    Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null, TrackPreferences? preferences = null, int requestedMaxWidth = 0);
 }
 
 public class BestPathDecisionManager : IBestPathDecisionManager
@@ -35,7 +35,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         public StreamOptionLogDto? Log { get; set; }
     }
 
-    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null, TrackPreferences? preferences = null)
+    public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null, TrackPreferences? preferences = null, int requestedMaxWidth = 0)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
         var trackPreferences = preferences ?? TrackPreferences.Automatic;
@@ -61,9 +61,12 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             var videoCodec = videoTrack.Codec?.ToLower() ?? "";
             var container = part.Container?.ToLower() ?? "";
 
-            int trackHeight = ParseHeightFromResolution(part.Resolution);
+            var sourceSize = OutputSize.Source(videoTrack.Width, videoTrack.Height, part.Resolution);
+            var clientBox = OutputSize.ClientBox(requestedMaxWidth, requestedMaxResolution);
+            int trackHeight = sourceSize is { } knownSource ? OutputSize.HeightClass(knownSource) : 0;
             bool is4k = trackHeight >= 2160;
-            int clientMaxRes = requestedMaxResolution > 0 ? requestedMaxResolution : 2160;
+            int clientMaxRes = clientBox.Height;
+            bool exceedsClientSize = sourceSize is { } measured && OutputSize.Exceeds(measured, clientBox);
 
             // What the client can decode and display, versus what the encoder
             // can actually hand it. A 1344p panel is served 1080p, so scoring
@@ -85,11 +88,18 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 && !string.Equals(videoTrack.HdrType, "SDR", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(videoTrack.HdrType, "None", StringComparison.OrdinalIgnoreCase);
             int effectiveTargetHeight = deliverableMaxRes;
+            var outputBox = clientBox;
             if (isHdrPart && string.Equals(settings.HdrTranscodeDownscale, "Always", StringComparison.OrdinalIgnoreCase))
             {
                 effectiveTargetHeight = Math.Min(effectiveTargetHeight, 1080);
+                outputBox = OutputSize.Within(outputBox, OutputSize.HdrDownscaleBox);
             }
-            int outputHeight = Math.Min(trackHeight, effectiveTargetHeight);
+            if (maxAllowedBandwidthKbps > 0)
+            {
+                outputBox = outputBox with { Width = Math.Min(outputBox.Width, OutputSize.MaxWidthForBitrate(maxAllowedBandwidthKbps, videoTrack.FrameRate, VideoCodec.H264)) };
+            }
+            FrameSize? outputSize = sourceSize is { } fitted ? OutputSize.Fit(fitted, outputBox) : null;
+            int outputHeight = outputSize is { } output ? OutputSize.HeightClass(output) : Math.Min(trackHeight, effectiveTargetHeight);
 
             var audioInFileOrder = part.AudioTracks.OrderBy(t => t.StreamIndex ?? int.MaxValue).ToList();
             var primaryAudioTrack = audioInFileOrder.FirstOrDefault(t => t.IsDefault) ?? audioInFileOrder.FirstOrDefault();
@@ -105,6 +115,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             bool requiresBurnIn = subTrack != null && IsImageSubtitleCodec(subCodec);
 
             int bitrateKbps = (int)((part.OverallBitrate ?? 3000000) / 1000);
+            int sourceVideoKbps = videoTrack.Bitrate is > 0 ? (int)(videoTrack.Bitrate.Value / 1000) : bitrateKbps;
             bool exceedsBandwidth = maxAllowedBandwidthKbps > 0 && bitrateKbps > maxAllowedBandwidthKbps;
 
             var renderable = RenderableHdrFormats(videoTrack.HdrType);
@@ -140,10 +151,10 @@ public class BestPathDecisionManager : IBestPathDecisionManager
 
                 var reasons = new List<string>();
 
-                if (trackHeight > clientMaxRes)
+                if (exceedsClientSize)
                 {
                     needsVideoTranscode = true;
-                    reasons.Add($"Video Transcode: Track resolution ({trackHeight}p) exceeds client maximum ({clientMaxRes}p).");
+                    reasons.Add($"Video Transcode: Track resolution ({FrameText(sourceSize)}) exceeds the client's screen ({clientBox.Width}x{clientBox.Height}).");
                 }
 
                 bool audioUnsupportedInHls = !needsAudioTranscode
@@ -156,7 +167,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     && !string.IsNullOrEmpty(videoCodec)
                     && !hlsVideo.Contains(videoCodec);
                 needsVideoTranscode |= videoReencodedForHls;
-                bool videoConvertsForItself = codecUnsupported || exceedsBandwidth || hdrNotRenderable || bitDepthTooHigh || trackHeight > clientMaxRes || videoReencodedForHls;
+                bool videoConvertsForItself = codecUnsupported || exceedsBandwidth || hdrNotRenderable || bitDepthTooHigh || exceedsClientSize || videoReencodedForHls;
 
                 var conversion = audioLimits.ConversionOf(trackChannels, clientPlaysDolbyDigital);
                 int heardChannels = needsAudioTranscode ? conversion.Channels : trackChannels;
@@ -205,7 +216,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                         if (requiresBurnIn) reasons.Add($"Video Transcode: Subtitle burn-in required ({subCodec}).");
                         else if (exceedsBandwidth) reasons.Add($"Video Transcode: Bitrate ({(bitrateKbps / 1000.0):F1} Mbps) exceeds {bandwidthLimitSource} ({(maxAllowedBandwidthKbps / 1000.0):F1} Mbps).");
                         else if (videoReencodedForHls) reasons.Add($"Video Transcode: This client's HLS player cannot take '{videoCodec}', and the stream has to be HLS.");
-                        else if (trackHeight > clientMaxRes) { }
+                        else if (exceedsClientSize) { }
                         else if (codecUnsupported) reasons.Add($"Video Transcode: '{videoCodec}' unsupported.");
 
                         if (hdrNotRenderable) reasons.Add($"Video Transcode: Source HDR ({videoTrack.HdrType}) not supported by client; tonemapping to SDR.");
@@ -308,11 +319,20 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 }
 
                 int finalBandwidthKbps = exceedsBandwidth ? maxAllowedBandwidthKbps : bitrateKbps;
-                if (settings.StreamingProfile == StreamingProfile.BandwidthOptimized && (needsVideoTranscode || needsAudioTranscode))
+                int profileCapKbps = settings.StreamingProfile == StreamingProfile.BandwidthOptimized ? LadderKbpsForHeight(outputHeight) : 0;
+                int averageKbps;
+                if (needsVideoTranscode)
                 {
-                    finalBandwidthKbps = Math.Min(finalBandwidthKbps, LadderKbpsForHeight(outputHeight));
+                    var rate = VideoBitrate.For(sourceVideoKbps, videoCodec, videoTrack.BitDepth, sourceSize, outputSize, VideoCodec.H264, maxAllowedBandwidthKbps, profileCapKbps);
+                    finalBandwidthKbps = rate.MaxKbps;
+                    averageKbps = rate.TargetKbps;
                 }
-                double finalMbps = finalBandwidthKbps / 1000.0;
+                else
+                {
+                    if (profileCapKbps > 0 && needsAudioTranscode) finalBandwidthKbps = Math.Min(finalBandwidthKbps, profileCapKbps);
+                    averageKbps = finalBandwidthKbps;
+                }
+                double finalMbps = averageKbps / 1000.0;
 
                 option.Decision.Reason = string.Join(" ", reasons);
                 option.Decision.BandwidthKbps = finalBandwidthKbps;
@@ -327,6 +347,11 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 {
                     option.Decision.OutputResolution = FormatHeightAsResolution(outputHeight);
                     option.Decision.OutputHdrType = "SDR";
+                    if (outputSize is { } size)
+                    {
+                        option.Decision.OutputWidth = size.Width;
+                        option.Decision.OutputHeight = size.Height;
+                    }
                 }
                 else
                 {
@@ -405,6 +430,8 @@ public class BestPathDecisionManager : IBestPathDecisionManager
     // the labels the existing source-side `Resolution` strings use so
     // the web's `'2160p' → '4K'` translation in GlobalVideoPlayer keeps
     // working when reading from `OutputResolution`.
+    private static string FrameText(FrameSize? size) => size is { } known ? $"{known.Width}x{known.Height}" : "unknown";
+
     private static string FormatHeightAsResolution(int height)
     {
         if (height >= 2160) return "2160p";

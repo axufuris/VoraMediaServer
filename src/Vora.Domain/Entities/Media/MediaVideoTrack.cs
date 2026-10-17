@@ -10,6 +10,9 @@ public class MediaVideoTrack
     public string? HdrType { get; set; }
     public int? BitDepth { get; set; }
     public long? Bitrate { get; set; }
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public double? FrameRate { get; set; }
     public bool IsDefault { get; set; }
 
     public Guid MediaPartId { get; set; }

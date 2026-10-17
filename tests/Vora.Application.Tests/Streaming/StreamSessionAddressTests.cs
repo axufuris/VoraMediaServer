@@ -47,7 +47,8 @@ public class StreamSessionAddressTests
         Substitute.For<IClientNotifier>(),
         Substitute.For<ITranscodeService>(),
         Options.Create(new StoragePathsOptions()),
-        _locations);
+        _locations,
+        Substitute.For<IMediaAnalyzerService>());
 
     private async Task<(StreamSession Session, string StreamUrl)> StartAsync(string? clientAddress)
     {

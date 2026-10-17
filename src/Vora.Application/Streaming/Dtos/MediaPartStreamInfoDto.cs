@@ -3,6 +3,7 @@
 public class MediaPartStreamInfoDto
 {
     public Guid Id { get; set; }
+    public string FilePath { get; set; } = string.Empty;
     public string? Resolution { get; set; }
     public string? Edition { get; set; }
     public string? Container { get; set; }

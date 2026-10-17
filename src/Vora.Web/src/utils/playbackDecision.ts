@@ -4,6 +4,8 @@ interface VideoTrackLike {
     codec?: string;
     hdrType?: string;
     bitDepth?: number;
+    width?: number;
+    height?: number;
 }
 
 interface PartLike {
@@ -78,10 +80,21 @@ export function isVideoDirectPlayable(track: VideoTrackLike, part: PartLike, cap
     if (codec && !caps.videoCodecs.includes(codec)) return false;
     if (caps.maxVideoBitDepth > 0 && (track.bitDepth ?? 0) > caps.maxVideoBitDepth) return false;
     if (!hdrRenderable(track.hdrType, caps.supportedHdrFormats)) return false;
-    const height = parseResolutionHeight(part.resolution);
-    if (caps.requestedMaxResolution > 0 && height > caps.requestedMaxResolution) return false;
+    if (exceedsScreen(track, part, caps)) return false;
     if (caps.requestedClientBitrateKbps > 0 && (part.bitrateKbps ?? 0) > caps.requestedClientBitrateKbps) return false;
     return true;
+}
+
+// Mirrors the server: the measured picture against the screen's width and
+// height (a client that sent only a height is taken to be widescreen), and the
+// file-name label only for a track that was never measured.
+function exceedsScreen(track: VideoTrackLike, part: PartLike, caps: DeviceCapabilities): boolean {
+    if (caps.requestedMaxResolution <= 0) return false;
+    if (track.width && track.height) {
+        const maxWidth = caps.requestedMaxWidth > 0 ? caps.requestedMaxWidth : Math.round(caps.requestedMaxResolution * 16 / 9);
+        return track.width > maxWidth || track.height > caps.requestedMaxResolution;
+    }
+    return parseResolutionHeight(part.resolution) > caps.requestedMaxResolution;
 }
 
 export function isAudioDirectPlayable(track: AudioTrackLike, caps: DeviceCapabilities): boolean {

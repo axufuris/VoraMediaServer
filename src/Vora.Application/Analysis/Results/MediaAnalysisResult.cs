@@ -50,8 +50,13 @@ public class VideoTrackInfo
     public string? HdrType { get; set; }
     public int? BitDepth { get; set; }
     public long? Bitrate { get; set; }
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public double? FrameRate { get; set; }
     public bool IsDefault { get; set; }
 }
+
+public sealed record VideoStreamFacts(int StreamIndex, int? Width, int? Height, double? FrameRate, string? HdrType);
 
 public class SubtitleTrackInfo
 {

@@ -17,7 +17,7 @@ const remember = vi.mocked(streamingService.rememberChoice);
 const caps: DeviceCapabilities = {
     videoCodecs: ['h264'], audioCodecs: ['aac', 'eac3'], containers: ['mkv'], maxAudioChannels: 6,
     detectedAudioChannels: 6, pickedAudioChannels: 0, playsAnyAudioLayout: true, canSwitchAudioTracks: false, hlsVideoCodecs: ['h264'],
-    clientBandwidthKbps: 100000, requestedClientBitrateKbps: 0, requestedMaxResolution: 2160, supportedHdrFormats: [], maxVideoBitDepth: 10,
+    clientBandwidthKbps: 100000, requestedClientBitrateKbps: 0, requestedMaxResolution: 2160, requestedMaxWidth: 3840, supportedHdrFormats: [], maxVideoBitDepth: 10,
 };
 
 const part: MediaPart = {
