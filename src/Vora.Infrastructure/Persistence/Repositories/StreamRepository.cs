@@ -12,24 +12,31 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
 {
     public async Task<Guid> ResolvePlayableMediaIdAsync(Guid mediaId, Guid? profileId)
     {
-        var isShow = await context.MediaItems.AsNoTracking().AnyAsync(m => m.Id == mediaId && m is TvShow);
-        if (!isShow) return mediaId;
+        var episodes = context.Set<Episode>().AsNoTracking().Where(e => e.MissingSince == null);
+        if (await context.MediaItems.AsNoTracking().AnyAsync(m => m.Id == mediaId && m is TvShow))
+        {
+            episodes = episodes.Where(e => e.Season.TvShowId == mediaId);
+        }
+        else if (await context.MediaItems.AsNoTracking().AnyAsync(m => m.Id == mediaId && m is Season))
+        {
+            episodes = episodes.Where(e => e.SeasonId == mediaId);
+        }
+        else
+        {
+            return mediaId;
+        }
 
         Guid? episodeId = null;
         if (profileId.HasValue)
         {
-            episodeId = await context.Set<Episode>()
-                .AsNoTracking()
-                .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
+            episodeId = await episodes
                 .Where(e => !context.UserMediaStates.Any(s => s.ProfileId == profileId.Value && s.MediaItemId == e.Id && s.IsPlayed))
                 .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
                 .Select(e => (Guid?)e.Id)
                 .FirstOrDefaultAsync();
         }
 
-        episodeId ??= await context.Set<Episode>()
-            .AsNoTracking()
-            .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
+        episodeId ??= await episodes
             .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
             .Select(e => (Guid?)e.Id)
             .FirstOrDefaultAsync();

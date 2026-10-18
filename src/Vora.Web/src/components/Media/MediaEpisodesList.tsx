@@ -4,6 +4,7 @@ import { mediaService, type Episode } from '../../api/Media/mediaService';
 import StarRating from '../Client/Primitives/StarRating';
 import { VoraRatingBadge } from '../Client/Primitives/RatingBadge';
 import ArtImage from '../Client/Primitives/ArtImage';
+import { PlayIcon } from '../Client/Primitives/ActionIcons';
 import { CornerChip, PosterCorner } from '../Client/Primitives/WatchedBadge';
 import { episodeCornerLabel } from '../../utils/posterCaption';
 import { StorageKeys } from '../../utils/storageKeys';
@@ -15,9 +16,14 @@ interface Props {
     episodes: Episode[];
     serverId?: string;
     onChanged?: () => void;
+    // With it, the episode's picture plays it (from where it was left) and its
+    // title and overview still open its page.
+    onPlay?: (episode: Episode) => void;
 }
 
-export default function MediaEpisodesList({ episodes, serverId, onChanged }: Props) {
+const isPartWatched = (episode: Episode) => !episode.isPlayed && (episode.resumePositionSeconds ?? 0) > 0;
+
+export default function MediaEpisodesList({ episodes, serverId, onChanged, onPlay }: Props) {
     const navigate = useNavigate();
     const [localRatings, setLocalRatings] = useState<Record<string, number | null>>({});
 
@@ -39,7 +45,7 @@ export default function MediaEpisodesList({ episodes, serverId, onChanged }: Pro
     if (!episodes || episodes.length === 0) return null;
 
     return (
-        <div className="mt-16">
+        <div>
             <h2 className="text-2xl font-bold mb-6 text-[var(--vora-text-primary)] border-b border-[var(--vora-border-subtle)] pb-2">Episodes</h2>
             <div className="space-y-4">
                 {episodes.map(ep => {
@@ -47,12 +53,20 @@ export default function MediaEpisodesList({ episodes, serverId, onChanged }: Pro
 
                     return (
                         <MediaMenuArea key={ep.id} target={mediaMenuTarget({ id: ep.id, type: 'Episode' }, serverId, { onChanged })} className="flex flex-col sm:flex-row gap-6 p-4 bg-[var(--vora-bg-sunken)]/50 hover:bg-[var(--vora-bg-sunken)] rounded-lg border border-transparent hover:border-[var(--vora-border-subtle)] transition-colors group">
-                            <div
-                                onClick={() => navigate(serverId ? `/server/${serverId}/media/${ep.id}` : `/media/${ep.id}`)}
-                                className="w-full sm:w-48 shrink-0 relative aspect-video bg-[var(--vora-bg-canvas)] rounded-md overflow-hidden shadow-[var(--vora-shadow-md)] cursor-pointer"
+                            <button
+                                type="button"
+                                aria-label={onPlay ? `${isPartWatched(ep) ? 'Resume' : 'Play'} ${ep.title}` : `Open ${ep.title}`}
+                                onClick={() => onPlay ? onPlay(ep) : navigate(serverId ? `/server/${serverId}/media/${ep.id}` : `/media/${ep.id}`)}
+                                className="w-full sm:w-48 shrink-0 relative aspect-video bg-[var(--vora-bg-canvas)] rounded-md overflow-hidden shadow-[var(--vora-shadow-md)] cursor-pointer border-0 p-0 text-left"
                             >
                                 <ArtImage src={ep.posterUrl} alt={ep.title} variant="still" imgClassName="w-full h-full object-contain bg-[var(--vora-bg-sunken)]" />
-                                <div className="absolute inset-0 bg-[color-mix(in_srgb,var(--vora-bg-canvas)_40%,transparent)] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--vora-bg-canvas)_40%,transparent)] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                    {onPlay && (
+                                        <span className="flex h-11 w-11 items-center justify-center rounded-full shadow-[var(--vora-shadow-lg)]" style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}>
+                                            <PlayIcon />
+                                        </span>
+                                    )}
+                                </div>
 
                                 <PosterCorner>
                                     <CornerChip
@@ -61,12 +75,12 @@ export default function MediaEpisodesList({ episodes, serverId, onChanged }: Pro
                                     />
                                 </PosterCorner>
 
-                                {ep.resumePositionSeconds && ep.resumePositionSeconds > 0 && !ep.isPlayed && ep.durationMinutes && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--vora-bg-sunken)] z-10">
-                                        <div className="h-full" style={{ width: `${(ep.resumePositionSeconds / (ep.durationMinutes * 60)) * 100}%`, background: 'var(--vora-accent-500)' }}></div>
+                                {isPartWatched(ep) && ep.durationMinutes ? (
+                                    <div data-testid="episode-progress" className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--vora-bg-sunken)] z-10">
+                                        <div className="h-full" style={{ width: `${Math.min(100, ((ep.resumePositionSeconds ?? 0) / (ep.durationMinutes * 60)) * 100)}%`, background: 'var(--vora-accent-500)' }}></div>
                                     </div>
-                                )}
-                            </div>
+                                ) : null}
+                            </button>
                             <div className="flex-1 flex flex-col justify-center">
                                 <h4
                                     onClick={() => navigate(serverId ? `/server/${serverId}/media/${ep.id}` : `/media/${ep.id}`)}
