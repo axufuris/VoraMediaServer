@@ -20,6 +20,10 @@ export function ActionMenuList({ entries, onSelected, roomy }: ActionMenuListPro
         <>
             {entries.map(entry => entry.kind === 'separator' ? (
                 <div key={entry.key} role="separator" className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />
+            ) : entry.kind === 'heading' ? (
+                <div key={entry.key} role="presentation" className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>
+                    {entry.label}
+                </div>
             ) : entry.kind === 'choice' ? (
                 <button
                     key={entry.key}

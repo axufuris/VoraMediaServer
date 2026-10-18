@@ -17,6 +17,7 @@ import RecommendationsPage from './RecommendationsPage';
 import MediaRow, { MediaRowItem } from '../../components/Client/Primitives/MediaRow';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import PosterRemoveButton from '../../components/Client/Primitives/PosterRemoveButton';
+import { mediaPath } from '../../utils/mediaPath';
 import { useDialog } from '../../dialogs';
 import { mediaMenuTarget } from '../../components/Media/ItemMenu/mediaItemMenu';
 
@@ -91,7 +92,7 @@ function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serve
                             item={item}
                             imageUrl={item.posterUrl ?? item.backgroundUrl}
                             progressPercent={percent}
-                            onClick={() => navigate(serverId ? `/server/${serverId}/media/${item.id}` : `/media/${item.id}`)}
+                            onClick={() => navigate(mediaPath(item, serverId))}
                             menu={mediaMenuTarget(item, serverId, { onChanged: () => fetchItems(true) })}
                             hoverBadge={<PosterRemoveButton onClick={() => handleHide(item)} title="Hide from Continue Watching" />}
                         />

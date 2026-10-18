@@ -25,6 +25,12 @@ interface DetailHeroProps {
     actions?: ReactNode;
     notice?: ReactNode;
     overview?: string | null;
+    // Clamps the overview to this many lines and holds that much room, so a
+    // page that swaps what the hero describes (a season's selected episode)
+    // does not move everything below it.
+    overviewLines?: number;
+    // Above the title: the season pills on a season page.
+    topContent?: ReactNode;
     // Resolution / audio / subtitle chips, in the hero's bottom-right corner.
     techChips?: ReactNode;
 }
@@ -174,7 +180,7 @@ export function HeroCredits({ directors, genres, studios }: {
 export default function DetailHero({
     backdropSrc, transitionKey, posterSrc, posterShape = 'poster',
     eyebrow, title, logoUrl, titleSuffix, subtitle,
-    chips, ratings, credits, actions, notice, overview, techChips,
+    chips, ratings, credits, actions, notice, overview, overviewLines, topContent, techChips,
 }: DetailHeroProps) {
     const isStill = posterShape === 'still';
     const [failedLogo, setFailedLogo] = useState<string | null>(null);
@@ -225,6 +231,8 @@ export default function DetailHero({
                     </div>
 
                     <div className="min-w-0">
+                        {topContent && <div className="mb-4">{topContent}</div>}
+
                         {eyebrow && (
                             <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-accent-text)' }}>
                                 {eyebrow}
@@ -272,7 +280,18 @@ export default function DetailHero({
 
                         {notice}
 
-                        <p className="mt-5 max-w-3xl text-[0.9375rem] leading-relaxed" style={{ color: 'var(--vora-text-secondary)' }}>
+                        <p
+                            data-testid="hero-overview"
+                            className="mt-5 max-w-3xl text-[0.9375rem] leading-relaxed"
+                            style={{
+                                color: 'var(--vora-text-secondary)',
+                                ...(overviewLines ? {
+                                    display: '-webkit-box', WebkitLineClamp: overviewLines, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                                    minHeight: `${overviewLines * 1.625}em`,
+                                } : undefined),
+                            }}
+                            title={overviewLines && overview ? overview : undefined}
+                        >
                             {overview || 'No overview available.'}
                         </p>
 

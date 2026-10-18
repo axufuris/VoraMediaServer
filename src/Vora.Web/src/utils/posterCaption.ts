@@ -1,4 +1,5 @@
 import { seasonEpisodeLabel, seasonName } from './seasonLabel';
+import { formatDate } from './serverTime';
 // The structured caption shown under a poster/card, consistent everywhere we
 // render a list of posters. The shape varies by media type:
 //
@@ -6,6 +7,7 @@ import { seasonEpisodeLabel, seasonName } from './seasonLabel';
 //   TvShow   {Title}            /  {Year}
 //   Season   {Show}             /  Season {name|number}  /  {Year}
 //   Episode  {Show}             /  {Episode}              /  S{season} · E{number}
+//            in its own season: {Episode}  /  {Air date}
 //   Music    {Artist}           /  {Year} · {Album}      /  {Song}
 //   Collection {Title}          /  {N items}
 //   Playlist {Name}             /  {N items} · {MediaType}   [/ by {Owner}]
@@ -35,6 +37,9 @@ export interface PosterCaptionItem {
     ownerName?: string | null;
     // One of your own that everyone else can currently see.
     sharedByYou?: boolean;
+    // An episode drawn inside its own season, where the show and season are
+    // already on the page and the corner chip numbers it.
+    withinSeason?: boolean;
 }
 
 export interface PosterCaption {
@@ -89,6 +94,9 @@ export function posterCaption(item: PosterCaptionItem): PosterCaption {
                 lines: [seasonLabel(item), year].filter((l): l is string => !!l),
             };
         case 'Episode': {
+            if (item.withinSeason) {
+                return { title: item.title, lines: item.releaseDate ? [formatDate(item.releaseDate)] : [] };
+            }
             // Show name leads, then the episode's own title, then the numbering
             // last — when scanning a rail the title identifies the episode far
             // faster than "S1 · E5" does. Falls back to the named-season label

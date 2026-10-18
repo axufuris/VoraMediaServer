@@ -36,6 +36,14 @@ describe('posterCaption', () => {
         expect(cap.lines).toEqual(['We Light the Way', 'S1 · E5']);
     });
 
+    it('episode inside its own season: its title, then when it aired, with the corner chip doing the numbering', () => {
+        const cap = posterCaption({ type: 'Episode', title: 'Anjin', seasonNumber: 1, episodeNumber: 1, releaseDate: '2024-02-27', withinSeason: true });
+        expect(cap.title).toBe('Anjin');
+        expect(cap.lines).toHaveLength(1);
+        expect(cap.lines[0]).toMatch(/2024/);
+        expect(posterCaption({ type: 'Episode', title: 'Anjin', episodeNumber: 1, withinSeason: true }).lines).toEqual([]);
+    });
+
     it('episode: named season without a number falls back to label · E#', () => {
         const cap = posterCaption({ type: 'Episode', title: 'The Snowmen', tvShowTitle: 'Doctor Who', seasonName: 'Specials', episodeNumber: 3 });
         expect(cap.lines).toEqual(['The Snowmen', 'Specials · E3']);

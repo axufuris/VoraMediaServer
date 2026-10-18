@@ -166,4 +166,49 @@ describe('MediaCard', () => {
             expect(screen.queryByText('E2')).toBeNull();
         });
     });
+
+    describe('a selectable card with its own play button', () => {
+        it('selects on a click and plays only from its round button', () => {
+            const onClick = vi.fn();
+            const onPlay = vi.fn();
+            render(<MediaCard title="Anjin" shape="still" onClick={onClick} onPlay={onPlay} playLabel="Play Anjin" />);
+
+            fireEvent.click(screen.getByRole('button', { name: 'Play Anjin' }));
+            expect(onPlay).toHaveBeenCalledTimes(1);
+            expect(onClick).not.toHaveBeenCalled();
+
+            fireEvent.click(screen.getByText('Anjin'));
+            expect(onClick).toHaveBeenCalledTimes(1);
+            expect(onPlay).toHaveBeenCalledTimes(1);
+        });
+
+        it('does not select when Enter is pressed on its play button', () => {
+            const onClick = vi.fn();
+            const onPlay = vi.fn();
+            render(<MediaCard title="Anjin" onClick={onClick} onPlay={onPlay} playLabel="Play Anjin" />);
+
+            fireEvent.keyDown(screen.getByRole('button', { name: 'Play Anjin' }), { key: 'Enter' });
+
+            expect(onClick).not.toHaveBeenCalled();
+        });
+
+        it('marks the selected card as current', () => {
+            const { rerender, container } = render(<MediaCard title="Anjin" onClick={vi.fn()} selected />);
+            expect(container.querySelector('[role="button"]')).toHaveAttribute('aria-current', 'true');
+
+            rerender(<MediaCard title="Anjin" onClick={vi.fn()} selected={false} />);
+            expect(container.querySelector('[role="button"]')).not.toHaveAttribute('aria-current');
+        });
+
+        it('reports focus on the card itself, not on the play button inside it', () => {
+            const onFocus = vi.fn();
+            const { container } = render(<MediaCard title="Anjin" onClick={vi.fn()} onFocus={onFocus} onPlay={vi.fn()} playLabel="Play Anjin" />);
+
+            screen.getByRole('button', { name: 'Play Anjin' }).focus();
+            expect(onFocus).not.toHaveBeenCalled();
+
+            container.querySelector<HTMLElement>('[role="button"]')?.focus();
+            expect(onFocus).toHaveBeenCalledTimes(1);
+        });
+    });
 });
