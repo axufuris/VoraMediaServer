@@ -167,6 +167,43 @@ describe('music now playing', () => {
         expect(value.setFullscreen).toHaveBeenCalledWith(false);
     });
 
+    it('plays and pauses on Space', () => {
+        getTrackLyrics.mockResolvedValue(null);
+        const value = player();
+        renderScreen(value);
+
+        fireEvent.keyDown(window, { key: ' ' });
+
+        expect(value.togglePlayPause).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId('player-key-indicator')).toHaveTextContent('Paused');
+    });
+
+    it('seeks and changes the volume with Shift and the arrows', () => {
+        getTrackLyrics.mockResolvedValue(null);
+        const value = player({ volume: 0.8 });
+        renderScreen(value);
+
+        fireEvent.keyDown(window, { key: 'ArrowRight', shiftKey: true });
+        fireEvent.keyDown(window, { key: 'ArrowLeft', shiftKey: true });
+        fireEvent.keyDown(window, { key: 'ArrowUp', shiftKey: true });
+
+        expect(value.skipForward).toHaveBeenCalledWith(10);
+        expect(value.skipBackward).toHaveBeenCalledWith(10);
+        expect(value.setVolume).toHaveBeenCalledWith(0.85);
+    });
+
+    it('leaves the plain arrows to moving between the buttons, for a TV remote', () => {
+        getTrackLyrics.mockResolvedValue(null);
+        const value = player();
+        renderScreen(value);
+
+        fireEvent.keyDown(window, { key: 'ArrowRight' });
+        fireEvent.keyDown(window, { key: 'ArrowUp' });
+
+        expect(value.skipForward).not.toHaveBeenCalled();
+        expect(value.setVolume).not.toHaveBeenCalled();
+    });
+
     it('offers to save a radio as a station', () => {
         getTrackLyrics.mockResolvedValue(null);
         renderScreen(player({ radioSeed: { seedKind: 'Artist', seedArtistId: 'blink' }, radioLabel: 'blink-182 Radio' }));

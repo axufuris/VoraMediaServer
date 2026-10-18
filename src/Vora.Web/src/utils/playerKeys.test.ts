@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DEFAULT_PLAYER_KEY_STEPS, isTypingTarget, nextVolume, playerKeyAction, readPlayerKeySteps } from './playerKeys';
+import { DEFAULT_PLAYER_KEY_STEPS, isTypingTarget, nextVolume, playerKeyAction, readPlayerKeySteps, spaceBelongsToTarget } from './playerKeys';
 
 const key = (name: string, modifiers: Partial<{ altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }> = {}) =>
     ({ key: name, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, ...modifiers });
@@ -27,16 +27,66 @@ describe('playerKeyAction', () => {
         expect(playerKeyAction(key('ArrowUp'), steps, false)).toEqual({ kind: 'volume', percent: 5 });
     });
 
-    it('leaves a key held with a modifier to the browser', () => {
+    it('leaves a key held with Alt, Ctrl or Meta to the browser', () => {
         expect(playerKeyAction(key('ArrowLeft', { altKey: true }), steps, true)).toBeNull();
         expect(playerKeyAction(key('ArrowRight', { ctrlKey: true }), steps, true)).toBeNull();
         expect(playerKeyAction(key('ArrowUp', { metaKey: true }), steps, true)).toBeNull();
-        expect(playerKeyAction(key('ArrowDown', { shiftKey: true }), steps, true)).toBeNull();
+        expect(playerKeyAction(key(' ', { ctrlKey: true }), steps, true)).toBeNull();
+    });
+
+    it('answers Shift with an arrow the same as the plain arrow', () => {
+        expect(playerKeyAction(key('ArrowRight', { shiftKey: true }), steps, true)).toEqual({ kind: 'seek', seconds: 10 });
+        expect(playerKeyAction(key('ArrowDown', { shiftKey: true }), steps, true)).toEqual({ kind: 'volume', percent: -5 });
+    });
+
+    it('answers only Shift with an arrow where the plain arrows move focus', () => {
+        expect(playerKeyAction(key('ArrowRight'), steps, true, false)).toBeNull();
+        expect(playerKeyAction(key('ArrowUp'), steps, true, false)).toBeNull();
+        expect(playerKeyAction(key('ArrowLeft', { shiftKey: true }), steps, true, false)).toEqual({ kind: 'seek', seconds: -10 });
+        expect(playerKeyAction(key('ArrowUp', { shiftKey: true }), steps, true, false)).toEqual({ kind: 'volume', percent: 5 });
+    });
+
+    it('plays and pauses on Space, and leaves Shift+Space to scroll the page', () => {
+        expect(playerKeyAction(key(' '), steps, true)).toEqual({ kind: 'playPause' });
+        expect(playerKeyAction(key(' '), steps, false, false)).toEqual({ kind: 'playPause' });
+        expect(playerKeyAction(key('Spacebar'), steps, true)).toEqual({ kind: 'playPause' });
+        expect(playerKeyAction(key(' ', { shiftKey: true }), steps, true)).toBeNull();
     });
 
     it('ignores every other key', () => {
-        expect(playerKeyAction(key(' '), steps, true)).toBeNull();
         expect(playerKeyAction(key('k'), steps, true)).toBeNull();
+        expect(playerKeyAction(key('Enter'), steps, true)).toBeNull();
+    });
+});
+
+describe('spaceBelongsToTarget', () => {
+    const element = <K extends keyof HTMLElementTagNameMap>(tag: K, setup?: (el: HTMLElementTagNameMap[K]) => void) => {
+        const el = document.createElement(tag);
+        setup?.(el);
+        return el;
+    };
+
+    it('leaves Space to a focused button, link, box or field, down to the icon inside a button', () => {
+        const button = element('button');
+        const icon = element('span');
+        button.appendChild(icon);
+        document.body.appendChild(button);
+
+        expect(spaceBelongsToTarget(button)).toBe(true);
+        expect(spaceBelongsToTarget(icon)).toBe(true);
+        expect(spaceBelongsToTarget(element('a', el => { el.href = '/library/1'; }))).toBe(true);
+        expect(spaceBelongsToTarget(element('input', el => { el.type = 'checkbox'; }))).toBe(true);
+        expect(spaceBelongsToTarget(element('input'))).toBe(true);
+        expect(spaceBelongsToTarget(element('div', el => el.setAttribute('role', 'menuitem')))).toBe(true);
+        button.remove();
+    });
+
+    it('gives Space to the player on a slider, the picture or the page', () => {
+        expect(spaceBelongsToTarget(element('input', el => { el.type = 'range'; }))).toBe(false);
+        expect(spaceBelongsToTarget(element('div', el => el.setAttribute('role', 'slider')))).toBe(false);
+        expect(spaceBelongsToTarget(element('video'))).toBe(false);
+        expect(spaceBelongsToTarget(document.body)).toBe(false);
+        expect(spaceBelongsToTarget(null)).toBe(false);
     });
 });
 

@@ -27,7 +27,7 @@ export default function NowPlayingFullscreen() {
     const { serverId } = useParams<{ serverId?: string }>();
     const {
         currentMedia, isPlaying, isFullscreen, setFullscreen,
-        togglePlayPause, nextTrack, previousTrack, hasNext, hasPrevious, seek,
+        togglePlayPause, nextTrack, previousTrack, hasNext, hasPrevious, seek, skipForward, skipBackward,
         queue, queueIndex, jumpToQueueIndex,
         isShuffled, toggleShuffle, repeatMode, cycleRepeatMode, closePlayer,
         radioSeed, radioLabel, volume, setVolume, getAudioAnalyser,
@@ -262,6 +262,15 @@ export default function NowPlayingFullscreen() {
             onMinimize={minimize}
             onClose={() => { setFullscreen(false); closePlayer(); }}
             initialFocusRef={playButtonRef}
+            playerKeys={{
+                isPlaying,
+                onPlayPause: togglePlayPause,
+                volume,
+                onVolume: setVolume,
+                onSkipForward: Number.isFinite(duration) && duration > 0 ? skipForward : undefined,
+                onSkipBackward: Number.isFinite(duration) && duration > 0 ? skipBackward : undefined,
+                enabled: !synthMenuOpen && !audioSettingsOpen && !addToPlaylistOpen && !stationDialogOpen,
+            }}
             headerActions={radioSeed && (
                 <NowPlayingPill
                     label={stationSaved ? 'Saved' : 'Save station'}

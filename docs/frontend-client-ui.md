@@ -127,13 +127,14 @@ The volume lives in `PlayerContext`, not in the media element: `setVolume` keeps
 
 `useAutoHideControls({ isMinimized, isPlaying, keepVisibleWhen })` and `useFullscreen(containerRef)` factor out the auto-hide effect (a mouse move or a key press shows the controls) and fullscreen toggle. Use them in any future player surface.
 
-`usePlayerKeyboard` (`Controls/`) gives a full-size video player its arrow keys: Left and Right skip back and forward through the same `skipBackward` / `skipForward` the buttons call, and Up and Down change the volume. `GlobalVideoPlayer` and `LiveTvPlayer` use it; Live TV passes `canSeek` only when it can timeshift, so there the arrows only change the volume. Rules it keeps (pure parts in `utils/playerKeys.ts`, tested on their own):
+`usePlayerKeyboard` (`Controls/`) gives a full-size player its keys: **Space** plays and pauses through the same `togglePlayPause` the button calls, Left and Right skip back and forward through `skipBackward` / `skipForward`, and Up and Down change the volume. `GlobalVideoPlayer` and `LiveTvPlayer` use it with plain arrows (Shift with an arrow does the same); Live TV passes `canSeek` only when it can timeshift, so there the arrows only change the volume. The audio screens get it through `NowPlayingShell`'s `playerKeys` with `plainArrows: false`: their plain arrows move focus for a TV remote (below), so only **Shift with an arrow** seeks or changes the volume there, and live radio, which passes no skips, only gets the volume (issue #162). Rules it keeps (pure parts in `utils/playerKeys.ts`, tested on their own):
 
-- It takes the key from the page (`preventDefault`), so the page behind does not scroll. A key with Alt, Ctrl, Meta or Shift is left to the browser.
+- It takes the key from the page (`preventDefault`), so the page behind does not scroll. A key with Alt, Ctrl or Meta is left to the browser, and so is Shift+Space (scroll up).
+- A focused button, link, checkbox, menu item or text field keeps Space (`spaceBelongsToTarget`): after clicking the play button, Space presses it again rather than toggling twice. A focused slider, the picture and the page give it to the player. Holding Space toggles once (`event.repeat`).
 - A text field, a `<select>` or an editable region keeps its arrows (`isTypingTarget`). A focused slider does not: the volume slider would otherwise move by its own step.
 - It stands down while the player is minimised or one of its panels is open, and whenever any `[aria-modal="true"]` element is on the page. A hand-built overlay therefore has to carry `aria-modal`, as `LiveTvRecordModal` does.
 - The steps are the viewer's Settings → Playback → Keyboard picks, read from `playback_prefs` on every press (default 10 s and 5%).
-- It returns what `PlayerKeyIndicator` shows in the middle of the picture for 0.9 s. Presses in one direction add up while it shows (+30s after three Rights). Its `role="status"` region stays mounted so a screen reader hears each change.
+- It returns what `PlayerKeyIndicator` shows in the middle of the picture for 0.9 s ("Paused" / "Playing" for Space). Presses in one direction add up while it shows (+30s after three Rights). Its `role="status"` region stays mounted so a screen reader hears each change.
 
 ## Remote-control (D-pad) navigation
 
@@ -145,6 +146,7 @@ Three rules worth knowing before reusing it:
 
 - **Cross-axis distance is the gap between rects, not between centres.** A full-width seek bar overlaps every transport button below it, so from any of them it reads as directly above rather than far off to one side.
 - **Movement is coned: a candidate further off the axis than along it is rejected.** Pressing Right at the end of a row therefore stops rather than leaping diagonally up to a header button. Stopping is the predictable behaviour on a remote.
+- **Shift with an arrow is not a D-pad press.** It is left to the player's keys (`usePlayerKeyboard` on the now-playing screens), so it seeks or changes the volume instead of moving focus.
 - **Sliders keep the axis they scrub on.** `ownsDirection` lets a focused `input[type=range]` handle Left/Right itself while Up/Down still moves focus off it; text fields keep both axes so caret movement is not stolen.
 
 A screen that opts in must also **give focus somewhere on open** — a D-pad can only move focus that already exists, and a remote cannot click to create it. `NowPlayingFullscreen` focuses play/pause.

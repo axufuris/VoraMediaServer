@@ -484,6 +484,8 @@ export default function GlobalVideoPlayer() {
         enabled: !!currentMedia && !isMinimized && !showSettings && !showSubtitles && !showInfo,
         canSeek: true,
         volume,
+        isPlaying,
+        onPlayPause: togglePlayPause,
         onSkipForward: skipForward,
         onSkipBackward: skipBackward,
         onVolume: setVolume,

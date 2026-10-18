@@ -43,7 +43,7 @@ export function useSpatialNavigation(
         const onKeyDown = (event: KeyboardEvent) => {
             const direction = directionFromKey(event.key);
             if (!direction) return;
-            if (event.altKey || event.ctrlKey || event.metaKey) return;
+            if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
 
             const root = container.current;
             if (!root) return;

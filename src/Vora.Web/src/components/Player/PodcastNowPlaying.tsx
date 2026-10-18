@@ -52,6 +52,7 @@ export default function PodcastNowPlaying({
             onMinimize={onMinimize}
             onClose={onClose}
             initialFocusRef={playButtonRef}
+            playerKeys={{ isPlaying, onPlayPause: onTogglePlay, volume, onVolume: onVolumeChange, onSkipForward, onSkipBackward: onSkipBack }}
             controls={
                 <>
                     <NowPlayingSeekBar currentTime={currentTime} duration={duration} onSeek={onSeek} />

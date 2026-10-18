@@ -8,18 +8,25 @@ import { StorageKeys } from '../../../utils/storageKeys';
 interface HarnessProps {
     enabled?: boolean;
     canSeek?: boolean;
+    plainArrows?: boolean;
     startVolume?: number;
+    startPlaying?: boolean;
+    onPlayPause?: () => void;
     onSkipForward?: (seconds: number) => void;
     onSkipBackward?: (seconds: number) => void;
     onVolume?: (volume: number) => void;
 }
 
-function Harness({ enabled = true, canSeek = true, startVolume = 0.5, onSkipForward = vi.fn(), onSkipBackward = vi.fn(), onVolume }: HarnessProps) {
+function Harness({ enabled = true, canSeek = true, plainArrows, startVolume = 0.5, startPlaying = true, onPlayPause, onSkipForward = vi.fn(), onSkipBackward = vi.fn(), onVolume }: HarnessProps) {
     const [volume, setVolume] = useState(startVolume);
+    const [playing, setPlaying] = useState(startPlaying);
     const indicator = usePlayerKeyboard({
         enabled,
         canSeek,
+        plainArrows,
         volume,
+        isPlaying: playing,
+        onPlayPause: () => { setPlaying(was => !was); onPlayPause?.(); },
         onSkipForward,
         onSkipBackward,
         onVolume: level => { setVolume(level); onVolume?.(level); },
@@ -28,6 +35,9 @@ function Harness({ enabled = true, canSeek = true, startVolume = 0.5, onSkipForw
         <div>
             <input aria-label="Search" />
             <input aria-label="Volume" type="range" />
+            <input aria-label="Remember" type="checkbox" />
+            <button type="button">Subtitles</button>
+            <div role="slider" tabIndex={0} aria-label="Playback position" aria-valuenow={0} />
             <PlayerKeyIndicator indicator={indicator} />
         </div>
     );
@@ -158,6 +168,80 @@ describe('usePlayerKeyboard', () => {
         expect(onVolume).toHaveBeenCalledWith(0.55);
     });
 
+    it('pauses and plays on Space and keeps the page from scrolling', () => {
+        const onPlayPause = vi.fn();
+        render(<Harness onPlayPause={onPlayPause} />);
+
+        const pause = press(' ');
+        press(' ');
+
+        expect(onPlayPause).toHaveBeenCalledTimes(2);
+        expect(pause.defaultPrevented).toBe(true);
+    });
+
+    it('toggles once while Space is held down', () => {
+        const onPlayPause = vi.fn();
+        render(<Harness onPlayPause={onPlayPause} />);
+
+        press(' ');
+        const held = press(' ', window, { repeat: true });
+        press(' ', window, { repeat: true });
+
+        expect(onPlayPause).toHaveBeenCalledTimes(1);
+        expect(held.defaultPrevented).toBe(true);
+    });
+
+    it('leaves Space to a focused button, box or text field', () => {
+        const onPlayPause = vi.fn();
+        render(<Harness onPlayPause={onPlayPause} />);
+
+        const onButton = press(' ', screen.getByRole('button', { name: 'Subtitles' }));
+        press(' ', screen.getByLabelText('Remember'));
+        press(' ', screen.getByLabelText('Search'));
+
+        expect(onPlayPause).not.toHaveBeenCalled();
+        expect(onButton.defaultPrevented).toBe(false);
+    });
+
+    it('takes Space from a focused seek bar or volume slider', () => {
+        const onPlayPause = vi.fn();
+        render(<Harness onPlayPause={onPlayPause} />);
+
+        press(' ', screen.getByRole('slider', { name: 'Playback position' }));
+        press(' ', screen.getByLabelText('Volume'));
+
+        expect(onPlayPause).toHaveBeenCalledTimes(2);
+    });
+
+    it('answers only Shift with an arrow where the plain arrows move focus, and still plays on Space', () => {
+        const onSkipForward = vi.fn();
+        const onVolume = vi.fn();
+        const onPlayPause = vi.fn();
+        render(<Harness plainArrows={false} onSkipForward={onSkipForward} onVolume={onVolume} onPlayPause={onPlayPause} />);
+
+        const plain = press('ArrowRight');
+        press('ArrowUp');
+        const shifted = press('ArrowRight', window, { shiftKey: true });
+        press('ArrowUp', window, { shiftKey: true });
+        press(' ');
+
+        expect(plain.defaultPrevented).toBe(false);
+        expect(onSkipForward).toHaveBeenCalledTimes(1);
+        expect(shifted.defaultPrevented).toBe(true);
+        expect(onVolume).toHaveBeenCalledWith(0.55);
+        expect(onPlayPause).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not play or pause while the player is minimised', () => {
+        const onPlayPause = vi.fn();
+        render(<Harness enabled={false} onPlayPause={onPlayPause} />);
+
+        const event = press(' ');
+
+        expect(onPlayPause).not.toHaveBeenCalled();
+        expect(event.defaultPrevented).toBe(false);
+    });
+
     it('ignores a key another handler already took', () => {
         const onSkipForward = vi.fn();
         render(<Harness onSkipForward={onSkipForward} />);
@@ -193,6 +277,18 @@ describe('PlayerKeyIndicator', () => {
 
         expect(screen.getByTestId('player-key-indicator')).toHaveTextContent('−10s');
         expect(screen.getByRole('status')).toHaveTextContent('Back 10 seconds');
+    });
+
+    it('says whether Space paused or played', () => {
+        render(<Harness startPlaying />);
+
+        press(' ');
+        expect(screen.getByTestId('player-key-indicator')).toHaveTextContent('Paused');
+        expect(screen.getByRole('status')).toHaveTextContent('Paused');
+
+        press(' ');
+        expect(screen.getByTestId('player-key-indicator')).toHaveTextContent('Playing');
+        expect(screen.getByRole('status')).toHaveTextContent('Playing');
     });
 
     it('shows the volume level', () => {

@@ -8,7 +8,8 @@ export interface PlayerKeySteps {
 
 export type PlayerKeyAction =
     | { kind: 'seek'; seconds: number }
-    | { kind: 'volume'; percent: number };
+    | { kind: 'volume'; percent: number }
+    | { kind: 'playPause' };
 
 export const SEEK_STEP_CHOICES: readonly number[] = [5, 10, 15, 30];
 export const VOLUME_STEP_CHOICES: readonly number[] = [2, 5, 10];
@@ -22,10 +23,16 @@ interface KeyLike {
     shiftKey: boolean;
 }
 
-// Left/Right seek and Up/Down change the volume. A key held with a modifier
-// belongs to the browser or the system (Alt+Left is Back), so it is left alone.
-export function playerKeyAction(event: KeyLike, steps: PlayerKeySteps, canSeek: boolean): PlayerKeyAction | null {
-    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return null;
+// Space plays and pauses. Left/Right seek and Up/Down change the volume, with
+// or without Shift. A screen whose plain arrows move focus between its buttons
+// for a TV remote's D-pad (the audio now-playing screens) passes plainArrows
+// false and answers only Shift with an arrow. Alt, Ctrl and Meta belong to the
+// browser or the system (Alt+Left is Back), and Shift+Space scrolls up, so
+// those are left alone.
+export function playerKeyAction(event: KeyLike, steps: PlayerKeySteps, canSeek: boolean, plainArrows = true): PlayerKeyAction | null {
+    if (event.altKey || event.ctrlKey || event.metaKey) return null;
+    if (event.key === ' ' || event.key === 'Spacebar') return event.shiftKey ? null : { kind: 'playPause' };
+    if (!event.shiftKey && !plainArrows) return null;
     switch (event.key) {
         case 'ArrowRight': return canSeek ? { kind: 'seek', seconds: steps.seekSeconds } : null;
         case 'ArrowLeft': return canSeek ? { kind: 'seek', seconds: -steps.seekSeconds } : null;
@@ -47,6 +54,36 @@ export function isTypingTarget(target: EventTarget | null): boolean {
     if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true;
     if (target instanceof HTMLInputElement) return !NonTypingInputTypes.has(target.type);
     return false;
+}
+
+const SpaceActivatedSelector = [
+    'button',
+    'a[href]',
+    'summary',
+    'select',
+    'textarea',
+    '[contenteditable]:not([contenteditable="false"])',
+    '[role="button"]',
+    '[role="link"]',
+    '[role="checkbox"]',
+    '[role="switch"]',
+    '[role="radio"]',
+    '[role="tab"]',
+    '[role="menuitem"]',
+    '[role="menuitemcheckbox"]',
+    '[role="menuitemradio"]',
+    '[role="option"]',
+    '[role="treeitem"]',
+].join(',');
+
+// Space presses the focused button, ticks the focused box and types a space in
+// a field, and those keep it: after a click on the play button, Space presses
+// it again rather than toggling twice. Anywhere else (the picture, a slider,
+// the page) it belongs to the player.
+export function spaceBelongsToTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target instanceof HTMLInputElement) return target.type !== 'range';
+    return target.closest(SpaceActivatedSelector) !== null;
 }
 
 export function nextVolume(volume: number, percent: number): number {
