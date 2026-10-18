@@ -215,6 +215,19 @@ describe('a season page', () => {
         expect(heroOverview()).toHaveTextContent('In Japan in the year 1600, at the dawn of a century-defining civil war.');
     });
 
+    it("shows the selected episode's cast, and the season's while an episode has none of its own", async () => {
+        items['ep-2'] = { ...servantsOfTwoMasters, cast: [{ actorId: 'sawai', tmdbId: 2, name: 'Anna Sawai', characterName: 'Toda Mariko', order: 0, role: 'Actor' }] };
+        const { container } = openPage('/media/season-1');
+
+        expect(await screen.findByText('Anna Sawai')).toBeInTheDocument();
+        expect(screen.queryByText('Hiroyuki Sanada')).toBeNull();
+
+        fireEvent.click(tile(container, 'ep-3'));
+
+        expect(await screen.findByText('Hiroyuki Sanada')).toBeInTheDocument();
+        await waitFor(() => expect(screen.queryByText('Anna Sawai')).toBeNull());
+    });
+
     it('lists the episodes above the cast', async () => {
         openPage('/media/season-1');
 

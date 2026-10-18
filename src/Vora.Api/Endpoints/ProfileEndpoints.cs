@@ -84,6 +84,8 @@ public class ClientPlaybackSettingsDto
     public int Bitrate { get; set; }
     public int MaxResolution { get; set; }
     public int MaxAudioChannels { get; set; }
+    public int SeekStepSeconds { get; set; } = 10;
+    public int VolumeStepPercent { get; set; } = 5;
 
     // Each defaults to true so a profile whose stored blob predates the field
     // keeps that sound on: System.Text.Json leaves an absent property at its
