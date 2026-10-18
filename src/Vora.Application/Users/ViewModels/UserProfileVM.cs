@@ -1,5 +1,6 @@
 ﻿using System.Linq.Expressions;
 using Vora.Domain.Entities.Users;
+using Vora.Domain.Enums;
 
 namespace Vora.Application.Users.ViewModels;
 
@@ -27,6 +28,8 @@ public class UserProfileVM
     public bool AutoSkipIntro { get; set; }
     public bool AutoSkipCredits { get; set; }
     public bool AutoPlayNext { get; set; } = true;
+    public UpNextOrder UpNextOrder { get; set; }
+    public EpisodeLayout EpisodeLayout { get; set; }
     public int MinimumCreditsSceneSeconds { get; set; }
 
     public static Expression<Func<UserProfile, UserProfileVM>> Projection =>
@@ -53,6 +56,8 @@ public class UserProfileVM
             AutoSkipIntro = p.AutoSkipIntro,
             AutoSkipCredits = p.AutoSkipCredits,
             AutoPlayNext = p.AutoPlayNext,
+            UpNextOrder = p.UpNextOrder,
+            EpisodeLayout = p.EpisodeLayout,
             MinimumCreditsSceneSeconds = p.MinimumCreditsSceneSeconds,
             AccessSchedules = p.AccessSchedules.Select(s => new ProfileScheduleVM
             {

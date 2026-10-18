@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261017231930_ChangesSinceInitial")]
+    [Migration("20261018072825_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -4391,6 +4391,9 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<int>("EpisodeLayout")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("HasAllIptvAccess")
                         .HasColumnType("boolean");
 
@@ -4460,6 +4463,9 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<int?>("SubtitleMode")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UpNextOrder")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("UserId")

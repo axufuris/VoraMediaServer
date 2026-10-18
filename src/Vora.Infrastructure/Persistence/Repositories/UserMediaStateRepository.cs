@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Media;
 using Vora.Application.Media.ViewModels;
+using Vora.Application.Streaming;
 using Vora.Application.Sync.ViewModels;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Users;
@@ -34,19 +35,9 @@ public class UserMediaStateRepository : IUserMediaStateRepository
 
     private async Task<UpNextItemVM?> FirstEpisodeToPlayAsync(IQueryable<Episode> episodes, Guid? profileId)
     {
-        var present = episodes.AsNoTracking().Where(e => e.MissingSince == null);
-        UpNextItemVM? next = null;
-        if (profileId.HasValue)
-        {
-            next = await present
-                .Where(e => !_context.UserMediaStates.Any(s => s.ProfileId == profileId.Value && s.MediaItemId == e.Id && s.IsPlayed))
-                .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
-                .Select(AsUpNextItem)
-                .FirstOrDefaultAsync();
-        }
-
-        return next ?? await present
-            .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
+        if (await EpisodeToPlay.PickAsync(_context, episodes, profileId) is not Guid episodeId) return null;
+        return await _context.Set<Episode>().AsNoTracking()
+            .Where(e => e.Id == episodeId)
             .Select(AsUpNextItem)
             .FirstOrDefaultAsync();
     }
@@ -237,6 +228,18 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         return result;
     }
 
+    private async Task<List<Guid>> WhereEachShowWasLeftAsync(List<Guid> showIds, HashSet<Guid> showsWithRegularEpisodes, HashSet<Guid> unwatched, Guid profileId)
+    {
+        var picks = new List<Guid>();
+        foreach (var showId in showIds)
+        {
+            var regular = showsWithRegularEpisodes.Contains(showId);
+            var episodes = _context.Set<Episode>().Where(e => e.Season.TvShowId == showId && (!regular || e.Season.SeasonNumber != EpisodeSequence.SpecialsSeason));
+            if (await EpisodeToPlay.PickAsync(_context, episodes, profileId) is Guid pick && unwatched.Contains(pick)) picks.Add(pick);
+        }
+        return picks;
+    }
+
     public async Task<List<ContinueWatchingVM>> GetContinueWatchingAsync(Guid profileId, int limit = 15)
     {
         var hiddenItemIds = await _context.UserMediaStates
@@ -248,7 +251,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
 
         var movieRows = await _context.UserMediaStates
             .AsNoTracking()
-            .Where(s => s.ProfileId == profileId && s.ResumePositionSeconds > 0 && !s.IsPlayed && !s.IsHiddenFromContinueWatching && s.MediaItem is Movie && s.MediaItem.MissingSince == null)
+            .Where(s => s.ProfileId == profileId && s.ResumePositionSeconds >= WatchStateTransition.MinimumResumeSeconds && !s.IsPlayed && !s.IsHiddenFromContinueWatching && s.MediaItem is Movie && s.MediaItem.MissingSince == null)
             .Select(s => new
             {
                 Vm = new ContinueWatchingVM
@@ -273,6 +276,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         var watchedShowSummaries = await _context.UserMediaStates
             .AsNoTracking()
             .Where(s => s.ProfileId == profileId && s.MediaItem is Episode && !s.IsHiddenFromContinueWatching && s.MediaItem.MissingSince == null)
+            .Where(s => s.IsPlayed || s.ResumePositionSeconds >= WatchStateTransition.MinimumResumeSeconds)
             .Select(s => new
             {
                 TvShowId = ((Episode)s.MediaItem).Season.TvShowId,
@@ -302,7 +306,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                     TvShowId = e.Season.TvShowId,
                     SeasonNumber = e.Season.SeasonNumber,
                     e.EpisodeNumber,
-                    InProgress = _context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == e.Id && s.ResumePositionSeconds > 0)
+                    InProgress = _context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == e.Id && s.ResumePositionSeconds >= WatchStateTransition.MinimumResumeSeconds)
                 })
                 .ToListAsync();
 
@@ -313,11 +317,17 @@ public class UserMediaStateRepository : IUserMediaStateRepository
                 .Distinct()
                 .ToListAsync()).ToHashSet();
 
-            var nextEpisodeIds = unplayedKeys
-                .GroupBy(e => e.TvShowId)
-                .Select(g => EpisodeSequence.PickNextUp(g, e => e.SeasonNumber, e => e.EpisodeNumber, e => e.InProgress, showsWithRegularEpisodes.Contains(g.Key))?.Id)
-                .OfType<Guid>()
-                .ToList();
+            var upNextOrder = await _context.UserProfiles.AsNoTracking()
+                .Where(p => p.Id == profileId)
+                .Select(p => p.UpNextOrder)
+                .FirstOrDefaultAsync();
+            var nextEpisodeIds = upNextOrder == UpNextOrder.WhereILeftOff
+                ? await WhereEachShowWasLeftAsync(candidateShowIds, showsWithRegularEpisodes, unplayedKeys.Select(e => e.Id).ToHashSet(), profileId)
+                : unplayedKeys
+                    .GroupBy(e => e.TvShowId)
+                    .Select(g => EpisodeSequence.PickNextUp(g, e => e.SeasonNumber, e => e.EpisodeNumber, e => e.InProgress, showsWithRegularEpisodes.Contains(g.Key))?.Id)
+                    .OfType<Guid>()
+                    .ToList();
 
             var candidateEpisodes = await _context.Set<Episode>()
                 .AsNoTracking()

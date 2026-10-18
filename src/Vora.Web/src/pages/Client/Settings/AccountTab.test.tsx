@@ -50,3 +50,30 @@ it('treats a server that does not know the setting yet as playing on', async () 
 
     expect(await screen.findByRole('checkbox', { name: /Play the next episode automatically/ })).toBeChecked();
 });
+
+it('starts a show at the next unwatched episode and shows episodes as a row until the profile picks otherwise', async () => {
+    profile.getMyPlaybackPreferences.mockResolvedValue({ autoSkipIntro: false, autoSkipCredits: false, autoPlayNext: true, minimumCreditsSceneSeconds: 15 });
+    render(<DialogProvider><AccountTab serverId="home" /></DialogProvider>);
+
+    const order = await screen.findByLabelText('Play on a show or season starts at');
+    const layout = screen.getByLabelText("Show a season's episodes as");
+    expect(order).toHaveValue('InOrder');
+    expect(layout).toHaveValue('Row');
+
+    fireEvent.change(order, { target: { value: 'WhereILeftOff' } });
+    fireEvent.change(layout, { target: { value: 'List' } });
+    expect(screen.getByText(/Starts at the episode you played most recently/)).toBeInTheDocument();
+    const playback = order.closest('section');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save' }).filter(button => playback?.contains(button))[0]);
+
+    await waitFor(() => expect(profile.saveMyPlaybackPreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ upNextOrder: 'WhereILeftOff', episodeLayout: 'List', autoPlayNext: true }), 'home'));
+});
+
+it('shows the saved choices of a profile that picked where it left off and a list', async () => {
+    profile.getMyPlaybackPreferences.mockResolvedValue({ autoSkipIntro: false, autoSkipCredits: false, autoPlayNext: true, upNextOrder: 'WhereILeftOff', episodeLayout: 'List', minimumCreditsSceneSeconds: 15 });
+    render(<DialogProvider><AccountTab serverId="home" /></DialogProvider>);
+
+    expect(await screen.findByLabelText('Play on a show or season starts at')).toHaveValue('WhereILeftOff');
+    expect(screen.getByLabelText("Show a season's episodes as")).toHaveValue('List');
+});

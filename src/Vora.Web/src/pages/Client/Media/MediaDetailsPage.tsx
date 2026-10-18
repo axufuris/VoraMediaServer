@@ -4,6 +4,7 @@ import { mediaService, type Episode, type MediaItem } from '../../../api/Media/m
 import CastRow from '../../../components/Client/Primitives/CastRow';
 import MediaExtrasRow from '../../../components/Media/MediaExtrasRow';
 import EpisodeRail from '../../../components/Media/EpisodeRail';
+import EpisodeList from '../../../components/Media/EpisodeList';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { streamingService } from '../../../api/Streaming/streamingService';
@@ -35,6 +36,7 @@ import { menuAction, menuHeading, menuSeparator, tidyMenu } from '../../../compo
 import { mediaPath } from '../../../utils/mediaPath';
 import SeasonPills from '../../../components/Media/SeasonPills';
 import { useSeasonEpisodeSelection, useSiblingSeasons } from './useSeasonEpisodeSelection';
+import { useEpisodeLayout } from './useEpisodeLayout';
 import { mediaMenuTarget } from '../../../components/Media/ItemMenu/mediaItemMenu';
 import { useMediaItemActions } from '../../../components/Media/ItemMenu/useMediaItemActions';
 import { toggleWatched, toggleWatchlist } from '../../../components/Media/ItemMenu/watchActions';
@@ -45,6 +47,8 @@ interface UpcomingEpisodeParsed {
     Title: string;
     AirDate: string;
 }
+
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 export default function MediaDetailsPage() {
     const dialog = useDialog();
@@ -70,6 +74,7 @@ export default function MediaDetailsPage() {
     const isSeasonPage = media?.type === 'Season';
     const selection = useSeasonEpisodeSelection(media, upNextEpisode, upNextResolved, serverId);
     const siblingSeasons = useSiblingSeasons(media, serverId);
+    const episodeLayout = useEpisodeLayout(serverId);
     const qualityMedia = !media
         ? null
         : isSeasonPage
@@ -418,6 +423,9 @@ export default function MediaDetailsPage() {
     const listedEpisodes = isSeason ? media.episodes ?? [] : inlineSeason?.episodes ?? [];
     const listedSeasonNumber = isSeason ? media.seasonNumber : inlineSeason?.seasonNumber;
     const listedShowTitle = isSeason ? media.tvShowTitle : media.title;
+    const pickListedEpisode = (episode: Episode) => isSeason
+        ? selection.select(episode)
+        : navigate(mediaPath({ id: episode.id, type: 'Episode', seasonId: inlineSeason?.id }, serverId));
     const showSeasonsRow = media.type === 'TvShow' && (media.seasons || []).length > 0 && ((media.seasons || []).length > 1 || inlineSeasonFailed);
 
     const videos = media.videos ?? [];
@@ -619,18 +627,31 @@ export default function MediaDetailsPage() {
             )}
 
             <div className="mt-8 space-y-12 px-12 max-md:px-4">
-                <EpisodeRail
-                    episodes={listedEpisodes}
-                    seasonNumber={listedSeasonNumber}
-                    serverId={serverId}
-                    selectedId={isSeason ? selection.selectedId : undefined}
-                    selectOnFocus={isSeason}
-                    onSelect={episode => isSeason
-                        ? selection.select(episode)
-                        : navigate(mediaPath({ id: episode.id, type: 'Episode', seasonId: inlineSeason?.id }, serverId))}
-                    onPlay={episode => { void playListedEpisode(episode, listedSeasonNumber, listedShowTitle); }}
-                    onChanged={reloadMedia}
-                />
+                {episodeLayout === 'List' ? (
+                    <EpisodeList
+                        episodes={listedEpisodes}
+                        seasonNumber={listedSeasonNumber}
+                        serverId={serverId}
+                        selectedId={isSeason ? selection.selectedId : undefined}
+                        onSelect={episode => {
+                            pickListedEpisode(episode);
+                            if (isSeason) window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+                        }}
+                        onPlay={episode => { void playListedEpisode(episode, listedSeasonNumber, listedShowTitle); }}
+                        onChanged={reloadMedia}
+                    />
+                ) : episodeLayout === 'Row' ? (
+                    <EpisodeRail
+                        episodes={listedEpisodes}
+                        seasonNumber={listedSeasonNumber}
+                        serverId={serverId}
+                        selectedId={isSeason ? selection.selectedId : undefined}
+                        selectOnFocus={isSeason}
+                        onSelect={pickListedEpisode}
+                        onPlay={episode => { void playListedEpisode(episode, listedSeasonNumber, listedShowTitle); }}
+                        onChanged={reloadMedia}
+                    />
+                ) : null}
                 <CastRow
                     cast={(media.cast || []).map(member => ({
                         id: member.actorId,
