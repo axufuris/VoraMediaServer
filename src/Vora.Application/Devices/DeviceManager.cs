@@ -95,7 +95,8 @@ public class DeviceManager : IDeviceManager
             SupportedContainers = dto.Containers,
             MaxAudioChannels = dto.MaxAudioChannels,
             SupportedHdrFormats = dto.SupportedHdrFormats,
-            MaxVideoBitDepth = dto.MaxVideoBitDepth
+            MaxVideoBitDepth = dto.MaxVideoBitDepth,
+            RendersImageSubtitles = dto.RendersImageSubtitles
         };
 
         await _repository.UpsertDeviceCapabilitiesAsync(device);

@@ -134,10 +134,20 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string AutoPlayMigration = "20261017231930_ChangesSinceInitial";
 
+    private const string ImageSubtitleDeviceColumns = """
+        ALTER TABLE "ClientDevices" ADD COLUMN IF NOT EXISTS "RendersImageSubtitles" boolean;
+        """;
+
+    public const string UpNextOrderMigration = "20261018072825_ChangesSinceInitial";
+
+    private const string ColumnsSinceUpNextOrder = """
+        ALTER TABLE "ClientDevices" DROP COLUMN "RendersImageSubtitles";
+        """;
+
     private const string ColumnsSinceAutoPlay = """
         ALTER TABLE "UserProfiles" DROP COLUMN "UpNextOrder";
         ALTER TABLE "UserProfiles" DROP COLUMN "EpisodeLayout";
-        """;
+        """ + ColumnsSinceUpNextOrder;
 
     private const string ColumnsSinceHdrTranscode = """
         ALTER TABLE "UserProfiles" DROP COLUMN "AutoPlayNext";
@@ -256,7 +266,7 @@ public sealed class LegacyDatabase : IAsyncDisposable
     public async Task SeedAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
     {
         await using var db = NewContext();
-        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns + ImageSubtitleDeviceColumns, cancellationToken);
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices + ColumnsSinceVideoDimensions, cancellationToken);
     }
@@ -313,6 +323,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceAutoPlay, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, AutoPlayMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildUpNextOrderStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceUpNextOrder, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, UpNextOrderMigration, "10.0.9", cancellationToken);
     }
 
     public async Task BuildHdrTranscodeStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)

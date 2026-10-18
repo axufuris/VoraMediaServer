@@ -44,7 +44,8 @@ ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""LibrarySortDescending"" 
 ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""PreserveHdrInTranscodes"" boolean NOT NULL DEFAULT TRUE;
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""AutoPlayNext"" boolean NOT NULL DEFAULT TRUE;
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""UpNextOrder"" integer NOT NULL DEFAULT 0;
-ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""EpisodeLayout"" integer NOT NULL DEFAULT 0;");
+ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""EpisodeLayout"" integer NOT NULL DEFAULT 0;
+ALTER TABLE ""ClientDevices"" ADD COLUMN IF NOT EXISTS ""RendersImageSubtitles"" boolean;");
 
             migrationBuilder.Sql(@"
 UPDATE ""UserMediaStates"" SET ""ResumePositionSeconds"" = 0
@@ -202,6 +203,10 @@ CREATE INDEX ""IX_Albums_ArtistId_Title"" ON ""Albums"" (""ArtistId"", ""Title""
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "RendersImageSubtitles",
+                table: "ClientDevices");
+
             migrationBuilder.DropColumn(
                 name: "UpNextOrder",
                 table: "UserProfiles");

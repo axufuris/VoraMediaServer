@@ -89,4 +89,24 @@ public class MediaDetailsPartInfoTests
         subtitles.Should().ContainSingle(s => s.IsExternal && s.IsDownloaded && s.Codec == "subrip");
         subtitles.Should().ContainSingle(s => !s.IsExternal && !s.IsDownloaded && s.Codec == "hdmv_pgs_subtitle");
     }
+
+    [Fact]
+    public void An_embedded_subtitle_carries_its_position_among_the_embedded_subtitles_and_a_sidecar_none()
+    {
+        using var db = NewContext();
+        var forcedEnglish = Guid.NewGuid();
+        var french = Guid.NewGuid();
+        var movie = SeedMovie(db, p =>
+        {
+            p.SubtitleTracks.Add(new MediaSubtitleTrack { Id = french, Codec = "subrip", Language = "fra", StreamIndex = 7 });
+            p.SubtitleTracks.Add(new MediaSubtitleTrack { Id = forcedEnglish, Codec = "hdmv_pgs_subtitle", Language = "eng", StreamIndex = 5, IsForced = true });
+        });
+
+        var subtitles = Details(db, movie.Id).MediaParts.Single().SubtitleTracks;
+
+        subtitles.Single(s => s.IsExternal).EmbeddedPosition.Should().BeNull();
+        subtitles.Single(s => s.Codec == "hdmv_pgs_subtitle" && !s.IsForced).EmbeddedPosition.Should().Be(0);
+        subtitles.Single(s => s.Id == forcedEnglish).EmbeddedPosition.Should().Be(1);
+        subtitles.Single(s => s.Id == french).EmbeddedPosition.Should().Be(2);
+    }
 }

@@ -21,6 +21,7 @@ public class ClientDevice
 
     public List<string>? SupportedHdrFormats { get; set; }
     public int MaxVideoBitDepth { get; set; }
+    public bool? RendersImageSubtitles { get; set; }
 
     public Guid? LastUserId { get; set; }
     public Guid? LastProfileId { get; set; }
