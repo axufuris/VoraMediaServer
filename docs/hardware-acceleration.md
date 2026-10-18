@@ -12,7 +12,7 @@ Which GPU decodes and encodes video, how Vora finds it, and what happens when it
 | `UseHardwareEncoding` | GPU encoding of playback and DVR transcodes (decode can stay on the GPU) |
 | `AnalyzeUseHardwareDecode` | GPU decode in the marker scan |
 | `VideoThumbnailUseHardwareDecode` | GPU decode for scrub-bar sprites |
-| `MaxGpuTranscodes` | GPU encodes at once; past it a stream decodes on the GPU and encodes on the CPU |
+| `MaxGpuTranscodes` | GPU encodes at once; past it a stream decodes on the GPU and encodes on the CPU. A session that copies the video (a remux, or one that converts only the audio) takes no GPU or CPU slot and runs without the GPU, and a seek restarting a transcode doesn't count itself (`TranscodeSlots`) |
 
 Every caller turns the setting into a concrete `HardwareAccelerator` (type, device, vendor, Vulkan interop) through `IHardwareCapabilityService.ResolveAsync`. **Never hard-code `-hwaccel cuda` or a device path**; build the flags with `HardwareArguments` (`InitDevices`, `Decode`, `InitAndDecode`, `DownloadScaled`).
 

@@ -148,7 +148,7 @@ public class ScreenHintDecisionTests
 
         decision.VideoStrategy.Should().Be("Transcode");
         decision.OutputHeight.Should().BeLessThanOrEqualTo(1080);
-        decision.Reason.Should().Contain("exceeds what the client plays (1920x1080)");
+        decision.Reason.Should().Contain("exceeds what the client plays (2048x1080)");
     }
 
     [Fact]

@@ -78,7 +78,8 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             int trackHeight = sourceSize is { } knownSource ? OutputSize.HeightClass(knownSource) : 0;
             bool is4k = trackHeight >= 2160;
             int clientMaxRes = clientBox.Height;
-            bool exceedsClientSize = sourceSize is { } measured && OutputSize.Exceeds(measured, clientBox);
+            var playbackBox = OutputSize.PlaybackBox(requestedMaxWidth, requestedMaxResolution);
+            bool exceedsClientSize = sourceSize is { } measured && !OutputSize.FitsPlayback(measured, playbackBox);
 
             // What the client can decode and display, versus what the encoder
             // can actually hand it. A 1344p panel is served 1080p, so scoring
@@ -166,7 +167,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 bool needsAudioDownmix = audioLimits.NeedsDownmix(trackChannels);
                 bool audioCodecUnsupported = !string.IsNullOrEmpty(audioCodec) && !client.SupportedAudioCodecs.Contains(audioCodec);
                 bool needsAudioTranscode = audioCodecUnsupported || needsAudioDownmix;
-                bool containerUnsupported = !string.IsNullOrEmpty(container) && !client.SupportedContainers.Contains(container);
+                bool containerUnsupported = !string.IsNullOrEmpty(container) && !ContainerFamily.PlaysIn(client.SupportedContainers, container);
                 bool serverDeliversTrack = !clientSwitchesTracks && !(isPrimaryAudio && everyPlayerStartsOnPrimary);
                 bool needsRemux = containerUnsupported || serverDeliversTrack;
 
@@ -175,7 +176,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 if (exceedsClientSize)
                 {
                     needsVideoTranscode = true;
-                    reasons.Add($"Video Transcode: Track resolution ({FrameText(sourceSize)}) exceeds what the client plays ({clientBox.Width}x{clientBox.Height}).");
+                    reasons.Add($"Video Transcode: Track resolution ({FrameText(sourceSize)}) exceeds what the client plays ({playbackBox.Width}x{playbackBox.Height}).");
                 }
 
                 bool audioUnsupportedInHls = !needsAudioTranscode
@@ -584,7 +585,9 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         IEnumerable<SubtitleStreamInfoDto> ByHearing(IEnumerable<SubtitleStreamInfoDto> candidates) =>
             candidates.OrderBy(s => s.IsHearingImpaired != preference.PreferHearingImpaired);
 
-        var forced = ByHearing(inLanguage.Where(s => s.IsForced)).FirstOrDefault() ?? tracks.FirstOrDefault(s => s.IsForced);
+        var forced = ByHearing(inLanguage.Where(s => s.IsForced)).FirstOrDefault()
+            ?? tracks.FirstOrDefault(s => s.IsForced && MetadataLanguageCodes.SameLanguage(s.Language, audioLanguage))
+            ?? tracks.FirstOrDefault(s => s.IsForced && MetadataLanguageCodes.Normalize(s.Language) is null or "und");
         var flagged = forced ?? tracks.FirstOrDefault(s => s.IsDefault);
         var audioIsForeign = MetadataLanguageCodes.Normalize(audioLanguage) != null && !MetadataLanguageCodes.SameLanguage(audioLanguage, preference.Language);
 

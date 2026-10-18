@@ -42,6 +42,17 @@ public static class OutputSize
         return new FrameSize(width, height);
     }
 
+    public static FrameSize PlaybackBox(int requestedMaxWidth, int requestedMaxHeight)
+    {
+        var height = requestedMaxHeight > 0 ? requestedMaxHeight : DefaultMaxHeight;
+        var width = requestedMaxWidth > 0 ? requestedMaxWidth : CinemaWidth(height);
+        return new FrameSize(width, height);
+    }
+
+    public static bool FitsPlayback(FrameSize source, FrameSize box) =>
+        Math.Max(source.Width, source.Height) <= Math.Max(box.Width, box.Height)
+        && Math.Min(source.Width, source.Height) <= Math.Min(box.Width, box.Height);
+
     public static FrameSize ScreenBox(FrameSize clientBox, DisplayHint? display)
     {
         if (display is not { Width: > 0, Height: > 0 } screen) return clientBox;
@@ -50,8 +61,6 @@ public static class OutputSize
 
     public static FrameSize Within(FrameSize box, FrameSize other) =>
         new(Math.Min(box.Width, other.Width), Math.Min(box.Height, other.Height));
-
-    public static bool Exceeds(FrameSize source, FrameSize box) => source.Width > box.Width || source.Height > box.Height;
 
     public static FrameSize Fit(FrameSize source, FrameSize box)
     {
@@ -87,4 +96,6 @@ public static class OutputSize
     }
 
     private static int Widescreen(int height) => (int)Math.Round(height * 16 / 9.0);
+
+    private static int CinemaWidth(int height) => (int)Math.Round(height * 256 / 135.0);
 }

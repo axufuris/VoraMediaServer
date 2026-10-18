@@ -166,7 +166,7 @@ public class ResolutionFitDecisionTests
     {
         var decision = await DecideAsync(Item(Part(FourKPartId, "2160p")), maxResolution: 1344);
 
-        decision.Reason.Should().Contain("exceeds what the client plays (2389x1344)");
+        decision.Reason.Should().Contain("exceeds what the client plays (2549x1344)");
     }
 
     [Fact]
