@@ -1,5 +1,23 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { useSpatialNavigation } from '../../../hooks/useSpatialNavigation';
+import { usePlayerKeyboard } from '../Controls/usePlayerKeyboard';
+import PlayerKeyIndicator from '../Controls/PlayerKeyIndicator';
+
+// The player's keys on an audio screen. Space plays and pauses; Shift with
+// Left/Right seeks and Shift with Up/Down changes the volume, because the plain
+// arrows move focus between the buttons for a TV remote. A screen with nothing
+// to seek (live radio) leaves out the skips.
+export interface NowPlayingKeys {
+    isPlaying: boolean;
+    onPlayPause: () => void;
+    volume: number;
+    onVolume: (volume: number) => void;
+    onSkipForward?: (seconds: number) => void;
+    onSkipBackward?: (seconds: number) => void;
+    enabled?: boolean;
+}
+
+const doNothing = () => { };
 
 // The full-screen frame shared by every audio "now playing" screen: blurred
 // artwork backdrop, glass header, a main area and a control bar. Music and live
@@ -17,6 +35,7 @@ interface NowPlayingShellProps {
     children: ReactNode;
     overlays?: ReactNode;
     initialFocusRef?: RefObject<HTMLElement | null>;
+    playerKeys?: NowPlayingKeys;
 }
 
 export function NowPlayingShell({
@@ -30,10 +49,23 @@ export function NowPlayingShell({
     children,
     overlays,
     initialFocusRef,
+    playerKeys,
 }: NowPlayingShellProps) {
     const screenRef = useRef<HTMLDivElement>(null);
 
     useSpatialNavigation(screenRef, true);
+
+    const keyIndicator = usePlayerKeyboard({
+        enabled: !!playerKeys && playerKeys.enabled !== false,
+        canSeek: !!playerKeys?.onSkipForward && !!playerKeys.onSkipBackward,
+        volume: playerKeys?.volume ?? 1,
+        isPlaying: playerKeys?.isPlaying ?? false,
+        onPlayPause: playerKeys?.onPlayPause ?? doNothing,
+        onSkipForward: playerKeys?.onSkipForward ?? doNothing,
+        onSkipBackward: playerKeys?.onSkipBackward ?? doNothing,
+        onVolume: playerKeys?.onVolume ?? doNothing,
+        plainArrows: false,
+    });
 
     // A D-pad can only move focus that already exists, and a remote cannot
     // click to create it, so the screen hands focus to its main control on open.
@@ -108,6 +140,7 @@ export function NowPlayingShell({
                 {controls}
             </div>
 
+            {playerKeys && <PlayerKeyIndicator indicator={keyIndicator} />}
             {overlays}
         </div>
     );

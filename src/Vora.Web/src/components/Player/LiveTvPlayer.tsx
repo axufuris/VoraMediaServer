@@ -340,6 +340,8 @@ export default function LiveTvPlayer() {
         enabled: !!currentMedia && !isMinimized && !showOverlayGuide && !showInfo && !showRecordModal,
         canSeek: canTimeshift,
         volume,
+        isPlaying,
+        onPlayPause: togglePlayPause,
         onSkipForward: skipForward,
         onSkipBackward: skipBackward,
         onVolume: setVolume,

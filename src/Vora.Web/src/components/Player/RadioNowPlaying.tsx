@@ -65,6 +65,7 @@ export default function RadioNowPlaying({
             onMinimize={onMinimize}
             onClose={onClose}
             initialFocusRef={playButtonRef}
+            playerKeys={{ isPlaying, onPlayPause: onTogglePlay, volume, onVolume: onVolumeChange }}
             controls={
                 <NowPlayingControlRow
                     transport={

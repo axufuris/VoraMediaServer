@@ -19,14 +19,23 @@ function VolumeIcon({ muted }: { muted: boolean }) {
     );
 }
 
+function PlayPauseIcon({ playing }: { playing: boolean }) {
+    return (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            {playing ? <polygon points="6 4 20 12 6 20 6 4" /> : <><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></>}
+        </svg>
+    );
+}
+
 function describe(indicator: PlayerKeyIndicatorState): string {
+    if (indicator.kind === 'playPause') return indicator.playing ? 'Playing' : 'Paused';
     if (indicator.kind === 'volume') return `Volume ${Math.round(indicator.volume * 100)}%`;
     const seconds = Math.abs(indicator.seconds);
     return `${indicator.seconds > 0 ? 'Forward' : 'Back'} ${seconds} second${seconds === 1 ? '' : 's'}`;
 }
 
-// The brief readout in the middle of the picture after an arrow-key seek or
-// volume change. The status region stays mounted so a screen reader hears each
+// The brief readout in the middle of the picture after Space, or an arrow-key
+// seek or volume change. The status region stays mounted so a screen reader hears each
 // change rather than only the first.
 export default function PlayerKeyIndicator({ indicator }: { indicator: PlayerKeyIndicatorState | null }) {
     return (
@@ -44,7 +53,12 @@ export default function PlayerKeyIndicator({ indicator }: { indicator: PlayerKey
                         boxShadow: 'var(--vora-shadow-overlay)',
                     }}
                 >
-                    {indicator.kind === 'seek' ? (
+                    {indicator.kind === 'playPause' ? (
+                        <>
+                            <PlayPauseIcon playing={indicator.playing} />
+                            <span>{indicator.playing ? 'Playing' : 'Paused'}</span>
+                        </>
+                    ) : indicator.kind === 'seek' ? (
                         <>
                             <SeekIcon forward={indicator.seconds > 0} />
                             <span>{indicator.seconds > 0 ? '+' : '−'}{Math.abs(indicator.seconds)}s</span>

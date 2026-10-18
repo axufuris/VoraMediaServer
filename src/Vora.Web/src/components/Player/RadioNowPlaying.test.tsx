@@ -143,4 +143,17 @@ describe('radio now playing', () => {
 
         expect(props.onClose).toHaveBeenCalledOnce();
     });
+
+    it('plays and pauses on Space and changes the volume with Shift and Up or Down', () => {
+        const props = renderRadio();
+
+        const shiftRight = new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true, cancelable: true });
+        fireEvent.keyDown(window, { key: ' ' });
+        fireEvent.keyDown(window, { key: 'ArrowUp', shiftKey: true });
+        window.dispatchEvent(shiftRight);
+
+        expect(props.onTogglePlay).toHaveBeenCalledTimes(1);
+        expect(props.onVolumeChange).toHaveBeenCalledWith(0.85);
+        expect(shiftRight.defaultPrevented).toBe(false);
+    });
 });

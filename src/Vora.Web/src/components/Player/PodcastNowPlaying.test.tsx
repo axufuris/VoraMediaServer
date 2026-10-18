@@ -120,4 +120,18 @@ describe('podcast now playing', () => {
 
         expect(screen.getAllByText('Podcast').length).toBeGreaterThan(0);
     });
+
+    it('plays and pauses on Space, and seeks and changes the volume with Shift and the arrows', () => {
+        const props = renderPodcast();
+
+        fireEvent.keyDown(window, { key: ' ' });
+        fireEvent.keyDown(window, { key: 'ArrowRight', shiftKey: true });
+        fireEvent.keyDown(window, { key: 'ArrowDown', shiftKey: true });
+        fireEvent.keyDown(window, { key: 'ArrowRight' });
+
+        expect(props.onTogglePlay).toHaveBeenCalledTimes(1);
+        expect(props.onSkipForward).toHaveBeenCalledTimes(1);
+        expect(props.onSkipForward).toHaveBeenCalledWith(10);
+        expect(props.onVolumeChange).toHaveBeenCalledWith(0.75);
+    });
 });
