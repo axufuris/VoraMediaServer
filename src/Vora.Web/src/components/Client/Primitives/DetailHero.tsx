@@ -31,6 +31,10 @@ interface DetailHeroProps {
     overviewLines?: number;
     // Above the title: the season pills on a season page.
     topContent?: ReactNode;
+    // The hero swaps what it describes (a season page's selected episode), and
+    // its file chips and ratings arrive a moment after the rest. Hold their room
+    // so the hero, which centres its content, does not jump as they come and go.
+    steady?: boolean;
     // Resolution / audio / subtitle chips, in the hero's bottom-right corner.
     techChips?: ReactNode;
 }
@@ -180,7 +184,7 @@ export function HeroCredits({ directors, genres, studios }: {
 export default function DetailHero({
     backdropSrc, transitionKey, posterSrc, posterShape = 'poster',
     eyebrow, title, logoUrl, titleSuffix, subtitle,
-    chips, ratings, credits, actions, notice, overview, overviewLines, topContent, techChips,
+    chips, ratings, credits, actions, notice, overview, overviewLines, topContent, steady, techChips,
 }: DetailHeroProps) {
     const isStill = posterShape === 'still';
     const [failedLogo, setFailedLogo] = useState<string | null>(null);
@@ -208,7 +212,7 @@ export default function DetailHero({
                 className="col-start-1 row-start-1 lg:pt-[min(36%,60vh,40rem)]"
             />
 
-            <div className={`relative z-10 col-start-1 row-start-1 flex flex-col justify-center px-12 max-md:px-4 pb-6 pt-6 ${techChips ? 'lg:pb-16' : ''}`}>
+            <div className={`relative z-10 col-start-1 row-start-1 flex flex-col justify-center px-12 max-md:px-4 pb-6 pt-6 ${techChips || steady ? 'lg:pb-16' : ''}`}>
                 <div className={`grid gap-8 max-md:gap-5 lg:items-center ${isStill ? 'lg:grid-cols-[16rem_1fr] xl:grid-cols-[20rem_1fr]' : 'lg:grid-cols-[12.5rem_1fr]'}`}>
                     <div className={`shrink-0 ${isStill ? 'max-md:w-60' : 'max-md:w-28'}`}>
                         <div
@@ -272,7 +276,7 @@ export default function DetailHero({
 
                         {chips && <div className="mt-4 flex flex-wrap items-center gap-2">{chips}</div>}
 
-                        {ratings && <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">{ratings}</div>}
+                        {ratings && <div data-testid="hero-ratings" className={`mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 ${steady ? 'min-h-7' : ''}`}>{ratings}</div>}
 
                         {credits}
 
@@ -295,8 +299,8 @@ export default function DetailHero({
                             {overview || 'No overview available.'}
                         </p>
 
-                        {techChips && (
-                            <div data-testid="hero-tech-chips" className="mt-4 flex flex-wrap items-center gap-2 lg:absolute lg:bottom-6 lg:right-12 lg:mt-0 lg:justify-end">
+                        {(techChips || steady) && (
+                            <div data-testid="hero-tech-chips" className={`mt-4 flex flex-wrap items-center gap-2 lg:absolute lg:bottom-6 lg:right-12 lg:mt-0 lg:justify-end ${steady ? 'min-h-8 lg:min-h-0' : ''}`}>
                                 {techChips}
                             </div>
                         )}

@@ -229,4 +229,23 @@ describe('DetailHero tech chips', () => {
 
         expect(screen.queryByTestId('hero-tech-chips')).toBeNull();
     });
+
+    // A season page's hero swaps to the episode picked, whose file chips and
+    // ratings arrive a moment later. The hero centres its content, so their
+    // coming and going moved everything; a steady hero holds their room.
+    it('holds the room for file chips and ratings that have not arrived yet when steady', () => {
+        render(<DetailHero title="Lioness" steady ratings={<></>} />);
+
+        const content = screen.getByRole('heading', { level: 1 }).closest('div.flex');
+        expect(content?.className).toContain('lg:pb-16');
+        expect(screen.getByTestId('hero-tech-chips').className).toContain('min-h-8');
+        expect(screen.getByTestId('hero-ratings').className).toContain('min-h-7');
+    });
+
+    it('lets a hero that is not steady size to what it has', () => {
+        render(<DetailHero title="Lioness" ratings={<></>} />);
+
+        expect(screen.queryByTestId('hero-tech-chips')).toBeNull();
+        expect(screen.getByTestId('hero-ratings').className).not.toContain('min-h-7');
+    });
 });
