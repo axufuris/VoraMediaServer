@@ -276,7 +276,10 @@ public class MediaDetailsVM
                     IsHearingImpaired = s.IsHearingImpaired,
                     IsDefault = s.IsDefault,
                     IsExternal = s.ExternalFilePath != null,
-                    IsDownloaded = s.IsDownloaded
+                    IsDownloaded = s.IsDownloaded,
+                    EmbeddedPosition = s.ExternalFilePath == null
+                        ? (int?)p.SubtitleTracks.Count(other => other.ExternalFilePath == null && other.StreamIndex < s.StreamIndex)
+                        : null
                 }).ToList()
             }).ToList()
         };
@@ -316,6 +319,7 @@ public class MediaDetailsPartSubtitleTrackVM
     public bool IsDefault { get; set; }
     public bool IsExternal { get; set; }
     public bool IsDownloaded { get; set; }
+    public int? EmbeddedPosition { get; set; }
 }
 
 public class MediaDetailsPartVM

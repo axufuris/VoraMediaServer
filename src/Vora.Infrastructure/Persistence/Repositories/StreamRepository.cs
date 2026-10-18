@@ -128,7 +128,9 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                         Language = st.Language,
                         IsDefault = st.IsDefault,
                         IsForced = st.IsForced,
-                        IsHearingImpaired = st.IsHearingImpaired
+                        IsHearingImpaired = st.IsHearingImpaired,
+                        StreamIndex = st.StreamIndex,
+                        IsExternal = st.ExternalFilePath != null
                     }).ToList()
                 }).ToList()
             })
@@ -297,7 +299,9 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
                         Language = st.Language,
                         IsDefault = st.IsDefault,
                         IsForced = st.IsForced,
-                        IsHearingImpaired = st.IsHearingImpaired
+                        IsHearingImpaired = st.IsHearingImpaired,
+                        StreamIndex = st.StreamIndex,
+                        IsExternal = st.ExternalFilePath != null
                     }).ToList()
                 }).ToList()
             })

@@ -22,6 +22,7 @@ public class StreamDecisionDto
     public bool PickReplaced { get; set; }
     public int TargetAudioChannels { get; set; }
     public Guid? SelectedSubtitleTrackId { get; set; }
+    public int? SelectedSubtitleTrackPosition { get; set; }
     public bool RequiresSubtitleBurnIn { get; set; }
 
     public string Quality { get; set; } = string.Empty;

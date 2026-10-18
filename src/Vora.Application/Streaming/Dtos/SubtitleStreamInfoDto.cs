@@ -1,4 +1,4 @@
-﻿namespace Vora.Application.Streaming.Dtos;
+namespace Vora.Application.Streaming.Dtos;
 
 public class SubtitleStreamInfoDto
 {
@@ -8,4 +8,6 @@ public class SubtitleStreamInfoDto
     public bool IsDefault { get; set; }
     public bool IsForced { get; set; }
     public bool IsHearingImpaired { get; set; }
+    public int StreamIndex { get; set; }
+    public bool IsExternal { get; set; }
 }

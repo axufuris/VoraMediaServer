@@ -25,7 +25,7 @@ The subtitle route is deliberately **off the video path**. Nothing about startin
 
 `BestPathDecisionManager.DetermineBestPathAsync` scores every (part × audio track) combination against the client's declared capabilities and the server's transcode settings, then takes the lowest penalty. Each option carries a `StreamStrategy` (`DirectPlay` / `Remux` / `Transcode`) plus separate `VideoStrategy`, `AudioStrategy`, and `SubtitleStrategy` strings, because the three can disagree — a session can copy video and transcode audio.
 
-**Which audio track plays, and how it gets there, is in [`docs/track-selection.md`](track-selection.md):** what a client reports about its audio output, what each streaming profile does with it, the scoring weights, why a browser sometimes gets the stream repackaged, and the matrix test that checks every combination. `Remux` is always delivered as HLS and says so in `TargetContainer`, and both `/start` and `/decision` return `audioTrackPosition` for clients that switch tracks themselves.
+**Which audio track plays, and how it gets there, is in [`docs/track-selection.md`](track-selection.md):** what a client reports about its audio output, what each streaming profile does with it, the scoring weights, why a browser sometimes gets the stream repackaged, and the matrix test that checks every combination. `Remux` is always delivered as HLS and says so in `TargetContainer`, and both `/start` and `/decision` return `audioTrackPosition` for clients that switch tracks themselves, and `subtitleTrackPosition` for the subtitle (an image subtitle a client draws itself is in [`docs/subtitles.md`](subtitles.md)).
 
 `OutputResolution` / `OutputHdrType` are what the client actually receives, distinct from the source part's `Resolution` / `HdrType`. A 4K HDR source under `HdrTranscodeDownscale = Always` becomes 1080p SDR, and the player badges, admin Now Playing, and Watch History all read the output values so the UI doesn't claim 4K.
 
@@ -134,12 +134,13 @@ Tests: `TranscodeThrottleTests` (the decision) and `TranscodeThrottlingFileTests
 A progress ping writes `UserMediaState` through `StreamRepository.UpdateUserMediaStateAsync`, and `WatchStateTransition` decides what it means:
 
 - past **90%** → played, resume cleared to 0
-- a re-watch that gets **15 seconds** in → **not** played any more, resume where the viewer is
+- a re-watch that gets **30 seconds** in → **not** played any more, resume where the viewer is
+- before **30 seconds** (`MinimumResumeSeconds`) → no resume point, so a peek gives no Resume button or Continue Watching tile
 - anything else → left as it was
 
 `IsPlayed` used to be `IsPlayed || completed`, so it could only ever go true. Re-watching a finished item stored a resume position nothing surfaced, because all three consumers require it to be false: the details page (`inProgress = resumePos > 0 && !isPlayed`), the watched check, and the Continue Watching query (`ResumePositionSeconds > 0 && !s.IsPlayed`). The only escape was marking it unwatched by hand.
 
-The 15-second window exists because a ping can land at position 0 before the player has seeked to its resume point — clearing on that would wipe a finished item's state for someone who never restarted it. An unknown duration (Live TV) leaves the flag alone entirely.
+The 30-second window (`RestartGraceSeconds`, equal to the minimum resume) exists because a ping can land at position 0 before the player has seeked to its resume point — clearing on that would wipe a finished item's state for someone who never restarted it. An unknown duration (Live TV) leaves the flag alone entirely.
 
 ## Watch history
 

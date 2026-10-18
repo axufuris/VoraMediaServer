@@ -44,6 +44,7 @@ public record StreamDecisionResponse(
     string OutputHdrType,
     string Quality,
     int AudioTrackPosition,
+    int? SubtitleTrackPosition,
     bool PickReplaced);
 
 public static class StreamingEndpoints
@@ -146,6 +147,7 @@ public static class StreamingEndpoints
                 AudioTrackId = result.Session.AudioTrackId,
                 AudioTrackPosition = result.AudioTrackPosition,
                 SubtitleTrackId = result.Session.SubtitleTrackId,
+                SubtitleTrackPosition = result.SubtitleTrackPosition,
                 Strategy = result.Session.Strategy,
                 VideoStrategy = result.Session.VideoStrategy,
                 AudioStrategy = result.Session.AudioStrategy,
@@ -262,6 +264,7 @@ public static class StreamingEndpoints
                 d.OutputHdrType,
                 d.Quality,
                 d.SelectedAudioTrackPosition,
+                d.SelectedSubtitleTrackPosition,
                 d.PickReplaced));
         }
         catch (Exception ex)
@@ -297,6 +300,7 @@ public static class StreamingEndpoints
                 AudioTrackId = result.Session.AudioTrackId,
                 AudioTrackPosition = result.AudioTrackPosition,
                 SubtitleTrackId = result.Session.SubtitleTrackId,
+                SubtitleTrackPosition = result.SubtitleTrackPosition,
                 Strategy = result.Session.Strategy,
                 VideoStrategy = result.Session.VideoStrategy,
                 AudioStrategy = result.Session.AudioStrategy,

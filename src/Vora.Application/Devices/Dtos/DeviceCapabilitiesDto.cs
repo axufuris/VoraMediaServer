@@ -21,4 +21,7 @@ public class DeviceCapabilitiesDto
 
     [JsonPropertyName("maxVideoBitDepth")]
     public int MaxVideoBitDepth { get; set; }
+
+    [JsonPropertyName("rendersImageSubtitles")]
+    public bool? RendersImageSubtitles { get; set; }
 }

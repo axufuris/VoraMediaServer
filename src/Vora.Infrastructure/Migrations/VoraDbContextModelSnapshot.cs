@@ -3796,6 +3796,9 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<bool?>("RendersImageSubtitles")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("SupportedAudioCodecs")
                         .IsRequired()
                         .HasColumnType("text");

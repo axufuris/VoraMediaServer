@@ -8,6 +8,7 @@ public class StartStreamResponse
     public required Guid AudioTrackId { get; set; }
     public int AudioTrackPosition { get; set; }
     public Guid? SubtitleTrackId { get; set; }
+    public int? SubtitleTrackPosition { get; set; }
     public string? SubtitleUrl { get; set; }
     public required string Strategy { get; set; }
     public required string VideoStrategy { get; set; }

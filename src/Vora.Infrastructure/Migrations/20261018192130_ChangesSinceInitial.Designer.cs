@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261018072825_ChangesSinceInitial")]
+    [Migration("20261018192130_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -3798,6 +3798,9 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<bool?>("RendersImageSubtitles")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("SupportedAudioCodecs")
                         .IsRequired()

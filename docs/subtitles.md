@@ -4,13 +4,15 @@ How subtitles reach the screen: the subtitle strategy a play decision picks, and
 
 ## Subtitle strategies
 
-`SubtitleStrategy` is one of three values, decided purely by the selected track's codec:
+`SubtitleStrategy` is one of three values, decided by the selected track's codec and by whether the client draws image subtitles:
 
 | Value | When | How it reaches the player |
 |---|---|---|
 | `None` | no subtitle selected | — |
-| `BurnIn` | image subtitle — `pgssub`, `hdmv_pgs_subtitle`, `dvd_subtitle`, `vobsub` | drawn onto the video by an FFmpeg `overlay` (below), which forces a video transcode |
-| `DirectPlay` | anything else (text: `subrip`, `ass`, `mov_text`, …) | WebVTT from the subtitle route, below |
+| `BurnIn` | image subtitle — `pgssub`, `hdmv_pgs_subtitle`, `dvd_subtitle`, `vobsub`, … (the full list is under Client support) | drawn onto the video by an FFmpeg `overlay` (below), which forces a video transcode |
+| `DirectPlay` | text (`subrip`, `ass`, `mov_text`, …), or an embedded image subtitle the client draws (below) | text: WebVTT from the subtitle route, below. Image: the client selects it in the original file |
+
+**A client that draws image subtitles** (Android TV, Fire TV, the desktop app) sends `rendersImageSubtitles: true` in its capabilities (`DeviceCapsDto`, stored on `ClientDevice`). An image subtitle survives only in the original file, because every HLS output, a remux included, is written with `-sn`. So `BestPathDecisionManager` first decides as if no burn-in were needed and keeps that decision **only when it is `DirectPlay`**. If anything else (bandwidth, codec, HDR, container, a quality pick, the streaming profile) makes it a remux or a transcode, it decides again exactly as before and burns the subtitle in, so a stream never drops a selected subtitle. A sidecar image subtitle (`.sub`/`.idx`) is not in the file the client plays and is always burned in. A missing or `false` value keeps the old behaviour. The decision says "Subtitle: The client draws the image subtitle (…) itself" when it does. `subtitleTrackPosition` on `/start` and `/decision` (and `embeddedPosition` on each track of the details page's parts) is the zero-based position among the file's embedded subtitle streams in stream order, sidecars left out; it is null for no subtitle, a sidecar and a burn-in. A client uses it to select the track, and to switch subtitles while it plays without a restart.
 
 ### Burn-in
 
@@ -41,7 +43,7 @@ Comparison goes through `MetadataLanguageCodes.SameLanguage`, which normalizes 2
 
 **The HLS output carries no subtitles at all** — `BuildFFmpegArguments` emits `-sn` unconditionally. Mapping an arbitrary subtitle stream into mpegts either errors or produces bytes no player renders, and Vora doesn't generate in-band WebVTT. Text subtitles are fetched separately, from the subtitle route.
 
-`StartStreamResponse.SubtitleUrl` still exists on the DTO but is **always null**. It is kept only so the response shape doesn't change; the client builds the subtitle URL itself from the session id and the track id it already has.
+`StartStreamResponse.SubtitleUrl` is kept on the DTO but **always null**; the client builds the subtitle URL from the session id and the track id it already has.
 
 ## The subtitle route
 
@@ -56,7 +58,7 @@ The handler:
 1. Resolve the session; **404 if it isn't the caller's own** (`session.UserId` against the account on the token). Subtitles are low-stakes, but an authenticated user shouldn't be able to read another user's session by guessing a session id.
 2. Resolve the part and its source file — 404 if either is gone.
 3. Find the track among the part's subtitle tracks **sorted by `StreamIndex`**, which gives both the absolute stream index and the 0-based ordinal. 404 if the id isn't on this part.
-4. 404 if it is an **image** subtitle (`BestPathDecisionManager.IsImageSubtitleCodec`). Those burn into the video; there is nothing to extract, and an empty VTT would be worse than saying no.
+4. 404 if it is an **image** subtitle (`BestPathDecisionManager.IsImageSubtitleCodec`). Those burn into the video or the client draws them from the file; there is nothing to extract, and an empty VTT would be worse than saying no.
 5. `GetOrExtractWebVttAsync`, then `Results.File(path, "text/vtt")` — or 404 if extraction produced nothing.
 
 Everything that can't be served is a **404, never a 500**: a missing subtitle is a normal outcome, not a server fault.

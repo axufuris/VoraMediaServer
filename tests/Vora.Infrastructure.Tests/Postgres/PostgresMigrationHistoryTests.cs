@@ -501,6 +501,39 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         resumePoints.Should().Equal(new Dictionary<Guid, double> { [glimpsed.Id] = 0, [underWay.Id] = 1250 });
     }
 
+    [Fact]
+    public async Task A_database_on_the_up_next_order_migration_only_gains_whether_a_device_draws_image_subtitles()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var device = new ClientDevice
+        {
+            DeviceId = "living-room", ClientName = "Vora", DeviceName = "Shield", DeviceType = "AndroidTV",
+            SupportedVideoCodecs = ["h264", "hevc"], SupportedHdrFormats = ["HDR10"], MaxVideoBitDepth = 10,
+        };
+        await legacy.BuildUpNextOrderStateAsync(async db =>
+        {
+            db.ClientDevices.Add(device);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "ClientDevices", cancellationToken)).Should().NotContain("RendersImageSubtitles");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var kept = await after.ClientDevices.AsNoTracking().SingleAsync(d => d.Id == device.Id, cancellationToken);
+        kept.RendersImageSubtitles.Should().BeNull();
+        kept.SupportedHdrFormats.Should().Equal("HDR10");
+        kept.MaxVideoBitDepth.Should().Be(10);
+    }
+
     private static Task<List<string>> ColumnsAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = {0}", table)

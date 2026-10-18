@@ -11,7 +11,7 @@ using Vora.Domain.Entities.Users;
 
 namespace Vora.Application.Streaming;
 
-public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[] Containers, int MaxAudioChannels, int ClientBandwidthKbps, int RequestedClientBitrateKbps, int RequestedMaxResolution = 0, string[]? SupportedHdrFormats = null, int MaxVideoBitDepth = 0, int DetectedAudioChannels = 0, int PickedAudioChannels = 0, bool PlaysAnyAudioLayout = false, bool CanSwitchAudioTracks = false, string[]? HlsVideoCodecs = null, int RequestedMaxWidth = 0, int DisplayWidth = 0, int DisplayHeight = 0, int MeasuredBandwidthKbps = 0)
+public record DeviceCapsDto(string[] VideoCodecs, string[] AudioCodecs, string[] Containers, int MaxAudioChannels, int ClientBandwidthKbps, int RequestedClientBitrateKbps, int RequestedMaxResolution = 0, string[]? SupportedHdrFormats = null, int MaxVideoBitDepth = 0, int DetectedAudioChannels = 0, int PickedAudioChannels = 0, bool PlaysAnyAudioLayout = false, bool CanSwitchAudioTracks = false, string[]? HlsVideoCodecs = null, int RequestedMaxWidth = 0, int DisplayWidth = 0, int DisplayHeight = 0, int MeasuredBandwidthKbps = 0, bool? RendersImageSubtitles = null)
 {
     public AudioOutputRequest AudioOutput => new(DetectedAudioChannels, PickedAudioChannels, PlaysAnyAudioLayout, CanSwitchAudioTracks);
 
@@ -111,7 +111,7 @@ public class StreamManager : IStreamManager
         var createdSession = await _repository.CreateSessionAsync(session);
 
         var playToken = _tokenSigner.Sign(PlayTokenScope, createdSession.Id.ToString(), PlayTokenTtl);
-        return new StartedStream(createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}", decision.SelectedAudioTrackPosition, decision.Reasons);
+        return new StartedStream(createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}", decision.SelectedAudioTrackPosition, decision.SelectedSubtitleTrackPosition, decision.Reasons);
     }
 
     public async Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null)
@@ -146,6 +146,7 @@ public class StreamManager : IStreamManager
             client.MaxAudioChannels = capabilities.MaxAudioChannels;
             client.SupportedHdrFormats = capabilities.SupportedHdrFormats?.ToList();
             client.MaxVideoBitDepth = capabilities.MaxVideoBitDepth;
+            client.RendersImageSubtitles = capabilities.RendersImageSubtitles;
         }
 
         bool isRemote = !IsLocalIp(AddressOf(client, clientAddress));
@@ -247,6 +248,7 @@ public class StreamManager : IStreamManager
             client.MaxAudioChannels = capabilities.MaxAudioChannels;
             client.SupportedHdrFormats = capabilities.SupportedHdrFormats?.ToList();
             client.MaxVideoBitDepth = capabilities.MaxVideoBitDepth;
+            client.RendersImageSubtitles = capabilities.RendersImageSubtitles;
         }
 
         await _repository.EndActiveSessionsForDeviceAsync(client.Id);
@@ -296,7 +298,7 @@ public class StreamManager : IStreamManager
 
         var createdSession = await _repository.CreateSessionAsync(session);
         var playToken = _tokenSigner.Sign(PlayTokenScope, createdSession.Id.ToString(), PlayTokenTtl);
-        return new StartedStream(createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}", decision.SelectedAudioTrackPosition, decision.Reasons);
+        return new StartedStream(createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}", decision.SelectedAudioTrackPosition, decision.SelectedSubtitleTrackPosition, decision.Reasons);
     }
 
     public async Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(int page, int pageSize, string search, Guid? profileId = null, IReadOnlyCollection<Guid>? libraryIds = null, IReadOnlyCollection<HistoryDelivery>? deliveries = null)

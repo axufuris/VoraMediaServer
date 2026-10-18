@@ -20,6 +20,7 @@ The `capabilities` object on `/api/streaming/start`, `/decision` and `/start-ext
 | `pickedAudioChannels` | The viewer's **Audio output** setting. 0 is Automatic. |
 | `playsAnyAudioLayout` | The client mixes any layout down by itself. Browsers send `true`. |
 | `canSwitchAudioTracks` | The client can select an audio track while it plays the original file. TV apps send `true`. |
+| `rendersImageSubtitles` | The client draws PGS, VobSub and DVB subtitles itself, from the original file. Android TV, Fire TV and the desktop app send `true`; absent or `false` burns them in as before. It counts only when the decision is Direct Play (`docs/subtitles.md`). |
 | `maxAudioChannels` | The older single value: the lower of detected and picked. The server reads it only when `detectedAudioChannels` is absent, and a client keeps sending it so it still works against an older server. |
 
 The detected value and the pick travel separately because the profile decides how far a pick may go. Folding them on the client is what made a 5.1 pick on a stereo-detected device impossible to honour.
@@ -122,7 +123,7 @@ The quality rank of the codec and the default flag only break ties. A version th
 
 ## How the chosen track reaches the viewer
 
-- **The client switches tracks.** The decision is `DirectPlay` and both responses carry `audioTrackPosition`: the zero-based position of the track among the file's audio streams, in stream order. The app selects that track in its player.
+- **The client switches tracks.** The decision is `DirectPlay` and both responses carry `audioTrackPosition`: the zero-based position of the track among the file's audio streams, in stream order. The app selects that track in its player. `subtitleTrackPosition` does the same for the subtitle, counting embedded subtitle streams only.
 - **The client cannot switch tracks** (browsers, older apps). The original file is served only when the wanted track is both flagged default and the first audio stream. Otherwise the decision is `Remux`: FFmpeg copies the video and the one wanted track into HLS, and `TargetContainer` is `hls`.
 
 The "default and first" test exists because players disagree. Measured in Edge: an MKV always starts on the first audio stream and ignores the default flag, while an MP4 follows the flag. `StreamRepository` therefore loads audio tracks in `StreamIndex` order, and `TrackStreamInfoDto.StreamIndex` carries it into the decision.

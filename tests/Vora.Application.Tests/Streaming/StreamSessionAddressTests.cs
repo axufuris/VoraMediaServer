@@ -53,7 +53,7 @@ public class StreamSessionAddressTests
 
     private async Task<(StreamSession Session, string StreamUrl)> StartAsync(string? clientAddress)
     {
-        var (session, streamUrl, _, _) = await Manager().StartSessionAsync(_mediaId, DeviceId, Guid.NewGuid(), Guid.NewGuid(), 0, clientAddress: clientAddress);
+        var (session, streamUrl, _, _, _) = await Manager().StartSessionAsync(_mediaId, DeviceId, Guid.NewGuid(), Guid.NewGuid(), 0, clientAddress: clientAddress);
         return (session, streamUrl);
     }
 
@@ -99,7 +99,7 @@ public class StreamSessionAddressTests
     [Fact]
     public async Task A_trailer_records_its_address_too()
     {
-        var (session, _, _, _) = await Manager().StartExtraSessionAsync(_extraId, DeviceId, Guid.NewGuid(), Guid.NewGuid(), 0, clientAddress: HotelAddress);
+        var (session, _, _, _, _) = await Manager().StartExtraSessionAsync(_extraId, DeviceId, Guid.NewGuid(), Guid.NewGuid(), 0, clientAddress: HotelAddress);
 
         session.IpAddress.Should().Be(HotelAddress);
         session.Location.Should().Be("Denver, CO, US");

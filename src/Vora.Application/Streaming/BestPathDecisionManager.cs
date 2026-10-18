@@ -38,6 +38,16 @@ public class BestPathDecisionManager : IBestPathDecisionManager
     public async Task<StreamDecisionDto> DetermineBestPathAsync(ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId = null, Guid? requestedAudioId = null, Guid? requestedSubtitleId = null, int requestedMaxResolution = 0, Guid? requestedMediaPartId = null, AudioOutputRequest? audioOutput = null, IReadOnlyCollection<string>? hlsVideoCodecs = null, ProfileTitlePlaybackChoice? remembered = null, TrackPreferences? preferences = null, int requestedMaxWidth = 0, DisplayHint? display = null, bool gpuEncodesHdr = false)
     {
         var settings = await _settingsRepo.GetSettingsAsync();
+        if (client.RendersImageSubtitles == true)
+        {
+            var drawnByClient = Decide(settings, clientDrawsImageSubtitles: true, client, mediaItem, maxAllowedBandwidthKbps, bandwidthLimitSource, requestedVideoId, requestedAudioId, requestedSubtitleId, requestedMaxResolution, requestedMediaPartId, audioOutput, hlsVideoCodecs, remembered, preferences, requestedMaxWidth, display, gpuEncodesHdr);
+            if (!drawnByClient.LeftAnImageSubtitleToTheClient || drawnByClient.Decision.Strategy == StreamStrategy.DirectPlay) return drawnByClient.Decision;
+        }
+        return Decide(settings, clientDrawsImageSubtitles: false, client, mediaItem, maxAllowedBandwidthKbps, bandwidthLimitSource, requestedVideoId, requestedAudioId, requestedSubtitleId, requestedMaxResolution, requestedMediaPartId, audioOutput, hlsVideoCodecs, remembered, preferences, requestedMaxWidth, display, gpuEncodesHdr).Decision;
+    }
+
+    private static (StreamDecisionDto Decision, bool LeftAnImageSubtitleToTheClient) Decide(ServerSetting settings, bool clientDrawsImageSubtitles, ClientDevice client, MediaStreamInfoDto mediaItem, int maxAllowedBandwidthKbps, string bandwidthLimitSource, Guid? requestedVideoId, Guid? requestedAudioId, Guid? requestedSubtitleId, int requestedMaxResolution, Guid? requestedMediaPartId, AudioOutputRequest? audioOutput, IReadOnlyCollection<string>? hlsVideoCodecs, ProfileTitlePlaybackChoice? remembered, TrackPreferences? preferences, int requestedMaxWidth, DisplayHint? display, bool gpuEncodesHdr)
+    {
         var trackPreferences = preferences ?? TrackPreferences.Automatic;
         var subtitlePreference = trackPreferences.SubtitlesOn(settings);
         var audioLimits = AudioOutputLimits.Resolve(client.MaxAudioChannels, audioOutput, settings.StreamingProfile);
@@ -47,6 +57,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         bool prefersUntouchedVideo = settings.StreamingProfile != StreamingProfile.ClientPreference;
         var options = new List<StreamOption>();
         var decisionLogs = new List<StreamOptionLogDto>();
+        bool leftAnImageSubtitleToTheClient = false;
 
         var wish = PlaybackWish.For(mediaItem, requestedMediaPartId, requestedVideoId, requestedAudioId, requestedSubtitleId, remembered);
 
@@ -100,7 +111,11 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             var subTrack = wish.SubtitleFor(part, () => PickAutomaticSubtitle(part.SubtitleTracks, heardLanguage, subtitlePreference));
 
             var subCodec = subTrack?.Codec?.ToLower() ?? "";
-            bool requiresBurnIn = subTrack != null && IsImageSubtitleCodec(subCodec);
+            bool imageSubtitle = subTrack != null && IsImageSubtitleCodec(subCodec);
+            bool clientDrawsSubtitle = imageSubtitle && clientDrawsImageSubtitles && subTrack is { IsExternal: false };
+            bool requiresBurnIn = imageSubtitle && !clientDrawsSubtitle;
+            leftAnImageSubtitleToTheClient |= clientDrawsSubtitle;
+            int? subtitlePosition = subTrack is { IsExternal: false } && !requiresBurnIn ? EmbeddedPosition(part.SubtitleTracks, subTrack) : null;
 
             int bitrateKbps = (int)((part.OverallBitrate ?? 3000000) / 1000);
             int sourceVideoKbps = videoTrack.Bitrate is > 0 ? (int)(videoTrack.Bitrate.Value / 1000) : bitrateKbps;
@@ -192,6 +207,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                         SelectedAudioTrackId = audioTrack.Id,
                         SelectedAudioTrackPosition = audioInFileOrder.IndexOf(audioTrack),
                         SelectedSubtitleTrackId = subTrack?.Id,
+                        SelectedSubtitleTrackPosition = subtitlePosition,
                         RequiresSubtitleBurnIn = requiresBurnIn,
                         TargetAudioChannels = heardChannels,
                         SubtitleStrategy = subTrack == null ? "None" : (requiresBurnIn ? "BurnIn" : "DirectPlay")
@@ -280,6 +296,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                     option.Decision.TargetContainer = container;
                     reasons.Add("Direct Play: Native support for all streams.");
                     if (!(isPrimaryAudio && everyPlayerStartsOnPrimary)) reasons.Add("Audio: The client switches to the selected track.");
+                    if (clientDrawsSubtitle) reasons.Add($"Subtitle: The client draws the image subtitle ({subCodec}) itself, from the original file.");
                 }
 
                 // Resolution-fit penalty. Two components added to the
@@ -408,8 +425,11 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             bestOption.Decision.Reasons.Add(pickReplaced);
         }
         bestOption.Decision.EvaluatedOptions = decisionLogs;
-        return bestOption.Decision;
+        return (bestOption.Decision, leftAnImageSubtitleToTheClient);
     }
+
+    private static int EmbeddedPosition(IEnumerable<SubtitleStreamInfoDto> tracks, SubtitleStreamInfoDto track) =>
+        tracks.Count(other => !other.IsExternal && other.StreamIndex < track.StreamIndex);
 
     private static List<StreamOption> PoolFor(List<StreamOption> options, PlaybackWish wish, StreamingProfile profile)
     {
