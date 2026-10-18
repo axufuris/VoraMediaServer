@@ -192,6 +192,16 @@ describe('MediaCard', () => {
             expect(onClick).not.toHaveBeenCalled();
         });
 
+        // Its badges and play button are stacked with z-index; without its own
+        // stacking context they rose above a menu opened from the hero above
+        // the row.
+        it('keeps its badges and play button stacked inside the card', () => {
+            const { container } = render(<MediaCard title="Anjin" onClick={vi.fn()} onPlay={vi.fn()} />);
+
+            const artwork = container.querySelector('[role="button"] > div');
+            expect(artwork?.className).toContain('isolate');
+        });
+
         it('marks the selected card as current', () => {
             const { rerender, container } = render(<MediaCard title="Anjin" onClick={vi.fn()} selected />);
             expect(container.querySelector('[role="button"]')).toHaveAttribute('aria-current', 'true');

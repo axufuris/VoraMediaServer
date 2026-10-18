@@ -588,11 +588,14 @@ export default function MediaDetailsPage() {
                 subtitle={heroSubtitle}
                 chips={heroChips}
                 ratings={heroRatings}
-                credits={<HeroCredits directors={described.directors ?? media.directors} studios={described.studios ?? media.studios} />}
+                credits={isSeason
+                    ? <HeroCredits directors={media.directors} studios={media.studios} />
+                    : <HeroCredits directors={described.directors ?? media.directors} studios={described.studios ?? media.studios} />}
                 actions={heroActions}
                 notice={heroNotice}
                 overview={heroEpisode?.overview || media.overview || (isSeason ? media.tvShowOverview : undefined)}
                 overviewLines={isSeason ? 3 : undefined}
+                steady={isSeason}
                 topContent={seasonPills}
                 techChips={heroTechChips}
             />

@@ -141,7 +141,7 @@ export default function MediaCard({
             style={{ ...menuTrigger?.style, width: fill ? '100%' : WIDTH_VAR[size], background: 'transparent', border: 'none', padding: 0 }}
         >
             <div
-                className={`relative overflow-hidden border ${selected ? 'border-[var(--vora-accent-500)]' : 'border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)]'}`}
+                className={`relative isolate overflow-hidden border ${selected ? 'border-[var(--vora-accent-500)]' : 'border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)]'}`}
                 style={{
                     aspectRatio: ASPECT[shape],
                     borderRadius: round ? '50%' : 'var(--vora-radius-md)',
