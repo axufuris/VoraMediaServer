@@ -11,6 +11,7 @@ export interface ContinueWatchingItem {
     resumePositionSeconds?: number;
     durationSeconds?: number;
     tvShowId?: string;
+    seasonId?: string;
     tvShowTitle?: string;
     seasonNumber?: number;
     episodeNumber?: number;

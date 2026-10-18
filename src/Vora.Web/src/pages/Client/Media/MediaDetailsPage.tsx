@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { mediaService, type Episode, type MediaItem } from '../../../api/Media/mediaService';
 import CastRow from '../../../components/Client/Primitives/CastRow';
 import MediaExtrasRow from '../../../components/Media/MediaExtrasRow';
-import MediaEpisodesList from '../../../components/Media/MediaEpisodesList';
+import EpisodeRail from '../../../components/Media/EpisodeRail';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { streamingService } from '../../../api/Streaming/streamingService';
@@ -31,7 +31,10 @@ import { formatDate, serverTimeMs, yearOf } from '../../../utils/serverTime';
 import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
 import { errorDetail, isMissingOrForbidden } from '../../../utils/apiError';
 import { ActionMenuList } from '../../../components/Client/Primitives/ActionMenu';
-import { tidyMenu } from '../../../components/Client/Primitives/menuEntries';
+import { menuAction, menuHeading, menuSeparator, tidyMenu } from '../../../components/Client/Primitives/menuEntries';
+import { mediaPath } from '../../../utils/mediaPath';
+import SeasonPills from '../../../components/Media/SeasonPills';
+import { useSeasonEpisodeSelection, useSiblingSeasons } from './useSeasonEpisodeSelection';
 import { mediaMenuTarget } from '../../../components/Media/ItemMenu/mediaItemMenu';
 import { useMediaItemActions } from '../../../components/Media/ItemMenu/useMediaItemActions';
 import { toggleWatched, toggleWatchlist } from '../../../components/Media/ItemMenu/watchActions';
@@ -55,17 +58,24 @@ export default function MediaDetailsPage() {
     const [showMenu, setShowMenu] = useState(false);
     const [playingTrailer, setPlayingTrailer] = useState<TrailerSource | null>(null);
     const [inWatchlist, setInWatchlist] = useState(false);
-    const [isRateOpen, setIsRateOpen] = useState(false);
+    const [rating, setRating] = useState<'title' | 'episode' | null>(null);
 
-    // A show and a season play their up-next episode, so its file is what the
-    // chips describe and the track picks apply to.
+    // A show plays its up-next episode, so that episode's file is what the
+    // chips describe and the track picks apply to. A season page describes the
+    // episode selected on it, which starts as the season's up-next episode.
     const [upNextQuality, setUpNextQuality] = useState<{ titleId: string; episode: MediaItem | null } | null>(null);
     const playsUpNext = media?.type === 'TvShow' || media?.type === 'Season';
+    const upNextEpisode = media && upNextQuality?.titleId === media.id ? upNextQuality.episode : null;
+    const upNextResolved = !!media && upNextQuality?.titleId === media.id;
+    const isSeasonPage = media?.type === 'Season';
+    const selection = useSeasonEpisodeSelection(media, upNextEpisode, upNextResolved, serverId);
+    const siblingSeasons = useSiblingSeasons(media, serverId);
     const qualityMedia = !media
         ? null
-        : !playsUpNext
-            ? media
-            : upNextQuality?.titleId === media.id ? upNextQuality.episode : null;
+        : isSeasonPage
+            ? selection.details
+            : !playsUpNext ? media : upNextEpisode;
+    const playEpisode = isSeasonPage ? selection.selected : qualityMedia;
 
     // A show with one season lists that season's episodes on its own page, so
     // there is no extra click through a Seasons row of one. The show page stays,
@@ -95,15 +105,29 @@ export default function MediaDetailsPage() {
     const { playMedia, isPlaying } = usePlayer();
     const tracks = useTitleTrackChoices(qualityMedia, caps, serverId);
 
+    // An episode has no page of its own: its address moves to its season with
+    // the episode selected, so a link from anywhere lands where the TV apps do.
+    const openOnSeason = useCallback((data: MediaItem) => {
+        if (data.type !== 'Episode' || !data.seasonId) return false;
+        navigate(mediaPath(data, serverId), { replace: true });
+        return true;
+    }, [navigate, serverId]);
+
     const reloadMedia = useCallback(async () => {
         if (!id) return;
         try {
             const data = await mediaService.getMediaItem(id, serverId);
-            setMedia(data);
+            if (!openOnSeason(data)) setMedia(data);
         } catch {
             console.error('Failed to reload media details.');
         }
-    }, [id, serverId]);
+    }, [id, serverId, openOnSeason]);
+
+    const episodeActions = useMediaItemActions(isSeasonPage ? selection.details : null, {
+        serverId,
+        onChanged: reloadMedia,
+        onDeleted: () => { void reloadMedia(); },
+    });
 
     const itemActions = useMediaItemActions(media, {
         serverId,
@@ -139,11 +163,10 @@ export default function MediaDetailsPage() {
 
         mediaService.getMediaItem(id, serverId)
             .then(data => {
-                if (isMounted) {
-                    setMedia(data);
-                    setLoadFailure(null);
-                    setLoading(false);
-                }
+                if (!isMounted || openOnSeason(data)) return;
+                setMedia(data);
+                setLoadFailure(null);
+                setLoading(false);
             })
             .catch((error: unknown) => {
                 if (!isMounted) return;
@@ -152,7 +175,7 @@ export default function MediaDetailsPage() {
             });
 
         return () => { isMounted = false; };
-    }, [id, serverId]);
+    }, [id, serverId, openOnSeason]);
 
     useEffect(() => {
         if (!media || (media.type !== 'TvShow' && media.type !== 'Season')) return;
@@ -209,7 +232,7 @@ export default function MediaDetailsPage() {
 
     const handlePlay = async (resume: boolean = true) => {
         if (!media) return;
-        const { item, startSeconds: startPos, contextType } = playTargetFor(media, qualityMedia, resume);
+        const { item, startSeconds: startPos, contextType } = playTargetFor(media, playEpisode, resume);
 
         let subtitle = '';
         if (item.type === 'Episode' && item.seasonNumber != null && item.episodeNumber != null) {
@@ -291,6 +314,21 @@ export default function MediaDetailsPage() {
         if (media && await toggleWatched(media, dialog, serverId)) reloadMedia();
     };
 
+    const handleToggleEpisodePlayed = async () => {
+        if (selection.selected && await toggleWatched(selection.selected, dialog, serverId)) reloadMedia();
+    };
+
+    const handleSetEpisodeRating = async (next: number | null) => {
+        const episodeId = selection.selectedId;
+        if (!episodeId) return;
+        try {
+            await mediaService.setRating(episodeId, next, serverId);
+        } catch {
+            await dialog.alert('Failed to update rating.');
+        }
+        reloadMedia();
+    };
+
     const handleSetRating = useCallback(async (next: number | null) => {
         if (!media) return;
         setMedia(prev => prev ? {
@@ -330,11 +368,16 @@ export default function MediaDetailsPage() {
     }
 
     const activePart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === tracks.videoId)) || qualityMedia?.mediaParts?.[0];
-    const playButton = playButtonFor(media, qualityMedia);
+    // On a season page the hero is the selected episode's page, as the TV apps'
+    // focused episode: its facts, ratings, overview and file, and Play, Watched
+    // and Rate act on it. The season's own actions are in the menu.
+    const heroEpisode = isSeasonPage ? selection.selected : null;
+    const described = heroEpisode ?? media;
+    const playButton = playButtonFor(media, playEpisode);
     const resumePos = playButton.resumeSeconds;
     const inProgress = resumePos > 0;
     const resumeClock = `${Math.floor(resumePos / 60)}:${String(Math.floor(resumePos % 60)).padStart(2, '0')}`;
-    const isFullyPlayed = isFullyWatched(media);
+    const isFullyPlayed = isFullyWatched(described);
 
     let nextEpisode: UpcomingEpisodeParsed | null = null;
     if (media.upcomingEpisodesJson && media.upcomingEpisodesJson !== '[]') {
@@ -354,10 +397,24 @@ export default function MediaDetailsPage() {
     const isEpisode = media.type === 'Episode';
     const isSeason = media.type === 'Season';
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
-    const heroSubtitle = isSeason ? seasonName(media.seasonNumber, media.title) : isEpisode ? media.title : undefined;
-    const moreEntries = tidyMenu(itemActions.entries);
+    const heroSubtitle = heroEpisode ? heroEpisode.title : isSeason ? seasonName(media.seasonNumber, media.title) : isEpisode ? media.title : undefined;
+    const heroSuffix = heroEpisode && heroEpisode.seasonNumber != null && heroEpisode.episodeNumber != null
+        ? seasonEpisodeLabel(heroEpisode.seasonNumber, heroEpisode.episodeNumber, { endEpisodeNumber: heroEpisode.endEpisodeNumber })
+        : isEpisode && media.seasonNumber != null && media.episodeNumber != null
+            ? seasonEpisodeLabel(media.seasonNumber, media.episodeNumber, { endEpisodeNumber: media.endEpisodeNumber })
+            : undefined;
+    const thisSeason = seasonName(media.seasonNumber, media.title);
+    const moreEntries = heroEpisode ? tidyMenu([
+        menuHeading('episode-heading', heroSuffix ? `${heroSuffix} · ${heroEpisode.title}` : heroEpisode.title),
+        ...episodeActions.entries,
+        menuSeparator('season-separator'),
+        menuHeading('season-heading', thisSeason),
+        menuAction('season-watched', isFullyWatched(media) ? `Mark ${thisSeason} as unwatched` : `Mark ${thisSeason} as watched`, () => { void handleTogglePlayed(); }),
+        menuAction('season-rate', media.myRating != null ? `Change your rating of ${thisSeason}` : `Rate ${thisSeason}`, () => setRating('title')),
+        ...itemActions.entries,
+    ]) : tidyMenu(itemActions.entries);
     const playLabel = playButton.label;
-    const playRuntime = formatRuntime(media.durationMinutes);
+    const playRuntime = formatRuntime(described.durationMinutes);
     const listedEpisodes = isSeason ? media.episodes ?? [] : inlineSeason?.episodes ?? [];
     const listedSeasonNumber = isSeason ? media.seasonNumber : inlineSeason?.seasonNumber;
     const listedShowTitle = isSeason ? media.tvShowTitle : media.title;
@@ -369,11 +426,12 @@ export default function MediaDetailsPage() {
         ? { name: trailerVideo.name ?? 'Trailer', videoKey: trailerVideo.videoKey, site: trailerVideo.site }
         : null;
 
-    const heroFacts = heroFactsLine({ year: yearOf(media.releaseDate), runtime: playRuntime, genres: media.genres });
-    const heroChips = (heroFacts || media.contentRating) ? (
+    const heroFacts = heroFactsLine({ year: yearOf(described.releaseDate ?? media.releaseDate), runtime: playRuntime, genres: described.genres ?? media.genres });
+    const contentRating = described.contentRating ?? media.contentRating;
+    const heroChips = (heroFacts || contentRating) ? (
         <>
             {heroFacts && <span className="text-sm" style={{ color: 'var(--vora-text-secondary)' }}>{heroFacts}</span>}
-            {media.contentRating && <HeroChip>{media.contentRating}</HeroChip>}
+            {contentRating && <HeroChip>{contentRating}</HeroChip>}
         </>
     ) : null;
 
@@ -391,17 +449,21 @@ export default function MediaDetailsPage() {
 
     const heroRatings = (
         <>
-            {media.myRating != null && <VoraRatingBadge value={media.myRating} label="Your rating" />}
-            {media.serverAdminRating != null && !isAdmin && (
+            {described.myRating != null && <VoraRatingBadge value={described.myRating} label="Your rating" />}
+            {described.serverAdminRating != null && !isAdmin && (
                 <div className="flex items-center gap-2">
                     <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Server admin</span>
-                    <VoraRatingBadge value={media.serverAdminRating} label="Server admin's rating" />
+                    <VoraRatingBadge value={described.serverAdminRating} label="Server admin's rating" />
                 </div>
             )}
-            {media.thirdPartyRating1 != null && <RatingBadge value={media.thirdPartyRating1} name={media.thirdPartyRating1Name} />}
-            {media.thirdPartyRating2 != null && <RatingBadge value={media.thirdPartyRating2} name={media.thirdPartyRating2Name} />}
+            {described.thirdPartyRating1 != null && <RatingBadge value={described.thirdPartyRating1} name={described.thirdPartyRating1Name} />}
+            {described.thirdPartyRating2 != null && <RatingBadge value={described.thirdPartyRating2} name={described.thirdPartyRating2Name} />}
         </>
     );
+
+    const seasonPills = isSeason && siblingSeasons.length > 1 ? (
+        <SeasonPills seasons={siblingSeasons} currentId={media.id} onPick={season => navigate(mediaPath({ id: season.id, type: 'Season' }, serverId), { replace: true })} />
+    ) : null;
 
     const heroActions = (
         <>
@@ -434,8 +496,8 @@ export default function MediaDetailsPage() {
                 <BookmarkIcon filled={inWatchlist} />
             </HeroIconButton>
 
-            <HeroIconButton label={media.myRating != null ? 'Change your rating' : 'Rate'} active={media.myRating != null} onClick={() => setIsRateOpen(true)}>
-                <StarIcon filled={media.myRating != null} />
+            <HeroIconButton label={described.myRating != null ? 'Change your rating' : 'Rate'} active={described.myRating != null} onClick={() => setRating(heroEpisode ? 'episode' : 'title')}>
+                <StarIcon filled={described.myRating != null} />
             </HeroIconButton>
 
             {trailer && (
@@ -447,7 +509,7 @@ export default function MediaDetailsPage() {
             <HeroIconButton
                 label={isFullyPlayed ? 'Mark as unwatched' : 'Mark as watched'}
                 active={isFullyPlayed}
-                onClick={handleTogglePlayed}
+                onClick={heroEpisode ? handleToggleEpisodePlayed : handleTogglePlayed}
             >
                 <CheckIcon bold={isFullyPlayed} />
             </HeroIconButton>
@@ -461,7 +523,7 @@ export default function MediaDetailsPage() {
                         <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
                         <div
                             role="menu"
-                            className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl z-50"
+                            className="absolute right-0 mt-2 w-64 overflow-hidden rounded-xl z-50"
                             style={{
                                 background: 'var(--vora-bg-raised)',
                                 border: '1px solid var(--vora-border-strong)',
@@ -505,10 +567,14 @@ export default function MediaDetailsPage() {
 
     return (
         <div className="relative min-h-full pb-20">
-            {isRateOpen && (
-                <RateDialog title={heroTitle} value={media.myRating ?? null} onSave={handleSetRating} onClose={() => setIsRateOpen(false)} />
+            {rating === 'title' && (
+                <RateDialog title={isSeason ? `${heroTitle} · ${thisSeason}` : heroTitle} value={media.myRating ?? null} onSave={handleSetRating} onClose={() => setRating(null)} />
+            )}
+            {rating === 'episode' && heroEpisode && (
+                <RateDialog title={heroEpisode.title} value={heroEpisode.myRating ?? null} onSave={handleSetEpisodeRating} onClose={() => setRating(null)} />
             )}
             {itemActions.dialogs}
+            {episodeActions.dialogs}
             <TrailerOverlay trailer={playingTrailer} onClose={() => setPlayingTrailer(null)} />
 
             <DetailHero
@@ -518,16 +584,16 @@ export default function MediaDetailsPage() {
                 posterShape={isEpisode ? 'still' : 'poster'}
                 title={heroTitle}
                 logoUrl={media.logoUrl}
-                titleSuffix={isEpisode && media.seasonNumber != null && media.episodeNumber != null
-                    ? seasonEpisodeLabel(media.seasonNumber, media.episodeNumber, { endEpisodeNumber: media.endEpisodeNumber })
-                    : undefined}
+                titleSuffix={heroSuffix}
                 subtitle={heroSubtitle}
                 chips={heroChips}
                 ratings={heroRatings}
-                credits={<HeroCredits directors={media.directors} studios={media.studios} />}
+                credits={<HeroCredits directors={described.directors ?? media.directors} studios={described.studios ?? media.studios} />}
                 actions={heroActions}
                 notice={heroNotice}
-                overview={media.overview || (isSeason ? media.tvShowOverview : undefined)}
+                overview={heroEpisode?.overview || media.overview || (isSeason ? media.tvShowOverview : undefined)}
+                overviewLines={isSeason ? 3 : undefined}
+                topContent={seasonPills}
                 techChips={heroTechChips}
             />
             {showSeasonsRow && (
@@ -540,7 +606,7 @@ export default function MediaDetailsPage() {
                                     title={seasonName(season.seasonNumber, season.title)}
                                     captionLines={[`${season.episodeCount || 0} episode${season.episodeCount === 1 ? '' : 's'}`]}
                                     unplayedCount={season.unplayedItemCount}
-                                    onClick={() => navigate(serverId ? `/server/${serverId}/media/${season.id}` : `/media/${season.id}`)}
+                                    onClick={() => navigate(mediaPath({ id: season.id, type: 'Season' }, serverId))}
                                     menu={mediaMenuTarget({ id: season.id, type: 'Season' }, serverId, { onChanged: reloadMedia })}
                                 />
                             </MediaRowItem>
@@ -550,11 +616,17 @@ export default function MediaDetailsPage() {
             )}
 
             <div className="mt-8 space-y-12 px-12 max-md:px-4">
-                <MediaEpisodesList
+                <EpisodeRail
                     episodes={listedEpisodes}
+                    seasonNumber={listedSeasonNumber}
                     serverId={serverId}
-                    onChanged={reloadMedia}
+                    selectedId={isSeason ? selection.selectedId : undefined}
+                    selectOnFocus={isSeason}
+                    onSelect={episode => isSeason
+                        ? selection.select(episode)
+                        : navigate(mediaPath({ id: episode.id, type: 'Episode', seasonId: inlineSeason?.id }, serverId))}
                     onPlay={episode => { void playListedEpisode(episode, listedSeasonNumber, listedShowTitle); }}
+                    onChanged={reloadMedia}
                 />
                 <CastRow
                     cast={(media.cast || []).map(member => ({

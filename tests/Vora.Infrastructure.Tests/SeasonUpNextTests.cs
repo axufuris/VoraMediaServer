@@ -119,6 +119,21 @@ public class SeasonUpNextTests
     }
 
     [Fact]
+    public async Task Continue_watching_names_the_season_so_its_tile_opens_that_season_with_the_episode_selected()
+    {
+        await using var db = NewContext();
+        var shogun = await SeedAsync(db);
+        await WatchAsync(db, shogun[1, 1], played: true);
+        await WatchAsync(db, shogun[1, 2], played: false, resume: 1250);
+
+        var rows = await new UserMediaStateRepository(db).GetContinueWatchingAsync(_profile);
+
+        rows.Should().ContainSingle();
+        rows[0].Id.Should().Be(shogun[1, 2].Id);
+        rows[0].SeasonId.Should().Be(shogun.SeasonOne.Id);
+    }
+
+    [Fact]
     public async Task A_show_and_an_episode_resolve_as_they_did()
     {
         await using var db = NewContext();

@@ -46,6 +46,14 @@ export interface MediaCardProps {
     // mediaMenuTarget(), which leaves it out for anything that is not a movie,
     // show, season or episode.
     menu?: MediaMenuTarget | null;
+    // The one card a page has chosen, such as the episode a season page
+    // describes: ringed in the accent and marked as current.
+    selected?: boolean;
+    // A round play button over the artwork, for a card whose click does
+    // something else (selects it). Shown on hover and focus, always on touch.
+    onPlay?: () => void;
+    playLabel?: string;
+    onFocus?: () => void;
     className?: string;
 }
 
@@ -79,7 +87,7 @@ export default function MediaCard({
     item, title, captionLines, captionExtra, imageUrl, imageFit = 'cover', uncachedImage, mosaicUrls,
     shape = 'poster', size = 'md', fill, onClick,
     isPlayed, unplayedCount, progressPercent, inWatchlist,
-    badge, hoverBadge, bottomLeftBadge, onRemove, onDelete, menu, className,
+    badge, hoverBadge, bottomLeftBadge, onRemove, onDelete, menu, selected, onPlay, playLabel, onFocus, className,
 }: MediaCardProps) {
     const menuTrigger = useMediaMenuTrigger(menu);
     const caption = item ? posterCaption(item) : { title: title ?? '', lines: captionLines ?? [] };
@@ -124,18 +132,20 @@ export default function MediaCard({
         <div
             role={onClick ? 'button' : undefined}
             tabIndex={onClick ? 0 : undefined}
+            aria-current={selected ? 'true' : undefined}
             onClick={onClick}
             onKeyDown={handleKeyDown}
+            onFocus={onFocus ? (e: React.FocusEvent<HTMLDivElement>) => { if (e.target === e.currentTarget) onFocus(); } : undefined}
             {...menuTrigger}
             className={`group block text-left ${onClick ? 'cursor-pointer' : ''} ${className ?? ''}`}
             style={{ ...menuTrigger?.style, width: fill ? '100%' : WIDTH_VAR[size], background: 'transparent', border: 'none', padding: 0 }}
         >
             <div
-                className="relative overflow-hidden border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)]"
+                className={`relative overflow-hidden border ${selected ? 'border-[var(--vora-accent-500)]' : 'border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)]'}`}
                 style={{
                     aspectRatio: ASPECT[shape],
                     borderRadius: round ? '50%' : 'var(--vora-radius-md)',
-                    boxShadow: 'var(--vora-shadow-md)',
+                    boxShadow: selected ? '0 0 0 2px var(--vora-accent-500), var(--vora-shadow-md)' : 'var(--vora-shadow-md)',
                     background: 'var(--vora-bg-surface)',
                     transition: 'transform var(--vora-duration-med, 240ms) var(--vora-ease-out), border-color var(--vora-duration-med, 240ms) var(--vora-ease-out)',
                 }}
@@ -194,6 +204,22 @@ export default function MediaCard({
                             <line x1="14" y1="11" x2="14" y2="17" />
                         </svg>
                     </button>
+                )}
+
+                {onPlay && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+                        <button
+                            type="button"
+                            aria-label={playLabel ?? `Play ${displayTitle}`}
+                            title={playLabel ?? `Play ${displayTitle}`}
+                            onClick={e => { e.stopPropagation(); onPlay(); }}
+                            onKeyDown={e => e.stopPropagation()}
+                            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105"
+                            style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', border: 'none', boxShadow: 'var(--vora-shadow-lg)', paddingLeft: 3 }}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                        </button>
+                    </div>
                 )}
 
                 {bottomLeftBadge && <div className="absolute bottom-2 left-2 z-10">{bottomLeftBadge}</div>}

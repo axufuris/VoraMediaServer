@@ -15,6 +15,7 @@ public class ContinueWatchingVM
     public double ResumePositionSeconds { get; set; }
     public double? DurationSeconds { get; set; }
     public Guid? TvShowId { get; set; }
+    public Guid? SeasonId { get; set; }
     public string? TvShowTitle { get; set; }
     public int? SeasonNumber { get; set; }
     public int? EpisodeNumber { get; set; }

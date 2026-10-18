@@ -60,7 +60,7 @@ components/Common/        Modal, ArtworkPicker, IconSelect, RuleTreeEditor.
                           Modal supports a `surface="light"` variant for admin
                           modals that should pick up the active theme.
 components/Layout/        SearchBar, ServerManagerModal
-components/Media/         MediaEpisodesList, MediaExtrasRow,
+components/Media/         EpisodeRail, SeasonPills, MediaExtrasRow,
                           RecommendationRow, EditMetadataModal,
                           MusicMetadataEditModal
 components/Collections/   AddToCollectionModal, CreateCollectionModal,
