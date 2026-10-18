@@ -569,8 +569,12 @@ public static class StreamingEndpoints
         {
             if (TryParseSegmentRequest(fileName, out var mediaItemId, out var segmentIndex))
             {
-                var ready = await transcodeService.EnsureSegmentAvailableAsync(mediaItemId, segmentIndex, ct);
-                if (!ready)
+                var availability = await transcodeService.EnsureSegmentAvailableAsync(mediaItemId, segmentIndex, ct);
+                if (availability == SegmentAvailability.PastTheEnd)
+                {
+                    return Results.StatusCode(StatusCodes.Status410Gone);
+                }
+                if (availability != SegmentAvailability.Ready)
                 {
                     log.LogWarning("HlsChunk 404 (segment not sealed after wait) fileName={FileName} mediaItemId={MediaItemId} segmentIndex={SegmentIndex}",
                         fileName, mediaItemId, segmentIndex);

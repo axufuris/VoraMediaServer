@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261017194415_ChangesSinceInitial")]
+    [Migration("20261017231930_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -4367,6 +4367,9 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<bool>("AutoApproveRequests")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("AutoPlayNext")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("AutoSkipCredits")

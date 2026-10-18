@@ -121,6 +121,7 @@ function PlaybackPreferencesSection({ serverId }: { serverId?: string }) {
     const dialog = useDialog();
     const [autoSkipIntro, setAutoSkipIntro] = useState(false);
     const [autoSkipCredits, setAutoSkipCredits] = useState(false);
+    const [autoPlayNext, setAutoPlayNext] = useState(true);
     const [minSceneSeconds, setMinSceneSeconds] = useState(15);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -134,6 +135,7 @@ function PlaybackPreferencesSection({ serverId }: { serverId?: string }) {
                 if (cancelled) return;
                 setAutoSkipIntro(prefs.autoSkipIntro);
                 setAutoSkipCredits(prefs.autoSkipCredits);
+                setAutoPlayNext(prefs.autoPlayNext !== false);
                 setMinSceneSeconds(prefs.minimumCreditsSceneSeconds);
             } catch (err) {
                 console.error('Failed to load playback preferences', err);
@@ -150,10 +152,12 @@ function PlaybackPreferencesSection({ serverId }: { serverId?: string }) {
             const saved = await profileService.saveMyPlaybackPreferences({
                 autoSkipIntro,
                 autoSkipCredits,
+                autoPlayNext,
                 minimumCreditsSceneSeconds: minSceneSeconds
             }, serverId);
             setAutoSkipIntro(saved.autoSkipIntro);
             setAutoSkipCredits(saved.autoSkipCredits);
+            setAutoPlayNext(saved.autoPlayNext !== false);
             setMinSceneSeconds(saved.minimumCreditsSceneSeconds);
             setDirty(false);
         } catch {
@@ -167,7 +171,7 @@ function PlaybackPreferencesSection({ serverId }: { serverId?: string }) {
         <section className="vora-card p-6">
             <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Playback preferences</h2>
             <p className="m-0 mb-4 text-sm" style={{ color: 'var(--vora-text-secondary)' }}>
-                Choose what gets skipped automatically during playback. Credit scenes (mid-credits and post-credits stingers) are never auto-skipped — you'll always get a button to jump to the next one.
+                Choose what gets skipped automatically during playback, and whether the next episode starts by itself. Credit scenes (mid-credits and post-credits stingers) are never auto-skipped — you'll always get a button to jump to the next one.
             </p>
             {loading ? (
                 <div className="vora-skeleton h-24" />
@@ -190,6 +194,15 @@ function PlaybackPreferencesSection({ serverId }: { serverId?: string }) {
                             className="h-4 w-4 cursor-pointer"
                         />
                         <span style={{ color: 'var(--vora-text-primary)' }}>Auto-skip end credits (only when no credit scene follows)</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={autoPlayNext}
+                            onChange={e => { setAutoPlayNext(e.target.checked); setDirty(true); }}
+                            className="h-4 w-4 cursor-pointer"
+                        />
+                        <span style={{ color: 'var(--vora-text-primary)' }}>Play the next episode automatically (also moves on through a playlist)</span>
                     </label>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                         <label className="text-sm" style={{ color: 'var(--vora-text-primary)' }}>

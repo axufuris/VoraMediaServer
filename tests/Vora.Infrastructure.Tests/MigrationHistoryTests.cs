@@ -6,7 +6,7 @@ namespace Vora.Infrastructure.Tests;
 public class MigrationHistoryTests
 {
     public const string Initial = "20260927181700_Initial";
-    public const string ChangesSinceInitial = "20261017194415_ChangesSinceInitial";
+    public const string ChangesSinceInitial = "20261017231930_ChangesSinceInitial";
 
     [Fact]
     public void The_history_is_initial_then_one_migration_with_everything_since()

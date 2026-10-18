@@ -40,6 +40,7 @@ public class UserProfile
 
     public bool AutoSkipIntro { get; set; }
     public bool AutoSkipCredits { get; set; }
+    public bool AutoPlayNext { get; set; } = true;
     public int MinimumCreditsSceneSeconds { get; set; } = 15;
 
     public string? PreferredAudioLanguage { get; set; }

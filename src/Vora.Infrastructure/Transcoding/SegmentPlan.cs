@@ -24,7 +24,6 @@ internal sealed class SegmentPlan
     private const double LatestFirstKeyframe = 0.5;
     private const double ShortestFinalSegment = 0.5;
     private const double TimelineOffsetSeconds = 1.0;
-    private const double LastSegmentRoundingSeconds = 0.01;
 
     private readonly double[] _starts;
     private readonly double _end;
@@ -66,10 +65,10 @@ internal sealed class SegmentPlan
     public static SegmentPlan Uniform(double durationSeconds)
     {
         int count = Math.Max(1, (int)Math.Ceiling(durationSeconds / SegmentSeconds));
-        var starts = Enumerable.Range(0, count).Select(index => index * (double)SegmentSeconds).ToArray();
         double last = durationSeconds - (count - 1) * SegmentSeconds;
-        double end = last <= LastSegmentRoundingSeconds ? count * (double)SegmentSeconds : durationSeconds;
-        return new SegmentPlan(starts, end, followsKeyframes: false);
+        if (count > 1 && last < ShortestFinalSegment) count--;
+        var starts = Enumerable.Range(0, count).Select(index => index * (double)SegmentSeconds).ToArray();
+        return new SegmentPlan(starts, durationSeconds, followsKeyframes: false);
     }
 
     public static SegmentPlan? FromKeyframes(IReadOnlyList<double> keyframes, double durationSeconds)

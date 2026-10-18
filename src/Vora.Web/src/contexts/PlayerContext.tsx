@@ -491,19 +491,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return () => clearInterval(interval);
     }, [sessionId]);
 
+    // The player goes away first and the server hears about it after, so a
+    // slow or stuck server cannot leave Close looking as if it did nothing.
     const closePlayer = useCallback(async () => {
         const media = currentMediaRef.current;
-        if (sessionId) {
-            try {
-                const sessionServerId = media?.serverId;
-                const finalPos = videoRef.current?.currentTime || 0;
-                const finalDur = videoRef.current?.duration || 0;
-                await streamingService.pingSession(sessionId, finalPos, finalDur, true, sessionServerId);
-                await streamingService.stopSession(sessionId, sessionServerId);
-            } catch (error) {
-                console.error("Failed to stop session remotely", error);
-            }
-        }
+        const closingSessionId = sessionId;
+        const finalPos = videoRef.current?.currentTime || 0;
+        const finalDur = videoRef.current?.duration || 0;
         if (videoRef.current) {
             videoRef.current.pause();
             videoRef.current.src = "";
@@ -520,6 +514,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         queueRef.current = [];
         queueIndexRef.current = 0;
         linearQueueRef.current = [];
+        if (closingSessionId) {
+            try {
+                await streamingService.pingSession(closingSessionId, finalPos, finalDur, true, media?.serverId);
+                await streamingService.stopSession(closingSessionId, media?.serverId);
+            } catch (error) {
+                console.error("Failed to stop session remotely", error);
+            }
+        }
     }, [sessionId]);
 
     useSignalREvent<{ sessionId: string, command: string, message?: string }>(

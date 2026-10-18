@@ -393,12 +393,7 @@ public class UserManager(
     {
         var profile = await repository.GetProfileByIdAsync(profileId)
             ?? throw new InvalidOperationException("Profile not found.");
-        return new PlaybackPreferencesVM
-        {
-            AutoSkipIntro = profile.AutoSkipIntro,
-            AutoSkipCredits = profile.AutoSkipCredits,
-            MinimumCreditsSceneSeconds = profile.MinimumCreditsSceneSeconds
-        };
+        return PlaybackPreferencesOf(profile);
     }
 
     public async Task<PlaybackPreferencesVM> SavePlaybackPreferencesAsync(Guid profileId, PlaybackPreferencesVM prefs)
@@ -407,15 +402,19 @@ public class UserManager(
             ?? throw new InvalidOperationException("Profile not found.");
         profile.AutoSkipIntro = prefs.AutoSkipIntro;
         profile.AutoSkipCredits = prefs.AutoSkipCredits;
+        if (prefs.AutoPlayNext is bool autoPlayNext) profile.AutoPlayNext = autoPlayNext;
         profile.MinimumCreditsSceneSeconds = Math.Clamp(prefs.MinimumCreditsSceneSeconds, 0, 600);
         await repository.UpdateProfileAsync(profile);
-        return new PlaybackPreferencesVM
-        {
-            AutoSkipIntro = profile.AutoSkipIntro,
-            AutoSkipCredits = profile.AutoSkipCredits,
-            MinimumCreditsSceneSeconds = profile.MinimumCreditsSceneSeconds
-        };
+        return PlaybackPreferencesOf(profile);
     }
+
+    private static PlaybackPreferencesVM PlaybackPreferencesOf(UserProfile profile) => new()
+    {
+        AutoSkipIntro = profile.AutoSkipIntro,
+        AutoSkipCredits = profile.AutoSkipCredits,
+        AutoPlayNext = profile.AutoPlayNext,
+        MinimumCreditsSceneSeconds = profile.MinimumCreditsSceneSeconds
+    };
 
     public async Task<LibrarySortVM> GetLibrarySortAsync(Guid profileId)
     {

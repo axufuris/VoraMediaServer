@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Vora.Application.Settings;
+using Vora.Application.Streaming;
 using Vora.Application.Streaming.ViewModels;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
@@ -66,7 +67,7 @@ public sealed class GpuFailureRetryTests : IDisposable
             await transcoder.StartTranscodeSessionAsync(source, output, decision, cancellationToken);
 
             File.Exists(Path.Combine(output, $"{decision.MediaItemId}_0.ts")).Should().BeTrue();
-            (await transcoder.EnsureSegmentAvailableAsync(decision.MediaItemId, 1, cancellationToken)).Should().BeTrue();
+            (await transcoder.EnsureSegmentAvailableAsync(decision.MediaItemId, 1, cancellationToken)).Should().Be(SegmentAvailability.Ready);
         }
         finally
         {

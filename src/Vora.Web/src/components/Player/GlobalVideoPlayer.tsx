@@ -12,6 +12,7 @@ import { loadHls } from '../../utils/loadHls';
 import { useDialog } from '../../dialogs';
 import { useAutoHideControls } from './Controls/useAutoHideControls';
 import { useUpNextEnding } from './useUpNextEnding';
+import { usePlaybackFinished } from './usePlaybackFinished';
 import { useFullscreen } from './Controls/useFullscreen';
 import { usePlayerKeyboard } from './Controls/usePlayerKeyboard';
 import PlayerKeyIndicator from './Controls/PlayerKeyIndicator';
@@ -237,8 +238,15 @@ export default function GlobalVideoPlayer() {
     const [playbackPrefs, setPlaybackPrefs] = useState<PlaybackPreferencesVM>({
         autoSkipIntro: false,
         autoSkipCredits: false,
+        autoPlayNext: true,
         minimumCreditsSceneSeconds: 15
     });
+    const [autoPlayCancelledFor, setAutoPlayCancelledFor] = useState<string | null>(null);
+    const { finished, markFinished } = usePlaybackFinished(videoRef, currentMedia?.sessionId ?? currentMedia?.id);
+    const finishedRef = useRef({ finished, markFinished });
+    useEffect(() => {
+        finishedRef.current = { finished, markFinished };
+    }, [finished, markFinished]);
 
     const setMarkersRef = useRef(setMarkers);
     useEffect(() => {
@@ -399,13 +407,25 @@ export default function GlobalVideoPlayer() {
                         video.play().catch(e => console.error('Auto-play blocked:', e));
                     });
 
+                    // 410 is the server saying the segment is past the end of
+                    // the file: the video ends there, so stop asking for it.
+                    // Restarting the load on every fatal network error used to
+                    // ask for that segment forever, frozen on the last frame.
+                    let recoveredMediaError = false;
                     instance.on(HlsClass.Events.ERROR, (_, data) => {
-                        if (data.fatal) {
-                            if (data.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
-                                instance.startLoad();
-                            } else {
-                                instance.destroy();
-                            }
+                        if (data.response?.code === 410) {
+                            instance.stopLoad();
+                            finishedRef.current.markFinished();
+                            return;
+                        }
+                        if (!data.fatal) return;
+                        if (data.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
+                            if (!finishedRef.current.finished) instance.startLoad();
+                        } else if (data.type === HlsClass.ErrorTypes.MEDIA_ERROR && !recoveredMediaError) {
+                            recoveredMediaError = true;
+                            instance.recoverMediaError();
+                        } else {
+                            instance.destroy();
                         }
                     });
 
@@ -470,6 +490,7 @@ export default function GlobalVideoPlayer() {
             && currentMedia.playbackContextType !== 'LiveTv',
         currentTime,
         duration,
+        finished,
         onEnterEnding: refreshUpNext,
     });
 
@@ -704,6 +725,10 @@ export default function GlobalVideoPlayer() {
                     upNextData={upNextData}
                     onPlayNext={handlePlayNext}
                     onClose={closePlayer}
+                    autoPlay={playbackPrefs.autoPlayNext !== false && autoPlayCancelledFor !== currentMedia.id}
+                    finished={finished}
+                    secondsLeft={finished || !isFinite(duration) ? 0 : Math.max(0, duration - currentTime)}
+                    onCancelAutoPlay={() => setAutoPlayCancelledFor(currentMedia.id)}
                 />
             )}
 
