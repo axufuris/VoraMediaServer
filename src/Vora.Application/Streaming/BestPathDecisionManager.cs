@@ -568,17 +568,17 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         return set;
     }
 
-    // What plays when the client asked for a part but not for a subtitle. The
-    // flag-driven pick is the baseline (Default); Smart adds the case a flag
-    // cannot express — a title whose own audio is in a language other than the
-    // profile's subtitle language, where the right track is the one in that
-    // language even though nothing in the file marks it as special. A profile
-    // that has not chosen a mode gets Smart when the server's
-    // AutoEnableSubtitlesForForeignAudio is on.
+    // What plays when the client asked for a part but not for a subtitle. Only a
+    // forced track turns on by itself; the file's default flag counts only for a
+    // profile that chose Default. Smart adds the case a flag cannot express — a
+    // title whose own audio is in a language other than the profile's subtitle
+    // language, where the viewer needs the full track in that language. A
+    // profile that has not chosen a mode gets Smart when the server's
+    // AutoEnableSubtitlesForForeignAudio is on, and Only forced otherwise.
     //
-    // An audio track with no language tag is left to the baseline. Most of those
-    // are ordinary local rips in the server's own language, and reading "no tag"
-    // as "foreign" would put subtitles on half a library.
+    // An audio track with no language tag is left to the forced pick. Most of
+    // those are ordinary local rips in the server's own language, and reading
+    // "no tag" as "foreign" would put subtitles on half a library.
     public static SubtitleStreamInfoDto? PickAutomaticSubtitle(List<SubtitleStreamInfoDto> tracks, string? audioLanguage, SubtitlePreference preference)
     {
         var inLanguage = tracks.Where(s => MetadataLanguageCodes.SameLanguage(s.Language, preference.Language)).ToList();
@@ -596,7 +596,8 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             SubtitleMode.Off => null,
             SubtitleMode.ForcedOnly => forced,
             SubtitleMode.Always => ByHearing(inLanguage.Where(s => !s.IsForced)).FirstOrDefault() ?? ByHearing(inLanguage).FirstOrDefault() ?? flagged,
-            SubtitleMode.Smart when audioIsForeign => ByHearing(inLanguage.Where(s => s.IsForced)).FirstOrDefault() ?? ByHearing(inLanguage).FirstOrDefault() ?? flagged,
+            SubtitleMode.Smart when audioIsForeign => ByHearing(inLanguage.Where(s => !s.IsForced)).FirstOrDefault() ?? ByHearing(inLanguage).FirstOrDefault() ?? forced,
+            SubtitleMode.Smart => forced,
             _ => flagged
         };
     }

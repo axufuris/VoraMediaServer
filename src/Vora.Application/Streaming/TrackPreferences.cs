@@ -10,7 +10,7 @@ public sealed record TrackPreferences(string? AudioLanguage, SubtitleMode? Subti
     public static readonly TrackPreferences Automatic = new(null, null, null, false);
 
     public static SubtitleMode ServerSubtitleMode(ServerSetting settings) =>
-        settings.AutoEnableSubtitlesForForeignAudio ? Domain.Enums.SubtitleMode.Smart : Domain.Enums.SubtitleMode.Default;
+        settings.AutoEnableSubtitlesForForeignAudio ? Domain.Enums.SubtitleMode.Smart : Domain.Enums.SubtitleMode.ForcedOnly;
 
     public SubtitlePreference SubtitlesOn(ServerSetting settings) =>
         new(SubtitleMode ?? ServerSubtitleMode(settings), SubtitleLanguage ?? settings.MetadataLanguage, PreferHearingImpaired);

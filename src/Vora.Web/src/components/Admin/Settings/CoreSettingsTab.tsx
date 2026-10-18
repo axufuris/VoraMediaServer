@@ -137,9 +137,9 @@ export default function CoreSettingsTab({ serverId, scanners, hardware, showModa
                         />
                         <FieldHint>
                             When a title's audio is in a language other than the Metadata Language set below, playback
-                            starts with subtitles in your language instead of none — a forced track if the file has one,
-                            otherwise the full subtitles. Titles whose audio already matches, and audio with no language
-                            tag, are left alone, and choosing a subtitle yourself always wins.
+                            starts with the full subtitles in your language instead of none, or a forced track when the
+                            file has no full ones. Otherwise only forced subtitles turn on by themselves (never a track the
+                            file just marks as default), and choosing a subtitle yourself always wins.
                         </FieldHint>
                     </div>
                     <div>
