@@ -15,7 +15,8 @@ namespace Vora.Application.Streaming;
 public static class WatchStateTransition
 {
     public const double CompletionFraction = 0.90;
-    public const double RestartGraceSeconds = 15;
+    public const double MinimumResumeSeconds = 30;
+    public const double RestartGraceSeconds = MinimumResumeSeconds;
 
     public static bool IsComplete(double positionSeconds, double durationSeconds) =>
         durationSeconds > 0 && (positionSeconds / durationSeconds) >= CompletionFraction;
@@ -35,7 +36,8 @@ public static class WatchStateTransition
         return wasPlayed;
     }
 
-    // A finished item has nothing to resume; anything else resumes where it is.
+    // A finished item has nothing to resume, nor does one stopped in its first
+    // half minute; anything else resumes where it is.
     public static double ResolveResumePosition(double positionSeconds, double durationSeconds) =>
-        IsComplete(positionSeconds, durationSeconds) ? 0 : positionSeconds;
+        IsComplete(positionSeconds, durationSeconds) || positionSeconds < MinimumResumeSeconds ? 0 : positionSeconds;
 }

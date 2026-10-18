@@ -127,9 +127,21 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string HdrTranscodeMigration = "20261017194415_ChangesSinceInitial";
 
+    private const string UpNextProfileColumns = """
+        ALTER TABLE "UserProfiles" ADD COLUMN IF NOT EXISTS "UpNextOrder" integer NOT NULL DEFAULT 0;
+        ALTER TABLE "UserProfiles" ADD COLUMN IF NOT EXISTS "EpisodeLayout" integer NOT NULL DEFAULT 0;
+        """;
+
+    public const string AutoPlayMigration = "20261017231930_ChangesSinceInitial";
+
+    private const string ColumnsSinceAutoPlay = """
+        ALTER TABLE "UserProfiles" DROP COLUMN "UpNextOrder";
+        ALTER TABLE "UserProfiles" DROP COLUMN "EpisodeLayout";
+        """;
+
     private const string ColumnsSinceHdrTranscode = """
         ALTER TABLE "UserProfiles" DROP COLUMN "AutoPlayNext";
-        """;
+        """ + ColumnsSinceAutoPlay;
 
     private const string ColumnsSinceLibrarySort = """
         ALTER TABLE "ServerSettings" DROP COLUMN "PreserveHdrInTranscodes";
@@ -244,7 +256,7 @@ public sealed class LegacyDatabase : IAsyncDisposable
     public async Task SeedAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
     {
         await using var db = NewContext();
-        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns, cancellationToken);
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices + ColumnsSinceVideoDimensions, cancellationToken);
     }
@@ -292,6 +304,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceLibrarySort, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, LibrarySortMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildAutoPlayStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceAutoPlay, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, AutoPlayMigration, "10.0.9", cancellationToken);
     }
 
     public async Task BuildHdrTranscodeStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)

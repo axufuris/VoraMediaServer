@@ -464,6 +464,43 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         (await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken)).PreserveHdrInTranscodes.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task A_database_on_the_autoplay_migration_gains_the_episode_settings_and_forgets_resume_points_under_half_a_minute()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var profileId = Guid.NewGuid();
+        var library = new MediaLibrary { Name = "Movies", Type = LibraryType.Movie, FolderPaths = ["/movies"] };
+        var glimpsed = new Movie { Title = "Heat", LibraryId = library.Id };
+        var underWay = new Movie { Title = "Ronin", LibraryId = library.Id };
+        await legacy.BuildAutoPlayStateAsync(async db =>
+        {
+            var account = new User { Email = "viewer@example.com", DisplayName = "Viewer" };
+            db.AddRange(account, library, glimpsed, underWay, new UserProfile { Id = profileId, Name = "Viewer", UserId = account.Id, AutoPlayNext = false, AutoSkipCredits = true });
+            db.UserMediaStates.AddRange(
+                new UserMediaState { ProfileId = profileId, MediaItemId = glimpsed.Id, ResumePositionSeconds = 12, LastPlayedAt = DateTime.UtcNow },
+                new UserMediaState { ProfileId = profileId, MediaItemId = underWay.Id, ResumePositionSeconds = 1250, LastPlayedAt = DateTime.UtcNow });
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "UserProfiles", cancellationToken)).Should().NotContain(["UpNextOrder", "EpisodeLayout"]);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var profile = await after.UserProfiles.AsNoTracking().SingleAsync(p => p.Id == profileId, cancellationToken);
+        (profile.UpNextOrder, profile.EpisodeLayout).Should().Be((UpNextOrder.InOrder, EpisodeLayout.Row));
+        (profile.AutoPlayNext, profile.AutoSkipCredits).Should().Be((false, true));
+        var resumePoints = await after.UserMediaStates.AsNoTracking().ToDictionaryAsync(s => s.MediaItemId, s => s.ResumePositionSeconds, cancellationToken);
+        resumePoints.Should().Equal(new Dictionary<Guid, double> { [glimpsed.Id] = 0, [underWay.Id] = 1250 });
+    }
+
     private static Task<List<string>> ColumnsAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = {0}", table)

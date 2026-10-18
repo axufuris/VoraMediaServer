@@ -122,7 +122,7 @@ Read (any authenticated user):
 
 - `GET /api/media/{id}/markers` → `MediaMarkerVM[]` — player fetch
 - `MediaDetailsVM.Markers` — included in the regular details fetch so the details page has markers without a second round-trip
-- `GET / PUT /api/users/profiles/me/playback-preferences` → `PlaybackPreferencesVM` — per-profile auto-skip flags and `AutoPlayNext` (nullable on PUT: an app that leaves it out keeps the profile's value)
+- `GET / PUT /api/users/profiles/me/playback-preferences` → `PlaybackPreferencesVM` — per-profile auto-skip flags, `AutoPlayNext`, `UpNextOrder` (`InOrder` / `WhereILeftOff`) and `EpisodeLayout` (`Row` / `List`), the last three nullable on PUT: an app that leaves one out keeps the profile's value (`docs/frontend-client-ui.md`)
 
 Admin-only:
 

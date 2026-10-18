@@ -27,6 +27,14 @@ vi.mock('../../../api/Streaming/streamingService', () => ({
     streamingService: { startSession: (mediaId: string, deviceId: string, start: number) => api.startSession(mediaId, deviceId, start) },
 }));
 vi.mock('../../../api/Watchlist/watchlistService', () => ({ watchlistService: { check: () => Promise.resolve(false) } }));
+const prefs = vi.hoisted(() => ({ episodeLayout: 'Row' as 'Row' | 'List' }));
+vi.mock('../../../api/Users/profileService', () => ({
+    profileService: {
+        getMyPlaybackPreferences: () => Promise.resolve({
+            autoSkipIntro: false, autoSkipCredits: false, autoPlayNext: true, minimumCreditsSceneSeconds: 15, episodeLayout: prefs.episodeLayout,
+        }),
+    },
+}));
 vi.mock('../../../hooks/useSignalREvent', () => ({ useSignalREvent: () => undefined }));
 vi.mock('../../../hooks/useTitleTrackChoices', () => ({
     useTitleTrackChoices: () => ({ videoId: '', audioId: '', subtitleId: 'none', audioPickedHere: false, pickReplaced: false }),
@@ -43,6 +51,7 @@ vi.mock('../../../dialogs', () => ({
 }));
 
 const playMedia = vi.fn();
+const scrollTo = vi.fn();
 
 const player: PlayerContextType = {
     currentMedia: null, isPlaying: false, isMinimized: false, volume: 1, sessionId: null,
@@ -110,8 +119,10 @@ const heroOverview = () => screen.getByTestId('hero-overview');
 
 beforeEach(() => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    vi.stubGlobal('scrollTo', scrollTo.mockReset());
     localStorage.clear();
     localStorage.setItem(StorageKeys.deviceId, 'device-1');
+    prefs.episodeLayout = 'Row';
     playMedia.mockReset();
     items = { 'season-1': season(1), 'season-2': season(2, { episodes: [episode(1)] }), 'ep-2': servantsOfTwoMasters, 'ep-3': tomorrowIsTomorrow, shogun: show(2) };
     api.alert.mockReset().mockResolvedValue(undefined);
@@ -263,5 +274,57 @@ describe('a show page', () => {
 
         expect(await screen.findByText('Seasons')).toBeInTheDocument();
         expect(screen.queryByText('Episodes')).toBeNull();
+    });
+});
+
+describe('a profile that shows episodes as a list', () => {
+    beforeEach(() => { prefs.episodeLayout = 'List'; });
+
+    const listed = (container: HTMLElement, episodeId: string) => {
+        const found = container.querySelector<HTMLElement>(`[data-episode-id="${episodeId}"]`);
+        if (!found) throw new Error(`No listed ${episodeId}`);
+        return found;
+    };
+
+    it('lists every episode with its plot instead of the row, and highlights the one the page describes', async () => {
+        const { container } = openPage('/media/season-1');
+
+        await screen.findByRole('button', { name: 'Resume S1 E2 20:50' });
+        expect(await screen.findByText('Plot of episode 1.')).toBeInTheDocument();
+        expect(screen.getByText('Plot of episode 3.')).toBeInTheDocument();
+        expect(listed(container, 'ep-2')).toHaveAttribute('aria-current', 'true');
+        expect(listed(container, 'ep-3')).not.toHaveAttribute('aria-current');
+        expect(container.querySelector('[data-episode-id] [role="button"]')).toBeNull();
+    });
+
+    it('describes an episode picked by its title, and scrolls up to show it', async () => {
+        const { container } = openPage('/media/season-1');
+        await screen.findByRole('button', { name: 'Resume S1 E2 20:50' });
+
+        fireEvent.click(await screen.findByRole('button', { name: '3. Tomorrow Is Tomorrow' }));
+
+        expect(await screen.findByRole('button', { name: 'Play S1 E3' })).toBeInTheDocument();
+        expect(heroOverview()).toHaveTextContent('Plot of episode 3.');
+        expect(listed(container, 'ep-3')).toHaveAttribute('aria-current', 'true');
+        expect(screen.getByTestId('address')).toHaveTextContent('/media/season-1?episode=ep-3');
+        expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    });
+
+    it('plays an episode from its picture, from where it was left', async () => {
+        openPage('/media/season-1');
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Resume Servants of Two Masters' }));
+
+        await waitFor(() => expect(api.startSession).toHaveBeenCalledWith('ep-2', 'device-1', 1250));
+        expect(screen.getByTestId('address')).toHaveTextContent('/media/season-1');
+    });
+
+    it("opens an episode on its season from a one-season show's page", async () => {
+        items.shogun = show(1);
+        openPage('/media/shogun');
+
+        fireEvent.click(await screen.findByRole('button', { name: '3. Tomorrow Is Tomorrow' }));
+
+        await waitFor(() => expect(screen.getByTestId('address')).toHaveTextContent('/media/season-1?episode=ep-3'));
     });
 });

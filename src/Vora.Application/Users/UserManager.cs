@@ -398,11 +398,22 @@ public class UserManager(
 
     public async Task<PlaybackPreferencesVM> SavePlaybackPreferencesAsync(Guid profileId, PlaybackPreferencesVM prefs)
     {
+        if (prefs.UpNextOrder is { } unknownOrder && !Enum.IsDefined(unknownOrder))
+        {
+            throw new ArgumentException($"'{unknownOrder}' is not an up-next order.", nameof(prefs));
+        }
+        if (prefs.EpisodeLayout is { } unknownLayout && !Enum.IsDefined(unknownLayout))
+        {
+            throw new ArgumentException($"'{unknownLayout}' is not an episode layout.", nameof(prefs));
+        }
+
         var profile = await repository.GetProfileByIdAsync(profileId)
             ?? throw new InvalidOperationException("Profile not found.");
         profile.AutoSkipIntro = prefs.AutoSkipIntro;
         profile.AutoSkipCredits = prefs.AutoSkipCredits;
         if (prefs.AutoPlayNext is bool autoPlayNext) profile.AutoPlayNext = autoPlayNext;
+        if (prefs.UpNextOrder is { } upNextOrder) profile.UpNextOrder = upNextOrder;
+        if (prefs.EpisodeLayout is { } episodeLayout) profile.EpisodeLayout = episodeLayout;
         profile.MinimumCreditsSceneSeconds = Math.Clamp(prefs.MinimumCreditsSceneSeconds, 0, 600);
         await repository.UpdateProfileAsync(profile);
         return PlaybackPreferencesOf(profile);
@@ -413,6 +424,8 @@ public class UserManager(
         AutoSkipIntro = profile.AutoSkipIntro,
         AutoSkipCredits = profile.AutoSkipCredits,
         AutoPlayNext = profile.AutoPlayNext,
+        UpNextOrder = profile.UpNextOrder,
+        EpisodeLayout = profile.EpisodeLayout,
         MinimumCreditsSceneSeconds = profile.MinimumCreditsSceneSeconds
     };
 

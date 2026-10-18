@@ -98,4 +98,26 @@ public class WatchStateTransitionTests
     {
         WatchStateTransition.IsComplete(Movie * fraction, Movie).Should().Be(expected);
     }
+
+    [Theory]
+    [InlineData(5)]
+    [InlineData(25)]
+    [InlineData(WatchStateTransition.MinimumResumeSeconds - 0.5)]
+    public void An_item_stopped_in_its_first_half_minute_has_nothing_to_resume(double position)
+    {
+        WatchStateTransition.ResolveResumePosition(position, Movie).Should().Be(0);
+    }
+
+    [Fact]
+    public void A_re_watch_stopped_in_its_first_half_minute_leaves_the_item_watched_with_nothing_to_resume()
+    {
+        WatchStateTransition.ResolveIsPlayed(wasPlayed: true, positionSeconds: 20, Movie).Should().BeTrue();
+        WatchStateTransition.ResolveResumePosition(20, Movie).Should().Be(0);
+    }
+
+    [Fact]
+    public void An_item_stopped_after_its_first_half_minute_resumes_where_it_is()
+    {
+        WatchStateTransition.ResolveResumePosition(WatchStateTransition.MinimumResumeSeconds, Movie).Should().Be(WatchStateTransition.MinimumResumeSeconds);
+    }
 }

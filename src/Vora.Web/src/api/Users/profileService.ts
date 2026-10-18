@@ -33,10 +33,16 @@ export interface ShowtimesLocationDto {
     location?: string | null;
 }
 
+export type UpNextOrder = 'InOrder' | 'WhereILeftOff';
+
+export type EpisodeLayout = 'Row' | 'List';
+
 export interface PlaybackPreferencesVM {
     autoSkipIntro: boolean;
     autoSkipCredits: boolean;
     autoPlayNext: boolean;
+    upNextOrder?: UpNextOrder;
+    episodeLayout?: EpisodeLayout;
     minimumCreditsSceneSeconds: number;
 }
 

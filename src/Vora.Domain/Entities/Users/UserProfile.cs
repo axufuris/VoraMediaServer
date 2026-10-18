@@ -41,6 +41,8 @@ public class UserProfile
     public bool AutoSkipIntro { get; set; }
     public bool AutoSkipCredits { get; set; }
     public bool AutoPlayNext { get; set; } = true;
+    public UpNextOrder UpNextOrder { get; set; } = UpNextOrder.InOrder;
+    public EpisodeLayout EpisodeLayout { get; set; } = EpisodeLayout.Row;
     public int MinimumCreditsSceneSeconds { get; set; } = 15;
 
     public string? PreferredAudioLanguage { get; set; }
