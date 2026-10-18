@@ -41,6 +41,7 @@ public class MediaDetailsVM
     public int? EpisodeNumber { get; set; }
     public int? EndEpisodeNumber { get; set; }
     public string? TvShowTitle { get; set; }
+    public string? TvShowOverview { get; set; }
     public Guid? TvShowId { get; set; }
     public Guid? SeasonId { get; set; }
     public List<EpisodeVM> Episodes { get; set; } = new();
@@ -205,6 +206,7 @@ public class MediaDetailsVM
                        item is Season ? item.Id : null,
             TvShowTitle = item is Season ? ((Season)item).TvShow.Title :
                           item is Episode ? ((Episode)item).Season.TvShow.Title : null,
+            TvShowOverview = item is Season ? ((Season)item).TvShow.Overview : null,
             UpcomingEpisodesJson = item is TvShow ? ((TvShow)item).UpcomingEpisodesJson :
                                    item is Season ? ((Season)item).TvShow.UpcomingEpisodesJson :
                                    item is Episode ? ((Episode)item).Season.TvShow.UpcomingEpisodesJson : "[]",

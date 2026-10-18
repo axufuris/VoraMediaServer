@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Media;
@@ -18,6 +19,38 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         _context = context;
     }
 
+    private static readonly Expression<Func<Episode, UpNextItemVM>> AsUpNextItem = e => new UpNextItemVM
+    {
+        Id = e.Id,
+        Title = e.Title,
+        TvShowTitle = e.Season.TvShow.Title,
+        SeasonNumber = e.Season.SeasonNumber,
+        EpisodeNumber = e.EpisodeNumber,
+        Type = "Episode",
+        PosterUrl = e.PosterUrl,
+        BackgroundUrl = e.BackgroundUrl,
+        Overview = e.Overview
+    };
+
+    private async Task<UpNextItemVM?> FirstEpisodeToPlayAsync(IQueryable<Episode> episodes, Guid? profileId)
+    {
+        var present = episodes.AsNoTracking().Where(e => e.MissingSince == null);
+        UpNextItemVM? next = null;
+        if (profileId.HasValue)
+        {
+            next = await present
+                .Where(e => !_context.UserMediaStates.Any(s => s.ProfileId == profileId.Value && s.MediaItemId == e.Id && s.IsPlayed))
+                .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
+                .Select(AsUpNextItem)
+                .FirstOrDefaultAsync();
+        }
+
+        return next ?? await present
+            .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
+            .Select(AsUpNextItem)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId, Guid? profileId)
     {
         var result = new UpNextResultVM();
@@ -28,7 +61,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
             .Select(m => new
             {
                 m.Id,
-                Type = m is Movie ? "Movie" : m is TvShow ? "TvShow" : m is Episode ? "Episode" : "Unknown",
+                Type = m is Movie ? "Movie" : m is TvShow ? "TvShow" : m is Season ? "Season" : m is Episode ? "Episode" : "Unknown",
                 DirectorId = m.Cast.Where(c => (c.Roles & MediaCastRole.Director) != 0).Select(c => c.ActorId).FirstOrDefault(),
                 GenreIds = m.Genres.Select(g => g.Id).ToList(),
                 SeasonId = m is Episode ? ((Episode)m).SeasonId : (Guid?)null,
@@ -142,54 +175,16 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         }
         else if (currentMedia.Type == "TvShow")
         {
-            UpNextItemVM? nextEpisode = null;
-
             var hasRegularEpisodes = await _context.Set<Episode>()
                 .AnyAsync(e => e.Season.TvShowId == mediaId && e.MissingSince == null && e.Season.SeasonNumber != EpisodeSequence.SpecialsSeason);
 
-            if (profileId.HasValue)
-            {
-                nextEpisode = await _context.Set<Episode>()
-                    .AsNoTracking()
-                    .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
-                    .Where(e => !hasRegularEpisodes || e.Season.SeasonNumber != EpisodeSequence.SpecialsSeason)
-                    .Where(e => !_context.UserMediaStates.Any(s => s.ProfileId == profileId.Value && s.MediaItemId == e.Id && s.IsPlayed))
-                    .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
-                    .Select(e => new UpNextItemVM
-                    {
-                        Id = e.Id,
-                        Title = e.Title,
-                        TvShowTitle = e.Season.TvShow.Title,
-                        SeasonNumber = e.Season.SeasonNumber,
-                        EpisodeNumber = e.EpisodeNumber,
-                        Type = "Episode",
-                        PosterUrl = e.PosterUrl,
-                        BackgroundUrl = e.BackgroundUrl,
-                        Overview = e.Overview
-                    })
-                    .FirstOrDefaultAsync();
-            }
-
-            nextEpisode ??= await _context.Set<Episode>()
-                .AsNoTracking()
-                .Where(e => e.Season.TvShowId == mediaId && e.MissingSince == null)
-                .Where(e => !hasRegularEpisodes || e.Season.SeasonNumber != EpisodeSequence.SpecialsSeason)
-                .OrderBy(e => e.Season.SeasonNumber).ThenBy(e => e.EpisodeNumber)
-                .Select(e => new UpNextItemVM
-                {
-                    Id = e.Id,
-                    Title = e.Title,
-                    TvShowTitle = e.Season.TvShow.Title,
-                    SeasonNumber = e.Season.SeasonNumber,
-                    EpisodeNumber = e.EpisodeNumber,
-                    Type = "Episode",
-                    PosterUrl = e.PosterUrl,
-                    BackgroundUrl = e.BackgroundUrl,
-                    Overview = e.Overview
-                })
-                .FirstOrDefaultAsync();
-
-            result.NextItem = nextEpisode;
+            result.NextItem = await FirstEpisodeToPlayAsync(
+                _context.Set<Episode>().Where(e => e.Season.TvShowId == mediaId && (!hasRegularEpisodes || e.Season.SeasonNumber != EpisodeSequence.SpecialsSeason)),
+                profileId);
+        }
+        else if (currentMedia.Type == "Season")
+        {
+            result.NextItem = await FirstEpisodeToPlayAsync(_context.Set<Episode>().Where(e => e.SeasonId == mediaId), profileId);
         }
 
         if (currentMedia.Type == "Movie")

@@ -156,6 +156,7 @@ export interface MediaItem {
     lockedFields?: string[];
     episodes?: Episode[];
     tvShowTitle?: string;
+    tvShowOverview?: string;
     tvShowId?: string;
     seasonId?: string;
     thirdPartyRating1?: number;

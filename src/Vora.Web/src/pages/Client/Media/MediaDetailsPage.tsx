@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mediaService, type MediaItem } from '../../../api/Media/mediaService';
+import { mediaService, type Episode, type MediaItem } from '../../../api/Media/mediaService';
 import CastRow from '../../../components/Client/Primitives/CastRow';
 import MediaExtrasRow from '../../../components/Media/MediaExtrasRow';
 import MediaEpisodesList from '../../../components/Media/MediaEpisodesList';
@@ -26,7 +26,7 @@ import { useTitleTrackChoices } from '../../../hooks/useTitleTrackChoices';
 import TrackChoiceChips from '../../../components/Media/TrackChoiceChips';
 import type { MediaMatchResult } from '../../../api/Media/libraryAdminService';
 import { heroFactsLine, pickChipAudioTrack } from '../../../utils/heroQualityChips';
-import { playTargetFor } from '../../../utils/playTarget';
+import { playButtonFor, playTargetFor } from '../../../utils/playTarget';
 import { formatDate, serverTimeMs, yearOf } from '../../../utils/serverTime';
 import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
 import { errorDetail, isMissingOrForbidden } from '../../../utils/apiError';
@@ -57,12 +57,23 @@ export default function MediaDetailsPage() {
     const [inWatchlist, setInWatchlist] = useState(false);
     const [isRateOpen, setIsRateOpen] = useState(false);
 
-    const [upNextQuality, setUpNextQuality] = useState<{ showId: string; episode: MediaItem | null } | null>(null);
+    // A show and a season play their up-next episode, so its file is what the
+    // chips describe and the track picks apply to.
+    const [upNextQuality, setUpNextQuality] = useState<{ titleId: string; episode: MediaItem | null } | null>(null);
+    const playsUpNext = media?.type === 'TvShow' || media?.type === 'Season';
     const qualityMedia = !media
         ? null
-        : media.type !== 'TvShow'
+        : !playsUpNext
             ? media
-            : upNextQuality?.showId === media.id ? upNextQuality.episode : null;
+            : upNextQuality?.titleId === media.id ? upNextQuality.episode : null;
+
+    // A show with one season lists that season's episodes on its own page, so
+    // there is no extra click through a Seasons row of one. The show page stays,
+    // for its own menu (Fix match, Edit metadata), trailers, rating and watchlist.
+    const [singleSeason, setSingleSeason] = useState<{ showId: string; season: MediaItem | null } | null>(null);
+    const onlySeasonId = media?.type === 'TvShow' && media.seasons?.length === 1 ? media.seasons[0].id : null;
+    const inlineSeason = media && singleSeason?.showId === media.id ? singleSeason.season : null;
+    const inlineSeasonFailed = !!media && singleSeason?.showId === media.id && singleSeason.season === null;
 
     // Navigating between items (e.g. episode → season) reuses this component,
     // so close any open overlay/menu from the previous item. Adjusted during
@@ -144,26 +155,37 @@ export default function MediaDetailsPage() {
     }, [id, serverId]);
 
     useEffect(() => {
-        if (!media || media.type !== 'TvShow') return;
+        if (!media || (media.type !== 'TvShow' && media.type !== 'Season')) return;
 
-        const showId = media.id;
+        const titleId = media.id;
         let cancelled = false;
         (async () => {
             try {
-                const upNext = await mediaService.getUpNext(showId, undefined, undefined, serverId);
+                const upNext = await mediaService.getUpNext(titleId, undefined, undefined, serverId);
                 if (cancelled) return;
                 if (!upNext.nextItem) {
-                    setUpNextQuality({ showId, episode: null });
+                    setUpNextQuality({ titleId, episode: null });
                     return;
                 }
                 const episode = await mediaService.getMediaItem(upNext.nextItem.id, serverId);
-                if (!cancelled) setUpNextQuality({ showId, episode });
+                if (!cancelled) setUpNextQuality({ titleId, episode });
             } catch {
-                if (!cancelled) setUpNextQuality({ showId, episode: null });
+                if (!cancelled) setUpNextQuality({ titleId, episode: null });
             }
         })();
         return () => { cancelled = true; };
     }, [media, serverId]);
+
+    useEffect(() => {
+        if (!media || !onlySeasonId) return;
+
+        const showId = media.id;
+        let cancelled = false;
+        mediaService.getMediaItem(onlySeasonId, serverId)
+            .then(season => { if (!cancelled) setSingleSeason({ showId, season }); })
+            .catch(() => { if (!cancelled) setSingleSeason({ showId, season: null }); });
+        return () => { cancelled = true; };
+    }, [media, onlySeasonId, serverId]);
 
     useEffect(() => {
         if (!isPlaying && id) {
@@ -175,10 +197,11 @@ export default function MediaDetailsPage() {
     useSignalREvent('MediaItemUpdated', useCallback((updatedId: string) => {
         if (!id || !media) return;
         const targetId = updatedId.toLowerCase();
-        if (targetId === id.toLowerCase() || media.episodes?.some(ep => ep.id.toLowerCase() === targetId) || media.seasons?.some(s => s.id.toLowerCase() === targetId)) {
+        const listed = [...(media.episodes ?? []), ...(inlineSeason?.episodes ?? [])];
+        if (targetId === id.toLowerCase() || listed.some(ep => ep.id.toLowerCase() === targetId) || media.seasons?.some(s => s.id.toLowerCase() === targetId)) {
             reloadMedia();
         }
-    }, [id, media, reloadMedia]));
+    }, [id, media, inlineSeason, reloadMedia]));
 
     useSignalREvent('MediaAnalysisUpdated', useCallback((updatedId: string) => {
         if (id && updatedId.toLowerCase() === id.toLowerCase()) reloadMedia();
@@ -225,6 +248,33 @@ export default function MediaDetailsPage() {
                 outputHdrType: sessionInfo.outputHdrType ?? undefined,
                 audioCodec: activeAudioTrack?.codec, audioChannels: activeAudioTrack?.channels,
                 playbackContextType: contextType
+            });
+        } catch {
+            await dialog.alert('Failed to start playback session.');
+        }
+    };
+
+    // An episode picked from the list plays from where it was left. Its tracks
+    // are the server's to choose (the profile's languages and the picks it
+    // remembers for the show), as when Up Next starts one.
+    const playListedEpisode = async (episode: Episode, seasonNumber: number | undefined, showTitle: string | undefined) => {
+        if (!media) return;
+        const deviceId = localStorage.getItem(StorageKeys.deviceId);
+        if (!deviceId) return;
+
+        const startPos = !episode.isPlayed ? episode.resumePositionSeconds || 0 : 0;
+        const label = seasonNumber != null ? seasonEpisodeLabel(seasonNumber, episode.episodeNumber, { endEpisodeNumber: episode.endEpisodeNumber }) : `E${episode.episodeNumber}`;
+        try {
+            const sessionInfo = await streamingService.startSession(episode.id, deviceId, startPos, undefined, undefined, undefined, serverId);
+            playMedia({
+                id: episode.id, title: episode.title,
+                subtitle: showTitle ? `${label} - ${showTitle}` : label,
+                posterUrl: episode.posterUrl || media.posterUrl, backgroundUrl: media.backgroundUrl,
+                ...sessionInfo, startPosition: startPos,
+                serverId: serverId ?? undefined,
+                outputResolution: sessionInfo.outputResolution ?? undefined,
+                outputHdrType: sessionInfo.outputHdrType ?? undefined,
+                playbackContextType: 'tvshow'
             });
         } catch {
             await dialog.alert('Failed to start playback session.');
@@ -280,8 +330,10 @@ export default function MediaDetailsPage() {
     }
 
     const activePart = qualityMedia?.mediaParts?.find(p => p.videoTracks?.some(v => v.id === tracks.videoId)) || qualityMedia?.mediaParts?.[0];
-    const resumePos = media.resumePositionSeconds || 0;
-    const inProgress = resumePos > 0 && !media.isPlayed;
+    const playButton = playButtonFor(media, qualityMedia);
+    const resumePos = playButton.resumeSeconds;
+    const inProgress = resumePos > 0;
+    const resumeClock = `${Math.floor(resumePos / 60)}:${String(Math.floor(resumePos % 60)).padStart(2, '0')}`;
     const isFullyPlayed = isFullyWatched(media);
 
     let nextEpisode: UpcomingEpisodeParsed | null = null;
@@ -304,8 +356,12 @@ export default function MediaDetailsPage() {
     const heroTitle = (isSeason || isEpisode) && media.tvShowTitle ? media.tvShowTitle : media.title;
     const heroSubtitle = isSeason ? seasonName(media.seasonNumber, media.title) : isEpisode ? media.title : undefined;
     const moreEntries = tidyMenu(itemActions.entries);
-    const playLabel = media.type === 'TvShow' ? 'Play next' : inProgress ? 'Resume' : 'Play';
+    const playLabel = playButton.label;
     const playRuntime = formatRuntime(media.durationMinutes);
+    const listedEpisodes = isSeason ? media.episodes ?? [] : inlineSeason?.episodes ?? [];
+    const listedSeasonNumber = isSeason ? media.seasonNumber : inlineSeason?.seasonNumber;
+    const listedShowTitle = isSeason ? media.tvShowTitle : media.title;
+    const showSeasonsRow = media.type === 'TvShow' && (media.seasons || []).length > 0 && ((media.seasons || []).length > 1 || inlineSeasonFailed);
 
     const videos = media.videos ?? [];
     const trailerVideo = videos.find(v => v.type === 'Trailer') ?? videos[0];
@@ -352,15 +408,15 @@ export default function MediaDetailsPage() {
             <button
                 type="button"
                 onClick={() => handlePlay(true)}
+                aria-label={[playLabel, playButton.episode, inProgress ? resumeClock : null].filter(Boolean).join(' ')}
                 className="vora-button-primary cursor-pointer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 30px', fontSize: 15 }}
             >
                 <PlayIcon />
                 {playLabel}
-                {inProgress && resumePos > 0 && (
-                    <span className="ml-1 text-xs font-normal opacity-70">
-                        {Math.floor(resumePos / 60)}:{String(Math.floor(resumePos % 60)).padStart(2, '0')}
-                    </span>
+                {playButton.episode && <span>{playButton.episode}</span>}
+                {inProgress && (
+                    <span className="ml-1 text-xs font-normal opacity-70">{resumeClock}</span>
                 )}
             </button>
 
@@ -471,10 +527,10 @@ export default function MediaDetailsPage() {
                 credits={<HeroCredits directors={media.directors} studios={media.studios} />}
                 actions={heroActions}
                 notice={heroNotice}
-                overview={media.overview}
+                overview={media.overview || (isSeason ? media.tvShowOverview : undefined)}
                 techChips={heroTechChips}
             />
-            {media.type === 'TvShow' && (media.seasons || []).length > 0 && (
+            {showSeasonsRow && (
                 <div className="mt-12">
                     <MediaRow title="Seasons">
                         {(media.seasons || []).map(season => (
@@ -494,6 +550,12 @@ export default function MediaDetailsPage() {
             )}
 
             <div className="mt-8 space-y-12 px-12 max-md:px-4">
+                <MediaEpisodesList
+                    episodes={listedEpisodes}
+                    serverId={serverId}
+                    onChanged={reloadMedia}
+                    onPlay={episode => { void playListedEpisode(episode, listedSeasonNumber, listedShowTitle); }}
+                />
                 <CastRow
                     cast={(media.cast || []).map(member => ({
                         id: member.actorId,
@@ -506,7 +568,6 @@ export default function MediaDetailsPage() {
                     onSelect={member => navigate(serverId ? `/server/${serverId}/actor/${member.id}` : `/actor/${member.id}`)}
                 />
                 <MediaExtrasRow videos={media.videos || []} extras={media.extras || []} serverId={serverId} />
-                <MediaEpisodesList episodes={media.episodes || []} serverId={serverId} onChanged={reloadMedia} />
             </div>
         </div>
     );
