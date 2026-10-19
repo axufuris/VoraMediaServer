@@ -20,10 +20,36 @@ const renderEditor = (onMoveItem = vi.fn()) => {
                 onToggleShowUnpinned={vi.fn()}
                 onMoveItem={onMoveItem}
                 onTogglePin={vi.fn()}
+                collapsed={false}
+                onToggleCollapsed={vi.fn()}
             />
         </MemoryRouter>,
     );
     return onMoveItem;
+};
+
+const renderSidebar = ({ collapsed, editing = false, onToggleCollapsed = vi.fn() }: { collapsed: boolean; editing?: boolean; onToggleCollapsed?: () => void }) => {
+    const unpinned: NavItem = { ...nav('podcasts', 3), isPinned: false };
+    const view = render(
+        <MemoryRouter>
+            <MainLayoutSidebar
+                navItems={[...items, unpinned]}
+                pinnedItems={items}
+                unpinnedItems={[unpinned]}
+                isEditingNav={editing}
+                showUnpinned
+                onToggleEditNav={vi.fn()}
+                onToggleShowUnpinned={vi.fn()}
+                onMoveItem={vi.fn()}
+                onTogglePin={vi.fn()}
+                collapsed={collapsed}
+                onToggleCollapsed={onToggleCollapsed}
+            />
+        </MemoryRouter>,
+    );
+    const panel = view.container.firstElementChild;
+    if (!(panel instanceof HTMLElement)) throw new Error('No sidebar rendered');
+    return { panel, onToggleCollapsed };
 };
 
 const dataTransfer = () => ({ setData: vi.fn(), effectAllowed: '', dropEffect: '' });
@@ -86,5 +112,46 @@ describe('Edit Navigation', () => {
 
         expect(onMoveItem).toHaveBeenCalledTimes(1);
         expect(onMoveItem).toHaveBeenCalledWith(1, 0);
+    });
+});
+
+describe('Collapsing the sidebar', () => {
+    it('folds to its icons from tablet width up, keeping every link named and titled', () => {
+        const { panel } = renderSidebar({ collapsed: true });
+
+        expect(panel.className).toContain('md:w-[4.5rem]');
+        for (const name of ['Home', 'Music', 'Movies', 'Podcasts']) {
+            const link = screen.getByRole('link', { name });
+            expect(link).toHaveAttribute('title', name);
+            expect(link.querySelector('.md\\:sr-only')).not.toBeNull();
+        }
+        expect(screen.getByRole('button', { name: 'Edit Navigation' })).toHaveAttribute('title', 'Edit Navigation');
+        expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('shows the full sidebar with labels and no tooltips when expanded', () => {
+        const { panel } = renderSidebar({ collapsed: false });
+
+        expect(panel.className).not.toContain('md:w-[4.5rem]');
+        expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('title');
+        expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('collapses and expands from its button, which a phone never shows', () => {
+        const { onToggleCollapsed } = renderSidebar({ collapsed: false });
+        const toggle = screen.getByRole('button', { name: 'Collapse sidebar' });
+
+        fireEvent.click(toggle);
+
+        expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
+        expect(toggle.className).toContain('max-md:hidden');
+    });
+
+    it('opens Edit Navigation at full width even while folded', () => {
+        const { panel } = renderSidebar({ collapsed: true, editing: true });
+
+        expect(panel.className).not.toContain('md:w-[4.5rem]');
+        expect(screen.queryByRole('button', { name: 'Expand sidebar' })).toBeNull();
+        expect(screen.getByText('Manage sidebar')).toBeInTheDocument();
     });
 });

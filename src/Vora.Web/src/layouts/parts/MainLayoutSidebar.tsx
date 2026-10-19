@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import type { NavItem } from '../MainLayout';
-import { renderNavIcon } from './navIcons';
+import { renderNavIcon, renderNavIconOrDefault } from './navIcons';
 import { dropIndex } from '../../utils/navOrder';
 import { reorderListProps, reorderRowProps, useTouchReorder } from '../../hooks/useTouchReorder';
 
@@ -15,6 +15,8 @@ interface MainLayoutSidebarProps {
     onToggleShowUnpinned: () => void;
     onMoveItem: (from: number, to: number) => void;
     onTogglePin: (id: string, itemServerId?: string) => void;
+    collapsed: boolean;
+    onToggleCollapsed: () => void;
 }
 
 const navItemStyle = (isActive: boolean): React.CSSProperties => ({
@@ -32,6 +34,8 @@ export default function MainLayoutSidebar({
     onToggleShowUnpinned,
     onMoveItem,
     onTogglePin,
+    collapsed,
+    onToggleCollapsed,
 }: MainLayoutSidebarProps) {
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [drop, setDrop] = useState<{ over: number; after: boolean } | null>(null);
@@ -43,6 +47,9 @@ export default function MainLayoutSidebar({
     const activeDrop = touch.drag ? { over: touch.drag.over, after: touch.drag.after } : drop;
 
     const keyOf = (item: NavItem) => `${item.serverId || 'local'}-${item.id}`;
+    const folded = collapsed && !isEditingNav;
+    const foldedLink = folded ? 'md:justify-center md:px-0' : '';
+    const foldedLabel = folded ? 'md:sr-only' : undefined;
 
     useEffect(() => {
         if (!refocusKey.current) return;
@@ -65,10 +72,10 @@ export default function MainLayoutSidebar({
 
     return (
         <div
-            className="z-20 flex w-64 flex-col transition-all duration-300"
+            className={`z-20 flex w-64 flex-col transition-all duration-300 ${folded ? 'md:w-[4.5rem]' : ''}`}
             style={{ background: 'var(--vora-bg-sunken)', borderRight: '1px solid var(--vora-border-subtle)' }}
         >
-            <div className="flex items-center justify-between p-6">
+            <div className={`flex items-center justify-between p-6 ${folded ? 'md:flex-col md:gap-4 md:px-0 md:py-5' : ''}`}>
                 <div className="flex items-center">
                     <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true">
                         <defs>
@@ -80,45 +87,65 @@ export default function MainLayoutSidebar({
                         <path d="M6 8 L18 8 L32 40 L46 8 L58 8 L32 60 Z" fill="url(#sidebar-vora-v)" />
                     </svg>
                     <h1
-                        className="m-0 text-2xl font-semibold tracking-wide"
+                        className={`m-0 text-2xl font-semibold tracking-wide ${folded ? 'md:sr-only' : ''}`}
                         style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.02em' }}
                         aria-label="Vora"
                     >
                         ora
                     </h1>
                 </div>
+                {!isEditingNav && (
+                    <button
+                        type="button"
+                        onClick={onToggleCollapsed}
+                        aria-label={folded ? 'Expand sidebar' : 'Collapse sidebar'}
+                        aria-expanded={!folded}
+                        title={folded ? 'Expand sidebar' : 'Collapse sidebar'}
+                        className="vora-icon-button flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md max-md:hidden"
+                        style={{ color: 'var(--vora-text-muted)' }}
+                    >
+                        <svg className={`h-5 w-5 transition-transform ${folded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                            <polyline points="7 7 2 12 7 17" />
+                            <line x1="10" y1="6" x2="21" y2="6" />
+                            <line x1="13" y1="12" x2="21" y2="12" />
+                            <line x1="10" y1="18" x2="21" y2="18" />
+                        </svg>
+                    </button>
+                )}
             </div>
 
             {!isEditingNav ? (
                 <>
-                    <div className="mb-4 space-y-1 px-4">
+                    <div className={`mb-4 space-y-1 px-4 ${folded ? 'md:px-2' : ''}`}>
                         <NavLink
                             to="/"
                             end
-                            className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${isActive ? '' : 'vora-row-interactive hover:text-[var(--vora-text-primary)]'}`}
+                            title={folded ? 'Home' : undefined}
+                            className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${foldedLink} ${isActive ? '' : 'vora-row-interactive hover:text-[var(--vora-text-primary)]'}`}
                             style={({ isActive }) => navItemStyle(isActive)}
                         >
                             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 12 12 3l9 9" />
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 10v10h4v-6h6v6h4V10" />
                             </svg>
-                            Home
+                            <span className={foldedLabel}>Home</span>
                         </NavLink>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto px-4">
+                    <div className={`flex-1 overflow-y-auto px-4 ${folded ? 'md:px-2' : ''}`}>
                         <div className="space-y-1">
                             {[...pinnedItems].sort((a, b) => a.order - b.order).map(item => {
-                                const icon = renderNavIcon(item.type === 'library' ? item.mediaType : item.id, 'w-5 h-5');
+                                const icon = renderNavIconOrDefault(item.type === 'library' ? item.mediaType : item.id, 'w-5 h-5');
                                 return (
                                     <NavLink
                                         key={`${item.serverId || 'local'}-${item.id}`}
                                         to={item.path}
-                                        className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? '' : 'vora-row-interactive hover:text-[var(--vora-text-primary)]'}`}
+                                        title={folded ? item.title : undefined}
+                                        className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${foldedLink} ${isActive ? '' : 'vora-row-interactive hover:text-[var(--vora-text-primary)]'}`}
                                         style={({ isActive }) => navItemStyle(isActive)}
                                     >
                                         {icon}
-                                        <span className="min-w-0 flex-1">
+                                        <span className={`min-w-0 flex-1 ${foldedLabel ?? ''}`}>
                                             <span className="block">{item.title}</span>
                                             {item.serverName && <span className="block text-[10px] font-normal" style={{ color: 'var(--vora-text-disabled)' }}>{item.serverName}</span>}
                                         </span>
@@ -131,33 +158,33 @@ export default function MainLayoutSidebar({
                                     <button
                                         type="button"
                                         onClick={onToggleShowUnpinned}
-                                        className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors vora-row-interactive hover:text-[var(--vora-text-primary)]"
+                                        aria-expanded={showUnpinned}
+                                        title={folded ? 'More' : undefined}
+                                        className={`flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors vora-row-interactive hover:text-[var(--vora-text-primary)] ${foldedLink}`}
                                         style={{ color: 'var(--vora-text-muted)' }}
                                     >
                                         <svg className={`h-4 w-4 transition-transform ${showUnpinned ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                                             <polyline points="6 9 12 15 18 9" />
                                         </svg>
-                                        More
+                                        <span className={foldedLabel}>More</span>
                                     </button>
 
                                     {showUnpinned && (
-                                        <div
-                                            className="ml-4 mt-1 space-y-1 pl-4"
-                                            style={{ borderLeft: '2px solid var(--vora-border-subtle)' }}
-                                        >
+                                        <div className={`ml-4 mt-1 space-y-1 border-l-2 border-[var(--vora-border-subtle)] pl-4 ${folded ? 'md:ml-0 md:border-l-0 md:pl-0' : ''}`}>
                                             {unpinnedItems.map(item => {
-                                                const icon = renderNavIcon(item.type === 'library' ? item.mediaType : item.id, 'w-5 h-5');
+                                                const icon = renderNavIconOrDefault(item.type === 'library' ? item.mediaType : item.id, 'w-5 h-5');
                                                 return (
                                                     <NavLink
                                                         key={`${item.serverId || 'local'}-${item.id}`}
                                                         to={item.path}
-                                                        className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${isActive ? '' : 'hover:text-[var(--vora-text-secondary)]'}`}
+                                                        title={folded ? item.title : undefined}
+                                                        className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${foldedLink} ${isActive ? '' : 'hover:text-[var(--vora-text-secondary)]'}`}
                                                         style={({ isActive }) => ({
                                                             color: isActive ? 'var(--vora-accent-text)' : 'var(--vora-text-disabled)',
                                                         })}
                                                     >
                                                         {icon}
-                                                        <span>{item.title}</span>
+                                                        <span className={foldedLabel}>{item.title}</span>
                                                     </NavLink>
                                                 );
                                             })}
@@ -168,11 +195,12 @@ export default function MainLayoutSidebar({
                         </div>
                     </div>
 
-                    <div className="p-4" style={{ borderTop: '1px solid var(--vora-border-subtle)' }}>
+                    <div className={`p-4 ${folded ? 'md:px-2' : ''}`} style={{ borderTop: '1px solid var(--vora-border-subtle)' }}>
                         <button
                             type="button"
                             onClick={() => onToggleEditNav(true)}
-                            className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors vora-row-interactive hover:text-[var(--vora-text-primary)]"
+                            title={folded ? 'Edit Navigation' : undefined}
+                            className={`flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors vora-row-interactive hover:text-[var(--vora-text-primary)] ${foldedLink}`}
                             style={{ color: 'var(--vora-text-muted)' }}
                         >
                             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
@@ -186,7 +214,7 @@ export default function MainLayoutSidebar({
                                 <line x1="9" y1="8" x2="15" y2="8" />
                                 <line x1="17" y1="16" x2="23" y2="16" />
                             </svg>
-                            Edit Navigation
+                            <span className={foldedLabel}>Edit Navigation</span>
                         </button>
                     </div>
                 </>
