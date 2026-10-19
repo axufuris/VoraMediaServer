@@ -38,6 +38,7 @@ public class StreamManager : IStreamManager
     public const string DefaultTranscodeTempDirectory = "/transcode";
     public static readonly TimeSpan PlayTokenTtl = TimeSpan.FromHours(4);
     public static readonly TimeSpan HlsTokenTtl = TimeSpan.FromHours(4);
+    public const int UploadFloorKbps = 1_500;
 
     private readonly IStreamRepository _repository;
     private readonly IBestPathDecisionManager _decisionManager;
@@ -149,11 +150,19 @@ public class StreamManager : IStreamManager
             client.RendersImageSubtitles = capabilities.RendersImageSubtitles;
         }
 
-        bool isRemote = !IsLocalIp(AddressOf(client, clientAddress));
+        var (maxAllowedBandwidthKbps, bandwidthLimitSource) = await BandwidthLimitAsync(client, deviceId, clientAddress, capabilities, settings);
+
+        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput, capabilities?.HlsVideoCodecs, remembered, preferences, capabilities?.RequestedMaxWidth ?? 0, capabilities?.Display, await GpuEncodesHdrAsync(settings));
+
+        return (decision, mediaInfo, client, mediaId);
+    }
+
+    private async Task<(int Kbps, string Source)> BandwidthLimitAsync(ClientDevice client, string deviceId, string? clientAddress, DeviceCapsDto? capabilities, ServerSetting settings)
+    {
         int maxAllowedBandwidthKbps = 0;
         string bandwidthLimitSource = "None";
 
-        if (isRemote)
+        if (!IsLocalIp(AddressOf(client, clientAddress)))
         {
             int uploadLimitKbps = settings.InternetUploadSpeedMbps * 1000;
             int remoteLimitKbps = settings.MaxRemoteStreamBitrateMbps * 1000;
@@ -169,7 +178,9 @@ public class StreamManager : IStreamManager
                     .Sum(s => s.BandwidthKbps);
             }
 
-            int remainingUploadKbps = uploadLimitKbps > 0 ? Math.Max(0, uploadLimitKbps - currentRemoteBandwidthKbps) : 0;
+            int remainingUploadKbps = uploadLimitKbps > 0
+                ? Math.Max(Math.Min(UploadFloorKbps, uploadLimitKbps), uploadLimitKbps - currentRemoteBandwidthKbps)
+                : 0;
 
             if (remoteLimitKbps > 0)
             {
@@ -205,9 +216,7 @@ public class StreamManager : IStreamManager
             bandwidthLimitSource = ConnectionLimit.Source;
         }
 
-        var decision = await _decisionManager.DetermineBestPathAsync(client, mediaInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, videoTrackId, audioTrackId, subtitleTrackId, capabilities?.RequestedMaxResolution ?? 0, mediaPartId, capabilities?.AudioOutput, capabilities?.HlsVideoCodecs, remembered, preferences, capabilities?.RequestedMaxWidth ?? 0, capabilities?.Display, await GpuEncodesHdrAsync(settings));
-
-        return (decision, mediaInfo, client, mediaId);
+        return (maxAllowedBandwidthKbps, bandwidthLimitSource);
     }
 
     private async Task<bool> GpuEncodesHdrAsync(ServerSetting settings)
@@ -255,7 +264,8 @@ public class StreamManager : IStreamManager
 
         var preferences = profileId.HasValue ? await _repository.GetTrackPreferencesAsync(profileId.Value) : null;
         var settings = await _settingsRepo.GetSettingsAsync();
-        var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, 0, "None", null, null, null, capabilities?.RequestedMaxResolution ?? 0, audioOutput: capabilities?.AudioOutput, hlsVideoCodecs: capabilities?.HlsVideoCodecs, preferences: preferences, requestedMaxWidth: capabilities?.RequestedMaxWidth ?? 0, display: capabilities?.Display, gpuEncodesHdr: await GpuEncodesHdrAsync(settings));
+        var (maxAllowedBandwidthKbps, bandwidthLimitSource) = await BandwidthLimitAsync(client, deviceId, clientAddress, capabilities, settings);
+        var decision = await _decisionManager.DetermineBestPathAsync(client, streamInfo, maxAllowedBandwidthKbps, bandwidthLimitSource, null, null, null, capabilities?.RequestedMaxResolution ?? 0, audioOutput: capabilities?.AudioOutput, hlsVideoCodecs: capabilities?.HlsVideoCodecs, preferences: preferences, requestedMaxWidth: capabilities?.RequestedMaxWidth ?? 0, display: capabilities?.Display, gpuEncodesHdr: await GpuEncodesHdrAsync(settings));
         var (address, location) = await WhereFromAsync(client, clientAddress);
 
         var selectedPart = streamInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);

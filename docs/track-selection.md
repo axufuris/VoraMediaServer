@@ -87,7 +87,7 @@ Set once per **profile** (not per device: a language does not depend on what the
 | Setting | Automatic | Otherwise |
 |---|---|---|
 | Audio language (`PreferredAudioLanguage`) | The file's default track's language. | Tracks in that language, then ranked as usual; a file without it falls back to Automatic. |
-| Subtitles (`SubtitleMode`) | Smart when the server's **Turn on subtitles when the audio is in another language** is on, else Default. | `Default`, `Smart`, `ForcedOnly`, `Always`, `Off` (`docs/subtitles.md`). |
+| Subtitles (`SubtitleMode`) | Smart when the server's **Turn on subtitles when the audio is in another language** is on, else Only forced (a track the file just flags as default stays off). | `Default`, `Smart`, `ForcedOnly`, `Always`, `Off` (`docs/subtitles.md`). |
 | Subtitle language (`PreferredSubtitleLanguage`) | The server's `MetadataLanguage`. | That language. |
 | Prefer SDH (`PreferHearingImpairedSubtitles`) | Off: an SDH track is a last resort. | SDH first among the tracks in the subtitle language. |
 
@@ -126,7 +126,7 @@ The quality rank of the codec and the default flag only break ties. A version th
 - **The client switches tracks.** The decision is `DirectPlay` and both responses carry `audioTrackPosition`: the zero-based position of the track among the file's audio streams, in stream order. The app selects that track in its player. `subtitleTrackPosition` does the same for the subtitle, counting embedded subtitle streams only.
 - **The client cannot switch tracks** (browsers, older apps). The original file is served only when the wanted track is both flagged default and the first audio stream. Otherwise the decision is `Remux`: FFmpeg copies the video and the one wanted track into HLS, and `TargetContainer` is `hls`.
 
-The "default and first" test exists because players disagree. Measured in Edge: an MKV always starts on the first audio stream and ignores the default flag, while an MP4 follows the flag. `StreamRepository` therefore loads audio tracks in `StreamIndex` order, and `TrackStreamInfoDto.StreamIndex` carries it into the decision.
+The "default and first" test exists because players disagree. Measured in Edge: an MKV always starts on the first audio stream and ignores the default flag, while an MP4 follows the flag. Measured again with an MP4 whose second audio track is the flagged one: Chrome plays that track, Firefox plays the first. So the flag alone can't be trusted even for MP4. `StreamRepository` therefore loads audio tracks in `StreamIndex` order, and `TrackStreamInfoDto.StreamIndex` carries it into the decision.
 
 HLS MPEG-TS carries only AAC, MP3, AC3 and EAC3 (`AudioPlayback.CanCopyToHls`, shared with FFmpeg). Any other codec in an HLS session is converted and reported as converted.
 
@@ -170,6 +170,6 @@ Three browser clients send a screen hint (a 1440p HDR screen, and 1080p screens 
 ## Known limits
 
 - The matrix proves the decision, not playback on a device.
-- Only Edge was measured for which track a browser starts on. Firefox and Safari are assumed to behave the same, and the "default and first" test is safe either way.
+- Edge, Chrome and Firefox were measured for which track a browser starts on (Firefox ignores an MP4's default flag); Safari was not. The "default and first" test is safe in all of them, at the cost of a remux for an MP4 whose flagged track isn't first.
 - A TV app's hard limit is what it detected. The server does not assume the device can downmix.
 - Per-track audio bitrates are not stored, so the bitrate limit is checked against the file's overall bitrate.

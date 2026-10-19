@@ -18,7 +18,7 @@ public class ClientDrawnSubtitleSessionTests
 
     private readonly IStreamRepository _repository = Substitute.For<IStreamRepository>();
     private readonly Guid _mediaId = Guid.NewGuid();
-    private readonly SubtitleStreamInfoDto _pgs = new() { Id = Guid.NewGuid(), Codec = "hdmv_pgs_subtitle", Language = "eng", StreamIndex = 3, IsDefault = true };
+    private readonly SubtitleStreamInfoDto _pgs = new() { Id = Guid.NewGuid(), Codec = "hdmv_pgs_subtitle", Language = "eng", StreamIndex = 3, IsForced = true };
 
     public ClientDrawnSubtitleSessionTests()
     {

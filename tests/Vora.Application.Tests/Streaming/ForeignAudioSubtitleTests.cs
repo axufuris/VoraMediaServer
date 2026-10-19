@@ -56,13 +56,43 @@ public class ForeignAudioSubtitleTests
     }
 
     [Fact]
-    public void A_forced_track_in_the_servers_language_is_preferred_to_the_full_one()
+    public void Foreign_audio_gets_the_full_track_in_the_servers_language_rather_than_the_signs_only_forced_one()
+    {
+        var fullEnglish = Sub("full", "eng");
+        var tracks = new List<SubtitleStreamInfoDto> { Sub("forced", "eng", forced: true), fullEnglish };
+
+        BestPathDecisionManager.PickAutomaticSubtitle(tracks, "fre", Settings(foreignAudioRule: true))
+            .Should().Be(fullEnglish);
+    }
+
+    [Fact]
+    public void Foreign_audio_gets_the_forced_track_when_it_is_the_only_one_in_the_servers_language()
     {
         var forcedEnglish = Sub("forced", "eng", forced: true);
-        var tracks = new List<SubtitleStreamInfoDto> { Sub("full", "eng"), forcedEnglish };
+        var tracks = new List<SubtitleStreamInfoDto> { Sub("full", "fre"), forcedEnglish };
 
         BestPathDecisionManager.PickAutomaticSubtitle(tracks, "fre", Settings(foreignAudioRule: true))
             .Should().Be(forcedEnglish);
+    }
+
+    private static SubtitleStreamInfoDto Flagged(string name, string language) => new() { Id = Guid.NewGuid(), Codec = name, Language = language, IsDefault = true };
+
+    [Fact]
+    public void A_track_the_file_flags_as_default_stays_off_unless_the_profile_chose_default()
+    {
+        var flagged = Flagged("full", "eng");
+        var tracks = new List<SubtitleStreamInfoDto> { flagged };
+
+        BestPathDecisionManager.PickAutomaticSubtitle(tracks, "eng", Settings(foreignAudioRule: false)).Should().BeNull();
+        BestPathDecisionManager.PickAutomaticSubtitle(tracks, "eng", Settings(foreignAudioRule: true)).Should().BeNull();
+        BestPathDecisionManager.PickAutomaticSubtitle(tracks, "eng", new SubtitlePreference(Vora.Domain.Enums.SubtitleMode.Default, "eng", false)).Should().Be(flagged);
+    }
+
+    [Fact]
+    public void A_profile_on_automatic_shows_only_forced_subtitles_unless_the_server_turns_them_on_for_foreign_audio()
+    {
+        TrackPreferences.ServerSubtitleMode(new ServerSetting()).Should().Be(Vora.Domain.Enums.SubtitleMode.ForcedOnly);
+        TrackPreferences.ServerSubtitleMode(new ServerSetting { AutoEnableSubtitlesForForeignAudio = true }).Should().Be(Vora.Domain.Enums.SubtitleMode.Smart);
     }
 
     [Fact]

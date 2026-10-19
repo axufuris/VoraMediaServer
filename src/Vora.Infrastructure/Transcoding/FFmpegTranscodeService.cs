@@ -79,27 +79,18 @@ public class FFmpegTranscodeService : ITranscodeService
         await _transcodeLock.WaitAsync(cancellationToken);
         try
         {
-            int currentGpu = _activeTranscodes.Values.Count(x => x.IsGpu);
-            int currentCpu = _activeTranscodes.Values.Count(x => !x.IsGpu);
-            bool attemptHwAccel = accelerator is not null && settings.UseHardwareEncoding;
-            bool willUseGpu = attemptHwAccel && (settings.MaxGpuTranscodes == 0 || currentGpu < settings.MaxGpuTranscodes);
-
-            if (willUseGpu)
-            {
-                if (settings.MaxGpuTranscodes > 0 && currentGpu >= settings.MaxGpuTranscodes && !_activeTranscodes.ContainsKey(decision.MediaItemId))
-                    throw new InvalidOperationException("Maximum GPU transcodes reached.");
-            }
-            else
-            {
-                if (settings.MaxCpuTranscodes > 0 && currentCpu >= settings.MaxCpuTranscodes && !_activeTranscodes.ContainsKey(decision.MediaItemId))
-                    throw new InvalidOperationException("Maximum CPU transcodes reached.");
-            }
+            bool encodesVideo = !CopiesVideo(decision);
+            var others = _activeTranscodes
+                .Where(running => running.Key != decision.MediaItemId)
+                .Select(running => new TranscodeSlots.Running(running.Value.EncodesVideo, running.Value.IsGpu));
+            var slot = TranscodeSlots.Assign(encodesVideo, accelerator is not null && settings.UseHardwareEncoding, others, settings.MaxGpuTranscodes, settings.MaxCpuTranscodes);
+            if (slot.Refusal is { } refusal) throw new InvalidOperationException(refusal);
 
             await StopProcessAndCleanFilesAsync(decision.MediaItemId, targetDir);
 
             WriteVodPlaylist(outputPath, decision.MediaItemId, plan, startSegment);
 
-            var hardware = accelerator is null ? null : new TranscodeHardware(accelerator, Encode: willUseGpu);
+            var hardware = accelerator is null || !encodesVideo ? null : new TranscodeHardware(accelerator, Encode: slot.OnGpu);
             if (!CopiesVideo(decision) && KeepsDynamicRange(decision.OutputHdrType) && KeepsDynamicRange(decision.SourceHdrType) && !KeepsHdr(decision, hardware))
             {
                 _logger.LogInformation("{MediaItemId} was to keep {Hdr}, but this transcode runs on the CPU or a GPU without 10-bit HEVC, so it is tone-mapped to SDR H.264.",
@@ -686,7 +677,7 @@ public class FFmpegTranscodeService : ITranscodeService
         };
         foreach (var arg in arguments) process.StartInfo.ArgumentList.Add(arg);
 
-        var entry = new TranscodeProcess(process, isGpu: hardware?.Encode == true);
+        var entry = new TranscodeProcess(process, isGpu: hardware?.Encode == true, encodesVideo: !CopiesVideo(ctx.Decision));
         var stderrBuffer = new StringBuilder();
         process.ErrorDataReceived += (_, args) =>
         {
@@ -1320,13 +1311,14 @@ public class FFmpegTranscodeService : ITranscodeService
 
     private sealed record TranscodeLaunch(int Id, int StartSegment, TranscodeHardware? Hardware);
 
-    private sealed class TranscodeProcess(Process process, bool isGpu)
+    private sealed class TranscodeProcess(Process process, bool isGpu, bool encodesVideo)
     {
         private volatile bool _stopping;
         private volatile bool _paused;
 
         public Process Process { get; } = process;
         public bool IsGpu { get; } = isGpu;
+        public bool EncodesVideo { get; } = encodesVideo;
         public SemaphoreSlim Control { get; } = new(1, 1);
         public bool Stopping
         {

@@ -39,6 +39,28 @@ public class OutputSizeTests
     }
 
     [Fact]
+    public void A_client_that_names_no_width_plays_the_cinema_width_of_its_height()
+    {
+        OutputSize.PlaybackBox(0, 0).Should().Be(new FrameSize(4096, 2160));
+        OutputSize.PlaybackBox(0, 1080).Should().Be(new FrameSize(2048, 1080));
+        OutputSize.PlaybackBox(1920, 1080).Should().Be(new FrameSize(1920, 1080));
+    }
+
+    [Theory]
+    [InlineData(4096, 2160, 0, 0, true)]
+    [InlineData(4096, 1716, 0, 2160, true)]
+    [InlineData(4096, 2304, 0, 0, false)]
+    [InlineData(2160, 3840, 0, 0, true)]
+    [InlineData(1080, 1920, 1920, 1080, true)]
+    [InlineData(1080, 1920, 1280, 720, false)]
+    [InlineData(4096, 2160, 3840, 2160, false)]
+    [InlineData(3840, 2160, 0, 1080, false)]
+    public void A_picture_plays_when_it_fits_the_box_either_way_round(int width, int height, int maxWidth, int maxHeight, bool fits)
+    {
+        OutputSize.FitsPlayback(new FrameSize(width, height), OutputSize.PlaybackBox(maxWidth, maxHeight)).Should().Be(fits);
+    }
+
+    [Fact]
     public void A_client_that_gives_only_a_height_gets_a_widescreen_box_and_one_that_gives_nothing_gets_4k()
     {
         OutputSize.ClientBox(0, 1440).Should().Be(new FrameSize(2560, 1440));

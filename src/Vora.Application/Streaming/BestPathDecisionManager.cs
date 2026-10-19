@@ -78,7 +78,8 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             int trackHeight = sourceSize is { } knownSource ? OutputSize.HeightClass(knownSource) : 0;
             bool is4k = trackHeight >= 2160;
             int clientMaxRes = clientBox.Height;
-            bool exceedsClientSize = sourceSize is { } measured && OutputSize.Exceeds(measured, clientBox);
+            var playbackBox = OutputSize.PlaybackBox(requestedMaxWidth, requestedMaxResolution);
+            bool exceedsClientSize = sourceSize is { } measured && !OutputSize.FitsPlayback(measured, playbackBox);
 
             // What the client can decode and display, versus what the encoder
             // can actually hand it. A 1344p panel is served 1080p, so scoring
@@ -166,7 +167,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 bool needsAudioDownmix = audioLimits.NeedsDownmix(trackChannels);
                 bool audioCodecUnsupported = !string.IsNullOrEmpty(audioCodec) && !client.SupportedAudioCodecs.Contains(audioCodec);
                 bool needsAudioTranscode = audioCodecUnsupported || needsAudioDownmix;
-                bool containerUnsupported = !string.IsNullOrEmpty(container) && !client.SupportedContainers.Contains(container);
+                bool containerUnsupported = !string.IsNullOrEmpty(container) && !ContainerFamily.PlaysIn(client.SupportedContainers, container);
                 bool serverDeliversTrack = !clientSwitchesTracks && !(isPrimaryAudio && everyPlayerStartsOnPrimary);
                 bool needsRemux = containerUnsupported || serverDeliversTrack;
 
@@ -175,7 +176,7 @@ public class BestPathDecisionManager : IBestPathDecisionManager
                 if (exceedsClientSize)
                 {
                     needsVideoTranscode = true;
-                    reasons.Add($"Video Transcode: Track resolution ({FrameText(sourceSize)}) exceeds what the client plays ({clientBox.Width}x{clientBox.Height}).");
+                    reasons.Add($"Video Transcode: Track resolution ({FrameText(sourceSize)}) exceeds what the client plays ({playbackBox.Width}x{playbackBox.Height}).");
                 }
 
                 bool audioUnsupportedInHls = !needsAudioTranscode
@@ -567,24 +568,26 @@ public class BestPathDecisionManager : IBestPathDecisionManager
         return set;
     }
 
-    // What plays when the client asked for a part but not for a subtitle. The
-    // flag-driven pick is the baseline (Default); Smart adds the case a flag
-    // cannot express — a title whose own audio is in a language other than the
-    // profile's subtitle language, where the right track is the one in that
-    // language even though nothing in the file marks it as special. A profile
-    // that has not chosen a mode gets Smart when the server's
-    // AutoEnableSubtitlesForForeignAudio is on.
+    // What plays when the client asked for a part but not for a subtitle. Only a
+    // forced track turns on by itself; the file's default flag counts only for a
+    // profile that chose Default. Smart adds the case a flag cannot express — a
+    // title whose own audio is in a language other than the profile's subtitle
+    // language, where the viewer needs the full track in that language. A
+    // profile that has not chosen a mode gets Smart when the server's
+    // AutoEnableSubtitlesForForeignAudio is on, and Only forced otherwise.
     //
-    // An audio track with no language tag is left to the baseline. Most of those
-    // are ordinary local rips in the server's own language, and reading "no tag"
-    // as "foreign" would put subtitles on half a library.
+    // An audio track with no language tag is left to the forced pick. Most of
+    // those are ordinary local rips in the server's own language, and reading
+    // "no tag" as "foreign" would put subtitles on half a library.
     public static SubtitleStreamInfoDto? PickAutomaticSubtitle(List<SubtitleStreamInfoDto> tracks, string? audioLanguage, SubtitlePreference preference)
     {
         var inLanguage = tracks.Where(s => MetadataLanguageCodes.SameLanguage(s.Language, preference.Language)).ToList();
         IEnumerable<SubtitleStreamInfoDto> ByHearing(IEnumerable<SubtitleStreamInfoDto> candidates) =>
             candidates.OrderBy(s => s.IsHearingImpaired != preference.PreferHearingImpaired);
 
-        var forced = ByHearing(inLanguage.Where(s => s.IsForced)).FirstOrDefault() ?? tracks.FirstOrDefault(s => s.IsForced);
+        var forced = ByHearing(inLanguage.Where(s => s.IsForced)).FirstOrDefault()
+            ?? tracks.FirstOrDefault(s => s.IsForced && MetadataLanguageCodes.SameLanguage(s.Language, audioLanguage))
+            ?? tracks.FirstOrDefault(s => s.IsForced && MetadataLanguageCodes.Normalize(s.Language) is null or "und");
         var flagged = forced ?? tracks.FirstOrDefault(s => s.IsDefault);
         var audioIsForeign = MetadataLanguageCodes.Normalize(audioLanguage) != null && !MetadataLanguageCodes.SameLanguage(audioLanguage, preference.Language);
 
@@ -593,7 +596,8 @@ public class BestPathDecisionManager : IBestPathDecisionManager
             SubtitleMode.Off => null,
             SubtitleMode.ForcedOnly => forced,
             SubtitleMode.Always => ByHearing(inLanguage.Where(s => !s.IsForced)).FirstOrDefault() ?? ByHearing(inLanguage).FirstOrDefault() ?? flagged,
-            SubtitleMode.Smart when audioIsForeign => ByHearing(inLanguage.Where(s => s.IsForced)).FirstOrDefault() ?? ByHearing(inLanguage).FirstOrDefault() ?? flagged,
+            SubtitleMode.Smart when audioIsForeign => ByHearing(inLanguage.Where(s => !s.IsForced)).FirstOrDefault() ?? ByHearing(inLanguage).FirstOrDefault() ?? forced,
+            SubtitleMode.Smart => forced,
             _ => flagged
         };
     }
