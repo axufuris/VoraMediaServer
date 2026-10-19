@@ -66,6 +66,7 @@ Read the doc that matches what you're doing. Each file is kept short (≤200 lin
 - [`docs/clients/media-primitive-specs.md`](docs/clients/media-primitive-specs.md) — specs for the media primitives (`CinematicBackdrop`, `Hero`, `MediaCard`, `DetailHero`, `PersonCard`, `VideoCard`, `MediaRow`); prop shapes, observable behavior, motion, per-primitive TV focus
 - [`docs/clients/openapi-codegen.md`](docs/clients/openapi-codegen.md) — how `Vora.Api`'s OpenAPI doc is produced (`AddVoraSwagger`); Swashbuckle hardening (operation IDs, no `Vora.Plugins` types or `[Flags]` enums on the wire, ProblemDetails), things to watch out for, verification
 - [`docs/clients/generated-clients.md`](docs/clients/generated-clients.md) — generating Swift (`swift-openapi-generator`) and Kotlin (`openapi-generator` + Retrofit) clients from `Vora.Api`'s OpenAPI doc; auth middleware, multi-server support, regeneration workflow
+- [`docs/clients/desktop/README.md`](docs/clients/desktop/README.md) — **Vora Desktop** (Windows + Linux) build plan: Electron shell loading the server-hosted Vora.Web, mpv direct-play in its own window with HDR output + passthrough, Lua player chrome fed by a headless web `usePlaybackController`, the `window.voraDesktop` bridge contract, `RendersImageSubtitles` capability, installers + QA/prod GitHub releases, QA matrix. Start at the README; numbered docs 01–06 follow
 
 ## Golden rules — apply on every change
 
