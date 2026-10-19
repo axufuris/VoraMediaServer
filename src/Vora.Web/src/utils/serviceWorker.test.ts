@@ -14,7 +14,7 @@ function giveBrowser({ secure, supportsWorkers }: { secure: boolean; supportsWor
 
 describe('registerServiceWorker', () => {
     beforeEach(() => {
-        register.mockClear();
+        register.mockReset().mockResolvedValue(undefined);
         vi.stubEnv('PROD', true);
     });
 
@@ -24,14 +24,33 @@ describe('registerServiceWorker', () => {
         Reflect.deleteProperty(navigator, 'serviceWorker');
     });
 
-    it('registers the worker once the page has loaded on a secure server', () => {
+    it('registers immediately on a secure production server without waiting for page resources', () => {
         giveBrowser({ secure: true, supportsWorkers: true });
 
         registerServiceWorker();
-        expect(register).not.toHaveBeenCalled();
+        expect(register).toHaveBeenCalledWith('/sw.js');
+    });
+
+    it('registers even when the page load event has already fired', () => {
+        giveBrowser({ secure: true, supportsWorkers: true });
         window.dispatchEvent(new Event('load'));
 
+        registerServiceWorker();
+
         expect(register).toHaveBeenCalledWith('/sw.js');
+    });
+
+    it('reports the registration error so proxy and script failures can be diagnosed', async () => {
+        giveBrowser({ secure: true, supportsWorkers: true });
+        const error = new Error('The script has an unsupported MIME type');
+        register.mockRejectedValueOnce(error);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        registerServiceWorker();
+        await Promise.resolve();
+
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('/sw.js'), error);
+        warn.mockRestore();
     });
 
     it('does nothing on a plain-HTTP server address, where a browser would refuse it', () => {
