@@ -102,6 +102,47 @@ public class DirectPlayCaseTests
         (await DecideAsync(Browser(), Video("mov", "prores", 1920, 1080, 8_000_000), StreamingProfile.DirectStreamPreference, BrowserOutput)).VideoStrategy.Should().Be("Transcode");
     }
 
+    private static ClientDevice TvListing(string container)
+    {
+        var tv = ShieldTv();
+        tv.SupportedContainers = [container];
+        return tv;
+    }
+
+    [Theory]
+    [InlineData("mp4", "3gp")]
+    [InlineData("mov", "mp4")]
+    [InlineData("m4v", "mov")]
+    [InlineData("3gp", "m4v")]
+    [InlineData("mpeg", "mpg")]
+    [InlineData("vob", "mpeg")]
+    [InlineData("mpg", "vob")]
+    [InlineData("ts", "ts")]
+    [InlineData("m2ts", "mts")]
+    [InlineData("mts", "m2ts")]
+    [InlineData("MP4", "Mov")]
+    public async Task A_client_that_lists_one_name_of_a_format_plays_every_name_of_it(string listed, string file)
+    {
+        var decision = await DecideAsync(TvListing(listed), Video(file, "h264", 1920, 1080, 8_000_000), StreamingProfile.DirectStreamPreference, TvOutput);
+
+        (decision.Strategy, decision.TargetContainer).Should().Be((StreamStrategy.DirectPlay, file.ToLowerInvariant()));
+    }
+
+    [Theory]
+    [InlineData("ts", "m2ts")]
+    [InlineData("m2ts", "ts")]
+    [InlineData("ts", "mts")]
+    [InlineData("mkv", "webm")]
+    [InlineData("webm", "mkv")]
+    [InlineData("mp4", "mpg")]
+    [InlineData("mpeg", "ts")]
+    public async Task Formats_that_not_every_player_reads_alike_are_kept_apart(string listed, string file)
+    {
+        var decision = await DecideAsync(TvListing(listed), Video(file, "h264", 1920, 1080, 8_000_000), StreamingProfile.DirectStreamPreference, TvOutput);
+
+        decision.Strategy.Should().Be(StreamStrategy.Remux);
+    }
+
     private static SubtitleStreamInfoDto Subtitle(string language, bool forced = false, bool isDefault = false) => new()
     {
         Id = Guid.NewGuid(), Codec = "hdmv_pgs_subtitle", Language = language, IsForced = forced, IsDefault = isDefault
