@@ -107,6 +107,16 @@ These four kinds of types each live in their own folder and are never mixed:
 
 Don't reuse one as another — e.g. never return a `*Dto` from an endpoint, return a `*VM` or a `*Response`.
 
+## Installing the web app
+
+A browser can install Vora as an app (a PWA): Chrome on Android adds it to the app drawer, and Chrome and Edge on a computer open it in its own window.
+
+- **`public/manifest.webmanifest`**: the name, `start_url` and `scope` `/`, `display: standalone`, the Cinema template's canvas `#08080b` as the theme and splash colour, and the icons. `index.html` links it, with `theme-color` and an `apple-touch-icon` for iPhone and iPad.
+- **Icons** in `public/icons/`: `vora-192.png` / `vora-512.png` (the favicon's rounded tile, transparent corners), `vora-maskable-192.png` / `vora-maskable-512.png` and `apple-touch-icon.png` (full-bleed, the V inside Android's safe zone, because the system cuts its own shape), drawn from `vora-app-icon.svg` and `vora-app-icon-maskable.svg`. Android needs PNGs. After changing an SVG, render the PNGs again at the same sizes (headless Edge or Chrome screenshots of the SVG work).
+- **`public/sw.js`** caches nothing. Every page load goes to the server, so an updated server is never answered with an old copy of the app (the stale-tab problem in `WebClientFileCaching` would come back with a caching worker). It answers only a page load that can't reach the server, with a page that says so; API calls, artwork and video don't pass through it. `utils/serviceWorker.ts` registers it after the page loads, in a production build on a secure origin only.
+- **HTTPS is required.** Browsers install, and run a service worker, only on a secure origin. A server reached at `http://192.168.x.x:port` can't be installed (Chrome on Android offers only a home-screen shortcut that opens a browser tab); the HTTPS reverse-proxy address can, with a trusted certificate.
+- The API serves `sw.js` and the manifest `no-cache` like `index.html` (`WebClientFileCaching`), and the manifest as `application/manifest+json`. Each server address installs as its own app. In an installed window on a computer there is no browser Back button; Android's back gesture works as in the browser.
+
 ## Build & run
 
 This solution is run from Visual Studio 2026 — there is no CLI build to invoke from outside.

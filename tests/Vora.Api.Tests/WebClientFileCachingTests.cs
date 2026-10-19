@@ -15,6 +15,8 @@ public sealed class WebClientFileCachingTests : IClassFixture<VoraApiTestFactory
         File.WriteAllText(Path.Combine(_webRoot, "index.html"), "<!doctype html><title>Vora</title>");
         File.WriteAllText(Path.Combine(_webRoot, "assets", "HomePage-3f9a1c.js"), "export default 1;");
         File.WriteAllText(Path.Combine(_webRoot, "favicon.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"/>");
+        File.WriteAllText(Path.Combine(_webRoot, "sw.js"), "self.addEventListener('install', () => self.skipWaiting());");
+        File.WriteAllText(Path.Combine(_webRoot, "manifest.webmanifest"), "{\"name\":\"Vora\"}");
         _client = factory.WithWebHostBuilder(builder => builder.UseWebRoot(_webRoot)).CreateClient();
     }
 
@@ -31,6 +33,19 @@ public sealed class WebClientFileCachingTests : IClassFixture<VoraApiTestFactory
         response.Headers.CacheControl.Should().NotBeNull();
         response.Headers.CacheControl?.NoCache.Should().BeTrue();
         response.Headers.CacheControl?.MaxAge.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("/sw.js", "text/javascript")]
+    [InlineData("/manifest.webmanifest", "application/manifest+json")]
+    public async Task The_service_worker_and_the_app_manifest_are_checked_with_the_server_every_time(string path, string contentType)
+    {
+        var response = await _client.GetAsync(path, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.MediaType.Should().Be(contentType);
+        response.Headers.CacheControl.Should().NotBeNull();
+        response.Headers.CacheControl?.NoCache.Should().BeTrue();
     }
 
     [Fact]

@@ -194,4 +194,5 @@ The video player exposes prev/next-episode buttons when a TV episode is playing.
 - `public/favicon.svg` — square Vora mark on a dark rounded background. Used as the browser/tab favicon.
 - `public/vora-mark.svg` — bare chevron V with transparent background. Use anywhere on a non-white surface.
 - `public/vora-logo.svg` — chevron V + "ora" lockup. Used by the sidebar header.
+- `public/icons/` — the installed app's icons: PNGs drawn from `vora-app-icon.svg` (the favicon's tile) and `vora-app-icon-maskable.svg` (full-bleed for Android and iOS). They keep the default orange, since an installed icon can't follow the template (`docs/architecture.md`).
 - The chevron gradient ties to `--vora-accent-*` so the brand picks up the active template's accent automatically.
