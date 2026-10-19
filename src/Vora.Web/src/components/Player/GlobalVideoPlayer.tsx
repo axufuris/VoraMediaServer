@@ -11,6 +11,7 @@ import type Hls from 'hls.js';
 import { loadHls } from '../../utils/loadHls';
 import { useDialog } from '../../dialogs';
 import { useAutoHideControls } from './Controls/useAutoHideControls';
+import { usePictureClick } from './Controls/usePictureClick';
 import { useUpNextEnding } from './useUpNextEnding';
 import { usePlaybackFinished } from './usePlaybackFinished';
 import { useFullscreen } from './Controls/useFullscreen';
@@ -513,6 +514,8 @@ export default function GlobalVideoPlayer() {
         onVolume: setVolume,
     });
 
+    const picture = usePictureClick({ isPlaying, onPlayPause: togglePlayPause });
+
     const thumbnailsEligible = currentMedia?.playbackContextType !== 'LiveTv' && currentMedia?.playbackContextType !== 'Dvr';
     // Thumbnails are per media part (different cuts get their own sprite). Resolve
     // the part being streamed from the active video track so scrubbing the 4K/1080p
@@ -841,6 +844,9 @@ export default function GlobalVideoPlayer() {
 
             {!isMinimized && !isEnding && (
                 <div
+                    data-testid="player-picture"
+                    onPointerDown={picture.onPointerDown}
+                    onClick={picture.onClick}
                     className={`absolute inset-0 z-30 flex flex-col justify-between transition-opacity duration-500 ${showControls || showSettings || showInfo || showSubtitles ? 'opacity-100' : 'opacity-0'}`}
                     style={{
                         background: showControls || showSettings || showInfo || showSubtitles
@@ -969,7 +975,7 @@ export default function GlobalVideoPlayer() {
                 </div>
             )}
 
-            {!isMinimized && <PlayerKeyIndicator indicator={keyIndicator} />}
+            {!isMinimized && <PlayerKeyIndicator indicator={picture.indicator ?? keyIndicator} />}
 
             {showSettings && (
                 <PlayerSettingsPanel
