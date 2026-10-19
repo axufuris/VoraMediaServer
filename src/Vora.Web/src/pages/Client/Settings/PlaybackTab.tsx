@@ -100,7 +100,7 @@ export default function PlaybackTab({ activeProfileId, serverId, onSaved }: { ac
 
             <section className="vora-card p-6">
                 <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Keyboard</h2>
-                <p className="m-0 mb-5 text-sm" style={{ color: 'var(--vora-text-muted)' }}>Space plays and pauses. While a video plays, Left and Right skip back and forward, and Up and Down change the volume. In the music, podcast and radio players, hold Shift with the arrow keys, because the arrows on their own move between the buttons there.</p>
+                <p className="m-0 mb-5 text-sm" style={{ color: 'var(--vora-text-muted)' }}>Space plays and pauses, and so does a click on the video. While a video plays, Left and Right skip back and forward, and Up and Down change the volume. In the music, podcast and radio players, hold Shift with the arrow keys, because the arrows on their own move between the buttons there.</p>
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                     <div>
                         <label htmlFor="playback-seek-step" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>Left and Right skip</label>
