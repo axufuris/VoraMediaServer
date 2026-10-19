@@ -17,6 +17,8 @@ import {
     type PlayerContextType,
     type PlayerTimeContextType,
 } from './usePlayer';
+import { PlaybackTransportContext, type PlaybackTransportHost } from './usePlaybackTransport';
+import type { EngineSnapshot, PlaybackTransport } from '../components/Player/engine/PlaybackEngine';
 
 interface PendingPlay {
     trackId: string;
@@ -39,6 +41,35 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const [adminMessage, setAdminMessage] = useState<string | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const transportRef = useRef<PlaybackTransport | null>(null);
+
+    const readPlayback = useCallback((): EngineSnapshot => {
+        const transport = transportRef.current;
+        if (transport) return transport.snapshot();
+        return {
+            position: videoRef.current?.currentTime || 0,
+            duration: videoRef.current?.duration || 0,
+            paused: videoRef.current?.paused ?? true,
+        };
+    }, []);
+
+    const attachTransport = useCallback((transport: PlaybackTransport) => {
+        transportRef.current = transport;
+        const detach = transport.on(event => {
+            if (event.type === 'time') {
+                setCurrentTime(event.position);
+                setDuration(event.duration);
+            } else if (event.type === 'paused') {
+                setIsPlaying(!event.paused);
+            } else if (event.type === 'ended') {
+                setIsPlaying(false);
+            }
+        });
+        return () => {
+            detach();
+            if (transportRef.current === transport) transportRef.current = null;
+        };
+    }, []);
 
     const currentMediaRef = useRef<PlayableMedia | null>(null);
     useEffect(() => { currentMediaRef.current = currentMedia; }, [currentMedia]);
@@ -477,11 +508,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (!sessionId) return;
 
         const ping = async () => {
-            const currentPos = videoRef.current?.currentTime || 0;
-            const currentDur = videoRef.current?.duration || 0;
-            const isVideoPaused = videoRef.current?.paused ?? true;
+            const playback = readPlayback();
             try {
-                await streamingService.pingSession(sessionId, currentPos, currentDur, isVideoPaused, currentServerIdRef.current);
+                await streamingService.pingSession(sessionId, playback.position, playback.duration, playback.paused, currentServerIdRef.current);
             } catch (error) {
                 console.error("Failed to ping stream session", error);
             }
@@ -489,16 +518,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
         const interval = setInterval(ping, 10000);
         return () => clearInterval(interval);
-    }, [sessionId]);
+    }, [sessionId, readPlayback]);
 
     // The player goes away first and the server hears about it after, so a
     // slow or stuck server cannot leave Close looking as if it did nothing.
     const closePlayer = useCallback(async () => {
         const media = currentMediaRef.current;
         const closingSessionId = sessionId;
-        const finalPos = videoRef.current?.currentTime || 0;
-        const finalDur = videoRef.current?.duration || 0;
-        if (videoRef.current) {
+        const { position: finalPos, duration: finalDur } = readPlayback();
+        const transport = transportRef.current;
+        if (transport) {
+            void transport.stop();
+        } else if (videoRef.current) {
             videoRef.current.pause();
             videoRef.current.src = "";
         }
@@ -522,16 +553,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 console.error("Failed to stop session remotely", error);
             }
         }
-    }, [sessionId]);
+    }, [sessionId, readPlayback]);
 
     useSignalREvent<{ sessionId: string, command: string, message?: string }>(
         "StreamCommandReceived",
         useCallback((payload) => {
             if (!sessionId || payload.sessionId !== sessionId) return;
 
-            if (payload.command === 'play') videoRef.current?.play();
-            else if (payload.command === 'pause') videoRef.current?.pause();
-            else if (payload.command === 'stop') {
+            const transport = transportRef.current;
+            if (payload.command === 'play') {
+                if (transport) transport.play();
+                else videoRef.current?.play();
+            } else if (payload.command === 'pause') {
+                if (transport) transport.pause();
+                else videoRef.current?.pause();
+            } else if (payload.command === 'stop') {
                 closePlayer();
                 setAdminMessage(payload.message || "The administrator has terminated your stream.");
             }
@@ -765,12 +801,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const changeStreams = useCallback(async (videoTrackId: string, audioTrackId: string, subtitleTrackId: string) => {
         const media = currentMediaRef.current;
         if (!media) return;
-        const currentPos = videoRef.current?.currentTime || 0;
+        const currentPos = readPlayback().position;
         const sourceServerId = media.serverId;
 
         if (sessionId) {
             try {
-                const currentDur = videoRef.current?.duration || 0;
+                const currentDur = readPlayback().duration;
                 await streamingService.pingSession(sessionId, currentPos, currentDur, true, sourceServerId);
                 await streamingService.stopSession(sessionId, sourceServerId);
             } catch (e) { console.error(e); }
@@ -801,15 +837,27 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             console.error("Failed to change streams", e);
             await dialog.alert("Failed to change streams.");
         }
-    }, [sessionId, dialog]);
+    }, [sessionId, dialog, readPlayback]);
 
     const togglePlayPause = useCallback(() => {
+        const transport = transportRef.current;
+        if (transport) {
+            if (isPlayingRef.current) transport.pause();
+            else transport.play();
+            return;
+        }
         if (!videoRef.current) return;
         if (isPlayingRef.current) videoRef.current.pause();
         else videoRef.current.play();
     }, []);
 
     const seek = useCallback((time: number) => {
+        const transport = transportRef.current;
+        if (transport) {
+            transport.seek(time);
+            setCurrentTime(time);
+            return;
+        }
         if (videoRef.current) {
             videoRef.current.currentTime = time;
             setCurrentTime(time);
@@ -817,6 +865,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const skipForward = useCallback((seconds: number = 30) => {
+        const transport = transportRef.current;
+        if (transport) {
+            const target = transport.snapshot().position + seconds;
+            transport.seek(target);
+            setCurrentTime(target);
+            return;
+        }
         const video = videoRef.current;
         if (!video) return;
         const target = video.currentTime + seconds;
@@ -825,6 +880,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const skipBackward = useCallback((seconds: number = 10) => {
+        const transport = transportRef.current;
+        if (transport) {
+            const target = Math.max(0, transport.snapshot().position - seconds);
+            transport.seek(target);
+            setCurrentTime(target);
+            return;
+        }
         const video = videoRef.current;
         if (!video) return;
         const target = Math.max(0, video.currentTime - seconds);
@@ -917,6 +979,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         getAudioAnalyser,
     ]);
 
+    const transportHost = useMemo<PlaybackTransportHost>(() => ({ attachTransport }), [attachTransport]);
+
     const timeValue = useMemo<PlayerTimeContextType>(() => ({
         currentTime,
         duration,
@@ -925,7 +989,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return (
         <PlayerContext.Provider value={contextValue}>
             <PlayerTimeContext.Provider value={timeValue}>
-                {children}
+                <PlaybackTransportContext.Provider value={transportHost}>
+                    {children}
+                </PlaybackTransportContext.Provider>
                 <audio ref={preloadAudioRef} preload="auto" style={{ display: 'none' }} muted />
 
 

@@ -109,4 +109,25 @@ public class MediaDetailsPartInfoTests
         subtitles.Single(s => s.Id == forcedEnglish).EmbeddedPosition.Should().Be(1);
         subtitles.Single(s => s.Id == french).EmbeddedPosition.Should().Be(2);
     }
+
+    [Fact]
+    public void An_audio_track_carries_its_position_among_the_audio_streams_in_stream_order()
+    {
+        using var db = NewContext();
+        var english = Guid.NewGuid();
+        var commentary = Guid.NewGuid();
+        var japanese = Guid.NewGuid();
+        var movie = SeedMovie(db, p =>
+        {
+            p.AudioTracks.Add(new MediaAudioTrack { Id = japanese, Codec = "truehd", Language = "jpn", StreamIndex = 4 });
+            p.AudioTracks.Add(new MediaAudioTrack { Id = english, Codec = "eac3", Language = "eng", StreamIndex = 1, IsDefault = true });
+            p.AudioTracks.Add(new MediaAudioTrack { Id = commentary, Codec = "aac", Language = "eng", StreamIndex = 2 });
+        });
+
+        var audio = Details(db, movie.Id).MediaParts.Single().AudioTracks;
+
+        audio.Single(a => a.Id == english).EmbeddedPosition.Should().Be(0);
+        audio.Single(a => a.Id == commentary).EmbeddedPosition.Should().Be(1);
+        audio.Single(a => a.Id == japanese).EmbeddedPosition.Should().Be(2);
+    }
 }

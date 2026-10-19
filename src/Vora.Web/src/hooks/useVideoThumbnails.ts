@@ -12,6 +12,8 @@ export interface ThumbnailCue {
     height: number;
 }
 
+const NoCues: ThumbnailCue[] = [];
+
 interface ParsedThumbnails {
     cues: ThumbnailCue[];
     width: number;
@@ -148,6 +150,7 @@ export function useVideoThumbnails(mediaItemId: string | undefined | null, partI
 
     return useMemo(() => ({
         available: !!data,
+        cues: data?.cues ?? NoCues,
         width: data?.width ?? 0,
         height: data?.height ?? 0,
         spriteUrl: data?.spriteBlobUrl ?? '',

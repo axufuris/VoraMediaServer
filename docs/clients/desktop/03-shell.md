@@ -116,7 +116,8 @@ The renderer runs code served by a network server, so lock it down:
   fedora → `sudo dnf install mpv`, arch → `sudo pacman -S mpv`, opensuse → `sudo zypper
   install mpv`, otherwise "install mpv from your distribution").
 - Re-run discovery when the window regains focus after the banner was shown, so
-  installing mpv doesn't need an app restart.
+  installing mpv doesn't need an app restart, and send a change through
+  `onMpvChanged` (the page's `bridge.mpv` is a copy taken at load).
 
 ## Capabilities (`capabilities.ts`)
 
@@ -140,7 +141,7 @@ interface DesktopSettings {
 Persisted in `userData/settings.json`. Changes apply on the next `player.open`.
 The "advanced mpv settings" folder is `userData/mpv/` containing a user-editable
 `mpv.conf` included **after** Vora's defaults (doc 04), created empty with a header
-comment explaining it.
+comment explaining it. `settings.openAdvancedFolder()` opens it with `shell.openPath`.
 
 ## Dev workflow (Visual Studio 2026 / CLI)
 
