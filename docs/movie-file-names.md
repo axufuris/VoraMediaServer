@@ -23,6 +23,10 @@ How a movie file becomes a film in a library, how a new file finds the film it b
 
 A year in the file name always wins over the folder's, and a `Title (Year)` folder wins over a release name in the file.
 
+## Naming an extra
+
+A local trailer or extra (`-trailer`, a `Trailers` folder, …) is stored under its file name, and is named for display when the title's details are read (`ExtraNames`, from `MediaManager`), so a rename reaches extras already in the library without a rescan. A name that is the film's own (a release name with a year, `Title (Year)`, the title itself, nothing at all, or just the kind of extra) reads as the title and the kind: `The.Movie.2007.1080p-trailer.mkv` is **The Movie Trailer**, using the film's metadata title, and the same for a show's extras. Any other name is kept, made readable: `Making.of.the.Dragon.1080p` is Making of the Dragon.
+
 ## Finding the film
 
 `MediaIngestionService.EnsureMovieAsync` returns an existing film, or creates one, in this order:
@@ -58,3 +62,4 @@ It leaves a film alone when:
 | NFO identity, hand-matched siblings | `tests/Vora.Application.Tests/Scanner/LocalMetadataScanTests.cs` |
 | Title + year with ids, no-year ambiguity, files of films with several | `tests/Vora.Infrastructure.Tests/MediaRepositoryMovieMatchTests.cs` |
 | `EnsureMovieAsync` passes the file's ids | `tests/Vora.Application.Tests/Media/MediaIngestionServiceTests.cs` |
+| Extra names | `tests/Vora.Application.Tests/Media/ExtraNamesTests.cs` |

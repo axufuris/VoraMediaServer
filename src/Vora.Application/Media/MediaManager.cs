@@ -79,7 +79,7 @@ public class MediaManager : IMediaManager
 
     public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
     {
-        var vm = HideCoverImageTracks(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated));
+        var vm = ReadyForDisplay(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated));
 
         if (vm == null || !profileId.HasValue) return vm;
 
@@ -98,9 +98,9 @@ public class MediaManager : IMediaManager
     }
 
     public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id) =>
-        HideCoverImageTracks(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection));
+        ReadyForDisplay(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection));
 
-    private static MediaDetailsVM? HideCoverImageTracks(MediaDetailsVM? details)
+    private static MediaDetailsVM? ReadyForDisplay(MediaDetailsVM? details)
     {
         if (details == null) return null;
 
@@ -108,6 +108,7 @@ public class MediaManager : IMediaManager
         {
             part.VideoTracks = CoverImageTracks.Without(part.VideoTracks, track => track.Codec);
         }
+        ExtraNames.Apply(details);
         return details;
     }
 
