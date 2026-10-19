@@ -653,7 +653,7 @@ export default function MediaDetailsPage() {
                     />
                 ) : null}
                 <CastRow
-                    cast={(media.cast || []).map(member => ({
+                    cast={((isSeason ? selection.details?.cast : undefined) ?? media.cast ?? []).map(member => ({
                         id: member.actorId,
                         name: member.name,
                         role: member.role,
