@@ -4,7 +4,9 @@ public static class ContainerFamily
 {
     public static string Of(string? container) => container?.Trim().ToLowerInvariant() switch
     {
-        "m4v" or "mov" => "mp4",
+        "mp4" or "m4v" or "mov" or "3gp" => "mp4",
+        "mpg" or "mpeg" or "vob" => "mpeg",
+        "m2ts" or "mts" => "m2ts",
         { } other => other,
         null => string.Empty
     };
