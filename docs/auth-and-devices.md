@@ -84,7 +84,6 @@ There are two parallel invitation systems and they coexist:
 `AuthManager.RegisterAsync` checks `inviteToken` first; if present, it takes the invitation path. Otherwise it falls through to the legacy `RegistrationMode`-based flow.
 
 ## localStorage keys
-
 These are the canonical keys. Don't invent new ones in a vacuum.
 
 | Key | Purpose | Set by |
@@ -107,6 +106,7 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 | `vora_library_sort_<profileId>_<libraryId>` | JSON `{ sortBy, sortDir, chosenUnder }`: a sort picked on a library's page, ignored once the profile's library sort is no longer `chosenUnder`. Replaces `vora_library_sort_<libraryId>` / `vora_library_sortdir_<libraryId>`, which are read while the profile is on the server default and removed on the next pick (`docs/frontend-client-ui.md`). | `LibraryPage` (`utils/librarySort.ts`) |
 | `audio_quality_preference`, `audio_crossfade_seconds`, `audio_eq_preset` | Music audio settings: stream quality, crossfade seconds (0–12), EQ preset. Device-local. | `NowPlayingFullscreen` (`utils/audioQuality.ts`) |
 | `calendar_view_mode_v2` | Release Calendar layout — `month`, `week`, or `day`. Device-local, not mirrored: it is a display preference, not a profile setting. Nothing saved, or an unrecognised value, opens on `week`. Renamed from `calendar_view_mode` when the default changed from Month, so a Month saved under the old default doesn't pin existing browsers there; the old key is simply ignored. | `CalendarPage` |
+| `sidebar_collapsed` | `"true"` while the client sidebar is folded to its icons (tablet width and up); anything else, or nothing, shows it in full. Device-local. | `MainLayout` (`layouts/parts/useSidebarCollapsed.ts`) |
 | `vora_library_migration_job_id` | Active library-migration job id. Lets the admin reload `/admin/library-migration` and re-attach to the running job. Cleared on "Run again" / "Start over" or when the backend returns 404 (job evicted on server restart). | `LibraryMigrationPage` |
 | Server vault keys | Managed by `utils/serverVault.ts` (`VAULT_KEY`, `ACTIVE_SERVER_KEY`) | `serverVault` |
 

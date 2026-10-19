@@ -20,6 +20,7 @@ import { useDialog } from '../dialogs';
 import { profileDeviceSettingsService } from '../api/Users/profileDeviceSettingsService';
 import MainLayoutSidebar from './parts/MainLayoutSidebar';
 import MainLayoutUserMenu from './parts/MainLayoutUserMenu';
+import { useSidebarCollapsed } from './parts/useSidebarCollapsed';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useScrollRestoration } from '../hooks/useScrollRestoration';
 import type { FeatureFlagsVM } from '../api/System/featureFlagsService';
@@ -110,6 +111,7 @@ export default function MainLayout() {
 
     const [isServerManagerOpen, setIsServerManagerOpen] = useState(false);
     const [isPhoneNavOpen, setIsPhoneNavOpen] = useState(false);
+    const [isSidebarCollapsed, toggleSidebarCollapsed] = useSidebarCollapsed();
     const closePhoneNav = useCallback(() => setIsPhoneNavOpen(false), []);
 
     const flags = useFeatureFlags();
@@ -374,6 +376,8 @@ export default function MainLayout() {
                     onToggleShowUnpinned={() => setShowUnpinned(!showUnpinned)}
                     onMoveItem={moveItem}
                     onTogglePin={togglePin}
+                    collapsed={isSidebarCollapsed}
+                    onToggleCollapsed={toggleSidebarCollapsed}
                 />
             </PhoneNavDrawer>
 

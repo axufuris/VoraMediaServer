@@ -38,3 +38,14 @@ export const renderNavIcon = (key: string | undefined, sizeClass: string): React
         <svg className={`${sizeClass} shrink-0`} fill="none" stroke="currentColor" viewBox="0 0 24 24">{paths}</svg>
     );
 };
+
+const DEFAULT_NAV_ICON_PATH = 'M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z';
+
+// The sidebar's lists always draw an icon, because a folded sidebar shows
+// nothing else: an item with no icon of its own would be an empty space there.
+export const renderNavIconOrDefault = (key: string | undefined, sizeClass: string): ReactNode =>
+    renderNavIcon(key, sizeClass) ?? (
+        <svg className={`${sizeClass} shrink-0`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={DEFAULT_NAV_ICON_PATH} />
+        </svg>
+    );

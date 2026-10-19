@@ -29,6 +29,8 @@ The open buttons are `md:hidden`:
 
 Both shells use `max-md:h-dvh`, so a phone's browser bar doesn't hide the bottom of the page.
 
+**Folding the client sidebar (tablet and up).** The button beside the logo in `MainLayoutSidebar` folds the sidebar to a 4.5rem rail of icons, and back. Every folded style is an `md:` variant and the button is `max-md:hidden`, so on a phone the drawer always opens the full menu. Folded, each label is `md:sr-only` (links keep their names) and the link gets a `title` tooltip; the list icons come from `renderNavIconOrDefault`, so an item without an icon of its own still shows one. Edit Navigation always opens at full width. The choice is remembered per browser (`useSidebarCollapsed`, `sidebar_collapsed` in `docs/auth-and-devices.md`).
+
 ## Tokens
 
 On phones, the `@media (width < 48rem)` block in `styles/tokens.css` shrinks the card sizes and the gutter:
