@@ -1,5 +1,6 @@
 import { apiClient } from '../client';
-import { scanDeviceCapabilities, type DeviceCapabilities } from '../../utils/hardwareScanner';
+import type { DeviceCapabilities } from '../../utils/hardwareScanner';
+import { playbackCapabilities } from '../../utils/desktopCapabilities';
 import { knownConnectionKbps, measureConnection, type SampleTiming } from '../../utils/connectionSpeed';
 
 export interface StartSessionResponse {
@@ -8,6 +9,7 @@ export interface StartSessionResponse {
     videoTrackId: string;
     audioTrackId: string;
     audioTrackPosition?: number;
+    subtitleTrackPosition?: number | null;
     subtitleTrackId: string | null;
     strategy: string;
     videoStrategy: string;
@@ -146,7 +148,7 @@ const subtitleObjectUrls = new Map<string, string>();
 const subtitleCacheKey = (sessionId: string, subtitleTrackId: string) => `${sessionId}|${subtitleTrackId}`;
 
 async function capabilitiesFor(serverId?: string): Promise<DeviceCapabilities> {
-    return { ...await scanDeviceCapabilities(), measuredBandwidthKbps: knownConnectionKbps(serverId) };
+    return { ...await playbackCapabilities(), measuredBandwidthKbps: knownConnectionKbps(serverId) };
 }
 
 export const streamingService = {
@@ -244,6 +246,17 @@ export const streamingService = {
             const objectUrl = URL.createObjectURL(response.data);
             subtitleObjectUrls.set(key, objectUrl);
             return objectUrl;
+        } catch {
+            return null;
+        }
+    },
+    fetchSubtitleText: async (sessionId: string, subtitleTrackId: string, serverId?: string): Promise<string | null> => {
+        try {
+            const response = await apiClient.get<string>(
+                `/streaming/sessions/${sessionId}/subtitle/${subtitleTrackId}.vtt`,
+                { serverId, responseType: 'text' },
+            );
+            return response.data;
         } catch {
             return null;
         }

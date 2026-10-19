@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
 import type { UpNextItemVM, UpNextResultVM } from '../../../api/Media/mediaService';
 import MediaCard from '../../Client/Primitives/MediaCard';
 import MediaRow from '../../Client/Primitives/MediaRow';
+import { useUpNextAutoPlay } from '../useUpNextAutoPlay';
 
 interface CurrentMediaSummary {
     title: string;
@@ -25,13 +25,7 @@ interface UpNextOverlayProps {
 export default function UpNextOverlay({ currentMedia, upNextData, onPlayNext, onClose, autoPlay = false, finished = false, secondsLeft = 0, onCancelAutoPlay }: UpNextOverlayProps) {
     const nextItem = upNextData?.nextItem;
     const countingDown = autoPlay && !!nextItem;
-    const startedRef = useRef(false);
-
-    useEffect(() => {
-        if (!countingDown || !finished || !nextItem || startedRef.current) return;
-        startedRef.current = true;
-        void onPlayNext(nextItem);
-    }, [countingDown, finished, nextItem, onPlayNext]);
+    useUpNextAutoPlay({ countingDown, finished, nextItem, onPlayNext });
 
     return (
         <div

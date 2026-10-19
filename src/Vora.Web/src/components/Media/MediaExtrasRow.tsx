@@ -44,7 +44,9 @@ export default function MediaExtrasRow({ videos, extras = [], serverId }: Props)
                 reasons: session.reasons,
                 videoTrackId: session.videoTrackId,
                 audioTrackId: session.audioTrackId,
+                audioTrackPosition: session.audioTrackPosition,
                 subtitleTrackId: session.subtitleTrackId,
+                subtitleTrackPosition: session.subtitleTrackPosition,
                 isExtra: true,
             });
         } catch (err) {

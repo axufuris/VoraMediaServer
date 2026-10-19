@@ -17,10 +17,10 @@ the picture only when the result is Direct Play. The desktop client sends
 **Container families — already on `main` (PR #176).** `ContainerFamily` compares `.m4v`
 and `.mov` as `mp4`.
 
-**Still to add — the audio track's position on the details payload.** Subtitle tracks
-carry `embeddedPosition`, but `MediaDetailsPartAudioTrackVM` has no position (nor a
-stream index), so mpv could not be told which audio stream to switch to mid-play.
-Add `EmbeddedPosition` to it with the meaning `/start`'s `audioTrackPosition` has: the
+**The audio track's position on the details payload.** Subtitle tracks carried
+`embeddedPosition`, but `MediaDetailsPartAudioTrackVM` had no position (nor a stream
+index), so mpv could not be told which audio stream to switch to mid-play. Its
+`EmbeddedPosition` now has the meaning `/start`'s `audioTrackPosition` has: the
 zero-based position among the file's audio streams in stream order.
 
 **Check, don't assume:**
@@ -38,14 +38,15 @@ zero-based position among the file's audio streams in stream order.
 
 New folder `src/desktop/`:
 
-- `desktopBridge.ts` — the `VoraDesktopBridge` interface and every type it references,
-  exactly as in `01-architecture.md` (this file is the contract; doc 05 has CI diff
-  the shell's copy against it). Plus:
-  - `getDesktopBridge(): VoraDesktopBridge | null` — reads `window.voraDesktop`,
-    validates `bridgeVersion >= MIN_DESKTOP_BRIDGE_VERSION`, returns null otherwise.
-  - `isDesktopPlayback(): boolean` — bridge present **and** `mpv.available` **and**
-    the user's "Use mpv for video" desktop setting is on.
-- A `Window` augmentation in a `.d.ts` so `window.voraDesktop` is typed without casts.
+- `desktopBridge.ts` — the `VoraDesktopBridge` interface and every type it references
+  (`01-architecture.md`), and nothing else: no imports, so the shell keeps a
+  byte-identical copy and doc 05's CI diff can compare them.
+- `desktopPlayback.ts` (React-free, so `src/api` may use it) — `getDesktopBridge()`
+  reads `window.voraDesktop` and returns null below `MIN_DESKTOP_BRIDGE_VERSION`;
+  `isDesktopPlayback()` is bridge present **and** `mpv.available` **and** "Use the Vora
+  player" on, read from a cache of the app's settings, capabilities and mpv status that
+  `loadDesktopPlayback()` fills. `useDesktopPlayback()` is the hook for components.
+- `voraDesktop.d.ts` types `window.voraDesktop` without casts.
 
 Respect the existing ESLint boundary rule for `src/api/`: the api layer may import
 types from `src/desktop/` but not components.
@@ -101,59 +102,59 @@ New `src/utils/desktopCapabilities.ts`, used by `streamingService.startSession` 
 - `measuredBandwidthKbps`: the same connection measurement the browser sends
   (`utils/connectionSpeed.ts`).
 
-Also check `utils/playQualification.ts` and `utils/playbackDecision.ts`: anything
-that predicts "this will transcode" on the client must use the desktop profile when
-`isDesktopPlayback()`, or details pages will show wrong quality chips.
+`playbackCapabilities()` picks the profile for `/start`, `/decision`, `/start-extra`
+and the device report. The client-side guesses (`playbackDecision.ts`, read by the
+details page chips and the player's Quality panel) get it through
+`usePlaybackCapabilities`. `playQualification.ts` is about music listens and has no
+part in this.
 
 ## E. Vora.Web — engine abstraction + headless controller
 
-Refactor `components/Player/GlobalVideoPlayer.tsx` (≈1,030 lines) as described in
-`01-architecture.md`:
+`components/Player/GlobalVideoPlayer.tsx` (≈1,030 lines) is split as `01-architecture.md`
+describes. Where this differs from the first plan, the code on `main` decided:
 
-1. `components/Player/engine/PlaybackEngine.ts` — the interface and event types.
-2. `components/Player/engine/WebVideoEngine.ts` — the current `<video>` + `loadHls`
-   behaviour moved behind the interface. **Do not change browser behaviour**, including
-   the resume-seek re-attach rule (time listener re-attaches when the `<video>`
-   re-mounts on a sessionId change).
-3. `components/Player/engine/DesktopMpvEngine.ts` — forwards to `bridge.player`.
-   `selectLocalTracks` returns `true` only when the current session's strategy is
-   `DirectPlay` (mpv switches embedded tracks instantly); otherwise `false`, and the
-   controller restarts the session as the web player does today.
-4. `components/Player/usePlaybackController.ts` — session start/stop, pings,
-   resume (from the freshly-loaded details VM, never a nav arg), markers + per-profile
-   auto-skip, up-next (`useUpNextEnding`), track and quality changes, scrub-thumbnail
-   VTT loading, extras. Everything `GlobalVideoPlayer` decides today.
-5. `GlobalVideoPlayer` becomes chrome over `usePlaybackController(webEngine)`.
-6. `components/Player/DesktopPlaybackHost.tsx` — mounted instead of the web chrome when
-   `isDesktopPlayback()`. Renders nothing visible (a small "Playing in Vora player…"
-   placeholder is fine). Builds `PlayerChromeState` from the controller and calls
-   `engine.setChromeState` whenever it changes (throttle to ≤10/s; position is not
-   part of it — Lua reads position from mpv directly).
-7. Handle `ChromeIntent`s from the engine by calling the same controller functions the
-   web chrome's buttons call.
+1. `engine/PlaybackEngine.ts` — `PlaybackEngine` (what the controller drives) and
+   `PlaybackTransport` (play, pause, seek, position, stop), one `EngineEvent` union.
+2. `engine/WebVideoEngine.ts` — the `<video>` + `loadHls` code moved unchanged.
+3. `engine/DesktopMpvEngine.ts` — forwards to `bridge.player`. `selectLocalTracks`
+   returns `true` only in a `DirectPlay` session; otherwise the controller restarts it.
+4. `usePlaybackController.ts` — markers + per-profile auto-skip, commercial skip,
+   up-next, track and version picks, subtitle sideloading, scrub thumbnails, extras:
+   everything `GlobalVideoPlayer` decided. Pings, close and session restarts stay in
+   `PlayerContext`, which music shares; it reads the attached transport instead of the
+   `<video>`. Resume comes from `startPosition`, which the caller takes from the
+   details VM it just loaded.
+5. `GlobalVideoPlayer` is chrome over `usePlaybackController(webEngine)`.
+6. `DesktopPlaybackHost.tsx` — mounted by `MainLayout` instead of the web chrome,
+   decided once per session. A small bar; `PlayerChromeState` (`desktopChromeState.ts`)
+   goes to mpv at most 10 times a second and only when it changed. Position is not
+   part of it — Lua reads it from mpv.
+7. `ChromeIntent`s call the controller functions the web buttons call; Up Next starts
+   through `useUpNextAutoPlay`, the hook `UpNextOverlay` uses.
 
 `PlayerChromeState` and `ChromeIntent` are defined in `desktopBridge.ts`; their full
 shape is in `04-player.md`.
 
-**Tests:** run the existing player tests unchanged (they must pass before and after
-the refactor). Add controller tests with a fake engine: resume position, ping cadence,
-auto-skip firing once per marker, up-next hand-off, local-vs-restart track switching.
+**Tests:** the existing player tests pass unchanged. Controller tests use a fake
+engine (resume position, auto-skip once per marker, up-next hand-off, local-vs-restart
+track switching); ping cadence is tested on `PlayerContext` with a fake transport.
 
 ## F. Vora.Web — desktop-only UI
 
-- **Settings → Playback → Desktop player** section, shown only when the bridge exists:
-  Use mpv for video (on), Audio passthrough (Off / AC-3 + DTS / All incl. TrueHD,
-  DTS-HD, E-AC-3), HDR output (on), Hardware decoding (Auto / Off), Open advanced mpv
-  settings folder. Reads/writes through `bridge.settings`. Use the existing admin/client
-  settings primitives — no hand-rolled controls.
-- **mpv missing banner** (Linux only): when `bridge.mpv.available` is false, a one-time
-  dismissible notice explaining video plays in the built-in player and how to install
-  mpv (`bridge.mpv.reason` carries the distro-specific text from the shell).
-- **Playback failure fallback:** if the desktop engine errors before the first frame,
-  `dialog.confirm` "Couldn't start the Vora player — play with the built-in player
-  instead?" → restart the session with the browser capability profile and the web
-  engine. Log the mpv error text.
-- **About / Settings footer:** show `Vora Desktop <shellVersion> (<channel>)`.
+- **Settings → Playback → Desktop player** (`DesktopPlayerSection`), shown only in the
+  app: Use the Vora player (on), Audio passthrough (Off / AC-3 and DTS / All incl.
+  TrueHD, DTS-HD, E-AC-3), HDR output (on), Hardware decoding (Automatic / Off), Open
+  mpv settings folder (`bridge.settings.openAdvancedFolder`). The same controls as the
+  other client settings sections, saved through `bridge.settings`.
+- **mpv missing banner** (Linux only, `MpvMissingBanner`): a dismissible notice
+  (`desktop_mpv_notice_dismissed`) that video plays in the built-in player, with
+  `bridge.mpv.reason`. It goes away by itself when the shell reports mpv found.
+- **Playback failure fallback:** when the desktop engine errors, `dialog.confirm`
+  "Couldn't start the Vora player — play with the built-in player instead?" (before
+  the first frame; "The Vora player stopped — keep watching…" after it) → the session
+  restarts at the same position with the browser profile and the web engine
+  (`forceBuiltInPlayer`, until the player closes). Declining closes the player.
+- **About tab:** `Vora Desktop <shellVersion> (<channel>)`.
 
 ## G. Docs to update in this repo
 

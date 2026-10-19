@@ -125,6 +125,17 @@ Right-clicking a movie, show, season or episode, or holding it on a touch screen
 - **Long press:** 500 ms without moving more than 10 px (`useMediaMenuTrigger`), so scrolling a row never opens it. Lifting that finger still produces a click, so the trigger swallows the next click on the poster, and `ActionMenu` ignores any click that did not start with a press on the menu itself. Without the second, the lift landed on the sheet that had just appeared and closed it, or picked a row.
 - Actions go to the server the title is on (`target.serverId`), not the one in the address bar: a search result can belong to another server.
 
+## Video playback: one controller, two engines
+
+`components/Player/usePlaybackController.ts` holds everything the video player decides: markers and per-profile auto-skip (once per marker), commercial skip, the details and Up Next fetches, the Up Next hand-off, version, audio and subtitle picks (remembered per title), subtitle sideloading, scrub thumbnails and what the quality chips say. It drives an engine (`engine/PlaybackEngine.ts`) that only plays:
+
+- `WebVideoEngine` is the `<video>` + `loadHls` code, unchanged. It never switches tracks inside the file (`selectLocalTracks` is false), so an audio or version change restarts the session as before.
+- `DesktopMpvEngine` forwards to `window.voraDesktop.player` inside Vora Desktop (`docs/clients/desktop/`). In a Direct Play session it switches audio and embedded subtitles, image ones too, inside the file by their `embeddedPosition`; a sidecar subtitle goes to mpv as VTT text.
+
+`PlayerContext` keeps the session: the 10 s pings, close, `changeStreams`, play, pause and seek. In a browser it drives the `<video>` itself, as it always has (music shares that element). An engine that isn't the `<video>` attaches itself as a `PlaybackTransport` (`usePlaybackTransportHost`); from then on those calls go to it and its time and pause events drive the clock.
+
+`GlobalVideoPlayer` is the web chrome over `usePlaybackController(webEngine)`. `MainLayout` mounts `DesktopPlaybackHost` in its place when `playsVideoInMpv` (the app, mpv found, **Use the Vora player** on), decided once per session so a setting changed mid-video never swaps players. The host shows a small bar, sends mpv a `PlayerChromeState` (`desktopChromeState.ts`) at most ten times a second and only when it changed, turns the chrome's `ChromeIntent`s into the controller calls the web buttons make, and starts the next episode through `useUpNextAutoPlay`, the hook `UpNextOverlay` uses. When mpv fails it asks whether to carry on in the built-in player, and restarts the session there with the browser profile (`forceBuiltInPlayer`, until the player closes).
+
 ## Player shared primitives
 
 `components/Player/Controls/PlayerButtons.tsx` exports `PlayPauseButton`, `SkipButton`, `VolumeControl`, `FullscreenButton`, `MaximizeButton`, `CloseButton`. Both `GlobalVideoPlayer` and `LiveTvPlayer` use these.

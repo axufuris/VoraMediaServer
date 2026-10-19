@@ -263,7 +263,8 @@ public class MediaDetailsVM
                     Language = a.Language,
                     Channels = a.Channels,
                     Title = a.Title,
-                    IsDefault = a.IsDefault
+                    IsDefault = a.IsDefault,
+                    EmbeddedPosition = p.AudioTracks.Count(other => other.StreamIndex < a.StreamIndex)
                 }).ToList(),
 
                 SubtitleTracks = p.SubtitleTracks.Select(s => new MediaDetailsPartSubtitleTrackVM
@@ -306,6 +307,7 @@ public class MediaDetailsPartAudioTrackVM
     public int? Channels { get; set; }
     public string? Title { get; set; }
     public bool IsDefault { get; set; }
+    public int EmbeddedPosition { get; set; }
 }
 
 public class MediaDetailsPartSubtitleTrackVM

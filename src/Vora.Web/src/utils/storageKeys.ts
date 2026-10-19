@@ -11,6 +11,7 @@ export const StorageKeys = {
     playbackPrefs: (profileId: string, deviceId: string) => `playback_prefs_${profileId}_${deviceId}`,
     calendarViewMode: 'calendar_view_mode_v2',
     sidebarCollapsed: 'sidebar_collapsed',
+    desktopMpvNoticeDismissed: 'desktop_mpv_notice_dismissed',
     musicSubTab: 'music_sub_tab',
     nowPlayingLyrics: 'now_playing_lyrics',
     nowPlayingSynth: 'now_playing_synth',

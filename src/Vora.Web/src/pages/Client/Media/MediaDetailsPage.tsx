@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mediaService, type Episode, type MediaItem } from '../../../api/Media/mediaService';
 import CastRow from '../../../components/Client/Primitives/CastRow';
@@ -8,7 +8,7 @@ import EpisodeList from '../../../components/Media/EpisodeList';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { streamingService } from '../../../api/Streaming/streamingService';
-import { getEffectiveCapabilities } from '../../../utils/hardwareScanner';
+import { usePlaybackCapabilities } from '../../../hooks/usePlaybackCapabilities';
 import { useDialog } from '../../../dialogs';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import DetailHero, { HeroChip, HeroCredits, HeroIconButton } from '../../../components/Client/Primitives/DetailHero';
@@ -19,7 +19,7 @@ import { watchlistService } from '../../../api/Watchlist/watchlistService';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import RateDialog from '../../../components/Client/Primitives/RateDialog';
-import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { StorageKeys } from '../../../utils/storageKeys';
 import { formatRuntime } from '../../../utils/formatRuntime';
 import { isFullyWatched } from '../../../utils/watchState';
 import { burnInSubtitleId, isNoSubtitle } from '../../../utils/subtitleKind';
@@ -101,12 +101,7 @@ export default function MediaDetailsPage() {
     }
 
     const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
-    const caps = useMemo(() => {
-        const profileToken = localStorage.getItem(StorageKeys.profileToken);
-        const profileId = (profileToken ? getProfileIdFromToken(profileToken) : null) || 'unknown';
-        const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
-        return getEffectiveCapabilities(profileId, deviceId);
-    }, []);
+    const caps = usePlaybackCapabilities();
     const { playMedia, isPlaying } = usePlayer();
     const tracks = useTitleTrackChoices(qualityMedia, caps, serverId);
 

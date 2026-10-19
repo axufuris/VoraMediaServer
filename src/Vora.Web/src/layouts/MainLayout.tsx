@@ -4,7 +4,11 @@ import { libraryService } from '../api/Media/libraryService';
 import { authService } from '../api/Auth/authService';
 import { useSignalREvent, disconnectSignalR } from '../hooks/useSignalREvent';
 import GlobalVideoPlayer from '../components/Player/GlobalVideoPlayer';
-import { scanDeviceCapabilities } from '../utils/hardwareScanner';
+import DesktopPlaybackHost from '../components/Player/DesktopPlaybackHost';
+import MpvMissingBanner from '../components/Desktop/MpvMissingBanner';
+import { useDesktopPlayback } from '../desktop/useDesktopPlayback';
+import { playsVideoInMpv, releaseBuiltInPlayer } from '../desktop/desktopPlayback';
+import { playbackCapabilities } from '../utils/desktopCapabilities';
 import { CONNECTION_SPEED_TTL_MS } from '../utils/connectionSpeed';
 import { streamingService } from '../api/Streaming/streamingService';
 import { deviceService } from '../api/Users/deviceService';
@@ -104,6 +108,19 @@ export default function MainLayout() {
     const [isBlockedBySchedule, setIsBlockedBySchedule] = useState<boolean>(getInitialBlockedState);
 
     const { currentMedia, isMinimized } = usePlayer();
+    const desktop = useDesktopPlayback();
+    const desktopBridge = desktop.bridge;
+    const playbackKey = currentMedia?.sessionId ?? currentMedia?.streamUrl;
+    const [playerChoice, setPlayerChoice] = useState({ playbackKey, desktop: playsVideoInMpv(desktop) });
+    if (playerChoice.playbackKey !== playbackKey) {
+        setPlayerChoice({ playbackKey, desktop: playsVideoInMpv(desktop) });
+    }
+    const videoInDesktopPlayer = playerChoice.desktop;
+    const playerOpen = !!currentMedia;
+
+    useEffect(() => {
+        if (!playerOpen) releaseBuiltInPlayer();
+    }, [playerOpen]);
 
     const [navItems, setNavItems] = useState<NavItem[]>([]);
     const [isEditingNav, setIsEditingNav] = useState(false);
@@ -296,7 +313,7 @@ export default function MainLayout() {
             sessionStorage.setItem(cacheKey, 'pending');
 
             try {
-                const capabilities = await scanDeviceCapabilities();
+                const capabilities = await playbackCapabilities();
                 await deviceService.updateCapabilities(capabilities, serverId);
 
                 sessionStorage.setItem(cacheKey, 'true');
@@ -399,6 +416,8 @@ export default function MainLayout() {
                     onSignOut={handleSignOut}
                 />
 
+                <MpvMissingBanner />
+
                 <main ref={scrollContainerRef} className="flex-1 overflow-y-auto">
                     <Outlet />
                 </main>
@@ -408,7 +427,9 @@ export default function MainLayout() {
                 ? <LiveTvPlayer />
                 : (currentMedia?.playbackContextType === 'LiveRadio' || currentMedia?.playbackContextType === 'Podcast' || currentMedia?.playbackContextType === 'Music')
                     ? <LiveRadioPlayer />
-                    : <GlobalVideoPlayer />}
+                    : videoInDesktopPlayer && desktopBridge && currentMedia
+                        ? <DesktopPlaybackHost bridge={desktopBridge} />
+                        : <GlobalVideoPlayer />}
 
             <NowPlayingFullscreen />
             </MediaItemMenuProvider>
