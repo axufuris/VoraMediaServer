@@ -5,7 +5,7 @@ public static class WebClientFileCaching
     public const string AppShell = "no-cache";
     public const string HashedAsset = "public, max-age=31536000, immutable";
 
-    private const string AppShellFile = "index.html";
+    private static readonly HashSet<string> AppShellFiles = new(StringComparer.OrdinalIgnoreCase) { "index.html", "sw.js", "manifest.webmanifest" };
     private const string HashedAssetFolder = "/assets";
 
     public static StaticFileOptions Options() => new()
@@ -19,7 +19,7 @@ public static class WebClientFileCaching
 
     public static string? CacheControlFor(PathString requestPath, string fileName)
     {
-        if (string.Equals(fileName, AppShellFile, StringComparison.OrdinalIgnoreCase)) return AppShell;
+        if (AppShellFiles.Contains(fileName)) return AppShell;
         return requestPath.StartsWithSegments(HashedAssetFolder, StringComparison.OrdinalIgnoreCase) ? HashedAsset : null;
     }
 }
