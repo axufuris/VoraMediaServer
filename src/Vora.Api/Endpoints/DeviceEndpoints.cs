@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Vora.Api.Extensions;
 using Vora.Application.Devices;
 using Vora.Application.Devices.Dtos;
 using Vora.Application.Devices.ViewModels;
@@ -58,13 +59,13 @@ public static class DeviceEndpoints
 
     private static async Task<IResult> UpdateCapabilitiesAsync(HttpContext context, [FromBody] DeviceCapabilitiesDto dto, IDeviceManager manager)
     {
-        var deviceId = context.Request.Headers["X-Vora-Device-Id"].FirstOrDefault();
-        if (string.IsNullOrEmpty(deviceId))
+        var deviceId = context.Request.ReadDeviceId();
+        if (deviceId is null)
         {
             return Results.BadRequest("DeviceId header missing.");
         }
 
-        await manager.UpdateDeviceCapabilitiesAsync(deviceId, dto);
+        await manager.UpdateDeviceCapabilitiesAsync(deviceId, context.Request.ReadDeviceIdentity(), dto);
         return Results.NoContent();
     }
 }

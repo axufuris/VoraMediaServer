@@ -9,12 +9,6 @@ namespace Vora.Api.Middleware;
 
 public class DeviceTrackingMiddleware
 {
-    private const string DeviceIdHeader = "X-Vora-Device-Id";
-    private const string ClientNameHeader = "X-Vora-Client";
-    private const string DeviceNameHeader = "X-Vora-Device";
-    private const string DeviceTypeHeader = "X-Vora-Device-Type";
-    private const string OperatingSystemHeader = "X-Vora-OS";
-
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(5);
 
     private readonly RequestDelegate _next;
@@ -28,8 +22,8 @@ public class DeviceTrackingMiddleware
 
     public async Task InvokeAsync(HttpContext context, IServiceProvider serviceProvider)
     {
-        var deviceId = context.Request.Headers[DeviceIdHeader].FirstOrDefault();
-        if (string.IsNullOrEmpty(deviceId))
+        var deviceId = context.Request.ReadDeviceId();
+        if (deviceId is null)
         {
             await _next(context);
             return;
@@ -112,7 +106,7 @@ public class DeviceTrackingMiddleware
                 return true;
             }
 
-            var (device, ipChanged) = UpsertDevice(dbContext, existingDevice, context.Request, deviceId, ip, accountId, profileId);
+            var (device, ipChanged) = UpsertDevice(dbContext, existingDevice, context.Request.ReadDeviceIdentity(), deviceId, ip, accountId, profileId);
 
             // Also retried while a device has no location yet, so devices saved
             // while every lookup was failing get one without waiting for their
@@ -142,7 +136,7 @@ public class DeviceTrackingMiddleware
     private static (ClientDevice Device, bool IpChanged) UpsertDevice(
         VoraDbContext dbContext,
         ClientDevice? existingDevice,
-        HttpRequest request,
+        DeviceIdentity identity,
         string deviceId,
         string ip,
         Guid accountId,
@@ -154,10 +148,10 @@ public class DeviceTrackingMiddleware
 
             existingDevice.LastConnectedAt = DateTime.UtcNow;
             existingDevice.LastIpAddress = ip;
-            existingDevice.ClientName = request.Headers[ClientNameHeader].FirstOrDefault() ?? existingDevice.ClientName;
-            existingDevice.DeviceName = request.Headers[DeviceNameHeader].FirstOrDefault() ?? existingDevice.DeviceName;
-            existingDevice.DeviceType = request.Headers[DeviceTypeHeader].FirstOrDefault() ?? existingDevice.DeviceType;
-            existingDevice.OperatingSystem = request.Headers[OperatingSystemHeader].FirstOrDefault() ?? existingDevice.OperatingSystem;
+            existingDevice.ClientName = identity.ClientName ?? existingDevice.ClientName;
+            existingDevice.DeviceName = identity.DeviceName ?? existingDevice.DeviceName;
+            existingDevice.DeviceType = identity.DeviceType ?? existingDevice.DeviceType;
+            existingDevice.OperatingSystem = identity.OperatingSystem ?? existingDevice.OperatingSystem;
             existingDevice.LastUserId = accountId;
             if (profileId.HasValue)
             {
@@ -170,10 +164,10 @@ public class DeviceTrackingMiddleware
         var newDevice = new ClientDevice
         {
             DeviceId = deviceId,
-            ClientName = request.Headers[ClientNameHeader].FirstOrDefault() ?? "Unknown Client",
-            DeviceName = request.Headers[DeviceNameHeader].FirstOrDefault() ?? "Unknown Device",
-            DeviceType = request.Headers[DeviceTypeHeader].FirstOrDefault() ?? "Unknown Type",
-            OperatingSystem = request.Headers[OperatingSystemHeader].FirstOrDefault() ?? "Unknown OS",
+            ClientName = identity.ClientName ?? DeviceIdentity.UnknownClient,
+            DeviceName = identity.DeviceName ?? DeviceIdentity.UnknownDevice,
+            DeviceType = identity.DeviceType ?? DeviceIdentity.UnknownType,
+            OperatingSystem = identity.OperatingSystem ?? DeviceIdentity.UnknownOperatingSystem,
             LastIpAddress = ip,
             LastConnectedAt = DateTime.UtcNow,
             LastUserId = accountId,

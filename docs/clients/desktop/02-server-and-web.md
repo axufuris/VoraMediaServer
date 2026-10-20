@@ -60,7 +60,7 @@ present send:
 | Header | Value |
 | --- | --- |
 | `X-Vora-Client` | `Vora Desktop` (QA builds: `Vora Desktop QA`) |
-| `X-Vora-Device` | `Vora Desktop (Windows)` / `Vora Desktop (Linux)` |
+| `X-Vora-Device` | `Vora Desktop (Windows)` / `Vora Desktop (Linux)` (QA builds: `Vora Desktop QA (Windows)` / `Vora Desktop QA (Linux)`) |
 | `X-Vora-Device-Type` | `Desktop` |
 | `X-Vora-OS` | from `bridge.platform` |
 

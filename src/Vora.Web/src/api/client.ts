@@ -61,9 +61,10 @@ function clientIdentity(): ClientIdentity {
     if (!desktop) return { client: 'Vora Web', device: 'Web Browser', deviceType: 'Browser', os: DETECTED_OS };
 
     const os = desktop.platform === 'windows' ? 'Windows' : 'Linux';
+    const client = desktop.channel === 'qa' ? 'Vora Desktop QA' : 'Vora Desktop';
     return {
-        client: desktop.channel === 'qa' ? 'Vora Desktop QA' : 'Vora Desktop',
-        device: `Vora Desktop (${os})`,
+        client,
+        device: `${client} (${os})`,
         deviceType: 'Desktop',
         os,
     };

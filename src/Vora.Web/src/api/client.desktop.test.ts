@@ -41,13 +41,13 @@ describe('the device headers', () => {
         expect(headers['X-Vora-OS']).toBe('Windows');
     });
 
-    it('mark a QA build in the client name', () => {
+    it('mark a QA build in the client and device names, so it stands apart from prod on the same computer', () => {
         window.voraDesktop = fakeDesktopBridge({ channel: 'qa', platform: 'linux' }).bridge;
 
         const headers = headersOfARequest();
 
         expect(headers['X-Vora-Client']).toBe('Vora Desktop QA');
-        expect(headers['X-Vora-Device']).toBe('Vora Desktop (Linux)');
+        expect(headers['X-Vora-Device']).toBe('Vora Desktop QA (Linux)');
         expect(headers['X-Vora-OS']).toBe('Linux');
     });
 
