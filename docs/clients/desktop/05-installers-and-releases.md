@@ -68,10 +68,12 @@ Linux notes the CLI must verify and document in the release notes template:
 Unsigned installers trigger SmartScreen ("Windows protected your PC").
 
 - Use **Azure Artifact Signing** (formerly Trusted Signing) through electron-builder's
-  `win.azureSignOptions`. Andy already knows Azure. Check current pricing and whether
-  individual developers are eligible before setting it up; tell Andy what you found.
+  `win.azureSignOptions`. October 2026: Basic is about US$9.99/month for 5,000 signatures;
+  individual public trust is US and Canada only (billing account of type Individual,
+  matching a government ID, 1–20 business days); new individual sign-ups are reported
+  paused. Details and setup steps are in `Vora.Desktop/.github/RELEASING.md`.
 - Secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, plus the
-  endpoint, account name and certificate profile as repo **variables**.
+  endpoint, account name, certificate profile and publisher name as repo **variables**.
 - **Prod fails** if signing isn't configured. **QA signs if configured**, otherwise
   builds unsigned with a `::warning::`.
 - Linux isn't signed. Publish `SHA256SUMS.txt` (GPG-signed checksums are a later
@@ -81,9 +83,9 @@ Unsigned installers trigger SmartScreen ("Windows protected your PC").
 
 - `electron-updater` with the GitHub provider (`owner: axufuris`, `repo: Vora.Desktop`).
 - Prod: `allowPrerelease = false`, default channel (`latest.yml`, `latest-linux.yml`).
-- QA: `channel = 'qa'`, `allowPrerelease = true` (`qa.yml`, `qa-linux.yml`). Check that
-  electron-builder emits channel files for a `-qa.N` prerelease. If it only knows
-  `alpha`/`beta`, use `beta` as the internal channel and keep "QA" everywhere users see it.
+- QA: `channel = 'qa'`, `allowPrerelease = true` (`qa.yml`, `qa-linux.yml`). electron-builder
+  does not take `qa` from the version, so the config sets the publish `channel`, and
+  `extraMetadata.name` (`vora-desktop-qa`) so QA has its own updater cache.
 - Check on launch and every 6 h; download in the background; when ready, show a
   non-blocking "Restart to update" notice. **Never restart or prompt during playback.**
 - `.deb`/`.rpm` installs can't self-update: show "Version X is available" with a button
@@ -106,8 +108,8 @@ Unsigned installers trigger SmartScreen ("Windows protected your PC").
    private, use a read-only fine-grained token secret `VORA_SERVER_READ_TOKEN`) and
    diff `src/Vora.Web/src/desktop/desktopBridge.ts` against `src/shared/bridge.ts`.
    Fail on any difference.
-3. Matrix `windows-latest` + `ubuntu-22.04`: package with `--publish never` to prove the
-   installers build. Upload them as workflow artifacts (7-day retention).
+3. `package.yml` (a reusable workflow that QA and release call too), matrix
+   `windows-latest` + `ubuntu-22.04`, `--publish never`, artifacts kept 7 days.
 
 **`qa.yml`** — on `push` to `main` + `workflow_dispatch`; `concurrency: qa`,
 `cancel-in-progress: true`:
