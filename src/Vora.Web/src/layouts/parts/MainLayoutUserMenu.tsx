@@ -1,5 +1,4 @@
 import SearchBar from '../../components/Layout/SearchBar';
-import { InstallAppButton } from '../../components/Common/InstallApp';
 
 interface MainLayoutUserMenuProps {
     profileName: string;
@@ -119,8 +118,6 @@ export default function MainLayoutUserMenu({
                             <button type="button" onClick={onClientSettings} className="block w-full cursor-pointer px-4 py-2 text-left text-sm vora-row-interactive" style={menuItemStyle}>
                                 Client settings
                             </button>
-
-                            <div className="px-4"><InstallAppButton /></div>
 
                             <button type="button" onClick={onAccountSettings} className="block w-full cursor-pointer px-4 py-2 text-left text-sm vora-row-interactive" style={menuItemStyle}>
                                 Account settings

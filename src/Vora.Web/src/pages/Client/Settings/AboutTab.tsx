@@ -1,10 +1,8 @@
 import { StorageKeys } from '../../../utils/storageKeys';
-import { InstallAppCard } from '../../../components/Common/InstallApp';
 
 export default function AboutTab() {
     return (
         <div className="space-y-6">
-            <InstallAppCard />
             <section className="vora-card p-6">
                 <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>About this client</h2>
                 <p className="m-0 mb-4 text-sm" style={{ color: 'var(--vora-text-muted)' }}>Vora is a self-hosted media server. This is the client running in your browser.</p>
