@@ -77,6 +77,9 @@ public interface IMediaRepository
     Task<List<Guid>> GetVideoThumbnailTargetIdsAsync(Guid libraryId, string currentSpriteVersion, bool includeCompleted, DateTime? generatedBefore = null);
     Task<List<Vora.Application.Subtitles.SubtitleExtractionTargetDto>> GetSubtitleExtractionTargetsForItemAsync(Guid mediaItemId);
     Task<List<Vora.Application.Subtitles.SubtitleExtractionTargetDto>> GetSubtitleExtractionTargetsForLibraryAsync(Guid libraryId);
+    Task<List<Vora.Application.Analysis.PictureAreaTarget>> GetPictureAreaTargetsForItemAsync(Guid mediaItemId);
+    Task<List<Vora.Application.Analysis.PictureAreaTarget>> GetPictureAreaTargetsForLibraryAsync(Guid libraryId);
+    Task SavePictureCropAsync(Guid videoTrackId, Vora.Application.Analysis.PictureCrop crop);
     Task<HashSet<Guid>> GetAllMediaPartIdsAsync();
     Task<Guid?> GetPrimaryMediaPartIdAsync(Guid mediaItemId);
     Task<Vora.Application.Subtitles.ViewModels.SubtitleSearchFactsDto?> GetSubtitleSearchFactsAsync(Guid mediaItemId);

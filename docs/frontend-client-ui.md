@@ -138,7 +138,7 @@ Right-clicking a movie, show, season or episode, or holding it on a touch screen
 
 ## Player shared primitives
 
-`components/Player/Controls/PlayerButtons.tsx` exports `PlayPauseButton`, `SkipButton`, `VolumeControl`, `FullscreenButton`, `MaximizeButton`, `CloseButton`. Both `GlobalVideoPlayer` and `LiveTvPlayer` use these.
+`components/Player/Controls/PlayerButtons.tsx` exports `PlayPauseButton`, `SkipButton`, `VolumeControl`, `FullscreenButton`, `MaximizeButton`, `CloseButton`. Both `GlobalVideoPlayer` and `LiveTvPlayer` use these. `PictureFitButton` (Fit / Fill) is the video player's alone: it fits the picture rather than the frame, with the black bars a scan found in the file left off (`usePictureLayout`, `docs/picture-bars.md`).
 
 The volume lives in `PlayerContext`, not in the media element: `setVolume` keeps the level even when no element exists, and every new element gets it when it appears (a new item, or a new session re-keying the video player's `<video>`). Closing a player unmounts its element, and the next one used to start at the browser's full volume under a slider still showing the old level (issue #141).
 

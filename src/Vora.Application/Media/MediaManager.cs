@@ -81,6 +81,7 @@ public class MediaManager : IMediaManager
     {
         var vm = ReadyForDisplay(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated));
 
+        if (vm != null && NeedsPictureArea(vm)) _taskQueueManager.QueueDetectMediaItemPictureArea(vm.Id, vm.Title, vm.LibraryId);
         if (vm == null || !profileId.HasValue) return vm;
 
         await _stateRepository.AttachUserMediaStateAsync(vm, profileId.Value);
@@ -99,6 +100,10 @@ public class MediaManager : IMediaManager
 
     public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id) =>
         ReadyForDisplay(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection));
+
+    private static bool NeedsPictureArea(MediaDetailsVM details) =>
+        (details.Type == "Movie" || details.Type == "Episode")
+        && details.MediaParts.Any(part => part.DurationSeconds > 0 && part.VideoTracks.OrderByDescending(track => track.IsDefault).FirstOrDefault() is { CropTop: null, Width: > 0, Height: > 0 });
 
     private static MediaDetailsVM? ReadyForDisplay(MediaDetailsVM? details)
     {

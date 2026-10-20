@@ -79,6 +79,26 @@ public class MediaDetailsPartInfoTests
     }
 
     [Fact]
+    public void A_video_track_says_where_its_picture_sits_once_the_bars_were_looked_for()
+    {
+        using var db = NewContext();
+        var checkedMovie = SeedMovie(db, p =>
+        {
+            var video = p.VideoTracks.Single();
+            video.CropTop = 60;
+            video.CropRight = 0;
+            video.CropBottom = 60;
+            video.CropLeft = 0;
+        });
+        var uncheckedMovie = SeedMovie(db);
+
+        var track = Details(db, checkedMovie.Id).MediaParts.Single().VideoTracks.Single();
+
+        (track.CropTop, track.CropRight, track.CropBottom, track.CropLeft).Should().Be((60, 0, 60, 0));
+        Details(db, uncheckedMovie.Id).MediaParts.Single().VideoTracks.Single().CropTop.Should().BeNull();
+    }
+
+    [Fact]
     public void A_subtitle_says_whether_it_is_a_sidecar_and_whether_vora_downloaded_it()
     {
         using var db = NewContext();

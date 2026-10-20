@@ -24,6 +24,10 @@ export interface VideoTrack {
     bitrateKbps?: number;
     width?: number;
     height?: number;
+    cropTop?: number | null;
+    cropRight?: number | null;
+    cropBottom?: number | null;
+    cropLeft?: number | null;
     isDefault?: boolean;
 }
 

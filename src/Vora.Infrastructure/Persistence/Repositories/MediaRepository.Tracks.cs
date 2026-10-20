@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Vora.Application.Analysis;
 using Vora.Domain.Entities.Media;
 
 namespace Vora.Infrastructure.Persistence.Repositories;
@@ -26,6 +27,7 @@ public partial class MediaRepository
         {
             if (existingVideoByIdx.TryGetValue(inc.StreamIndex, out var ex))
             {
+                if (PictureCrop.StreamChanged(ex, inc)) PictureCrop.Forget(ex);
                 ex.Codec = inc.Codec; ex.Profile = inc.Profile; ex.HdrType = inc.HdrType;
                 ex.BitDepth = inc.BitDepth; ex.Bitrate = inc.Bitrate; ex.IsDefault = inc.IsDefault;
                 ex.Width = inc.Width; ex.Height = inc.Height; ex.FrameRate = inc.FrameRate;

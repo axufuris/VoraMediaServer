@@ -124,6 +124,12 @@ public static class TaskRecipes
             case nameof(ITaskQueueManager.QueuePreExtractLibrarySubtitles):
                 queue.QueuePreExtractLibrarySubtitles(r.Guid("libraryId"), r.Text("libraryName"));
                 return true;
+            case nameof(ITaskQueueManager.QueueDetectMediaItemPictureArea):
+                queue.QueueDetectMediaItemPictureArea(r.Guid("mediaItemId"), r.Text("mediaItemName"), r.OptionalGuid("libraryId"));
+                return true;
+            case nameof(ITaskQueueManager.QueueDetectLibraryPictureArea):
+                queue.QueueDetectLibraryPictureArea(r.Guid("libraryId"), r.Text("libraryName"));
+                return true;
             case nameof(ITaskQueueManager.QueueSubtitleBackfill):
                 queue.QueueSubtitleBackfill();
                 return true;

@@ -13,6 +13,10 @@ public class MediaVideoTrack
     public int? Width { get; set; }
     public int? Height { get; set; }
     public double? FrameRate { get; set; }
+    public int? CropTop { get; set; }
+    public int? CropRight { get; set; }
+    public int? CropBottom { get; set; }
+    public int? CropLeft { get; set; }
     public bool IsDefault { get; set; }
 
     public Guid MediaPartId { get; set; }

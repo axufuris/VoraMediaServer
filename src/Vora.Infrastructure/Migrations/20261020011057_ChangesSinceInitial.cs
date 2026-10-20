@@ -45,7 +45,11 @@ ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""PreserveHdrInTranscode
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""AutoPlayNext"" boolean NOT NULL DEFAULT TRUE;
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""UpNextOrder"" integer NOT NULL DEFAULT 0;
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""EpisodeLayout"" integer NOT NULL DEFAULT 0;
-ALTER TABLE ""ClientDevices"" ADD COLUMN IF NOT EXISTS ""RendersImageSubtitles"" boolean;");
+ALTER TABLE ""ClientDevices"" ADD COLUMN IF NOT EXISTS ""RendersImageSubtitles"" boolean;
+ALTER TABLE ""MediaVideoTracks"" ADD COLUMN IF NOT EXISTS ""CropTop"" integer;
+ALTER TABLE ""MediaVideoTracks"" ADD COLUMN IF NOT EXISTS ""CropRight"" integer;
+ALTER TABLE ""MediaVideoTracks"" ADD COLUMN IF NOT EXISTS ""CropBottom"" integer;
+ALTER TABLE ""MediaVideoTracks"" ADD COLUMN IF NOT EXISTS ""CropLeft"" integer;");
 
             migrationBuilder.Sql(@"
 UPDATE ""UserMediaStates"" SET ""ResumePositionSeconds"" = 0
@@ -203,6 +207,22 @@ CREATE INDEX ""IX_Albums_ArtistId_Title"" ON ""Albums"" (""ArtistId"", ""Title""
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "CropTop",
+                table: "MediaVideoTracks");
+
+            migrationBuilder.DropColumn(
+                name: "CropRight",
+                table: "MediaVideoTracks");
+
+            migrationBuilder.DropColumn(
+                name: "CropBottom",
+                table: "MediaVideoTracks");
+
+            migrationBuilder.DropColumn(
+                name: "CropLeft",
+                table: "MediaVideoTracks");
+
             migrationBuilder.DropColumn(
                 name: "RendersImageSubtitles",
                 table: "ClientDevices");

@@ -253,6 +253,10 @@ public class MediaDetailsVM
                     BitrateKbps = v.Bitrate.HasValue ? (int)(v.Bitrate.Value / 1000) : (int?)null,
                     Width = v.Width,
                     Height = v.Height,
+                    CropTop = v.CropTop,
+                    CropRight = v.CropRight,
+                    CropBottom = v.CropBottom,
+                    CropLeft = v.CropLeft,
                     IsDefault = v.IsDefault
                 }).ToList(),
 
@@ -296,6 +300,10 @@ public class MediaDetailsPartVideoTrackVM
     public int? BitrateKbps { get; set; }
     public int? Width { get; set; }
     public int? Height { get; set; }
+    public int? CropTop { get; set; }
+    public int? CropRight { get; set; }
+    public int? CropBottom { get; set; }
+    public int? CropLeft { get; set; }
     public bool IsDefault { get; set; }
 }
 

@@ -92,8 +92,7 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 | `account_token` | Account JWT after login | `LoginPage`, `RegisterPage` |
 | `profile_token` | Profile JWT after profile selection | `ProfileSelectionPage` |
 | `user_id` | Account user ID | `LoginPage`, `RegisterPage` |
-| `profile_name` | Display name of active profile | `ProfileSelectionPage` |
-| `profile_name_<serverId>` | Per-server profile name (multi-server) | `ServerManagerModal` |
+| `profile_name`, `profile_name_<serverId>` | Display name of the active profile, and the per-server one (multi-server) | `ProfileSelectionPage`, `ServerManagerModal` |
 | `is_server_admin` | `"true"` if the underlying user has `isAdmin` on the server. **THE** admin flag. | `ProfileSelectionPage`, `ServerManagerModal` |
 | `is_profile_admin` | `"true"` if the active profile is the admin profile | `ProfileSelectionPage` |
 | `auto_login_profile_id` | Skips profile picker on next load | `ProfileSelectionPage` |
@@ -107,6 +106,7 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 | `audio_quality_preference`, `audio_crossfade_seconds`, `audio_eq_preset` | Music audio settings: stream quality, crossfade seconds (0–12), EQ preset. Device-local. | `NowPlayingFullscreen` (`utils/audioQuality.ts`) |
 | `calendar_view_mode_v2` | Release Calendar layout — `month`, `week`, or `day`. Device-local, not mirrored: it is a display preference, not a profile setting. Nothing saved, or an unrecognised value, opens on `week`. Renamed from `calendar_view_mode` when the default changed from Month, so a Month saved under the old default doesn't pin existing browsers there; the old key is simply ignored. | `CalendarPage` |
 | `sidebar_collapsed` | `"true"` while the client sidebar is folded to its icons (tablet width and up); anything else, or nothing, shows it in full. Device-local. | `MainLayout` (`layouts/parts/useSidebarCollapsed.ts`) |
+| `player_picture_fit` | `fill` once the viewer picked Fill in the video player (cover the window, trimming the sides); anything else, or nothing, is Fit. Device-local (`docs/picture-bars.md`). | `GlobalVideoPlayer` (`utils/pictureLayout.ts`) |
 | `desktop_mpv_notice_dismissed` | `"true"` once a Vora Desktop user on Linux dismissed the notice that mpv is missing and videos play in the built-in player. Device-local. | `MainLayout` (`components/Desktop/MpvMissingBanner.tsx`) |
 | `vora_library_migration_job_id` | Active library-migration job id. Lets the admin reload `/admin/library-migration` and re-attach to the running job. Cleared on "Run again" / "Start over" or when the backend returns 404 (job evicted on server restart). | `LibraryMigrationPage` |
 | Server vault keys | Managed by `utils/serverVault.ts` (`VAULT_KEY`, `ACTIVE_SERVER_KEY`) | `serverVault` |

@@ -17,6 +17,7 @@ export const StorageKeys = {
     nowPlayingSynth: 'now_playing_synth',
     nowPlayingSynthStyle: 'now_playing_synth_style',
     nowPlayingSynthColors: 'now_playing_synth_colors',
+    playerPictureFit: 'player_picture_fit',
 } as const;
 
 export const SessionKeys = {

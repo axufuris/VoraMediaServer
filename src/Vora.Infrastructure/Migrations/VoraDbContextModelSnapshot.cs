@@ -2138,6 +2138,18 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<int?>("CropBottom")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CropLeft")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CropRight")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CropTop")
+                        .HasColumnType("integer");
+
                     b.Property<double?>("FrameRate")
                         .HasColumnType("double precision");
 

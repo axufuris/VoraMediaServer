@@ -154,6 +154,44 @@ export function FullscreenButton({ onClick }: FullscreenButtonProps) {
     );
 }
 
+interface PictureFitButtonProps {
+    fit: 'fit' | 'fill';
+    onToggle: () => void;
+}
+
+export function PictureFitButton({ fit, onToggle }: PictureFitButtonProps) {
+    const label = fit === 'fill' ? 'Show the whole picture' : 'Fill the screen';
+    return (
+        <button
+            type="button"
+            onClick={onToggle}
+            title={label}
+            aria-label={label}
+            aria-pressed={fit === 'fill'}
+            className="cursor-pointer rounded-full p-1.5 vora-icon-button transition-colors"
+            style={{ color: 'var(--vora-text-primary)' }}
+        >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                {fit === 'fill' ? (
+                    <>
+                        <path d="M5 12h4" />
+                        <path d="M7 10l2 2-2 2" />
+                        <path d="M19 12h-4" />
+                        <path d="M17 10l-2 2 2 2" />
+                    </>
+                ) : (
+                    <>
+                        <path d="M8 12h8" />
+                        <path d="M10 10l-2 2 2 2" />
+                        <path d="M14 10l2 2-2 2" />
+                    </>
+                )}
+            </svg>
+        </button>
+    );
+}
+
 interface SubtitlesButtonProps {
     onClick: () => void;
     // Filled when a subtitle is showing, so the control says at a glance whether

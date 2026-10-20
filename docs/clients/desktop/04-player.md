@@ -196,5 +196,5 @@ that choice in the checklist. At minimum:
 - [ ] Resume from the details VM position; Start over handled on the details page
 - [ ] Extras/trailers play in the same player without touching the parent's watch state
 - [ ] Buffering indicator; friendly error with "play with the built-in player" fallback
-- [ ] Volume + mute (desktop-only addition)
-- [ ] Desktop-only: windowed/fullscreen toggle
+- [ ] Desktop-only: volume + mute, windowed/fullscreen toggle
+- [ ] Fit / Fill over the stored crop (`docs/picture-bars.md`): mpv `video-crop`, `panscan=1` for Fill; the crop rides on `OpenRequest` (bridge change on the server first)

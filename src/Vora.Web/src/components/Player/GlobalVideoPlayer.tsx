@@ -1,19 +1,22 @@
 import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { MediaMarker } from '../../api/Media/mediaService';
 import { useAutoHideControls } from './Controls/useAutoHideControls';
 import { usePictureClick } from './Controls/usePictureClick';
 import { useFullscreen } from './Controls/useFullscreen';
+import { usePictureLayout } from './Controls/usePictureLayout';
 import { usePlayerKeyboard } from './Controls/usePlayerKeyboard';
 import PlayerKeyIndicator from './Controls/PlayerKeyIndicator';
 import VideoSeekBar from './Controls/VideoSeekBar';
-import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeButton, CloseButton, EpisodeNavButton, SubtitlesButton } from './Controls/PlayerButtons';
+import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeButton, CloseButton, EpisodeNavButton, SubtitlesButton, PictureFitButton } from './Controls/PlayerButtons';
 import PlayerSettingsPanel from './Panels/PlayerSettingsPanel';
 import SubtitleTracksPanel from './Panels/SubtitleTracksPanel';
 import MediaInfoDialog from '../Media/MediaInfoDialog';
 import PlaybackStatsSections from './Panels/PlaybackStatsSections';
 import UpNextOverlay from './Panels/UpNextOverlay';
 import { isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
+import { readPictureFit, savePictureFit, type PictureFit } from '../../utils/pictureLayout';
+import { cueAreaOf } from '../../utils/subtitleCuePlacement';
 import { ScrubPreview } from './VideoScrubThumbnails';
 import { WebVideoEngine } from './engine/WebVideoEngine';
 import { usePlaybackController } from './usePlaybackController';
@@ -90,6 +93,27 @@ export default function GlobalVideoPlayer() {
 
     const toggleFullScreen = useFullscreen(playerContainerRef);
 
+    const [pictureFit, setPictureFit] = useState<PictureFit>(readPictureFit);
+    const framing = usePictureLayout({
+        containerRef: playerContainerRef,
+        videoRef,
+        videoKey: currentMedia?.sessionId,
+        crop: controller.pictureCrop,
+        fit: pictureFit,
+        enabled: !!currentMedia && !isMinimized && !controller.isEnding,
+    });
+    const { layout: pictureLayout, viewport } = framing;
+
+    useEffect(() => {
+        engine.placeSubtitles(cueAreaOf(pictureLayout, viewport));
+    }, [engine, pictureLayout, viewport]);
+
+    const togglePictureFit = () => {
+        const next: PictureFit = pictureFit === 'fill' ? 'fit' : 'fill';
+        setPictureFit(next);
+        savePictureFit(next);
+    };
+
     const keyIndicator = usePlayerKeyboard({
         enabled: !!currentMedia && !isMinimized && !showSettings && !showSubtitles && !showInfo,
         canSeek: true,
@@ -137,7 +161,7 @@ export default function GlobalVideoPlayer() {
             ref={playerContainerRef}
             className={`transition-all duration-300 ease-in-out ${isMinimized
                 ? 'fixed bottom-0 left-0 right-0 z-[99999] flex h-24 flex-col vora-glass'
-                : 'fixed inset-0 z-[99999] bg-[var(--vora-bg-canvas)]'
+                : `fixed inset-0 z-[99999] bg-[var(--vora-bg-canvas)]${pictureLayout ? ' overflow-hidden' : ''}`
                 }`}
             style={isMinimized ? { borderTop: '1px solid var(--vora-border-subtle)' } : undefined}
         >
@@ -149,8 +173,12 @@ export default function GlobalVideoPlayer() {
                 className={`absolute bg-[var(--vora-bg-canvas)] transition-all duration-700 ease-in-out
                     ${isMinimized ? 'bottom-4 left-6 z-20 h-16 w-16 cursor-pointer rounded-md object-cover shadow-[var(--vora-shadow-lg)] hover:ring-2 hover:ring-[var(--vora-accent-500)] max-md:left-3' :
                         controller.isEnding ? 'left-20 top-32 z-20 aspect-video w-96 cursor-pointer rounded-xl object-cover shadow-[var(--vora-shadow-overlay)] max-md:left-4 max-md:top-4 max-md:w-40' :
-                            'absolute left-0 top-0 z-0 h-[100vh] w-full object-contain'}`}
-                style={controller.isEnding && !isMinimized ? { border: '1px solid var(--vora-border-strong)' } : undefined}
+                            pictureLayout ? 'z-0 object-contain' : 'absolute left-0 top-0 z-0 h-[100vh] w-full object-contain'}`}
+                style={controller.isEnding && !isMinimized
+                    ? { border: '1px solid var(--vora-border-strong)' }
+                    : pictureLayout
+                        ? { left: pictureLayout.left, top: pictureLayout.top, width: pictureLayout.width, height: pictureLayout.height }
+                        : undefined}
             />
 
             {controller.isEnding && !isMinimized && (
@@ -396,6 +424,7 @@ export default function GlobalVideoPlayer() {
                                 <div className="contents max-md:hidden">
                                     <VolumeControl value={volume} onChange={setVolume} />
                                 </div>
+                                {framing.canFill && <PictureFitButton fit={pictureFit} onToggle={togglePictureFit} />}
                                 <FullscreenButton onClick={toggleFullScreen} />
                             </div>
                         </div>

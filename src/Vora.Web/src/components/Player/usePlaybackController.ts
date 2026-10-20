@@ -13,6 +13,7 @@ import { useDialog } from '../../dialogs';
 import { isImageSubtitleCodec, isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
 import { seasonEpisodeLabel } from '../../utils/seasonLabel';
 import { pickBestAudioTrack } from '../../utils/audioTrackSelection';
+import { cropOf, NoCrop } from '../../utils/pictureLayout';
 import { EndStretchSeconds, usePlaybackFinished } from './usePlaybackFinished';
 import { useUpNextEnding } from './useUpNextEnding';
 import type { PlaybackEngine } from './engine/PlaybackEngine';
@@ -541,6 +542,7 @@ export function usePlaybackController(engine: PlaybackEngine) {
 
     const activeVideoTrack = activeStreamPart?.videoTracks?.find((vt: VideoTrackType) => vt.id === currentMedia?.videoTrackId);
     const activeAudioTrack = activeStreamPart?.audioTracks?.find((at: AudioTrackType) => at.id === playingAudioId);
+    const pictureCrop = currentMedia?.subtitleStrategy === 'BurnIn' ? NoCrop : cropOf(activeVideoTrack);
     const effectiveSubtitleId = textSubtitleId ?? currentMedia?.subtitleTrackId;
 
     // Nothing to open when the file carries no subtitles and no provider could
@@ -605,6 +607,7 @@ export function usePlaybackController(engine: PlaybackEngine) {
         hasSubtitleOptions,
         activeStreamPart,
         activeSubtitleTrack,
+        pictureCrop,
         thumbnails,
         readPlayer,
         display: {

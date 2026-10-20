@@ -79,6 +79,8 @@ public interface ITaskQueueManager
     void QueueGenerateMediaItemVideoThumbnails(Guid mediaItemId, string? mediaItemName = null, bool forceOverride = false);
     void QueuePreExtractMediaItemSubtitles(Guid mediaItemId, string? mediaItemName = null, Guid? libraryId = null);
     void QueuePreExtractLibrarySubtitles(Guid libraryId, string? libraryName = null);
+    void QueueDetectMediaItemPictureArea(Guid mediaItemId, string? mediaItemName = null, Guid? libraryId = null);
+    void QueueDetectLibraryPictureArea(Guid libraryId, string? libraryName = null);
     void QueueSubtitleBackfill();
     void QueueRefreshMusicPopularity();
     void QueueRateMusicContent();
@@ -316,6 +318,7 @@ public class TaskQueueManager : ITaskQueueManager
             // pre-extraction target is known. Queued rather than awaited: it
             // runs on its own throttled key and must not hold up the ingest.
             sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractMediaItemSubtitles(itemId, libraryId: libraryId);
+            sp.GetRequiredService<ITaskQueueManager>().QueueDetectMediaItemPictureArea(itemId, libraryId: libraryId);
 
             await metadataManager.TriggerMediaItemMetadataRefreshAsync(itemId, false, ct);
             await metadataManager.TriggerMediaItemArtworkRefreshAsync(itemId, false, ct);
@@ -443,6 +446,7 @@ public class TaskQueueManager : ITaskQueueManager
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, cancellationToken: ct);
             var libraryId = await sp.GetRequiredService<IMediaRepository>().GetProjectedAsync(mediaItemId, m => (Guid?)m.LibraryId);
             sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractMediaItemSubtitles(mediaItemId, mediaItemName, libraryId);
+            sp.GetRequiredService<ITaskQueueManager>().QueueDetectMediaItemPictureArea(mediaItemId, mediaItemName, libraryId);
         }, mediaItemName == null ? MediaLabel(mediaItemId, "Analyze Media Item: {0}") : null, mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueueAnalyzeMediaItemContent), new { mediaItemId, mediaItemName, forceOverride }));
     }
 
@@ -1096,6 +1100,33 @@ public class TaskQueueManager : ITaskQueueManager
         DropPendingItemPreExtractions(libraryId);
     }
 
+    private const string PictureAreaKey = "picture-area";
+    private const string ItemPictureAreaPrefix = "picture-area:item:";
+    private const string LibraryPictureAreaPrefix = "picture-area:library:";
+
+    public void QueueDetectMediaItemPictureArea(Guid mediaItemId, string? mediaItemName = null, Guid? libraryId = null)
+    {
+        if (libraryId is Guid library && IsPending(LibraryPictureAreaPrefix + library)) return;
+
+        Enqueue($"Find Black Bars: {ResolveDisplayName(mediaItemId, mediaItemName)}", async (ct, sp) =>
+        {
+            await sp.GetRequiredService<IPictureAreaManager>().DetectForItemAsync(mediaItemId, ct);
+        }, mediaItemName == null ? MediaLabel(mediaItemId, "Find Black Bars: {0}") : null,
+            resourceKey: PictureAreaKey, dedupeKey: ItemPictureAreaPrefix + mediaItemId, libraryId: libraryId, mediaItemId: mediaItemId,
+            recipe: TaskRecipe.Of(nameof(QueueDetectMediaItemPictureArea), new { mediaItemId, mediaItemName, libraryId }));
+    }
+
+    public void QueueDetectLibraryPictureArea(Guid libraryId, string? libraryName = null)
+    {
+        Enqueue($"Find Black Bars: {ResolveDisplayName(libraryId, libraryName)}", async (ct, sp) =>
+        {
+            await sp.GetRequiredService<IPictureAreaManager>().DetectForLibraryAsync(libraryId, ct);
+        }, libraryName == null ? LibraryLabel(libraryId, "Find Black Bars: {0}") : null,
+            resourceKey: PictureAreaKey, dedupeKey: LibraryPictureAreaPrefix + libraryId, rerunIfRunning: true, libraryId: libraryId,
+            recipe: TaskRecipe.Of(nameof(QueueDetectLibraryPictureArea), new { libraryId, libraryName }));
+        DropPendingItemTasks(ItemPictureAreaPrefix, libraryId);
+    }
+
     private bool IsLibraryWidePreExtractionActive() =>
         _taskStates.Values.Any(t => t.Status != CancellingStatus
             && (t.DedupeKey == BackfillPreExtractionKey || t.DedupeKey?.StartsWith(LibraryPreExtractionPrefix, StringComparison.Ordinal) == true));
@@ -1103,11 +1134,13 @@ public class TaskQueueManager : ITaskQueueManager
     private bool IsPending(string dedupeKey) =>
         _taskStates.Values.Any(t => t.DedupeKey == dedupeKey && t.Status == PendingStatus);
 
-    private void DropPendingItemPreExtractions(Guid? libraryId)
+    private void DropPendingItemPreExtractions(Guid? libraryId) => DropPendingItemTasks(ItemPreExtractionPrefix, libraryId);
+
+    private void DropPendingItemTasks(string itemPrefix, Guid? libraryId)
     {
         var covered = _taskStates.Values
             .Where(t => t.Status == PendingStatus
-                && t.DedupeKey?.StartsWith(ItemPreExtractionPrefix, StringComparison.Ordinal) == true
+                && t.DedupeKey?.StartsWith(itemPrefix, StringComparison.Ordinal) == true
                 && (libraryId == null || t.LibraryId == libraryId))
             .Select(t => t.Id)
             .ToList();
@@ -1419,6 +1452,11 @@ public class TaskQueueManager : ITaskQueueManager
             && (await sp.GetRequiredService<Vora.Application.Settings.ISystemSettingsRepository>().GetSettingsAsync()).PreExtractSubtitlesOnScan)
         {
             sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractLibrarySubtitles(libraryId, libraryName);
+        }
+
+        if (subtitleLibraryType.HasValue && subtitleLibraryType.Value.HasVideoContent())
+        {
+            sp.GetRequiredService<ITaskQueueManager>().QueueDetectLibraryPictureArea(libraryId, libraryName);
         }
 
         progress.Report(null);

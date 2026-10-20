@@ -3,7 +3,7 @@ import type { RefObject } from 'react';
 import { streamingService } from '../../../api/Streaming/streamingService';
 import { loadHls } from '../../../utils/loadHls';
 import { safeMediaUrl } from '../../../utils/safeUrl';
-import { placeCues } from '../../../utils/subtitleCuePlacement';
+import { cuesToMove, placeCues, textCues, WholeVideo, type CueArea, type MovedCue } from '../../../utils/subtitleCuePlacement';
 import {
     EngineEventHub,
     type EngineEventHandler,
@@ -29,6 +29,8 @@ export class WebVideoEngine implements PlaybackEngine {
     private label = '';
     private sideloadedTrack: HTMLTrackElement | null = null;
     private sideloadListeners: AbortController | null = null;
+    private movedCues: MovedCue[] = [];
+    private cueArea: CueArea = WholeVideo;
 
     constructor(videoRef: RefObject<HTMLVideoElement | null>) {
         this.videoRef = videoRef;
@@ -146,7 +148,8 @@ export class WebVideoEngine implements PlaybackEngine {
 
         track.addEventListener('load', () => {
             track.track.mode = 'showing';
-            placeCues(track.track.cues);
+            this.movedCues = cuesToMove(textCues(track.track.cues));
+            placeCues(this.movedCues, this.cueArea);
         }, { once: true, signal: listeners.signal });
         if (track.track) track.track.mode = 'showing';
 
@@ -165,12 +168,18 @@ export class WebVideoEngine implements PlaybackEngine {
     hideTextSubtitle(): void {
         this.sideloadListeners?.abort();
         this.sideloadListeners = null;
+        this.movedCues = [];
 
         const track = this.sideloadedTrack;
         this.sideloadedTrack = null;
         if (!track) return;
         if (track.track) track.track.mode = 'disabled';
         track.remove();
+    }
+
+    placeSubtitles(area: CueArea): void {
+        this.cueArea = area;
+        placeCues(this.movedCues, area);
     }
 
     setChromeState(): void { }

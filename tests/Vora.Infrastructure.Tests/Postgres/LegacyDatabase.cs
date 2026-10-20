@@ -140,9 +140,25 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string UpNextOrderMigration = "20261018072825_ChangesSinceInitial";
 
+    private const string PictureCropColumns = """
+        ALTER TABLE "MediaVideoTracks" ADD COLUMN IF NOT EXISTS "CropTop" integer;
+        ALTER TABLE "MediaVideoTracks" ADD COLUMN IF NOT EXISTS "CropRight" integer;
+        ALTER TABLE "MediaVideoTracks" ADD COLUMN IF NOT EXISTS "CropBottom" integer;
+        ALTER TABLE "MediaVideoTracks" ADD COLUMN IF NOT EXISTS "CropLeft" integer;
+        """;
+
+    public const string ImageSubtitlesMigration = "20261018192130_ChangesSinceInitial";
+
+    private const string ColumnsSinceImageSubtitles = """
+        ALTER TABLE "MediaVideoTracks" DROP COLUMN "CropTop";
+        ALTER TABLE "MediaVideoTracks" DROP COLUMN "CropRight";
+        ALTER TABLE "MediaVideoTracks" DROP COLUMN "CropBottom";
+        ALTER TABLE "MediaVideoTracks" DROP COLUMN "CropLeft";
+        """;
+
     private const string ColumnsSinceUpNextOrder = """
         ALTER TABLE "ClientDevices" DROP COLUMN "RendersImageSubtitles";
-        """;
+        """ + ColumnsSinceImageSubtitles;
 
     private const string ColumnsSinceAutoPlay = """
         ALTER TABLE "UserProfiles" DROP COLUMN "UpNextOrder";
@@ -266,7 +282,7 @@ public sealed class LegacyDatabase : IAsyncDisposable
     public async Task SeedAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
     {
         await using var db = NewContext();
-        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns + ImageSubtitleDeviceColumns, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns + ImageSubtitleDeviceColumns + PictureCropColumns, cancellationToken);
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices + ColumnsSinceVideoDimensions, cancellationToken);
     }
@@ -332,6 +348,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceUpNextOrder, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, UpNextOrderMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildImageSubtitlesStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceImageSubtitles, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, ImageSubtitlesMigration, "10.0.9", cancellationToken);
     }
 
     public async Task BuildHdrTranscodeStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)

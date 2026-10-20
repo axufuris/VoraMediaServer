@@ -534,6 +534,40 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         kept.MaxVideoBitDepth.Should().Be(10);
     }
 
+    [Fact]
+    public async Task A_database_on_the_image_subtitles_migration_only_gains_where_the_picture_sits_in_the_frame()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var library = new MediaLibrary { Id = Guid.NewGuid(), Name = "Movies", Type = LibraryType.Movie, FolderPaths = ["/movies"] };
+        var movie = new Movie { Id = Guid.NewGuid(), Title = "Dune: Part Two", LibraryId = library.Id };
+        var part = new MediaPart { Id = Guid.NewGuid(), FilePath = "/movies/Dune Part Two (2024).mkv", Container = "mkv", MediaItemId = movie.Id };
+        var track = new MediaVideoTrack { Id = Guid.NewGuid(), StreamIndex = 0, Codec = "hevc", Width = 1920, Height = 1080, MediaPartId = part.Id };
+        await legacy.BuildImageSubtitlesStateAsync(async db =>
+        {
+            db.Add(library);
+            db.Add(movie);
+            db.Add(part);
+            db.Add(track);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "MediaVideoTracks", cancellationToken)).Should().NotContain("CropTop");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var kept = await after.MediaVideoTracks.AsNoTracking().SingleAsync(t => t.Id == track.Id, cancellationToken);
+        (kept.CropTop, kept.CropRight, kept.CropBottom, kept.CropLeft).Should().Be((null, null, null, null));
+        (kept.Width, kept.Height).Should().Be((1920, 1080));
+    }
+
     private static Task<List<string>> ColumnsAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = {0}", table)

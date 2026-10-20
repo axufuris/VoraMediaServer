@@ -484,6 +484,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IIptvEpgService, IptvEpgService>();
         services.AddScoped<IIptvPassthroughService, IptvPassthroughService>();
         services.AddScoped<IMediaAnalyzerService, FFmpegAnalyzerService>();
+        services.AddSingleton<Vora.Application.Analysis.IPictureAreaDetector, Vora.Infrastructure.Analysis.FFmpegPictureAreaDetector>();
+        services.AddScoped<Vora.Application.Analysis.IPictureAreaManager, Vora.Application.Analysis.PictureAreaManager>();
         services.AddScoped<IMediaEmbeddingService, MediaEmbeddingService>();
         services.AddScoped<IMediaIngestionService, MediaIngestionService>();
         services.AddScoped<IMetadataFetchService, MetadataFetchService>();
