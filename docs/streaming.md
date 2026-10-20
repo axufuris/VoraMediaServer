@@ -129,7 +129,7 @@ A paused FFmpeg keeps its process and decoder state, so resuming costs nothing, 
 
 Plex throttles this way by default. Jellyfin has the same pause and resume but leaves it off, with a 60-second minimum.
 
-Tests: `TranscodeThrottleTests` (the decision) and `TranscodeThrottlingFileTests`, which runs real jellyfin-ffmpeg: a transcode far ahead pauses and writes nothing, then carries on once the player catches up. It is skipped without jellyfin-ffmpeg on PATH.
+Tests: `TranscodeThrottleTests` (the decision) and `TranscodeThrottlingFileTests`, which runs real jellyfin-ffmpeg: a transcode far ahead pauses and writes nothing, then carries on once the player catches up. It is skipped without jellyfin-ffmpeg on PATH; the PR check installs jellyfin-ffmpeg7, so it runs there.
 
 ## Watch state
 
