@@ -24,14 +24,15 @@ Vora.Desktop/
 ├─ electron.vite.config.ts
 ├─ src/
 │  ├─ main/                  index.ts, windowManager.ts, serverStore.ts, certTrust.ts,
-│  │                         mpvHost.ts, mpvIpc.ts, mpvDiscovery.ts, capabilities.ts,
-│  │                         spriteDecoder.ts, desktopSettings.ts, updater.ts, logger.ts
+│  │                         mpvHost.ts, mpvIpc.ts, mpvDiscovery.ts, mpvConfig.ts,
+│  │                         mpvPlayback.ts, mpvTracks.ts, capabilities.ts, spriteDecoder.ts,
+│  │                         desktopSettings.ts, updater.ts, logger.ts
 │  ├─ preload/index.ts       contextBridge → window.voraDesktop
 │  ├─ shared/bridge.ts       copy of Vora.Web/src/desktop/desktopBridge.ts (CI-diffed)
 │  ├─ pages/                 connect.html + error.html (local, bundled, themed)
 │  └─ player/                vora.lua, mpv.conf, input.conf, fonts/
 ├─ resources/                icons (prod + QA variants), linux .desktop template
-├─ scripts/fetch-mpv-windows.ts   downloads the pinned mpv build for packaging
+├─ scripts/                  mpv-windows.json (the pin) + fetch-mpv-windows.mts (npm run fetch-mpv)
 └─ .github/workflows/        pr.yml, qa.yml, release.yml (doc 05)
 ```
 
@@ -102,35 +103,39 @@ The renderer runs code served by a network server, so lock it down:
   On Linux keep the menu bar hidden (Alt shows it); on Windows the same.
 - Linux: Electron 38.2 and later pick Wayland where it's available and X11 otherwise
   by default, so no ozone switch is set.
-- When playback starts, hide the main window; restore and focus it when mpv closes.
-  If mpv crashes, restore the window and emit a `player-error` event so the renderer
-  can offer the web-player fallback.
+- When mpv loads the first file of a run, hide the main window; restore and focus it
+  when mpv exits. If mpv dies on its own, the page gets an `error` event ("stopped
+  before the video started" or "stopped unexpectedly") and then `closed`, and offers
+  the web-player fallback. A user quitting mpv (`q`) gives only `closed`, which the web
+  client treats as Back.
 
 ## mpv discovery (`mpvDiscovery.ts`)
 
 | Platform | Where mpv comes from | Minimum |
 | --- | --- | --- |
 | Windows | **Bundled** in the installer under `resources/mpv/` (pinned build, see doc 05) | Whatever we pin |
-| Linux | **System mpv** from the user's package manager (`mpv` on `PATH`, plus `/usr/bin/mpv`, `/usr/local/bin/mpv`). The .deb/.rpm declare it as a dependency; the AppImage cannot | **0.38+** to play; recommend the newest the distro has — HDR output on Wayland needs a recent mpv + compositor, so check the mpv release notes for the version that added Wayland colour-management and state it in the banner text |
+| Linux | **System mpv** from the user's package manager (`mpv` on `PATH`, plus `/usr/bin/mpv`, `/usr/local/bin/mpv`). The .deb/.rpm declare it as a dependency; the AppImage cannot | **0.37+** (`MINIMUM_MPV`), so Ubuntu 24.04 LTS's mpv plays; nothing the shell sends needs newer (it sets `start` instead of using `loadfile`'s 0.38 index argument), and CI plays a file in that version. Recommend the newest the distro has — HDR output on Wayland needs a recent mpv + compositor |
 
-- Parse `mpv --version`. Also require a Lua-enabled build (`mpv --script-opts=` with a
-  tiny probe script, or check `--version` features) and the `gpu-next` VO
-  (`mpv --vo=help`).
+- Parse `mpv --no-config --version`. Also require Lua (a probe script that logs a
+  marker and quits, run with `--script=`) and the `gpu-next` VO (`--vo=help`). Each
+  check is a short process (about 80 ms); they run in parallel at startup, and the
+  server page loads after them so the page never sees a passing "missing" state.
 - Result → `bridge.mpv = { available, version, reason }`. When unavailable, `reason` is
-  a user-facing sentence with the right install command for the detected distro
-  family (`/etc/os-release` `ID` / `ID_LIKE`: debian/ubuntu → `sudo apt install mpv`,
-  fedora → `sudo dnf install mpv`, arch → `sudo pacman -S mpv`, opensuse → `sudo zypper
-  install mpv`, otherwise "install mpv from your distribution").
-- Re-run discovery when the window regains focus after the banner was shown, so
-  installing mpv doesn't need an app restart, and send a change through
+  the whole explanation the banner shows: missing ("…needs mpv, which isn't installed.
+  Install it with `sudo apt install mpv`.", the command from `/etc/os-release` `ID` /
+  `ID_LIKE`: debian/ubuntu → apt, fedora/rhel → dnf, arch → pacman, opensuse → zypper,
+  otherwise "Install mpv from your distribution."), too old, no Lua, or no gpu-next.
+- Re-run discovery when the window regains focus while mpv is unavailable (at most
+  every 5 s), so installing mpv doesn't need an app restart, and send a change through
   `onMpvChanged` (the page's `bridge.mpv` is a copy taken at load).
 
 ## Capabilities (`capabilities.ts`)
 
 `bridge.capabilities()` returns the codec/container lists the web profile reports
 (doc 02 D). Derive them from the actual mpv binary rather than hard-coding: run
-`mpv --vd=help` and `mpv --ad=help` once at startup, intersect with the list Vora's
-decision manager knows, cache per mpv version. Containers: mpv/FFmpeg demux all the
+`mpv --vd=help` and `mpv --ad=help` during discovery (a line `dca (dts) - …` is a
+decoder for the codec in brackets), intersect with the list Vora's decision manager
+knows, and keep the result with the binary. Containers: mpv/FFmpeg demux all the
 listed ones; hard-code them. `maxAudioChannels: 8`.
 
 ## Desktop settings (`desktopSettings.ts`)
@@ -155,8 +160,8 @@ comment explaining it. `settings.openAdvancedFolder()` opens it with `shell.open
   `dev`, `build`, `test`, `lint`, `typecheck`, `package:win`, `package:linux`.
 - `npm run dev` with `VORA_DESKTOP_DEV_URL=http://localhost:5173` loads the Vite dev
   server of Vora.Web (API in Docker as usual), so web + shell changes hot-reload together.
-- On Windows dev machines, `scripts/fetch-mpv-windows.ts` populates `resources/mpv/`
-  (git-ignored) so dev playback uses the same mpv as the installer.
+- On Windows dev machines, `npm run fetch-mpv` populates `resources/mpv/` (git-ignored)
+  so dev playback uses the same mpv as the installer.
 - In a VS Code terminal, unset `ELECTRON_RUN_AS_NODE` first: VS Code sets it for its
   own processes, and with it Electron starts as plain Node.
 - Linux testing: the Linux machine installs the QA AppImage/deb from GitHub (doc 05).

@@ -30,7 +30,7 @@ export default function MpvMissingBanner() {
             <div className="min-w-0">
                 <h2 className="font-semibold text-[var(--vora-text-primary)]">Videos play in the built-in player</h2>
                 <p className="text-sm text-[var(--vora-text-secondary)]">
-                    The Vora player needs mpv, which isn't installed. {desktop.mpv.reason ?? 'Install mpv from your distribution.'} Once it is, videos open in the Vora player with no restart.
+                    {desktop.mpv.reason ?? "The Vora player needs mpv, which isn't installed. Install mpv from your distribution."} Once mpv is ready, videos open in the Vora player with no restart.
                 </p>
             </div>
             <button type="button" onClick={dismiss} className="vora-button-secondary cursor-pointer">Dismiss</button>

@@ -23,7 +23,7 @@ Vora default `mpv.conf` (the CLI should verify each option against the pinned mp
 `--list-options` and drop/rename any that changed):
 
 ```
-# chrome
+# chrome (also osd-on-seek=no, osd-font=Inter, cursor-autohide=3000)
 osc=no
 osd-bar=no
 input-default-bindings=no
@@ -66,14 +66,14 @@ Observe: `time-pos`, `duration`, `pause`, `paused-for-cache`, `core-idle`,
 
 Forward to the renderer as `PlayerEvent`s: `time` (throttled to 4/s), `paused`,
 `buffering`, `ended` (`eof-reached` true), `error` (`end-file` reason `error`, or the
-process dying before `file-loaded`), `intent`, `info` (video/audio params for the Info
-panel). mpv process exit → `closed`.
+process dying on its own), `intent`, `info` (video/audio params for the Info
+panel). mpv process exit → `closed`. Track and `sub-add` commands wait for `file-loaded`.
 
 Commands main issues for the renderer:
 
 | Bridge command | mpv |
 | --- | --- |
-| `open` / `load-next` | `loadfile <url> replace -1 start=<seconds>` (+ `set_property force-media-title <title>`) |
+| `open` / `load-next` | `set_property force-media-title <title>`, `set_property start <seconds>`, `loadfile <url> replace` (no 0.38-only index argument) |
 | `play` / `pause` | `set_property pause false/true` |
 | `seek` | `seek <seconds> absolute+exact` (relative: `seek <delta> relative`) |
 | `tracks` (local switch) | `set_property aid/sid <mpv id>` — see mapping below |
@@ -103,16 +103,16 @@ mid-play, audio and embedded subtitle tracks carry it as `embeddedPosition`.
 
 ## The chrome (`src/player/vora/*.lua`)
 
-A directory script: `main.lua` plus modules (`state.lua`, `layout.lua`, `draw.lua`,
-`input.lua`, `scrub.lua`, `panels.lua`, `icons.lua`). Lua is **render + input only**.
+A directory script: `main.lua` (state, input, focus, timers), `view.lua` (layout, hit
+areas, focus rows), `draw.lua` (ASS drawing), `icons.lua`. Lua is **render + input only**.
 
 - Draw with `mp.create_osd_overlay('ass-events')` (rounded rects, text, icons as ASS
-  vector paths). Generate `icons.lua` at build time from the same SVG icons Vora.Web
-  uses (`scripts/build-icons.ts` converts SVG paths to ASS `\p1` drawings) so the icon set
-  matches.
+  vector paths). `icons.lua` is generated (`npm run build-icons`, `scripts/svgToAss.ts`) from
+  copies of Vora.Web's player SVGs in `src/player/icons/`; strokes are traced there and back
+  and drawn as an ASS border of half the stroke width. A test fails when it is stale.
 - Images (scrub thumbnails) via `overlay-add`: main decodes the sprite the renderer
-  sends (`ScrubSpriteSpec.image`) once with `nativeImage` to raw BGRA in
-  `userData/tmp/sprite-<sessionId>.bgra`; Lua shows a cell
+  sends (`ScrubSpriteSpec.image`) once with `nativeImage` to raw BGRA, padded by one row
+  (mpv maps `stride × h` from the cell's offset), in `userData/tmp/`; Lua shows a cell
   with `overlay-add <id> <x> <y> <file> <offset> bgra <w> <h> <stride>`, where `offset`
   selects the cell inside the single sprite file. Thumbnails are server-generated —
   never generate them client-side.
@@ -123,11 +123,11 @@ A directory script: `main.lua` plus modules (`state.lua`, `layout.lua`, `draw.lu
   `mp.commandv('script-message', 'vora-intent', json)`.
 - Theming: `PlayerChromeState.theme` carries hex colours the renderer reads from the
   active template's CSS tokens (`--vora-accent-500`, `--vora-bg-raised`, text tokens), so
-  seasonal templates reach the player too. Font: bundle the web client's UI font in
-  `player/fonts/` and point `osd-font` at it (check Vora.Web for the font in use).
-- HDR: the chrome is drawn inside mpv's HDR output. Check that white UI isn't blinding
-  on an HDR display; if mpv offers an OSD/subtitle HDR peak option on the pinned
-  version use it, otherwise cap chrome whites around 80%.
+  seasonal templates reach the player too. Font: Inter 4.1 (the web client's
+  `--vora-font-sans`, SIL OFL), copied into the runtime config's `fonts/` before each start.
+- HDR: the chrome is drawn inside mpv's HDR output, so its text colours are capped at
+  80% while `video-out-params` says `pq` or `hlg`. It runs on mpv 0.37, which CI checks;
+  `format_json` returns a second value there, so take one value from such calls.
 
 ```ts
 interface PlayerChromeState {
