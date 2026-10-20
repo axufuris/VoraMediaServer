@@ -35,6 +35,7 @@ jobs:
     env:
       VORA_TEST_POSTGRES: Host=localhost;Port=5432;Username=postgres;Password=postgres
       SixLaborsLicenseKey: ${{ secrets.SIXLABORS_LICENSE_KEY }}
+      BUILD_CONFIGURATION: ${{ secrets.SIXLABORS_LICENSE_KEY != '' && 'Release' || 'Debug' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -46,10 +47,14 @@ jobs:
       - name: Restore
         run: dotnet restore Vora.slnx
 
+      - name: Note a pull request without the licence
+        if: env.BUILD_CONFIGURATION == 'Debug'
+        run: echo "::notice::This pull request comes from a fork, which GitHub gives no secrets, so it is built and tested in Debug, where a missing Six Labors licence is only a warning. main is still tested in Release after the merge."
+
       # Build separately from test so a compile failure reads as a compile
       # failure in the log rather than as a test run that never started.
       - name: Build
-        run: dotnet build Vora.slnx --no-restore --configuration Release
+        run: dotnet build Vora.slnx --no-restore --configuration "$BUILD_CONFIGURATION"
 
       # Tests that start a real encode, like the GPU-failure retry, skip
       # without FFmpeg on PATH.
@@ -57,7 +62,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
       - name: Test
-        run: dotnet test Vora.slnx --no-restore --configuration Release --verbosity minimal
+        run: dotnet test Vora.slnx --no-restore --configuration "$BUILD_CONFIGURATION" --verbosity minimal
 
   web:
     name: Web
