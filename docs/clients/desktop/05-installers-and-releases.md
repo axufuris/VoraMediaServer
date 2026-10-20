@@ -1,4 +1,4 @@
-# 05 — Installers, signing, auto-update, QA + prod releases
+# 05 — Installers, auto-update, QA + prod releases
 
 Releases live on **`axufuris/Vora.Desktop` → GitHub Releases** (public repo, so anyone
 can download). The flow mirrors the server's: **QA on every push to `main`**, **Prod on
@@ -59,25 +59,24 @@ Linux notes the CLI must verify and document in the release notes template:
 - Licensing: mpv is GPL-2.0+ (FFmpeg components LGPL/GPL); Vora is AGPL-3.0. The zip
   has no licence files, so fetch mpv's `LICENSE.GPL`, `LICENSE.LGPL` and `Copyright`
   from the same tag, and ship them with a `THIRD-PARTY-NOTICES.md` naming the exact upstream
-  release/commit with a link to its source. Flag anything unclear to Andy rather than
-  guessing; this is not legal advice.
+  release/commit with a link to its source. The same file names the Inter font, Electron
+  and the npm packages inside `app.asar` (electron-updater and its dependencies) with
+  their licences. Flag anything unclear to Andy rather than guessing; this is not legal
+  advice.
 - Updating mpv = change the pin in a PR; QA tests it like any other change.
 
-## Windows code signing
+## Unsigned installers
 
-Unsigned installers trigger SmartScreen ("Windows protected your PC").
+Nothing is signed. Andy decided against paying for a certificate (Azure Artifact Signing,
+the cheapest, is about US$9.99 a month). Publish `SHA256SUMS.txt` with every release.
 
-- Use **Azure Artifact Signing** (formerly Trusted Signing) through electron-builder's
-  `win.azureSignOptions`. October 2026: Basic is about US$9.99/month for 5,000 signatures;
-  individual public trust is US and Canada only (billing account of type Individual,
-  matching a government ID, 1–20 business days); new individual sign-ups are reported
-  paused. Details and setup steps are in `Vora.Desktop/.github/RELEASING.md`.
-- Secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, plus the
-  endpoint, account name, certificate profile and publisher name as repo **variables**.
-- **Prod fails** if signing isn't configured. **QA signs if configured**, otherwise
-  builds unsigned with a `::warning::`.
-- Linux isn't signed. Publish `SHA256SUMS.txt` (GPG-signed checksums are a later
-  follow-up).
+- Windows: SmartScreen shows "Windows protected your PC" on the first install
+  (**More info → Run anyway**), and Edge or Chrome may say the file isn't commonly
+  downloaded. The Vora.Desktop README and the release notes say so.
+- Updates still install on their own: electron-updater checks each download against the
+  SHA-512 in `latest.yml`, and with no publisher in `app-update.yml` there is no signature
+  to check.
+- Linux isn't signed either (GPG-signed checksums are a later follow-up).
 
 ## Auto-update (`updater.ts`)
 
@@ -125,7 +124,7 @@ Unsigned installers trigger SmartScreen ("Windows protected your PC").
 1. Skip if `github.event.release.prerelease` or the tag contains `-qa.`.
 2. Check out the tag; fail if it doesn't match `package.json`.
 3. Test job.
-4. Build matrix with `VORA_CHANNEL=prod`, signing on, `--publish never`.
+4. Build matrix with `VORA_CHANNEL=prod`, `--publish never`.
 5. `SHA256SUMS.txt`, then `gh release upload <tag> <files> --clobber`.
 
 Why `--publish never` + `gh`: electron-builder won't upload to a release that's already
@@ -141,8 +140,6 @@ obvious (YAML comments are fine; the no-comments rule is for C#).
 | Name | Kind | Used by |
 | --- | --- | --- |
 | `GITHUB_TOKEN` | built-in | creating/uploading releases |
-| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | secret | Windows signing |
-| `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT`, `AZURE_SIGNING_PROFILE` | variable | Windows signing |
 | `VORA_SERVER_READ_TOKEN` | secret, only if VoraMediaServer is private | bridge contract check |
 
 Write `Vora.Desktop/.github/RELEASING.md` covering these and the checklist below, the
