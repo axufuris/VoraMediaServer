@@ -27,6 +27,19 @@ public class StreamFactsReadingTests
     }
 
     [Theory]
+    [InlineData("""{ "index": 0, "codec_type": "video", "tags": { "BPS": "23986068" } }""", 3_706_601L, null)]
+    [InlineData("""{ "index": 0, "codec_type": "video", "tags": { "BPS-eng": "29800000" } }""", 35_000_000L, 29_800_000L)]
+    [InlineData("""{ "index": 0, "codec_type": "video", "bit_rate": "9759000" }""", 11_167_000L, 9_759_000L)]
+    [InlineData("""{ "index": 0, "codec_type": "video", "tags": { "BPS": "8000000" } }""", null, 8_000_000L)]
+    [InlineData("""{ "index": 0, "codec_type": "video" }""", 11_167_000L, null)]
+    public void A_video_bitrate_is_kept_only_when_it_fits_inside_the_whole_file(string stream, long? fileBitrate, long? expected)
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(stream);
+
+        FFmpegAnalyzerService.VideoTrackBitrate(document.RootElement, fileBitrate).Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("not json")]

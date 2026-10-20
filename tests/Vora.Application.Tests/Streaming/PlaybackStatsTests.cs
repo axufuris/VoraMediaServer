@@ -56,6 +56,32 @@ public class PlaybackStatsTests
     private static readonly TranscodeStatusDto Nvenc = new("h264_nvenc", "NVIDIA NVENC", "NVIDIA NVDEC", 6800, 8000, "hable (GPU, CUDA)", "aac", 2, 192, 96, 4.01, true, false, false);
 
     [Fact]
+    public void A_video_bitrate_above_the_whole_files_is_not_shown()
+    {
+        _video.Bitrate = null;
+        IReadOnlyList<MediaStreamFacts> staleTag = [new(0, "video", "hevc", "Main 10", 153, null, null, 23_986_068)];
+
+        var stats = PlaybackStats.Build(Transcoding(), Part(), staleTag, Nvenc);
+
+        stats.Video?.BitrateKbps.Should().BeNull();
+        stats.SourceBitrateKbps.Should().Be(18_500);
+    }
+
+    [Fact]
+    public void A_session_whose_video_track_is_gone_describes_the_video_not_the_cover_image()
+    {
+        var part = Part();
+        part.VideoTracks = [new MediaVideoTrack { StreamIndex = 2, Codec = "mjpeg", Width = 600, Height = 900 }, _video];
+        var session = Transcoding();
+        session.VideoTrackId = Guid.NewGuid();
+
+        var stats = PlaybackStats.Build(session, part, Facts, Nvenc);
+
+        stats.Video?.Codec.Should().Be("hevc");
+        stats.Video?.Width.Should().Be(3840);
+    }
+
+    [Fact]
     public void Describes_the_source_beside_what_the_viewer_gets()
     {
         var stats = PlaybackStats.Build(Transcoding(), Part(), Facts, Nvenc);
